@@ -46,13 +46,7 @@ impl ArrayRepository {
             "initialize failed to initialize the packages array"
         );
 
-        self.packages
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|p| p.clone())
-            .collect()
+        self.packages.borrow().as_ref().unwrap().to_vec()
     }
 
     /// @param array<PackageInterface> $packages
@@ -295,8 +289,8 @@ impl RepositoryInterface for ArrayRepository {
         };
 
         for package in self.get_packages_internal() {
-            if name == package.get_name() {
-                if constraint.is_none()
+            if name == package.get_name()
+                && (constraint.is_none()
                     || constraint.as_ref().unwrap().matches(
                         &SimpleConstraint::new(
                             "==".to_string(),
@@ -304,10 +298,9 @@ impl RepositoryInterface for ArrayRepository {
                             None,
                         )
                         .into(),
-                    )
-                {
-                    packages.push(package);
-                }
+                    ))
+            {
+                packages.push(package);
             }
         }
 
@@ -340,10 +333,10 @@ impl RepositoryInterface for ArrayRepository {
             if matches.contains_key(&name) {
                 continue;
             }
-            if let Some(t) = &r#type {
-                if package.get_type() != *t {
-                    continue;
-                }
+            if let Some(t) = &r#type
+                && package.get_type() != *t
+            {
+                continue;
             }
 
             let complete = package.as_complete();

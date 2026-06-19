@@ -69,6 +69,12 @@ pub struct ShowCommand {
     repository_set: Option<std::rc::Rc<std::cell::RefCell<RepositorySet>>>,
 }
 
+impl Default for ShowCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ShowCommand {
     pub fn new() -> Self {
         let mut command = ShowCommand {
@@ -283,9 +289,7 @@ impl Command for ShowCommand {
                         .get_repository_manager()
                         .borrow()
                         .get_repositories()
-                        .iter()
-                        .map(|r| r.clone())
-                        .collect(),
+                        .to_vec(),
                 ));
                 ir.add_repository(
                     composer
@@ -512,28 +516,30 @@ impl Command for ShowCommand {
         // show single package or single version
         if let Some(ref pkg) = single_package {
             versions_map.insert(pkg.get_pretty_version(), pkg.get_version());
-        } else if let Some(ref pf) = package_filter {
-            if !pf.contains('*') {
-                let (matched_package, vers) = self.get_package(
-                    &*installed_repo.borrow(),
-                    &repos,
-                    pf,
-                    input.borrow().get_argument("version")?,
-                )?;
+        } else if let Some(ref pf) = package_filter
+            && !pf.contains('*')
+        {
+            let (matched_package, vers) = self.get_package(
+                &*installed_repo.borrow(),
+                &repos,
+                pf,
+                input.borrow().get_argument("version")?,
+            )?;
 
-                if let Some(ref pkg) = matched_package {
-                    if input.borrow().get_option("direct")?.as_bool() == Some(true) {
-                        if !in_array(
-                            PhpMixed::String(pkg.get_name()),
-                            &PhpMixed::List(
-                                self.get_root_requires()
-                                    .into_iter()
-                                    .map(|s| Box::new(PhpMixed::String(s)))
-                                    .collect(),
-                            ),
-                            true,
-                        ) {
-                            return Err(InvalidArgumentException {
+            if let Some(ref pkg) = matched_package
+                && input.borrow().get_option("direct")?.as_bool() == Some(true)
+                && !in_array(
+                    PhpMixed::String(pkg.get_name()),
+                    &PhpMixed::List(
+                        self.get_root_requires()
+                            .into_iter()
+                            .map(|s| Box::new(PhpMixed::String(s)))
+                            .collect(),
+                    ),
+                    true,
+                )
+            {
+                return Err(InvalidArgumentException {
                                 message: format!(
                                     "Package \"{}\" is installed but not a direct dependent of the root package.",
                                     pkg.get_name()
@@ -541,47 +547,42 @@ impl Command for ShowCommand {
                                 code: 0,
                             }
                             .into());
-                        }
-                    }
-                }
-
-                if matched_package.is_none() {
-                    let options = input.borrow().get_options();
-                    let mut hint = String::new();
-                    if input.borrow().get_option("locked")?.as_bool() == Some(true) {
-                        hint.push_str(" in lock file");
-                    }
-                    if options.contains_key("working-dir") {
-                        hint.push_str(&format!(
-                            " in {}/composer.json",
-                            options
-                                .get("working-dir")
-                                .and_then(|v| v.as_string())
-                                .unwrap_or("")
-                        ));
-                    }
-                    if PlatformRepository::is_platform_package(pf)
-                        && input.borrow().get_option("platform")?.as_bool() != Some(true)
-                    {
-                        hint.push_str(", try using --platform (-p) to show platform packages");
-                    }
-                    if input.borrow().get_option("all")?.as_bool() != Some(true)
-                        && input.borrow().get_option("available")?.as_bool() != Some(true)
-                    {
-                        hint.push_str(
-                            ", try using --available (-a) to show all available packages",
-                        );
-                    }
-
-                    return Err(InvalidArgumentException {
-                        message: format!("Package \"{}\" not found{}.", pf, hint),
-                        code: 0,
-                    }
-                    .into());
-                }
-                single_package = matched_package;
-                versions_map = vers;
             }
+
+            if matched_package.is_none() {
+                let options = input.borrow().get_options();
+                let mut hint = String::new();
+                if input.borrow().get_option("locked")?.as_bool() == Some(true) {
+                    hint.push_str(" in lock file");
+                }
+                if options.contains_key("working-dir") {
+                    hint.push_str(&format!(
+                        " in {}/composer.json",
+                        options
+                            .get("working-dir")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
+                    ));
+                }
+                if PlatformRepository::is_platform_package(pf)
+                    && input.borrow().get_option("platform")?.as_bool() != Some(true)
+                {
+                    hint.push_str(", try using --platform (-p) to show platform packages");
+                }
+                if input.borrow().get_option("all")?.as_bool() != Some(true)
+                    && input.borrow().get_option("available")?.as_bool() != Some(true)
+                {
+                    hint.push_str(", try using --available (-a) to show all available packages");
+                }
+
+                return Err(InvalidArgumentException {
+                    message: format!("Package \"{}\" not found{}.", pf, hint),
+                    code: 0,
+                }
+                .into());
+            }
+            single_package = matched_package;
+            versions_map = vers;
         }
 
         if let Some(ref package) = single_package {
@@ -653,7 +654,7 @@ impl Command for ShowCommand {
                     .as_ref()
                     .unwrap()
                     .as_complete()
-                    .map_or(true, |c| !c.is_abandoned()))
+                    .is_none_or(|c| !c.is_abandoned()))
             {
                 exit_code = 1;
             }
@@ -669,7 +670,7 @@ impl Command for ShowCommand {
                 };
                 if let Some(path) = path {
                     let real = realpath(&path).unwrap_or_default();
-                    let trimmed = real.split(|c| c == '\r' || c == '\n').next().unwrap_or("");
+                    let trimmed = real.split(['\r', '\n']).next().unwrap_or("");
                     self.get_io().write(&format!(" {}", trimmed));
                 } else {
                     self.get_io().write(" null");
@@ -776,7 +777,7 @@ impl Command for ShowCommand {
                 "platform"
             } else if locked_repo
                 .as_ref()
-                .map_or(false, |lr| Self::same_repository(&repo, lr))
+                .is_some_and(|lr| Self::same_repository(&repo, lr))
             {
                 "locked"
             } else if Self::same_repository(&repo, &installed_repo)
@@ -784,9 +785,7 @@ impl Command for ShowCommand {
                     .borrow()
                     .as_any()
                     .downcast_ref::<InstalledRepository>()
-                    .map_or(false, |ir| {
-                        ir.get_repositories().iter().any(|r| r.ptr_eq(&repo))
-                    })
+                    .is_some_and(|ir| ir.get_repositories().iter().any(|r| r.ptr_eq(&repo)))
             {
                 "installed"
             } else {
@@ -800,7 +799,7 @@ impl Command for ShowCommand {
                 for name in names {
                     packages
                         .entry(type_owned.clone())
-                        .or_insert_with(IndexMap::new)
+                        .or_default()
                         .insert(name.clone(), PackageOrName::Name(name));
                 }
             } else {
@@ -816,7 +815,7 @@ impl Command for ShowCommand {
                         }
                     };
                     if need_replace {
-                        let mut p: crate::package::PackageInterfaceHandle = package.clone().into();
+                        let mut p: crate::package::PackageInterfaceHandle = package.clone();
                         while let Some(alias) = p.as_alias() {
                             p = alias.get_alias_of().into();
                         }
@@ -840,7 +839,7 @@ impl Command for ShowCommand {
                             if matches_list {
                                 packages
                                     .entry(type_owned.clone())
-                                    .or_insert_with(IndexMap::new)
+                                    .or_default()
                                     .insert(p.get_name(), PackageOrName::Pkg(p));
                             }
                         }
@@ -850,7 +849,7 @@ impl Command for ShowCommand {
                     for (name, p) in platform_repo.borrow().get_disabled_packages() {
                         packages
                             .entry(type_owned.clone())
-                            .or_insert_with(IndexMap::new)
+                            .or_default()
                             .insert(name.clone(), PackageOrName::Pkg(p.clone().into()));
                     }
                 }
@@ -869,7 +868,7 @@ impl Command for ShowCommand {
                 .as_list()
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| strtolower(s)))
+                        .filter_map(|v| v.as_string().map(strtolower))
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default(),
@@ -902,24 +901,23 @@ impl Command for ShowCommand {
 
                 if show_latest && *show_version {
                     for package_or_name in type_packages.values() {
-                        if let PackageOrName::Pkg(package) = package_or_name {
-                            if !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())
-                            {
-                                let latest = self.find_latest_package(
-                                    package.clone(),
-                                    composer.as_ref().unwrap(),
-                                    &platform_repo,
-                                    show_major_only,
-                                    show_minor_only,
-                                    show_patch_only,
-                                    platform_req_filter.clone(),
-                                )?;
-                                if latest.is_none() {
-                                    continue;
-                                }
-
-                                latest_packages.insert(package.get_pretty_name(), latest.unwrap());
+                        if let PackageOrName::Pkg(package) = package_or_name
+                            && !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())
+                        {
+                            let latest = self.find_latest_package(
+                                package.clone(),
+                                composer.as_ref().unwrap(),
+                                &platform_repo,
+                                show_major_only,
+                                show_minor_only,
+                                show_patch_only,
+                                platform_req_filter.clone(),
+                            )?;
+                            if latest.is_none() {
+                                continue;
                             }
+
+                            latest_packages.insert(package.get_pretty_name(), latest.unwrap());
                         }
                     }
                 }
@@ -967,7 +965,7 @@ impl Command for ShowCommand {
                             ) == package.get_full_pretty_version(
                                 true,
                                 crate::package::DisplayMode::SourceRefIfDev,
-                            ) && latest.as_complete().map_or(true, |c| !c.is_abandoned())
+                            ) && latest.as_complete().is_none_or(|c| !c.is_abandoned())
                         } else {
                             false
                         };
@@ -1065,8 +1063,7 @@ impl Command for ShowCommand {
                                 );
                             }
                         }
-                        if write_latest && latest_package.is_some() {
-                            let latest = latest_package.unwrap();
+                        if write_latest && let Some(latest) = latest_package {
                             let mut latest_version_str = latest.get_full_pretty_version(
                                 true,
                                 crate::package::DisplayMode::SourceRefIfDev,
@@ -1107,13 +1104,11 @@ impl Command for ShowCommand {
                             );
                             latest_length = latest_length.max("[none matched]".len());
                         }
-                        if write_description {
-                            if let Some(c) = package.as_complete() {
-                                package_view_data.insert(
-                                    "description".to_string(),
-                                    PhpMixed::String(c.get_description().unwrap_or_default()),
-                                );
-                            }
+                        if write_description && let Some(c) = package.as_complete() {
+                            package_view_data.insert(
+                                "description".to_string(),
+                                PhpMixed::String(c.get_description().unwrap_or_default()),
+                            );
                         }
                         if write_path {
                             let installation_manager = composer
@@ -1126,8 +1121,7 @@ impl Command for ShowCommand {
                                 .get_install_path(package.clone());
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
-                                let trimmed =
-                                    r.split(|c| c == '\r' || c == '\n').next().unwrap_or("");
+                                let trimmed = r.split(['\r', '\n']).next().unwrap_or("");
                                 package_view_data.insert(
                                     "path".to_string(),
                                     PhpMixed::String(trimmed.to_string()),
@@ -1138,31 +1132,27 @@ impl Command for ShowCommand {
                         }
 
                         let mut package_is_abandoned: PhpMixed = PhpMixed::Bool(false);
-                        if let Some(latest) = latest_package {
-                            if let Some(c) = latest.as_complete() {
-                                if c.is_abandoned() {
-                                    let replacement_package_name = c.get_replacement_package();
-                                    let replacement = if let Some(ref rp) = replacement_package_name
-                                    {
-                                        format!("Use {} instead", rp)
-                                    } else {
-                                        "No replacement was suggested".to_string()
-                                    };
-                                    let package_warning = format!(
-                                        "Package {} is abandoned, you should avoid using it. {}.",
-                                        package.get_pretty_name(),
-                                        replacement
-                                    );
-                                    package_view_data.insert(
-                                        "warning".to_string(),
-                                        PhpMixed::String(package_warning),
-                                    );
-                                    package_is_abandoned = match replacement_package_name {
-                                        Some(rp) => PhpMixed::String(rp),
-                                        None => PhpMixed::Bool(true),
-                                    };
-                                }
-                            }
+                        if let Some(latest) = latest_package
+                            && let Some(c) = latest.as_complete()
+                            && c.is_abandoned()
+                        {
+                            let replacement_package_name = c.get_replacement_package();
+                            let replacement = if let Some(ref rp) = replacement_package_name {
+                                format!("Use {} instead", rp)
+                            } else {
+                                "No replacement was suggested".to_string()
+                            };
+                            let package_warning = format!(
+                                "Package {} is abandoned, you should avoid using it. {}.",
+                                package.get_pretty_name(),
+                                replacement
+                            );
+                            package_view_data
+                                .insert("warning".to_string(), PhpMixed::String(package_warning));
+                            package_is_abandoned = match replacement_package_name {
+                                Some(rp) => PhpMixed::String(rp),
+                                None => PhpMixed::Bool(true),
+                            };
                         }
 
                         package_view_data.insert("abandoned".to_string(), package_is_abandoned);
@@ -1390,6 +1380,7 @@ impl BaseCommand for ShowCommand {
 impl ShowCommand {
     // TODO(cli-completion): pub fn suggest_package_based_on_mode(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String>>
 
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn print_packages(
         &mut self,
         packages: &[IndexMap<String, PhpMixed>],
@@ -1445,91 +1436,90 @@ impl ShowCommand {
                 let width_pad = if pad_name { name_length } else { 0 };
                 io.write_no_newline(&format!("{}{:<width$}", indent, name, width = width_pad));
             }
-            if let Some(version) = package.get("version").and_then(|v| v.as_string()) {
-                if write_version {
-                    let width_pad = if pad_version { version_length } else { 0 };
-                    io.write_no_newline(&format!(" {:<width$}", version, width = width_pad));
-                }
+            if let Some(version) = package.get("version").and_then(|v| v.as_string())
+                && write_version
+            {
+                let width_pad = if pad_version { version_length } else { 0 };
+                io.write_no_newline(&format!(" {:<width$}", version, width = width_pad));
             }
             if let (Some(latest_version), Some(update_status)) = (
                 package.get("latest").and_then(|v| v.as_string()),
                 package.get("latest-status").and_then(|v| v.as_string()),
-            ) {
-                if write_latest {
-                    let mut latest_version = latest_version.to_string();
-                    let style = Self::update_status_to_version_style(update_status);
-                    if !io.is_decorated() {
-                        let marker = update_status
-                            .replace("up-to-date", "=")
-                            .replace("semver-safe-update", "!")
-                            .replace("update-possible", "~");
-                        latest_version = format!("{} {}", marker, latest_version);
-                    }
-                    let width_pad = if pad_latest { latest_length } else { 0 };
-                    io.write_no_newline(&format!(
-                        " <{}>{:<width$}</{}>",
-                        style,
-                        latest_version,
-                        style,
-                        width = width_pad
-                    ));
-                    if write_release_date {
-                        if let Some(age) = package.get("release-age").and_then(|v| v.as_string()) {
-                            let width_pad = if pad_release_date {
-                                release_date_length
-                            } else {
-                                0
-                            };
-                            io.write_no_newline(&format!(" {:<width$}", age, width = width_pad));
-                        }
-                    }
+            ) && write_latest
+            {
+                let mut latest_version = latest_version.to_string();
+                let style = Self::update_status_to_version_style(update_status);
+                if !io.is_decorated() {
+                    let marker = update_status
+                        .replace("up-to-date", "=")
+                        .replace("semver-safe-update", "!")
+                        .replace("update-possible", "~");
+                    latest_version = format!("{} {}", marker, latest_version);
+                }
+                let width_pad = if pad_latest { latest_length } else { 0 };
+                io.write_no_newline(&format!(
+                    " <{}>{:<width$}</{}>",
+                    style,
+                    latest_version,
+                    style,
+                    width = width_pad
+                ));
+                if write_release_date
+                    && let Some(age) = package.get("release-age").and_then(|v| v.as_string())
+                {
+                    let width_pad = if pad_release_date {
+                        release_date_length
+                    } else {
+                        0
+                    };
+                    io.write_no_newline(&format!(" {:<width$}", age, width = width_pad));
                 }
             }
-            if let Some(description) = package.get("description").and_then(|v| v.as_string()) {
-                if write_description {
-                    let mut description = description
-                        .split(|c| c == '\r' || c == '\n')
-                        .next()
-                        .unwrap_or("")
-                        .to_string();
+            if let Some(description) = package.get("description").and_then(|v| v.as_string())
+                && write_description
+            {
+                let mut description = description
+                    .split(['\r', '\n'])
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
 
-                    // Compute remaining width available for the description.
-                    let mut remaining = (width as i64)
-                        - (name_length as i64)
-                        - (version_length as i64)
-                        - (release_date_length as i64)
-                        - 4;
-                    if write_latest {
-                        remaining -= latest_length as i64;
-                    }
-
-                    // If nothing fits, clear the description.
-                    if remaining <= 0 {
-                        description = String::new();
-                    } else if extension_loaded("mbstring") {
-                        // Use mb_strwidth/mb_strimwidth to measure and trim by display width
-                        // (CJK characters count as width 2). mb_strimwidth counts the trim
-                        // marker ('...') in the width parameter, so pass $remaining directly.
-                        if description.chars().count() > remaining as usize {
-                            description = format!(
-                                "{}...",
-                                description
-                                    .chars()
-                                    .take((remaining as usize).saturating_sub(3))
-                                    .collect::<String>()
-                            );
-                        }
-                    } else {
-                        // Fallback when mbstring is not available: do a conservative byte-based cut.
-                        // Ensure cut length is non-negative and leave room for the ellipsis.
-                        let cut = (remaining as i64 - 3).max(0) as usize;
-                        if description.len() > cut {
-                            description = format!("{}...", &description[..cut]);
-                        }
-                    }
-
-                    io.write_no_newline(&format!(" {}", description));
+                // Compute remaining width available for the description.
+                let mut remaining = (width as i64)
+                    - (name_length as i64)
+                    - (version_length as i64)
+                    - (release_date_length as i64)
+                    - 4;
+                if write_latest {
+                    remaining -= latest_length as i64;
                 }
+
+                // If nothing fits, clear the description.
+                if remaining <= 0 {
+                    description = String::new();
+                } else if extension_loaded("mbstring") {
+                    // Use mb_strwidth/mb_strimwidth to measure and trim by display width
+                    // (CJK characters count as width 2). mb_strimwidth counts the trim
+                    // marker ('...') in the width parameter, so pass $remaining directly.
+                    if description.chars().count() > remaining as usize {
+                        description = format!(
+                            "{}...",
+                            description
+                                .chars()
+                                .take((remaining as usize).saturating_sub(3))
+                                .collect::<String>()
+                        );
+                    }
+                } else {
+                    // Fallback when mbstring is not available: do a conservative byte-based cut.
+                    // Ensure cut length is non-negative and leave room for the ellipsis.
+                    let cut = (remaining - 3).max(0) as usize;
+                    if description.len() > cut {
+                        description = format!("{}...", &description[..cut]);
+                    }
+                }
+
+                io.write_no_newline(&format!(" {}", description));
             }
             if package.contains_key("path") {
                 let path_str = match package.get("path") {
@@ -1616,11 +1606,11 @@ impl ShowCommand {
         let mut literals: Vec<i64> = Vec::new();
         for package in matches.iter() {
             // avoid showing the 9999999-dev alias if the default branch has no branch-alias set
-            let mut p: crate::package::PackageInterfaceHandle = package.clone().into();
-            if let Some(alias) = p.as_alias() {
-                if p.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                    p = alias.get_alias_of().into();
-                }
+            let mut p: crate::package::PackageInterfaceHandle = package.clone();
+            if let Some(alias) = p.as_alias()
+                && p.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS
+            {
+                p = alias.get_alias_of().into();
             }
 
             // select an exact match if it is in the installed repo and no specific version was required
@@ -1635,12 +1625,13 @@ impl ShowCommand {
         // select preferred package according to policy rules
         if matched_package.is_none() && !literals.is_empty() {
             let preferred = policy.select_preferred_packages(&pool, literals.clone(), None);
-            matched_package = Some(pool.literal_to_package(preferred[0]).into());
+            matched_package = Some(pool.literal_to_package(preferred[0]));
         }
 
-        if let Some(ref mp) = matched_package {
-            if mp.as_complete().is_none() {
-                return Err(LogicException {
+        if let Some(ref mp) = matched_package
+            && mp.as_complete().is_none()
+        {
+            return Err(LogicException {
                     message: format!(
                         "ShowCommand::getPackage can only work with CompletePackageInterface, but got {}",
                         shirabe_php_shim::get_class(&PhpMixed::Null)
@@ -1648,7 +1639,6 @@ impl ShowCommand {
                     code: 0,
                 }
                 .into());
-            }
         }
 
         let matched_package = matched_package.and_then(|mp| mp.as_complete());
@@ -1708,15 +1698,13 @@ impl ShowCommand {
         self.get_io()
             .write(&format!("<info>keywords</info> : {}", keywords.join(", ")));
         self.print_versions(package.clone(), versions, installed_repo)?;
-        if is_installed_package {
-            if let Some(rd) = package.get_release_date() {
-                let rel = self.get_relative_time(&rd);
-                self.get_io().write(&format!(
-                    "<info>released</info> : {}, {}",
-                    rd.format(date_format_to_strftime("Y-m-d")),
-                    rel
-                ));
-            }
+        if is_installed_package && let Some(rd) = package.get_release_date() {
+            let rel = self.get_relative_time(&rd);
+            self.get_io().write(&format!(
+                "<info>released</info> : {}, {}",
+                rd.format(date_format_to_strftime("Y-m-d")),
+                rel
+            ));
         }
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
             let style = self.get_version_style(latest.clone(), package.clone().into());
@@ -1764,10 +1752,10 @@ impl ShowCommand {
         if is_installed_package {
             let path: Option<String> = self.require_composer(None, None).ok().and_then(|c| {
                 let installation_manager = c.borrow_partial().get_installation_manager();
-                let p = installation_manager
+
+                installation_manager
                     .borrow_mut()
-                    .get_install_path(package.clone().into());
-                p
+                    .get_install_path(package.clone().into())
             });
             if let Some(p) = path {
                 self.get_io().write(&format!(
@@ -1783,18 +1771,18 @@ impl ShowCommand {
             package.get_names(true).join(", ")
         ));
 
-        if let Some(c) = latest.as_complete() {
-            if c.is_abandoned() {
-                let replacement = match c.get_replacement_package() {
-                    Some(rp) => format!(" The author suggests using the {} package instead.", rp),
-                    None => String::new(),
-                };
+        if let Some(c) = latest.as_complete()
+            && c.is_abandoned()
+        {
+            let replacement = match c.get_replacement_package() {
+                Some(rp) => format!(" The author suggests using the {} package instead.", rp),
+                None => String::new(),
+            };
 
-                self.get_io().write_error(&format!(
+            self.get_io().write_error(&format!(
                     "<warning>Attention: This package is abandoned and no longer maintained.{}</warning>",
                     replacement
                 ));
-            }
         }
 
         let support = package.get_support();
@@ -1830,14 +1818,14 @@ impl ShowCommand {
                                 .write(&format!("{} => {}", name_disp, path_str));
                         }
                     }
-                } else if r#type == "classmap" {
-                    if let PhpMixed::List(l) = autoloads {
-                        let joined: Vec<String> = l
-                            .iter()
-                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                            .collect();
-                        self.get_io().write(&joined.join(", "));
-                    }
+                } else if r#type == "classmap"
+                    && let PhpMixed::List(l) = autoloads
+                {
+                    let joined: Vec<String> = l
+                        .iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect();
+                    self.get_io().write(&joined.join(", "));
                 }
             }
             let include_paths = package.get_include_paths();
@@ -1869,10 +1857,10 @@ impl ShowCommand {
                     .iter()
                     .map(|v| (v.clone(), v.clone()))
                     .collect();
-                if let Some(found) = array_search(&installed_version, &key_map) {
-                    if let Some(idx) = versions_keys.iter().position(|v| v == &found) {
-                        versions_keys[idx] = format!("<info>* {}</info>", installed_version);
-                    }
+                if let Some(found) = array_search(&installed_version, &key_map)
+                    && let Some(idx) = versions_keys.iter().position(|v| v == &found)
+                {
+                    versions_keys[idx] = format!("<info>* {}</info>", installed_version);
                 }
             }
         }
@@ -1924,7 +1912,7 @@ impl ShowCommand {
                     // SpdxLicenses::getLicenseByIdentifier returns [0 => fullname, 1 => osiApproved, 2 => url].
                     let list = license.as_list();
                     let fullname = list
-                        .and_then(|l| l.get(0))
+                        .and_then(|l| l.first())
                         .and_then(|v| v.as_string())
                         .unwrap_or("")
                         .to_string();
@@ -2075,16 +2063,16 @@ impl ShowCommand {
             }
         }
 
-        if let Some(c) = latest.as_complete() {
-            if c.is_abandoned() {
-                json.insert(
-                    "replacement".to_string(),
-                    match c.get_replacement_package() {
-                        Some(rp) => PhpMixed::String(rp.to_string()),
-                        None => PhpMixed::Null,
-                    },
-                );
-            }
+        if let Some(c) = latest.as_complete()
+            && c.is_abandoned()
+        {
+            json.insert(
+                "replacement".to_string(),
+                match c.get_replacement_package() {
+                    Some(rp) => PhpMixed::String(rp.to_string()),
+                    None => PhpMixed::Null,
+                },
+            );
         }
 
         if !package.get_suggests().is_empty() {
@@ -2182,7 +2170,7 @@ impl ShowCommand {
                             // Note 'osi' is the license id string, not the OSI-approved flag.
                             let list = l.as_list();
                             let name = list
-                                .and_then(|x| x.get(0))
+                                .and_then(|x| x.first())
                                 .and_then(|v| v.as_string())
                                 .unwrap_or("")
                                 .to_string();
@@ -2340,10 +2328,7 @@ impl ShowCommand {
                 .to_string();
             self.get_io().write_no_newline(&format!(" {}", version));
             if let Some(description) = package.get("description").and_then(|v| v.as_string()) {
-                let trimmed = description
-                    .split(|c| c == '\r' || c == '\n')
-                    .next()
-                    .unwrap_or("");
+                let trimmed = description.split(['\r', '\n']).next().unwrap_or("");
                 self.get_io().write(&format!(" {}", trimmed));
             } else {
                 // output newline
@@ -2680,6 +2665,7 @@ impl ShowCommand {
     }
 
     /// Given a package, this finds the latest package matching it
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn find_latest_package(
         &mut self,
         package: PackageInterfaceHandle,
@@ -2829,9 +2815,7 @@ impl ShowCommand {
                     .get_repository_manager()
                     .borrow()
                     .get_repositories()
-                    .iter()
-                    .map(|r| r.clone())
-                    .collect(),
+                    .to_vec(),
             )))?;
             self.repository_set = Some(std::rc::Rc::new(std::cell::RefCell::new(rs)));
         }

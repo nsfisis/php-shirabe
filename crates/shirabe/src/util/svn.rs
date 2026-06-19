@@ -372,24 +372,24 @@ impl Svn {
             .as_array()
             .and_then(|m| m.get(host_str))
             .map(|v| (**v).clone());
-        if let Some(entry) = auth_for_host {
-            if let Some(entry_arr) = entry.as_array() {
-                self.credentials = Some(SvnCredentials {
-                    username: entry_arr
-                        .get("username")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                        .to_string(),
-                    password: entry_arr
-                        .get("password")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                        .to_string(),
-                });
+        if let Some(entry) = auth_for_host
+            && let Some(entry_arr) = entry.as_array()
+        {
+            self.credentials = Some(SvnCredentials {
+                username: entry_arr
+                    .get("username")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string(),
+                password: entry_arr
+                    .get("password")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string(),
+            });
 
-                self.has_auth = Some(true);
-                return true;
-            }
+            self.has_auth = Some(true);
+            return true;
         }
 
         self.has_auth = Some(false);

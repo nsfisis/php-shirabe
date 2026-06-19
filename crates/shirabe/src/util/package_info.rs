@@ -8,10 +8,10 @@ impl PackageInfo {
     pub fn get_view_source_url(package: PackageInterfaceHandle) -> Option<String> {
         if let Some(complete) = package.as_complete() {
             let support = complete.get_support();
-            if let Some(source) = support.get("source") {
-                if source != "" {
-                    return Some(source.clone());
-                }
+            if let Some(source) = support.get("source")
+                && !source.is_empty()
+            {
+                return Some(source.clone());
             }
         }
 

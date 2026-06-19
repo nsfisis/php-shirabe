@@ -107,13 +107,13 @@ impl Versions {
         };
         std::fs::write(&channel_file, format!("{}{}", stored_channel, PHP_EOL))?;
 
-        if let Some(io) = io {
-            if previously_stored.as_deref() != Some(&stored_channel) {
-                io.write_error(&format!(
+        if let Some(io) = io
+            && previously_stored.as_deref() != Some(&stored_channel)
+        {
+            io.write_error(&format!(
                     "Storing \"<info>{}</info>\" as default update channel for the next self-update run.",
                     stored_channel
                 ));
-            }
         }
 
         Ok(Ok(()))
@@ -129,19 +129,18 @@ impl Versions {
             None => self.get_channel()?,
         };
 
-        if let PhpMixed::Array(ref map) = versions {
-            if let Some(channel_versions) = map.get(&effective_channel) {
-                if let PhpMixed::List(ref list) = **channel_versions {
-                    for version in list {
-                        if let PhpMixed::Array(ref v) = **version {
-                            let min_php = v.get("min-php").and_then(|p| p.as_int()).unwrap_or(0);
-                            if min_php <= PHP_VERSION_ID {
-                                return Ok(Ok(v
-                                    .iter()
-                                    .map(|(k, val)| (k.clone(), *val.clone()))
-                                    .collect()));
-                            }
-                        }
+        if let PhpMixed::Array(ref map) = versions
+            && let Some(channel_versions) = map.get(&effective_channel)
+            && let PhpMixed::List(ref list) = **channel_versions
+        {
+            for version in list {
+                if let PhpMixed::Array(ref v) = **version {
+                    let min_php = v.get("min-php").and_then(|p| p.as_int()).unwrap_or(0);
+                    if min_php <= PHP_VERSION_ID {
+                        return Ok(Ok(v
+                            .iter()
+                            .map(|(k, val)| (k.clone(), *val.clone()))
+                            .collect()));
                     }
                 }
             }

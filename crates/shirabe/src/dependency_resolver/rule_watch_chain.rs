@@ -9,6 +9,12 @@ pub struct RuleWatchChain {
     current_offset: usize,
 }
 
+impl Default for RuleWatchChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RuleWatchChain {
     pub fn new() -> Self {
         Self {

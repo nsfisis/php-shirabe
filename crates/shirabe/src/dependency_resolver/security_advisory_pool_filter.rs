@@ -92,14 +92,13 @@ impl SecurityAdvisoryPoolFilter {
             IndexMap::new();
         for package in pool.get_packages() {
             if self.audit_config.block_abandoned
-                && self
+                && !self
                     .auditor
                     .filter_abandoned_packages(
-                        &[package.clone()],
+                        std::slice::from_ref(package),
                         &self.audit_config.ignore_abandoned_for_blocking,
                     )?
-                    .len()
-                    != 0
+                    .is_empty()
             {
                 for package_name in package.get_names(false) {
                     abandoned_removed_versions
@@ -114,7 +113,7 @@ impl SecurityAdvisoryPoolFilter {
             }
 
             let matching_advisories = self.get_matching_advisories(package.clone(), &advisory_map);
-            if matching_advisories.len() > 0 {
+            if !matching_advisories.is_empty() {
                 for package_name in package.get_names(false) {
                     security_removed_versions
                         .entry(package_name)

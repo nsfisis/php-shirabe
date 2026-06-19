@@ -119,17 +119,16 @@ impl VcsDriverBase {
         let mut composer: IndexMap<String, PhpMixed> =
             array.into_iter().map(|(k, v)| (k, *v)).collect();
 
-        if !composer.contains_key("time")
+        if (!composer.contains_key("time")
             || composer
                 .get("time")
-                .map_or(true, |v| v.as_string().map_or(true, |s| s.is_empty()))
+                .is_none_or(|v| v.as_string().is_none_or(|s| s.is_empty())))
+            && let Some(d) = change_date()?
         {
-            if let Some(d) = change_date()? {
-                composer.insert(
-                    "time".to_string(),
-                    PhpMixed::String(d.format(DATE_RFC3339).to_string()),
-                );
-            }
+            composer.insert(
+                "time".to_string(),
+                PhpMixed::String(d.format(DATE_RFC3339).to_string()),
+            );
         }
 
         Ok(Some(composer))
@@ -150,16 +149,16 @@ impl VcsDriverBase {
                 self.info_cache.get(identifier).and_then(|v| v.clone()),
             ));
         }
-        if self.should_cache(identifier) {
-            if let Some(res) = self.cache.as_mut().and_then(|c| c.read(identifier)) {
-                let parsed = JsonFile::parse_json(Some(&res), None)?;
-                let composer: Option<IndexMap<String, PhpMixed>> = parsed
-                    .as_array()
-                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
-                self.info_cache
-                    .insert(identifier.to_string(), composer.clone());
-                return Ok(Some(composer));
-            }
+        if self.should_cache(identifier)
+            && let Some(res) = self.cache.as_mut().and_then(|c| c.read(identifier))
+        {
+            let parsed = JsonFile::parse_json(Some(&res), None)?;
+            let composer: Option<IndexMap<String, PhpMixed>> = parsed
+                .as_array()
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+            self.info_cache
+                .insert(identifier.to_string(), composer.clone());
+            return Ok(Some(composer));
         }
         Ok(None)
     }
@@ -215,38 +214,38 @@ pub trait VcsDriver: VcsDriverInterface {
         identifier: &str,
     ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if !self.info_cache().contains_key(identifier) {
-            if self.should_cache(identifier) {
-                if let Some(res) = self.cache_mut().and_then(|c| c.read(identifier)) {
-                    let parsed = JsonFile::parse_json(Some(&res), None)?;
-                    let parsed_map: Option<IndexMap<String, PhpMixed>> = match parsed {
-                        PhpMixed::Array(a) => Some(a.into_iter().map(|(k, v)| (k, *v)).collect()),
-                        _ => None,
-                    };
-                    self.info_cache_mut()
-                        .insert(identifier.to_string(), parsed_map);
-                    return Ok(self.info_cache().get(identifier).and_then(|v| v.clone()));
-                }
+            if self.should_cache(identifier)
+                && let Some(res) = self.cache_mut().and_then(|c| c.read(identifier))
+            {
+                let parsed = JsonFile::parse_json(Some(&res), None)?;
+                let parsed_map: Option<IndexMap<String, PhpMixed>> = match parsed {
+                    PhpMixed::Array(a) => Some(a.into_iter().map(|(k, v)| (k, *v)).collect()),
+                    _ => None,
+                };
+                self.info_cache_mut()
+                    .insert(identifier.to_string(), parsed_map);
+                return Ok(self.info_cache().get(identifier).and_then(|v| v.clone()));
             }
 
             let composer = self.get_base_composer_information(identifier)?;
 
-            if self.should_cache(identifier) {
-                if let Some(ref composer_map) = composer {
-                    let composer_mixed = PhpMixed::Array(
-                        composer_map
-                            .iter()
-                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                            .collect(),
-                    );
-                    let encoded = JsonFile::encode_with_options(
-                        &composer_mixed,
-                        JsonEncodeOptions {
-                            pretty_print: false,
-                            ..Default::default()
-                        },
-                    );
-                    self.cache_mut().map(|c| c.write(identifier, &encoded));
-                }
+            if self.should_cache(identifier)
+                && let Some(ref composer_map) = composer
+            {
+                let composer_mixed = PhpMixed::Array(
+                    composer_map
+                        .iter()
+                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                        .collect(),
+                );
+                let encoded = JsonFile::encode_with_options(
+                    &composer_mixed,
+                    JsonEncodeOptions {
+                        pretty_print: false,
+                        ..Default::default()
+                    },
+                );
+                self.cache_mut().map(|c| c.write(identifier, &encoded));
             }
 
             self.info_cache_mut()
@@ -278,27 +277,26 @@ pub trait VcsDriver: VcsDriverInterface {
             _ => return Ok(None),
         };
 
-        if !composer.contains_key("time")
+        if (!composer.contains_key("time")
             || composer
                 .get("time")
-                .map_or(true, |v| v.as_string().map_or(true, |s| s.is_empty()))
+                .is_none_or(|v| v.as_string().is_none_or(|s| s.is_empty())))
+            && let Some(change_date) = self.get_change_date(identifier)?
         {
-            if let Some(change_date) = self.get_change_date(identifier)? {
-                composer.insert(
-                    "time".to_string(),
-                    PhpMixed::String(change_date.format(DATE_RFC3339).to_string()),
-                );
-            }
+            composer.insert(
+                "time".to_string(),
+                PhpMixed::String(change_date.format(DATE_RFC3339).to_string()),
+            );
         }
 
         Ok(Some(composer))
     }
 
     fn has_composer_file(&mut self, identifier: &str) -> bool {
-        match VcsDriver::get_composer_information(self, identifier) {
-            Ok(Some(_)) => true,
-            _ => false,
-        }
+        matches!(
+            VcsDriver::get_composer_information(self, identifier),
+            Ok(Some(_))
+        )
     }
 
     fn get_scheme(&self) -> &str {

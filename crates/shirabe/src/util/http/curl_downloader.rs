@@ -270,12 +270,7 @@ impl CurlDownloader {
         self.init_download(resolve, reject, origin, url, options, copy_to, attributes)
     }
 
-    /// @param mixed[]  $options
-    ///
-    /// @param array{retryAuthFailure?: bool, redirects?: int<0, max>, retries?: int<0, max>, storeAuth?: 'prompt'|bool, ipResolve?: 4|6|null} $attributes
-    /// @param non-empty-string $url
-    ///
-    /// @return int internal job id
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn init_download(
         &mut self,
         resolve: Box<dyn Fn(PhpMixed) + Send + Sync>,
@@ -444,27 +439,26 @@ impl CurlDownloader {
 
         // $options['http']['header'] = array_diff($options['http']['header'], ['Connection: close']);
         // $options['http']['header'][] = 'Connection: keep-alive';
-        if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-            if let Some(boxed) = http.get_mut("header") {
-                if let PhpMixed::List(list) = boxed.as_mut() {
-                    let headers: Vec<String> = list
-                        .iter()
-                        .filter_map(|b| match b.as_ref() {
-                            PhpMixed::String(s) => Some(s.clone()),
-                            _ => None,
-                        })
-                        .collect();
-                    let diffed = array_diff(&headers, &["Connection: close".to_string()]);
-                    let mut new_list: Vec<Box<PhpMixed>> = diffed
-                        .into_iter()
-                        .map(|s| Box::new(PhpMixed::String(s)))
-                        .collect();
-                    new_list.push(Box::new(PhpMixed::String(
-                        "Connection: keep-alive".to_string(),
-                    )));
-                    *list = new_list;
-                }
-            }
+        if let Some(PhpMixed::Array(http)) = options.get_mut("http")
+            && let Some(boxed) = http.get_mut("header")
+            && let PhpMixed::List(list) = boxed.as_mut()
+        {
+            let headers: Vec<String> = list
+                .iter()
+                .filter_map(|b| match b.as_ref() {
+                    PhpMixed::String(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .collect();
+            let diffed = array_diff(&headers, &["Connection: close".to_string()]);
+            let mut new_list: Vec<Box<PhpMixed>> = diffed
+                .into_iter()
+                .map(|s| Box::new(PhpMixed::String(s)))
+                .collect();
+            new_list.push(Box::new(PhpMixed::String(
+                "Connection: keep-alive".to_string(),
+            )));
+            *list = new_list;
         }
 
         let version = curl_version();
@@ -1085,9 +1079,10 @@ impl CurlDownloader {
                         );
                         // Gzipped responses with missing Content-Length header cannot be detected during the file download
                         // because $progress['size_download'] refers to the gzipped size downloaded, not the actual file size
-                        if let Some(c_str) = c.as_deref() {
-                            if Platform::strlen(c_str) >= max_file_size {
-                                anyhow::bail!(
+                        if let Some(c_str) = c.as_deref()
+                            && Platform::strlen(c_str) >= max_file_size
+                        {
+                            anyhow::bail!(
                                     MaxFileSizeExceededException(TransportException::new(
                                         format!(
                                             "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
@@ -1099,7 +1094,6 @@ impl CurlDownloader {
                                     .0
                                     .message
                                 );
-                            }
                         }
                         contents = PhpMixed::String(c.unwrap_or_default());
                     } else {
@@ -1193,8 +1187,7 @@ impl CurlDownloader {
 
                 // handle 3xx redirects, 304 Not Modified is excluded
                 let sc = status_code.unwrap_or(0);
-                if sc >= 300
-                    && sc <= 399
+                if (300..=399).contains(&sc)
                     && sc != 304
                     && job
                         .get("attributes")
@@ -1228,7 +1221,7 @@ impl CurlDownloader {
                 }
 
                 // fail 4xx and 5xx responses and capture the response
-                if sc >= 400 && sc <= 599 {
+                if (400..=599).contains(&sc) {
                     let method_is_get = !job
                         .get("options")
                         .and_then(|v| v.as_array())
@@ -1480,48 +1473,48 @@ impl CurlDownloader {
                     .and_then(|v| v.as_string())
                     .unwrap_or("")
                     .to_string();
-                if let Some(primary_ip) = primary_ip {
-                    if primary_ip.as_string() != Some(&prev_primary_ip) {
-                        let prevent_ip_access_callable = self
-                            .jobs
-                            .get(&i)
-                            .and_then(|j| j.get("options"))
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get("prevent_ip_access_callable"))
-                            .is_some();
-                        // PHP: is_callable($cb = $job['options']['prevent_ip_access_callable']) && $cb($primaryIp)
-                        // TODO(phase-c): prevent_ip_access_callable is a caller-supplied callable
-                        // carried inside the options array as PhpMixed; invoking it needs a typed
-                        // callable model (options would have to hold an Rc<dyn Fn>), which the
-                        // PhpMixed-keyed options map cannot express yet.
-                        let blocked = prevent_ip_access_callable && false;
-                        if blocked {
-                            let job = self.jobs.get(&i).cloned().unwrap_or_default();
-                            self.reject_job(
-                                &job,
-                                anyhow::anyhow!(
-                                    TransportException::new(
-                                        format!(
-                                            "IP \"{}\" is blocked for \"{}\".",
-                                            primary_ip.clone(),
-                                            progress_now
-                                                .get("url")
-                                                .cloned()
-                                                .unwrap_or(PhpMixed::Null),
-                                        ),
-                                        0,
-                                    )
-                                    .message
-                                ),
-                            );
-                        }
+                if let Some(primary_ip) = primary_ip
+                    && primary_ip.as_string() != Some(&prev_primary_ip)
+                {
+                    let prevent_ip_access_callable = self
+                        .jobs
+                        .get(&i)
+                        .and_then(|j| j.get("options"))
+                        .and_then(|v| v.as_array())
+                        .and_then(|a| a.get("prevent_ip_access_callable"))
+                        .is_some();
+                    // PHP: is_callable($cb = $job['options']['prevent_ip_access_callable']) && $cb($primaryIp)
+                    // TODO(phase-c): prevent_ip_access_callable is a caller-supplied callable
+                    // carried inside the options array as PhpMixed; invoking it needs a typed
+                    // callable model (options would have to hold an Rc<dyn Fn>), which the
+                    // PhpMixed-keyed options map cannot express yet.
+                    // The callable that would actually decide blocking cannot be invoked yet
+                    // (see TODO above), so no IP is treated as blocked for now.
+                    let _ = prevent_ip_access_callable;
+                    let blocked = false;
+                    if blocked {
+                        let job = self.jobs.get(&i).cloned().unwrap_or_default();
+                        self.reject_job(
+                            &job,
+                            anyhow::anyhow!(
+                                TransportException::new(
+                                    format!(
+                                        "IP \"{}\" is blocked for \"{}\".",
+                                        primary_ip.clone(),
+                                        progress_now.get("url").cloned().unwrap_or(PhpMixed::Null),
+                                    ),
+                                    0,
+                                )
+                                .message
+                            ),
+                        );
+                    }
 
-                        if let Some(job) = self.jobs.get_mut(&i) {
-                            job.insert(
-                                "primaryIp".to_string(),
-                                PhpMixed::String(primary_ip.as_string().unwrap_or("").to_string()),
-                            );
-                        }
+                    if let Some(job) = self.jobs.get_mut(&i) {
+                        job.insert(
+                            "primaryIp".to_string(),
+                            PhpMixed::String(primary_ip.as_string().unwrap_or("").to_string()),
+                        );
                     }
                 }
 
@@ -1538,46 +1531,46 @@ impl CurlDownloader {
         response: &CurlResponse,
     ) -> anyhow::Result<Result<String, TransportException>> {
         let mut target_url = String::new();
-        if let Some(location_header) = response.inner.get_header("location") {
-            if !location_header.is_empty() {
-                if !parse_url(&location_header, shirabe_php_shim::PHP_URL_SCHEME).is_null() {
-                    // Absolute URL; e.g. https://example.com/composer
-                    target_url = location_header.clone();
-                } else if !parse_url(&location_header, shirabe_php_shim::PHP_URL_HOST).is_null() {
-                    // Scheme relative; e.g. //example.com/foo
-                    let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
-                    target_url = format!(
-                        "{}:{}",
-                        parse_url(job_url, shirabe_php_shim::PHP_URL_SCHEME)
-                            .as_string()
-                            .unwrap_or(""),
-                        location_header
-                    );
-                } else if location_header.starts_with('/') {
-                    // Absolute path; e.g. /foo
-                    let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
-                    let url_host = parse_url(job_url, shirabe_php_shim::PHP_URL_HOST);
-                    let url_host_str = url_host.as_string().unwrap_or("");
+        if let Some(location_header) = response.inner.get_header("location")
+            && !location_header.is_empty()
+        {
+            if !parse_url(&location_header, shirabe_php_shim::PHP_URL_SCHEME).is_null() {
+                // Absolute URL; e.g. https://example.com/composer
+                target_url = location_header.clone();
+            } else if !parse_url(&location_header, shirabe_php_shim::PHP_URL_HOST).is_null() {
+                // Scheme relative; e.g. //example.com/foo
+                let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
+                target_url = format!(
+                    "{}:{}",
+                    parse_url(job_url, shirabe_php_shim::PHP_URL_SCHEME)
+                        .as_string()
+                        .unwrap_or(""),
+                    location_header
+                );
+            } else if location_header.starts_with('/') {
+                // Absolute path; e.g. /foo
+                let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
+                let url_host = parse_url(job_url, shirabe_php_shim::PHP_URL_HOST);
+                let url_host_str = url_host.as_string().unwrap_or("");
 
-                    // Replace path using hostname as an anchor.
-                    target_url = Preg::replace(
-                        &format!(
-                            r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",
-                            preg_quote(url_host_str, None)
-                        ),
-                        &format!("\\1{}", location_header),
-                        job_url,
-                    );
-                } else {
-                    // Relative path; e.g. foo
-                    // This actually differs from PHP which seems to add duplicate slashes.
-                    let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
-                    target_url = Preg::replace(
-                        r"{^(.+/)[^/?]*(?:\?.*)?$}",
-                        &format!("\\1{}", location_header),
-                        job_url,
-                    );
-                }
+                // Replace path using hostname as an anchor.
+                target_url = Preg::replace(
+                    &format!(
+                        r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",
+                        preg_quote(url_host_str, None)
+                    ),
+                    &format!("\\1{}", location_header),
+                    job_url,
+                );
+            } else {
+                // Relative path; e.g. foo
+                // This actually differs from PHP which seems to add duplicate slashes.
+                let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
+                target_url = Preg::replace(
+                    r"{^(.+/)[^/?]*(?:\?.*)?$}",
+                    &format!("\\1{}", location_header),
+                    job_url,
+                );
             }
         }
 
@@ -1772,7 +1765,7 @@ impl CurlDownloader {
             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),
         };
-        let origin = Url::get_origin(&*self.config.borrow(), url);
+        let origin = Url::get_origin(&self.config.borrow(), url);
 
         let copy_to = job
             .get("filename")

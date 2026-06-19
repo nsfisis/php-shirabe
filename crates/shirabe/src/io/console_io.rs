@@ -638,7 +638,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             _ => vec![],
         };
         let is_assoc =
-            !choice_keys.is_empty() && choice_keys.iter().any(|k| !k.parse::<i64>().is_ok());
+            !choice_keys.is_empty() && choice_keys.iter().any(|k| k.parse::<i64>().is_err());
         if is_assoc {
             return result;
         }

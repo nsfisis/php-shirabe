@@ -155,7 +155,7 @@ impl Application {
 
     pub fn new(name: String, mut version: String) -> Self {
         static SHUTDOWN_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
-        if version == "" {
+        if version.is_empty() {
             version = composer::get_version();
         }
         if function_exists("ini_set") && extension_loaded("xdebug") {
@@ -459,22 +459,18 @@ impl Application {
             && !file_exists(&Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
-                || (input
+                || (!input
                     .borrow()
                     .has_parameter_option(PhpMixed::from(vec!["--file"]), true)
-                    == false
-                    && input
+                    && !input
                         .borrow()
-                        .has_parameter_option(PhpMixed::from(vec!["-f"]), true)
-                        == false))
-            && input
+                        .has_parameter_option(PhpMixed::from(vec!["-f"]), true)))
+            && !input
                 .borrow()
                 .has_parameter_option(PhpMixed::from(vec!["--help"]), true)
-                == false
-            && input
+            && !input
                 .borrow()
                 .has_parameter_option(PhpMixed::from(vec!["-h"]), true)
-                == false
         {
             let mut dir = dirname(&Platform::get_cwd(true).unwrap_or_default());
             let home_value = Platform::get_env("HOME")
@@ -713,22 +709,21 @@ impl Application {
                 ));
             }
 
-            if is_non_allowed_root {
-                if command_name.as_deref() != Some("self-update")
-                    && command_name.as_deref() != Some("selfupdate")
-                    && command_name.as_deref() != Some("_complete")
-                {
-                    io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
+            if is_non_allowed_root
+                && command_name.as_deref() != Some("self-update")
+                && command_name.as_deref() != Some("selfupdate")
+                && command_name.as_deref() != Some("_complete")
+            {
+                io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
 
-                    if io.is_interactive() {
-                        if !io.ask_confirmation(
-                            "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
-                                .to_string(),
-                            true,
-                        ) {
-                            return Ok(1);
-                        }
-                    }
+                if io.is_interactive()
+                    && !io.ask_confirmation(
+                        "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
+                            .to_string(),
+                        true,
+                    )
+                {
+                    return Ok(1);
                 }
             }
 
@@ -766,138 +761,135 @@ impl Application {
                 let composer_json: PhpMixed =
                     json_decode(&file_get_contents(&file).unwrap_or_default(), true)
                         .unwrap_or(PhpMixed::Null);
-                if let Some(arr) = composer_json.as_array() {
-                    if let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array()) {
-                        for (script, dummy) in scripts {
-                            let script_event_const = format!(
-                                "Composer\\Script\\ScriptEvents::{}",
-                                str_replace("-", "_", &strtoupper(script))
-                            );
-                            if !defined(&script_event_const) {
-                                if application.borrow_mut().has(script) {
-                                    io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
-                                } else {
-                                    let mut description = format!(
-                                        "Runs the {} script as defined in composer.json",
-                                        script
-                                    );
+                if let Some(arr) = composer_json.as_array()
+                    && let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array())
+                {
+                    for (script, dummy) in scripts {
+                        let script_event_const = format!(
+                            "Composer\\Script\\ScriptEvents::{}",
+                            str_replace("-", "_", &strtoupper(script))
+                        );
+                        if !defined(&script_event_const) {
+                            if application.borrow_mut().has(script) {
+                                io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
+                            } else {
+                                let mut description = format!(
+                                    "Runs the {} script as defined in composer.json",
+                                    script
+                                );
 
-                                    if let Some(desc) = arr
-                                        .get("scripts-descriptions")
-                                        .and_then(|v| v.as_array())
-                                        .and_then(|a| a.get(script))
-                                        .and_then(|v| v.as_string())
-                                    {
-                                        description = desc.to_string();
-                                    }
-
-                                    let aliases: Vec<String> = arr
-                                        .get("scripts-aliases")
-                                        .and_then(|v| v.as_array())
-                                        .and_then(|a| a.get(script))
-                                        .and_then(|v| v.as_list())
-                                        .map(|l| {
-                                            l.iter()
-                                                .filter_map(|v| {
-                                                    v.as_string().map(|s| s.to_string())
-                                                })
-                                                .collect()
-                                        })
-                                        .unwrap_or_default();
-
-                                    let composer_opt =
-                                        application.borrow_mut().get_composer(false, None, None)?;
-                                    if let Some(composer) = composer_opt {
-                                        let composer = crate::command::composer_full(&composer);
-                                        let root_package = composer.get_package();
-                                        let generator = composer.get_autoload_generator().clone();
-                                        let generator = generator.borrow();
-
-                                        let installation_manager =
-                                            composer.get_installation_manager();
-                                        let package_map = generator.build_package_map(
-                                            &mut installation_manager.borrow_mut(),
-                                            root_package.clone(),
-                                            vec![],
-                                        )?;
-                                        let map = generator.parse_autoloads(
-                                            package_map,
-                                            root_package.clone(),
-                                            PhpMixed::Bool(false),
-                                        );
-
-                                        let loader = generator.create_loader(
-                                            &map,
-                                            composer
-                                                .get_config()
-                                                .borrow()
-                                                .get("vendor-dir")
-                                                .as_string()
-                                                .map(|s| s.to_string()),
-                                        );
-                                        loader.register(false);
-                                    }
-
-                                    // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly
-                                    let dummy_str = dummy.as_string().unwrap_or("").to_string();
-                                    let cmd: PhpMixed = if is_string(dummy)
-                                        && shirabe_php_shim::class_exists(&dummy_str)
-                                        && is_subclass_of(
-                                            &PhpMixed::String(dummy_str.clone()),
-                                            "Symfony\\Component\\Console\\Command\\Command",
-                                            true,
-                                        ) {
-                                        if is_subclass_of(
-                                            &PhpMixed::String(dummy_str.clone()),
-                                            "Symfony\\Component\\Console\\SingleCommandApplication",
-                                            true,
-                                        ) {
-                                            io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
-                                        }
-                                        let mut cmd = shirabe_php_shim::instantiate_class(
-                                            &dummy_str,
-                                            vec![PhpMixed::String(script.clone())],
-                                        );
-                                        // TODO(phase-c): the script's command class is built by
-                                        // reflection (instantiate_class) and stays PhpMixed; the
-                                        // SingleCommandApplication / SymfonyCommand typed registry it
-                                        // belongs to is an external-package todo!() stub.
-                                        // let _ = SingleCommandApplication::new;
-
-                                        // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
-                                        // TODO(phase-c): cmd is the PhpMixed result of reflection
-                                        // instantiation; reading/overriding its
-                                        // name/description requires the typed SymfonyCommand model that
-                                        // the Symfony stub does not yet provide.
-                                        let _ = description.clone();
-                                        let _ = &mut cmd;
-                                        cmd
-                                    } else {
-                                        // fallback to usual aliasing behavior
-                                        // TODO(phase-c): ScriptAliasCommand is a typed BaseCommand
-                                        // but this code path stores commands as PhpMixed; it can
-                                        // only be carried as a typed trait object once the Symfony
-                                        // command registry is modelled.
-                                        let _ = ScriptAliasCommand::new(
-                                            script.clone(),
-                                            Some(description.clone()),
-                                            aliases,
-                                        );
-                                        PhpMixed::Null
-                                    };
-
-                                    // Compatibility layer for symfony/console <7.4
-                                    // TODO(phase-c): Application::add() takes Rc<RefCell<dyn
-                                    // SymfonyCommand>>
-                                    // but `cmd` here is the PhpMixed result of reflection-based
-                                    // plugin command instantiation; registering it as a typed
-                                    // command instance is blocked on the Symfony command-registry
-                                    // model (external-package todo!() stub).
-                                    let _ = &cmd;
-                                    todo!(
-                                        "plugin: register reflection-instantiated command on Application::add"
-                                    );
+                                if let Some(desc) = arr
+                                    .get("scripts-descriptions")
+                                    .and_then(|v| v.as_array())
+                                    .and_then(|a| a.get(script))
+                                    .and_then(|v| v.as_string())
+                                {
+                                    description = desc.to_string();
                                 }
+
+                                let aliases: Vec<String> = arr
+                                    .get("scripts-aliases")
+                                    .and_then(|v| v.as_array())
+                                    .and_then(|a| a.get(script))
+                                    .and_then(|v| v.as_list())
+                                    .map(|l| {
+                                        l.iter()
+                                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                                            .collect()
+                                    })
+                                    .unwrap_or_default();
+
+                                let composer_opt =
+                                    application.borrow_mut().get_composer(false, None, None)?;
+                                if let Some(composer) = composer_opt {
+                                    let composer = crate::command::composer_full(&composer);
+                                    let root_package = composer.get_package();
+                                    let generator = composer.get_autoload_generator().clone();
+                                    let generator = generator.borrow();
+
+                                    let installation_manager = composer.get_installation_manager();
+                                    let package_map = generator.build_package_map(
+                                        &mut installation_manager.borrow_mut(),
+                                        root_package.clone(),
+                                        vec![],
+                                    )?;
+                                    let map = generator.parse_autoloads(
+                                        package_map,
+                                        root_package.clone(),
+                                        PhpMixed::Bool(false),
+                                    );
+
+                                    let loader = generator.create_loader(
+                                        &map,
+                                        composer
+                                            .get_config()
+                                            .borrow()
+                                            .get("vendor-dir")
+                                            .as_string()
+                                            .map(|s| s.to_string()),
+                                    );
+                                    loader.register(false);
+                                }
+
+                                // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly
+                                let dummy_str = dummy.as_string().unwrap_or("").to_string();
+                                let cmd: PhpMixed = if is_string(dummy)
+                                    && shirabe_php_shim::class_exists(&dummy_str)
+                                    && is_subclass_of(
+                                        &PhpMixed::String(dummy_str.clone()),
+                                        "Symfony\\Component\\Console\\Command\\Command",
+                                        true,
+                                    ) {
+                                    if is_subclass_of(
+                                        &PhpMixed::String(dummy_str.clone()),
+                                        "Symfony\\Component\\Console\\SingleCommandApplication",
+                                        true,
+                                    ) {
+                                        io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
+                                    }
+                                    let mut cmd = shirabe_php_shim::instantiate_class(
+                                        &dummy_str,
+                                        vec![PhpMixed::String(script.clone())],
+                                    );
+                                    // TODO(phase-c): the script's command class is built by
+                                    // reflection (instantiate_class) and stays PhpMixed; the
+                                    // SingleCommandApplication / SymfonyCommand typed registry it
+                                    // belongs to is an external-package todo!() stub.
+                                    // let _ = SingleCommandApplication::new;
+
+                                    // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
+                                    // TODO(phase-c): cmd is the PhpMixed result of reflection
+                                    // instantiation; reading/overriding its
+                                    // name/description requires the typed SymfonyCommand model that
+                                    // the Symfony stub does not yet provide.
+                                    let _ = description.clone();
+                                    let _ = &mut cmd;
+                                    cmd
+                                } else {
+                                    // fallback to usual aliasing behavior
+                                    // TODO(phase-c): ScriptAliasCommand is a typed BaseCommand
+                                    // but this code path stores commands as PhpMixed; it can
+                                    // only be carried as a typed trait object once the Symfony
+                                    // command registry is modelled.
+                                    let _ = ScriptAliasCommand::new(
+                                        script.clone(),
+                                        Some(description.clone()),
+                                        aliases,
+                                    );
+                                    PhpMixed::Null
+                                };
+
+                                // Compatibility layer for symfony/console <7.4
+                                // TODO(phase-c): Application::add() takes Rc<RefCell<dyn
+                                // SymfonyCommand>>
+                                // but `cmd` here is the PhpMixed result of reflection-based
+                                // plugin command instantiation; registering it as a typed
+                                // command instance is blocked on the Symfony command-registry
+                                // model (external-package todo!() stub).
+                                let _ = &cmd;
+                                todo!(
+                                    "plugin: register reflection-instantiated command on Application::add"
+                                );
                             }
                         }
                     }
@@ -936,14 +928,14 @@ impl Application {
             }
 
             // chdir back to oldWorkingDir if set
-            if let Some(ref owd) = old_working_dir {
-                if !owd.is_empty() {
-                    let owd = owd.clone();
-                    let _ = Silencer::call(|| {
-                        chdir(&owd);
-                        Ok(())
-                    });
-                }
+            if let Some(ref owd) = old_working_dir
+                && !owd.is_empty()
+            {
+                let owd = owd.clone();
+                let _ = Silencer::call(|| {
+                    chdir(&owd);
+                    Ok(())
+                });
             }
 
             if let Some(st) = start_time {
@@ -1014,17 +1006,17 @@ impl Application {
             )
             .as_string()
             .map(|s| s.to_string());
-        if let Some(ref wd) = working_dir {
-            if !is_dir(wd) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Invalid working directory specified, {} does not exist.",
-                        wd
-                    ),
-                    code: 0,
-                }
-                .into());
+        if let Some(ref wd) = working_dir
+            && !is_dir(wd)
+        {
+            return Err(RuntimeException {
+                message: format!(
+                    "Invalid working directory specified, {} does not exist.",
+                    wd
+                ),
+                code: 0,
             }
+            .into());
         }
 
         Ok(working_dir)
@@ -1049,8 +1041,7 @@ impl Application {
         // avoid overlapping borrows of self (get_composer needs &mut self).
         let disk_hint_msg: Option<String> = (|| -> anyhow::Result<Option<String>> {
             let composer = self.get_composer(false, Some(true), None)?;
-            if composer.is_some() && function_exists("disk_free_space") {
-                let composer = composer.unwrap();
+            if let Some(composer) = composer && function_exists("disk_free_space") {
                 let composer = composer.borrow_partial();
                 let config = composer.get_config();
 
@@ -1116,7 +1107,7 @@ impl Application {
                     .map(|s| Box::new(PhpMixed::String(s.clone())))
                     .collect(),
             );
-            if is_array(&avast_detect_pm) && avast_detect.len() != 0 {
+            if is_array(&avast_detect_pm) && !avast_detect.is_empty() {
                 io.write_error3("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
                 io.write_error3(
                     "<error>Check https://getcomposer.org/local-issuer for details</error>",
@@ -1311,7 +1302,7 @@ impl Application {
         if !composer::BRANCH_ALIAS_VERSION.is_empty()
             && composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
         {
-            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION.to_string(),);
+            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION,);
         }
 
         format!(
@@ -1492,7 +1483,6 @@ impl Application {
                 // from the exception's `code` field needs the downcast strategy decided.
                 let exit_code = shirabe_php_shim::php_exception_get_code(&e);
                 if shirabe_php_shim::is_numeric_string(&exit_code.to_string()) {
-                    let exit_code = exit_code;
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
                     1
@@ -1743,7 +1733,7 @@ impl Application {
             let filtered: Vec<shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion> =
                 command_names
                     .into_iter()
-                    .filter(|n| shirabe_php_shim::php_truthy(n))
+                    .filter(shirabe_php_shim::php_truthy)
                     .map(|n| {
                         shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion::String(
                             shirabe_php_shim::php_to_string(&n),
@@ -1926,20 +1916,20 @@ impl Application {
             return true;
         }
 
-        if let Some(command_loader) = &self.command_loader {
-            if command_loader.has(name) {
-                let command = command_loader.get(name);
-                // $this->add($this->commandLoader->get($name))
-                // TODO(review): command_loader.get() returns Box<dyn SymfonyCommand> while add() expects
-                // Rc<RefCell<dyn SymfonyCommand>>; the loader return type needs reconciliation.
-                let _ = command;
-                return self
-                    .add(todo!(
-                        "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name)"
-                    ))
-                    .map(|c| c.is_some())
-                    .unwrap_or(false);
-            }
+        if let Some(command_loader) = &self.command_loader
+            && command_loader.has(name)
+        {
+            let command = command_loader.get(name);
+            // $this->add($this->commandLoader->get($name))
+            // TODO(review): command_loader.get() returns Box<dyn SymfonyCommand> while add() expects
+            // Rc<RefCell<dyn SymfonyCommand>>; the loader return type needs reconciliation.
+            let _ = command;
+            return self
+                .add(todo!(
+                    "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name)"
+                ))
+                .map(|c| c.is_some())
+                .unwrap_or(false);
         }
 
         false
@@ -2101,11 +2091,11 @@ impl Application {
 
         // if no commands matched or we just matched namespaces
         if commands.is_empty()
-            || shirabe_php_shim::preg_grep(&format!("{{^{}$}}i", expr), &commands).len() < 1
+            || shirabe_php_shim::preg_grep(&format!("{{^{}$}}i", expr), &commands).is_empty()
         {
             if let Some(pos) = shirabe_php_shim::strrpos(name, ":") {
                 // check if a namespace exists and contains commands
-                self.find_namespace(&name[..pos as usize])?;
+                self.find_namespace(&name[..pos])?;
             }
 
             let mut message = format!(
@@ -2219,7 +2209,7 @@ impl Application {
                     let filtered: Vec<String> = formatted_abbrevs
                         .iter()
                         .filter(|a| shirabe_php_shim::php_truthy(a))
-                        .map(|a| shirabe_php_shim::php_to_string(a))
+                        .map(shirabe_php_shim::php_to_string)
                         .collect();
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 

@@ -154,20 +154,20 @@ impl JsonFile {
                     }
                     .into());
                 }
-                if let Some(io) = &self.io {
-                    if io.is_debug() {
-                        let mut realpath_info = String::new();
-                        if let Some(realpath) = realpath(&self.path) {
-                            if realpath != self.path {
-                                realpath_info = format!(" ({})", realpath);
-                            }
-                        }
-                        io.write_error3(
-                            &format!("Reading {}{}", self.path, realpath_info),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                if let Some(io) = &self.io
+                    && io.is_debug()
+                {
+                    let mut realpath_info = String::new();
+                    if let Some(realpath) = realpath(&self.path)
+                        && realpath != self.path
+                    {
+                        realpath_info = format!(" ({})", realpath);
                     }
+                    io.write_error3(
+                        &format!("Reading {}{}", self.path, realpath_info),
+                        true,
+                        io_interface::NORMAL,
+                    );
                 }
                 Ok(file_get_contents(&self.path))
             }
@@ -502,21 +502,22 @@ impl JsonFile {
         let mut data = json_decode(json, true)?;
         if matches!(data, PhpMixed::Null) && JSON_ERROR_NONE != json_last_error() {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
-            if let Some(file) = file {
-                if str_ends_with(file, ".lock") && str_contains(json, "\"content-hash\"") {
-                    let mut count: usize = 0;
-                    let replaced = Preg::replace5(
-                        r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#,
-                        "    \"content-hash\": \"VCS merge conflict detected. Please run `composer update --lock`.\",$1",
-                        json,
-                        -1,
-                        &mut count,
-                    );
-                    if count == 1 {
-                        data = json_decode(&replaced, true)?;
-                        if !matches!(data, PhpMixed::Null) {
-                            return Ok(data);
-                        }
+            if let Some(file) = file
+                && str_ends_with(file, ".lock")
+                && str_contains(json, "\"content-hash\"")
+            {
+                let mut count: usize = 0;
+                let replaced = Preg::replace5(
+                    r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#,
+                    "    \"content-hash\": \"VCS merge conflict detected. Please run `composer update --lock`.\",$1",
+                    json,
+                    -1,
+                    &mut count,
+                );
+                if count == 1 {
+                    data = json_decode(&replaced, true)?;
+                    if !matches!(data, PhpMixed::Null) {
+                        return Ok(data);
                     }
                 }
             }

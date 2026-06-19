@@ -152,7 +152,7 @@ impl RepositoryInterfaceHandle {
         self.0
             .borrow()
             .as_installed_repository_interface()
-            .map_or(false, |r| r.is_fresh())
+            .is_some_and(|r| r.is_fresh())
     }
 
     pub fn get_dev_mode(&self) -> Option<bool> {

@@ -310,7 +310,7 @@ impl BinaryInstaller {
                 .find_shortest_path_code(link, bin, false, true, false);
             let mut stream_proxy_code = String::new();
             let mut stream_hint = String::new();
-            let mut globals_code = format!("$GLOBALS['_composer_bin_dir'] = __DIR__;\n",);
+            let mut globals_code = "$GLOBALS['_composer_bin_dir'] = __DIR__;\n".to_string();
             let mut phpunit_hack1 = String::new();
             let mut phpunit_hack2 = String::new();
             // Don't expose autoload path when vendor dir was not set in custom installers
@@ -329,30 +329,29 @@ impl BinaryInstaller {
                 ));
             }
             // Add workaround for PHPUnit process isolation
-            if let Some(vendor_dir) = &self.vendor_dir {
-                if self.filesystem.borrow().normalize_path(bin)
+            if let Some(vendor_dir) = &self.vendor_dir
+                && self.filesystem.borrow().normalize_path(bin)
                     == self
                         .filesystem
                         .borrow()
                         .normalize_path(&format!("{}/phpunit/phpunit/phpunit", vendor_dir))
-                {
-                    // workaround issue on PHPUnit 6.5+ running on PHP 8+
-                    globals_code.push_str(&format!(
+            {
+                // workaround issue on PHPUnit 6.5+ running on PHP 8+
+                globals_code.push_str(&format!(
                         "$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'] = $GLOBALS['__PHPUNIT_ISOLATION_BLACKLIST'] = array(realpath({}));\n",
                         bin_path_exported,
                     ));
-                    // workaround issue on all PHPUnit versions running on PHP <8
-                    phpunit_hack1 = "'phpvfscomposer://'.".to_string();
-                    phpunit_hack2 = "
+                // workaround issue on all PHPUnit versions running on PHP <8
+                phpunit_hack1 = "'phpvfscomposer://'.".to_string();
+                phpunit_hack2 = "
                 $data = str_replace('__DIR__', var_export(dirname($this->realpath), true), $data);
                 $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
-                        .to_string();
-                }
+                    .to_string();
             }
-            if trim(m.get(0).map(|s| s.as_str()).unwrap_or(""), None) != "<?php" {
-                stream_hint = format!(
+            if trim(m.first().map(|s| s.as_str()).unwrap_or(""), None) != "<?php" {
+                stream_hint =
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
-                );
+                        .to_string();
                 stream_proxy_code = format!(
                     "if (PHP_VERSION_ID < 80000) {{\n    if (!class_exists('Composer\\BinProxyWrapper')) {{\n        /**\n         * @internal\n         */\n        final class BinProxyWrapper\n        {{\n            private $handle;\n            private $position;\n            private $realpath;\n\n            public function stream_open($path, $mode, $options, &$opened_path)\n            {{\n                // get rid of phpvfscomposer:// prefix for __FILE__ & __DIR__ resolution\n                $opened_path = substr($path, 17);\n                $this->realpath = realpath($opened_path) ?: $opened_path;\n                $opened_path = {phpunit_hack1}$this->realpath;\n                $this->handle = fopen($this->realpath, $mode);\n                $this->position = 0;\n\n                return (bool) $this->handle;\n            }}\n\n            public function stream_read($count)\n            {{\n                $data = fread($this->handle, $count);\n\n                if ($this->position === 0) {{\n                    $data = preg_replace('{{^#!.*\\r?\\n}}', '', $data);\n                }}{phpunit_hack2}\n\n                $this->position += strlen($data);\n\n                return $data;\n            }}\n\n            public function stream_cast($castAs)\n            {{\n                return $this->handle;\n            }}\n\n            public function stream_close()\n            {{\n                fclose($this->handle);\n            }}\n\n            public function stream_lock($operation)\n            {{\n                return $operation ? flock($this->handle, $operation) : true;\n            }}\n\n            public function stream_seek($offset, $whence)\n            {{\n                if (0 === fseek($this->handle, $offset, $whence)) {{\n                    $this->position = ftell($this->handle);\n                    return true;\n                }}\n\n                return false;\n            }}\n\n            public function stream_tell()\n            {{\n                return $this->position;\n            }}\n\n            public function stream_eof()\n            {{\n                return feof($this->handle);\n            }}\n\n            public function stream_stat()\n            {{\n                return array();\n            }}\n\n            public function stream_set_option($option, $arg1, $arg2)\n            {{\n                return true;\n            }}\n\n            public function url_stat($path, $flags)\n            {{\n                $path = substr($path, 17);\n                if (file_exists($path)) {{\n                    return stat($path);\n                }}\n\n                return false;\n            }}\n        }}\n    }}\n\n    if (\n        (function_exists('stream_get_wrappers') && in_array('phpvfscomposer', stream_get_wrappers(), true))\n        || (function_exists('stream_wrapper_register') && stream_wrapper_register('phpvfscomposer', 'Composer\\BinProxyWrapper'))\n    ) {{\n        return include(\"phpvfscomposer://\" . {bin_path_exported});\n    }}\n}}\n",
                     phpunit_hack1 = phpunit_hack1,

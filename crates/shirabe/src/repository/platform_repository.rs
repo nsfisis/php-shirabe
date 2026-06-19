@@ -70,7 +70,7 @@ impl PlatformRepository {
         runtime: Option<Runtime>,
         hhvm_detector: Option<HhvmDetector>,
     ) -> anyhow::Result<Self> {
-        let runtime = runtime.unwrap_or_else(|| Runtime);
+        let runtime = runtime.unwrap_or(Runtime);
         let hhvm_detector = hhvm_detector.unwrap_or_else(|| HhvmDetector::new(None, None));
         let mut overrides_map: IndexMap<String, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
@@ -329,12 +329,10 @@ impl PlatformRepository {
                     .collect(),
             ),
             true,
-        ) {
-            if let Some(xdebug_pretty_version) = XdebugHandler::get_skipped_version() {
-                if !xdebug_pretty_version.is_empty() {
-                    self.add_extension("xdebug", &xdebug_pretty_version)?;
-                }
-            }
+        ) && let Some(xdebug_pretty_version) = XdebugHandler::get_skipped_version()
+            && !xdebug_pretty_version.is_empty()
+        {
+            self.add_extension("xdebug", &xdebug_pretty_version)?;
         }
 
         // Another quick loop, just for possible libraries
@@ -1551,11 +1549,11 @@ impl PlatformRepository {
             } else {
                 format!("actual: {}", package.get_pretty_version())
             };
-            if let Some(overrider) = overrider {
-                if let Some(overrider) = overrider.as_complete() {
-                    let description = overrider.get_description().unwrap_or_default();
-                    overrider.set_description(format!("{}, {}", description, actual_text));
-                }
+            if let Some(overrider) = overrider
+                && let Some(overrider) = overrider.as_complete()
+            {
+                let description = overrider.get_description().unwrap_or_default();
+                overrider.set_description(format!("{}, {}", description, actual_text));
             }
 
             return Ok(());

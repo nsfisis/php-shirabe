@@ -92,10 +92,7 @@ impl std::fmt::Display for Link {
         write!(
             f,
             "{} {} {} ({})",
-            self.source,
-            self.description,
-            self.target,
-            self.constraint.to_string(),
+            self.source, self.description, self.target, self.constraint,
         )
     }
 }

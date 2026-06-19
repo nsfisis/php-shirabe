@@ -90,8 +90,8 @@ pub trait BaseDependencyCommand: BaseCommand {
             let local_repo = repository_manager.get_local_repository();
             let root_pkg = composer.get_package();
 
-            if local_repo.get_packages()?.len() == 0
-                && (root_pkg.get_requires().len() > 0 || root_pkg.get_dev_requires().len() > 0)
+            if local_repo.get_packages()?.is_empty()
+                && (!root_pkg.get_requires().is_empty() || !root_pkg.get_dev_requires().is_empty())
             {
                 output.borrow().writeln(
                     &["<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>".to_string()],
@@ -451,7 +451,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 ""
             };
             self.write_tree_line(
-                &format!(
+                format!(
                     "{}{}{} ({}) {}",
                     prefix,
                     if is_last { "└──" } else { "├──" },
@@ -459,8 +459,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     link_text,
                     circular_warn
                 )
-                .trim_end()
-                .to_string(),
+                .trim_end(),
             );
             if let Some(children_vec) = children {
                 self.print_tree(

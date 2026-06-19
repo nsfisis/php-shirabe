@@ -49,6 +49,12 @@ pub struct UpdateCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for UpdateCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UpdateCommand {
     pub fn new() -> Self {
         let mut command = UpdateCommand {
@@ -152,7 +158,7 @@ impl Command for UpdateCommand {
         )?;
 
         // extract --with shorthands from the allowlist
-        if packages.len() > 0 {
+        if !packages.is_empty() {
             let allowlist_packages_with_requirements: Vec<String> =
                 array_filter(&packages, |pkg: &String| -> bool {
                     Preg::is_match(r"{\S+[ =:]\S+}", pkg)
@@ -191,9 +197,10 @@ impl Command for UpdateCommand {
             let package = strtolower(package);
             let parsed_constraint = parser.parse_constraints(constraint)?;
             temporary_constraints.insert(package.clone(), parsed_constraint.clone());
-            if let Some(root_req) = root_requirements.get(&package) {
-                if !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())? {
-                    io.write_error3(
+            if let Some(root_req) = root_requirements.get(&package)
+                && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
+            {
+                io.write_error3(
                         &format!(
                             "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
                             constraint,
@@ -203,13 +210,12 @@ impl Command for UpdateCommand {
                         true,
                         io_interface::NORMAL,
                     );
-                    io.write(&format!(
+                io.write(&format!(
                         "<info>Run `composer require {}` or `composer require {}:{}` instead to replace the constraint</info>",
                         package, package, constraint,
                     ));
 
-                    return Ok(crate::command::FAILURE);
-                }
+                return Ok(crate::command::FAILURE);
             }
         }
 
@@ -346,7 +352,7 @@ impl Command for UpdateCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
 
         let optimize = input
             .borrow()
@@ -476,7 +482,7 @@ impl Command for UpdateCommand {
             )
             .set_temporary_constraints(temporary_constraints)
             .set_audit_config(
-                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input.clone())?,
+                self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,
             )
             .set_minimal_update(minimal_changes);
 
@@ -587,7 +593,7 @@ impl UpdateCommand {
             composer_ref.get_package().get_dev_requires(),
         );
 
-        let filter: Option<String> = if packages.len() > 0 {
+        let filter: Option<String> = if !packages.is_empty() {
             Some(base_package::package_names_to_regexp(&packages, "%s"))
         } else {
             None
@@ -615,10 +621,10 @@ impl UpdateCommand {
             };
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
-            if let Some(filter) = &filter {
-                if !Preg::is_match(filter, &package.get_name()) {
-                    continue;
-                }
+            if let Some(filter) = &filter
+                && !Preg::is_match(filter, &package.get_name())
+            {
+                continue;
             }
             let current_version = package.get_pretty_version();
             let constraint = requires
@@ -642,20 +648,20 @@ impl UpdateCommand {
                 PhpMixed::Bool(true),
             )?;
             let _ = &platform_req_filter;
-            if let Some(latest) = latest_version {
-                if package.get_version() != latest.get_version() || latest.is_dev() {
-                    autocompleter_values.insert(
-                        package.get_name(),
-                        format!(
-                            "<comment>{}</comment> => <comment>{}</comment>",
-                            current_version,
-                            latest.get_pretty_version(),
-                        ),
-                    );
-                }
+            if let Some(latest) = latest_version
+                && (package.get_version() != latest.get_version() || latest.is_dev())
+            {
+                autocompleter_values.insert(
+                    package.get_name(),
+                    format!(
+                        "<comment>{}</comment> => <comment>{}</comment>",
+                        current_version,
+                        latest.get_pretty_version(),
+                    ),
+                );
             }
         }
-        if 0 == installed_packages.len() {
+        if installed_packages.is_empty() {
             for (req, _constraint) in &requires {
                 if PlatformRepository::is_platform_package(req) {
                     continue;
@@ -664,7 +670,7 @@ impl UpdateCommand {
             }
         }
 
-        if 0 == autocompleter_values.len() {
+        if autocompleter_values.is_empty() {
             return Err(RuntimeException {
                 message: "Could not find any package with new versions available".to_string(),
                 code: 0,

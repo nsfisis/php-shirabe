@@ -789,16 +789,16 @@ impl GitBitbucketDriver {
             _ => return,
         };
         for clone_link in list {
-            if let PhpMixed::Array(m) = clone_link.as_ref() {
-                if m.get("name").and_then(|v| v.as_string()) == Some("https") {
-                    // Format: https://(user@)bitbucket.org/{user}/{repo}
-                    // Strip username from URL (only present in clone URL's for private repositories)
-                    self.clone_https_url = Preg::replace(
-                        r"/https:\/\/([^@]+@)?/",
-                        "https://",
-                        m.get("href").and_then(|v| v.as_string()).unwrap_or(""),
-                    );
-                }
+            if let PhpMixed::Array(m) = clone_link.as_ref()
+                && m.get("name").and_then(|v| v.as_string()) == Some("https")
+            {
+                // Format: https://(user@)bitbucket.org/{user}/{repo}
+                // Strip username from URL (only present in clone URL's for private repositories)
+                self.clone_https_url = Preg::replace(
+                    r"/https:\/\/([^@]+@)?/",
+                    "https://",
+                    m.get("href").and_then(|v| v.as_string()).unwrap_or(""),
+                );
             }
         }
     }

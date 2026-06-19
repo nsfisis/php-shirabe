@@ -56,7 +56,7 @@ pub trait BaseConfigCommand: BaseCommand {
             config_rc.borrow_mut().set_base_dir(Some(home));
         }
 
-        let config_file = self.get_composer_config_file(input.clone(), &*config_rc.borrow())?;
+        let config_file = self.get_composer_config_file(input.clone(), &config_rc.borrow())?;
 
         // Create global composer.json if invoked using `composer global [config-cmd]`
         if (config_file == "composer.json" || config_file == "./composer.json")

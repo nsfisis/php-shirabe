@@ -67,7 +67,7 @@ impl SvnDownloader {
     pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &["svn", "revert", "-R", "."].map(|s| s.to_string()).to_vec(),
+            ["svn", "revert", "-R", "."].map(|s| s.to_string()).as_ref(),
             &mut output,
             Some(path.to_string()),
         ) != 0
@@ -169,13 +169,12 @@ impl VcsDownloader for SvnDownloader {
                 let repo_ref = repo.borrow();
                 if let Some(vcs_repo) = repo_ref.as_any().downcast_ref::<VcsRepository>() {
                     let repo_config = vcs_repo.get_repo_config();
-                    if repo_config.contains_key("svn-cache-credentials") {
-                        if let Some(val) = repo_config
+                    if repo_config.contains_key("svn-cache-credentials")
+                        && let Some(val) = repo_config
                             .get("svn-cache-credentials")
                             .and_then(|v| v.as_bool())
-                        {
-                            self.cache_credentials = val;
-                        }
+                    {
+                        self.cache_credentials = val;
                     }
                 }
             }
@@ -412,8 +411,8 @@ impl VcsDownloader for SvnDownloader {
             };
 
             // strip paths from references and only keep the actual revision
-            let from_revision = Preg::replace(r"{.*@(\d+)$}", "$1", &from_reference);
-            let to_revision = Preg::replace(r"{.*@(\d+)$}", "$1", &to_reference);
+            let from_revision = Preg::replace(r"{.*@(\d+)$}", "$1", from_reference);
+            let to_revision = Preg::replace(r"{.*@(\d+)$}", "$1", to_reference);
 
             let command = vec![
                 "svn".to_string(),
@@ -463,9 +462,9 @@ impl ChangeReportInterface for SvnDownloader {
 
         let mut output = String::new();
         self.inner.process.borrow_mut().execute_args(
-            &["svn", "status", "--ignore-externals"]
+            ["svn", "status", "--ignore-externals"]
                 .map(|s| s.to_string())
-                .to_vec(),
+                .as_ref(),
             &mut output,
             Some(path.to_string()),
         );

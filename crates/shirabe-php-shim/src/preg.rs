@@ -99,7 +99,7 @@ pub fn preg_match_all_set_order(
     count
 }
 
-pub fn preg_grep(pattern: &str, input: &Vec<String>) -> Vec<String> {
+pub fn preg_grep(pattern: &str, input: &[String]) -> Vec<String> {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     input.iter().filter(|s| re.is_match(s)).cloned().collect()
 }

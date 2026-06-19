@@ -240,7 +240,7 @@ impl ArgvInput {
             if let Some(key) = &first_key {
                 let input_argument = &all[key];
                 if input_argument.get_name() == "command" {
-                    symfony_command_name = self.inner.arguments.get("command").map(|v| v.clone());
+                    symfony_command_name = self.inner.arguments.get("command").cloned();
                     all.shift_remove(key);
                 }
             }

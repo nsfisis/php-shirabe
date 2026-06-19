@@ -35,6 +35,12 @@ pub struct GlobalCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for GlobalCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GlobalCommand {
     pub fn new() -> Self {
         let mut command = GlobalCommand {
@@ -116,7 +122,7 @@ impl GlobalCommand {
         // TODO(phase-c): getApplication()->resetComposer() needs the shared shirabe Application
         // handle (deferred with the Application shared-ownership work).
 
-        Ok(StringInput::new(&new_input_str)?)
+        StringInput::new(&new_input_str)
     }
 }
 

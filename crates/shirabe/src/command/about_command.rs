@@ -25,6 +25,12 @@ pub struct AboutCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for AboutCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AboutCommand {
     pub fn new() -> Self {
         let mut command = AboutCommand {

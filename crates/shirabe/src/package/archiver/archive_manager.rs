@@ -198,20 +198,20 @@ impl ArchiveManager {
                 let mut json_file = JsonFile::new(composer_json_path, None, None)?;
                 let json_data = json_file.read()?;
                 if let Some(archive) = json_data.get("archive") {
-                    if let Some(name) = archive.get("name").and_then(|v| v.as_string()) {
-                        if !name.is_empty() {
-                            package.set_archive_name(name.to_string());
-                        }
+                    if let Some(name) = archive.get("name").and_then(|v| v.as_string())
+                        && !name.is_empty()
+                    {
+                        package.set_archive_name(name.to_string());
                     }
-                    if let Some(exclude) = archive.get("exclude") {
-                        if let Some(excludes) = exclude.as_array() {
-                            let excludes: Vec<String> = excludes
-                                .values()
-                                .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                                .collect();
-                            if !excludes.is_empty() {
-                                package.set_archive_excludes(excludes);
-                            }
+                    if let Some(exclude) = archive.get("exclude")
+                        && let Some(excludes) = exclude.as_array()
+                    {
+                        let excludes: Vec<String> = excludes
+                            .values()
+                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                            .collect();
+                        if !excludes.is_empty() {
+                            package.set_archive_excludes(excludes);
                         }
                     }
                 }

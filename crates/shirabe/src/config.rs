@@ -410,12 +410,11 @@ impl Config {
                             self.config.get(key),
                             Some(PhpMixed::Array(m)) if m.contains_key("*")
                         );
-                        if has_wildcard {
-                            if let Some(PhpMixed::Array(m)) = self.config.get_mut(key) {
-                                if let Some(wildcard) = m.shift_remove("*") {
-                                    m.insert("*".to_string(), wildcard);
-                                }
-                            }
+                        if has_wildcard
+                            && let Some(PhpMixed::Array(m)) = self.config.get_mut(key)
+                            && let Some(wildcard) = m.shift_remove("*")
+                        {
+                            m.insert("*".to_string(), wildcard);
                         }
                     } else {
                         self.config.insert(key.clone(), val.clone());
@@ -481,7 +480,7 @@ impl Config {
                 }
 
                 // disable a repository with an anonymous {"name": false} repo
-                if is_array(&repository)
+                if is_array(repository)
                     && repository.as_array().map(|m| m.len()).unwrap_or(0) == 1
                     && matches!(current(repository.clone()), PhpMixed::Bool(false))
                 {
@@ -725,10 +724,10 @@ impl Config {
             // special cases below
             "cache-files-ttl" => {
                 let v = self.config.get(key).cloned();
-                if let Some(v) = v {
-                    if !v.is_null() {
-                        return Ok(PhpMixed::Int(max(0, v.as_int().unwrap_or(0))));
-                    }
+                if let Some(v) = v
+                    && !v.is_null()
+                {
+                    return Ok(PhpMixed::Int(max(0, v.as_int().unwrap_or(0))));
                 }
 
                 self.get_with_flags("cache-ttl", 0)
@@ -1203,10 +1202,11 @@ impl Config {
                 )
                 .into());
             }
-            if let Some(ref io) = io {
-                if let Some(ref hostname) = hostname {
-                    if !self.warned_hosts.contains_key(hostname) {
-                        io.write_error3(
+            if let Some(ref io) = io
+                && let Some(ref hostname) = hostname
+            {
+                if !self.warned_hosts.contains_key(hostname) {
+                    io.write_error3(
                             &format!(
                                 "<warning>Warning: Accessing {} over {} which is an insecure protocol.</warning>",
                                 hostname,
@@ -1215,51 +1215,49 @@ impl Config {
                             true,
                             io_interface::NORMAL,
                         );
-                    }
-                    self.warned_hosts.insert(hostname.clone(), true);
                 }
+                self.warned_hosts.insert(hostname.clone(), true);
             }
         }
 
-        if let Some(ref io) = io {
-            if let Some(ref hostname) = hostname {
-                if !self.ssl_verify_warned_hosts.contains_key(hostname) {
-                    let mut warning: Option<String> = None;
-                    let verify_peer = repo_options
-                        .get("ssl")
-                        .and_then(|v| v.as_array())
-                        .and_then(|m| m.get("verify_peer"));
-                    if let Some(v) = verify_peer {
-                        if v.as_bool() == Some(false) {
-                            warning = Some("verify_peer".to_string());
-                        }
-                    }
+        if let Some(ref io) = io
+            && let Some(ref hostname) = hostname
+            && !self.ssl_verify_warned_hosts.contains_key(hostname)
+        {
+            let mut warning: Option<String> = None;
+            let verify_peer = repo_options
+                .get("ssl")
+                .and_then(|v| v.as_array())
+                .and_then(|m| m.get("verify_peer"));
+            if let Some(v) = verify_peer
+                && v.as_bool() == Some(false)
+            {
+                warning = Some("verify_peer".to_string());
+            }
 
-                    let verify_peer_name = repo_options
-                        .get("ssl")
-                        .and_then(|v| v.as_array())
-                        .and_then(|m| m.get("verify_peer_name"));
-                    if let Some(v) = verify_peer_name {
-                        if v.as_bool() == Some(false) {
-                            warning = match warning {
-                                None => Some("verify_peer_name".to_string()),
-                                Some(w) => Some(format!("{} and verify_peer_name", w)),
-                            };
-                        }
-                    }
+            let verify_peer_name = repo_options
+                .get("ssl")
+                .and_then(|v| v.as_array())
+                .and_then(|m| m.get("verify_peer_name"));
+            if let Some(v) = verify_peer_name
+                && v.as_bool() == Some(false)
+            {
+                warning = match warning {
+                    None => Some("verify_peer_name".to_string()),
+                    Some(w) => Some(format!("{} and verify_peer_name", w)),
+                };
+            }
 
-                    if let Some(w) = warning {
-                        io.write_error3(
-                            &format!(
-                                "<warning>Warning: Accessing {} with {} disabled.</warning>",
-                                hostname, w
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
-                        self.ssl_verify_warned_hosts.insert(hostname.clone(), true);
-                    }
-                }
+            if let Some(w) = warning {
+                io.write_error3(
+                    &format!(
+                        "<warning>Warning: Accessing {} with {} disabled.</warning>",
+                        hostname, w
+                    ),
+                    true,
+                    io_interface::NORMAL,
+                );
+                self.ssl_verify_warned_hosts.insert(hostname.clone(), true);
             }
         }
 

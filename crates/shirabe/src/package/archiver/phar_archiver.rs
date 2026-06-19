@@ -29,6 +29,12 @@ fn compress_formats() -> IndexMap<&'static str, i64> {
 #[derive(Debug)]
 pub struct PharArchiver;
 
+impl Default for PharArchiver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PharArchiver {
     pub fn new() -> Self {
         Self

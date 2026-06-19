@@ -15,10 +15,10 @@ impl StabilityFilter {
         for name in names {
             // allow if package matches the package-specific stability flag
             if let Some(&flag) = stability_flags.get(name) {
-                if let Some(&stability_value) = STABILITIES.get(stability) {
-                    if stability_value <= flag {
-                        return true;
-                    }
+                if let Some(&stability_value) = STABILITIES.get(stability)
+                    && stability_value <= flag
+                {
+                    return true;
                 }
             } else if acceptable_stabilities.contains_key(stability) {
                 // allow if package matches the global stability requirement and has no exception

@@ -35,6 +35,12 @@ pub struct HomeCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for HomeCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HomeCommand {
     pub fn new() -> Self {
         let mut command = HomeCommand {
@@ -57,7 +63,7 @@ impl HomeCommand {
             .get("source")
             .cloned()
             .or_else(|| package.get_source_url().map(|s| s.to_string()));
-        if url.as_deref().map_or(true, |s| s.is_empty()) || show_homepage {
+        if url.as_deref().is_none_or(|s| s.is_empty()) || show_homepage {
             url = package.get_homepage().map(|s| s.to_string());
         }
 
@@ -224,13 +230,13 @@ impl Command for HomeCommand {
             let mut package_exists = false;
 
             'repos: for repo in &repos {
-                for package in repo.find_packages(&package_name, None)? {
+                for package in repo.find_packages(package_name, None)? {
                     package_exists = true;
-                    if let Some(complete_pkg) = package.as_complete() {
-                        if self.handle_package(complete_pkg, show_homepage, show_only) {
-                            handled = true;
-                            break 'repos;
-                        }
+                    if let Some(complete_pkg) = package.as_complete()
+                        && self.handle_package(complete_pkg, show_homepage, show_only)
+                    {
+                        handled = true;
+                        break 'repos;
                     }
                 }
             }

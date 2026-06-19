@@ -41,6 +41,12 @@ pub struct LicensesCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for LicensesCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LicensesCommand {
     pub fn new() -> Self {
         let mut command = LicensesCommand {
@@ -161,8 +167,7 @@ impl Command for LicensesCommand {
             }
         };
 
-        let packages: Vec<crate::package::PackageInterfaceHandle> =
-            packages.into_iter().map(|p| p.into()).collect();
+        let packages: Vec<crate::package::PackageInterfaceHandle> = packages.into_iter().collect();
         let packages = PackageSorter::sort_packages_alphabetically(packages);
         let io = self.get_io();
 

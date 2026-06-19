@@ -118,7 +118,7 @@ impl Git {
                 map.insert("%url%".to_string(), url.to_string());
                 map.insert(
                     "%sanitizedUrl%".to_string(),
-                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", &url),
+                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", url),
                 );
 
                 array_map(
@@ -198,10 +198,8 @@ impl Git {
                 counter += 1;
             }
 
-            if collect_outputs {
-                if let Some(out) = command_output {
-                    *out = PhpMixed::String(implode("", &outputs));
-                }
+            if collect_outputs && let Some(out) = command_output {
+                *out = PhpMixed::String(implode("", &outputs));
             }
 
             status
@@ -222,7 +220,7 @@ impl Git {
             // capture username/password from URL if there is one and we have no auth configured yet
             let mut output = String::new();
             self.process.borrow_mut().execute_args(
-                &vec!["git".to_string(), "remote".to_string(), "-v".to_string()],
+                &["git".to_string(), "remote".to_string(), "-v".to_string()],
                 &mut output,
                 cwd.map(|s| s.to_string()),
             );
@@ -252,7 +250,7 @@ impl Git {
         if Preg::is_match3(
             &format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
-                Self::get_github_domains_regex(&*self.config.borrow())
+                Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
             Some(&mut m),
@@ -276,7 +274,7 @@ impl Git {
 
                 if run_commands_inline(
                     &proto_url,
-                    &mut *self.process.borrow_mut(),
+                    &mut self.process.borrow_mut(),
                     &mut last_command,
                     command_output.as_deref_mut(),
                 ) == 0
@@ -286,17 +284,11 @@ impl Git {
                 messages.push(format!(
                     "- {}\n{}",
                     proto_url,
-                    Preg::replace(
-                        r"#^#m",
-                        "  ",
-                        &self.process.borrow().get_error_output().to_string()
-                    )
+                    Preg::replace(r"#^#m", "  ", self.process.borrow().get_error_output())
                 ));
 
-                if initial_clone {
-                    if let Some(ref orig) = orig_cwd {
-                        self.filesystem.borrow_mut().remove_directory(orig);
-                    }
+                if initial_clone && let Some(ref orig) = orig_cwd {
+                    self.filesystem.borrow_mut().remove_directory(orig);
                 }
             }
 
@@ -326,7 +318,7 @@ impl Git {
         let bypass_ssh_for_github = Preg::is_match(
             &format!(
                 "{{^git@{}:(.+?)\\.git$}}i",
-                Self::get_github_domains_regex(&*self.config.borrow())
+                Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
         ) && !in_array(
@@ -345,7 +337,7 @@ impl Git {
         if bypass_ssh_for_github
             || 0 != run_commands_inline(
                 url,
-                &mut *self.process.borrow_mut(),
+                &mut self.process.borrow_mut(),
                 &mut last_command,
                 command_output.as_deref_mut(),
             )
@@ -357,14 +349,14 @@ impl Git {
             let github_matched = Preg::is_match3(
                 &format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
-                    Self::get_github_domains_regex(&*self.config.borrow())
+                    Self::get_github_domains_regex(&self.config.borrow())
                 ),
                 url,
                 Some(&mut m),
             ) || Preg::is_match3(
                 &format!(
                     "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
-                    Self::get_github_domains_regex(&*self.config.borrow())
+                    Self::get_github_domains_regex(&self.config.borrow())
                 ),
                 url,
                 Some(&mut m),
@@ -408,7 +400,7 @@ impl Git {
                     );
                     if run_commands_inline(
                         &auth_url,
-                        &mut *self.process.borrow_mut(),
+                        &mut self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -419,18 +411,15 @@ impl Git {
                     credentials = vec![rawurlencode(&username), rawurlencode(&password)];
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
-            } else if {
-                let bb_matched = Preg::is_match3(
-                    r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i",
-                    url,
-                    Some(&mut m),
-                ) || Preg::is_match3(
-                    r"{^(git)@(bitbucket\.org):(.+?\.git)$}i",
-                    url,
-                    Some(&mut m),
-                );
-                bb_matched
-            } {
+            } else if Preg::is_match3(
+                r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i",
+                url,
+                Some(&mut m),
+            ) || Preg::is_match3(
+                r"{^(git)@(bitbucket\.org):(.+?\.git)$}i",
+                url,
+                Some(&mut m),
+            ) {
                 // bitbucket either through oauth or app password, with fallback to ssh.
                 let mut bitbucket_util = Bitbucket::new(
                     self.io.clone(),
@@ -493,7 +482,7 @@ impl Git {
 
                     if run_commands_inline(
                         &auth_url,
-                        &mut *self.process.borrow_mut(),
+                        &mut self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -540,7 +529,7 @@ impl Git {
                     );
                     if run_commands_inline(
                         &auth_url,
-                        &mut *self.process.borrow_mut(),
+                        &mut self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -559,7 +548,7 @@ impl Git {
                 );
                 if run_commands_inline(
                     &ssh_url,
-                    &mut *self.process.borrow_mut(),
+                    &mut self.process.borrow_mut(),
                     &mut last_command,
                     command_output.as_deref_mut(),
                 ) == 0
@@ -568,24 +557,21 @@ impl Git {
                 }
 
                 error_msg = self.process.borrow().get_error_output().to_string();
-            } else if {
-                let gl_matched = Preg::is_match3(
-                    &format!(
-                        "{{^(git)@{}:(.+?\\.git)$}}i",
-                        Self::get_gitlab_domains_regex(&*self.config.borrow())
-                    ),
-                    url,
-                    Some(&mut m),
-                ) || Preg::is_match3(
-                    &format!(
-                        "{{^(https?)://{}/(.*)}}i",
-                        Self::get_gitlab_domains_regex(&*self.config.borrow())
-                    ),
-                    url,
-                    Some(&mut m),
-                );
-                gl_matched
-            } {
+            } else if Preg::is_match3(
+                &format!(
+                    "{{^(git)@{}:(.+?\\.git)$}}i",
+                    Self::get_gitlab_domains_regex(&self.config.borrow())
+                ),
+                url,
+                Some(&mut m),
+            ) || Preg::is_match3(
+                &format!(
+                    "{{^(https?)://{}/(.*)}}i",
+                    Self::get_gitlab_domains_regex(&self.config.borrow())
+                ),
+                url,
+                Some(&mut m),
+            ) {
                 let mut m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
@@ -649,7 +635,7 @@ impl Git {
 
                     if run_commands_inline(
                         &auth_url,
-                        &mut *self.process.borrow_mut(),
+                        &mut self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -668,7 +654,7 @@ impl Git {
                 let mut auth_parts: Option<String> = None;
                 if str_contains(&m2, "@") {
                     let parts = explode("@", &m2);
-                    auth_parts = parts.get(0).cloned();
+                    auth_parts = parts.first().cloned();
                     m2 = parts.get(1).cloned().unwrap_or_default();
                 }
 
@@ -677,14 +663,14 @@ impl Git {
                     auth = Some(self.io.get_authentication(&m2));
                 } else if self.io.is_interactive() {
                     let mut default_username: Option<String> = None;
-                    if let Some(ref parts) = auth_parts {
-                        if !parts.is_empty() {
-                            if str_contains(parts, ":") {
-                                let split = explode(":", parts);
-                                default_username = split.get(0).cloned();
-                            } else {
-                                default_username = Some(parts.clone());
-                            }
+                    if let Some(ref parts) = auth_parts
+                        && !parts.is_empty()
+                    {
+                        if str_contains(parts, ":") {
+                            let split = explode(":", parts);
+                            default_username = split.first().cloned();
+                        } else {
+                            default_username = Some(parts.clone());
                         }
                     }
 
@@ -742,9 +728,9 @@ impl Git {
 
                     if run_commands_inline(
                         &auth_url,
-                        &mut *self.process.borrow_mut(),
+                        &mut self.process.borrow_mut(),
                         &mut last_command,
-                        command_output.as_deref_mut(),
+                        command_output,
                     ) == 0
                     {
                         self.io.borrow_mut().set_authentication(
@@ -768,10 +754,8 @@ impl Git {
                 }
             }
 
-            if initial_clone {
-                if let Some(ref orig) = orig_cwd {
-                    self.filesystem.borrow_mut().remove_directory(orig);
-                }
+            if initial_clone && let Some(ref orig) = orig_cwd {
+                self.filesystem.borrow_mut().remove_directory(orig);
             }
 
             let mut last_command_str = match &last_command {
@@ -822,7 +806,7 @@ impl Git {
         let mut output = String::new();
         if is_dir(dir)
             && self.process.borrow_mut().execute_args(
-                &vec![
+                &[
                     "git".to_string(),
                     "rev-parse".to_string(),
                     "--git-dir".to_string(),
@@ -933,12 +917,12 @@ impl Git {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
             if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref) && pretty_version.is_some() {
                 let branch =
-                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version.unwrap());
+                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", pretty_version.unwrap());
                 let mut branches: Option<String> = None;
                 let mut tags: Option<String> = None;
                 let mut output = String::new();
                 if self.process.borrow_mut().execute_args(
-                    &vec!["git".to_string(), "branch".to_string()],
+                    &["git".to_string(), "branch".to_string()],
                     &mut output,
                     Some(dir.to_string()),
                 ) == 0
@@ -947,7 +931,7 @@ impl Git {
                 }
                 let mut output = String::new();
                 if self.process.borrow_mut().execute_args(
-                    &vec!["git".to_string(), "tag".to_string()],
+                    &["git".to_string(), "tag".to_string()],
                     &mut output,
                     Some(dir.to_string()),
                 ) == 0
@@ -988,10 +972,10 @@ impl Git {
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> String {
         let git_version = Self::get_version(process);
-        if let Some(v) = git_version {
-            if version_compare(&v, "2.10.0-rc0", ">=") {
-                return " --no-show-signature".to_string();
-            }
+        if let Some(v) = git_version
+            && version_compare(&v, "2.10.0-rc0", ">=")
+        {
+            return " --no-show-signature".to_string();
         }
 
         String::new()
@@ -1063,7 +1047,7 @@ impl Git {
         let mut output = String::new();
         if is_dir(dir)
             && self.process.borrow_mut().execute_args(
-                &vec![
+                &[
                     "git".to_string(),
                     "rev-parse".to_string(),
                     "--git-dir".to_string(),
@@ -1075,7 +1059,7 @@ impl Git {
         {
             let mut ignored_output = String::new();
             let exit_code = self.process.borrow_mut().execute_args(
-                &vec![
+                &[
                     "git".to_string(),
                     "rev-parse".to_string(),
                     "--quiet".to_string(),
@@ -1137,7 +1121,7 @@ impl Git {
             if is_local_path_repository {
                 let mut output = String::new();
                 self.process.borrow_mut().execute_args(
-                    &vec![
+                    &[
                         "git".to_string(),
                         "remote".to_string(),
                         "show".to_string(),
@@ -1279,7 +1263,7 @@ impl Git {
 
         let mut ignored_output = String::new();
         if self.process.borrow_mut().execute_args(
-            &vec!["git".to_string(), "--version".to_string()],
+            &["git".to_string(), "--version".to_string()],
             &mut ignored_output,
             Option::<&str>::None,
         ) != 0

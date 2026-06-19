@@ -111,12 +111,11 @@ impl InstalledVersions {
                 .cloned()
                 .unwrap_or_default();
             for (name, package) in versions {
-                if let Some(pkg) = package.as_array() {
-                    if let Some(pkg_type) = pkg.get("type").and_then(|v| v.as_string()) {
-                        if pkg_type == r#type {
-                            packages_by_type.push(name);
-                        }
-                    }
+                if let Some(pkg) = package.as_array()
+                    && let Some(pkg_type) = pkg.get("type").and_then(|v| v.as_string())
+                    && pkg_type == r#type
+                {
+                    packages_by_type.push(name);
                 }
             }
         }

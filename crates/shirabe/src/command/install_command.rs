@@ -31,6 +31,12 @@ pub struct InstallCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for InstallCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InstallCommand {
     pub fn new() -> Self {
         let mut command = InstallCommand {
@@ -150,7 +156,7 @@ impl Command for InstallCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
 
         let optimize = input
             .borrow()
@@ -243,7 +249,7 @@ impl Command for InstallCommand {
             .set_apcu_autoloader(apcu, apcu_prefix.clone())
             .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?)
             .set_audit_config(
-                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input.clone())?,
+                self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,
             )
             .set_error_on_audit(
                 input

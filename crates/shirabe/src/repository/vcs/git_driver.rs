@@ -167,7 +167,7 @@ impl GitDriver {
             None,
             false,
         ));
-        self.inner.cache.as_mut().map(|c| {
+        if let Some(c) = self.inner.cache.as_mut() {
             c.set_read_only(
                 self.inner
                     .config
@@ -176,7 +176,7 @@ impl GitDriver {
                     .as_bool()
                     .unwrap_or(false),
             )
-        });
+        }
 
         Ok(())
     }
@@ -215,11 +215,11 @@ impl GitDriver {
                 for branch in &branches {
                     if !branch.is_empty() {
                         let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::match3(r"{^\* +(\S+)}", branch, Some(&mut caps)) {
-                            if let Some(name) = caps.get(&CaptureKey::ByIndex(1)) {
-                                self.root_identifier = Some(name.clone());
-                                break;
-                            }
+                        if Preg::match3(r"{^\* +(\S+)}", branch, Some(&mut caps))
+                            && let Some(name) = caps.get(&CaptureKey::ByIndex(1))
+                        {
+                            self.root_identifier = Some(name.clone());
+                            break;
                         }
                     }
                 }
@@ -338,16 +338,14 @@ impl GitDriver {
                         r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}",
                         &tag,
                         Some(&mut caps),
+                    ) && let (Some(hash), Some(name)) = (
+                        caps.get(&CaptureKey::ByIndex(1)),
+                        caps.get(&CaptureKey::ByIndex(2)),
                     ) {
-                        if let (Some(hash), Some(name)) = (
-                            caps.get(&CaptureKey::ByIndex(1)),
-                            caps.get(&CaptureKey::ByIndex(2)),
-                        ) {
-                            self.tags
-                                .as_mut()
-                                .unwrap()
-                                .insert(name.clone(), hash.clone());
-                        }
+                        self.tags
+                            .as_mut()
+                            .unwrap()
+                            .insert(name.clone(), hash.clone());
                     }
                 }
             }
@@ -379,15 +377,12 @@ impl GitDriver {
                         r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}",
                         &branch,
                         Some(&mut caps),
-                    ) {
-                        if let (Some(name), Some(hash)) = (
-                            caps.get(&CaptureKey::ByIndex(1)),
-                            caps.get(&CaptureKey::ByIndex(2)),
-                        ) {
-                            if !name.starts_with('-') {
-                                branches.insert(name.clone(), hash.clone());
-                            }
-                        }
+                    ) && let (Some(name), Some(hash)) = (
+                        caps.get(&CaptureKey::ByIndex(1)),
+                        caps.get(&CaptureKey::ByIndex(2)),
+                    ) && !name.starts_with('-')
+                    {
+                        branches.insert(name.clone(), hash.clone());
                     }
                 }
             }
@@ -430,7 +425,7 @@ impl GitDriver {
                 return Ok(true);
             }
             GitUtil::check_for_repo_ownership_error(
-                &process.borrow().get_error_output(),
+                process.borrow().get_error_output(),
                 &url,
                 Some(io.clone()),
             )?;

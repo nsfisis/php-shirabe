@@ -69,6 +69,12 @@ pub struct DiagnoseCommand {
     pub(crate) exit_code: i64,
 }
 
+impl Default for DiagnoseCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiagnoseCommand {
     pub fn new() -> Self {
         let mut command = DiagnoseCommand {
@@ -158,7 +164,7 @@ impl Command for DiagnoseCommand {
 
         if strpos(file!(), "phar:") == Some(0) {
             io.write_no_newline("Checking pubkeys: ");
-            let r = self.check_pub_keys(&*config.borrow())?;
+            let r = self.check_pub_keys(&config.borrow())?;
             self.output_result(r);
 
             io.write_no_newline("Checking Composer version: ");
@@ -172,7 +178,7 @@ impl Command for DiagnoseCommand {
         ));
 
         io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
-        let r = self.check_composer_audit(&*config.borrow())?;
+        let r = self.check_composer_audit(&config.borrow())?;
         self.output_result(r);
 
         let platform_overrides = config
@@ -194,14 +200,14 @@ impl Command for DiagnoseCommand {
         )?
         .unwrap();
         let mut php_version = php_pkg.get_pretty_version().to_string();
-        if let Some(cp) = php_pkg.as_complete() {
-            if str_contains(&cp.get_description().unwrap_or_default(), "overridden") {
-                php_version = format!(
-                    "{} - {}",
-                    php_version,
-                    cp.get_description().unwrap_or_default()
-                );
-            }
+        if let Some(cp) = php_pkg.as_complete()
+            && str_contains(&cp.get_description().unwrap_or_default(), "overridden")
+        {
+            php_version = format!(
+                "{} - {}",
+                php_version,
+                cp.get_description().unwrap_or_default()
+            );
         }
 
         io.write(&format!("PHP version: <comment>{}</comment>", php_version));
@@ -298,11 +304,11 @@ impl Command for DiagnoseCommand {
         self.output_result(PhpMixed::String(r));
 
         io.write_no_newline("Checking http connectivity to packagist: ");
-        let r = self.check_http("http", &*config.borrow())?;
+        let r = self.check_http("http", &config.borrow())?;
         self.output_result(r);
 
         io.write_no_newline("Checking https connectivity to packagist: ");
-        let r = self.check_http("https", &*config.borrow())?;
+        let r = self.check_http("https", &config.borrow())?;
         self.output_result(r);
 
         for repo in config.borrow().get_repositories() {
@@ -317,7 +323,7 @@ impl Command for DiagnoseCommand {
                 let composer_repo = ComposerRepository::new(
                     repo_arr_unboxed,
                     self.get_io().clone(),
-                    &*config.borrow(),
+                    &config.borrow(),
                     self.http_downloader.clone().unwrap(),
                     None,
                 )
@@ -339,7 +345,7 @@ impl Command for DiagnoseCommand {
                         .and_then(|v| v.as_string())
                         .unwrap_or("")
                 ));
-                let r = self.check_composer_repo(&url, &*config.borrow())?;
+                let r = self.check_composer_repo(&url, &config.borrow())?;
                 self.output_result(r);
             }
         }
@@ -375,11 +381,7 @@ impl Command for DiagnoseCommand {
                 self.output_result(if is_string(&status) {
                     status
                 } else {
-                    PhpMixed::String(format!(
-                        "<error>[{}] {}</error>",
-                        get_class_err(&e),
-                        e.to_string()
-                    ))
+                    PhpMixed::String(format!("<error>[{}] {}</error>", get_class_err(&e), e))
                 });
             } else {
                 return Err(e);
@@ -426,14 +428,14 @@ impl Command for DiagnoseCommand {
                             self.output_result(PhpMixed::String(format!(
                                 "<error>[{}] {}</error>",
                                 get_class_err(&e),
-                                e.to_string()
+                                e
                             )));
                         }
                     } else {
                         self.output_result(PhpMixed::String(format!(
                             "<error>[{}] {}</error>",
                             get_class_err(&e),
-                            e.to_string()
+                            e
                         )));
                     }
                 }
@@ -441,7 +443,7 @@ impl Command for DiagnoseCommand {
         }
 
         io.write_no_newline("Checking disk free space: ");
-        let r = self.check_disk_space(&*config.borrow());
+        let r = self.check_disk_space(&config.borrow());
         self.output_result(r);
 
         Ok(self.exit_code)
@@ -519,7 +521,7 @@ impl DiagnoseCommand {
 
         let mut output = String::new();
         let _ = self.process.as_mut().unwrap().borrow_mut().execute(
-            &vec![
+            vec![
                 "git".to_string(),
                 "config".to_string(),
                 "color.ui".to_string(),
@@ -588,7 +590,7 @@ impl DiagnoseCommand {
             result_list.push(Box::new(PhpMixed::String(w)));
         }
 
-        if result_list.len() > 0 {
+        if !result_list.is_empty() {
             return Ok(PhpMixed::List(result_list));
         }
 
@@ -639,7 +641,7 @@ impl DiagnoseCommand {
             result_list.push(Box::new(PhpMixed::String(w)));
         }
 
-        if result_list.len() > 0 {
+        if !result_list.is_empty() {
             return Ok(PhpMixed::List(result_list));
         }
 
@@ -759,18 +761,18 @@ impl DiagnoseCommand {
                 )))
             }
             Err(e) => {
-                if let Some(te) = e.downcast_ref::<TransportException>() {
-                    if te.get_code() == 401 {
-                        return Ok(PhpMixed::String(format!(
-                            "<comment>The oauth token for {} seems invalid, run \"composer config --global --unset github-oauth.{}\" to remove it</comment>",
-                            domain, domain
-                        )));
-                    }
+                if let Some(te) = e.downcast_ref::<TransportException>()
+                    && te.get_code() == 401
+                {
+                    return Ok(PhpMixed::String(format!(
+                        "<comment>The oauth token for {} seems invalid, run \"composer config --global --unset github-oauth.{}\" to remove it</comment>",
+                        domain, domain
+                    )));
                 }
                 Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
                     get_class_err(&e),
-                    e.to_string()
+                    e
                 )))
             }
         }
@@ -913,7 +915,7 @@ impl DiagnoseCommand {
                 return Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
                     get_class_err(&e),
-                    e.to_string()
+                    e
                 )));
             }
         };
@@ -1006,7 +1008,7 @@ impl DiagnoseCommand {
             Err(e) => {
                 return Ok(PhpMixed::String(format!(
                     "<highlight>Failed performing audit: {}</>",
-                    e.to_string()
+                    e
                 )));
             }
         };
@@ -1102,8 +1104,7 @@ impl DiagnoseCommand {
         let mut had_warning = false;
         let mut result = result;
         // PHP: $result instanceof \Exception → already converted to string at call sites here
-        if !result.as_bool().unwrap_or(true) && !result.as_string().is_some() && !is_array(&result)
-        {
+        if !result.as_bool().unwrap_or(true) && result.as_string().is_none() && !is_array(&result) {
             // falsey results should be considered as an error, even if there is nothing to output
             had_error = true;
         } else {
@@ -1334,7 +1335,7 @@ impl DiagnoseCommand {
                         return Err(InvalidArgumentException {
                             message: format!(
                                 "DiagnoseCommand: Unknown error type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
-                                other.to_string(),
+                                other,
                             ),
                             code: 0,
                         }
@@ -1413,7 +1414,7 @@ impl DiagnoseCommand {
                         return Err(InvalidArgumentException {
                             message: format!(
                                 "DiagnoseCommand: Unknown warning type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
-                                other.to_string(),
+                                other,
                             ),
                             code: 0,
                         }
@@ -1429,7 +1430,7 @@ impl DiagnoseCommand {
         }
 
         let composer_ipresolve = Platform::get_env("COMPOSER_IPRESOLVE").unwrap_or_default();
-        if vec!["4".to_string(), "6".to_string()].contains(&composer_ipresolve) {
+        if ["4".to_string(), "6".to_string()].contains(&composer_ipresolve) {
             warnings.insert("ipresolve".to_string(), PhpMixed::Bool(true));
             out_fn(
                 &format!(
@@ -1441,7 +1442,7 @@ impl DiagnoseCommand {
             );
         }
 
-        Ok(if warnings.len() == 0 && errors.len() == 0 {
+        Ok(if warnings.is_empty() && errors.is_empty() {
             PhpMixed::Bool(true)
         } else {
             PhpMixed::String(output)

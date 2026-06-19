@@ -56,11 +56,10 @@ impl PerforceDownloader {
         let repository = package.get_repository();
         let repo_config: Option<IndexMap<String, PhpMixed>> = if let Some(repo) = repository {
             let repo_ref = repo.borrow();
-            if let Some(vcs_repo) = repo_ref.as_any().downcast_ref::<VcsRepository>() {
-                Some(self.get_repo_config(vcs_repo))
-            } else {
-                None
-            }
+            repo_ref
+                .as_any()
+                .downcast_ref::<VcsRepository>()
+                .map(|vcs_repo| self.get_repo_config(vcs_repo))
         } else {
             None
         };

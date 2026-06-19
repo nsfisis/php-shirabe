@@ -477,7 +477,7 @@ impl SymfonyStyle {
 
         for message in messages {
             let message = Self::php_string(&message);
-            self.inner.writeln(&[message.clone()], r#type);
+            self.inner.writeln(std::slice::from_ref(&message), r#type);
             self.write_buffer(&message, true, r#type);
         }
     }
@@ -493,7 +493,8 @@ impl SymfonyStyle {
 
         for message in messages {
             let message = Self::php_string(&message);
-            self.inner.write(&[message.clone()], newline, r#type);
+            self.inner
+                .write(std::slice::from_ref(&message), newline, r#type);
             self.write_buffer(&message, newline, r#type);
         }
     }
@@ -696,8 +697,7 @@ impl StyleInterface for SymfonyStyle {
         choices: Vec<PhpMixed>,
         default: Option<PhpMixed>,
     ) -> PhpMixed {
-        let default = if default.is_some() {
-            let default = default.unwrap();
+        let default = if let Some(default) = default {
             let values = shirabe_php_shim::array_flip(&PhpMixed::List(
                 choices.iter().cloned().map(Box::new).collect(),
             ));
@@ -705,7 +705,7 @@ impl StyleInterface for SymfonyStyle {
             let _ = values;
             Some(default)
         } else {
-            default
+            None
         };
 
         // PHP: return $this->askQuestion(new ChoiceQuestion($question, $choices, $default));

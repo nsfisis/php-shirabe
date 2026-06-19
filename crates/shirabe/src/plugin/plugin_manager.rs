@@ -460,7 +460,7 @@ impl PluginManager {
         // — add_subscriber here is generic over `S: EventSubscriberInterface` and cannot
         // accept a `&dyn EventSubscriberInterface`. Skipped until subscriber dispatch is
         // implemented dynamically.
-        let _ = (&*plugin).is_event_subscriber_interface();
+        let _ = (*plugin).is_event_subscriber_interface();
         self.plugins.push(plugin);
         Ok(())
     }
@@ -520,10 +520,7 @@ impl PluginManager {
             }
         }
 
-        let sorted_packages = PackageSorter::sort_packages(
-            packages.iter().map(|p| p.clone().into()).collect(),
-            weights,
-        );
+        let sorted_packages = PackageSorter::sort_packages(packages.to_vec(), weights);
         let required_packages: Vec<crate::package::BasePackageHandle> = if !is_global_repo {
             // PHP: $requiredPackages = RepositoryUtils::filterRequiredPackages($packages, $rootPackage, true);
             let bucket: Vec<crate::package::BasePackageHandle> = vec![];
@@ -582,10 +579,7 @@ impl PluginManager {
         // TODO(plugin): deactivate plugins from a repository
         let packages = repo.get_packages()?;
         // PHP: $sortedPackages = array_reverse(PackageSorter::sortPackages($packages));
-        let mut sorted_packages = PackageSorter::sort_packages(
-            packages.iter().map(|p| p.clone().into()).collect(),
-            IndexMap::new(),
-        );
+        let mut sorted_packages = PackageSorter::sort_packages(packages.to_vec(), IndexMap::new());
         sorted_packages.reverse();
 
         for package in &sorted_packages {
@@ -615,11 +609,11 @@ impl PluginManager {
                 .find_packages_with_replacers_and_providers(require_link.get_target(), None)?
             {
                 if !collected.contains_key(&required_package.get_name()) {
-                    collected.insert(required_package.get_name(), required_package.clone().into());
+                    collected.insert(required_package.get_name(), required_package.clone());
                     collected = self.collect_dependencies(
                         installed_repo,
                         collected,
-                        required_package.clone().into(),
+                        required_package.clone(),
                     )?;
                 }
             }
@@ -794,12 +788,12 @@ impl PluginManager {
     }
 
     pub fn are_plugins_disabled(&self, r#type: &str) -> bool {
-        match (&self.disable_plugins, r#type) {
-            (DisablePlugins::All, _) => true,
-            (DisablePlugins::Local, "local") => true,
-            (DisablePlugins::Global, "global") => true,
-            _ => false,
-        }
+        matches!(
+            (&self.disable_plugins, r#type),
+            (DisablePlugins::All, _)
+                | (DisablePlugins::Local, "local")
+                | (DisablePlugins::Global, "global")
+        )
     }
 
     pub fn disable_plugins(&mut self) {

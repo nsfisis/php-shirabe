@@ -271,7 +271,7 @@ impl Solver {
             crate::io::VERBOSE,
         );
 
-        if self.problems.len() > 0 {
+        if !self.problems.is_empty() {
             // TODO(phase-c): SolverProblemsException stores `Rc<RefCell<Rule>>` which is not
             // `Send + Sync`, so it cannot satisfy `anyhow::Error`'s bounds. Returning a
             // placeholder error preserves control flow until the solver error path is reworked to
@@ -285,18 +285,10 @@ impl Solver {
 
         // LockTransaction stores PackageInterfaceHandle maps; widen the request's BasePackageHandle
         // maps into them.
-        let present_map = request
-            .get_present_map(false)?
-            .into_iter()
-            .map(|(k, v)| (k, v.into()))
-            .collect();
-        let unlockable_map = request
-            .get_fixed_packages_map()
-            .into_iter()
-            .map(|(k, v)| (k, v.into()))
-            .collect();
+        let present_map = request.get_present_map(false)?.into_iter().collect();
+        let unlockable_map = request.get_fixed_packages_map().into_iter().collect();
         Ok(LockTransaction::new(
-            &*self.pool.borrow(),
+            &self.pool.borrow(),
             present_map,
             unlockable_map,
             &self.decisions,
@@ -430,7 +422,7 @@ impl Solver {
     ) -> anyhow::Result<i64> {
         // choose best package to install from decisionQueue
         let mut literals = self.policy.select_preferred_packages(
-            &*self.pool.borrow(),
+            &self.pool.borrow(),
             decision_queue,
             rule.borrow().get_required_package(),
         );
@@ -439,7 +431,7 @@ impl Solver {
             .expect("select_preferred_packages returned an empty literal list");
 
         // if there are multiple candidates, then branch
-        if literals.len() > 0 {
+        if !literals.is_empty() {
             self.branches.push((literals, level));
         }
 
@@ -519,8 +511,8 @@ impl Solver {
                         return Err(anyhow::anyhow!(SolverBugException::new(format!(
                             "Reached invalid decision id {} while looking through {} for a literal present in the analyzed rule {}.",
                             decision_id,
-                            rule.borrow().to_string(),
-                            analyzed_rule.borrow().to_string()
+                            rule.borrow(),
+                            analyzed_rule.borrow()
                         ))));
                     }
 
@@ -600,7 +592,7 @@ impl Solver {
             None => {
                 return Err(anyhow::anyhow!(SolverBugException::new(format!(
                     "Did not find a learnable literal in analyzed rule {}.",
-                    analyzed_rule.borrow().to_string()
+                    analyzed_rule.borrow()
                 ))));
             }
         };
@@ -731,7 +723,7 @@ impl Solver {
                             }
                         }
 
-                        if none_satisfied && decision_queue.len() > 0 {
+                        if none_satisfied && !decision_queue.is_empty() {
                             // if any of the options in the decision queue are fixed, only use those
                             let mut pruned_queue: Vec<i64> = Vec::new();
                             for literal in &decision_queue {
@@ -739,12 +731,12 @@ impl Solver {
                                     pruned_queue.push(*literal);
                                 }
                             }
-                            if pruned_queue.len() > 0 {
+                            if !pruned_queue.is_empty() {
                                 decision_queue = pruned_queue;
                             }
                         }
 
-                        if none_satisfied && decision_queue.len() > 0 {
+                        if none_satisfied && !decision_queue.is_empty() {
                             let o_level = level;
                             level = self.select_and_install(level, decision_queue, rule)?;
 
@@ -875,7 +867,7 @@ impl Solver {
             }
 
             // minimization step
-            if self.branches.len() > 0 {
+            if !self.branches.is_empty() {
                 let mut last_literal: Option<i64> = None;
                 let mut last_level: Option<i64> = None;
                 let mut last_branch_index = 0_usize;

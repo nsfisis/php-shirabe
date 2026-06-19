@@ -93,49 +93,34 @@ impl JsonConfigSource {
                 "scripts-aliases",
                 "support",
             ] {
-                if let PhpMixed::Array(map) = &mut config {
-                    if let Some(boxed) = map.get(prop) {
-                        if let PhpMixed::Array(inner) = boxed.as_ref() {
-                            if inner.is_empty() {
-                                // PHP: $config[$prop] = new \stdClass;
-                                map.insert(
-                                    prop.to_string(),
-                                    Box::new(PhpMixed::Array(IndexMap::new())),
-                                );
-                            }
-                        }
-                    }
+                if let PhpMixed::Array(map) = &mut config
+                    && let Some(boxed) = map.get(prop)
+                    && let PhpMixed::Array(inner) = boxed.as_ref()
+                    && inner.is_empty()
+                {
+                    // PHP: $config[$prop] = new \stdClass;
+                    map.insert(prop.to_string(), Box::new(PhpMixed::Array(IndexMap::new())));
                 }
             }
             for prop in ["psr-0", "psr-4"] {
                 if let PhpMixed::Array(map) = &mut config {
-                    if let Some(autoload) = map.get_mut("autoload") {
-                        if let PhpMixed::Array(autoload_map) = autoload.as_mut() {
-                            if let Some(inner) = autoload_map.get(prop) {
-                                if let PhpMixed::Array(inner_map) = inner.as_ref() {
-                                    if inner_map.is_empty() {
-                                        autoload_map.insert(
-                                            prop.to_string(),
-                                            Box::new(PhpMixed::Array(IndexMap::new())),
-                                        );
-                                    }
-                                }
-                            }
-                        }
+                    if let Some(autoload) = map.get_mut("autoload")
+                        && let PhpMixed::Array(autoload_map) = autoload.as_mut()
+                        && let Some(inner) = autoload_map.get(prop)
+                        && let PhpMixed::Array(inner_map) = inner.as_ref()
+                        && inner_map.is_empty()
+                    {
+                        autoload_map
+                            .insert(prop.to_string(), Box::new(PhpMixed::Array(IndexMap::new())));
                     }
-                    if let Some(autoload_dev) = map.get_mut("autoload-dev") {
-                        if let PhpMixed::Array(autoload_dev_map) = autoload_dev.as_mut() {
-                            if let Some(inner) = autoload_dev_map.get(prop) {
-                                if let PhpMixed::Array(inner_map) = inner.as_ref() {
-                                    if inner_map.is_empty() {
-                                        autoload_dev_map.insert(
-                                            prop.to_string(),
-                                            Box::new(PhpMixed::Array(IndexMap::new())),
-                                        );
-                                    }
-                                }
-                            }
-                        }
+                    if let Some(autoload_dev) = map.get_mut("autoload-dev")
+                        && let PhpMixed::Array(autoload_dev_map) = autoload_dev.as_mut()
+                        && let Some(inner) = autoload_dev_map.get(prop)
+                        && let PhpMixed::Array(inner_map) = inner.as_ref()
+                        && inner_map.is_empty()
+                    {
+                        autoload_dev_map
+                            .insert(prop.to_string(), Box::new(PhpMixed::Array(IndexMap::new())));
                     }
                 }
             }
@@ -150,21 +135,14 @@ impl JsonConfigSource {
                 "forgejo-token",
                 "preferred-install",
             ] {
-                if let PhpMixed::Array(map) = &mut config {
-                    if let Some(cfg) = map.get_mut("config") {
-                        if let PhpMixed::Array(cfg_map) = cfg.as_mut() {
-                            if let Some(inner) = cfg_map.get(prop) {
-                                if let PhpMixed::Array(inner_map) = inner.as_ref() {
-                                    if inner_map.is_empty() {
-                                        cfg_map.insert(
-                                            prop.to_string(),
-                                            Box::new(PhpMixed::Array(IndexMap::new())),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if let PhpMixed::Array(map) = &mut config
+                    && let Some(cfg) = map.get_mut("config")
+                    && let PhpMixed::Array(cfg_map) = cfg.as_mut()
+                    && let Some(inner) = cfg_map.get(prop)
+                    && let PhpMixed::Array(inner_map) = inner.as_ref()
+                    && inner_map.is_empty()
+                {
+                    cfg_map.insert(prop.to_string(), Box::new(PhpMixed::Array(IndexMap::new())));
                 }
             }
             self.file.borrow().write(config)?;
@@ -282,7 +260,7 @@ impl JsonConfigSource {
                 .entry(seg.to_string())
                 .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())));
             if !matches!(entry.as_ref(), PhpMixed::Array(_)) {
-                *entry = Box::new(PhpMixed::Array(IndexMap::new()));
+                **entry = PhpMixed::Array(IndexMap::new());
             }
             cursor = match entry.as_mut() {
                 PhpMixed::Array(m) => m,
@@ -346,18 +324,17 @@ impl ConfigSourceInterface for JsonConfigSource {
                             {
                                 let mut replaced = IndexMap::new();
                                 replaced.insert(name.to_string(), Box::new(PhpMixed::Bool(false)));
-                                *repository = Box::new(PhpMixed::Array(replaced));
+                                **repository = PhpMixed::Array(replaced);
                                 return Ok(());
                             }
-                            if let PhpMixed::Array(m) = repository.as_ref() {
-                                if m.len() == 1
-                                    && matches!(
-                                        m.get(name).map(|b| b.as_ref()),
-                                        Some(PhpMixed::Bool(false))
-                                    )
-                                {
-                                    return Ok(());
-                                }
+                            if let PhpMixed::Array(m) = repository.as_ref()
+                                && m.len() == 1
+                                && matches!(
+                                    m.get(name).map(|b| b.as_ref()),
+                                    Some(PhpMixed::Bool(false))
+                                )
+                            {
+                                return Ok(());
                             }
                         }
                     } else {
@@ -377,18 +354,19 @@ impl ConfigSourceInterface for JsonConfigSource {
                 }
 
                 let mut repo_config = config;
-                if let PhpMixed::Array(rc) = &repo_config {
-                    if !name.is_empty() && !rc.contains_key("name") {
-                        let mut with_name = IndexMap::new();
-                        with_name.insert(
-                            "name".to_string(),
-                            Box::new(PhpMixed::String(name.to_string())),
-                        );
-                        for (k, v) in rc.clone() {
-                            with_name.insert(k, v);
-                        }
-                        repo_config = PhpMixed::Array(with_name);
+                if let PhpMixed::Array(rc) = &repo_config
+                    && !name.is_empty()
+                    && !rc.contains_key("name")
+                {
+                    let mut with_name = IndexMap::new();
+                    with_name.insert(
+                        "name".to_string(),
+                        Box::new(PhpMixed::String(name.to_string())),
+                    );
+                    for (k, v) in rc.clone() {
+                        with_name.insert(k, v);
                     }
+                    repo_config = PhpMixed::Array(with_name);
                 }
 
                 Self::dedupe_repositories_by_name(root, name);
@@ -441,16 +419,15 @@ impl ConfigSourceInterface for JsonConfigSource {
                             index_to_insert = Some(i);
                             break;
                         }
-                        if let PhpMixed::Array(m) = repository.as_ref() {
-                            if m.len() == 1
-                                && matches!(
-                                    m.get(reference_name).map(|b| b.as_ref()),
-                                    Some(PhpMixed::Bool(false))
-                                )
-                            {
-                                index_to_insert = Some(i);
-                                break;
-                            }
+                        if let PhpMixed::Array(m) = repository.as_ref()
+                            && m.len() == 1
+                            && matches!(
+                                m.get(reference_name).map(|b| b.as_ref()),
+                                Some(PhpMixed::Bool(false))
+                            )
+                        {
+                            index_to_insert = Some(i);
+                            break;
                         }
                     }
                 }
@@ -466,18 +443,19 @@ impl ConfigSourceInterface for JsonConfigSource {
                 };
 
                 let mut repo_config = config;
-                if let PhpMixed::Array(rc) = &repo_config {
-                    if !name.is_empty() && !rc.contains_key("name") {
-                        let mut with_name = IndexMap::new();
-                        with_name.insert(
-                            "name".to_string(),
-                            Box::new(PhpMixed::String(name.to_string())),
-                        );
-                        for (k, v) in rc.clone() {
-                            with_name.insert(k, v);
-                        }
-                        repo_config = PhpMixed::Array(with_name);
+                if let PhpMixed::Array(rc) = &repo_config
+                    && !name.is_empty()
+                    && !rc.contains_key("name")
+                {
+                    let mut with_name = IndexMap::new();
+                    with_name.insert(
+                        "name".to_string(),
+                        Box::new(PhpMixed::String(name.to_string())),
+                    );
+                    for (k, v) in rc.clone() {
+                        with_name.insert(k, v);
                     }
+                    repo_config = PhpMixed::Array(with_name);
                 }
 
                 if let Some(PhpMixed::List(list)) = root.get_mut("repositories").map(|b| b.as_mut())
@@ -529,13 +507,13 @@ impl ConfigSourceInterface for JsonConfigSource {
                                 break;
                             }
                         }
-                        if let Some(k) = target {
-                            if let Some(PhpMixed::Array(m)) = map.get_mut(&k).map(|b| b.as_mut()) {
-                                m.insert(
-                                    "url".to_string(),
-                                    Box::new(PhpMixed::String(url.to_string())),
-                                );
-                            }
+                        if let Some(k) = target
+                            && let Some(PhpMixed::Array(m)) = map.get_mut(&k).map(|b| b.as_mut())
+                        {
+                            m.insert(
+                                "url".to_string(),
+                                Box::new(PhpMixed::String(url.to_string())),
+                            );
                         }
                     }
                     _ => {}
@@ -587,7 +565,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if auth_config {
                     let parts = explode(".", name);
                     m.add_sub_node(
-                        parts.get(0).map(String::as_str).unwrap_or(""),
+                        parts.first().map(String::as_str).unwrap_or(""),
                         parts.get(1).map(String::as_str).unwrap_or(""),
                         value_cloned,
                         false,
@@ -625,7 +603,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if auth_config {
                     let parts = explode(".", name);
                     m.remove_sub_node(
-                        parts.get(0).map(String::as_str).unwrap_or(""),
+                        parts.first().map(String::as_str).unwrap_or(""),
                         parts.get(1).map(String::as_str).unwrap_or(""),
                     )
                 } else {
@@ -669,7 +647,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                         .entry(first.to_string())
                         .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())));
                     if !matches!(entry.as_ref(), PhpMixed::Array(_)) {
-                        *entry = Box::new(PhpMixed::Array(IndexMap::new()));
+                        **entry = PhpMixed::Array(IndexMap::new());
                     }
                     let mut cursor = match entry.as_mut() {
                         PhpMixed::Array(m) => m,
@@ -680,7 +658,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                             .entry(bit.to_string())
                             .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())));
                         if !matches!(e.as_ref(), PhpMixed::Array(_)) {
-                            *e = Box::new(PhpMixed::Array(IndexMap::new()));
+                            **e = PhpMixed::Array(IndexMap::new());
                         }
                         cursor = match e.as_mut() {
                             PhpMixed::Array(m) => m,

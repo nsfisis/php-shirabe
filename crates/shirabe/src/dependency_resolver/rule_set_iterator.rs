@@ -59,7 +59,7 @@ impl RuleSetIterator {
 
                 self.current_type = self.types[self.current_type_offset as usize];
 
-                if self.rules[&self.current_type].len() != 0 {
+                if !self.rules[&self.current_type].is_empty() {
                     break;
                 }
             }
@@ -81,7 +81,7 @@ impl RuleSetIterator {
 
             self.current_type = self.types[self.current_type_offset as usize];
 
-            if self.rules[&self.current_type].len() != 0 {
+            if !self.rules[&self.current_type].is_empty() {
                 break;
             }
         }

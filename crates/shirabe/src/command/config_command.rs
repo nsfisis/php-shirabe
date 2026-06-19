@@ -70,6 +70,12 @@ impl ConfigCommand {
     ];
 }
 
+impl Default for ConfigCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConfigCommand {
     pub fn new() -> Self {
         let mut command = ConfigCommand {
@@ -157,7 +163,7 @@ impl Command for ConfigCommand {
         )?;
 
         let auth_config_file =
-            self.get_auth_config_file(input.clone(), &*self.config.as_ref().unwrap().borrow())?;
+            self.get_auth_config_file(input.clone(), &self.config.as_ref().unwrap().borrow())?;
 
         let auth_config_file_jf = std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
             auth_config_file,
@@ -299,7 +305,7 @@ impl Command for ConfigCommand {
             let config_rc = self.config.as_ref().unwrap().clone();
             self.get_io()
                 .borrow_mut()
-                .load_configuration(&mut *config_rc.borrow_mut())?;
+                .load_configuration(&mut config_rc.borrow_mut())?;
         }
 
         // List the configuration of the file settings
@@ -407,12 +413,7 @@ impl Command for ConfigCommand {
                 let bits = explode(".", &setting_key);
                 // PHP: $data here is the mixed dot-segment cursor; the rest of the loop walks it.
                 let mut cursor: PhpMixed = if bits[0] == "extra" || bits[0] == "suggest" {
-                    PhpMixed::Array(
-                        raw_data
-                            .as_array()
-                            .map(|a| a.clone())
-                            .unwrap_or_else(IndexMap::new),
-                    )
+                    PhpMixed::Array(raw_data.as_array().cloned().unwrap_or_else(IndexMap::new))
                 } else {
                     data.get("config").cloned().unwrap_or(PhpMixed::Null)
                 };
@@ -425,12 +426,12 @@ impl Command for ConfigCommand {
                     };
                     key_acc = Some(new_key.clone());
                     r#match = false;
-                    if let Some(arr) = cursor.as_array() {
-                        if let Some(v) = arr.get(&new_key) {
-                            r#match = true;
-                            cursor = (**v).clone();
-                            key_acc = None;
-                        }
+                    if let Some(arr) = cursor.as_array()
+                        && let Some(v) = arr.get(&new_key)
+                    {
+                        r#match = true;
+                        cursor = (**v).clone();
+                        key_acc = None;
                     }
                 }
 
@@ -564,7 +565,7 @@ impl Command for ConfigCommand {
         };
         let boolean_normalizer = |val: &PhpMixed| -> PhpMixed {
             let s = val.as_string().unwrap_or("");
-            PhpMixed::Bool(s != "false" && s != "" && s != "0")
+            PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
         };
 
         // handle config values
@@ -1133,7 +1134,7 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches[1] == "custom-headers" {
-                if values.len() == 0 {
+                if values.is_empty() {
                     return Err(RuntimeException {
                         message: "Expected at least one argument (header), got none".to_string(),
                         code: 0,
@@ -1279,7 +1280,7 @@ impl ConfigCommand {
         &mut self,
         key: &str,
         callbacks: &(ValidatorFn, NormalizerFn),
-        values: &Vec<String>,
+        values: &[String],
         method: &str,
     ) -> anyhow::Result<()> {
         let (validator, normalizer) = callbacks;
@@ -1349,7 +1350,7 @@ impl ConfigCommand {
         &mut self,
         key: &str,
         callbacks: &(ValidatorFn, NormalizerFn),
-        values: &Vec<String>,
+        values: &[String],
         method: &str,
     ) -> anyhow::Result<()> {
         let (validator, normalizer) = callbacks;
@@ -1551,7 +1552,7 @@ fn boolean_validator(val: &PhpMixed) -> PhpMixed {
 
 fn boolean_normalizer(val: &PhpMixed) -> PhpMixed {
     let s = val.as_string().unwrap_or("");
-    PhpMixed::Bool(s != "false" && s != "" && s != "0")
+    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
 }
 
 fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)> {
@@ -1624,7 +1625,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
                 if s == "prompt" {
                     PhpMixed::String("prompt".to_string())
                 } else {
-                    PhpMixed::Bool(s != "false" && s != "" && s != "0")
+                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
             }),
         ),
@@ -1772,7 +1773,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
                 if s == "stash" {
                     PhpMixed::String("stash".to_string())
                 } else {
-                    PhpMixed::Bool(s != "false" && s != "" && s != "0")
+                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
             }),
         ),
@@ -1845,7 +1846,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
                 if s == "dev" || s == "no-dev" {
                     val.clone()
                 } else {
-                    PhpMixed::Bool(s != "false" && s != "" && s != "0")
+                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
             }),
         ),
@@ -1924,7 +1925,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
                 if s == "php-only" {
                     PhpMixed::String("php-only".to_string())
                 } else {
-                    PhpMixed::Bool(s != "false" && s != "" && s != "0")
+                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
             }),
         ),
@@ -1949,7 +1950,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
                 if s == "prompt" {
                     PhpMixed::String("prompt".to_string())
                 } else {
-                    PhpMixed::Bool(s != "false" && s != "" && s != "0")
+                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
             }),
         ),
@@ -2197,10 +2198,10 @@ fn key_first_key(value: &PhpMixed) -> Option<String> {
     if let Some(arr) = value.as_array() {
         return arr.keys().next().cloned();
     }
-    if let Some(list) = value.as_list() {
-        if !list.is_empty() {
-            return Some("0".to_string());
-        }
+    if let Some(list) = value.as_list()
+        && !list.is_empty()
+    {
+        return Some("0".to_string());
     }
     None
 }

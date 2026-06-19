@@ -120,7 +120,10 @@ impl ChoiceQuestion {
                 ) {
                     return Err(InvalidArgumentException(
                         shirabe_php_shim::InvalidArgumentException {
-                            message: shirabe_php_shim::sprintf(&error_message, &[selected.clone()]),
+                            message: shirabe_php_shim::sprintf(
+                                &error_message,
+                                std::slice::from_ref(&selected),
+                            ),
                             code: 0,
                         },
                     ));
@@ -198,7 +201,10 @@ impl ChoiceQuestion {
                 if matches!(result, PhpMixed::Bool(false)) {
                     return Err(InvalidArgumentException(
                         shirabe_php_shim::InvalidArgumentException {
-                            message: shirabe_php_shim::sprintf(&error_message, &[value.clone()]),
+                            message: shirabe_php_shim::sprintf(
+                                &error_message,
+                                std::slice::from_ref(value),
+                            ),
                             code: 0,
                         },
                     ));

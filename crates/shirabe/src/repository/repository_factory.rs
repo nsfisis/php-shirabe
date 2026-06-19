@@ -48,11 +48,9 @@ impl RepositoryFactory {
                 Some(io.clone()),
             )?;
             let data = json.read()?;
-            let has_packages = data.get("packages").map_or(false, |v| !v.is_null());
-            let has_includes = data.get("includes").map_or(false, |v| !v.is_null());
-            let has_provider_includes = data
-                .get("provider-includes")
-                .map_or(false, |v| !v.is_null());
+            let has_packages = data.get("packages").is_some_and(|v| !v.is_null());
+            let has_includes = data.get("includes").is_some_and(|v| !v.is_null());
+            let has_provider_includes = data.get("provider-includes").is_some_and(|v| !v.is_null());
             if has_packages || has_includes || has_provider_includes {
                 let real_path = std::fs::canonicalize(repository)
                     .ok()
@@ -153,7 +151,7 @@ impl RepositoryFactory {
         };
         if let Some(io) = &io {
             io.borrow_mut()
-                .load_configuration(&mut *config.borrow_mut())?;
+                .load_configuration(&mut config.borrow_mut())?;
         }
 
         let mut owned_rm;
@@ -241,7 +239,7 @@ impl RepositoryFactory {
         )?));
         let mut manager = Self::manager(io.clone(), &config, None, None, None)?;
         io.borrow_mut()
-            .load_configuration(&mut *config.borrow_mut())?;
+            .load_configuration(&mut config.borrow_mut())?;
         Self::default_repos(Some(io), Some(config), Some(&mut manager))
     }
 

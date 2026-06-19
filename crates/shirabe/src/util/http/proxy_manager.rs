@@ -110,10 +110,10 @@ impl ProxyManager {
 
     fn get_proxy_env(env_name: &str) -> (Option<String>, String) {
         for name in [env_name.to_lowercase(), env_name.to_uppercase()] {
-            if let Ok(val) = std::env::var(&name) {
-                if !val.is_empty() {
-                    return (Some(val), name);
-                }
+            if let Ok(val) = std::env::var(&name)
+                && !val.is_empty()
+            {
+                return (Some(val), name);
             }
         }
         (None, String::new())

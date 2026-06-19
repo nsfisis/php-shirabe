@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFilter.php
 
 use shirabe_php_shim::PharData;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct ArchivableFilesFilter {
     inner: Box<dyn Iterator<Item = PathBuf>>,
@@ -16,7 +16,7 @@ impl ArchivableFilesFilter {
         }
     }
 
-    fn accept(&mut self, file: &PathBuf) -> bool {
+    fn accept(&mut self, file: &Path) -> bool {
         if file.is_dir() {
             self.dirs.push(file.to_string_lossy().into_owned());
             return false;

@@ -98,10 +98,10 @@ pub struct Factory;
 impl Factory {
     fn get_home_dir() -> anyhow::Result<String> {
         let home = Platform::get_env("COMPOSER_HOME");
-        if let Some(h) = home {
-            if !h.is_empty() {
-                return Ok(h);
-            }
+        if let Some(h) = home
+            && !h.is_empty()
+        {
+            return Ok(h);
         }
 
         if Platform::is_windows() {
@@ -369,7 +369,7 @@ impl Factory {
         let env = Platform::get_env("COMPOSER");
         if let Some(env_str) = env {
             let env_trimmed = trim(&env_str, Some(" \t\n\r\0\u{0B}"));
-            if env_trimmed != "" {
+            if !env_trimmed.is_empty() {
                 if is_dir(&env_trimmed) {
                     return Err(anyhow::anyhow!(RuntimeException {
                         message: format!(
@@ -448,10 +448,11 @@ impl Factory {
         // if a custom composer.json path is given, we change the default cwd to be that file's directory
         let mut local_config = local_config;
         let mut cwd = cwd.map(|s| s.to_string());
-        if let Some(LocalConfigInput::Path(ref s)) = local_config {
-            if is_file(s) && cwd.is_none() {
-                cwd = Some(dirname(s));
-            }
+        if let Some(LocalConfigInput::Path(ref s)) = local_config
+            && is_file(s)
+            && cwd.is_none()
+        {
+            cwd = Some(dirname(s));
         }
 
         let cwd = match cwd {
@@ -489,21 +490,21 @@ impl Factory {
                 }));
             }
 
-            if !Platform::is_input_completion_process() {
-                if let Err(e) = file.validate_schema(JsonFile::LAX_SCHEMA, None) {
-                    if let Some(jve) = e.downcast_ref::<JsonValidationException>() {
-                        let errors = format!(
-                            " - {}",
-                            implode(&format!("{} - ", PHP_EOL), jve.get_errors())
-                        );
-                        let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
-                        return Err(anyhow::anyhow!(JsonValidationException::new(
-                            message,
-                            jve.get_errors().clone(),
-                        )));
-                    }
-                    return Err(e);
+            if !Platform::is_input_completion_process()
+                && let Err(e) = file.validate_schema(JsonFile::LAX_SCHEMA, None)
+            {
+                if let Some(jve) = e.downcast_ref::<JsonValidationException>() {
+                    let errors = format!(
+                        " - {}",
+                        implode(&format!("{} - ", PHP_EOL), jve.get_errors())
+                    );
+                    let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
+                    return Err(anyhow::anyhow!(JsonValidationException::new(
+                        message,
+                        jve.get_errors().clone(),
+                    )));
                 }
+                return Err(e);
             }
 
             local_config_data = file
@@ -604,7 +605,7 @@ impl Factory {
                     if full_load {
                         // load auth configs into the IO instance
                         io.borrow_mut()
-                            .load_configuration(&mut *config.borrow_mut())?;
+                            .load_configuration(&mut config.borrow_mut())?;
 
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
@@ -734,7 +735,7 @@ impl Factory {
                         ));
 
                         // initialize archive manager
-                        let am = self.create_archive_manager(&*config.borrow(), &dm, &r#loop)?;
+                        let am = self.create_archive_manager(&config.borrow(), &dm, &r#loop)?;
                         composer_full
                             .set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(am)));
                     }
@@ -826,7 +827,7 @@ impl Factory {
             let global_composer = if !is_global {
                 self.create_global_composer(
                     io.clone(),
-                    &*config.borrow(),
+                    &config.borrow(),
                     disable_plugins,
                     disable_scripts,
                     false,
@@ -1004,7 +1005,7 @@ impl Factory {
             Some("source") => {
                 dm.set_prefer_source(true);
             }
-            Some("auto") | _ => {
+            _ => {
                 // noop
             }
         }
@@ -1404,24 +1405,24 @@ impl Factory {
         let http_downloader = match http_downloader_result {
             Ok(h) => h,
             Err(e) => {
-                if let Some(te) = e.downcast_ref::<TransportException>() {
-                    if strpos(&te.get_message(), "cafile").is_some() {
-                        io.write3(
+                if let Some(te) = e.downcast_ref::<TransportException>()
+                    && strpos(te.get_message(), "cafile").is_some()
+                {
+                    io.write3(
                             "<error>Unable to locate a valid CA certificate file. You must set a valid 'cafile' option.</error>",
                             true,
                             crate::io::NORMAL,
                         );
-                        io.write3(
+                    io.write3(
                             "<error>A valid CA certificate file is required for SSL/TLS protection.</error>",
                             true,
                             crate::io::NORMAL,
                         );
-                        io.write3(
+                    io.write3(
                             "<error>You can disable this error, at your own risk, by setting the 'disable-tls' option to true.</error>",
                             true,
                             crate::io::NORMAL,
                         );
-                    }
                 }
                 return Err(e);
             }

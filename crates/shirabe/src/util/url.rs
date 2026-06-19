@@ -166,7 +166,7 @@ impl Url {
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
         let url = Preg::replace(r"([&?]access_token=)[^&]+", "$1***", &url);
 
-        let url = Preg::replace_callback(
+        Preg::replace_callback(
             r"(?i)^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@",
             |m| {
                 let user = m
@@ -185,8 +185,6 @@ impl Url {
                 }
             },
             &url,
-        );
-
-        url
+        )
     }
 }

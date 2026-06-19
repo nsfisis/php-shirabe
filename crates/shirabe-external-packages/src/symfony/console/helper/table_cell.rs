@@ -78,11 +78,6 @@ impl TableCell {
         Self::new(value, options).expect("TableCell options built internally are always valid")
     }
 
-    /// Returns the cell value.
-    pub fn to_string(&self) -> String {
-        self.value.clone()
-    }
-
     /// Gets number of colspan.
     pub fn get_colspan(&self) -> i64 {
         match self.options["colspan"] {

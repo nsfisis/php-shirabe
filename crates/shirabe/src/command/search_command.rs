@@ -33,6 +33,12 @@ pub struct SearchCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for SearchCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SearchCommand {
     pub fn new() -> Self {
         let mut command = SearchCommand {
@@ -217,7 +223,7 @@ impl Command for SearchCommand {
 
         let results = repos.search(query, mode, r#type)?;
 
-        if results.len() > 0 && format == "text" {
+        if !results.is_empty() && format == "text" {
             let width = self.get_terminal_width();
             let mut name_length: i64 = 0;
             for result in &results {

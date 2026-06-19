@@ -140,37 +140,32 @@ impl InstalledRepository {
                 let needles_snapshot = needles.clone();
                 for link in package.get_replaces().values() {
                     for needle in &needles_snapshot {
-                        if link.get_source() == needle.as_str() {
-                            if constraint.is_none()
-                                || link.get_constraint().matches(constraint.as_ref().unwrap())
-                            {
-                                if packages_in_tree.contains(&link.get_target().to_string()) {
-                                    results.push(DependentsEntry(
-                                        package.clone(),
-                                        link.clone(),
-                                        None,
-                                    ));
-                                    continue;
-                                }
-                                packages_in_tree.push(link.get_target().to_string());
-                                let dependents = if recurse {
-                                    self.get_dependents(
-                                        NeedleInput::Single(link.get_target().to_string()),
-                                        None,
-                                        false,
-                                        true,
-                                        Some(packages_in_tree.clone()),
-                                    )?
-                                } else {
-                                    vec![]
-                                };
-                                results.push(DependentsEntry(
-                                    package.clone(),
-                                    link.clone(),
-                                    Some(dependents),
-                                ));
-                                needles.push(link.get_target().to_string());
+                        if link.get_source() == needle.as_str()
+                            && (constraint.is_none()
+                                || link.get_constraint().matches(constraint.as_ref().unwrap()))
+                        {
+                            if packages_in_tree.contains(&link.get_target().to_string()) {
+                                results.push(DependentsEntry(package.clone(), link.clone(), None));
+                                continue;
                             }
+                            packages_in_tree.push(link.get_target().to_string());
+                            let dependents = if recurse {
+                                self.get_dependents(
+                                    NeedleInput::Single(link.get_target().to_string()),
+                                    None,
+                                    false,
+                                    true,
+                                    Some(packages_in_tree.clone()),
+                                )?
+                            } else {
+                                vec![]
+                            };
+                            results.push(DependentsEntry(
+                                package.clone(),
+                                link.clone(),
+                                Some(dependents),
+                            ));
+                            needles.push(link.get_target().to_string());
                         }
                     }
                 }
@@ -187,7 +182,7 @@ impl InstalledRepository {
                     if link.get_target() == needle.as_str() {
                         let matches_constraint = constraint
                             .as_ref()
-                            .map_or(true, |c| link.get_constraint().matches(c) == !invert);
+                            .is_none_or(|c| link.get_constraint().matches(c) != invert);
                         if constraint.is_none() || matches_constraint {
                             if packages_in_tree.contains(&link.get_source().to_string()) {
                                 results.push(DependentsEntry(package.clone(), link.clone(), None));

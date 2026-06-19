@@ -208,77 +208,76 @@ impl Rule {
         request: &Request,
         pool: &Pool,
     ) -> bool {
-        if self.get_reason() == RULE_PACKAGE_REQUIRES {
-            if let ReasonData::Link(link) = self.get_reason_data() {
-                if PlatformRepository::is_platform_package(link.get_target()) {
-                    return false;
-                }
-                // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
-                // returns Result while is_caused_by_lock returns bool; resolving needs the bool
-                // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
-                let locked_repo: Option<()> = todo!("request.get_locked_repository()");
-                if let Some(_locked_repo) = locked_repo {
-                    let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
-                    for package in packages {
-                        let p = package.clone();
-                        if p.get_name() == link.get_target() {
-                            if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
-                                return true;
-                            }
-                            if !link.get_constraint().matches(
-                                &SimpleConstraint::new(
-                                    "=".to_string(),
-                                    p.get_version().to_string(),
-                                    None,
-                                )
-                                .into(),
-                            ) {
-                                return true;
-                            }
-                            // required package was locked but has been unlocked and still matches
-                            if !request.is_locked_package(p) {
-                                return true;
-                            }
-                            break;
+        if self.get_reason() == RULE_PACKAGE_REQUIRES
+            && let ReasonData::Link(link) = self.get_reason_data()
+        {
+            if PlatformRepository::is_platform_package(link.get_target()) {
+                return false;
+            }
+            // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
+            // returns Result while is_caused_by_lock returns bool; resolving needs the bool
+            // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
+            let locked_repo: Option<()> = todo!("request.get_locked_repository()");
+            if let Some(_locked_repo) = locked_repo {
+                let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
+                for package in packages {
+                    let p = package.clone();
+                    if p.get_name() == link.get_target() {
+                        if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
+                            return true;
                         }
+                        if !link.get_constraint().matches(
+                            &SimpleConstraint::new(
+                                "=".to_string(),
+                                p.get_version().to_string(),
+                                None,
+                            )
+                            .into(),
+                        ) {
+                            return true;
+                        }
+                        // required package was locked but has been unlocked and still matches
+                        if !request.is_locked_package(p) {
+                            return true;
+                        }
+                        break;
                     }
                 }
             }
         }
 
-        if self.get_reason() == RULE_ROOT_REQUIRE {
-            if let ReasonData::RootRequire {
+        if self.get_reason() == RULE_ROOT_REQUIRE
+            && let ReasonData::RootRequire {
                 package_name,
                 constraint,
             } = self.get_reason_data()
-            {
-                if PlatformRepository::is_platform_package(package_name) {
-                    return false;
-                }
-                // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
-                // returns Result while is_caused_by_lock returns bool; resolving needs the bool
-                // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
-                let locked_repo: Option<()> = todo!("request.get_locked_repository()");
-                if let Some(_locked_repo) = locked_repo {
-                    let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
-                    for package in packages {
-                        let p = package.clone();
-                        if p.get_name() == *package_name {
-                            if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
-                                return true;
-                            }
-                            if !constraint.matches(
-                                &SimpleConstraint::new(
-                                    "=".to_string(),
-                                    p.get_version().to_string(),
-                                    None,
-                                )
-                                .into(),
-                            ) {
-                                return true;
-                            }
-                            break;
+        {
+            if PlatformRepository::is_platform_package(package_name) {
+                return false;
+            }
+            // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
+            // returns Result while is_caused_by_lock returns bool; resolving needs the bool
+            // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
+            let locked_repo: Option<()> = todo!("request.get_locked_repository()");
+            if let Some(_locked_repo) = locked_repo {
+                let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
+                for package in packages {
+                    let p = package.clone();
+                    if p.get_name() == *package_name {
+                        if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
+                            return true;
                         }
+                        if !constraint.matches(
+                            &SimpleConstraint::new(
+                                "=".to_string(),
+                                p.get_version().to_string(),
+                                None,
+                            )
+                            .into(),
+                        ) {
+                            return true;
+                        }
+                        break;
                     }
                 }
             }
@@ -300,10 +299,10 @@ impl Rule {
 
                 let reason_data = self.get_reason_data();
                 // swap literals if they are not in the right order with package2 being the conflicter
-                if let ReasonData::Link(link) = reason_data {
-                    if link.get_source() == package1.get_name() {
-                        std::mem::swap(&mut package1, &mut package2);
-                    }
+                if let ReasonData::Link(link) = reason_data
+                    && link.get_source() == package1.get_name()
+                {
+                    std::mem::swap(&mut package1, &mut package2);
                 }
 
                 Ok(package2)
@@ -350,7 +349,7 @@ impl Rule {
                 };
 
                 let packages = pool.what_provides(package_name, Some(constraint));
-                if 0 == packages.len() {
+                if packages.is_empty() {
                     return Ok(format!(
                         "No package found to satisfy root composer.json require {} {}",
                         package_name,
@@ -361,7 +360,7 @@ impl Rule {
                 let packages_non_alias: Vec<BasePackageHandle> = packages
                     .iter()
                     .filter(|p| p.as_alias().is_none())
-                    .map(|p| p.clone())
+                    .cloned()
                     .collect();
                 if packages_non_alias.len() == 1 {
                     let package = &packages_non_alias[0];
@@ -380,7 +379,7 @@ impl Rule {
                     constraint.get_pretty_string(),
                     self.format_packages_unique_from_packages(
                         pool,
-                        packages.iter().map(|p| p.clone()).collect(),
+                        packages.to_vec(),
                         is_verbose,
                         Some(constraint),
                         false
@@ -473,7 +472,7 @@ impl Rule {
             }
 
             r if r == RULE_PACKAGE_REQUIRES => {
-                assert!(literals.len() > 0);
+                assert!(!literals.is_empty());
                 let source_literal = array_shift(&mut literals).unwrap();
                 let source_package =
                     self.deduplicate_default_branch_alias(pool.literal_to_package(source_literal));
@@ -489,7 +488,7 @@ impl Rule {
                 }
 
                 let text = link.get_pretty_string(source_package.clone());
-                if requires.len() > 0 {
+                if !requires.is_empty() {
                     format!(
                         "{} -> satisfiable by {}.",
                         text,
@@ -562,7 +561,7 @@ impl Rule {
                         }
                     }
 
-                    if installed_packages.len() > 0 && removable_packages.len() > 0 {
+                    if !installed_packages.is_empty() && !removable_packages.is_empty() {
                         return Ok(format!(
                             "{} cannot be installed as that would require removing {}. {}",
                             self.format_packages_unique_from_packages(
@@ -605,7 +604,7 @@ impl Rule {
                 let learned_string = " (conflict analysis result)";
 
                 let rule_text = if literals.len() == 1 {
-                    pool.literal_to_pretty_string(literals[0], &installed_map)
+                    pool.literal_to_pretty_string(literals[0], installed_map)
                 } else {
                     let mut groups: IndexMap<String, Vec<BasePackageHandle>> = IndexMap::new();
                     for literal in &literals {
@@ -622,7 +621,7 @@ impl Rule {
 
                         groups
                             .entry(group.to_string())
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(self.deduplicate_default_branch_alias(package.clone()));
                     }
                     let mut rule_texts: Vec<String> = vec![];
@@ -633,7 +632,7 @@ impl Rule {
                             if packages.len() > 1 { " one of" } else { "" },
                             self.format_packages_unique_from_packages(
                                 pool,
-                                packages.iter().map(|p| p.clone()).collect(),
+                                packages.to_vec(),
                                 is_verbose,
                                 None,
                                 false,
@@ -685,7 +684,7 @@ impl Rule {
                     if i != 0 {
                         rule_text.push('|');
                     }
-                    rule_text.push_str(&pool.literal_to_pretty_string(*literal, &installed_map));
+                    rule_text.push_str(&pool.literal_to_pretty_string(*literal, installed_map));
                 }
 
                 format!("({})", rule_text)
@@ -734,10 +733,10 @@ impl Rule {
     }
 
     fn deduplicate_default_branch_alias(&self, package: BasePackageHandle) -> BasePackageHandle {
-        if let Some(alias_pkg) = package.as_alias() {
-            if alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                return alias_pkg.get_alias_of().into();
-            }
+        if let Some(alias_pkg) = package.as_alias()
+            && alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS
+        {
+            return alias_pkg.get_alias_of().into();
         }
 
         package

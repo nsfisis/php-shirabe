@@ -1459,8 +1459,8 @@ pub fn glob(_pattern: &str) -> Vec<String> {
 
 pub fn basename(path: &str) -> String {
     // PHP basename(): the trailing name component, after stripping trailing directory separators.
-    let trimmed = path.trim_end_matches(|c| matches!(c, '/' | '\\'));
-    match trimmed.rfind(|c| matches!(c, '/' | '\\')) {
+    let trimmed = path.trim_end_matches(['/', '\\']);
+    match trimmed.rfind(['/', '\\']) {
         Some(index) => trimmed[index + 1..].to_string(),
         None => trimmed.to_string(),
     }
@@ -1933,7 +1933,7 @@ pub fn dirname_levels(_path: &str, _levels: i64) -> String {
 // re-scanned. Empty keys are ignored.
 pub fn strtr_array(s: &str, pairs: &IndexMap<String, String>) -> String {
     let mut keys: Vec<&String> = pairs.keys().filter(|k| !k.is_empty()).collect();
-    keys.sort_by(|a, b| b.len().cmp(&a.len()));
+    keys.sort_by_key(|k| std::cmp::Reverse(k.len()));
 
     let bytes = s.as_bytes();
     let mut result: Vec<u8> = Vec::with_capacity(bytes.len());

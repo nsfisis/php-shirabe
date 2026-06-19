@@ -27,6 +27,12 @@ pub struct SelfUpdateCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for SelfUpdateCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SelfUpdateCommand {
     pub fn new() -> Self {
         let mut command = SelfUpdateCommand {

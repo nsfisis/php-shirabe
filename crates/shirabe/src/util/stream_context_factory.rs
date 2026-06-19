@@ -51,19 +51,19 @@ impl StreamContextFactory {
         };
         options = array_replace_recursive(options, default_options);
 
-        if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-            if let Some(header) = http.get("header").cloned() {
-                let fixed = Self::fix_http_header_field(&*header);
-                http.insert(
-                    "header".to_string(),
-                    Box::new(PhpMixed::List(
-                        fixed
-                            .into_iter()
-                            .map(|s| Box::new(PhpMixed::String(s)))
-                            .collect(),
-                    )),
-                );
-            }
+        if let Some(PhpMixed::Array(http)) = options.get_mut("http")
+            && let Some(header) = http.get("header").cloned()
+        {
+            let fixed = Self::fix_http_header_field(&header);
+            http.insert(
+                "header".to_string(),
+                Box::new(PhpMixed::List(
+                    fixed
+                        .into_iter()
+                        .map(|s| Box::new(PhpMixed::String(s)))
+                        .collect(),
+                )),
+            );
         }
 
         Ok(stream_context_create(&options, Some(&default_params)))
@@ -80,10 +80,8 @@ impl StreamContextFactory {
             .and_then(|v| v.as_array())
             .map(|a| a.contains_key("header"))
             .unwrap_or(false);
-        if !has_header {
-            if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
-            }
+        if !has_header && let Some(PhpMixed::Array(http)) = options.get_mut("http") {
+            http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
         }
         // Convert string header to array
         let header_is_string = options
@@ -92,16 +90,15 @@ impl StreamContextFactory {
             .and_then(|a| a.get("header"))
             .map(|v| matches!(**v, PhpMixed::String(_)))
             .unwrap_or(false);
-        if header_is_string {
-            if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                if let Some(PhpMixed::String(header_str)) = http.get("header").map(|v| *v.clone()) {
-                    let parts: Vec<Box<PhpMixed>> = header_str
-                        .split("\r\n")
-                        .map(|s| Box::new(PhpMixed::String(s.to_string())))
-                        .collect();
-                    http.insert("header".to_string(), Box::new(PhpMixed::List(parts)));
-                }
-            }
+        if header_is_string
+            && let Some(PhpMixed::Array(http)) = options.get_mut("http")
+            && let Some(PhpMixed::String(header_str)) = http.get("header").map(|v| *v.clone())
+        {
+            let parts: Vec<Box<PhpMixed>> = header_str
+                .split("\r\n")
+                .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                .collect();
+            http.insert("header".to_string(), Box::new(PhpMixed::List(parts)));
         }
 
         // Add stream proxy options if there is a proxy
@@ -136,14 +133,11 @@ impl StreamContextFactory {
 
                 // Header will be a Proxy-Authorization string or not set
                 let proxy_http = proxy_options.get("http");
-                if let Some(proxy_header) = proxy_http.and_then(|h| h.get("header")) {
-                    if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                        if let Some(PhpMixed::List(headers)) =
-                            http.get_mut("header").map(|v| &mut **v)
-                        {
-                            headers.push(Box::new(proxy_header.clone()));
-                        }
-                    }
+                if let Some(proxy_header) = proxy_http.and_then(|h| h.get("header"))
+                    && let Some(PhpMixed::Array(http)) = options.get_mut("http")
+                    && let Some(PhpMixed::List(headers)) = http.get_mut("header").map(|v| &mut **v)
+                {
+                    headers.push(Box::new(proxy_header.clone()));
                 }
 
                 let proxy_options_flat: IndexMap<String, PhpMixed> = proxy_options
@@ -226,10 +220,10 @@ impl StreamContextFactory {
                     ""
                 },
             );
-            if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                if let Some(PhpMixed::List(headers)) = http.get_mut("header").map(|v| &mut **v) {
-                    headers.push(Box::new(PhpMixed::String(user_agent)));
-                }
+            if let Some(PhpMixed::Array(http)) = options.get_mut("http")
+                && let Some(PhpMixed::List(headers)) = http.get_mut("header").map(|v| &mut **v)
+            {
+                headers.push(Box::new(PhpMixed::String(user_agent)));
             }
         }
 
@@ -315,23 +309,23 @@ impl StreamContextFactory {
             d
         };
 
-        if let Some(ssl_options) = options.get("ssl") {
-            if let Some(ssl_defaults_mixed) = defaults.get("ssl").cloned() {
-                let merged = array_replace_recursive(
-                    match ssl_defaults_mixed {
-                        PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
-                        _ => IndexMap::new(),
-                    },
-                    match ssl_options.clone() {
-                        PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
-                        _ => IndexMap::new(),
-                    },
-                );
-                defaults.insert(
-                    "ssl".to_string(),
-                    PhpMixed::Array(merged.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                );
-            }
+        if let Some(ssl_options) = options.get("ssl")
+            && let Some(ssl_defaults_mixed) = defaults.get("ssl").cloned()
+        {
+            let merged = array_replace_recursive(
+                match ssl_defaults_mixed {
+                    PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    _ => IndexMap::new(),
+                },
+                match ssl_options.clone() {
+                    PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    _ => IndexMap::new(),
+                },
+            );
+            defaults.insert(
+                "ssl".to_string(),
+                PhpMixed::Array(merged.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+            );
         }
 
         // Attempt to find a local cafile or throw an exception if none pre-set.
@@ -358,13 +352,13 @@ impl StreamContextFactory {
             .and_then(|a| a.get("cafile"))
             .and_then(|v| v.as_string())
             .map(|s| s.to_string());
-        if let Some(ref cafile) = cafile {
-            if !Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger) {
-                return Err(TransportException::new(
-                    "The configured cafile was not valid or could not be read.".to_string(),
-                    0,
-                ));
-            }
+        if let Some(ref cafile) = cafile
+            && (!Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger))
+        {
+            return Err(TransportException::new(
+                "The configured cafile was not valid or could not be read.".to_string(),
+                0,
+            ));
         }
 
         let capath = defaults
@@ -373,13 +367,13 @@ impl StreamContextFactory {
             .and_then(|a| a.get("capath"))
             .and_then(|v| v.as_string())
             .map(|s| s.to_string());
-        if let Some(ref capath) = capath {
-            if !shirabe_php_shim::is_dir(capath) || !Filesystem::is_readable(capath) {
-                return Err(TransportException::new(
-                    "The configured capath was not valid or could not be read.".to_string(),
-                    0,
-                ));
-            }
+        if let Some(ref capath) = capath
+            && (!shirabe_php_shim::is_dir(capath) || !Filesystem::is_readable(capath))
+        {
+            return Err(TransportException::new(
+                "The configured capath was not valid or could not be read.".to_string(),
+                0,
+            ));
         }
 
         // Disable TLS compression to prevent CRIME attacks where supported.

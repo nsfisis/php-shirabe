@@ -84,12 +84,11 @@ impl EventDispatcher {
             ))))
         });
         let event_stack: Vec<String> = Vec::new();
-        let skip_scripts_env =
-            Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_else(|| "".to_string());
+        let skip_scripts_env = Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_default();
         let skip_scripts: Vec<String> = skip_scripts_env
             .split(',')
             .map(|v| trim(v, Some(" \t\n\r\0\u{0B}")))
-            .filter(|val| val != "")
+            .filter(|val| !val.is_empty())
             .collect();
         Self {
             composer,
@@ -252,15 +251,14 @@ impl EventDispatcher {
         }
         for cb in spl_autoload_functions() {
             // once we get to the first known autoloader, we can leave any appended autoloader without problems
-            if let Some(entry) = known_identifiers.get(&Self::get_callback_identifier(&cb)) {
-                if entry
+            if let Some(entry) = known_identifiers.get(&Self::get_callback_identifier(&cb))
+                && entry
                     .get("key")
                     .and_then(|v| v.as_int())
                     .map(|k| k == 0)
                     .unwrap_or(false)
-                {
-                    break;
-                }
+            {
+                break;
             }
 
             // other newly appeared prepended autoloaders should be appended instead to ensure Composer loads its classes first
@@ -289,12 +287,12 @@ impl EventDispatcher {
 
             let mut additional_args = event.get_arguments().clone();
             let mut callable = callable;
-            if let Callable::String(ref s) = callable {
-                if str_contains(s, "@no_additional_args") {
-                    let replaced = Preg::replace("{ ?@no_additional_args}", "", s);
-                    callable = Callable::String(replaced);
-                    additional_args = Vec::new();
-                }
+            if let Callable::String(ref s) = callable
+                && str_contains(s, "@no_additional_args")
+            {
+                let replaced = Preg::replace("{ ?@no_additional_args}", "", s);
+                callable = Callable::String(replaced);
+                additional_args = Vec::new();
             }
             let formatted_event_name_with_args = format!(
                 "{}{}",
@@ -514,12 +512,9 @@ impl EventDispatcher {
                             Err(e) => {
                                 self.io.write_error3(
                                     &format!(
-                                        "<error>{}</error>",
-                                        format!(
-                                            "Script {} handling the {} event terminated with an exception",
-                                            PhpMixed::String(callable_str.clone()),
-                                            PhpMixed::String(event.get_name().to_string()),
-                                        )
+                                        "<error>Script {} handling the {} event terminated with an exception</error>",
+                                        PhpMixed::String(callable_str.clone()),
+                                        PhpMixed::String(event.get_name().to_string()),
                                     ),
                                     true,
                                     crate::io::QUIET,
@@ -608,7 +603,7 @@ impl EventDispatcher {
                             format!(
                                 "{}{}",
                                 callable_str,
-                                if args == "" {
+                                if args.is_empty() {
                                     "".to_string()
                                 } else {
                                     format!(" {}", args)
@@ -810,7 +805,7 @@ impl EventDispatcher {
             }
         };
         let php_args = finder.find_arguments();
-        let php_args = if php_args.len() > 0 {
+        let php_args = if !php_args.is_empty() {
             format!(" {}", implode(" ", &php_args))
         } else {
             "".to_string()
@@ -894,9 +889,9 @@ impl EventDispatcher {
     pub fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64) {
         self.listeners
             .entry(event_name.to_string())
-            .or_insert_with(IndexMap::new)
+            .or_default()
             .entry(priority)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(listener);
     }
 
@@ -949,7 +944,7 @@ impl EventDispatcher {
         {
             self.listeners
                 .entry(name.clone())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(0, Vec::new());
         }
         if let Some(priorities) = self.listeners.get_mut(&name) {
@@ -957,10 +952,10 @@ impl EventDispatcher {
         }
 
         let mut listeners = self.listeners.clone();
-        if let Some(priorities) = listeners.get_mut(&name) {
-            if let Some(zero_list) = priorities.get_mut(&0) {
-                zero_list.extend(script_listeners);
-            }
+        if let Some(priorities) = listeners.get_mut(&name)
+            && let Some(zero_list) = priorities.get_mut(&0)
+        {
+            zero_list.extend(script_listeners);
         }
 
         let mut result: Vec<Callable> = Vec::new();
@@ -976,7 +971,7 @@ impl EventDispatcher {
     pub fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool {
         let listeners = self.get_listeners(event);
 
-        listeners.len() > 0
+        !listeners.is_empty()
     }
 
     /// Finds all listeners defined as scripts in the package
@@ -1096,28 +1091,28 @@ impl EventDispatcher {
         if is_object(cb) {
             return format!("obj:{}", spl_object_hash(cb));
         }
-        if is_array(cb) {
-            if let PhpMixed::Array(map) = cb {
-                let entries: Vec<&Box<PhpMixed>> = map.values().collect();
-                if entries.len() >= 2 {
-                    let first = entries[0].as_ref();
-                    let second = entries[1].as_ref();
-                    let prefix = if is_string(first) {
-                        if let PhpMixed::String(s) = first {
-                            s.clone()
-                        } else {
-                            "?".to_string()
-                        }
-                    } else {
-                        format!("{}#{}", get_class(first), spl_object_hash(first))
-                    };
-                    let suffix = if let PhpMixed::String(s) = second {
+        if is_array(cb)
+            && let PhpMixed::Array(map) = cb
+        {
+            let entries: Vec<&Box<PhpMixed>> = map.values().collect();
+            if entries.len() >= 2 {
+                let first = entries[0].as_ref();
+                let second = entries[1].as_ref();
+                let prefix = if is_string(first) {
+                    if let PhpMixed::String(s) = first {
                         s.clone()
                     } else {
                         "?".to_string()
-                    };
-                    return format!("array:{}::{}", prefix, suffix);
-                }
+                    }
+                } else {
+                    format!("{}#{}", get_class(first), spl_object_hash(first))
+                };
+                let suffix = if let PhpMixed::String(s) = second {
+                    s.clone()
+                } else {
+                    "?".to_string()
+                };
+                return format!("array:{}::{}", prefix, suffix);
             }
         }
 

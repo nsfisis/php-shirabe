@@ -33,6 +33,12 @@ pub struct RunScriptCommand {
     script_events: Vec<&'static str>,
 }
 
+impl Default for RunScriptCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RunScriptCommand {
     pub fn new() -> Self {
         let mut command = RunScriptCommand {
@@ -314,9 +320,9 @@ impl Command for RunScriptCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        Ok(dispatcher
+        dispatcher
             .borrow_mut()
-            .dispatch_script(&script, dev_mode, args, IndexMap::new())?)
+            .dispatch_script(&script, dev_mode, args, IndexMap::new())
     }
 
     fn initialize(

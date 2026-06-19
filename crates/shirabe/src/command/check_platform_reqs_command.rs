@@ -40,6 +40,12 @@ pub struct CheckPlatformReqsCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for CheckPlatformReqsCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CheckPlatformReqsCommand {
     pub fn new() -> Self {
         let mut command = CheckPlatformReqsCommand {
@@ -253,7 +259,7 @@ impl Command for CheckPlatformReqsCommand {
             for (require, link) in composer.get_package().get_dev_requires() {
                 requires
                     .entry(require.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(link.clone());
             }
         }
@@ -273,7 +279,7 @@ impl Command for CheckPlatformReqsCommand {
             for (require, link) in package.get_requires() {
                 requires
                     .entry(require.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(link.clone());
             }
         }

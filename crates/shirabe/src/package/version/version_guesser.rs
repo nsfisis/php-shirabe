@@ -90,10 +90,10 @@ impl VersionGuesser {
         }
 
         let version_data = self.guess_hg_version(package_config, path)?;
-        if let Some(vd) = version_data {
-            if vd.version.is_some() {
-                return Ok(Some(self.postprocess(vd)));
-            }
+        if let Some(vd) = version_data
+            && vd.version.is_some()
+        {
+            return Ok(Some(self.postprocess(vd)));
         }
 
         let version_data = self.guess_fossil_version(path)?;
@@ -102,10 +102,10 @@ impl VersionGuesser {
         }
 
         let version_data = self.guess_svn_version(package_config, path)?;
-        if let Some(vd) = version_data {
-            if vd.version.is_some() {
-                return Ok(Some(self.postprocess(vd)));
-            }
+        if let Some(vd) = version_data
+            && vd.version.is_some()
+        {
+            return Ok(Some(self.postprocess(vd)));
         }
 
         Ok(None)
@@ -173,7 +173,7 @@ impl VersionGuesser {
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
     ) -> Result<VersionData> {
-        GitUtil::clean_env(&mut self.process);
+        GitUtil::clean_env(&self.process);
         let mut commit: Option<String> = None;
         let mut version: Option<String> = None;
         let mut pretty_version: Option<String> = None;
@@ -263,7 +263,7 @@ impl VersionGuesser {
             }
         }
         GitUtil::check_for_repo_ownership_error(
-            &self.process.borrow().get_error_output(),
+            self.process.borrow().get_error_output(),
             path,
             self.io.clone(),
         );

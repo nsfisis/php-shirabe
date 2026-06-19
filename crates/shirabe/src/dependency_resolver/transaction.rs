@@ -92,7 +92,7 @@ impl Transaction {
             for name in package.get_names(true) {
                 self.result_packages_by_name
                     .entry(name)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(package.clone());
             }
             self.result_package_map
@@ -266,7 +266,7 @@ impl Transaction {
             return vec![];
         };
 
-        packages.iter().cloned().collect()
+        packages.to_vec()
     }
 
     /// Workaround: if your packages depend on plugins, we must be sure
@@ -315,8 +315,8 @@ impl Transaction {
 
             // is this a downloads modifying plugin or a dependency of one?
             if is_downloads_modifying_plugin
-                || array_intersect(&package.get_names(true), &dl_modifying_plugin_requires).len()
-                    > 0
+                || !array_intersect(&package.get_names(true), &dl_modifying_plugin_requires)
+                    .is_empty()
             {
                 // get the package's requires, but filter out any platform requirements
                 let requires: Vec<String> = array_filter(
@@ -344,7 +344,8 @@ impl Transaction {
                 || package.get_type() == "composer-installer";
 
             // is this a plugin or a dependency of a plugin?
-            if is_plugin || array_intersect(&package.get_names(true), &plugin_requires).len() > 0 {
+            if is_plugin || !array_intersect(&package.get_names(true), &plugin_requires).is_empty()
+            {
                 // get the package's requires, but filter out any platform requirements
                 let requires: Vec<String> = array_filter(
                     &array_keys(&package.get_requires()),

@@ -97,7 +97,7 @@ impl ConfigValidator {
         // validate actual data
         if manifest
             .get("license")
-            .map_or(true, |v| matches!(v, PhpMixed::Null))
+            .is_none_or(|v| matches!(v, PhpMixed::Null))
             || !manifest.contains_key("license")
         {
             warnings.push("No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.".to_string());
@@ -160,26 +160,28 @@ impl ConfigValidator {
             warnings.push("The version field is present, it is recommended to leave it out if the package is published on Packagist.".to_string());
         }
 
-        if let Some(PhpMixed::String(name)) = manifest.get("name") {
-            if !name.is_empty() && Preg::is_match(r"{[A-Z]}", name) {
-                let suggest_name = Preg::replace(
-                    r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
-                    r"\1\3-\2\4",
-                    name,
-                );
-                let suggest_name = suggest_name.to_lowercase();
+        if let Some(PhpMixed::String(name)) = manifest.get("name")
+            && !name.is_empty()
+            && Preg::is_match(r"{[A-Z]}", name)
+        {
+            let suggest_name = Preg::replace(
+                r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
+                r"\1\3-\2\4",
+                name,
+            );
+            let suggest_name = suggest_name.to_lowercase();
 
-                publish_errors.push(format!(
+            publish_errors.push(format!(
                     "Name \"{}\" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using \"{}\" instead. As such you will not be able to submit it to Packagist.",
                     name, suggest_name
                 ));
-            }
         }
 
-        if let Some(PhpMixed::String(t)) = manifest.get("type") {
-            if !t.is_empty() && t == "composer-installer" {
-                warnings.push("The package type 'composer-installer' is deprecated. Please distribute your custom installers as plugins from now on. See https://getcomposer.org/doc/articles/plugins.md for plugin documentation.".to_string());
-            }
+        if let Some(PhpMixed::String(t)) = manifest.get("type")
+            && !t.is_empty()
+            && t == "composer-installer"
+        {
+            warnings.push("The package type 'composer-installer' is deprecated. Please distribute your custom installers as plugins from now on. See https://getcomposer.org/doc/articles/plugins.md for plugin documentation.".to_string());
         }
 
         // check for require-dev overrides
@@ -236,13 +238,13 @@ impl ConfigValidator {
         let mut packages: IndexMap<String, Box<PhpMixed>> = require;
         packages.extend(require_dev);
         for (package, version) in &packages {
-            if let PhpMixed::String(version_str) = version.as_ref() {
-                if Preg::is_match(r"{#}", version_str) {
-                    warnings.push(format!(
+            if let PhpMixed::String(version_str) = version.as_ref()
+                && Preg::is_match(r"{#}", version_str)
+            {
+                warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",
                         package
                     ));
-                }
             }
         }
 
@@ -280,15 +282,15 @@ impl ConfigValidator {
 
         // check for empty psr-0/psr-4 namespace prefixes
         if let Some(PhpMixed::Array(autoload)) = manifest.get("autoload") {
-            if let Some(PhpMixed::Array(psr0)) = autoload.get("psr-0").map(|v| v.as_ref()) {
-                if psr0.contains_key("") {
-                    warnings.push("Defining autoload.psr-0 with an empty namespace prefix is a bad idea for performance".to_string());
-                }
+            if let Some(PhpMixed::Array(psr0)) = autoload.get("psr-0").map(|v| v.as_ref())
+                && psr0.contains_key("")
+            {
+                warnings.push("Defining autoload.psr-0 with an empty namespace prefix is a bad idea for performance".to_string());
             }
-            if let Some(PhpMixed::Array(psr4)) = autoload.get("psr-4").map(|v| v.as_ref()) {
-                if psr4.contains_key("") {
-                    warnings.push("Defining autoload.psr-4 with an empty namespace prefix is a bad idea for performance".to_string());
-                }
+            if let Some(PhpMixed::Array(psr4)) = autoload.get("psr-4").map(|v| v.as_ref())
+                && psr4.contains_key("")
+            {
+                warnings.push("Defining autoload.psr-4 with an empty namespace prefix is a bad idea for performance".to_string());
             }
         }
 

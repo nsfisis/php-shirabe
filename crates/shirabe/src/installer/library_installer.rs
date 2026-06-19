@@ -109,18 +109,18 @@ impl LibraryInstaller {
         let install_path = self.get_install_path(package.clone()).unwrap();
         let target_dir = package.get_target_dir();
 
-        if let Some(target_dir) = target_dir {
-            if !target_dir.is_empty() {
-                let replaced = Preg::replace(
-                    &format!(
-                        "{{/*{}/?$}}",
-                        preg_quote(&target_dir, None).replace('/', "/+")
-                    ),
-                    "",
-                    &install_path,
-                );
-                return replaced;
-            }
+        if let Some(target_dir) = target_dir
+            && !target_dir.is_empty()
+        {
+            let replaced = Preg::replace(
+                &format!(
+                    "{{/*{}/?$}}",
+                    preg_quote(&target_dir, None).replace('/', "/+")
+                ),
+                "",
+                &install_path,
+            );
+            return replaced;
         }
 
         install_path
@@ -368,7 +368,7 @@ impl InstallerInterface for LibraryInstaller {
         self.binary_installer.remove_binaries(package.clone());
         repo.remove_package(package.clone());
 
-        if strpos(&package.get_name(), "/").map_or(false, |pos| pos != 0) {
+        if strpos(&package.get_name(), "/").is_some_and(|pos| pos != 0) {
             let package_vendor_dir = dirname(&download_path);
             if is_dir(&package_vendor_dir)
                 && self.filesystem.borrow().is_dir_empty(&package_vendor_dir)

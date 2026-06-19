@@ -222,23 +222,23 @@ impl InstallationManager {
                             .as_install_operation()
                             .map(|install| install.get_package())
                     };
-                if let Some(package) = package {
-                    if package.get_type() == "composer-plugin" {
-                        let extra = package.get_extra();
-                        if extra
-                            .get("plugin-modifies-downloads")
-                            .and_then(|v| v.as_bool())
-                            == Some(true)
-                        {
-                            if (batch.len() as i64) > 0 {
-                                batches.push(std::mem::take(&mut batch));
-                            }
-                            let mut single = IndexMap::new();
-                            single.insert(index, operation);
-                            batches.push(single);
-
-                            continue;
+                if let Some(package) = package
+                    && package.get_type() == "composer-plugin"
+                {
+                    let extra = package.get_extra();
+                    if extra
+                        .get("plugin-modifies-downloads")
+                        .and_then(|v| v.as_bool())
+                        == Some(true)
+                    {
+                        if (batch.len() as i64) > 0 {
+                            batches.push(std::mem::take(&mut batch));
                         }
+                        let mut single = IndexMap::new();
+                        single.insert(index, operation);
+                        batches.push(single);
+
+                        continue;
                     }
                 }
                 batch.insert(index, operation);
@@ -290,9 +290,7 @@ impl InstallationManager {
         Ok(())
     }
 
-    /// @param OperationInterface[] $operations    List of operations to execute in this batch
-    /// @param OperationInterface[] $allOperations Complete list of operations to be executed in the install job, used for event listeners
-    /// @phpstan-param array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     async fn download_and_execute_batch(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
@@ -563,9 +561,8 @@ impl InstallationManager {
     /// @phpstan-return PromiseInterface<void|null>|null
     pub async fn download(&mut self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
         let installer = self.get_installer(&package.get_type()).ok()?;
-        let promise = installer.cleanup("install", package, None).await.ok()?;
 
-        promise
+        installer.cleanup("install", package, None).await.ok()?
     }
 
     /// Executes install operation.
@@ -599,7 +596,7 @@ impl InstallationManager {
         let initial_type = initial.get_type();
         let target_type = target.get_type();
 
-        let promise = if initial_type == target_type {
+        if initial_type == target_type {
             let installer = self.get_installer(&initial_type).ok()?;
             let promise = installer.update(repo, initial, target.clone()).await.ok()?;
             self.mark_for_notification(target.clone());
@@ -614,9 +611,7 @@ impl InstallationManager {
                 .ok()?;
             let installer = self.get_installer(&target_type).ok()?;
             installer.install(repo, target).await.ok()?
-        };
-
-        promise
+        }
     }
 
     /// Uninstalls package.
@@ -803,7 +798,7 @@ impl InstallationManager {
         if let Some(notification_url) = package.get_notification_url() {
             self.notifiable_packages
                 .entry(notification_url)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(package.clone());
         }
     }

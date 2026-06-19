@@ -34,6 +34,12 @@ impl DerefMut for DumpCompletionCommand {
     }
 }
 
+impl Default for DumpCompletionCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DumpCompletionCommand {
     pub const DEFAULT_NAME: &'static str = "completion";
     pub const DEFAULT_DESCRIPTION: &'static str = "Dump the shell completion script";

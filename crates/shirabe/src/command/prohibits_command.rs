@@ -27,6 +27,12 @@ pub struct ProhibitsCommand {
     colors: Vec<String>,
 }
 
+impl Default for ProhibitsCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProhibitsCommand {
     pub fn new() -> Self {
         let mut command = ProhibitsCommand {

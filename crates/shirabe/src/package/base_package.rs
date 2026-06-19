@@ -90,7 +90,7 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
 
     fn is_platform(&self) -> bool {
         self.repository_opt()
-            .map_or(false, |r| r.is::<PlatformRepository>())
+            .is_some_and(|r| r.is::<PlatformRepository>())
     }
 
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {

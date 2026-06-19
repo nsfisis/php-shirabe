@@ -59,6 +59,7 @@ impl VersionSelector {
         })
     }
 
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn find_best_candidate(
         &mut self,
         package_name: &str,
@@ -92,7 +93,7 @@ impl VersionSelector {
         };
         let mut candidates = self.repository_set.borrow().find_packages(
             &strtolower(package_name),
-            constraint.as_ref().map(|c| c.clone()),
+            constraint.clone(),
             repo_set_flags,
         )?;
 
@@ -158,16 +159,16 @@ impl VersionSelector {
                                 .as_any()
                                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                             );
-                            if let Some(list_filter) = list_filter_opt {
-                                if list_filter.is_upper_bound_ignored(name) {
-                                    let filtered_constraint = list_filter.filter_constraint(
-                                        name,
-                                        link.get_constraint().clone(),
-                                        false,
-                                    )?;
-                                    if filtered_constraint.matches(provided_constraint) {
-                                        continue 'reqs;
-                                    }
+                            if let Some(list_filter) = list_filter_opt
+                                && list_filter.is_upper_bound_ignored(name)
+                            {
+                                let filtered_constraint = list_filter.filter_constraint(
+                                    name,
+                                    link.get_constraint().clone(),
+                                    false,
+                                )?;
+                                if filtered_constraint.matches(provided_constraint) {
+                                    continue 'reqs;
                                 }
                             }
                         }
@@ -220,13 +221,13 @@ impl VersionSelector {
                     continue;
                 }
 
-                found_package = Some(pkg.clone().into());
+                found_package = Some(pkg.clone());
                 break;
             }
             package = found_package;
         } else {
             package = if !candidates.is_empty() {
-                Some(candidates.remove(0).into())
+                Some(candidates.remove(0))
             } else {
                 None
             };
@@ -279,14 +280,13 @@ impl VersionSelector {
         let loader = ArrayLoader::new(Some(self.get_parser().clone()), false);
         let dumper = ArrayDumper::new();
         let extra = loader.get_branch_alias(&dumper.dump(package.clone()))?;
-        if let Some(extra) = extra {
-            if extra != VersionParser::DEFAULT_BRANCH_ALIAS {
-                let new_extra =
-                    Preg::replace(r"{^(\d+\.\d+\.\d+)(\.9999999)-dev$}", "$1.0", &extra);
-                if new_extra != extra {
-                    let new_extra = new_extra.replace(".9999999", ".0");
-                    return self.transform_version(&new_extra, &new_extra, "dev");
-                }
+        if let Some(extra) = extra
+            && extra != VersionParser::DEFAULT_BRANCH_ALIAS
+        {
+            let new_extra = Preg::replace(r"{^(\d+\.\d+\.\d+)(\.9999999)-dev$}", "$1.0", &extra);
+            if new_extra != extra {
+                let new_extra = new_extra.replace(".9999999", ".0");
+                return self.transform_version(&new_extra, &new_extra, "dev");
             }
         }
 

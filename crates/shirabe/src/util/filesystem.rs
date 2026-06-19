@@ -51,7 +51,7 @@ impl Filesystem {
             .depth(0)
             .r#in(dir);
 
-        finder.len() == 0
+        finder.is_empty()
     }
 
     pub fn empty_directory(
@@ -519,11 +519,7 @@ impl Filesystem {
             // Returning early-formatted Result is not possible without changing signature; panic to surface in tests.
             panic!(
                 "{}",
-                format!(
-                    "$from ({}) and $to ({}) must be absolute paths.",
-                    from.to_string(),
-                    to.to_string()
-                )
+                format!("$from ({}) and $to ({}) must be absolute paths.", from, to)
             );
         }
 
@@ -584,11 +580,7 @@ impl Filesystem {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
             panic!(
                 "{}",
-                format!(
-                    "$from ({}) and $to ({}) must be absolute paths.",
-                    from.to_string(),
-                    to.to_string()
-                )
+                format!("$from ({}) and $to ({}) must be absolute paths.", from, to)
             );
         }
 
@@ -722,8 +714,8 @@ impl Filesystem {
         for chunk in explode("/", &path) {
             if ".." == chunk && (strlen(&absolute) > 0 || up) {
                 array_pop(&mut parts);
-                up = !(parts.len() == 0 || ".." == end(&parts).unwrap_or_default());
-            } else if "." != chunk && "" != chunk {
+                up = !(parts.is_empty() || ".." == end(&parts).unwrap_or_default());
+            } else if "." != chunk && !chunk.is_empty() {
                 parts.push(chunk.clone());
                 up = ".." != chunk;
             }

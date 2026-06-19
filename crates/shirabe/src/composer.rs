@@ -15,17 +15,17 @@ use crate::repository::RepositoryManager;
 use crate::util::r#loop::Loop;
 
 // TODO: change this information to Shirabe version.
-pub const VERSION: &'static str = "2.9.7";
-pub const BRANCH_ALIAS_VERSION: &'static str = "";
-pub const RELEASE_DATE: &'static str = "2026-04-14 13:31:52";
-pub const SOURCE_VERSION: &'static str = "";
-pub const RUNTIME_API_VERSION: &'static str = "2.2.2";
+pub const VERSION: &str = "2.9.7";
+pub const BRANCH_ALIAS_VERSION: &str = "";
+pub const RELEASE_DATE: &str = "2026-04-14 13:31:52";
+pub const SOURCE_VERSION: &str = "";
+pub const RUNTIME_API_VERSION: &str = "2.2.2";
 
 pub fn get_version() -> String {
     if VERSION == "@package_version@" {
         return SOURCE_VERSION.to_string();
     }
-    if BRANCH_ALIAS_VERSION != "" && Preg::is_match("{^[a-f0-9]{40}$}", VERSION) {
+    if !BRANCH_ALIAS_VERSION.is_empty() && Preg::is_match("{^[a-f0-9]{40}$}", VERSION) {
         return format!("{}+{}", BRANCH_ALIAS_VERSION, VERSION);
     }
     VERSION.to_string()
@@ -120,6 +120,12 @@ pub struct Composer {
     plugin_manager: Option<std::rc::Rc<std::cell::RefCell<PluginManager>>>,
     autoload_generator: Option<std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>>,
     archive_manager: Option<std::rc::Rc<std::cell::RefCell<ArchiveManager>>>,
+}
+
+impl Default for Composer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Composer {

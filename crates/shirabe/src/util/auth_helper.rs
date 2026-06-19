@@ -114,13 +114,7 @@ impl AuthHelper {
         Ok(())
     }
 
-    /// @param  int         $statusCode HTTP status code that triggered this call
-    /// @param  string|null $reason     a message/description explaining why this was called
-    /// @param  string[]    $headers
-    /// @param  int         $retryCount the amount of retries already done on this URL
-    /// @return array       containing retry (bool) and storeAuth (string|bool) keys, if retry is true the request should be
-    ///                                retried, if storeAuth is true then on a successful retry the authentication should be persisted to auth.json
-    /// @phpstan-return array{retry: bool, storeAuth: 'prompt'|bool}
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn prompt_auth_if_needed(
         &mut self,
         url: &str,
@@ -194,28 +188,23 @@ impl AuthHelper {
                 }
 
                 message = format!(
-                    "{}\n",
-                    format!(
-                        "GitHub API limit ({} calls/hr) is exhausted, could not fetch {}. {} You can also wait until {} for the rate limit to reset.",
-                        rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
-                        url,
-                        message,
-                        rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
-                    ),
+                    "GitHub API limit ({} calls/hr) is exhausted, could not fetch {}. {} You can also wait until {} for the rate limit to reset.\n",
+                    rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
+                    url,
+                    message,
+                    rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
                 );
             } else {
                 // Try to extract a more specific error message from GitHub's API response
                 let mut git_hub_api_message: Option<String> = None;
                 if let Some(body) = response_body {
                     let decoded = json_decode(body, true)?;
-                    if is_array(&decoded) {
-                        if let Some(arr) = decoded.as_array() {
-                            if let Some(msg) = arr.get("message") {
-                                if is_string(msg) {
-                                    git_hub_api_message = msg.as_string().map(|s| s.to_string());
-                                }
-                            }
-                        }
+                    if is_array(&decoded)
+                        && let Some(arr) = decoded.as_array()
+                        && let Some(msg) = arr.get("message")
+                        && is_string(msg)
+                    {
+                        git_hub_api_message = msg.as_string().map(|s| s.to_string());
                     }
                 }
 
@@ -297,16 +286,16 @@ impl AuthHelper {
                 .into());
             }
 
-            if let Some(prev_auth) = auth {
-                if self.io.has_authentication(origin) {
-                    let current_auth = self.io.get_authentication(origin);
-                    if prev_auth == current_auth {
-                        return Err(TransportException::new(
-                            format!("Invalid credentials for '{}', aborting.", url),
-                            status_code,
-                        )
-                        .into());
-                    }
+            if let Some(prev_auth) = auth
+                && self.io.has_authentication(origin)
+            {
+                let current_auth = self.io.get_authentication(origin);
+                if prev_auth == current_auth {
+                    return Err(TransportException::new(
+                        format!("Invalid credentials for '{}', aborting.", url),
+                        status_code,
+                    )
+                    .into());
                 }
             }
         } else if origin == "bitbucket.org" || origin == "api.bitbucket.org" {
@@ -473,10 +462,8 @@ impl AuthHelper {
             } else {
                 false
             };
-            if !http_has_header {
-                if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                    http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
-                }
+            if !http_has_header && let Some(PhpMixed::Array(http)) = options.get_mut("http") {
+                http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
             }
         }
 

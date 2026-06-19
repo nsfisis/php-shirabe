@@ -85,7 +85,7 @@ impl VcsDownloader for HgDownloader {
     ) -> Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),
-            &*self.inner.config.borrow(),
+            &self.inner.config.borrow(),
             &self.inner.process,
         );
 
@@ -140,7 +140,7 @@ impl VcsDownloader for HgDownloader {
     ) -> Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),
-            &*self.inner.config.borrow(),
+            &self.inner.config.borrow(),
             &self.inner.process,
         );
 

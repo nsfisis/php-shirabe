@@ -382,7 +382,7 @@ impl Bitbucket {
             .remove_config_setting(&format!("bitbucket-oauth.{}", origin_url))?;
 
         let token = self.token.as_ref().ok_or_else(|| LogicException {
-            message: format!("Expected a token configured with expires_in present, got null",),
+            message: "Expected a token configured with expires_in present, got null".to_string(),
             code: 0,
         })?;
         let expires_in = token

@@ -253,28 +253,28 @@ impl FilesystemRepository {
             let mut pkg_array = dumper.dump(package.clone());
             let path = installation_manager.get_install_path(package.clone());
             let mut install_path: Option<String> = None;
-            if let Some(path_str) = &path {
-                if !path_str.is_empty() {
-                    let normalized_path = self.filesystem.borrow_mut().normalize_path(&if self
-                        .filesystem
-                        .borrow()
-                        .is_absolute_path(path_str)
-                    {
-                        path_str.clone()
-                    } else {
-                        format!(
-                            "{}/{}",
-                            Platform::get_cwd(false).unwrap_or_default(),
-                            path_str
-                        )
-                    });
-                    install_path = Some(self.filesystem.borrow_mut().find_shortest_path(
-                        &repo_dir,
-                        &normalized_path,
-                        true,
-                        false,
-                    ));
-                }
+            if let Some(path_str) = &path
+                && !path_str.is_empty()
+            {
+                let normalized_path = self.filesystem.borrow_mut().normalize_path(&if self
+                    .filesystem
+                    .borrow()
+                    .is_absolute_path(path_str)
+                {
+                    path_str.clone()
+                } else {
+                    format!(
+                        "{}/{}",
+                        Platform::get_cwd(false).unwrap_or_default(),
+                        path_str
+                    )
+                });
+                install_path = Some(self.filesystem.borrow_mut().find_shortest_path(
+                    &repo_dir,
+                    &normalized_path,
+                    true,
+                    false,
+                ));
             }
             install_paths.insert(package.get_name().to_string(), install_path.clone());
 
@@ -306,10 +306,9 @@ impl FilesystemRepository {
                         .collect(),
                 ),
                 true,
-            ) {
-                if let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names") {
-                    list.push(Box::new(PhpMixed::String(package.get_name().to_string())));
-                }
+            ) && let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names")
+            {
+                list.push(Box::new(PhpMixed::String(package.get_name().to_string())));
             }
         }
 
@@ -497,12 +496,8 @@ impl FilesystemRepository {
                 .map(|s| Box::new(PhpMixed::String(s.clone())))
                 .collect(),
         ));
-        let mut packages: Vec<PackageInterfaceHandle> = self
-            .inner
-            .get_packages()?
-            .into_iter()
-            .map(|p| p.into())
-            .collect();
+        let mut packages: Vec<PackageInterfaceHandle> =
+            self.inner.get_packages()?.into_iter().collect();
         let mut current_root: RootPackageInterfaceHandle = match &self.root_package {
             None => {
                 return Err(LogicException {
@@ -617,10 +612,10 @@ impl FilesystemRepository {
                 "aliases",
                 pretty.clone(),
             );
-            if package.as_root().is_some() {
-                if let Some(PhpMixed::Array(root_map)) = versions.get_mut("root") {
-                    push_to_list(root_map, "aliases", pretty);
-                }
+            if package.as_root().is_some()
+                && let Some(PhpMixed::Array(root_map)) = versions.get_mut("root")
+            {
+                push_to_list(root_map, "aliases", pretty);
             }
         }
 
@@ -633,16 +628,16 @@ impl FilesystemRepository {
             for (_name, version) in versions_map.iter_mut() {
                 if let PhpMixed::Array(version_map) = version.as_mut() {
                     for key in ["aliases", "replaced", "provided"] {
-                        if let Some(boxed) = version_map.get_mut(key) {
-                            if let PhpMixed::List(list) = boxed.as_mut() {
-                                // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
-                                usort(list, |a: &Box<PhpMixed>, b: &Box<PhpMixed>| -> i64 {
-                                    shirabe_php_shim::strnatcmp(
-                                        a.as_string().unwrap_or(""),
-                                        b.as_string().unwrap_or(""),
-                                    )
-                                });
-                            }
+                        if let Some(boxed) = version_map.get_mut(key)
+                            && let PhpMixed::List(list) = boxed.as_mut()
+                        {
+                            // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
+                            usort(list, |a: &Box<PhpMixed>, b: &Box<PhpMixed>| -> i64 {
+                                shirabe_php_shim::strnatcmp(
+                                    a.as_string().unwrap_or(""),
+                                    b.as_string().unwrap_or(""),
+                                )
+                            });
                         }
                     }
                 }
@@ -665,9 +660,9 @@ impl FilesystemRepository {
         let mut reference: Option<String> = None;
         if let Some(install_src) = package.get_installation_source() {
             reference = if install_src == "source" {
-                package.get_source_reference().map(String::from)
+                package.get_source_reference()
             } else {
-                package.get_dist_reference().map(String::from)
+                package.get_dist_reference()
             };
         }
         if reference.is_none() {

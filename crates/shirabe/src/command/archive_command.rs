@@ -40,6 +40,12 @@ pub struct ArchiveCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for ArchiveCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArchiveCommand {
     const FORMATS: &'static [&'static str] = &["tar", "tar.gz", "tar.bz2", "zip"];
 
@@ -201,6 +207,7 @@ impl BaseCommand for ArchiveCommand {
 }
 
 impl ArchiveCommand {
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn archive(
         &mut self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -239,7 +246,7 @@ impl ArchiveCommand {
                 Some(process),
             )));
             owned_archive_manager =
-                factory.create_archive_manager(&*config.borrow(), &download_manager, &loop_)?;
+                factory.create_archive_manager(&config.borrow(), &download_manager, &loop_)?;
             &mut owned_archive_manager
         };
 
@@ -299,12 +306,7 @@ impl ArchiveCommand {
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![local_repo];
-            repos.extend(
-                repository_manager
-                    .get_repositories()
-                    .iter()
-                    .map(|r| r.clone()),
-            );
+            repos.extend(repository_manager.get_repositories().iter().cloned());
             repo = CompositeRepository::new(repos);
             min_stability = composer.get_package().get_minimum_stability().to_string();
         } else {
@@ -368,7 +370,7 @@ impl ArchiveCommand {
                 None,
                 shirabe_php_shim::PhpMixed::Bool(true),
             )?;
-            let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap().into());
+            let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 
             io.write_error(&format!(
                 "<info>Found multiple matches, selected {}.</info>",
@@ -378,8 +380,7 @@ impl ArchiveCommand {
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
             p
         } else if packages.len() == 1 {
-            let p: crate::package::PackageInterfaceHandle =
-                packages.into_iter().next().unwrap().into();
+            let p: crate::package::PackageInterfaceHandle = packages.into_iter().next().unwrap();
             io.write_error(&format!(
                 "<info>Found an exact match {}.</info>",
                 p.get_pretty_string()

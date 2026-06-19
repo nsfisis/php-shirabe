@@ -39,6 +39,12 @@ impl DerefMut for HelpCommand {
     }
 }
 
+impl Default for HelpCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HelpCommand {
     pub fn new() -> Self {
         let mut command = HelpCommand {

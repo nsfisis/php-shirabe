@@ -50,10 +50,9 @@ impl PerforceDriver {
             .repo_config
             .get("branch")
             .and_then(|v| v.as_string())
+            && !branch.is_empty()
         {
-            if !branch.is_empty() {
-                self.branch = branch.to_string();
-            }
+            self.branch = branch.to_string();
         }
 
         let repo_config = self.inner.repo_config.clone();
@@ -171,7 +170,7 @@ impl PerforceDriver {
             .as_mut()
             .unwrap()
             .get_composer_information(&path)
-            .map_or(false, |info| info.map_or(false, |i| !i.is_empty()))
+            .is_ok_and(|info| info.is_some_and(|i| !i.is_empty()))
     }
 
     pub fn get_contents(&self, _url: &str) -> anyhow::Result<Response> {

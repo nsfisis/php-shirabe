@@ -72,16 +72,7 @@ impl Auditor {
     pub const STATUS_VULNERABLE: i64 = 1;
     pub const STATUS_ABANDONED: i64 = 2;
 
-    /// @param PackageInterface[] $packages
-    /// @param self::FORMAT_* $format The format that will be used to output audit results.
-    /// @param bool $warningOnly If true, outputs a warning. If false, outputs an error.
-    /// @param array<string, string|null> $ignoreList List of advisory IDs, remote IDs, CVE IDs or package names that reported but not listed as vulnerabilities.
-    /// @param self::ABANDONED_* $abandoned
-    /// @param array<string, string|null> $ignoredSeverities List of ignored severity levels
-    /// @param array<string, string|null> $ignoreAbandoned List of abandoned package name that reported but not listed as vulnerabilities.
-    ///
-    /// @return int-mask<self::STATUS_*> A bitmask of STATUS_* constants or 0 on success
-    /// @throws InvalidArgumentException If no packages are passed in
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn audit(
         &self,
         io: &mut dyn IOInterface,
@@ -166,7 +157,7 @@ impl Auditor {
         }
 
         let error_or_warn = if warning_only { "warning" } else { "error" };
-        if affected_packages_count > 0 || ignored_advisories.len() > 0 {
+        if affected_packages_count > 0 || !ignored_advisories.is_empty() {
             let passes: Vec<(
                 &IndexMap<String, Vec<AnySecurityAdvisory>>,
                 String,
@@ -237,7 +228,7 @@ impl Auditor {
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
         ignore_list: &IndexMap<String, Option<String>>,
     ) -> bool {
-        if advisories.len() == 0 {
+        if advisories.is_empty() {
             return false;
         }
 
@@ -268,7 +259,7 @@ impl Auditor {
         ignore_abandoned: &IndexMap<String, Option<String>>,
     ) -> anyhow::Result<Vec<CompletePackageInterfaceHandle>> {
         let mut filter: Option<String> = None;
-        if ignore_abandoned.len() != 0 {
+        if !ignore_abandoned.is_empty() {
             filter = Some(base_package::package_names_to_regexp(
                 &array_keys(ignore_abandoned),
                 "{^(?:%s)$}iD",
@@ -325,22 +316,22 @@ impl Auditor {
                 }
 
                 if let Some(full) = advisory.as_security_advisory() {
-                    if let Some(severity) = &full.severity {
-                        if array_key_exists(severity, ignored_severities) {
-                            is_active = false;
-                            ignore_reason = ignored_severities
-                                .get(severity)
-                                .cloned()
-                                .flatten()
-                                .or_else(|| Some(format!("{} severity is ignored", severity)));
-                        }
+                    if let Some(severity) = &full.severity
+                        && array_key_exists(severity, ignored_severities)
+                    {
+                        is_active = false;
+                        ignore_reason = ignored_severities
+                            .get(severity)
+                            .cloned()
+                            .flatten()
+                            .or_else(|| Some(format!("{} severity is ignored", severity)));
                     }
 
-                    if let Some(cve) = &full.cve {
-                        if array_key_exists(cve, ignore_list) {
-                            is_active = false;
-                            ignore_reason = ignore_list.get(cve).cloned().flatten();
-                        }
+                    if let Some(cve) = &full.cve
+                        && array_key_exists(cve, ignore_list)
+                    {
+                        is_active = false;
+                        ignore_reason = ignore_list.get(cve).cloned().flatten();
                     }
 
                     for source in &full.sources {
@@ -356,7 +347,7 @@ impl Auditor {
                 if is_active {
                     advisories
                         .entry(package.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(advisory);
                     continue;
                 }
@@ -370,10 +361,7 @@ impl Auditor {
                     advisory
                 };
 
-                ignored
-                    .entry(package.clone())
-                    .or_insert_with(Vec::new)
-                    .push(advisory);
+                ignored.entry(package.clone()).or_default().push(advisory);
             }
         }
 
@@ -624,10 +612,10 @@ impl Auditor {
     fn get_package_name_with_link(&self, package: PackageInterfaceHandle) -> String {
         let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
 
-        if package_url.is_some() {
+        if let Some(package_url) = package_url {
             format!(
                 "<href={}>{}</>",
-                OutputFormatter::escape(&package_url.unwrap())
+                OutputFormatter::escape(&package_url)
                     .expect("OutputFormatter::escape does not fail"),
                 package.get_pretty_name()
             )

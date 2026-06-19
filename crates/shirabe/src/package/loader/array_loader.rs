@@ -35,10 +35,7 @@ pub struct ArrayLoader {
 
 impl ArrayLoader {
     pub fn new(parser: Option<VersionParser>, load_options: bool) -> Self {
-        let parser = match parser {
-            Some(p) => p,
-            None => VersionParser::new(),
-        };
+        let parser = parser.unwrap_or_default();
         Self {
             version_parser: parser,
             load_options,
@@ -340,11 +337,11 @@ impl ArrayLoader {
                 .set_target_dir(target_dir.as_string().map(|s| s.to_string()));
         }
 
-        if let Some(extra) = config.get("extra") {
-            if matches!(extra, PhpMixed::Array(_)) {
-                let extra_map = php_to_map(extra);
-                package.package_mut().set_extra(extra_map);
-            }
+        if let Some(extra) = config.get("extra")
+            && matches!(extra, PhpMixed::Array(_))
+        {
+            let extra_map = php_to_map(extra);
+            package.package_mut().set_extra(extra_map);
         }
 
         if let Some(bin) = config.get("bin").cloned() {
@@ -355,13 +352,13 @@ impl ArrayLoader {
             if let PhpMixed::List(ref mut list) = bin_list {
                 for item in list.iter_mut() {
                     if let Some(s) = item.as_string() {
-                        *item = Box::new(PhpMixed::String(ltrim(s, Some("/"))));
+                        **item = PhpMixed::String(ltrim(s, Some("/")));
                     }
                 }
             } else if let PhpMixed::Array(ref mut map) = bin_list {
                 for (_k, v) in map.iter_mut() {
                     if let Some(s) = v.as_string() {
-                        *v = Box::new(PhpMixed::String(ltrim(s, Some("/"))));
+                        **v = PhpMixed::String(ltrim(s, Some("/")));
                     }
                 }
             }
@@ -376,10 +373,10 @@ impl ArrayLoader {
                 .set_installation_source(installation_source.as_string().map(|s| s.to_string()));
         }
 
-        if let Some(default_branch) = config.get("default-branch") {
-            if default_branch.as_bool() == Some(true) {
-                package.package_mut().set_is_default_branch(true);
-            }
+        if let Some(default_branch) = config.get("default-branch")
+            && default_branch.as_bool() == Some(true)
+        {
+            package.package_mut().set_is_default_branch(true);
         }
 
         if let Some(source) = config.get("source").cloned() {
@@ -473,25 +470,23 @@ impl ArrayLoader {
             }
         }
 
-        if let Some(suggest) = config.get("suggest").cloned() {
-            if let PhpMixed::Array(mut suggest_map) = suggest {
-                for (target, reason) in suggest_map.iter_mut() {
-                    if let Some(r) = reason.as_string() {
-                        if trim(r, None) == "self.version" {
-                            *reason = Box::new(PhpMixed::String(
-                                package.get_pretty_version().to_string(),
-                            ));
-                            let _ = target;
-                        }
-                    }
+        if let Some(suggest) = config.get("suggest").cloned()
+            && let PhpMixed::Array(mut suggest_map) = suggest
+        {
+            for (target, reason) in suggest_map.iter_mut() {
+                if let Some(r) = reason.as_string()
+                    && trim(r, None) == "self.version"
+                {
+                    **reason = PhpMixed::String(package.get_pretty_version().to_string());
+                    let _ = target;
                 }
-                let suggests: IndexMap<String, String> = suggest_map
-                    .iter()
-                    .map(|(k, v)| (k.clone(), strval(v)))
-                    .collect();
-                config.insert("suggest".to_string(), PhpMixed::Array(suggest_map));
-                package.package_mut().set_suggests(suggests);
             }
+            let suggests: IndexMap<String, String> = suggest_map
+                .iter()
+                .map(|(k, v)| (k.clone(), strval(v)))
+                .collect();
+            config.insert("suggest".to_string(), PhpMixed::Array(suggest_map));
+            package.package_mut().set_suggests(suggests);
         }
 
         if let Some(autoload) = config.get("autoload") {
@@ -514,201 +509,198 @@ impl ArrayLoader {
             package.package_mut().set_php_ext(Some(php_ext_map));
         }
 
-        if let Some(time_value) = config.get("time") {
-            if !shirabe_php_shim::empty(time_value) {
-                let time_str = time_value.as_string().unwrap_or("");
-                let time = if Preg::is_match(r"/^\d++$/D", time_str) {
-                    format!("@{}", time_str)
-                } else {
-                    time_str.to_string()
-                };
+        if let Some(time_value) = config.get("time")
+            && !shirabe_php_shim::empty(time_value)
+        {
+            let time_str = time_value.as_string().unwrap_or("");
+            let time = if Preg::is_match(r"/^\d++$/D", time_str) {
+                format!("@{}", time_str)
+            } else {
+                time_str.to_string()
+            };
 
-                if let Ok(date) = shirabe_php_shim::date_create::<Utc>(&time) {
-                    package.package_mut().set_release_date(Some(date));
-                }
+            if let Ok(date) = shirabe_php_shim::date_create::<Utc>(&time) {
+                package.package_mut().set_release_date(Some(date));
             }
         }
 
-        if let Some(notification_url) = config.get("notification-url") {
-            if !shirabe_php_shim::empty(notification_url) {
-                package
-                    .package_mut()
-                    .set_notification_url(strval(notification_url));
-            }
+        if let Some(notification_url) = config.get("notification-url")
+            && !shirabe_php_shim::empty(notification_url)
+        {
+            package
+                .package_mut()
+                .set_notification_url(strval(notification_url));
         }
 
-        if let Some(archive) = config.get("archive").cloned() {
-            if let PhpMixed::Array(archive_map) = archive {
-                if let Some(name) = archive_map.get("name") {
-                    if !shirabe_php_shim::empty(name) {
-                        package.complete_mut().set_archive_name(strval(name));
-                    }
-                }
-                if let Some(exclude) = archive_map.get("exclude") {
-                    if !shirabe_php_shim::empty(exclude) {
-                        package
-                            .complete_mut()
-                            .set_archive_excludes(php_to_string_vec(exclude));
-                    }
-                }
+        if let Some(archive) = config.get("archive").cloned()
+            && let PhpMixed::Array(archive_map) = archive
+        {
+            if let Some(name) = archive_map.get("name")
+                && !shirabe_php_shim::empty(name)
+            {
+                package.complete_mut().set_archive_name(strval(name));
             }
-        }
-
-        if let Some(scripts) = config.get("scripts").cloned() {
-            if let PhpMixed::Array(mut scripts_map) = scripts {
-                for (event, listeners) in scripts_map.iter_mut() {
-                    let listeners_array = match listeners.as_ref() {
-                        PhpMixed::Array(_) | PhpMixed::List(_) => listeners.clone(),
-                        other => Box::new(PhpMixed::List(vec![Box::new(other.clone())])),
-                    };
-                    *listeners = listeners_array;
-                    let _ = event;
-                }
-                for reserved in ["composer", "php", "putenv"].iter() {
-                    if scripts_map.contains_key(*reserved) {
-                        trigger_error(
-                            &format!(
-                                "The `{}` script name is reserved for internal use, please avoid defining it",
-                                reserved
-                            ),
-                            E_USER_DEPRECATED,
-                        );
-                    }
-                }
-                let scripts: IndexMap<String, Vec<String>> = scripts_map
-                    .iter()
-                    .map(|(k, v)| (k.clone(), php_to_string_vec(v)))
-                    .collect();
-                config.insert("scripts".to_string(), PhpMixed::Array(scripts_map));
-                package.complete_mut().set_scripts(scripts);
-            }
-        }
-
-        if let Some(description) = config.get("description") {
-            if !shirabe_php_shim::empty(description) && is_string(description) {
+            if let Some(exclude) = archive_map.get("exclude")
+                && !shirabe_php_shim::empty(exclude)
+            {
                 package
                     .complete_mut()
-                    .set_description(description.as_string().unwrap_or("").to_string());
+                    .set_archive_excludes(php_to_string_vec(exclude));
             }
         }
 
-        if let Some(homepage) = config.get("homepage") {
-            if !shirabe_php_shim::empty(homepage) && is_string(homepage) {
-                package
-                    .complete_mut()
-                    .set_homepage(homepage.as_string().unwrap_or("").to_string());
-            }
-        }
-
-        if let Some(keywords) = config.get("keywords") {
-            if !shirabe_php_shim::empty(keywords) {
-                if matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_)) {
-                    let keywords_vec: Vec<String> = match keywords {
-                        PhpMixed::List(list) => list.iter().map(|v| strval(v)).collect(),
-                        PhpMixed::Array(map) => map.values().map(|v| strval(v)).collect(),
-                        _ => vec![],
-                    };
-                    package.complete_mut().set_keywords(keywords_vec);
-                }
-            }
-        }
-
-        if let Some(license) = config.get("license") {
-            if !shirabe_php_shim::empty(license) {
-                let license_vec: Vec<String> = match license {
-                    PhpMixed::Array(map) => map
-                        .values()
-                        .map(|v| v.as_string().unwrap_or("").to_string())
-                        .collect(),
-                    PhpMixed::List(list) => list
-                        .iter()
-                        .map(|v| v.as_string().unwrap_or("").to_string())
-                        .collect(),
-                    other => vec![other.as_string().unwrap_or("").to_string()],
+        if let Some(scripts) = config.get("scripts").cloned()
+            && let PhpMixed::Array(mut scripts_map) = scripts
+        {
+            for (event, listeners) in scripts_map.iter_mut() {
+                let listeners_array = match listeners.as_ref() {
+                    PhpMixed::Array(_) | PhpMixed::List(_) => listeners.clone(),
+                    other => Box::new(PhpMixed::List(vec![Box::new(other.clone())])),
                 };
-                package.complete_mut().set_license(license_vec);
+                *listeners = listeners_array;
+                let _ = event;
             }
-        }
-
-        if let Some(authors) = config.get("authors") {
-            if !shirabe_php_shim::empty(authors) {
-                if let PhpMixed::List(list) = authors {
-                    let authors_vec: Vec<IndexMap<String, String>> = list
-                        .iter()
-                        .filter_map(|v| match v.as_ref() {
-                            PhpMixed::Array(m) => Some(
-                                m.iter()
-                                    .map(|(k, v)| {
-                                        (k.clone(), v.as_string().unwrap_or("").to_string())
-                                    })
-                                    .collect(),
-                            ),
-                            _ => None,
-                        })
-                        .collect();
-                    package.complete_mut().set_authors(authors_vec);
+            for reserved in ["composer", "php", "putenv"].iter() {
+                if scripts_map.contains_key(*reserved) {
+                    trigger_error(
+                        &format!(
+                            "The `{}` script name is reserved for internal use, please avoid defining it",
+                            reserved
+                        ),
+                        E_USER_DEPRECATED,
+                    );
                 }
             }
+            let scripts: IndexMap<String, Vec<String>> = scripts_map
+                .iter()
+                .map(|(k, v)| (k.clone(), php_to_string_vec(v)))
+                .collect();
+            config.insert("scripts".to_string(), PhpMixed::Array(scripts_map));
+            package.complete_mut().set_scripts(scripts);
         }
 
-        if let Some(support) = config.get("support") {
-            if let PhpMixed::Array(map) = support {
-                let support_map: IndexMap<String, String> = map
+        if let Some(description) = config.get("description")
+            && !shirabe_php_shim::empty(description)
+            && is_string(description)
+        {
+            package
+                .complete_mut()
+                .set_description(description.as_string().unwrap_or("").to_string());
+        }
+
+        if let Some(homepage) = config.get("homepage")
+            && !shirabe_php_shim::empty(homepage)
+            && is_string(homepage)
+        {
+            package
+                .complete_mut()
+                .set_homepage(homepage.as_string().unwrap_or("").to_string());
+        }
+
+        if let Some(keywords) = config.get("keywords")
+            && !shirabe_php_shim::empty(keywords)
+            && matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_))
+        {
+            let keywords_vec: Vec<String> = match keywords {
+                PhpMixed::List(list) => list.iter().map(|v| strval(v)).collect(),
+                PhpMixed::Array(map) => map.values().map(|v| strval(v)).collect(),
+                _ => vec![],
+            };
+            package.complete_mut().set_keywords(keywords_vec);
+        }
+
+        if let Some(license) = config.get("license")
+            && !shirabe_php_shim::empty(license)
+        {
+            let license_vec: Vec<String> = match license {
+                PhpMixed::Array(map) => map
+                    .values()
+                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .collect(),
+                PhpMixed::List(list) => list
                     .iter()
-                    .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
-                    .collect();
-                package.complete_mut().set_support(support_map);
-            }
+                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .collect(),
+                other => vec![other.as_string().unwrap_or("").to_string()],
+            };
+            package.complete_mut().set_license(license_vec);
         }
 
-        if let Some(funding) = config.get("funding") {
-            if !shirabe_php_shim::empty(funding) {
-                if let PhpMixed::List(list) = funding {
-                    let funding_vec: Vec<IndexMap<String, PhpMixed>> = list
-                        .iter()
-                        .filter_map(|v| match v.as_ref() {
-                            PhpMixed::Array(m) => {
-                                Some(m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
-                            }
-                            _ => None,
-                        })
-                        .collect();
-                    package.complete_mut().set_funding(funding_vec);
-                }
-            }
+        if let Some(authors) = config.get("authors")
+            && !shirabe_php_shim::empty(authors)
+            && let PhpMixed::List(list) = authors
+        {
+            let authors_vec: Vec<IndexMap<String, String>> = list
+                .iter()
+                .filter_map(|v| match v.as_ref() {
+                    PhpMixed::Array(m) => Some(
+                        m.iter()
+                            .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                            .collect(),
+                    ),
+                    _ => None,
+                })
+                .collect();
+            package.complete_mut().set_authors(authors_vec);
+        }
+
+        if let Some(support) = config.get("support")
+            && let PhpMixed::Array(map) = support
+        {
+            let support_map: IndexMap<String, String> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                .collect();
+            package.complete_mut().set_support(support_map);
+        }
+
+        if let Some(funding) = config.get("funding")
+            && !shirabe_php_shim::empty(funding)
+            && let PhpMixed::List(list) = funding
+        {
+            let funding_vec: Vec<IndexMap<String, PhpMixed>> = list
+                .iter()
+                .filter_map(|v| match v.as_ref() {
+                    PhpMixed::Array(m) => {
+                        Some(m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                    }
+                    _ => None,
+                })
+                .collect();
+            package.complete_mut().set_funding(funding_vec);
         }
 
         if let Some(abandoned) = config.get("abandoned") {
             package.complete_mut().set_abandoned(abandoned.clone());
         }
 
-        if self.load_options {
-            if let Some(transport_options) = config.get("transport-options") {
-                let options = php_to_map(transport_options);
-                package.package_mut().set_transport_options(options);
-            }
+        if self.load_options
+            && let Some(transport_options) = config.get("transport-options")
+        {
+            let options = php_to_map(transport_options);
+            package.package_mut().set_transport_options(options);
         }
 
         let alias_normalized = self.get_branch_alias(config)?;
-        if let Some(alias_normalized) = alias_normalized {
-            if !alias_normalized.is_empty() {
-                let pretty_alias = Preg::replace(r"{(\.9{7})+}", ".x", &alias_normalized);
+        if let Some(alias_normalized) = alias_normalized
+            && !alias_normalized.is_empty()
+        {
+            let pretty_alias = Preg::replace(r"{(\.9{7})+}", ".x", &alias_normalized);
 
-                return Ok(match package {
-                    CompleteOrRootPackage::Root(root) => RootAliasPackageHandle::new(
-                        RootPackageHandle::from_root_package(root),
-                        alias_normalized,
-                        pretty_alias,
-                    )
-                    .into(),
-                    CompleteOrRootPackage::Complete(complete) => CompleteAliasPackageHandle::new(
-                        CompletePackageHandle::from_complete_package(complete),
-                        alias_normalized,
-                        pretty_alias,
-                    )
-                    .into(),
-                });
-            }
+            return Ok(match package {
+                CompleteOrRootPackage::Root(root) => RootAliasPackageHandle::new(
+                    RootPackageHandle::from_root_package(root),
+                    alias_normalized,
+                    pretty_alias,
+                )
+                .into(),
+                CompleteOrRootPackage::Complete(complete) => CompleteAliasPackageHandle::new(
+                    CompletePackageHandle::from_complete_package(complete),
+                    alias_normalized,
+                    pretty_alias,
+                )
+                .into(),
+            });
         }
 
         Ok(package.into_handle())
@@ -773,11 +765,11 @@ impl ArrayLoader {
                             let entry = (target.clone(), link);
                             link_cache
                                 .entry(name.clone())
-                                .or_insert_with(IndexMap::new)
+                                .or_default()
                                 .entry(r#type.to_string())
-                                .or_insert_with(IndexMap::new)
+                                .or_default()
                                 .entry(target.clone())
-                                .or_insert_with(IndexMap::new)
+                                .or_default()
                                 .insert(constraint_str.clone(), entry.clone());
                             entry
                         };
@@ -940,10 +932,10 @@ impl ArrayLoader {
                 let target_prefix = self
                     .version_parser
                     .parse_numeric_alias_prefix(&target_branch);
-                if let (Some(sp), Some(tp)) = (source_prefix.as_ref(), target_prefix.as_ref()) {
-                    if stripos(tp, sp) != Some(0) {
-                        continue;
-                    }
+                if let (Some(sp), Some(tp)) = (source_prefix.as_ref(), target_prefix.as_ref())
+                    && stripos(tp, sp) != Some(0)
+                {
+                    continue;
                 }
 
                 return Ok(Some(validated_target_branch));

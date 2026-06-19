@@ -26,6 +26,12 @@ pub struct OutdatedCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for OutdatedCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OutdatedCommand {
     pub fn new() -> Self {
         let mut command = OutdatedCommand {

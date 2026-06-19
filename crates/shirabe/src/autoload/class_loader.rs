@@ -134,7 +134,7 @@ impl ClassLoader {
         if prefix.is_empty() {
             if prepend {
                 let mut new_dirs = paths.clone();
-                new_dirs.extend(self.fallback_dirs_psr0.drain(..));
+                new_dirs.append(&mut self.fallback_dirs_psr0);
                 self.fallback_dirs_psr0 = new_dirs;
             } else {
                 self.fallback_dirs_psr0.extend(paths);
@@ -144,10 +144,7 @@ impl ClassLoader {
         }
 
         let first = prefix.chars().next().unwrap_or('\0').to_string();
-        let entry = self
-            .prefixes_psr0
-            .entry(first.clone())
-            .or_insert_with(IndexMap::new);
+        let entry = self.prefixes_psr0.entry(first.clone()).or_default();
         if !entry.contains_key(prefix) {
             entry.insert(prefix.to_string(), paths);
             return;
@@ -155,7 +152,7 @@ impl ClassLoader {
         let existing = entry.get_mut(prefix).unwrap();
         if prepend {
             let mut new_dirs = paths.clone();
-            new_dirs.extend(existing.drain(..));
+            new_dirs.append(existing);
             *existing = new_dirs;
         } else {
             existing.extend(paths);
@@ -176,7 +173,7 @@ impl ClassLoader {
             // Register directories for the root namespace.
             if prepend {
                 let mut new_dirs = paths.clone();
-                new_dirs.extend(self.fallback_dirs_psr4.drain(..));
+                new_dirs.append(&mut self.fallback_dirs_psr4);
                 self.fallback_dirs_psr4 = new_dirs;
             } else {
                 self.fallback_dirs_psr4.extend(paths);
@@ -195,14 +192,14 @@ impl ClassLoader {
             let first = prefix.chars().next().unwrap_or('\0').to_string();
             self.prefix_lengths_psr4
                 .entry(first)
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(prefix.to_string(), length);
             self.prefix_dirs_psr4.insert(prefix.to_string(), paths);
         } else if prepend {
             // Prepend directories for an already registered namespace.
             let existing = self.prefix_dirs_psr4.get_mut(prefix).unwrap();
             let mut new_dirs = paths.clone();
-            new_dirs.extend(existing.drain(..));
+            new_dirs.append(existing);
             *existing = new_dirs;
         } else {
             // Append directories for an already registered namespace.
@@ -221,7 +218,7 @@ impl ClassLoader {
             let first = prefix.chars().next().unwrap_or('\0').to_string();
             self.prefixes_psr0
                 .entry(first)
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(prefix.to_string(), paths);
         }
     }
@@ -246,7 +243,7 @@ impl ClassLoader {
             let first = prefix.chars().next().unwrap_or('\0').to_string();
             self.prefix_lengths_psr4
                 .entry(first)
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(prefix.to_string(), length);
             self.prefix_dirs_psr4.insert(prefix.to_string(), paths);
         }
@@ -327,11 +324,8 @@ impl ClassLoader {
     pub fn unregister(&self) {
         spl_autoload_unregister(Box::new(|_class: &str| -> PhpMixed { PhpMixed::Null }));
 
-        if self.vendor_dir.is_some() {
-            REGISTERED_LOADERS
-                .lock()
-                .unwrap()
-                .shift_remove(self.vendor_dir.as_ref().unwrap());
+        if let Some(vendor_dir) = &self.vendor_dir {
+            REGISTERED_LOADERS.lock().unwrap().shift_remove(vendor_dir);
         }
     }
 
@@ -360,12 +354,9 @@ impl ClassLoader {
         if self.class_map_authoritative || self.missing_classes.contains_key(class) {
             return None;
         }
-        if self.apcu_prefix.is_some() {
+        if let Some(apcu_prefix) = &self.apcu_prefix {
             let mut hit = false;
-            let file = apcu_fetch(
-                &format!("{}{}", self.apcu_prefix.as_ref().unwrap(), class),
-                &mut hit,
-            );
+            let file = apcu_fetch(&format!("{}{}", apcu_prefix, class), &mut hit);
             if hit {
                 return file.as_string().map(String::from);
             }
@@ -378,9 +369,9 @@ impl ClassLoader {
             file = self.find_file_with_extension(class, ".hh");
         }
 
-        if self.apcu_prefix.is_some() {
+        if let Some(apcu_prefix) = &self.apcu_prefix {
             apcu_add(
-                &format!("{}{}", self.apcu_prefix.as_ref().unwrap(), class),
+                &format!("{}{}", apcu_prefix, class),
                 match file.as_ref() {
                     Some(s) => PhpMixed::String(s.clone()),
                     None => PhpMixed::Bool(false),
@@ -483,10 +474,10 @@ impl ClassLoader {
         }
 
         // PSR-0 include paths.
-        if self.use_include_path {
-            if let Some(file) = stream_resolve_include_path(&logical_path_psr0) {
-                return Some(file);
-            }
+        if self.use_include_path
+            && let Some(file) = stream_resolve_include_path(&logical_path_psr0)
+        {
+            return Some(file);
         }
 
         None

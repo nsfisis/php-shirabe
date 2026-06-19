@@ -68,14 +68,14 @@ impl DefaultPolicy {
                 return -1;
             }
 
-            if let Some(ref required_package) = required_package {
-                if let Some(pos) = required_package.find('/') {
-                    let required_vendor = &required_package[..pos];
-                    let a_is_same_vendor = a.get_name().starts_with(required_vendor);
-                    let b_is_same_vendor = b.get_name().starts_with(required_vendor);
-                    if b_is_same_vendor != a_is_same_vendor {
-                        return if a_is_same_vendor { -1 } else { 1 };
-                    }
+            if let Some(ref required_package) = required_package
+                && let Some(pos) = required_package.find('/')
+            {
+                let required_vendor = &required_package[..pos];
+                let a_is_same_vendor = a.get_name().starts_with(required_vendor);
+                let b_is_same_vendor = b.get_name().starts_with(required_vendor);
+                if b_is_same_vendor != a_is_same_vendor {
+                    return if a_is_same_vendor { -1 } else { 1 };
                 }
             }
         }
@@ -140,11 +140,11 @@ impl DefaultPolicy {
 
         for &literal in &literals {
             let package = pool.literal_to_package(literal);
-            if let Some(alias_pkg) = package.as_alias() {
-                if alias_pkg.is_root_package_alias() {
-                    has_local_alias = true;
-                    break;
-                }
+            if let Some(alias_pkg) = package.as_alias()
+                && alias_pkg.is_root_package_alias()
+            {
+                has_local_alias = true;
+                break;
             }
         }
 
@@ -155,10 +155,10 @@ impl DefaultPolicy {
         let mut selected = vec![];
         for &literal in &literals {
             let package = pool.literal_to_package(literal);
-            if let Some(alias_pkg) = package.as_alias() {
-                if alias_pkg.is_root_package_alias() {
-                    selected.push(literal);
-                }
+            if let Some(alias_pkg) = package.as_alias()
+                && alias_pkg.is_root_package_alias()
+            {
+                selected.push(literal);
             }
         }
         selected
@@ -235,10 +235,10 @@ impl PolicyInterface for DefaultPolicy {
 
         {
             let cache = self.preferred_package_result_cache_per_pool.borrow();
-            if let Some(pool_cache) = cache.get(&pool_id) {
-                if let Some(cached) = pool_cache.get(&result_cache_key) {
-                    return cached.clone();
-                }
+            if let Some(pool_cache) = cache.get(&pool_id)
+                && let Some(cached) = pool_cache.get(&result_cache_key)
+            {
+                return cached.clone();
             }
         }
 
@@ -250,10 +250,10 @@ impl PolicyInterface for DefaultPolicy {
                     format!("i{}.{}{}", a, b, required_package.as_deref().unwrap_or(""));
                 {
                     let cache = self.sorting_cache_per_pool.borrow();
-                    if let Some(pool_cache) = cache.get(&pool_id) {
-                        if let Some(&result) = pool_cache.get(&cache_key) {
-                            return result.cmp(&0);
-                        }
+                    if let Some(pool_cache) = cache.get(&pool_id)
+                        && let Some(&result) = pool_cache.get(&cache_key)
+                    {
+                        return result.cmp(&0);
                     }
                 }
                 let result = self.compare_by_priority(
@@ -283,10 +283,10 @@ impl PolicyInterface for DefaultPolicy {
             let cache_key = format!("{}.{}{}", a, b, required_package.as_deref().unwrap_or(""));
             {
                 let cache = self.sorting_cache_per_pool.borrow();
-                if let Some(pool_cache) = cache.get(&pool_id) {
-                    if let Some(&result) = pool_cache.get(&cache_key) {
-                        return result.cmp(&0);
-                    }
+                if let Some(pool_cache) = cache.get(&pool_id)
+                    && let Some(&result) = pool_cache.get(&cache_key)
+                {
+                    return result.cmp(&0);
                 }
             }
             let result = self.compare_by_priority(

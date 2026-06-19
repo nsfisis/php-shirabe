@@ -39,6 +39,12 @@ pub struct RemoveCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for RemoveCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RemoveCommand {
     pub fn new() -> Self {
         let mut command = RemoveCommand {
@@ -208,7 +214,7 @@ impl Command for RemoveCommand {
             .as_list()
             .map(|l| {
                 l.iter()
-                    .filter_map(|v| v.as_string().map(|s| strtolower(s)))
+                    .filter_map(|v| v.as_string().map(strtolower))
                     .collect()
             })
             .unwrap_or_default();
@@ -375,22 +381,22 @@ impl Command for RemoveCommand {
                     "<warning>{} could not be found in {} but it is present in {}</warning>",
                     canonical_name, r#type, alt_type
                 ));
-                if io.is_interactive() {
-                    if io.ask_confirmation(
+                if io.is_interactive()
+                    && io.ask_confirmation(
                         format!(
                             "Do you want to remove it from {} [<comment>yes</comment>]? ",
                             alt_type
                         ),
                         true,
-                    ) {
-                        if dry_run {
-                            to_remove
-                                .entry(alt_type.to_string())
-                                .or_default()
-                                .push(canonical_name.clone());
-                        } else {
-                            json.remove_link(alt_type, &canonical_name);
-                        }
+                    )
+                {
+                    if dry_run {
+                        to_remove
+                            .entry(alt_type.to_string())
+                            .or_default()
+                            .push(canonical_name.clone());
+                    } else {
+                        json.remove_link(alt_type, &canonical_name);
                     }
                 }
             } else {
@@ -436,22 +442,22 @@ impl Command for RemoveCommand {
                             "<warning>{} could not be found in {} but it is present in {}</warning>",
                             matched_package, r#type, alt_type
                         ));
-                        if io.is_interactive() {
-                            if io.ask_confirmation(
+                        if io.is_interactive()
+                            && io.ask_confirmation(
                                 format!(
                                     "Do you want to remove it from {} [<comment>yes</comment>]? ",
                                     alt_type
                                 ),
                                 true,
-                            ) {
-                                if dry_run {
-                                    to_remove
-                                        .entry(alt_type.to_string())
-                                        .or_default()
-                                        .push(matched_package.clone());
-                                } else {
-                                    json.remove_link(alt_type, matched_package);
-                                }
+                            )
+                        {
+                            if dry_run {
+                                to_remove
+                                    .entry(alt_type.to_string())
+                                    .or_default()
+                                    .push(matched_package.clone());
+                            } else {
+                                json.remove_link(alt_type, matched_package);
                             }
                         }
                     }
@@ -675,7 +681,7 @@ impl Command for RemoveCommand {
             .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?);
         install.set_dry_run(dry_run);
         install.set_audit_config(
-            self.create_audit_config(&mut *composer.get_config().borrow_mut(), input)?,
+            self.create_audit_config(&mut composer.get_config().borrow_mut(), input)?,
         );
         install.set_minimal_update(minimal_changes);
 

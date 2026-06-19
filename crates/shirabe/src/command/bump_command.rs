@@ -37,6 +37,12 @@ pub struct BumpCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for BumpCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BumpCommand {
     const ERROR_GENERIC: i64 = 1;
     const ERROR_LOCK_OUTDATED: i64 = 2;
@@ -72,7 +78,7 @@ impl BumpCommand {
         }
 
         let mut composer_json = JsonFile::new(composer_json_path.clone(), None, None)?;
-        let contents = match file_get_contents(&composer_json.get_path()) {
+        let contents = match file_get_contents(composer_json.get_path()) {
             Some(c) => c,
             None => {
                 io.write_error3(
@@ -146,7 +152,7 @@ impl BumpCommand {
             let contents_data = composer_json.read()?;
             if !contents_data
                 .as_array()
-                .map_or(false, |m| m.contains_key("type"))
+                .is_some_and(|m| m.contains_key("type"))
             {
                 io.write_error3(
                     "If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".",
@@ -301,7 +307,7 @@ impl BumpCommand {
         json: &JsonFile,
         updates: &indexmap::IndexMap<&str, indexmap::IndexMap<String, String>>,
     ) -> Result<bool> {
-        let contents = match file_get_contents(&json.get_path()) {
+        let contents = match file_get_contents(json.get_path()) {
             Some(c) => c,
             None => {
                 return Err(shirabe_php_shim::RuntimeException {
@@ -322,7 +328,7 @@ impl BumpCommand {
             }
         }
 
-        match file_put_contents(&json.get_path(), manipulator.get_contents().as_bytes()) {
+        match file_put_contents(json.get_path(), manipulator.get_contents().as_bytes()) {
             Some(_) => Ok(true),
             None => Err(shirabe_php_shim::RuntimeException {
                 message: format!("Unable to write new {} contents.", json.get_path()),

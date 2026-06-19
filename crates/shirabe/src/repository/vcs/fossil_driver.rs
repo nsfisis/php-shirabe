@@ -101,7 +101,7 @@ impl FossilDriver {
     pub(crate) fn check_fossil(&self) -> anyhow::Result<()> {
         let mut ignored_output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &["fossil", "version"].map(|s| s.to_string()).to_vec(),
+            ["fossil", "version"].map(|s| s.to_string()).as_ref(),
             &mut ignored_output,
             (),
         ) != 0
@@ -141,13 +141,13 @@ impl FossilDriver {
         if is_file(&repo_file)
             && is_dir(&self.checkout_dir)
             && self.inner.process.borrow_mut().execute_args(
-                &["fossil", "info"].map(|s| s.to_string()).to_vec(),
+                ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
                 Some(self.checkout_dir.clone()),
             ) == 0
         {
             if self.inner.process.borrow_mut().execute_args(
-                &["fossil", "pull"].map(|s| s.to_string()).to_vec(),
+                ["fossil", "pull"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
                 Some(self.checkout_dir.clone()),
             ) != 0
@@ -166,9 +166,9 @@ impl FossilDriver {
 
             let mut output = String::new();
             if self.inner.process.borrow_mut().execute_args(
-                &["fossil", "clone", "--", &self.inner.url, &repo_file]
+                ["fossil", "clone", "--", &self.inner.url, &repo_file]
                     .map(|s| s.to_string())
-                    .to_vec(),
+                    .as_ref(),
                 &mut output,
                 (),
             ) != 0
@@ -185,9 +185,9 @@ impl FossilDriver {
             }
 
             if self.inner.process.borrow_mut().execute_args(
-                &["fossil", "open", "--nested", "--", &repo_file]
+                ["fossil", "open", "--nested", "--", &repo_file]
                     .map(|s| s.to_string())
-                    .to_vec(),
+                    .as_ref(),
                 &mut output,
                 Some(self.checkout_dir.clone()),
             ) != 0
@@ -244,9 +244,9 @@ impl FossilDriver {
 
         let mut content = String::new();
         self.inner.process.borrow_mut().execute_args(
-            &["fossil", "cat", "-r", identifier, "--", file]
+            ["fossil", "cat", "-r", identifier, "--", file]
                 .map(|s| s.to_string())
-                .to_vec(),
+                .as_ref(),
             &mut content,
             Some(self.checkout_dir.clone()),
         );
@@ -264,9 +264,9 @@ impl FossilDriver {
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         let mut output = String::new();
         self.inner.process.borrow_mut().execute_args(
-            &["fossil", "finfo", "-b", "-n", "1", "composer.json"]
+            ["fossil", "finfo", "-b", "-n", "1", "composer.json"]
                 .map(|s| s.to_string())
-                .to_vec(),
+                .as_ref(),
             &mut output,
             Some(self.checkout_dir.clone()),
         );
@@ -282,7 +282,7 @@ impl FossilDriver {
             let mut tags: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
             self.inner.process.borrow_mut().execute_args(
-                &["fossil", "tag", "list"].map(|s| s.to_string()).to_vec(),
+                ["fossil", "tag", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(self.checkout_dir.clone()),
             );
@@ -299,12 +299,12 @@ impl FossilDriver {
             let mut branches: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
             self.inner.process.borrow_mut().execute_args(
-                &["fossil", "branch", "list"].map(|s| s.to_string()).to_vec(),
+                ["fossil", "branch", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(self.checkout_dir.clone()),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                let branch = Preg::replace(r"/^\*/", "", &branch.trim());
+                let branch = Preg::replace(r"/^\*/", "", branch.trim());
                 let branch = branch.trim().to_string();
                 branches.insert(branch.clone(), branch);
             }
@@ -340,7 +340,7 @@ impl FossilDriver {
             let mut process = ProcessExecutor::new(Some(io));
             let mut output = String::new();
             if process.execute_args(
-                &["fossil", "info"].map(|s| s.to_string()).to_vec(),
+                ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(url),
             ) == 0

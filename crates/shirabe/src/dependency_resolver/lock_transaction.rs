@@ -37,7 +37,7 @@ impl LockTransaction {
         let all: Vec<PackageInterfaceHandle> = this
             .result_packages
             .get("all")
-            .map(|v| v.iter().cloned().collect())
+            .map(|v| v.to_vec())
             .unwrap_or_default();
         let present: Vec<PackageInterfaceHandle> = this.present_map.values().cloned().collect();
         this.inner = Transaction::new(present, all);
@@ -59,12 +59,12 @@ impl LockTransaction {
                 result_packages
                     .get_mut("all")
                     .unwrap()
-                    .push(package.clone().into());
+                    .push(package.clone());
                 if !self.unlockable_map.contains_key(&package.get_id()) {
                     result_packages
                         .get_mut("non-dev")
                         .unwrap()
-                        .push(package.clone().into());
+                        .push(package.clone());
                 }
             }
         }

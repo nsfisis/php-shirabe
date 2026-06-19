@@ -231,10 +231,10 @@ impl RemoteFilesystem {
             options.shift_remove("gitlab-token");
         }
 
-        if let Some(http_opts) = options.get_mut("http") {
-            if let PhpMixed::Array(m) = http_opts {
-                m.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
-            }
+        if let Some(http_opts) = options.get_mut("http")
+            && let PhpMixed::Array(m) = http_opts
+        {
+            m.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
         }
 
         let mut degraded_packagist = false;
@@ -399,12 +399,11 @@ impl RemoteFilesystem {
                     te.set_headers(http_response_header.clone());
                     te.set_status_code(Self::find_status_code(&http_response_header));
                 }
-                if result.is_some() {
-                    if let Ok(decoded) =
+                if result.is_some()
+                    && let Ok(decoded) =
                         self.decode_result(result.as_deref(), &http_response_header)
-                    {
-                        te.set_response(decoded);
-                    }
+                {
+                    te.set_response(decoded);
                 }
             }
             caught_e = Some(e);
@@ -421,13 +420,14 @@ impl RemoteFilesystem {
                 error_message
             );
         }
-        if let Some(e) = caught_e {
-            if !self.retry {
-                let msg_owned = format!("{}", e);
-                if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
-                    self.degraded_mode = true;
-                    self.io.write_error3("", true, crate::io::NORMAL);
-                    self.io.write_error3(
+        if let Some(e) = caught_e
+            && !self.retry
+        {
+            let msg_owned = format!("{}", e);
+            if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
+                self.degraded_mode = true;
+                self.io.write_error3("", true, crate::io::NORMAL);
+                self.io.write_error3(
                         &format!(
                             "<error>{}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
                             msg_owned,
@@ -436,17 +436,16 @@ impl RemoteFilesystem {
                         crate::io::NORMAL,
                     );
 
-                    return self.get(
-                        &self.origin_url.clone(),
-                        &self.file_url.clone(),
-                        additional_options,
-                        self.file_name.clone(),
-                        self.progress,
-                    );
-                }
-
-                return Err(e);
+                return self.get(
+                    &self.origin_url.clone(),
+                    &self.file_url.clone(),
+                    additional_options,
+                    self.file_name.clone(),
+                    self.progress,
+                );
             }
+
+            return Err(e);
         }
 
         let mut status_code: Option<i64> = None;
@@ -465,10 +464,9 @@ impl RemoteFilesystem {
             && substr(&self.file_url, -4, None) == ".zip"
             && (location_header.is_none()
                 || substr(
-                    &parse_url(location_header.as_deref().unwrap_or(""), PHP_URL_PATH)
+                    parse_url(location_header.as_deref().unwrap_or(""), PHP_URL_PATH)
                         .as_string()
-                        .unwrap_or("")
-                        .to_string(),
+                        .unwrap_or(""),
                     -4,
                     None,
                 ) != ".zip")
@@ -501,46 +499,48 @@ impl RemoteFilesystem {
         }
 
         let mut has_followed_redirect = false;
-        if let Some(code) = status_code {
-            if code >= 300 && code <= 399 && code != 304 && self.redirects < self.max_redirects {
-                has_followed_redirect = true;
-                result = self.handle_redirect(
-                    &http_response_header,
-                    additional_options.clone(),
-                    result.clone(),
-                )?;
-            }
+        if let Some(code) = status_code
+            && (300..=399).contains(&code)
+            && code != 304
+            && self.redirects < self.max_redirects
+        {
+            has_followed_redirect = true;
+            result = self.handle_redirect(
+                &http_response_header,
+                additional_options.clone(),
+                result.clone(),
+            )?;
         }
 
-        if let Some(code) = status_code {
-            if code >= 400 && code <= 599 {
-                if !self.retry {
-                    if self.progress && !is_redirect {
-                        self.io.overwrite_error4(
-                            "Downloading (<error>failed</error>)",
-                            false,
-                            None,
-                            crate::io::NORMAL,
-                        );
-                    }
-
-                    let mut e = TransportException::new_with_code(
-                        format!(
-                            "The \"{}\" file could not be downloaded ({})",
-                            self.file_url, http_response_header[0]
-                        ),
-                        code,
+        if let Some(code) = status_code
+            && (400..=599).contains(&code)
+        {
+            if !self.retry {
+                if self.progress && !is_redirect {
+                    self.io.overwrite_error4(
+                        "Downloading (<error>failed</error>)",
+                        false,
+                        None,
+                        crate::io::NORMAL,
                     );
-                    e.set_headers(http_response_header.clone());
-                    let decoded = self
-                        .decode_result(result.as_deref(), &http_response_header)
-                        .unwrap_or(None);
-                    e.set_response(decoded);
-                    e.set_status_code(Some(code));
-                    return Err(anyhow::anyhow!(e));
                 }
-                result = None;
+
+                let mut e = TransportException::new_with_code(
+                    format!(
+                        "The \"{}\" file could not be downloaded ({})",
+                        self.file_url, http_response_header[0]
+                    ),
+                    code,
+                );
+                e.set_headers(http_response_header.clone());
+                let decoded = self
+                    .decode_result(result.as_deref(), &http_response_header)
+                    .unwrap_or(None);
+                e.set_response(decoded);
+                e.set_status_code(Some(code));
+                return Err(anyhow::anyhow!(e));
             }
+            result = None;
         }
 
         if self.progress && !self.retry && !is_redirect {
@@ -724,16 +724,15 @@ impl RemoteFilesystem {
             Err(e) => caught_e = Some(e),
         }
 
-        if let Some(ref r) = result {
-            if let Some(max) = max_file_size {
-                if Platform::strlen(r) >= max {
-                    return Err(anyhow::anyhow!(MaxFileSizeExceededException::new(format!(
-                        "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
-                        Platform::strlen(r),
-                        max
-                    ))));
-                }
-            }
+        if let Some(ref r) = result
+            && let Some(max) = max_file_size
+            && Platform::strlen(r) >= max
+        {
+            return Err(anyhow::anyhow!(MaxFileSizeExceededException::new(format!(
+                "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
+                Platform::strlen(r),
+                max
+            ))));
         }
 
         if PHP_VERSION_ID >= 80400 {

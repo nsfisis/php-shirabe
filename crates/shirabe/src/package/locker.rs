@@ -240,33 +240,33 @@ impl Locker {
                 }
             }
 
-            if let Some(aliases) = lock_data.get("aliases") {
-                if let PhpMixed::List(alias_list) = aliases {
-                    for alias in alias_list {
-                        if let PhpMixed::Array(m) = alias.as_ref() {
-                            let alias_pkg_name = m
-                                .get("package")
-                                .and_then(|v| v.as_string())
-                                .unwrap_or("")
-                                .to_string();
-                            if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
-                                let alias_of = base_pkg.as_complete_package().expect(
+            if let Some(aliases) = lock_data.get("aliases")
+                && let PhpMixed::List(alias_list) = aliases
+            {
+                for alias in alias_list {
+                    if let PhpMixed::Array(m) = alias.as_ref() {
+                        let alias_pkg_name = m
+                            .get("package")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
+                            .to_string();
+                        if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
+                            let alias_of = base_pkg.as_complete_package().expect(
                                     "CompleteAliasPackage requires aliasOf to be a real CompletePackage",
                                 );
-                                let alias_pkg = CompleteAliasPackageHandle::new(
-                                    alias_of,
-                                    m.get("alias_normalized")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                    m.get("alias")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                );
-                                alias_pkg.set_root_package_alias(true);
-                                packages.add_package(alias_pkg.into())?;
-                            }
+                            let alias_pkg = CompleteAliasPackageHandle::new(
+                                alias_of,
+                                m.get("alias_normalized")
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or("")
+                                    .to_string(),
+                                m.get("alias")
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or("")
+                                    .to_string(),
+                            );
+                            alias_pkg.set_root_package_alias(true);
+                            packages.add_package(alias_pkg.into())?;
                         }
                     }
                 }
@@ -465,6 +465,7 @@ impl Locker {
     }
 
     /// Locks provided data into lockfile.
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn set_lock_data(
         &mut self,
         packages: Vec<PackageInterfaceHandle>,
@@ -585,7 +586,7 @@ impl Locker {
                     .collect(),
             ),
         );
-        if platform_overrides.len() > 0 {
+        if !platform_overrides.is_empty() {
             lock.insert(
                 "platform-overrides".to_string(),
                 PhpMixed::Array(
@@ -663,7 +664,7 @@ impl Locker {
     where
         F: FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>,
     {
-        let contents = file_get_contents(&composer_json.get_path());
+        let contents = file_get_contents(composer_json.get_path());
         let contents = match contents {
             Some(s) => s,
             None => {
@@ -678,7 +679,7 @@ impl Locker {
             }
         };
 
-        let lock_mtime = filemtime(&self.lock_file.get_path());
+        let lock_mtime = filemtime(self.lock_file.get_path());
         let lock_data_php = self.lock_file.read()?;
         let mut lock_data: IndexMap<String, PhpMixed> = match lock_data_php {
             PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
@@ -700,10 +701,10 @@ impl Locker {
         ))?;
         *self.lock_data_cache.borrow_mut() = None;
         self.virtual_file_written = false;
-        if let Some(mtime) = lock_mtime {
-            if is_int(&PhpMixed::Int(mtime)) {
-                let _ = touch2(&self.lock_file.get_path(), mtime);
-            }
+        if let Some(mtime) = lock_mtime
+            && is_int(&PhpMixed::Int(mtime))
+        {
+            let _ = touch2(self.lock_file.get_path(), mtime);
         }
         Ok(())
     }
@@ -930,7 +931,7 @@ impl Locker {
             method: "getRequires".to_string(),
             description: "Required".to_string(),
         }];
-        if include_dev == true {
+        if include_dev {
             sets.push(SetEntry {
                 repo: self.get_locked_repository(true)?,
                 method: "getDevRequires".to_string(),
@@ -949,7 +950,7 @@ impl Locker {
                 _ => unreachable!(),
             };
             for link in links.values() {
-                if PlatformRepository::is_platform_package(&link.get_target()) {
+                if PlatformRepository::is_platform_package(link.get_target()) {
                     continue;
                 }
                 if link.get_pretty_constraint() == "self.version" {
@@ -957,7 +958,7 @@ impl Locker {
                 }
                 if installed_repo
                     .find_packages_with_replacers_and_providers(
-                        &link.get_target(),
+                        link.get_target(),
                         Some(FindPackageConstraint::Constraint(
                             link.get_constraint().clone(),
                         )),
@@ -965,7 +966,7 @@ impl Locker {
                     .is_empty()
                 {
                     let results = installed_repo
-                        .find_packages_with_replacers_and_providers(&link.get_target(), None)?;
+                        .find_packages_with_replacers_and_providers(link.get_target(), None)?;
 
                     if !results.is_empty() {
                         // PHP `reset($results)` returns the first shared package; clone the handle.

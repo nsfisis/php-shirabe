@@ -16,6 +16,7 @@ pub struct IgnoredSecurityAdvisory {
 }
 
 impl IgnoredSecurityAdvisory {
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         package_name: String,
         advisory_id: String,

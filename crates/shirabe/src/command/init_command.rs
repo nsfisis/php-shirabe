@@ -93,6 +93,12 @@ impl PackageDiscoveryTrait for InitCommand {
     }
 }
 
+impl Default for InitCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InitCommand {
     pub fn new() -> Self {
         let mut command = InitCommand {
@@ -357,7 +363,7 @@ impl Command for InitCommand {
                 );
                 let errors = format!(
                     " - {}",
-                    implode(&format!("{} - ", PHP_EOL), &json_err.get_errors())
+                    implode(&format!("{} - ", PHP_EOL), json_err.get_errors())
                 );
                 io.write_error3(
                     &format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),
@@ -496,7 +502,7 @@ impl Command for InitCommand {
                     None,
                 )?));
                 io.borrow_mut()
-                    .load_configuration(&mut *config.borrow_mut())?;
+                    .load_configuration(&mut config.borrow_mut())?;
                 let mut repo_manager =
                     RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 
@@ -970,14 +976,14 @@ impl InitCommand {
             Some(&mut m),
         ) {
             let email = m.get(&CaptureKey::ByName("email".to_string())).cloned();
-            if let Some(ref email) = email {
-                if !self.is_valid_email(email) {
-                    return Err(InvalidArgumentException {
-                        message: format!("Invalid email \"{}\"", email),
-                        code: 0,
-                    }
-                    .into());
+            if let Some(ref email) = email
+                && !self.is_valid_email(email)
+            {
+                return Err(InvalidArgumentException {
+                    message: format!("Invalid email \"{}\"", email),
+                    code: 0,
                 }
+                .into());
             }
 
             let mut result: IndexMap<String, Option<String>> = IndexMap::new();
@@ -1029,7 +1035,7 @@ impl InitCommand {
 
         let namespace: Vec<String> = array_map(
             |part: &String| {
-                let part = Preg::replace(r"/[^a-z0-9]/i", " ", &part);
+                let part = Preg::replace(r"/[^a-z0-9]/i", " ", part);
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
@@ -1049,7 +1055,7 @@ impl InitCommand {
 
         let mut output = String::new();
         if process.execute_args(
-            &vec!["git".to_string(), "config".to_string(), "-l".to_string()],
+            &["git".to_string(), "config".to_string(), "-l".to_string()],
             &mut output,
             (),
         ) == 0
@@ -1175,9 +1181,8 @@ impl InitCommand {
         );
         let name = strtolower(&name);
         let name = Preg::replace(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u", "", &name);
-        let name = Preg::replace(r"{([_.-]){2,}}u", "$1", &name);
 
-        name
+        Preg::replace(r"{([_.-]){2,}}u", "$1", &name)
     }
 
     fn get_default_package_name(&mut self) -> String {

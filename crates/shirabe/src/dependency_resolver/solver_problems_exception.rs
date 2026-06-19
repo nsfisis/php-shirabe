@@ -128,7 +128,7 @@ impl SolverProblemsException {
     fn create_extension_hint(&self, missing_extensions: &[String]) -> String {
         let mut paths = IniHelper::get_all();
 
-        if paths.first().map_or(false, |s| s.is_empty()) {
+        if paths.first().is_some_and(|s| s.is_empty()) {
             if paths.len() == 1 {
                 return String::new();
             }
@@ -162,10 +162,10 @@ impl SolverProblemsException {
         for reason_set in reason_sets.values() {
             for rule in reason_set {
                 let required = rule.borrow().get_required_package();
-                if let Some(req) = required {
-                    if req.starts_with("ext-") {
-                        missing_extensions.insert(req.to_string(), 1);
-                    }
+                if let Some(req) = required
+                    && req.starts_with("ext-")
+                {
+                    missing_extensions.insert(req.to_string(), 1);
                 }
             }
         }

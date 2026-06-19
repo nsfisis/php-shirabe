@@ -165,14 +165,14 @@ pub trait VcsDownloader:
                             true,
                             io_interface::NORMAL,
                         );
-                    } else if urls.len() > 0 {
+                    } else if !urls.is_empty() {
                         self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
                         );
                     }
-                    if urls.len() == 0 {
+                    if urls.is_empty() {
                         return Err(e);
                     }
                 }
@@ -269,14 +269,14 @@ pub trait VcsDownloader:
                             true,
                             io_interface::NORMAL,
                         );
-                    } else if urls.len() > 0 {
+                    } else if !urls.is_empty() {
                         self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
                         );
                     }
-                    if urls.len() == 0 {
+                    if urls.is_empty() {
                         return Err(e);
                     }
                 }
@@ -338,7 +338,7 @@ pub trait VcsDownloader:
                             true,
                             io_interface::NORMAL,
                         );
-                    } else if urls.len() > 0 {
+                    } else if !urls.is_empty() {
                         self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
@@ -358,12 +358,12 @@ pub trait VcsDownloader:
             let mut message = "Pulling in changes:";
             let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path)?;
 
-            if trim(&logs, None) == "" {
+            if trim(&logs, None).is_empty() {
                 message = "Rolling back changes:";
                 logs = self.get_commit_logs(&target_ref, &initial_ref, path)?;
             }
 
-            if trim(&logs, None) != "" {
+            if !trim(&logs, None).is_empty() {
                 let prefixed: Vec<String> = array_map(
                     |line: &String| format!("      {}", line),
                     &explode("\n", &logs),
@@ -379,10 +379,10 @@ pub trait VcsDownloader:
             }
         }
 
-        if urls.is_empty() {
-            if let Some(e) = exception {
-                return Err(e);
-            }
+        if urls.is_empty()
+            && let Some(e) = exception
+        {
+            return Err(e);
         }
 
         Ok(None)

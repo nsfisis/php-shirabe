@@ -69,12 +69,11 @@ impl Response {
                 shirabe_external_packages::composer::pcre::CaptureKey,
                 String,
             > = indexmap::IndexMap::new();
-            if Preg::match3(&pattern, header, Some(&mut matches)) {
-                if let Some(s) =
+            if Preg::match3(&pattern, header, Some(&mut matches))
+                && let Some(s) =
                     matches.get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
-                {
-                    value = Some(s.clone());
-                }
+            {
+                value = Some(s.clone());
             }
         }
         value

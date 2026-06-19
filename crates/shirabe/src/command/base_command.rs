@@ -287,20 +287,20 @@ impl BaseCommand for BaseCommandData {
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Option<PartialComposerHandle> {
-        if self.composer.is_none() {
-            if let Some(application) = self.get_application() {
-                let result = {
-                    let mut app_ref = application.borrow_mut();
-                    let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
-                    let app = app_dyn
-                        .as_any_mut()
-                        .downcast_mut::<Application>()
-                        .expect("a Composer command's application is a shirabe Application");
-                    app.get_composer(false, disable_plugins, disable_scripts)
-                };
-                if let Ok(composer) = result {
-                    self.composer = composer;
-                }
+        if self.composer.is_none()
+            && let Some(application) = self.get_application()
+        {
+            let result = {
+                let mut app_ref = application.borrow_mut();
+                let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
+                let app = app_dyn
+                    .as_any_mut()
+                    .downcast_mut::<Application>()
+                    .expect("a Composer command's application is a shirabe Application");
+                app.get_composer(false, disable_plugins, disable_scripts)
+            };
+            if let Ok(composer) = result {
+                self.composer = composer;
             }
         }
 
@@ -399,7 +399,7 @@ impl BaseCommand for BaseCommandData {
             "dist" => {
                 prefer_dist = true;
             }
-            "auto" | _ => {
+            _ => {
                 // noop
             }
         }
@@ -523,21 +523,18 @@ impl BaseCommand for BaseCommandData {
             .into());
         }
 
-        if true
-            == input
-                .borrow()
-                .get_option("ignore-platform-reqs")?
-                .as_bool()
-                .unwrap_or(false)
+        if input
+            .borrow()
+            .get_option("ignore-platform-reqs")?
+            .as_bool()
+            .unwrap_or(false)
         {
             return Ok(PlatformRequirementFilterFactory::ignore_all());
         }
 
         let ignores = input.borrow().get_option("ignore-platform-req")?;
         if count(&ignores) > 0 {
-            return Ok(PlatformRequirementFilterFactory::from_bool_or_list(
-                ignores,
-            )?);
+            return PlatformRequirementFilterFactory::from_bool_or_list(ignores);
         }
 
         Ok(PlatformRequirementFilterFactory::ignore_nothing())
@@ -664,7 +661,7 @@ impl BaseCommand for BaseCommandData {
         let audit_config = AuditConfig::from_config(config, audit, &audit_format)?;
 
         if Platform::get_env("COMPOSER_NO_SECURITY_BLOCKING")
-            .map_or(false, |s| !s.is_empty() && s != "0")
+            .is_some_and(|s| !s.is_empty() && s != "0")
             || (input.borrow().has_option("no-security-blocking")
                 && input
                     .borrow()
@@ -777,41 +774,38 @@ pub fn base_command_initialize(
     .collect();
     for (env_name, option_names) in &env_options {
         for option_name in option_names {
-            if true == input.borrow().has_option(option_name) {
-                if false
-                    == input
-                        .borrow()
-                        .get_option(option_name)?
-                        .as_bool()
-                        .unwrap_or(false)
-                    && Platform::get_env(env_name).map_or(false, |s| !s.is_empty() && s != "0")
-                {
-                    input
-                        .borrow_mut()
-                        .set_option(option_name, PhpMixed::Bool(true));
-                }
+            if input.borrow().has_option(option_name)
+                && !input
+                    .borrow()
+                    .get_option(option_name)?
+                    .as_bool()
+                    .unwrap_or(false)
+                && Platform::get_env(env_name).is_some_and(|s| !s.is_empty() && s != "0")
+            {
+                input
+                    .borrow_mut()
+                    .set_option(option_name, PhpMixed::Bool(true));
             }
         }
     }
 
-    if true == input.borrow().has_option("ignore-platform-reqs") {
-        if !input
+    if input.borrow().has_option("ignore-platform-reqs")
+        && !input
             .borrow()
             .get_option("ignore-platform-reqs")?
             .as_bool()
             .unwrap_or(false)
-            && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
-                .map_or(false, |s| !s.is_empty() && s != "0")
-        {
-            input
-                .borrow_mut()
-                .set_option("ignore-platform-reqs", PhpMixed::Bool(true));
+        && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
+            .is_some_and(|s| !s.is_empty() && s != "0")
+    {
+        input
+            .borrow_mut()
+            .set_option("ignore-platform-reqs", PhpMixed::Bool(true));
 
-            io.write_error("<warning>COMPOSER_IGNORE_PLATFORM_REQS is set. You may experience unexpected errors.</warning>");
-        }
+        io.write_error("<warning>COMPOSER_IGNORE_PLATFORM_REQS is set. You may experience unexpected errors.</warning>");
     }
 
-    if true == input.borrow().has_option("ignore-platform-req")
+    if input.borrow().has_option("ignore-platform-req")
         && (!input.borrow().has_option("ignore-platform-reqs")
             || !input
                 .borrow()
@@ -823,7 +817,7 @@ pub fn base_command_initialize(
         let ignore_str = ignore_platform_req_env.clone().unwrap_or_default();
         if 0 == count(&input.borrow().get_option("ignore-platform-req")?)
             && ignore_platform_req_env.is_some()
-            && "" != ignore_str
+            && !ignore_str.is_empty()
         {
             input.borrow_mut().set_option(
                 "ignore-platform-req",

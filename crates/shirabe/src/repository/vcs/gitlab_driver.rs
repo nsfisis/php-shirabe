@@ -222,7 +222,7 @@ impl GitLabDriver {
             None,
             false,
         ));
-        self.inner.cache.as_mut().map(|c| {
+        if let Some(c) = self.inner.cache.as_mut() {
             c.set_read_only(
                 self.inner
                     .config
@@ -231,7 +231,7 @@ impl GitLabDriver {
                     .as_bool()
                     .unwrap_or(false),
             )
-        });
+        }
 
         self.fetch_project()?;
 
@@ -283,27 +283,27 @@ impl GitLabDriver {
                     || self.get_change_date(identifier),
                 )?;
 
-                if self.inner.should_cache(identifier) {
-                    if let Some(ref composer_map) = composer {
-                        self.inner.cache.as_mut().map(|c| {
-                            c.write(
-                                identifier,
-                                &JsonFile::encode_with_options(
-                                    &PhpMixed::Array(
-                                        composer_map
-                                            .clone()
-                                            .into_iter()
-                                            .map(|(k, v)| (k, Box::new(v)))
-                                            .collect(),
-                                    ),
-                                    JsonEncodeOptions {
-                                        pretty_print: false,
-                                        ..Default::default()
-                                    },
+                if self.inner.should_cache(identifier)
+                    && let Some(ref composer_map) = composer
+                {
+                    self.inner.cache.as_mut().map(|c| {
+                        c.write(
+                            identifier,
+                            &JsonFile::encode_with_options(
+                                &PhpMixed::Array(
+                                    composer_map
+                                        .clone()
+                                        .into_iter()
+                                        .map(|(k, v)| (k, Box::new(v)))
+                                        .collect(),
                                 ),
-                            )
-                        });
-                    }
+                                JsonEncodeOptions {
+                                    pretty_print: false,
+                                    ..Default::default()
+                                },
+                            ),
+                        )
+                    });
                 }
 
                 composer
@@ -615,7 +615,7 @@ impl GitLabDriver {
                     ]),
                     true,
                 ) {
-                format!("%{}", format!("{:02X}", ord(&character)))
+                format!("%{:02X}", ord(&character))
             } else {
                 character
             };
@@ -828,14 +828,12 @@ impl GitLabDriver {
                             json_map.get("permissions").and_then(|v| v.as_array())
                         {
                             for (_, permission) in permissions {
-                                if let Some(perm_map) = permission.as_array() {
-                                    if let Some(level) =
+                                if let Some(perm_map) = permission.as_array()
+                                    && let Some(level) =
                                         perm_map.get("access_level").and_then(|v| v.as_int())
-                                    {
-                                        if level >= 20 {
-                                            more_than_guest_access = true;
-                                        }
-                                    }
+                                    && level >= 20
+                                {
+                                    more_than_guest_access = true;
                                 }
                             }
                         }
@@ -874,7 +872,7 @@ impl GitLabDriver {
                         }
 
                         if !empty(
-                            &*json_map
+                            &json_map
                                 .get("id")
                                 .cloned()
                                 .unwrap_or(Box::new(PhpMixed::Null)),

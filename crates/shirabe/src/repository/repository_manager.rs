@@ -61,7 +61,7 @@ impl RepositoryManager {
                 name,
                 crate::repository::FindPackageConstraint::Constraint(constraint.clone()),
             )? {
-                return Ok(Some(package.into()));
+                return Ok(Some(package));
             }
         }
         Ok(None)

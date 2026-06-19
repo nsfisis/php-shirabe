@@ -84,8 +84,7 @@ impl ConfigurableRepositoryInterface for VcsRepository {
 }
 
 impl VcsRepository {
-    /// @param array{url: string, type?: string}&array<string, mixed> $repoConfig
-    /// @param array<string, class-string<VcsDriverInterface>>|null $drivers
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         mut repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -315,10 +314,10 @@ impl VcsRepository {
                             }
                             Ok(None) => {}
                             Err(e) => {
-                                if let Some(te) = e.downcast_ref::<TransportException>() {
-                                    if self.should_rethrow_transport_exception(te) {
-                                        return Err(e);
-                                    }
+                                if let Some(te) = e.downcast_ref::<TransportException>()
+                                    && self.should_rethrow_transport_exception(te)
+                                {
+                                    return Err(e);
                                 }
                                 if is_very_verbose {
                                     self.io.write_error(&format!(
@@ -331,10 +330,10 @@ impl VcsRepository {
                     }
                 }
                 Err(e) => {
-                    if let Some(te) = e.downcast_ref::<TransportException>() {
-                        if self.should_rethrow_transport_exception(te) {
-                            return Err(e);
-                        }
+                    if let Some(te) = e.downcast_ref::<TransportException>()
+                        && self.should_rethrow_transport_exception(te)
+                    {
+                        return Err(e);
                     }
                     if is_very_verbose {
                         self.io.write_error(&format!(
@@ -528,7 +527,7 @@ impl VcsRepository {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
                     self.version_transport_exceptions
                         .entry("tags".to_string())
-                        .or_insert_with(IndexMap::new)
+                        .or_default()
                         .insert(tag.clone(), te.clone());
                     if te.get_code() == 404 {
                         self.empty_references.push(identifier.clone());
@@ -701,15 +700,15 @@ impl VcsRepository {
                     .loader
                     .as_ref()
                     .and_then(|l| l.as_any().downcast_ref::<ValidatingArrayLoader>());
-                if let Some(validating) = loader_as_validating {
-                    if !validating.get_warnings().is_empty() {
-                        return Err(InvalidPackageException::new(
-                            validating.get_errors().to_vec(),
-                            validating.get_warnings().to_vec(),
-                            package_data,
-                        )
-                        .into());
-                    }
+                if let Some(validating) = loader_as_validating
+                    && !validating.get_warnings().is_empty()
+                {
+                    return Err(InvalidPackageException::new(
+                        validating.get_errors().to_vec(),
+                        validating.get_warnings().to_vec(),
+                        package_data,
+                    )
+                    .into());
                 }
                 self.inner.add_package(package)?;
                 Ok(())
@@ -718,7 +717,7 @@ impl VcsRepository {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
                     self.version_transport_exceptions
                         .entry("branches".to_string())
-                        .or_insert_with(IndexMap::new)
+                        .or_default()
                         .insert(branch.clone(), te.clone());
                     if te.get_code() == 404 {
                         self.empty_references.push(identifier.clone());
@@ -830,10 +829,12 @@ impl VcsRepository {
             PhpMixed::Array(m) => m.get("reference").cloned(),
             _ => None,
         });
-        if dist_is_array && dist_lacks_reference && source_reference.is_some() {
-            if let Some(PhpMixed::Array(dist_map)) = data.get_mut("dist") {
-                dist_map.insert("reference".to_string(), source_reference.unwrap());
-            }
+        if dist_is_array
+            && dist_lacks_reference
+            && source_reference.is_some()
+            && let Some(PhpMixed::Array(dist_map)) = data.get_mut("dist")
+        {
+            dist_map.insert("reference".to_string(), source_reference.unwrap());
         }
 
         Ok(data)

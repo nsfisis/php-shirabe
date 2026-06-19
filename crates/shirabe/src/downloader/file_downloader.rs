@@ -201,7 +201,7 @@ impl DownloaderInterface for FileDownloader {
                 cache_key,
             });
         }
-        debug_assert!(urls.len() > 0);
+        debug_assert!(!urls.is_empty());
 
         let file_name = self.get_file_name(package.clone(), path);
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
@@ -253,13 +253,13 @@ impl DownloaderInterface for FileDownloader {
                 // mark the file as having been written in cache even though it is only read from cache, so that if
                 // the cache is corrupt the archive will be deleted and the next attempt will re-download it
                 // see https://github.com/composer/composer/issues/10028
-                if let Some(cache) = self.cache.as_ref() {
-                    if !cache.borrow().is_read_only() {
-                        self.last_cache_writes
-                            .lock()
-                            .unwrap()
-                            .insert(package.get_name().to_string(), cache_key.clone());
-                    }
+                if let Some(cache) = self.cache.as_ref()
+                    && !cache.borrow().is_read_only()
+                {
+                    self.last_cache_writes
+                        .lock()
+                        .unwrap()
+                        .insert(package.get_name().to_string(), cache_key.clone());
                 }
             } else {
                 if output {
@@ -304,14 +304,14 @@ impl DownloaderInterface for FileDownloader {
                             );
                         }
 
-                        if let Some(cache) = self.cache.as_ref() {
-                            if !cache.borrow().is_read_only() {
-                                self.last_cache_writes
-                                    .lock()
-                                    .unwrap()
-                                    .insert(package.get_name().to_string(), cache_key.clone());
-                                cache.borrow_mut().copy_from(&cache_key, &file_name);
-                            }
+                        if let Some(cache) = self.cache.as_ref()
+                            && !cache.borrow().is_read_only()
+                        {
+                            self.last_cache_writes
+                                .lock()
+                                .unwrap()
+                                .insert(package.get_name().to_string(), cache_key.clone());
+                            cache.borrow_mut().copy_from(&cache_key, &file_name);
                         }
 
                         response.collect();
@@ -366,7 +366,7 @@ impl DownloaderInterface for FileDownloader {
                         if !urls.is_empty() {
                             urls.remove(0);
                         }
-                        if urls.len() > 0 {
+                        if !urls.is_empty() {
                             let code = e
                                 .downcast_ref::<TransportException>()
                                 .map_or(0, |te| te.get_code());
@@ -414,19 +414,18 @@ impl DownloaderInterface for FileDownloader {
                 .into());
             }
 
-            if let Some(checksum) = checksum.as_deref() {
-                if !checksum.is_empty()
-                    && hash_file("sha1", &file_name).as_deref() != Some(checksum)
-                {
-                    return Err(UnexpectedValueException {
-                        message: format!(
-                            "The checksum verification of the file failed (downloaded from {})",
-                            url.base
-                        ),
-                        code: 0,
-                    }
-                    .into());
+            if let Some(checksum) = checksum.as_deref()
+                && !checksum.is_empty()
+                && hash_file("sha1", &file_name).as_deref() != Some(checksum)
+            {
+                return Err(UnexpectedValueException {
+                    message: format!(
+                        "The checksum verification of the file failed (downloaded from {})",
+                        url.base
+                    ),
+                    code: 0,
                 }
+                .into());
             }
 
             // TODO(plugin): dispatch PostFileDownloadEvent.
@@ -526,7 +525,7 @@ impl DownloaderInterface for FileDownloader {
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the file to be installed. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
-        if false == {
+        if !{
             let normalized_vendor = self.filesystem.borrow_mut().normalize_path(&vendor_dir);
             let normalized_path = self
                 .filesystem
@@ -620,7 +619,7 @@ impl ChangeReportInterface for FileDownloader {
         );
         self.io
             .borrow_mut()
-            .load_configuration(&mut *self.config.borrow_mut())?;
+            .load_configuration(&mut self.config.borrow_mut())?;
 
         let target_dir = Filesystem::trim_trailing_slash(path);
         // PHP attaches an onRejected handler to capture the error and drives the promise via
@@ -721,7 +720,7 @@ impl FileDownloader {
     pub(crate) fn add_cleanup_path(&mut self, package: PackageInterfaceHandle, path: &str) {
         self.additional_cleanup_paths
             .entry(package.get_name())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(path.to_string());
     }
 
@@ -786,7 +785,7 @@ impl FileDownloader {
         let mut url = url.to_string();
         if package.get_dist_reference().is_some() {
             url = UrlUtil::update_dist_reference(
-                &*self.config.borrow(),
+                &self.config.borrow(),
                 url,
                 &package.get_dist_reference().unwrap(),
             );

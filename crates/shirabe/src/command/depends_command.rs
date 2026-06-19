@@ -28,6 +28,12 @@ pub struct DependsCommand {
     colors: Vec<String>,
 }
 
+impl Default for DependsCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DependsCommand {
     pub fn new() -> Self {
         let mut command = DependsCommand {

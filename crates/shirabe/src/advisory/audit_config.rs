@@ -23,6 +23,7 @@ pub struct AuditConfig {
 }
 
 impl AuditConfig {
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         audit: bool,
         audit_format: String,

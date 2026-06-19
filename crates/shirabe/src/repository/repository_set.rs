@@ -222,7 +222,7 @@ impl RepositorySet {
         } else {
             'outer: for repository in &self.repositories {
                 let mut name_map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-                name_map.insert(name.to_string(), constraint.as_ref().map(|c| c.clone()));
+                name_map.insert(name.to_string(), constraint.clone());
                 let acceptable = if ignore_stability {
                     // PHP: BasePackage::STABILITIES
                     crate::package::STABILITIES
@@ -314,10 +314,10 @@ impl RepositorySet {
         let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
         for package in packages {
             // ignore root alias versions as they are not actual package versions and should not matter when it comes to vulnerabilities
-            if let Some(alias) = package.as_alias() {
-                if alias.is_root_package_alias() {
-                    continue;
-                }
+            if let Some(alias) = package.as_alias()
+                && alias.is_root_package_alias()
+            {
+                continue;
             }
             let name = package.get_name().to_string();
             if map.contains_key(&name) {
@@ -452,9 +452,7 @@ impl RepositorySet {
     }
 
     /// Create a pool for dependency resolution from the packages in this repository set.
-    ///
-    /// @param list<string>      $ignoredTypes Packages of those types are ignored
-    /// @param list<string>|null $allowedTypes Only packages of those types are allowed if set to non-null
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn create_pool(
         &mut self,
         request: &mut Request,
@@ -546,32 +544,32 @@ impl RepositorySet {
                 let version = package.get_version();
                 packages.push(package.clone());
 
-                if let Some(versions) = self.root_aliases.get(&name) {
-                    if let Some(alias) = versions.get(&version) {
-                        while let Some(alias_pkg) = package.as_alias() {
-                            package = alias_pkg.get_alias_of().into();
-                        }
-                        let alias_package: BasePackageHandle =
-                            if let Some(complete) = package.as_complete_package() {
-                                CompleteAliasPackageHandle::new(
-                                    complete,
-                                    alias.alias_normalized.clone(),
-                                    alias.alias.clone(),
-                                )
-                                .into()
-                            } else {
-                                AliasPackageHandle::new(
-                                    package.as_package().unwrap(),
-                                    alias.alias_normalized.clone(),
-                                    alias.alias.clone(),
-                                )
-                                .into()
-                            };
-                        if let Some(alias_handle) = alias_package.as_alias() {
-                            alias_handle.set_root_package_alias(true);
-                        }
-                        packages.push(alias_package);
+                if let Some(versions) = self.root_aliases.get(&name)
+                    && let Some(alias) = versions.get(&version)
+                {
+                    while let Some(alias_pkg) = package.as_alias() {
+                        package = alias_pkg.get_alias_of().into();
                     }
+                    let alias_package: BasePackageHandle =
+                        if let Some(complete) = package.as_complete_package() {
+                            CompleteAliasPackageHandle::new(
+                                complete,
+                                alias.alias_normalized.clone(),
+                                alias.alias.clone(),
+                            )
+                            .into()
+                        } else {
+                            AliasPackageHandle::new(
+                                package.as_package().unwrap(),
+                                alias.alias_normalized.clone(),
+                                alias.alias.clone(),
+                            )
+                            .into()
+                        };
+                    if let Some(alias_handle) = alias_package.as_alias() {
+                        alias_handle.set_root_package_alias(true);
+                    }
+                    packages.push(alias_package);
                 }
             }
         }
@@ -643,16 +641,13 @@ impl RepositorySet {
             IndexMap::new();
 
         for alias in aliases {
-            normalized_aliases
-                .entry(alias.package)
-                .or_insert_with(IndexMap::new)
-                .insert(
-                    alias.version,
-                    RootAliasEntry {
-                        alias: alias.alias,
-                        alias_normalized: alias.alias_normalized,
-                    },
-                );
+            normalized_aliases.entry(alias.package).or_default().insert(
+                alias.version,
+                RootAliasEntry {
+                    alias: alias.alias,
+                    alias_normalized: alias.alias_normalized,
+                },
+            );
         }
 
         normalized_aliases

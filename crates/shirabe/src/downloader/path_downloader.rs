@@ -135,7 +135,7 @@ impl PathDownloader {
         let mut allowed_strategies = vec![Self::STRATEGY_SYMLINK, Self::STRATEGY_MIRROR];
 
         let mirror_path_repos = Platform::get_env("COMPOSER_MIRROR_PATH_REPOS");
-        if mirror_path_repos.map_or(false, |v| !v.is_empty()) {
+        if mirror_path_repos.is_some_and(|v| !v.is_empty()) {
             current_strategy = Self::STRATEGY_MIRROR;
         }
 

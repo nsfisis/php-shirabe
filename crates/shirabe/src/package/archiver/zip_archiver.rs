@@ -13,6 +13,12 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct ZipArchiver;
 
+impl Default for ZipArchiver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ZipArchiver {
     pub fn new() -> Self {
         Self

@@ -27,6 +27,12 @@ pub struct DumpAutoloadCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for DumpAutoloadCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DumpAutoloadCommand {
     pub fn new() -> Self {
         let mut command = DumpAutoloadCommand {
@@ -269,7 +275,7 @@ impl Command for DumpAutoloadCommand {
             &config_ref,
             local_repo,
             package,
-            &mut *installation_manager_ref,
+            &mut installation_manager_ref,
             "composer",
             optimize,
             None,

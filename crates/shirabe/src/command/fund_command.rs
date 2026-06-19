@@ -38,6 +38,12 @@ pub struct FundCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for FundCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FundCommand {
     pub fn new() -> Self {
         let mut command = FundCommand {
@@ -60,7 +66,7 @@ impl FundCommand {
 
         for funding_option in package.get_funding() {
             let url_val = funding_option.get("url").and_then(|v| v.as_string());
-            if url_val.map_or(true, |s| s.is_empty()) {
+            if url_val.is_none_or(|s| s.is_empty()) {
                 continue;
             }
             let mut url = url_val.unwrap().to_string();
@@ -68,14 +74,12 @@ impl FundCommand {
                 .get("type")
                 .and_then(|v| v.as_string())
                 .unwrap_or("");
-            if r#type == "github" {
-                if let Some(matches) =
+            if r#type == "github"
+                && let Some(matches) =
                     Preg::is_match_with_indexed_captures(r"^https://github.com/([^/]+)$", &url)
-                {
-                    if let Some(sponsor) = matches.into_iter().nth(1) {
-                        url = format!("https://github.com/sponsors/{}", sponsor);
-                    }
-                }
+                && let Some(sponsor) = matches.into_iter().nth(1)
+            {
+                url = format!("https://github.com/sponsors/{}", sponsor);
             }
             fundings
                 .entry(vendor.to_string())
@@ -115,13 +119,8 @@ impl Command for FundCommand {
         let repository_manager = composer.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();
         let repo = repository_manager.get_local_repository();
-        let mut remote_repos = CompositeRepository::new(
-            repository_manager
-                .get_repositories()
-                .iter()
-                .map(|r| r.clone())
-                .collect(),
-        );
+        let mut remote_repos =
+            CompositeRepository::new(repository_manager.get_repositories().to_vec());
         let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
 
         let mut packages_to_load: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
@@ -149,14 +148,13 @@ impl Command for FundCommand {
         for (_, package) in &result.packages {
             if package.as_alias().is_none() {
                 // TODO: check for CompleteAliasPackage as well
-                if let Some(complete_pkg) = package.as_complete() {
-                    if complete_pkg.is_default_branch()
-                        && !complete_pkg.get_funding().is_empty()
-                        && packages_to_load_names.contains(&complete_pkg.get_name())
-                    {
-                        Self::insert_funding_data(&mut fundings, &complete_pkg)?;
-                        packages_to_load_names.shift_remove(&complete_pkg.get_name());
-                    }
+                if let Some(complete_pkg) = package.as_complete()
+                    && complete_pkg.is_default_branch()
+                    && !complete_pkg.get_funding().is_empty()
+                    && packages_to_load_names.contains(&complete_pkg.get_name())
+                {
+                    Self::insert_funding_data(&mut fundings, &complete_pkg)?;
+                    packages_to_load_names.shift_remove(&complete_pkg.get_name());
                 }
             }
         }
@@ -168,10 +166,10 @@ impl Command for FundCommand {
                 continue;
             }
             // TODO: check for CompleteAliasPackage as well
-            if let Some(complete_pkg) = package.as_complete() {
-                if !complete_pkg.get_funding().is_empty() {
-                    Self::insert_funding_data(&mut fundings, &complete_pkg)?;
-                }
+            if let Some(complete_pkg) = package.as_complete()
+                && !complete_pkg.get_funding().is_empty()
+            {
+                Self::insert_funding_data(&mut fundings, &complete_pkg)?;
             }
         }
 

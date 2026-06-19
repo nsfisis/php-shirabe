@@ -39,7 +39,7 @@ impl BufferIO {
             .into());
         }
 
-        let _decorated = formatter.as_ref().map_or(false, |f| f.is_decorated());
+        let _decorated = formatter.as_ref().is_some_and(|f| f.is_decorated());
         // TODO(phase-c): wire StreamOutput as the output. StreamOutput::new requires a
         // PhpResource, but `fopen` here yields a PhpMixed; PhpMixed has no resource variant,
         // so the stream cannot be passed through yet (same PhpResource/PhpMixed gap noted in
@@ -81,7 +81,7 @@ impl BufferIO {
 
         let output = stream_get_contents(stream).unwrap_or_default();
 
-        let output = Preg::replace_callback(
+        Preg::replace_callback(
             r"{(?<=^|\n|\x08)(.+?)(\x08+)}",
             |matches: &indexmap::IndexMap<
                 shirabe_external_packages::composer::pcre::CaptureKey,
@@ -105,9 +105,7 @@ impl BufferIO {
                 format!("{}\n", g1.trim_end())
             },
             &output,
-        );
-
-        output
+        )
     }
 
     pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> Result<()> {

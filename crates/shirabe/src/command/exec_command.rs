@@ -26,6 +26,12 @@ pub struct ExecCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for ExecCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExecCommand {
     pub fn new() -> Self {
         let mut command = ExecCommand {
@@ -61,10 +67,10 @@ impl ExecCommand {
         let mut binaries: Vec<String> = Vec::new();
         let mut previous_bin: Option<String> = None;
         for bin in bins.iter().chain(local_bins.iter()) {
-            if let Some(prev) = &previous_bin {
-                if bin == &format!("{}.bat", prev) {
-                    continue;
-                }
+            if let Some(prev) = &previous_bin
+                && bin == &format!("{}.bat", prev)
+            {
+                continue;
             }
             previous_bin = Some(bin.clone());
             binaries.push(basename(bin));
@@ -201,13 +207,13 @@ impl Command for ExecCommand {
         // Application handle (deferred with the Application shared-ownership work). Until then the
         // working-directory restore is skipped.
         let initial_working_directory: Option<String> = None;
-        if let Some(ref iwd) = initial_working_directory {
-            if getcwd().as_deref() != Some(iwd.as_str()) {
-                chdir(iwd).map_err(|e| RuntimeException {
-                    message: format!("Could not switch back to working directory \"{}\"", iwd),
-                    code: 0,
-                })?;
-            }
+        if let Some(ref iwd) = initial_working_directory
+            && getcwd().as_deref() != Some(iwd.as_str())
+        {
+            chdir(iwd).map_err(|e| RuntimeException {
+                message: format!("Could not switch back to working directory \"{}\"", iwd),
+                code: 0,
+            })?;
         }
 
         let args = input
@@ -221,12 +227,12 @@ impl Command for ExecCommand {
             })
             .unwrap_or_default();
 
-        Ok(dispatcher.borrow_mut().dispatch_script(
+        dispatcher.borrow_mut().dispatch_script(
             "__exec_command",
             true,
             args,
             indexmap::IndexMap::new(),
-        )?)
+        )
     }
 
     fn initialize(

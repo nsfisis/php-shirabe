@@ -45,10 +45,10 @@ impl Zip {
 
     fn locate_file(zip: &ZipArchive, filename: &str) -> Result<i64> {
         // return root composer.json if it is there and is a file
-        if let Some(index) = zip.locate_name(filename) {
-            if zip.get_from_index(index).is_some() {
-                return Ok(index);
-            }
+        if let Some(index) = zip.locate_name(filename)
+            && zip.get_from_index(index).is_some()
+        {
+            return Ok(index);
         }
 
         let mut top_level_paths: IndexMap<String, bool> = IndexMap::new();
@@ -95,10 +95,10 @@ impl Zip {
 
         if !top_level_paths.is_empty() {
             let first_key = top_level_paths.keys().next().unwrap().clone();
-            if let Some(index) = zip.locate_name(&format!("{}{}", first_key, filename)) {
-                if zip.get_from_index(index).is_some() {
-                    return Ok(index);
-                }
+            if let Some(index) = zip.locate_name(&format!("{}{}", first_key, filename))
+                && zip.get_from_index(index).is_some()
+            {
+                return Ok(index);
             }
         }
 

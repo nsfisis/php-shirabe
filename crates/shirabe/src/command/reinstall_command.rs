@@ -39,6 +39,12 @@ pub struct ReinstallCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for ReinstallCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReinstallCommand {
     pub fn new() -> Self {
         let mut command = ReinstallCommand {
@@ -171,11 +177,10 @@ impl Command for ReinstallCommand {
 
         let present_packages = local_repo.get_packages()?;
         let result_packages: Vec<crate::package::PackageInterfaceHandle> =
-            present_packages.iter().map(|p| p.clone().into()).collect();
+            present_packages.to_vec();
         let present_packages: Vec<crate::package::PackageInterfaceHandle> = present_packages
             .into_iter()
             .filter(|package| !package_names_to_reinstall.contains(&package.get_name()))
-            .map(|p| p.into())
             .collect();
 
         let transaction = Transaction::new(present_packages, result_packages);
@@ -183,10 +188,10 @@ impl Command for ReinstallCommand {
 
         let mut install_order = indexmap::IndexMap::new();
         for (index, op) in install_operations.iter().enumerate() {
-            if let Some(install_op) = op.as_any().downcast_ref::<InstallOperation>() {
-                if install_op.get_package().as_alias().is_none() {
-                    install_order.insert(install_op.get_package().get_name(), index);
-                }
+            if let Some(install_op) = op.as_any().downcast_ref::<InstallOperation>()
+                && install_op.get_package().as_alias().is_none()
+            {
+                install_order.insert(install_op.get_package().get_name(), index);
             }
         }
 
@@ -212,7 +217,7 @@ impl Command for ReinstallCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
 
         let installation_manager = composer.get_installation_manager().clone();
         let download_manager = composer.get_download_manager();

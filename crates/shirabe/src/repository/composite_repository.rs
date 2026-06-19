@@ -137,7 +137,7 @@ impl RepositoryInterface for CompositeRepository {
         for repository in &self.repositories {
             let name_map_cloned: IndexMap<String, Option<AnyConstraint>> = package_name_map
                 .iter()
-                .map(|(k, v)| (k.clone(), v.as_ref().map(|c| c.clone())))
+                .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
             let result = repository.load_packages(
                 name_map_cloned,

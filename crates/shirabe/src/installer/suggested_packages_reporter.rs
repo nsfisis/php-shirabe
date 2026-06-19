@@ -64,11 +64,11 @@ impl SuggestedPackagesReporter {
         for suggestion in &suggested_packages {
             suggesters
                 .entry(suggestion["source"].clone())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(suggestion["target"].clone(), suggestion["reason"].clone());
             suggested
                 .entry(suggestion["target"].clone())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(suggestion["source"].clone(), suggestion["reason"].clone());
         }
         suggesters.sort_keys();
@@ -132,8 +132,7 @@ impl SuggestedPackagesReporter {
         }
 
         if let Some(only_dependents_of) = only_dependents_of {
-            let all_suggested_packages =
-                self.get_filtered_suggestions(installed_repo.as_deref_mut(), None)?;
+            let all_suggested_packages = self.get_filtered_suggestions(installed_repo, None)?;
             let diff = all_suggested_packages.len() as i64 - suggested_packages.len() as i64;
             if diff != 0 {
                 self.io.write(&format!("<info>{} additional suggestions</info> by transitive dependencies can be shown with <info>--all</info>", diff));

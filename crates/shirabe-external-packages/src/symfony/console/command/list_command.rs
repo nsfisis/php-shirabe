@@ -38,6 +38,12 @@ impl DerefMut for ListCommand {
     }
 }
 
+impl Default for ListCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ListCommand {
     pub fn new() -> Self {
         let mut command = ListCommand {

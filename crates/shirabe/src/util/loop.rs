@@ -18,9 +18,8 @@ impl Loop {
     ) -> Self {
         http_downloader.borrow_mut().enable_async();
 
-        let process_executor = process_executor.map(|pe| {
+        let process_executor = process_executor.inspect(|pe| {
             pe.borrow_mut().enable_async();
-            pe
         });
 
         Self {
@@ -51,10 +50,10 @@ impl Loop {
         // on a multi-thread runtime these futures should be driven concurrently instead of in order.
         // The PHP progress bar is tied to the worker active-job count and is also deferred until then.
         for promise in promises {
-            if let Err(e) = promise.await {
-                if uncaught.is_none() {
-                    uncaught = Some(e);
-                }
+            if let Err(e) = promise.await
+                && uncaught.is_none()
+            {
+                uncaught = Some(e);
             }
         }
 

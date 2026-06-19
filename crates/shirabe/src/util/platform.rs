@@ -151,23 +151,21 @@ impl Platform {
             return Ok(home);
         }
 
-        if Self::is_windows() {
-            if let Some(home) = Self::get_env("USERPROFILE") {
-                return Ok(home);
-            }
+        if Self::is_windows()
+            && let Some(home) = Self::get_env("USERPROFILE")
+        {
+            return Ok(home);
         }
 
         if function_exists("posix_getuid") && function_exists("posix_getpwuid") {
             let info = posix_getpwuid(posix_getuid());
 
-            if is_array(&info) {
-                if let Some(arr) = info.as_array() {
-                    if let Some(dir) = arr.get("dir") {
-                        if let Some(s) = dir.as_string() {
-                            return Ok(s.to_string());
-                        }
-                    }
-                }
+            if is_array(&info)
+                && let Some(arr) = info.as_array()
+                && let Some(dir) = arr.get("dir")
+                && let Some(s) = dir.as_string()
+            {
+                return Ok(s.to_string());
             }
         }
 
@@ -335,10 +333,10 @@ impl Platform {
         }
 
         // Check if formatted mode is S_IFCHR
-        if let Some(arr) = stat.as_array() {
-            if let Some(mode) = arr.get("mode").and_then(|v| v.as_int()) {
-                return 0o020000 == (mode & 0o170000);
-            }
+        if let Some(arr) = stat.as_array()
+            && let Some(mode) = arr.get("mode").and_then(|v| v.as_int())
+        {
+            return 0o020000 == (mode & 0o170000);
         }
 
         false
@@ -368,18 +366,16 @@ impl Platform {
 
             if function_exists("posix_getpwuid") && function_exists("posix_geteuid") {
                 let process_user = posix_getpwuid(posix_geteuid());
-                if is_array(&process_user) {
-                    if let Some(arr) = process_user.as_array() {
-                        if arr
-                            .get("name")
-                            .and_then(|v| v.as_string())
-                            .map(|s| s == "vagrant")
-                            .unwrap_or(false)
-                        {
-                            *cached = Some(true);
-                            return true;
-                        }
-                    }
+                if is_array(&process_user)
+                    && let Some(arr) = process_user.as_array()
+                    && arr
+                        .get("name")
+                        .and_then(|v| v.as_string())
+                        .map(|s| s == "vagrant")
+                        .unwrap_or(false)
+                {
+                    *cached = Some(true);
+                    return true;
                 }
             }
 

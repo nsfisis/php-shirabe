@@ -163,6 +163,7 @@ impl Installer {
     // technically exceptions are thrown with various status codes >400, but the process exit code is normalized to 100
     pub const ERROR_TRANSPORT_EXCEPTION: i64 = 100;
 
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -416,12 +417,12 @@ impl Installer {
             let local_repo_handle = self.repository_manager.borrow().get_local_repository();
             let mut local_repo_ref = local_repo_handle.borrow_mut();
             self.autoload_generator.borrow_mut().dump(
-                &*self.config.borrow(),
+                &self.config.borrow(),
                 local_repo_ref
                     .as_installed_repository_interface_mut()
                     .unwrap(),
                 self.package.clone(),
-                &mut *self.installation_manager.borrow_mut(),
+                &mut self.installation_manager.borrow_mut(),
                 "composer",
                 self.optimize_autoloader,
                 None,
@@ -455,10 +456,11 @@ impl Installer {
             let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
             for package in repository_manager.get_local_repository().get_packages()? {
-                if let Some(cp) = package.as_complete() {
-                    if package.as_alias().is_none() && !cp.get_funding().is_empty() {
-                        funding_count += 1;
-                    }
+                if let Some(cp) = package.as_complete()
+                    && package.as_alias().is_none()
+                    && !cp.get_funding().is_empty()
+                {
+                    funding_count += 1;
                 }
             }
             if funding_count > 0 {
@@ -510,7 +512,7 @@ impl Installer {
                     "installed",
                 )
             };
-            if packages.len() > 0 {
+            if !packages.is_empty() {
                 let auditor = Auditor;
                 let mut repo_set = RepositorySet::new(
                     "stable",
@@ -930,7 +932,7 @@ impl Installer {
         &mut self,
         lock_transaction: &mut LockTransaction,
         platform_repo: &PlatformRepositoryHandle,
-        aliases: &Vec<IndexMap<String, String>>,
+        aliases: &[IndexMap<String, String>],
         policy: std::rc::Rc<dyn PolicyInterface>,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> anyhow::Result<i64> {
@@ -1029,7 +1031,7 @@ impl Installer {
             let mut repository_set = self.create_repository_set(
                 false,
                 &platform_repo,
-                &vec![],
+                &[],
                 Some(&mut *locked_repo_borrow),
             )?;
             drop(locked_repo_borrow);
@@ -1117,7 +1119,7 @@ impl Installer {
                     solver = None;
 
                     // installing the locked packages on this platform resulted in lock modifying operations, there wasn't a conflict, but the lock file as-is seems to not work on this system
-                    if 0 != lock_transaction.get_operations().len() {
+                    if !lock_transaction.get_operations().is_empty() {
                         self.io.write_error3(
                             "<error>Your lock file cannot be installed on this system without changes. Please run composer update.</error>",
                             true,
@@ -1229,7 +1231,7 @@ impl Installer {
             drop(local_repo_ref);
 
             // see https://github.com/composer/composer/issues/2764
-            if local_repo_transaction.get_operations().len() > 0 {
+            if !local_repo_transaction.get_operations().is_empty() {
                 let vendor_dir = self
                     .config
                     .borrow_mut()
@@ -1291,7 +1293,7 @@ impl Installer {
         &mut self,
         for_update: bool,
         platform_repo: &PlatformRepositoryHandle,
-        root_aliases: &Vec<IndexMap<String, String>>,
+        root_aliases: &[IndexMap<String, String>],
         locked_repository: Option<&mut dyn RepositoryInterface>,
     ) -> anyhow::Result<RepositorySet> {
         let minimum_stability: String;
@@ -1377,7 +1379,7 @@ impl Installer {
         );
 
         let root_aliases_input: Vec<crate::repository::RootAliasInput> = root_aliases
-            .into_iter()
+            .iter()
             .map(|alias| crate::repository::RootAliasInput {
                 package: alias.get("package").cloned().unwrap_or_default(),
                 version: alias.get("version").cloned().unwrap_or_default(),
@@ -1498,7 +1500,7 @@ impl Installer {
             // skip platform packages that are provided by the root package
             let pkg_repo_is_platform = package
                 .get_repository()
-                .map_or(false, |r| r.is::<PlatformRepository>());
+                .is_some_and(|r| r.is::<PlatformRepository>());
             let name = package.get_name();
             if !pkg_repo_is_platform
                 || !provided.contains_key(&name)
@@ -1658,7 +1660,7 @@ impl Installer {
     fn get_audit_config(&mut self) -> anyhow::Result<&AuditConfig> {
         if self.audit_config.is_none() {
             self.audit_config = Some(AuditConfig::from_config(
-                &mut *self.config.borrow_mut(),
+                &mut self.config.borrow_mut(),
                 self.audit,
                 &self.audit_format,
             )?);
@@ -1871,7 +1873,7 @@ impl Installer {
     /// restrict the update operation to a few packages, all other packages
     /// that are already installed will be kept at their current version
     pub fn set_update_allow_list(&mut self, packages: Vec<String>) -> &mut Self {
-        if packages.len() == 0 {
+        if packages.is_empty() {
             self.update_allow_list = None;
         } else {
             let lowered: Vec<String> = array_map(|s: &String| strtolower(s), &packages);

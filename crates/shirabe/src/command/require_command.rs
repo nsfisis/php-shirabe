@@ -67,6 +67,12 @@ pub struct RequireCommand {
     dependency_resolution_completed: bool,
 }
 
+impl Default for RequireCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RequireCommand {
     pub fn new() -> Self {
         let mut command = RequireCommand {
@@ -394,7 +400,6 @@ impl Command for RequireCommand {
                     .get_repos()
                     .find_packages(name, None)?
                     .into_iter()
-                    .map(|p| p.into())
                     .collect();
                 let pkg: Option<crate::package::PackageInterfaceHandle> =
                     PackageSorter::get_most_current_version(found_packages);
@@ -537,9 +542,7 @@ impl Command for RequireCommand {
                     }
 
                     input.borrow_mut().set_option("dev", PhpMixed::Bool(true))?;
-                    let swap = require_key;
-                    require_key = remove_key;
-                    remove_key = swap;
+                    std::mem::swap(&mut require_key, &mut remove_key);
                 }
             }
         }
@@ -980,7 +983,7 @@ impl RequireCommand {
         let mut install = Installer::create(io.clone(), &composer_handle);
 
         let (prefer_source, prefer_dist) = self.get_preferred_install_options(
-            &*composer.get_config().borrow(),
+            &composer.get_config().borrow(),
             input.clone(),
             false,
         )?;
@@ -1034,7 +1037,7 @@ impl RequireCommand {
                     .unwrap_or(false),
             )
             .set_audit_config(
-                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input.clone())?,
+                self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,
             )
             .set_minimal_update(minimal_changes);
 

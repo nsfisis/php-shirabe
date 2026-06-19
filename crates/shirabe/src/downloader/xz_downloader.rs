@@ -69,7 +69,7 @@ impl ArchiveDownloader for XzDownloader {
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        let command = vec!["tar", "-xJf", file, "-C", path];
+        let command = ["tar", "-xJf", file, "-C", path];
 
         let mut ignored_output = PhpMixed::Null;
         if self.inner.process.borrow_mut().execute(

@@ -14,7 +14,7 @@ impl IniHelper {
     pub fn get_message() -> String {
         let mut paths = Self::get_all();
 
-        if paths.first().map_or(false, |s| s.is_empty()) {
+        if paths.first().is_some_and(|s| s.is_empty()) {
             paths.remove(0);
         }
 

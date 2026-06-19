@@ -178,16 +178,13 @@ impl CommandData {
                 description.to_string(),
                 default.clone(),
             )?)?;
-        if self.full_definition.is_some() {
-            self.full_definition
-                .as_mut()
-                .unwrap()
-                .add_argument(InputArgument::new(
-                    name.to_string(),
-                    mode,
-                    description.to_string(),
-                    default,
-                )?)?;
+        if let Some(full_definition) = self.full_definition.as_mut() {
+            full_definition.add_argument(InputArgument::new(
+                name.to_string(),
+                mode,
+                description.to_string(),
+                default,
+            )?)?;
         }
 
         Ok(self)
@@ -214,17 +211,14 @@ impl CommandData {
                 description.to_string(),
                 default.clone(),
             )?)?;
-        if self.full_definition.is_some() {
-            self.full_definition
-                .as_mut()
-                .unwrap()
-                .add_option(InputOption::new(
-                    name,
-                    shortcut,
-                    mode,
-                    description.to_string(),
-                    default,
-                )?)?;
+        if let Some(full_definition) = self.full_definition.as_mut() {
+            full_definition.add_option(InputOption::new(
+                name,
+                shortcut,
+                mode,
+                description.to_string(),
+                default,
+            )?)?;
         }
 
         Ok(self)

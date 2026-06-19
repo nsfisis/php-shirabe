@@ -719,14 +719,14 @@ impl PackageInterface for Package {
         self.php_ext.clone()
     }
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
-        if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade()) {
-            if !Rc::ptr_eq(&existing, repository.as_rc()) {
-                return Err(LogicException {
-                    message: "A package can only be added to one repository".to_string(),
-                    code: 0,
-                }
-                .into());
+        if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade())
+            && !Rc::ptr_eq(&existing, repository.as_rc())
+        {
+            return Err(LogicException {
+                message: "A package can only be added to one repository".to_string(),
+                code: 0,
             }
+            .into());
         }
         self.repository = Some(repository.downgrade());
         Ok(())

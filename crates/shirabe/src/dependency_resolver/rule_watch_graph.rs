@@ -15,6 +15,12 @@ pub struct RuleWatchGraph {
     pub(crate) watch_chains: IndexMap<i64, RuleWatchChain>,
 }
 
+impl Default for RuleWatchGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RuleWatchGraph {
     pub fn new() -> Self {
         Self {

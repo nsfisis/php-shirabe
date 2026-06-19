@@ -83,6 +83,7 @@ pub struct PoolBuilder {
 impl PoolBuilder {
     const LOAD_BATCH_SIZE: i64 = 50;
 
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
@@ -148,7 +149,7 @@ impl PoolBuilder {
             None
         };
 
-        if request.get_update_allow_list().len() > 0 {
+        if !request.get_update_allow_list().is_empty() {
             self.update_allow_list = request.get_update_allow_list().clone();
             self.warn_about_non_matching_update_allow_list(request)?;
 
@@ -185,7 +186,7 @@ impl PoolBuilder {
                         }
                     }
 
-                    request.lock_package(locked_package.into());
+                    request.lock_package(locked_package);
                 }
             }
         }
@@ -209,9 +210,9 @@ impl PoolBuilder {
             // TODO in how far can we do the above for conflicts? It's more tricky cause conflicts can be limited to
             // specific versions while replace is a conflict with all versions of the name
 
-            let in_root_or_platform = package.get_repository().map_or(false, |r| {
-                r.is::<RootPackageRepository>() || r.is::<PlatformRepository>()
-            });
+            let in_root_or_platform = package
+                .get_repository()
+                .is_some_and(|r| r.is::<RootPackageRepository>() || r.is::<PlatformRepository>());
             if in_root_or_platform
                 || StabilityFilter::is_package_acceptable(
                     &self.acceptable_stabilities,
@@ -248,11 +249,11 @@ impl PoolBuilder {
             self.packages_to_load.shift_remove(&name);
         }
 
-        while self.packages_to_load.len() > 0 {
+        while !self.packages_to_load.is_empty() {
             self.load_packages_marked_for_loading(request, &repositories)?;
         }
 
-        if self.temporary_constraints.len() > 0 {
+        if !self.temporary_constraints.is_empty() {
             let indices: Vec<i64> = self.packages.keys().cloned().collect();
             for i in indices {
                 let package = match self.packages.get(&i) {
@@ -298,7 +299,7 @@ impl PoolBuilder {
             }
         }
 
-        if self.event_dispatcher.is_some() {
+        if let Some(event_dispatcher) = &self.event_dispatcher {
             // TODO(plugin): PrePoolCreateEvent::new takes Request and Vec<Box<dyn RepositoryInterface>>
             // by value but neither can be cloned (PHP class shared semantics). This event is purely
             // plugin-facing and nothing in the no-plugin path reads it back, so it stays deferred
@@ -312,20 +313,13 @@ impl PoolBuilder {
                 self.root_aliases.clone(),
                 self.root_references.clone(),
                 self.packages.values().cloned().collect(),
-                self.unacceptable_fixed_or_locked_packages
-                    .iter()
-                    .cloned()
-                    .collect(),
+                self.unacceptable_fixed_or_locked_packages.to_vec(),
             );
             let pre_pool_create_event_name = pre_pool_create_event.get_name().to_string();
-            self.event_dispatcher
-                .as_ref()
-                .unwrap()
-                .borrow_mut()
-                .dispatch(
-                    Some(&pre_pool_create_event_name),
-                    Some(&mut pre_pool_create_event),
-                )?;
+            event_dispatcher.borrow_mut().dispatch(
+                Some(&pre_pool_create_event_name),
+                Some(&mut pre_pool_create_event),
+            )?;
             // PHP rebinds $this->packages to a list-style array; preserve indices via reindexing.
             // TODO(plugin)/TODO(phase-c): rebind self.packages from the (handle-based) event packages
             // once EventDispatcher::dispatch returns the mutated event.
@@ -334,10 +328,7 @@ impl PoolBuilder {
 
         let mut pool = Pool::new(
             self.packages.values().cloned().collect(),
-            self.unacceptable_fixed_or_locked_packages
-                .iter()
-                .cloned()
-                .collect(),
+            self.unacceptable_fixed_or_locked_packages.to_vec(),
             IndexMap::new(),
             IndexMap::new(),
             IndexMap::new(),
@@ -390,10 +381,10 @@ impl PoolBuilder {
         // we make sure that we load at most the intervals covered by the root constraint.
         let root_requires = request.get_requires();
         let mut constraint = constraint;
-        if let Some(root_constraint) = root_requires.get(name) {
-            if !Intervals::is_subset_of(&constraint, root_constraint).unwrap_or(false) {
-                constraint = root_constraint.clone();
-            }
+        if let Some(root_constraint) = root_requires.get(name)
+            && !Intervals::is_subset_of(&constraint, root_constraint).unwrap_or(false)
+        {
+            constraint = root_constraint.clone();
         }
 
         // Not yet loaded or already marked for a reload, set the constraint to be loaded
@@ -499,12 +490,12 @@ impl PoolBuilder {
             // never need to load anything else from them
             let is_locked_repo = request
                 .get_locked_repository()
-                .map_or(false, |h| repository.ptr_eq(&h.into()));
+                .is_some_and(|h| repository.ptr_eq(&h.into()));
             if repository.is::<PlatformRepository>() || is_locked_repo {
                 continue;
             }
 
-            if 0 == package_batches.len() {
+            if package_batches.is_empty() {
                 break;
             }
 
@@ -620,7 +611,7 @@ impl PoolBuilder {
         if let Some(alias) = package.as_alias() {
             self.alias_map
                 .entry(alias.get_alias_of().ptr_id().to_string())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(index, alias);
         }
 
@@ -649,8 +640,9 @@ impl PoolBuilder {
             .get(&name)
             .and_then(|m| m.get(&package.get_version()))
             .cloned();
-        if (propagate_update || path_repo_match) && alias_for_version.is_some() {
-            let alias = alias_for_version.unwrap();
+        if (propagate_update || path_repo_match)
+            && let Some(alias) = alias_for_version
+        {
             let base_package: BasePackageHandle = if let Some(ap) = package.as_alias() {
                 ap.get_alias_of().into()
             } else {
@@ -674,7 +666,7 @@ impl PoolBuilder {
             self.packages.insert(new_index, alias_handle.clone().into());
             self.alias_map
                 .entry(alias_handle.get_alias_of().ptr_id().to_string())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(new_index, alias_handle);
         }
 
@@ -692,7 +684,7 @@ impl PoolBuilder {
                     let skipped_root_requires = self.get_skipped_root_requires(request, &require);
 
                     if request.get_update_allow_transitive_root_dependencies()
-                        || 0 == skipped_root_requires.len()
+                        || skipped_root_requires.is_empty()
                     {
                         self.unlock_package(request, repositories, &require)?;
                         self.mark_package_name_for_loading(request, &require, link_constraint);
@@ -727,7 +719,7 @@ impl PoolBuilder {
                     let skipped_root_requires = self.get_skipped_root_requires(request, &replace);
 
                     if request.get_update_allow_transitive_root_dependencies()
-                        || 0 == skipped_root_requires.len()
+                        || skipped_root_requires.is_empty()
                     {
                         self.unlock_package(request, repositories, &replace)?;
                         // the replaced package only needs to be loaded if something else requires it
@@ -875,7 +867,7 @@ impl PoolBuilder {
         let skipped: Vec<PackageInterfaceHandle> = self
             .skipped_load
             .get(name)
-            .map(|v| v.iter().cloned().collect())
+            .map(|v| v.to_vec())
             .unwrap_or_default();
         for package_or_replacer in &skipped {
             // if we unfixed a replaced package name, we also need to unfix the replacer itself
@@ -1026,7 +1018,7 @@ impl PoolBuilder {
     fn remove_loaded_package(
         &mut self,
         _request: &Request,
-        repositories: &Vec<RepositoryInterfaceHandle>,
+        repositories: &[RepositoryInterfaceHandle],
         package: BasePackageHandle,
         index: i64,
     ) {
@@ -1040,23 +1032,21 @@ impl PoolBuilder {
             })
             .unwrap_or(-1);
 
-        if repo_index >= 0 {
-            if let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index) {
-                if let Some(name_map) = repo_map.get_mut(&package.get_name()) {
-                    name_map.shift_remove(&package.get_version());
-                }
-            }
+        if repo_index >= 0
+            && let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index)
+            && let Some(name_map) = repo_map.get_mut(&package.get_name())
+        {
+            name_map.shift_remove(&package.get_version());
         }
         self.packages.shift_remove(&index);
         let object_hash = package.ptr_id().to_string();
         if let Some(aliases) = self.alias_map.shift_remove(&object_hash) {
             for (alias_index, alias_package) in &aliases {
-                if repo_index >= 0 {
-                    if let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index) {
-                        if let Some(name_map) = repo_map.get_mut(&alias_package.get_name()) {
-                            name_map.shift_remove(&alias_package.get_version());
-                        }
-                    }
+                if repo_index >= 0
+                    && let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index)
+                    && let Some(name_map) = repo_map.get_mut(&alias_package.get_name())
+                {
+                    name_map.shift_remove(&alias_package.get_version());
                 }
                 self.packages.shift_remove(alias_index);
             }
@@ -1110,7 +1100,7 @@ impl PoolBuilder {
     fn run_security_advisory_filter(
         &mut self,
         pool: Pool,
-        repositories: &Vec<RepositoryInterfaceHandle>,
+        repositories: &[RepositoryInterfaceHandle],
         request: &Request,
     ) -> anyhow::Result<Pool> {
         if self.security_advisory_pool_filter.is_none() {
@@ -1122,7 +1112,7 @@ impl PoolBuilder {
         let before = microtime(true);
         let total = pool.get_packages().len() as f64;
 
-        let repos_owned: Vec<RepositoryInterfaceHandle> = repositories.iter().cloned().collect();
+        let repos_owned: Vec<RepositoryInterfaceHandle> = repositories.to_vec();
         let pool = self
             .security_advisory_pool_filter
             .as_mut()

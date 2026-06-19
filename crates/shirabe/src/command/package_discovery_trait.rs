@@ -136,24 +136,19 @@ pub trait PackageDiscoveryTrait {
         if is_file(&file) && Filesystem::is_readable(&file) {
             let contents = file_get_contents(&file).unwrap_or_default();
             let composer = json_decode(&contents, true).unwrap_or(PhpMixed::Null);
-            if is_array(&composer) {
-                if let Some(arr) = composer.as_array() {
-                    if let Some(ms) = arr.get("minimum-stability") {
-                        if let Some(s) = ms.as_string() {
-                            return VersionParser::normalize_stability(s).unwrap_or_default();
-                        }
-                    }
-                }
+            if is_array(&composer)
+                && let Some(arr) = composer.as_array()
+                && let Some(ms) = arr.get("minimum-stability")
+                && let Some(s) = ms.as_string()
+            {
+                return VersionParser::normalize_stability(s).unwrap_or_default();
             }
         }
 
         "stable".to_string()
     }
 
-    /// @param array<string> $requires
-    ///
-    /// @return array<string>
-    /// @throws \Exception
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn determine_requirements(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -164,7 +159,7 @@ pub trait PackageDiscoveryTrait {
         use_best_version_constraint: bool,
         fixed: bool,
     ) -> Result<Vec<String>> {
-        if requires.len() > 0 {
+        if !requires.is_empty() {
             let requires_norm = self.normalize_requirements(requires.clone());
             let mut result: Vec<String> = vec![];
             let io = self.get_io();
@@ -268,7 +263,7 @@ pub trait PackageDiscoveryTrait {
                 None,
             )?;
 
-            if matches.len() > 0 {
+            if !matches.is_empty() {
                 // Remove existing packages from search results.
                 matches.retain(|found_package| {
                     !in_array(
@@ -295,7 +290,7 @@ pub trait PackageDiscoveryTrait {
                 if !exact_match {
                     let providers: IndexMap<String, crate::repository::ProviderInfo> =
                         self.get_repos().get_providers(package.clone())?;
-                    if providers.len() > 0 {
+                    if !providers.is_empty() {
                         // PHP: array_unshift($matches, ['name' => $package, 'description' => '']);
                         matches.insert(
                             0,
@@ -356,7 +351,7 @@ pub trait PackageDiscoveryTrait {
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(
                         move |selection_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
                             let selection = selection_mixed.as_string().unwrap_or("").to_string();
-                            if "" == selection {
+                            if selection.is_empty() {
                                 return Ok(PhpMixed::Bool(false));
                             }
 
@@ -530,7 +525,7 @@ pub trait PackageDiscoveryTrait {
 
             // Check if it is a virtual package provided by others
             let providers = repo_set.borrow().get_providers(name)?;
-            if providers.len() > 0 {
+            if !providers.is_empty() {
                 let mut constraint = "*".to_string();
                 if input.borrow().is_interactive() {
                     let providers_count = providers.len();
@@ -693,7 +688,7 @@ pub trait PackageDiscoveryTrait {
 
             // Check for similar names/typos
             let similar = self.find_similar(name)?;
-            if similar.len() > 0 {
+            if !similar.is_empty() {
                 if in_array(
                     PhpMixed::String(name.to_string()),
                     &PhpMixed::List(
@@ -720,25 +715,24 @@ pub trait PackageDiscoveryTrait {
                             "<error>Could not find package {}.</error>\nPick one of these or leave empty to abort:",
                             name,
                         ),
-                        similar.iter().map(|s| s.clone()).collect(),
+                        similar.to_vec(),
                         PhpMixed::Bool(false),
                         PhpMixed::Int(1),
                         "No package named \"%s\" is installed.".to_string(),
                         false,
                     );
-                    if let Some(idx_str) = result_mixed.as_string() {
-                        if let Ok(idx) = idx_str.parse::<usize>() {
-                            if let Some(selected) = similar.get(idx) {
-                                return self.find_best_version_and_name_for_package(
-                                    io.clone(),
-                                    input,
-                                    selected,
-                                    platform_repo,
-                                    preferred_stability,
-                                    fixed,
-                                );
-                            }
-                        }
+                    if let Some(idx_str) = result_mixed.as_string()
+                        && let Ok(idx) = idx_str.parse::<usize>()
+                        && let Some(selected) = similar.get(idx)
+                    {
+                        return self.find_best_version_and_name_for_package(
+                            io.clone(),
+                            input,
+                            selected,
+                            platform_repo,
+                            preferred_stability,
+                            fixed,
+                        );
                     }
                 }
 

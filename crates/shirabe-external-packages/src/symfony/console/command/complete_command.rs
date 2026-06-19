@@ -373,7 +373,7 @@ impl Command for CompleteCommand {
                 }
             }
 
-            completion_output.write(&suggestions, &mut *output.borrow_mut());
+            completion_output.write(&suggestions, &*output.borrow_mut());
 
             Ok(0)
         })();

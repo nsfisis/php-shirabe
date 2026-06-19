@@ -76,7 +76,7 @@ impl ForgejoDriver {
             None,
             false,
         ));
-        self.inner.cache.as_mut().map(|c| {
+        if let Some(c) = self.inner.cache.as_mut() {
             c.set_read_only(
                 self.inner
                     .config
@@ -85,7 +85,7 @@ impl ForgejoDriver {
                     .as_bool()
                     .unwrap_or(false),
             )
-        });
+        }
 
         self.fetch_repository_data()?;
 
@@ -114,11 +114,8 @@ impl ForgejoDriver {
         let needs_git_blob = if let PhpMixed::Array(ref arr) = resource {
             let content_empty = arr
                 .get("content")
-                .map_or(true, |v| v.as_string().map_or(true, |s| s.is_empty()));
-            let encoding_none = arr
-                .get("encoding")
-                .and_then(|v| v.as_string())
-                .map_or(false, |s| s == "none");
+                .is_none_or(|v| v.as_string().is_none_or(|s| s.is_empty()));
+            let encoding_none = arr.get("encoding").and_then(|v| v.as_string()) == Some("none");
             let has_git_url = arr.contains_key("git_url");
             content_empty && encoding_none && has_git_url
         } else {
@@ -143,10 +140,7 @@ impl ForgejoDriver {
 
         let content_b64 = if let PhpMixed::Array(ref arr) = resource {
             let has_content = arr.contains_key("content");
-            let encoding_ok = arr
-                .get("encoding")
-                .and_then(|v| v.as_string())
-                .map_or(false, |s| s == "base64");
+            let encoding_ok = arr.get("encoding").and_then(|v| v.as_string()) == Some("base64");
             if has_content && encoding_ok {
                 arr.get("content")
                     .and_then(|v| v.as_string())
@@ -357,25 +351,25 @@ impl ForgejoDriver {
                         file_content,
                         || self.get_change_date(identifier),
                     )?;
-                    if self.inner.should_cache(identifier) {
-                        if let Some(ref composer_map) = c {
-                            let encoded = JsonFile::encode_with_options(
-                                &PhpMixed::Array(
-                                    composer_map
-                                        .iter()
-                                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                        .collect(),
-                                ),
-                                JsonEncodeOptions {
-                                    pretty_print: false,
-                                    ..Default::default()
-                                },
-                            );
-                            self.inner
-                                .cache
-                                .as_mut()
-                                .map(|c| c.write(identifier, &encoded));
-                        }
+                    if self.inner.should_cache(identifier)
+                        && let Some(ref composer_map) = c
+                    {
+                        let encoded = JsonFile::encode_with_options(
+                            &PhpMixed::Array(
+                                composer_map
+                                    .iter()
+                                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                    .collect(),
+                            ),
+                            JsonEncodeOptions {
+                                pretty_print: false,
+                                ..Default::default()
+                            },
+                        );
+                        self.inner
+                            .cache
+                            .as_mut()
+                            .map(|c| c.write(identifier, &encoded));
                     }
                     c
                 }
@@ -392,7 +386,7 @@ impl ForgejoDriver {
                 // specials for forgejo
                 let support_not_array = composer_map
                     .get("support")
-                    .map_or(false, |v| v.as_array().is_none());
+                    .is_some_and(|v| v.as_array().is_none());
                 if support_not_array {
                     composer_map.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
                 }
@@ -400,7 +394,7 @@ impl ForgejoDriver {
                 let has_source = composer_map
                     .get("support")
                     .and_then(|v| v.as_array())
-                    .map_or(false, |arr| arr.contains_key("source"));
+                    .is_some_and(|arr| arr.contains_key("source"));
 
                 if !has_source {
                     let html_url = self
@@ -437,14 +431,9 @@ impl ForgejoDriver {
                 let has_issues = composer_map
                     .get("support")
                     .and_then(|v| v.as_array())
-                    .map_or(false, |arr| arr.contains_key("issues"));
+                    .is_some_and(|arr| arr.contains_key("issues"));
 
-                if !has_issues
-                    && self
-                        .repository_data
-                        .as_ref()
-                        .map_or(false, |r| r.has_issues)
-                {
+                if !has_issues && self.repository_data.as_ref().is_some_and(|r| r.has_issues) {
                     let issues_url = format!(
                         "{}/issues",
                         self.repository_data
@@ -459,10 +448,7 @@ impl ForgejoDriver {
                 }
 
                 if !composer_map.contains_key("abandoned")
-                    && self
-                        .repository_data
-                        .as_ref()
-                        .map_or(false, |r| r.is_archived)
+                    && self.repository_data.as_ref().is_some_and(|r| r.is_archived)
                 {
                     composer_map.insert("abandoned".to_string(), PhpMixed::Bool(true));
                 }
@@ -520,9 +506,8 @@ impl ForgejoDriver {
         let forgejo_domains = config.borrow().get("forgejo-domains");
         let in_domains = if let Some(list) = forgejo_domains.as_list() {
             list.iter().any(|d| {
-                d.as_string().map_or(false, |s| {
-                    s.to_lowercase() == forgejo_url.origin_url.to_lowercase()
-                })
+                d.as_string()
+                    .is_some_and(|s| s.to_lowercase() == forgejo_url.origin_url.to_lowercase())
             })
         } else {
             false
@@ -605,10 +590,10 @@ impl ForgejoDriver {
         let links = explode(",", &header);
         for link in links {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::match3(r#"{<(.+?)>; *rel="next"}"#, &link, Some(&mut m)) {
-                if let Some(url) = m.get(&CaptureKey::ByIndex(1)) {
-                    return Some(url.clone());
-                }
+            if Preg::match3(r#"{<(.+?)>; *rel="next"}"#, &link, Some(&mut m))
+                && let Some(url) = m.get(&CaptureKey::ByIndex(1))
+            {
+                return Some(url.clone());
             }
         }
 

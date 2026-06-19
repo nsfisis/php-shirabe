@@ -26,6 +26,12 @@ pub struct ClearCacheCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for ClearCacheCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ClearCacheCommand {
     pub fn new() -> Self {
         let mut command = ClearCacheCommand {

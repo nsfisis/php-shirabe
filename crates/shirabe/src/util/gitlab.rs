@@ -478,18 +478,14 @@ impl GitLab {
 
     pub fn is_oauth_expired(&self, origin_url: &str) -> bool {
         let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
-        if let Some(map) = auth_tokens.as_array() {
-            if let Some(token_info) = map.get(origin_url) {
-                if let Some(token_map) = token_info.as_array() {
-                    if let Some(expires_at) = token_map.get("expires-at") {
-                        if let Some(expires_at_int) = expires_at.as_int() {
-                            if expires_at_int < time() {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
+        if let Some(map) = auth_tokens.as_array()
+            && let Some(token_info) = map.get(origin_url)
+            && let Some(token_map) = token_info.as_array()
+            && let Some(expires_at) = token_map.get("expires-at")
+            && let Some(expires_at_int) = expires_at.as_int()
+            && expires_at_int < time()
+        {
+            return true;
         }
 
         false

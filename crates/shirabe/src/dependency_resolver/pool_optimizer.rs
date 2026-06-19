@@ -93,7 +93,7 @@ impl PoolOptimizer {
         for (_, package) in request.get_fixed_or_locked_packages() {
             irremovable_package_constraint_groups
                 .entry(package.get_name())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(
                     SimpleConstraint::new(
                         "==".to_string(),
@@ -131,7 +131,7 @@ impl PoolOptimizer {
             if let Some(alias_pkg) = package.as_alias() {
                 self.aliases_per_package
                     .entry(alias_pkg.get_alias_of().id())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(package.clone());
             }
         }
@@ -197,7 +197,7 @@ impl PoolOptimizer {
             } else {
                 removed_versions
                     .entry(package.get_name())
-                    .or_insert_with(IndexMap::new)
+                    .or_default()
                     .insert(
                         package.get_version().to_string(),
                         package.get_pretty_version().to_string(),
@@ -261,7 +261,7 @@ impl PoolOptimizer {
                         ));
                     }
 
-                    if package.get_replaces().len() > 0 {
+                    if !package.get_replaces().is_empty() {
                         for (_, link) in package.get_replaces() {
                             if CompilingMatcher::r#match(
                                 link.get_constraint(),
@@ -294,22 +294,22 @@ impl PoolOptimizer {
                         }
                     }
 
-                    if 0 == group_hash_parts.len() {
+                    if group_hash_parts.is_empty() {
                         continue;
                     }
 
                     let group_hash = implode("", &group_hash_parts);
                     identical_definitions_per_package
                         .entry(package_name.clone())
-                        .or_insert_with(IndexMap::new)
+                        .or_default()
                         .entry(group_hash.clone())
-                        .or_insert_with(IndexMap::new)
+                        .or_default()
                         .entry(dependency_hash.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(package.clone());
                     package_identical_definition_lookup
                         .entry(package.id())
-                        .or_insert_with(IndexMap::new)
+                        .or_default()
                         .insert(
                             package_name.clone(),
                             IdenticalDefinitionPointers {
@@ -382,7 +382,7 @@ impl PoolOptimizer {
         ];
 
         for (key, links) in hash_relevant_links {
-            if 0 == links.len() {
+            if links.is_empty() {
                 continue;
             }
 
@@ -457,33 +457,32 @@ impl PoolOptimizer {
 
         // record all the versions of the package group so we can list them later in Problem output
         for name in package.get_names(false) {
-            if let Some(per_name) = package_identical_definition_lookup.get(&package.id()) {
-                if let Some(package_group_pointers) = per_name.get(&name) {
-                    let package_group = identical_definitions_per_package
-                        .get(&name)
-                        .and_then(|m| m.get(&package_group_pointers.group_hash))
-                        .and_then(|m| m.get(&package_group_pointers.dependency_hash));
-                    if let Some(package_group) = package_group {
-                        for pkg in package_group {
-                            let pkg: BasePackageHandle = if let Some(alias_pkg) = pkg.as_alias() {
-                                if alias_pkg.get_pretty_version()
-                                    == VersionParser::DEFAULT_BRANCH_ALIAS
-                                {
-                                    alias_pkg.get_alias_of().into()
-                                } else {
-                                    pkg.clone()
-                                }
+            if let Some(per_name) = package_identical_definition_lookup.get(&package.id())
+                && let Some(package_group_pointers) = per_name.get(&name)
+            {
+                let package_group = identical_definitions_per_package
+                    .get(&name)
+                    .and_then(|m| m.get(&package_group_pointers.group_hash))
+                    .and_then(|m| m.get(&package_group_pointers.dependency_hash));
+                if let Some(package_group) = package_group {
+                    for pkg in package_group {
+                        let pkg: BasePackageHandle = if let Some(alias_pkg) = pkg.as_alias() {
+                            if alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS
+                            {
+                                alias_pkg.get_alias_of().into()
                             } else {
                                 pkg.clone()
-                            };
-                            self.removed_versions_by_package
-                                .entry(package.ptr_id().to_string())
-                                .or_insert_with(IndexMap::new)
-                                .insert(
-                                    pkg.get_version().to_string(),
-                                    pkg.get_pretty_version().to_string(),
-                                );
-                        }
+                            }
+                        } else {
+                            pkg.clone()
+                        };
+                        self.removed_versions_by_package
+                            .entry(package.ptr_id().to_string())
+                            .or_default()
+                            .insert(
+                                pkg.get_version().to_string(),
+                                pkg.get_pretty_version().to_string(),
+                            );
                     }
                 }
             }
@@ -504,34 +503,33 @@ impl PoolOptimizer {
 
             // record all the versions of the package group so we can list them later in Problem output
             for name in alias_names {
-                if let Some(per_name) = package_identical_definition_lookup.get(&alias_id) {
-                    if let Some(package_group_pointers) = per_name.get(&name) {
-                        let package_group = identical_definitions_per_package
-                            .get(&name)
-                            .and_then(|m| m.get(&package_group_pointers.group_hash))
-                            .and_then(|m| m.get(&package_group_pointers.dependency_hash));
-                        if let Some(package_group) = package_group {
-                            for pkg in package_group {
-                                let pkg: BasePackageHandle = if let Some(alias_pkg) = pkg.as_alias()
+                if let Some(per_name) = package_identical_definition_lookup.get(&alias_id)
+                    && let Some(package_group_pointers) = per_name.get(&name)
+                {
+                    let package_group = identical_definitions_per_package
+                        .get(&name)
+                        .and_then(|m| m.get(&package_group_pointers.group_hash))
+                        .and_then(|m| m.get(&package_group_pointers.dependency_hash));
+                    if let Some(package_group) = package_group {
+                        for pkg in package_group {
+                            let pkg: BasePackageHandle = if let Some(alias_pkg) = pkg.as_alias() {
+                                if alias_pkg.get_pretty_version()
+                                    == VersionParser::DEFAULT_BRANCH_ALIAS
                                 {
-                                    if alias_pkg.get_pretty_version()
-                                        == VersionParser::DEFAULT_BRANCH_ALIAS
-                                    {
-                                        alias_pkg.get_alias_of().into()
-                                    } else {
-                                        pkg.clone()
-                                    }
+                                    alias_pkg.get_alias_of().into()
                                 } else {
                                     pkg.clone()
-                                };
-                                self.removed_versions_by_package
-                                    .entry(format!("alias-{}", alias_id))
-                                    .or_insert_with(IndexMap::new)
-                                    .insert(
-                                        pkg.get_version().to_string(),
-                                        pkg.get_pretty_version().to_string(),
-                                    );
-                            }
+                                }
+                            } else {
+                                pkg.clone()
+                            };
+                            self.removed_versions_by_package
+                                .entry(format!("alias-{}", alias_id))
+                                .or_default()
+                                .insert(
+                                    pkg.get_version().to_string(),
+                                    pkg.get_pretty_version().to_string(),
+                                );
                         }
                     }
                 }
@@ -543,7 +541,7 @@ impl PoolOptimizer {
     /// This will reduce packages with significant numbers of historical versions to a smaller number
     /// and reduce the resulting rule set that is generated
     fn optimize_impossible_packages_away(&mut self, request: &Request, pool: &Pool) {
-        if request.get_locked_packages().len() == 0 {
+        if request.get_locked_packages().is_empty() {
             return;
         }
 
@@ -569,7 +567,7 @@ impl PoolOptimizer {
 
             package_index
                 .entry(package.get_name())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(package.id(), package.clone());
         }
 
@@ -607,18 +605,16 @@ impl PoolOptimizer {
                         .get(require)
                         .and_then(|m| m.get(&id))
                         .map(|p| p.get_version().to_string());
-                    if let Some(version_str) = version_str {
-                        if false
-                            == CompilingMatcher::r#match(
-                                link_constraint,
-                                SimpleConstraint::OP_EQ,
-                                version_str,
-                            )
-                        {
-                            self.mark_package_for_removal(id);
-                            if let Some(map) = package_index.get_mut(require) {
-                                map.shift_remove(&id);
-                            }
+                    if let Some(version_str) = version_str
+                        && !CompilingMatcher::r#match(
+                            link_constraint,
+                            SimpleConstraint::OP_EQ,
+                            version_str,
+                        )
+                    {
+                        self.mark_package_for_removal(id);
+                        if let Some(map) = package_index.get_mut(require) {
+                            map.shift_remove(&id);
                         }
                     }
                 }
@@ -639,7 +635,7 @@ impl PoolOptimizer {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.require_constraints_per_package
                 .entry(package.to_string())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(expanded.to_string(), expanded);
         }
     }
@@ -657,7 +653,7 @@ impl PoolOptimizer {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.conflict_constraints_per_package
                 .entry(package.to_string())
-                .or_insert_with(IndexMap::new)
+                .or_default()
                 .insert(expanded.to_string(), expanded);
         }
     }
@@ -669,12 +665,12 @@ impl PoolOptimizer {
     ) -> Vec<AnyConstraint> {
         let constraint = Intervals::compact_constraint(&constraint).unwrap_or(constraint);
 
-        if let Some(multi) = constraint.as_multi_constraint() {
-            if multi.is_disjunctive_mc() {
-                // No need to call ourselves recursively here because Intervals::compactConstraint() ensures that there
-                // are no nested disjunctive MultiConstraint instances possible
-                return multi.get_constraints().iter().map(|c| c.clone()).collect();
-            }
+        if let Some(multi) = constraint.as_multi_constraint()
+            && multi.is_disjunctive_mc()
+        {
+            // No need to call ourselves recursively here because Intervals::compactConstraint() ensures that there
+            // are no nested disjunctive MultiConstraint instances possible
+            return multi.get_constraints().to_vec();
         }
 
         // Regular constraints and conjunctive MultiConstraints

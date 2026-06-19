@@ -168,33 +168,32 @@ impl SvnDriver {
         identifier: &str,
     ) -> Result<Option<IndexMap<String, PhpMixed>>> {
         if !self.inner.info_cache.contains_key(identifier) {
-            if self.should_cache(identifier) {
-                if let Some(mut res) = self
+            if self.should_cache(identifier)
+                && let Some(mut res) = self
                     .inner
                     .cache
                     .as_mut()
                     .and_then(|c| c.read(&format!("{}.json", identifier)))
-                {
-                    // old cache files had '' stored instead of null due to af3783b5f40bae32a23e353eaf0a00c9b8ce82e2, so we make sure here that we always return null or array
-                    // and fix outdated invalid cache files
-                    if res == "\"\"" {
-                        res = "null".to_string();
-                        self.inner
-                            .cache
-                            .as_mut()
-                            .unwrap()
-                            .write(&format!("{}.json", identifier), &res)?;
-                    }
-
-                    let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
-                    let composer: Option<IndexMap<String, PhpMixed>> = parsed
-                        .as_array()
-                        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+            {
+                // old cache files had '' stored instead of null due to af3783b5f40bae32a23e353eaf0a00c9b8ce82e2, so we make sure here that we always return null or array
+                // and fix outdated invalid cache files
+                if res == "\"\"" {
+                    res = "null".to_string();
                     self.inner
-                        .info_cache
-                        .insert(identifier.to_string(), composer.clone());
-                    return Ok(composer);
+                        .cache
+                        .as_mut()
+                        .unwrap()
+                        .write(&format!("{}.json", identifier), &res)?;
                 }
+
+                let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
+                let composer: Option<IndexMap<String, PhpMixed>> = parsed
+                    .as_array()
+                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+                self.inner
+                    .info_cache
+                    .insert(identifier.to_string(), composer.clone());
+                return Ok(composer);
             }
 
             let base_result =
@@ -290,7 +289,7 @@ impl SvnDriver {
                 return Err(e);
             }
         };
-        if trim(&output, None) == "" {
+        if trim(&output, None).is_empty() {
             return Ok(None);
         }
 
@@ -506,14 +505,14 @@ impl SvnDriver {
         }
 
         // Subversion client 1.7 and older
-        if stripos(&process.get_error_output(), "authorization failed:").is_some() {
+        if stripos(process.get_error_output(), "authorization failed:").is_some() {
             // This is likely a remote Subversion repository that requires
             // authentication. We will handle actual authentication later.
             return Ok(true);
         }
 
         // Subversion client 1.8 and newer
-        if stripos(&process.get_error_output(), "Authentication failed").is_some() {
+        if stripos(process.get_error_output(), "Authentication failed").is_some() {
             // This is likely a remote Subversion or newer repository that requires
             // authentication. We will handle actual authentication later.
             return Ok(true);

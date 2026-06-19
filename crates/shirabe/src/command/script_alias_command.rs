@@ -161,9 +161,9 @@ impl Command for ScriptAliasCommand {
             })
             .unwrap_or_default();
 
-        Ok(dispatcher
+        dispatcher
             .borrow_mut()
-            .dispatch_script(&self.script, dev_mode, args_value, flags)?)
+            .dispatch_script(&self.script, dev_mode, args_value, flags)
     }
 
     fn initialize(

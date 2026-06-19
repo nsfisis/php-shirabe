@@ -36,6 +36,12 @@ pub struct RepositoryCommand {
     config_source: Option<JsonConfigSource>,
 }
 
+impl Default for RepositoryCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RepositoryCommand {
     pub fn new() -> Self {
         let mut command = RepositoryCommand {
@@ -94,14 +100,13 @@ impl RepositoryCommand {
             }
 
             if let PhpMixed::Array(ref repo_map) = *repo {
-                if repo_map.len() == 1 {
-                    if let Some(first_val) = repo_map.values().next() {
-                        if matches!(**first_val, PhpMixed::Bool(false)) {
-                            let first_key = repo_map.keys().next().unwrap();
-                            io.write(&format!("[{}] <info>disabled</info>", first_key));
-                            continue;
-                        }
-                    }
+                if repo_map.len() == 1
+                    && let Some(first_val) = repo_map.values().next()
+                    && matches!(**first_val, PhpMixed::Bool(false))
+                {
+                    let first_key = repo_map.keys().next().unwrap();
+                    io.write(&format!("[{}] <info>disabled</info>", first_key));
+                    continue;
                 }
 
                 let name = repo_map
@@ -237,12 +242,11 @@ impl Command for RepositoryCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let action = strtolower(
-            &input
+            input
                 .borrow()
                 .get_argument("action")?
                 .as_string()
-                .unwrap_or("")
-                .to_string(),
+                .unwrap_or(""),
         );
         let name = input
             .borrow()
@@ -406,8 +410,24 @@ impl Command for RepositoryCommand {
                     }));
                 }
                 let name_str = name.as_deref().unwrap();
-                if let Some(repo) = repos.get(name_str) {
-                    if let PhpMixed::Array(ref repo_map) = *repo {
+                if let Some(repo) = repos.get(name_str)
+                    && let PhpMixed::Array(ref repo_map) = *repo
+                {
+                    let url = repo_map.get("url").and_then(|v| v.as_string());
+                    if let Some(url) = url {
+                        self.get_io().write(url);
+                        return Ok(0);
+                    }
+                    return Err(anyhow::anyhow!(InvalidArgumentException {
+                        message: format!("The {} repository does not have a URL", name_str),
+                        code: 0,
+                    }));
+                }
+                for (_key, val) in &repos {
+                    if let PhpMixed::Array(ref repo_map) = *val
+                        && let Some(n) = repo_map.get("name").and_then(|v| v.as_string())
+                        && n == name_str
+                    {
                         let url = repo_map.get("url").and_then(|v| v.as_string());
                         if let Some(url) = url {
                             self.get_io().write(url);
@@ -417,26 +437,6 @@ impl Command for RepositoryCommand {
                             message: format!("The {} repository does not have a URL", name_str),
                             code: 0,
                         }));
-                    }
-                }
-                for (_key, val) in &repos {
-                    if let PhpMixed::Array(ref repo_map) = *val {
-                        if let Some(n) = repo_map.get("name").and_then(|v| v.as_string()) {
-                            if n == name_str {
-                                let url = repo_map.get("url").and_then(|v| v.as_string());
-                                if let Some(url) = url {
-                                    self.get_io().write(url);
-                                    return Ok(0);
-                                }
-                                return Err(anyhow::anyhow!(InvalidArgumentException {
-                                    message: format!(
-                                        "The {} repository does not have a URL",
-                                        name_str
-                                    ),
-                                    code: 0,
-                                }));
-                            }
-                        }
                     }
                 }
                 Err(anyhow::anyhow!(InvalidArgumentException {

@@ -85,19 +85,19 @@ impl HgDriver {
 
             let hg_utils = HgUtils::new(
                 self.inner.io.clone(),
-                &*self.inner.config.borrow(),
+                &self.inner.config.borrow(),
                 &self.inner.process,
             );
 
             if is_dir(&self.repo_dir)
                 && self.inner.process.borrow_mut().execute_args(
-                    &["hg", "summary"].map(|s| s.to_string()).to_vec(),
+                    ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                     &mut String::new(),
                     Some(self.repo_dir.clone()),
                 ) == 0
             {
                 if self.inner.process.borrow_mut().execute_args(
-                    &["hg", "pull"].map(|s| s.to_string()).to_vec(),
+                    ["hg", "pull"].map(|s| s.to_string()).as_ref(),
                     &mut String::new(),
                     Some(self.repo_dir.clone()),
                 ) != 0
@@ -134,9 +134,9 @@ impl HgDriver {
         if self.root_identifier.is_none() {
             let mut output = String::new();
             self.inner.process.borrow_mut().execute_args(
-                &["hg", "tip", "--template", "{node}"]
+                ["hg", "tip", "--template", "{node}"]
                     .map(|s| s.to_string())
-                    .to_vec(),
+                    .as_ref(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
@@ -214,7 +214,7 @@ impl HgDriver {
 
         let mut output = String::new();
         self.inner.process.borrow_mut().execute_args(
-            &[
+            [
                 "hg",
                 "log",
                 "--template",
@@ -223,7 +223,7 @@ impl HgDriver {
                 identifier,
             ]
             .map(|s| s.to_string())
-            .to_vec(),
+            .as_ref(),
             &mut output,
             Some(self.repo_dir.clone()),
         );
@@ -237,7 +237,7 @@ impl HgDriver {
             let mut tags: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
             self.inner.process.borrow_mut().execute_args(
-                &["hg", "tags"].map(|s| s.to_string()).to_vec(),
+                ["hg", "tags"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
@@ -267,7 +267,7 @@ impl HgDriver {
 
             let mut output = String::new();
             self.inner.process.borrow_mut().execute_args(
-                &["hg", "branches"].map(|s| s.to_string()).to_vec(),
+                ["hg", "branches"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
@@ -288,7 +288,7 @@ impl HgDriver {
 
             output.clear();
             self.inner.process.borrow_mut().execute_args(
-                &["hg", "bookmarks"].map(|s| s.to_string()).to_vec(),
+                ["hg", "bookmarks"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
@@ -337,7 +337,7 @@ impl HgDriver {
             let mut process = crate::util::ProcessExecutor::new(Some(io.clone()));
             let mut output = String::new();
             if process.execute_args(
-                &["hg", "summary"].map(|s| s.to_string()).to_vec(),
+                ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(url),
             ) == 0
@@ -353,9 +353,9 @@ impl HgDriver {
         let mut process = crate::util::ProcessExecutor::new(Some(io));
         let mut ignored = String::new();
         let exit = process.execute_args(
-            &["hg", "identify", "--", url]
+            ["hg", "identify", "--", url]
                 .map(|s| s.to_string())
-                .to_vec(),
+                .as_ref(),
             &mut ignored,
             (),
         );

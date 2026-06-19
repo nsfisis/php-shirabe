@@ -32,6 +32,12 @@ pub struct ValidateCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for ValidateCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ValidateCommand {
     pub fn new() -> Self {
         let mut command = ValidateCommand {
@@ -325,6 +331,7 @@ impl BaseCommand for ValidateCommand {
 }
 
 impl ValidateCommand {
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn output_result(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -387,16 +394,16 @@ impl ValidateCommand {
         if !publish_errors.is_empty() && check_publish {
             *publish_errors = publish_errors.iter().map(|e| format!("- {}", e)).collect();
             publish_errors.insert(0, "# Publish errors".to_string());
-            errors.extend(publish_errors.drain(..));
+            errors.append(publish_errors);
         }
 
         if !lock_errors.is_empty() {
             if check_lock {
                 lock_errors.insert(0, "# Lock file errors".to_string());
-                errors.extend(lock_errors.drain(..));
+                errors.append(lock_errors);
             } else {
                 lock_errors.insert(0, "# Lock file warnings".to_string());
-                extra_warnings.extend(lock_errors.drain(..));
+                extra_warnings.append(lock_errors);
             }
         }
 

@@ -110,12 +110,12 @@ impl HttpDownloader {
         disable_tls: bool,
     ) -> Self {
         let disabled = Platform::get_env("COMPOSER_DISABLE_NETWORK")
-            .map_or(false, |s| !s.is_empty() && s != "0");
+            .is_some_and(|s| !s.is_empty() && s != "0");
 
         // Setup TLS options
         // The cafile option can be set via config.json
         let mut self_options: IndexMap<String, PhpMixed> = IndexMap::new();
-        if disable_tls == false {
+        if !disable_tls {
             self_options = StreamContextFactory::get_tls_defaults(&options, ()).unwrap_or_default();
         }
 
@@ -174,7 +174,7 @@ impl HttpDownloader {
 
     /// Download a file synchronously
     pub fn get(&mut self, url: &str, options: IndexMap<String, PhpMixed>) -> Result<Response> {
-        if "" == url {
+        if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
                 code: 0,
@@ -202,7 +202,7 @@ impl HttpDownloader {
         url: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> Result<Response> {
-        if "" == url {
+        if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
                 code: 0,
@@ -229,7 +229,7 @@ impl HttpDownloader {
         to: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> Result<Response> {
-        if "" == url {
+        if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
                 code: 0,
@@ -256,7 +256,7 @@ impl HttpDownloader {
         to: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> Result<Response> {
-        if "" == url {
+        if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
                 code: 0,
@@ -296,7 +296,7 @@ impl HttpDownloader {
 
         let id = self.id_gen;
         self.id_gen += 1;
-        let origin = Url::get_origin(&*self.config.borrow(), &request.url);
+        let origin = Url::get_origin(&self.config.borrow(), &request.url);
 
         if !sync && !self.allow_async {
             return Err(LogicException {
@@ -680,21 +680,21 @@ impl HttpDownloader {
             }
 
             let versions_key = format!("{}-versions", r#type);
-            if let Some(versions_value) = data.get(&versions_key) {
-                if !shirabe_php_shim::empty(versions_value) {
-                    let version_parser: VersionParser = VersionParser::new();
-                    let constraint = version_parser
-                        .parse_constraints(versions_value.as_string().unwrap_or(""))?;
-                    let composer_constraint = SimpleConstraint::new(
-                        "==".to_string(),
-                        version_parser
-                            .normalize(&composer::get_version(), None)?
-                            .to_string(),
-                        None,
-                    );
-                    if !constraint.matches(&composer_constraint.into()) {
-                        continue;
-                    }
+            if let Some(versions_value) = data.get(&versions_key)
+                && !shirabe_php_shim::empty(versions_value)
+            {
+                let version_parser: VersionParser = VersionParser::new();
+                let constraint =
+                    version_parser.parse_constraints(versions_value.as_string().unwrap_or(""))?;
+                let composer_constraint = SimpleConstraint::new(
+                    "==".to_string(),
+                    version_parser
+                        .normalize(&composer::get_version(), None)?
+                        .to_string(),
+                    None,
+                );
+                if !constraint.matches(&composer_constraint.into()) {
+                    continue;
                 }
             }
 
@@ -761,13 +761,11 @@ impl HttpDownloader {
     /// @return ?string[]
     pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<String>> {
         let e_as_transport: Option<&TransportException> = e.downcast_ref::<TransportException>();
-        if e_as_transport.is_none() {
-            return None;
-        }
+        e_as_transport?;
         let e_as_transport = e_as_transport.unwrap();
 
-        if false != strpos(e_as_transport.get_message(), "Resolving timed out").is_some()
-            || false != strpos(e_as_transport.get_message(), "Could not resolve host").is_some()
+        if strpos(e_as_transport.get_message(), "Resolving timed out").is_some()
+            || strpos(e_as_transport.get_message(), "Could not resolve host").is_some()
         {
             Silencer::suppress(None);
             let mut ctx_options: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -814,10 +812,10 @@ impl HttpDownloader {
             PhpMixed::Array(m) => m.get("allow_self_signed").cloned(),
             _ => None,
         });
-        if let Some(v) = allow_self_signed {
-            if !shirabe_php_shim::empty(&v) {
-                return false;
-            }
+        if let Some(v) = allow_self_signed
+            && !shirabe_php_shim::empty(&v)
+        {
+            return false;
         }
 
         true

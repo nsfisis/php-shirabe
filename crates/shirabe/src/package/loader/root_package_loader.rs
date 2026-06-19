@@ -221,17 +221,17 @@ impl RootPackageLoader {
         }
 
         for link_type in SUPPORTED_LINK_TYPES.keys() {
-            if let Some(section) = config.get(*link_type) {
-                if let Some(section_map) = section.as_array() {
-                    for (link_name, _constraint) in section_map {
-                        if let Some(err) =
-                            ValidatingArrayLoader::has_package_naming_error(link_name, true)
-                        {
-                            return Err(anyhow::anyhow!(RuntimeException {
-                                message: format!("{}.{}", link_type, err),
-                                code: 0,
-                            }));
-                        }
+            if let Some(section) = config.get(*link_type)
+                && let Some(section_map) = section.as_array()
+            {
+                for (link_name, _constraint) in section_map {
+                    if let Some(err) =
+                        ValidatingArrayLoader::has_package_naming_error(link_name, true)
+                    {
+                        return Err(anyhow::anyhow!(RuntimeException {
+                            message: format!("{}.{}", link_type, err),
+                            code: 0,
+                        }));
                     }
                 }
             }
@@ -392,14 +392,14 @@ impl RootPackageLoader {
         for (req_name, req_version) in requires {
             let req_version = Preg::replace(r"^([^,\s@]+) as .+$", "$1", req_version);
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(r"^[^,\s@]+?#([a-f0-9]+)$", &req_version, Some(&mut m)) {
-                if VersionParser::parse_stability(&req_version) == "dev" {
-                    let name = strtolower(req_name);
-                    references.insert(
-                        name,
-                        m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
-                    );
-                }
+            if Preg::is_match3(r"^[^,\s@]+?#([a-f0-9]+)$", &req_version, Some(&mut m))
+                && VersionParser::parse_stability(&req_version) == "dev"
+            {
+                let name = strtolower(req_name);
+                references.insert(
+                    name,
+                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                );
             }
         }
         references

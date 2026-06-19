@@ -18,6 +18,12 @@ pub struct VersionParser {
     inner: SemverVersionParser,
 }
 
+impl Default for VersionParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VersionParser {
     pub const DEFAULT_BRANCH_ALIAS: &'static str = "9999999-dev";
 
@@ -45,7 +51,7 @@ impl VersionParser {
         let count = pairs.len();
         let mut i = 0_usize;
         while i < count {
-            let mut pair = Preg::replace(r"{^([^=: ]+)[=: ](.*)$}", "$1 $2", &pairs[i].trim());
+            let mut pair = Preg::replace(r"{^([^=: ]+)[=: ](.*)$}", "$1 $2", pairs[i].trim());
             if !pair.contains(' ')
                 && i + 1 < count
                 && !pairs[i + 1].contains('/')

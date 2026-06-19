@@ -130,7 +130,7 @@ impl GitHubDriver {
             None,
             false,
         ));
-        self.inner.cache.as_mut().map(|c| {
+        if let Some(c) = self.inner.cache.as_mut() {
             c.set_read_only(
                 self.inner
                     .config
@@ -139,7 +139,7 @@ impl GitHubDriver {
                     .as_bool()
                     .unwrap_or(false),
             )
-        });
+        }
 
         if self
             .inner
@@ -290,27 +290,27 @@ impl GitHubDriver {
                     || self.get_change_date(identifier),
                 )?;
 
-                if self.inner.should_cache(identifier) {
-                    if let Some(ref composer_map) = composer {
-                        let php_value: PhpMixed = PhpMixed::Array(
-                            composer_map
-                                .iter()
-                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                .collect(),
-                        );
-                        self.inner.cache.as_mut().map(|c| {
-                            c.write(
-                                identifier,
-                                &JsonFile::encode_with_options(
-                                    &php_value,
-                                    JsonEncodeOptions {
-                                        pretty_print: false,
-                                        ..Default::default()
-                                    },
-                                ),
-                            )
-                        });
-                    }
+                if self.inner.should_cache(identifier)
+                    && let Some(ref composer_map) = composer
+                {
+                    let php_value: PhpMixed = PhpMixed::Array(
+                        composer_map
+                            .iter()
+                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                            .collect(),
+                    );
+                    self.inner.cache.as_mut().map(|c| {
+                        c.write(
+                            identifier,
+                            &JsonFile::encode_with_options(
+                                &php_value,
+                                JsonEncodeOptions {
+                                    pretty_print: false,
+                                    ..Default::default()
+                                },
+                            ),
+                        )
+                    });
                 }
 
                 composer
@@ -379,21 +379,22 @@ impl GitHubDriver {
                     .and_then(|v| v.as_array())
                     .map(|m| m.contains_key("issues"))
                     .unwrap_or(false);
-                if issues_missing && self.has_issues {
-                    if let Some(support) = composer.get_mut("support").and_then(|v| match v {
+                if issues_missing
+                    && self.has_issues
+                    && let Some(support) = composer.get_mut("support").and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
-                    }) {
-                        support.insert(
-                            "issues".to_string(),
-                            Box::new(PhpMixed::String(format!(
-                                "https://{}/{}/{}/issues",
-                                PhpMixed::String(self.inner.origin_url.clone()),
-                                PhpMixed::String(self.owner.clone()),
-                                PhpMixed::String(self.repository.clone()),
-                            ))),
-                        );
-                    }
+                    })
+                {
+                    support.insert(
+                        "issues".to_string(),
+                        Box::new(PhpMixed::String(format!(
+                            "https://{}/{}/{}/issues",
+                            PhpMixed::String(self.inner.origin_url.clone()),
+                            PhpMixed::String(self.owner.clone()),
+                            PhpMixed::String(self.repository.clone()),
+                        ))),
+                    );
                 }
                 if !composer.contains_key("abandoned") && self.is_archived {
                     composer.insert("abandoned".to_string(), PhpMixed::Bool(true));
@@ -1066,7 +1067,9 @@ impl GitHubDriver {
                         let scopes_failed = array_diff(&scopes_needed, &scopes_issued);
                         // non-authenticated requests get no scopesNeeded, so ask for credentials
                         // authenticated requests which failed some scopes should ask for new credentials too
-                        if headers.is_empty() || scopes_needed.is_empty() || scopes_failed.len() > 0
+                        if headers.is_empty()
+                            || scopes_needed.is_empty()
+                            || !scopes_failed.is_empty()
                         {
                             git_hub_util.authorize_oauth_interactively(
                                 &self.inner.origin_url,

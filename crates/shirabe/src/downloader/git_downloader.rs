@@ -208,7 +208,7 @@ impl GitDownloader {
             if unpushed_changes.is_some() && i == 0 {
                 let mut output = String::new();
                 self.inner.process.borrow_mut().execute_args(
-                    &vec!["git".to_string(), "fetch".to_string(), "--all".to_string()],
+                    &["git".to_string(), "fetch".to_string(), "--all".to_string()],
                     &mut output,
                     Some(path.clone()),
                 );
@@ -278,7 +278,7 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version);
+        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", pretty_version);
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.
@@ -287,7 +287,7 @@ impl GitDownloader {
         {
             let mut output = String::new();
             if self.inner.process.borrow_mut().execute_args(
-                &vec!["git".to_string(), "branch".to_string(), "-r".to_string()],
+                &["git".to_string(), "branch".to_string(), "-r".to_string()],
                 &mut output,
                 Some(path.to_string()),
             ) == 0
@@ -483,7 +483,7 @@ impl GitDownloader {
     pub(crate) fn update_origin_url(&mut self, path: &str, url: &str) {
         let mut output = String::new();
         self.inner.process.borrow_mut().execute_args(
-            &vec![
+            &[
                 "git".to_string(),
                 "remote".to_string(),
                 "set-url".to_string(),
@@ -503,7 +503,7 @@ impl GitDownloader {
         if Preg::is_match3(
             &format!(
                 "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
-                GitUtil::get_github_domains_regex(&*self.inner.config.borrow())
+                GitUtil::get_github_domains_regex(&self.inner.config.borrow())
             ),
             url,
             Some(&mut match_),
@@ -549,7 +549,7 @@ impl GitDownloader {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &vec!["git".to_string(), "clean".to_string(), "-df".to_string()],
+            &["git".to_string(), "clean".to_string(), "-df".to_string()],
             &mut output,
             Some(path.clone()),
         ) != 0
@@ -562,7 +562,7 @@ impl GitDownloader {
         }
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &vec!["git".to_string(), "reset".to_string(), "--hard".to_string()],
+            &["git".to_string(), "reset".to_string(), "--hard".to_string()],
             &mut output,
             Some(path.clone()),
         ) != 0
@@ -585,7 +585,7 @@ impl GitDownloader {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &vec![
+            &[
                 "git".to_string(),
                 "stash".to_string(),
                 "--include-untracked".to_string(),
@@ -611,7 +611,7 @@ impl GitDownloader {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &vec!["git".to_string(), "diff".to_string(), "HEAD".to_string()],
+            &["git".to_string(), "diff".to_string(), "HEAD".to_string()],
             &mut output,
             Some(path.clone()),
         ) != 0
@@ -829,7 +829,7 @@ impl VcsDownloader for GitDownloader {
             {
                 self.cached_packages
                     .entry(package.get_id())
-                    .or_insert_with(IndexMap::new)
+                    .or_default()
                     .insert(r#ref.as_deref().unwrap_or("").to_string(), true);
             }
         } else if git_version.is_none() {
@@ -880,12 +880,11 @@ impl VcsDownloader for GitDownloader {
                 cache_path.clone(),
             ];
             let transport_options = package.get_transport_options();
-            if let Some(git_opts) = transport_options.get("git").and_then(|v| v.as_array()) {
-                if let Some(single) = git_opts.get("single_use_clone").and_then(|v| v.as_bool()) {
-                    if single {
-                        clone_flags = vec![];
-                    }
-                }
+            if let Some(git_opts) = transport_options.get("git").and_then(|v| v.as_array())
+                && let Some(single) = git_opts.get("single_use_clone").and_then(|v| v.as_bool())
+                && single
+            {
+                clone_flags = vec![];
             }
 
             commands = vec![
@@ -1057,7 +1056,7 @@ impl VcsDownloader for GitDownloader {
 
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &vec![
+            &[
                 "git".to_string(),
                 "rev-parse".to_string(),
                 "--quiet".to_string(),
@@ -1118,7 +1117,7 @@ impl VcsDownloader for GitDownloader {
         let mut update_origin_url = false;
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
-            &vec!["git".to_string(), "remote".to_string(), "-v".to_string()],
+            &["git".to_string(), "remote".to_string(), "-v".to_string()],
             &mut output,
             Some(path.clone()),
         ) == 0
@@ -1166,25 +1165,24 @@ impl VcsDownloader for GitDownloader {
         let path = self.normalize_path(path);
 
         let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
-        if let Some(unpushed) = unpushed.as_deref() {
-            if self.inner.io.is_interactive()
+        if let Some(unpushed) = unpushed.as_deref()
+            && (self.inner.io.is_interactive()
                 || self
                     .inner
                     .config
                     .borrow_mut()
                     .get("discard-changes")
                     .as_bool()
-                    != Some(true)
-            {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Source directory {} has unpushed changes on the current branch: \n{}",
-                        path, unpushed
-                    ),
-                    code: 0,
-                }
-                .into());
+                    != Some(true))
+        {
+            return Err(RuntimeException {
+                message: format!(
+                    "Source directory {} has unpushed changes on the current branch: \n{}",
+                    path, unpushed
+                ),
+                code: 0,
             }
+            .into());
         }
 
         let changes = match self.get_local_changes(package.clone(), &path)? {
@@ -1337,7 +1335,7 @@ impl VcsDownloader for GitDownloader {
             );
             let mut output = String::new();
             if self.inner.process.borrow_mut().execute_args(
-                &vec!["git".to_string(), "stash".to_string(), "pop".to_string()],
+                &["git".to_string(), "stash".to_string(), "pop".to_string()],
                 &mut output,
                 Some(path.clone()),
             ) != 0

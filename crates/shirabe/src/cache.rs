@@ -45,7 +45,7 @@ impl Cache {
         read_only: bool,
     ) -> Self {
         let allowlist = allowlist.unwrap_or("a-z0-9._").to_string();
-        let root = format!("{}/", cache_dir.trim_end_matches(|c| c == '/' || c == '\\'));
+        let root = format!("{}/", cache_dir.trim_end_matches(['/', '\\']));
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let mut this = Self {
@@ -305,10 +305,10 @@ impl Cache {
         if self.is_enabled() {
             let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
-            if file_exists(&full_path) {
-                if let Some(mtime) = filemtime(&full_path) {
-                    return Some(abs(time() - mtime));
-                }
+            if file_exists(&full_path)
+                && let Some(mtime) = filemtime(&full_path)
+            {
+                return Some(abs(time() - mtime));
             }
         }
 

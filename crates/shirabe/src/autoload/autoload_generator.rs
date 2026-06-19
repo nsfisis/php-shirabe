@@ -104,6 +104,7 @@ impl AutoloadGenerator {
         self.platform_requirement_filter = platform_requirement_filter;
     }
 
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn dump(
         &mut self,
         config: &Config,
@@ -137,10 +138,10 @@ impl AutoloadGenerator {
             )?;
             if installed_json.exists() {
                 let installed_json_data = installed_json.read()?;
-                if let Some(arr) = installed_json_data.as_array() {
-                    if let Some(dev) = arr.get("dev") {
-                        self.dev_mode = dev.as_bool();
-                    }
+                if let Some(arr) = installed_json_data.as_array()
+                    && let Some(dev) = arr.get("dev")
+                {
+                    self.dev_mode = dev.as_bool();
                 }
             }
         }
@@ -310,7 +311,7 @@ impl AutoloadGenerator {
             && main_autoload
                 .get("psr-0")
                 .and_then(|v| v.as_array())
-                .map_or(false, |a| !a.is_empty())
+                .is_some_and(|a| !a.is_empty())
         {
             let levels = substr_count(
                 &filesystem.normalize_path(&root_package.get_target_dir().unwrap_or_default()),
@@ -341,13 +342,12 @@ impl AutoloadGenerator {
         if let Some(ex) = autoloads
             .get("exclude-from-classmap")
             .and_then(|v| v.as_list())
+            && !ex.is_empty()
         {
-            if !ex.is_empty() {
-                excluded = ex
-                    .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect();
-            }
+            excluded = ex
+                .iter()
+                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .collect();
         }
 
         let classmap_list = autoloads
@@ -383,7 +383,7 @@ impl AutoloadGenerator {
                     entry.insert("type".to_string(), PhpMixed::String(psr_type.to_string()));
                     namespaces_to_scan
                         .entry(namespace.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(entry);
                 }
             }
@@ -487,7 +487,7 @@ impl AutoloadGenerator {
         for (class_name, path) in class_map.get_map() {
             let path_code = format!(
                 "{},\n",
-                self.get_path_code(&filesystem, &base_path, &vendor_path, &path)
+                self.get_path_code(&filesystem, &base_path, &vendor_path, path)
             );
             classmap_file.push_str(&format!(
                 "    {} => {}",
@@ -608,7 +608,7 @@ impl AutoloadGenerator {
             platform_check_content = self.get_platform_check(
                 &package_map,
                 config.get("platform-check").clone(),
-                &dev_package_names,
+                dev_package_names,
             );
             if platform_check_content.is_none() {
                 check_platform = false;
@@ -750,7 +750,7 @@ impl AutoloadGenerator {
         if autoload
             .get("psr-4")
             .and_then(|v| v.as_array())
-            .map_or(false, |a| !a.is_empty())
+            .is_some_and(|a| !a.is_empty())
             && package.get_target_dir().is_some()
         {
             let name = package.get_name();
@@ -883,13 +883,12 @@ impl AutoloadGenerator {
             if let Some(ex) = autoloads
                 .get("exclude-from-classmap")
                 .and_then(|v| v.as_list())
+                && !ex.is_empty()
             {
-                if !ex.is_empty() {
-                    excluded = ex
-                        .iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect();
-                }
+                excluded = ex
+                    .iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect();
             }
 
             let mut class_map_generator = ClassMapGenerator::new(vec![
@@ -943,11 +942,11 @@ impl AutoloadGenerator {
             };
 
             let mut install_path = install_path;
-            if let Some(target_dir) = package.get_target_dir() {
-                if !target_dir.is_empty() {
-                    let suffix_to_remove = format!("/{}", target_dir);
-                    install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as i64)));
-                }
+            if let Some(target_dir) = package.get_target_dir()
+                && !target_dir.is_empty()
+            {
+                let suffix_to_remove = format!("/{}", target_dir);
+                install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as i64)));
             }
 
             for include_path in package.get_include_paths() {
@@ -1077,7 +1076,7 @@ impl AutoloadGenerator {
         &self,
         package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         check_platform: PhpMixed,
-        dev_package_names: &Vec<String>,
+        dev_package_names: &[String],
     ) -> Option<String> {
         let mut lowest_php_version = Bound::zero();
         let mut required_php_64bit = false;
@@ -1092,13 +1091,13 @@ impl AutoloadGenerator {
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches)) {
-                    if let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned() {
-                        extension_providers
-                            .entry(ext)
-                            .or_insert_with(Vec::new)
-                            .push(link.get_constraint().clone());
-                    }
+                if Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
+                    && let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned()
+                {
+                    extension_providers
+                        .entry(ext)
+                        .or_default()
+                        .push(link.get_constraint().clone());
                 }
             }
         }
@@ -1144,7 +1143,7 @@ impl AutoloadGenerator {
                     // skip extension checks if they have a valid provider/replacer
                     if let Some(provided_list) = extension_providers.get(&ext_key) {
                         for provided in provided_list {
-                            if provided.matches(&*link.get_constraint()) {
+                            if provided.matches(link.get_constraint()) {
                                 continue 'outer;
                             }
                         }
@@ -1299,6 +1298,7 @@ impl AutoloadGenerator {
     }
 
     /// Note: vendor_path_code and app_base_dir_code are unused in this method
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub(crate) fn get_autoload_real_file(
         &self,
         _use_class_map: bool,
@@ -1413,7 +1413,7 @@ impl AutoloadGenerator {
                 } else {
                     vec![]
                 };
-                loader.set(&namespace, paths);
+                loader.set(namespace, paths);
             }
         }
 
@@ -1428,20 +1428,21 @@ impl AutoloadGenerator {
                 } else {
                     vec![]
                 };
-                loader.set_psr4(&namespace, paths).unwrap_or(());
+                loader.set_psr4(namespace, paths).unwrap_or(());
             }
         }
 
         let class_map =
             shirabe_php_shim::php_require(&format!("{}/autoload_classmap.php", target_dir));
-        if class_map.as_bool() != Some(false) && !class_map.is_null() {
-            if let Some(cm) = class_map.as_array() {
-                let cm_str: IndexMap<String, String> = cm
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
-                    .collect();
-                loader.add_class_map(cm_str);
-            }
+        if class_map.as_bool() != Some(false)
+            && !class_map.is_null()
+            && let Some(cm) = class_map.as_array()
+        {
+            let cm_str: IndexMap<String, String> = cm
+                .iter()
+                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                .collect();
+            loader.add_class_map(cm_str);
         }
 
         let filesystem = Filesystem::new(None);
@@ -1564,7 +1565,7 @@ impl AutoloadGenerator {
             {
                 continue;
             }
-            maps.insert(substr(&prop, prefix_len as i64, None), value);
+            maps.insert(substr(&prop, prefix_len, None), value);
         }
 
         for (prop, value) in &maps {
@@ -1905,10 +1906,8 @@ impl AutoloadGenerator {
             paths.insert(name, path.clone());
         }
 
-        let sorted_packages = PackageSorter::sort_packages(
-            packages.values().map(|p| p.clone()).collect(),
-            IndexMap::new(),
-        );
+        let sorted_packages =
+            PackageSorter::sort_packages(packages.values().cloned().collect(), IndexMap::new());
 
         let mut sorted_package_map: Vec<(PackageInterfaceHandle, Option<String>)> = vec![];
 

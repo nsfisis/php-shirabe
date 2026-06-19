@@ -75,7 +75,7 @@ impl ZipDownloader {
             .lock()
             .unwrap()
             .as_ref()
-            .map_or(true, |v| v.is_empty());
+            .is_none_or(|v| v.is_empty());
         if unzip_commands_empty {
             return self.extract_with_zip_archive(package, file, path).await;
         }
@@ -283,13 +283,10 @@ impl ZipDownloader {
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        let mut zip_archive = self
-            .zip_archive_object
-            .take()
-            .unwrap_or_else(ZipArchive::new);
+        let mut zip_archive = self.zip_archive_object.take().unwrap_or_default();
 
         let result: Result<Option<PhpMixed>> = (|| {
-            let retval = if !file_exists(file) || filesize(file).map_or(true, |s| s == 0) {
+            let retval = if !file_exists(file) || filesize(file).is_none_or(|s| s == 0) {
                 Err(-1i64)
             } else {
                 zip_archive.open(file, 0)
@@ -323,16 +320,17 @@ impl ZipDownloader {
                         }
                         i += 1;
                     }
-                    if let Some(archive_sz) = archive_size {
-                        if total_size > archive_sz * 100 && total_size > 50 * 1024 * 1024 {
-                            return Err(RuntimeException {
+                    if let Some(archive_sz) = archive_size
+                        && total_size > archive_sz * 100
+                        && total_size > 50 * 1024 * 1024
+                    {
+                        return Err(RuntimeException {
                                 message: format!(
                                     "Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)",
                                     package.get_name(),
                                 ),
                                 code: 0,
                             }.into());
-                        }
                     }
                 }
 
@@ -343,20 +341,20 @@ impl ZipDownloader {
                     return Ok(None);
                 }
 
-                return Err(RuntimeException {
+                Err(RuntimeException {
                     message: format!(
                         "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
                         package.get_name(),
                     ),
                     code: 0,
-                }.into());
+                }.into())
             } else {
                 let code = retval.unwrap_err();
-                return Err(UnexpectedValueException {
+                Err(UnexpectedValueException {
                     message: self.get_error_message(code, file).trim_end().to_string(),
                     code,
                 }
-                .into());
+                .into())
             }
         })();
 
@@ -461,20 +459,19 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                 *unzip_commands = Some(vec![]);
                 let finder = ExecutableFinder::new();
                 let commands = unzip_commands.as_mut().unwrap();
-                if Platform::is_windows() {
-                    if let Some(cmd) =
+                if Platform::is_windows()
+                    && let Some(cmd) =
                         finder.find("7z", None, &[r"C:\Program Files\7-Zip".to_string()])
-                    {
-                        commands.push(vec![
-                            "7z".to_string(),
-                            cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
-                        ]);
-                    }
+                {
+                    commands.push(vec![
+                        "7z".to_string(),
+                        cmd,
+                        "x".to_string(),
+                        "-bb0".to_string(),
+                        "-y".to_string(),
+                        "%file%".to_string(),
+                        "-o%path%".to_string(),
+                    ]);
                 }
                 if let Some(cmd) = finder.find("unzip", None, &[]) {
                     commands.push(vec![
@@ -542,7 +539,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
             .lock()
             .unwrap()
             .as_ref()
-            .map_or(true, |v| v.is_empty());
+            .is_none_or(|v| v.is_empty());
 
         if !has_zip_archive && unzip_commands_empty {
             let ini_message = IniHelper::get_message();

@@ -209,43 +209,40 @@ impl PathRepository {
                 .get("name")
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_string())
-            {
-                if let Some(version) = self
+                && let Some(version) = self
                     .options
                     .get("versions")
                     .and_then(|v| v.as_array())
                     .and_then(|a| a.get(&name))
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string())
-                {
-                    package.insert("version".to_string(), PhpMixed::String(version));
-                }
+            {
+                package.insert("version".to_string(), PhpMixed::String(version));
             }
 
             // carry over the root package version if this path repo is in the same git repository as root package
-            if !package.contains_key("version") {
-                if let Some(root_version) = Platform::get_env("COMPOSER_ROOT_VERSION") {
-                    if !root_version.is_empty() {
-                        let mut ref1 = PhpMixed::Null;
-                        let mut ref2 = PhpMixed::Null;
-                        let cmd = PhpMixed::from(vec!["git", "rev-parse", "HEAD"]);
-                        let code1 = self
-                            .process
-                            .borrow_mut()
-                            .execute(cmd.clone(), Some(&mut ref1), Some(path.as_str()))
-                            .unwrap_or(1);
-                        let code2 = self
-                            .process
-                            .borrow_mut()
-                            .execute(cmd, Some(&mut ref2), ())
-                            .unwrap_or(1);
-                        if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
-                            package.insert(
-                                "version".to_string(),
-                                PhpMixed::String(self.version_guesser.get_root_version_from_env()?),
-                            );
-                        }
-                    }
+            if !package.contains_key("version")
+                && let Some(root_version) = Platform::get_env("COMPOSER_ROOT_VERSION")
+                && !root_version.is_empty()
+            {
+                let mut ref1 = PhpMixed::Null;
+                let mut ref2 = PhpMixed::Null;
+                let cmd = PhpMixed::from(vec!["git", "rev-parse", "HEAD"]);
+                let code1 = self
+                    .process
+                    .borrow_mut()
+                    .execute(cmd.clone(), Some(&mut ref1), Some(path.as_str()))
+                    .unwrap_or(1);
+                let code2 = self
+                    .process
+                    .borrow_mut()
+                    .execute(cmd, Some(&mut ref2), ())
+                    .unwrap_or(1);
+                if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
+                    package.insert(
+                        "version".to_string(),
+                        PhpMixed::String(self.version_guesser.get_root_version_from_env()?),
+                    );
                 }
             }
 

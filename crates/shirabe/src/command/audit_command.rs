@@ -34,6 +34,12 @@ pub struct AuditCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for AuditCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AuditCommand {
     pub fn new() -> Self {
         let mut command = AuditCommand {
@@ -147,7 +153,7 @@ impl Command for AuditCommand {
         }
 
         let audit_config = AuditConfig::from_config(
-            &mut *composer.get_config().borrow_mut(),
+            &mut composer.get_config().borrow_mut(),
             true,
             Auditor::FORMAT_SUMMARY,
         )?;

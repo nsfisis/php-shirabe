@@ -61,6 +61,12 @@ pub struct CreateProjectCommand {
         Option<std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>>,
 }
 
+impl Default for CreateProjectCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CreateProjectCommand {
     pub fn new() -> Self {
         let mut command = CreateProjectCommand {
@@ -178,7 +184,7 @@ impl Command for CreateProjectCommand {
         let repository_url_opt = input.borrow().get_option("repository-url")?;
         let repositories = if repository_opt
             .as_list()
-            .map(|l| l.len() > 0)
+            .map(|l| !l.is_empty())
             .unwrap_or(false)
         {
             Some(repository_opt)
@@ -321,7 +327,7 @@ impl CreateProjectCommand {
 
         // we need to manually load the configuration to pass the auth credentials to the io interface!
         io.borrow_mut()
-            .load_configuration(&mut *config.borrow_mut())?;
+            .load_configuration(&mut config.borrow_mut())?;
 
         self.suggested_packages_reporter = Some(std::rc::Rc::new(std::cell::RefCell::new(
             SuggestedPackagesReporter::new(io.clone()),
@@ -363,61 +369,61 @@ impl CreateProjectCommand {
         )?;
 
         // add the repository to the composer.json and use it for the install run later
-        if let Some(repos) = repositories.as_ref() {
-            if add_repository {
-                for (index, repo) in repos.iter().enumerate() {
-                    let config = crate::command::composer_full(&composer_handle).get_config();
-                    let repo_config =
-                        RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
-                    let composer_json_repositories_config =
-                        crate::command::composer_full(&composer_handle)
-                            .get_config()
-                            .borrow()
-                            .get_repositories();
-                    let name = RepositoryFactory::generate_repository_name(
-                        &PhpMixed::Int(index as i64),
-                        &repo_config,
-                        &composer_json_repositories_config,
-                    );
-                    let mut config_source = JsonConfigSource::new(
-                        std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-                            "composer.json".to_string(),
-                            None,
-                            None,
-                        )?)),
+        if let Some(repos) = repositories.as_ref()
+            && add_repository
+        {
+            for (index, repo) in repos.iter().enumerate() {
+                let config = crate::command::composer_full(&composer_handle).get_config();
+                let repo_config =
+                    RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
+                let composer_json_repositories_config =
+                    crate::command::composer_full(&composer_handle)
+                        .get_config()
+                        .borrow()
+                        .get_repositories();
+                let name = RepositoryFactory::generate_repository_name(
+                    &PhpMixed::Int(index as i64),
+                    &repo_config,
+                    &composer_json_repositories_config,
+                );
+                let mut config_source = JsonConfigSource::new(
+                    std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
+                        "composer.json".to_string(),
+                        None,
+                        None,
+                    )?)),
+                    false,
+                );
+
+                let is_packagist_disabled = (repo_config.contains_key("packagist")
+                    && repo_config.len() == 1
+                    && repo_config.get("packagist").and_then(|v| v.as_bool()) == Some(false))
+                    || (repo_config.contains_key("packagist.org")
+                        && repo_config.len() == 1
+                        && repo_config.get("packagist.org").and_then(|v| v.as_bool())
+                            == Some(false));
+                if is_packagist_disabled {
+                    config_source.add_repository("packagist.org", PhpMixed::Bool(false), false);
+                } else {
+                    config_source.add_repository(
+                        &name,
+                        PhpMixed::Array(
+                            repo_config
+                                .iter()
+                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                .collect(),
+                        ),
                         false,
                     );
-
-                    let is_packagist_disabled = (repo_config.contains_key("packagist")
-                        && repo_config.len() == 1
-                        && repo_config.get("packagist").and_then(|v| v.as_bool()) == Some(false))
-                        || (repo_config.contains_key("packagist.org")
-                            && repo_config.len() == 1
-                            && repo_config.get("packagist.org").and_then(|v| v.as_bool())
-                                == Some(false));
-                    if is_packagist_disabled {
-                        config_source.add_repository("packagist.org", PhpMixed::Bool(false), false);
-                    } else {
-                        config_source.add_repository(
-                            &name,
-                            PhpMixed::Array(
-                                repo_config
-                                    .iter()
-                                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                    .collect(),
-                            ),
-                            false,
-                        );
-                    }
-
-                    composer_handle = self.create_composer_instance(
-                        input.clone(),
-                        io.clone(),
-                        None,
-                        disable_plugins,
-                        None,
-                    )?;
                 }
+
+                composer_handle = self.create_composer_instance(
+                    input.clone(),
+                    io.clone(),
+                    None,
+                    disable_plugins,
+                    None,
+                )?;
             }
         }
 
@@ -444,12 +450,12 @@ impl CreateProjectCommand {
         // use the new config including the newly installed project
         let config = composer.get_config();
         let (ps, pd) =
-            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
         prefer_source = ps;
         prefer_dist = pd;
 
         // install dependencies of the created project
-        if no_install == false {
+        if !no_install {
             composer
                 .get_installation_manager()
                 .borrow_mut()
@@ -487,7 +493,7 @@ impl CreateProjectCommand {
                     None,
                 )
                 .set_audit_config(
-                    self.create_audit_config(&mut *config.borrow_mut(), input.clone())?,
+                    self.create_audit_config(&mut config.borrow_mut(), input.clone())?,
                 );
 
             if !composer.get_locker().borrow_mut().is_locked() {
@@ -654,16 +660,17 @@ impl CreateProjectCommand {
         }
 
         // if no directory was specified, use the 2nd part of the package name
-        let mut directory = if directory.is_none() {
-            let mut parts = explode_with_limit("/", &name, 2);
-            format!(
-                "{}{}{}",
-                Platform::get_cwd(false)?,
-                DIRECTORY_SEPARATOR,
-                array_pop(&mut parts).unwrap_or_default()
-            )
-        } else {
-            directory.unwrap()
+        let mut directory = match directory {
+            None => {
+                let mut parts = explode_with_limit("/", &name, 2);
+                format!(
+                    "{}{}{}",
+                    Platform::get_cwd(false)?,
+                    DIRECTORY_SEPARATOR,
+                    array_pop(&mut parts).unwrap_or_default()
+                )
+            }
+            Some(directory) => directory,
         };
         directory = rtrim(&directory, Some("/\\"));
 
@@ -679,7 +686,7 @@ impl CreateProjectCommand {
                 directory
             );
         }
-        if "" == directory {
+        if directory.is_empty() {
             return Err(UnexpectedValueException {
                 message: "Got an empty target directory, something went wrong".to_string(),
                 code: 0,
@@ -806,21 +813,8 @@ impl CreateProjectCommand {
             indexmap::IndexMap::new(),
             indexmap::IndexMap::new(),
         );
-        if repositories.is_none() {
-            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-                CompositeRepository::new(
-                    RepositoryFactory::default_repos(
-                        Some(io.clone()),
-                        Some(config.clone()),
-                        Some(&mut rm.borrow_mut()),
-                    )?
-                    .into_iter()
-                    .map(|(_, v)| v)
-                    .collect(),
-                ),
-            ))?;
-        } else {
-            for repo in repositories.unwrap() {
+        if let Some(repositories) = repositories {
+            for repo in repositories {
                 let mut repo_config =
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let is_packagist_disabled = (repo_config.contains_key("packagist")
@@ -860,6 +854,19 @@ impl CreateProjectCommand {
                     None,
                 )?);
             }
+        } else {
+            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+                CompositeRepository::new(
+                    RepositoryFactory::default_repos(
+                        Some(io.clone()),
+                        Some(config.clone()),
+                        Some(&mut rm.borrow_mut()),
+                    )?
+                    .into_iter()
+                    .map(|(_, v)| v)
+                    .collect(),
+                ),
+            ))?;
         }
 
         let platform_overrides = config.borrow_mut().get("platform");
@@ -965,10 +972,10 @@ impl CreateProjectCommand {
         }
 
         // avoid displaying 9999999-dev as version if default-branch was selected
-        if let Some(alias) = package.as_alias() {
-            if package.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                package = alias.get_alias_of().into();
-            }
+        if let Some(alias) = package.as_alias()
+            && package.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS
+        {
+            package = alias.get_alias_of().into();
         }
 
         io.write_error(&format!(

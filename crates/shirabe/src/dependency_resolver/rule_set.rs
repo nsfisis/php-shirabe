@@ -21,6 +21,12 @@ pub struct RuleSet {
     pub(crate) rules_by_hash: IndexMap<String, Vec<Rc<RefCell<Rule>>>>,
 }
 
+impl Default for RuleSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RuleSet {
     pub const TYPE_PACKAGE: i64 = 0;
     pub const TYPE_REQUEST: i64 = 1;
@@ -74,19 +80,13 @@ impl RuleSet {
 
         // The same rule instance is referenced from `rules`, `rule_by_id`, and
         // `rules_by_hash` (PHP shares one object across all three).
-        self.rules
-            .entry(r#type)
-            .or_insert_with(Vec::new)
-            .push(rule.clone());
+        self.rules.entry(r#type).or_default().push(rule.clone());
         self.rule_by_id.insert(self.next_rule_id, rule.clone());
         rule.borrow_mut().set_type(r#type);
 
         self.next_rule_id += 1;
 
-        self.rules_by_hash
-            .entry(hash)
-            .or_insert_with(Vec::new)
-            .push(rule);
+        self.rules_by_hash.entry(hash).or_default().push(rule);
 
         Ok(())
     }

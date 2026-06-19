@@ -21,6 +21,12 @@ fn mirror_to_php(mirror: Mirror) -> PhpMixed {
 #[derive(Debug)]
 pub struct ArrayDumper;
 
+impl Default for ArrayDumper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArrayDumper {
     pub fn new() -> Self {
         Self
@@ -66,19 +72,19 @@ impl ArrayDumper {
                     Box::new(PhpMixed::String(reference.to_string())),
                 );
             }
-            if let Some(mirrors) = package.get_source_mirrors() {
-                if !mirrors.is_empty() {
-                    source.insert(
-                        "mirrors".to_string(),
-                        Box::new(PhpMixed::Array(
-                            mirrors
-                                .into_iter()
-                                .enumerate()
-                                .map(|(i, m)| (i.to_string(), Box::new(mirror_to_php(m))))
-                                .collect(),
-                        )),
-                    );
-                }
+            if let Some(mirrors) = package.get_source_mirrors()
+                && !mirrors.is_empty()
+            {
+                source.insert(
+                    "mirrors".to_string(),
+                    Box::new(PhpMixed::Array(
+                        mirrors
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, m)| (i.to_string(), Box::new(mirror_to_php(m))))
+                            .collect(),
+                    )),
+                );
             }
             data.insert("source".to_string(), PhpMixed::Array(source));
         }
@@ -105,19 +111,19 @@ impl ArrayDumper {
                     Box::new(PhpMixed::String(shasum.to_string())),
                 );
             }
-            if let Some(mirrors) = package.get_dist_mirrors() {
-                if !mirrors.is_empty() {
-                    dist.insert(
-                        "mirrors".to_string(),
-                        Box::new(PhpMixed::Array(
-                            mirrors
-                                .into_iter()
-                                .enumerate()
-                                .map(|(i, m)| (i.to_string(), Box::new(mirror_to_php(m))))
-                                .collect(),
-                        )),
-                    );
-                }
+            if let Some(mirrors) = package.get_dist_mirrors()
+                && !mirrors.is_empty()
+            {
+                dist.insert(
+                    "mirrors".to_string(),
+                    Box::new(PhpMixed::Array(
+                        mirrors
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, m)| (i.to_string(), Box::new(mirror_to_php(m))))
+                            .collect(),
+                    )),
+                );
             }
             data.insert("dist".to_string(), PhpMixed::Array(dist));
         }

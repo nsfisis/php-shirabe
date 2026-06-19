@@ -58,23 +58,23 @@ impl IgnoreListPlatformRequirementFilter {
 
         let intervals = Intervals::get(&constraint)?;
         let last = intervals.numeric.last();
-        if let Some(last) = last {
-            if last.get_end().to_string() != Interval::until_positive_infinity().to_string() {
-                let constraint = MultiConstraint::new(
-                    vec![
-                        constraint,
-                        AnyConstraint::Simple(SimpleConstraint::new(
-                            ">=".to_string(),
-                            last.get_end().get_version().to_string(),
-                            None,
-                        )),
-                    ],
-                    false,
-                    None,
-                )
-                .into();
-                return Ok(constraint);
-            }
+        if let Some(last) = last
+            && last.get_end().to_string() != Interval::until_positive_infinity().to_string()
+        {
+            let constraint = MultiConstraint::new(
+                vec![
+                    constraint,
+                    AnyConstraint::Simple(SimpleConstraint::new(
+                        ">=".to_string(),
+                        last.get_end().get_version().to_string(),
+                        None,
+                    )),
+                ],
+                false,
+                None,
+            )
+            .into();
+            return Ok(constraint);
         }
 
         Ok(constraint)

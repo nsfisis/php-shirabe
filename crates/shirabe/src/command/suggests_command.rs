@@ -29,6 +29,12 @@ pub struct SuggestsCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for SuggestsCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SuggestsCommand {
     pub fn new() -> Self {
         let mut command = SuggestsCommand {

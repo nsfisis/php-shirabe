@@ -276,7 +276,11 @@ impl ChangeReportInterface for FossilDownloader {
 
         let output = output.trim().to_string();
 
-        Ok(if output.len() > 0 { Some(output) } else { None })
+        Ok(if !output.is_empty() {
+            Some(output)
+        } else {
+            None
+        })
     }
 }
 

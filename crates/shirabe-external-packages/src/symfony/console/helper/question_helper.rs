@@ -465,7 +465,7 @@ impl QuestionHelper {
                             None,
                         );
                         output.borrow().write(
-                            &[remaining_characters.clone()],
+                            std::slice::from_ref(&remaining_characters),
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
@@ -518,9 +518,11 @@ impl QuestionHelper {
                 }
 
                 let cur = c.clone().unwrap_or_default();
-                output
-                    .borrow()
-                    .write(&[cur.clone()], false, output_interface::OUTPUT_NORMAL);
+                output.borrow().write(
+                    std::slice::from_ref(&cur),
+                    false,
+                    output_interface::OUTPUT_NORMAL,
+                );
                 ret.push_str(&cur);
                 full_choice.push_str(&cur);
                 i += 1;

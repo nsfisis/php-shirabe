@@ -135,7 +135,7 @@ impl NoProxyPattern {
             matched = rule_ipdata.ip == url_ipdata.ip;
         } else {
             // Match host and port
-            let haystack = substr(&url.name, -(strlen(&rule.name) as i64), None);
+            let haystack = substr(&url.name, -strlen(&rule.name), None);
             matched = stripos(&haystack, &rule.name) == Some(0);
         }
 
@@ -260,7 +260,7 @@ impl NoProxyPattern {
         // Check for a CIDR prefix-length
         if strpos(&host, "/").is_some() {
             let parts = explode("/", &host);
-            host = parts.get(0).cloned().unwrap_or_default();
+            host = parts.first().cloned().unwrap_or_default();
             let prefix_str = parts.get(1).cloned().unwrap_or_default();
 
             if !allow_prefix || !self.validate_int(&prefix_str, 0, 128) {
@@ -446,7 +446,7 @@ impl NoProxyPattern {
 
         // Check for square-bracket notation
         // PHP: if ($hostName[0] === '[')
-        if host_name.chars().next() == Some('[') {
+        if host_name.starts_with('[') {
             let index = strpos(&host_name, "]");
 
             // The smallest ip6 address is ::

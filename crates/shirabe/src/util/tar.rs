@@ -47,10 +47,10 @@ impl Tar {
             "{}/composer.json",
             top_level_paths.keys().next().cloned().unwrap_or_default()
         );
-        if !top_level_paths.is_empty() {
-            if let Some(file) = phar.get(&composer_json_path) {
-                return Ok(file.get_content());
-            }
+        if !top_level_paths.is_empty()
+            && let Some(file) = phar.get(&composer_json_path)
+        {
+            return Ok(file.get_content());
         }
 
         Err(anyhow::anyhow!(RuntimeException {

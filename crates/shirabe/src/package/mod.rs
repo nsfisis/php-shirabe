@@ -10,6 +10,7 @@ pub mod handle;
 pub mod link;
 pub mod loader;
 pub mod locker;
+#[allow(clippy::module_inception, reason = "to port PHP's structure as it is")]
 pub mod package;
 pub mod package_interface;
 pub mod root_alias_package;

@@ -11,6 +11,12 @@ pub struct NullIO {
     authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 }
 
+impl Default for NullIO {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NullIO {
     pub fn new() -> Self {
         Self {

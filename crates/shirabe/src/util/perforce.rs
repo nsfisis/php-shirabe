@@ -85,7 +85,7 @@ impl Perforce {
     pub fn check_server_exists(url: &str, process_executor: &mut ProcessExecutor) -> bool {
         let mut ignored_output = String::new();
         process_executor.execute_args(
-            &vec![
+            &[
                 "p4".to_string(),
                 "-p".to_string(),
                 url.to_string(),
@@ -208,10 +208,10 @@ impl Perforce {
         self.p4_stream = Some(stream.to_string());
         let index = strrpos(stream, "/");
         // Stream format is //depot/stream, while non-streaming depot is //depot
-        if let Some(i) = index {
-            if (i as i64) > 2 {
-                self.p4_depot_type = Some("stream".to_string());
-            }
+        if let Some(i) = index
+            && (i as i64) > 2
+        {
+            self.p4_depot_type = Some("stream".to_string());
         }
     }
 
@@ -295,7 +295,7 @@ impl Perforce {
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
                 let fields = explode("=", line);
-                if strcmp(name, fields.get(0).map(|s| s.as_str()).unwrap_or("")) == 0 {
+                if strcmp(name, fields.first().map(|s| s.as_str()).unwrap_or("")) == 0 {
                     let field1 = fields.get(1).cloned().unwrap_or_default();
                     let index = strpos(&field1, " ");
                     let value = match index {
@@ -705,7 +705,7 @@ impl Perforce {
         ));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
-        let last_commit = res_array.get(0).cloned().unwrap_or_default();
+        let last_commit = res_array.first().cloned().unwrap_or_default();
         let last_commit_arr = explode(" ", &last_commit);
         let last_commit_num = last_commit_arr.get(1).cloned().unwrap_or_default();
 

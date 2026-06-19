@@ -208,7 +208,6 @@ impl RuleSetGenerator {
                     .borrow_mut()
                     .what_provides(link.get_target(), Some(&constraint))
                     .into_iter()
-                    .map(|p| p.into())
                     .collect();
 
                 let rule = self.create_require_rule(
@@ -257,7 +256,6 @@ impl RuleSetGenerator {
                     .borrow_mut()
                     .what_provides(link.get_target(), Some(&constraint))
                     .into_iter()
-                    .map(|p| p.into())
                     .collect();
 
                 for conflict in &conflicts {
@@ -282,7 +280,7 @@ impl RuleSetGenerator {
         let names_packages: Vec<(String, Vec<PackageInterfaceHandle>)> = self
             .added_packages_by_names
             .iter()
-            .map(|(k, v)| (k.clone(), v.iter().cloned().collect()))
+            .map(|(k, v)| (k.clone(), v.to_vec()))
             .collect();
 
         for (name, packages) in names_packages {
@@ -324,13 +322,13 @@ impl RuleSetGenerator {
                 }));
             }
 
-            self.add_rules_for_package(package.clone().into(), platform_requirement_filter);
+            self.add_rules_for_package(package.clone(), platform_requirement_filter);
 
             let rule = self.create_install_one_of_rule(
-                &[package.clone().into()],
+                &[package.clone()],
                 rule::RULE_FIXED,
                 rule::ReasonData::Fixed {
-                    package: package.clone().into(),
+                    package: package.clone(),
                 },
             );
             self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::Generic(rule)));
@@ -355,7 +353,6 @@ impl RuleSetGenerator {
                 .borrow_mut()
                 .what_provides(package_name, Some(&constraint))
                 .into_iter()
-                .map(|p| p.into())
                 .collect();
             if !packages.is_empty() {
                 for package in &packages {
@@ -382,29 +379,21 @@ impl RuleSetGenerator {
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        let packages: Vec<PackageInterfaceHandle> = self
-            .pool
-            .borrow()
-            .get_packages()
-            .iter()
-            .map(|p| p.clone().into())
-            .collect();
+        let packages: Vec<PackageInterfaceHandle> = self.pool.borrow().get_packages().to_vec();
         for package in &packages {
             // ensure that rules for root alias packages and aliases of packages which were loaded are also loaded
             // even if the alias itself isn't required, otherwise a package could be installed without its alias which
             // leads to unexpected behavior
             let is_not_added = !self.added_map.contains_key(&package.get_id());
             let as_alias = package.as_alias();
-            if is_not_added {
-                if let Some(alias_pkg) = as_alias {
-                    if alias_pkg.is_root_package_alias()
-                        || self
-                            .added_map
-                            .contains_key(&alias_pkg.get_alias_of().get_id())
-                    {
-                        self.add_rules_for_package(package.clone(), platform_requirement_filter);
-                    }
-                }
+            if is_not_added
+                && let Some(alias_pkg) = as_alias
+                && (alias_pkg.is_root_package_alias()
+                    || self
+                        .added_map
+                        .contains_key(&alias_pkg.get_alias_of().get_id()))
+            {
+                self.add_rules_for_package(package.clone(), platform_requirement_filter);
             }
         }
     }
@@ -427,7 +416,7 @@ impl RuleSetGenerator {
         self.added_map = IndexMap::new();
         self.added_packages_by_names = IndexMap::new();
 
-        let rules = std::mem::replace(&mut self.rules, RuleSet::new());
+        let rules = std::mem::take(&mut self.rules);
 
         Ok(rules)
     }

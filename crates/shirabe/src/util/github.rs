@@ -257,7 +257,7 @@ impl GitHub {
                     );
                     return Ok(false);
                 }
-                return Err(te.into());
+                return Err(te);
             }
         }
 

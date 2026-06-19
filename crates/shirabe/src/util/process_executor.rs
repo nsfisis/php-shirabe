@@ -251,16 +251,16 @@ impl ProcessExecutor {
 
         if !Platform::is_windows() && tty {
             // PHP: try { $process->setTty(true); } catch (RuntimeException $e) { /* ignore */ }
-            if let Err(e) = process.set_tty(true) {
-                if e.downcast_ref::<SymfonyProcessRuntimeException>().is_none() {
-                    return Err(e);
-                }
-                // ignore TTY enabling errors
+            if let Err(e) = process.set_tty(true)
+                && e.downcast_ref::<SymfonyProcessRuntimeException>().is_none()
+            {
+                return Err(e);
             }
+            // ignore TTY enabling errors
         }
 
         // PHP: $callback = is_callable($output) ? $output : fn($type, $buffer) => $this->outputHandler($type, $buffer);
-        let output_is_callable = output.as_deref().map(|o| is_callable(o)).unwrap_or(false);
+        let output_is_callable = output.as_deref().map(is_callable).unwrap_or(false);
         let _callback: Box<dyn Fn(&str, &str)> = if output_is_callable {
             // TODO(phase-c): the user-supplied $output is a PhpMixed callable that cannot be
             // invoked without a typed callable model (Rc<dyn Fn>); deferred with the callable model.
@@ -291,20 +291,20 @@ impl ProcessExecutor {
             }),
         );
 
-        let result: Result<()> = (|| -> Result<()> {
+        let result: Result<()> = {
             let _ = process.run(/* callback */ Some(Box::new(|_t: &str, _b: &str| {})));
 
-            let output_is_callable_inner =
-                output.as_deref().map(|o| is_callable(o)).unwrap_or(false);
-            if self.capture_output && !output_is_callable_inner {
-                if let Some(out) = output.as_mut() {
-                    **out = PhpMixed::String(process.get_output());
-                }
+            let output_is_callable_inner = output.as_deref().map(is_callable).unwrap_or(false);
+            if self.capture_output
+                && !output_is_callable_inner
+                && let Some(out) = output.as_mut()
+            {
+                **out = PhpMixed::String(process.get_output());
             }
 
             self.error_output = process.get_error_output();
             Ok(())
-        })();
+        };
         let final_result: Result<()> = match result {
             Ok(()) => Ok(()),
             Err(e) => {
@@ -369,7 +369,7 @@ impl ProcessExecutor {
         }
 
         Ok(self
-            .run_process(command, cwd, env, tty, output.as_deref_mut())?
+            .run_process(command, cwd, env, tty, output)?
             .unwrap_or(0))
     }
 
@@ -466,33 +466,31 @@ impl ProcessExecutor {
 
         self.output_command_run(&command, cwd.as_deref(), true);
 
-        let process_result: Result<Process> = (|| -> Result<Process> {
-            if is_string(&command) {
-                Ok(Process::from_shell_commandline(
-                    command.as_string().unwrap_or(""),
-                    cwd.as_deref(),
-                    None,
-                    None,
-                    Some(Self::get_timeout() as f64),
-                ))
-            } else if let PhpMixed::List(ref list) = command {
-                Ok(Process::new(
-                    list.iter()
-                        .map(|v| v.as_string().unwrap_or("").to_string())
-                        .collect(),
-                    cwd.clone(),
-                    None,
-                    None,
-                    Some(Self::get_timeout() as f64),
-                ))
-            } else {
-                Err(LogicException {
-                    message: "Invalid command type".to_string(),
-                    code: 0,
-                }
-                .into())
+        let process_result: Result<Process> = (if is_string(&command) {
+            Ok(Process::from_shell_commandline(
+                command.as_string().unwrap_or(""),
+                cwd.as_deref(),
+                None,
+                None,
+                Some(Self::get_timeout() as f64),
+            ))
+        } else if let PhpMixed::List(ref list) = command {
+            Ok(Process::new(
+                list.iter()
+                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .collect(),
+                cwd.clone(),
+                None,
+                None,
+                Some(Self::get_timeout() as f64),
+            ))
+        } else {
+            Err(LogicException {
+                message: "Invalid command type".to_string(),
+                code: 0,
             }
-        })();
+            .into())
+        });
         let process = match process_result {
             Ok(p) => p,
             Err(e) => {
@@ -511,10 +509,10 @@ impl ProcessExecutor {
         }
 
         // PHP: $process->start($callback); — we operate on the stored job.process directly
-        if let Some(job) = self.jobs.get_mut(&id) {
-            if let Some(p) = job.process.as_mut() {
-                p.start(None);
-            }
+        if let Some(job) = self.jobs.get_mut(&id)
+            && let Some(p) = job.process.as_mut()
+        {
+            p.start(None);
         }
     }
 
@@ -570,36 +568,34 @@ impl ProcessExecutor {
                 let j = self.jobs.get(id).unwrap();
                 (j.status, j.process.is_some())
             };
-            if status == Self::STATUS_STARTED {
-                if has_process {
-                    let is_running = self
+            if status == Self::STATUS_STARTED && has_process {
+                let is_running = self
+                    .jobs
+                    .get(id)
+                    .and_then(|j| j.process.as_ref())
+                    .map(|p| p.is_running())
+                    .unwrap_or(false);
+                if !is_running {
+                    // PHP: call_user_func($job['resolve'], $job['process']) — the .then handler
+                    // marks the job completed/failed based on the process exit status.
+                    let successful = self
                         .jobs
                         .get(id)
                         .and_then(|j| j.process.as_ref())
-                        .map(|p| p.is_running())
+                        .map(|p| p.is_successful())
                         .unwrap_or(false);
-                    if !is_running {
-                        // PHP: call_user_func($job['resolve'], $job['process']) — the .then handler
-                        // marks the job completed/failed based on the process exit status.
-                        let successful = self
-                            .jobs
-                            .get(id)
-                            .and_then(|j| j.process.as_ref())
-                            .map(|p| p.is_successful())
-                            .unwrap_or(false);
-                        if let Some(job) = self.jobs.get_mut(id) {
-                            job.status = if successful {
-                                Self::STATUS_COMPLETED
-                            } else {
-                                Self::STATUS_FAILED
-                            };
-                        }
-                        self.mark_job_done();
+                    if let Some(job) = self.jobs.get_mut(id) {
+                        job.status = if successful {
+                            Self::STATUS_COMPLETED
+                        } else {
+                            Self::STATUS_FAILED
+                        };
                     }
+                    self.mark_job_done();
+                }
 
-                    if let Some(p) = self.jobs.get(id).and_then(|j| j.process.as_ref()) {
-                        p.check_timeout()?;
-                    }
+                if let Some(p) = self.jobs.get(id).and_then(|j| j.process.as_ref()) {
+                    p.check_timeout()?;
                 }
             }
 
@@ -725,7 +721,7 @@ impl ProcessExecutor {
     /// Escapes a string to be used as a shell argument for Symfony Process.
     fn escape_argument(argument: &str) -> String {
         let mut argument = argument.to_string();
-        if "" == argument {
+        if argument.is_empty() {
             return escapeshellarg(&argument);
         }
 
@@ -792,7 +788,7 @@ impl ProcessExecutor {
                 _ => vec![],
             }
         };
-        if cmd.get(0).map(|s| s.as_str()) != Some("git") {
+        if cmd.first().map(|s| s.as_str()) != Some("git") {
             return false;
         }
 

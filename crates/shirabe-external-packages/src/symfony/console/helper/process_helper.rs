@@ -149,11 +149,13 @@ impl ProcessHelper {
                 .write(&[stopped], false, output_interface::OUTPUT_NORMAL);
         }
 
-        if !process.is_successful() && error.is_some() {
+        if !process.is_successful()
+            && let Some(error) = error
+        {
             output.borrow().writeln(
                 &[format!(
                     "<error>{}</error>",
-                    shirabe_php_shim::PhpMixed::String(self.escape_string(error.unwrap()),),
+                    shirabe_php_shim::PhpMixed::String(self.escape_string(error),),
                 )],
                 output_interface::OUTPUT_NORMAL,
             );

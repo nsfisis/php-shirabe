@@ -33,7 +33,7 @@ impl JsonManipulator {
 
     pub fn new(contents: String) -> anyhow::Result<Self> {
         let mut contents = trim(&contents, Some(" \t\n\r\0\u{0B}"));
-        if contents == "" {
+        if contents.is_empty() {
             contents = "{}".to_string();
         }
         if !Preg::is_match3("#^\\{(.*)\\}$#s", &contents, None) {
@@ -215,7 +215,7 @@ impl JsonManipulator {
         config: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
-        if "" != name && !self.do_remove_repository(name)? {
+        if !name.is_empty() && !self.do_remove_repository(name)? {
             return Ok(false);
         }
 
@@ -225,7 +225,7 @@ impl JsonManipulator {
 
         let final_config = if is_array(&config)
             && !is_numeric(&PhpMixed::String(name.to_string()))
-            && "" != name
+            && !name.is_empty()
         {
             // PHP: ['name' => $name] + $config — preserve $config keys
             let mut merged: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
@@ -365,9 +365,9 @@ impl JsonManipulator {
         );
         let mut matches: IndexMap<String, String> = IndexMap::new();
 
-        let list_match = list_regex.as_ref().map_or(false, |r| {
-            Preg::is_match_named(r, &self.contents, &mut matches)
-        });
+        let list_match = list_regex
+            .as_ref()
+            .is_some_and(|r| Preg::is_match_named(r, &self.contents, &mut matches));
         if list_match || Preg::is_match_named(&object_regex, &self.contents, &mut matches) {
             // invalid match due to un-regexable content, abort
             let raw_repo = matches.get("repository").cloned().unwrap_or_default();
@@ -418,7 +418,7 @@ impl JsonManipulator {
         reference_name: &str,
         offset: i64,
     ) -> anyhow::Result<bool> {
-        if "" != name && !self.do_remove_repository(name)? {
+        if !name.is_empty() && !self.do_remove_repository(name)? {
             return Ok(false);
         }
 
@@ -447,16 +447,15 @@ impl JsonManipulator {
 
             // PHP: $repositoryIndex === $referenceName — comparing list index to a string is rare; skip in Rust port
             // PHP: [$referenceName => false] === $repository
-            if let Some(arr) = repository.as_array() {
-                if arr.len() == 1
-                    && arr
-                        .get(reference_name)
-                        .map(|v| v.as_bool() == Some(false))
-                        .unwrap_or(false)
-                {
-                    index_to_insert = Some(i as i64);
-                    break;
-                }
+            if let Some(arr) = repository.as_array()
+                && arr.len() == 1
+                && arr
+                    .get(reference_name)
+                    .map(|v| v.as_bool() == Some(false))
+                    .unwrap_or(false)
+            {
+                index_to_insert = Some(i as i64);
+                break;
             }
         }
 
@@ -467,7 +466,7 @@ impl JsonManipulator {
 
         let final_config = if is_array(&config)
             && !is_numeric(&PhpMixed::String(name.to_string()))
-            && "" != name
+            && !name.is_empty()
         {
             let mut merged: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             merged.insert(
@@ -968,61 +967,59 @@ impl JsonManipulator {
             "#^\\{\\s*?(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s",
             &children_clean,
             &mut empty_match,
-        ) {
-            if empty_match.get("content").is_none() {
-                let newline = self.newline.clone();
-                let indent = self.indent.clone();
+        ) && empty_match.get("content").is_none()
+        {
+            let newline = self.newline.clone();
+            let indent = self.indent.clone();
 
-                self.contents = Preg::replace_callback(
-                    &node_regex,
-                    move |matches: &IndexMap<CaptureKey, String>| -> String {
-                        format!(
-                            "{}{{{}{}}}{}",
-                            matches
-                                .get(&CaptureKey::ByName("start".to_string()))
-                                .cloned()
-                                .unwrap_or_default(),
-                            newline,
-                            indent,
-                            matches
-                                .get(&CaptureKey::ByName("end".to_string()))
-                                .cloned()
-                                .unwrap_or_default()
-                        )
-                    },
-                    &self.contents,
-                );
+            self.contents = Preg::replace_callback(
+                &node_regex,
+                move |matches: &IndexMap<CaptureKey, String>| -> String {
+                    format!(
+                        "{}{{{}{}}}{}",
+                        matches
+                            .get(&CaptureKey::ByName("start".to_string()))
+                            .cloned()
+                            .unwrap_or_default(),
+                        newline,
+                        indent,
+                        matches
+                            .get(&CaptureKey::ByName("end".to_string()))
+                            .cloned()
+                            .unwrap_or_default()
+                    )
+                },
+                &self.contents,
+            );
 
-                // we have a subname, so we restore the rest of $name
-                if let Some(sub) = sub_name {
-                    let mut cur_val = json_decode(&children, true)?;
-                    if let Some(arr) = cur_val.as_array_mut() {
-                        if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut())
-                        {
-                            inner.shift_remove(&sub);
-                        }
-                        let now_empty = arr
-                            .get(&name_owned)
-                            .and_then(|v| v.as_array())
-                            .map(|a| a.is_empty())
-                            .unwrap_or(false);
-                        if now_empty {
-                            arr.insert(
-                                name_owned.clone(),
-                                Box::new(PhpMixed::Object(ArrayObject::new(None))),
-                            );
-                        }
+            // we have a subname, so we restore the rest of $name
+            if let Some(sub) = sub_name {
+                let mut cur_val = json_decode(&children, true)?;
+                if let Some(arr) = cur_val.as_array_mut() {
+                    if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut()) {
+                        inner.shift_remove(&sub);
                     }
-                    let val = cur_val
-                        .as_array()
-                        .and_then(|a| a.get(&name_owned))
-                        .map(|v| (**v).clone())
-                        .unwrap_or(PhpMixed::Null);
-                    self.add_sub_node(main_node, &name_owned, val, true)?;
+                    let now_empty = arr
+                        .get(&name_owned)
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.is_empty())
+                        .unwrap_or(false);
+                    if now_empty {
+                        arr.insert(
+                            name_owned.clone(),
+                            Box::new(PhpMixed::Object(ArrayObject::new(None))),
+                        );
+                    }
                 }
-
-                return Ok(true);
+                let val = cur_val
+                    .as_array()
+                    .and_then(|a| a.get(&name_owned))
+                    .map(|v| (**v).clone())
+                    .unwrap_or(PhpMixed::Null);
+                self.add_sub_node(main_node, &name_owned, val, true)?;
             }
+
+            return Ok(true);
         }
 
         let name_capture = name_owned.clone();
@@ -1088,10 +1085,10 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no main node yet
-        if decoded.as_array().and_then(|a| a.get(main_node)).is_none() {
-            if !self.add_main_key(main_node, PhpMixed::List(vec![]))? {
-                return Ok(false);
-            }
+        if decoded.as_array().and_then(|a| a.get(main_node)).is_none()
+            && !self.add_main_key(main_node, PhpMixed::List(vec![]))?
+        {
+            return Ok(false);
         }
 
         // main node content not match-able
@@ -1229,10 +1226,10 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no main node yet
-        if decoded.as_array().and_then(|a| a.get(main_node)).is_none() {
-            if !self.add_main_key(main_node, PhpMixed::List(vec![]))? {
-                return Ok(false);
-            }
+        if decoded.as_array().and_then(|a| a.get(main_node)).is_none()
+            && !self.add_main_key(main_node, PhpMixed::List(vec![]))?
+        {
+            return Ok(false);
         }
 
         let main_node_count = decoded

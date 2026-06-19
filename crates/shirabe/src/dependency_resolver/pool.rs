@@ -120,12 +120,12 @@ impl Pool {
             .get(package_name)
             .unwrap_or(&empty);
         for (version, _package_with_security_advisories) in versions {
-            if let Some(c) = constraint {
-                if c.matches(
+            if let Some(c) = constraint
+                && c.matches(
                     &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                ) {
-                    return true;
-                }
+                )
+            {
+                return true;
             }
         }
 
@@ -144,15 +144,15 @@ impl Pool {
             .get(package_name)
             .unwrap_or(&empty);
         for (version, package_with_security_advisories) in versions {
-            if let Some(c) = constraint {
-                if c.matches(
+            if let Some(c) = constraint
+                && c.matches(
                     &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                ) {
-                    return package_with_security_advisories
-                        .iter()
-                        .map(|advisory| advisory.advisory_id().to_string())
-                        .collect();
-                }
+                )
+            {
+                return package_with_security_advisories
+                    .iter()
+                    .map(|advisory| advisory.advisory_id().to_string())
+                    .collect();
             }
         }
 
@@ -170,12 +170,12 @@ impl Pool {
             .get(package_name)
             .unwrap_or(&empty);
         for (version, _pretty_version) in versions {
-            if let Some(c) = constraint {
-                if c.matches(
+            if let Some(c) = constraint
+                && c.matches(
                     &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                ) {
-                    return true;
-                }
+                )
+            {
+                return true;
             }
         }
 
@@ -207,7 +207,7 @@ impl Pool {
             for provided in package.get_names(true) {
                 self.package_by_name
                     .entry(provided)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(package.clone());
             }
 
@@ -241,16 +241,16 @@ impl Pool {
             Some(c) => c.to_string(),
             None => String::new(),
         };
-        if let Some(by_key) = self.provider_cache.get(name) {
-            if let Some(cached) = by_key.get(&key) {
-                return cached.clone();
-            }
+        if let Some(by_key) = self.provider_cache.get(name)
+            && let Some(cached) = by_key.get(&key)
+        {
+            return cached.clone();
         }
 
         let computed = self.compute_what_provides(name, constraint);
         self.provider_cache
             .entry(name.to_string())
-            .or_insert_with(IndexMap::new)
+            .or_default()
             .insert(key, computed.clone());
         computed
     }
@@ -352,16 +352,16 @@ impl Pool {
             return false;
         }
 
-        if let Some(provide) = provides.get(name) {
-            if constraint.is_none() || constraint.unwrap().matches(provide.get_constraint()) {
-                return true;
-            }
+        if let Some(provide) = provides.get(name)
+            && (constraint.is_none() || constraint.unwrap().matches(provide.get_constraint()))
+        {
+            return true;
         }
 
-        if let Some(replace) = replaces.get(name) {
-            if constraint.is_none() || constraint.unwrap().matches(replace.get_constraint()) {
-                return true;
-            }
+        if let Some(replace) = replaces.get(name)
+            && (constraint.is_none() || constraint.unwrap().matches(replace.get_constraint()))
+        {
+            return true;
         }
 
         false

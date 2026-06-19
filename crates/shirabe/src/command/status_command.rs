@@ -32,6 +32,12 @@ pub struct StatusCommand {
     base_command_data: BaseCommandData,
 }
 
+impl Default for StatusCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StatusCommand {
     const EXIT_CODE_ERRORS: i64 = 1;
     const EXIT_CODE_UNPUSHED_CHANGES: i64 = 2;
@@ -115,57 +121,54 @@ impl StatusCommand {
                 }
             }
 
-            if let Some(vcs_downloader) = downloader.as_vcs_capable_downloader_interface() {
-                if vcs_downloader
+            if let Some(vcs_downloader) = downloader.as_vcs_capable_downloader_interface()
+                && vcs_downloader
                     .get_vcs_reference(package.clone(), target_dir.clone())
                     .is_some()
+            {
+                let previous_ref = match package.get_installation_source().as_deref() {
+                    Some("source") => package.get_source_reference().map(|s| s.to_string()),
+                    Some("dist") => package.get_dist_reference().map(|s| s.to_string()),
+                    _ => None,
+                };
+
+                let current_version =
+                    guesser.guess_version(&dumper.dump(package.clone()), &target_dir)?;
+
+                if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version)
+                    && cur_version.commit.as_deref() != Some(prev_ref.as_str())
+                    && cur_version.pretty_version.as_deref() != Some(prev_ref.as_str())
                 {
-                    let previous_ref = match package.get_installation_source().as_deref() {
-                        Some("source") => package.get_source_reference().map(|s| s.to_string()),
-                        Some("dist") => package.get_dist_reference().map(|s| s.to_string()),
-                        _ => None,
-                    };
+                    let mut previous = IndexMap::new();
+                    previous.insert(
+                        "version".to_string(),
+                        package.get_pretty_version().to_string(),
+                    );
+                    previous.insert("ref".to_string(), prev_ref.clone());
 
-                    let current_version =
-                        guesser.guess_version(&dumper.dump(package.clone()), &target_dir)?;
+                    let mut current = IndexMap::new();
+                    current.insert(
+                        "version".to_string(),
+                        cur_version.pretty_version.clone().unwrap_or_default(),
+                    );
+                    current.insert(
+                        "ref".to_string(),
+                        cur_version.commit.clone().unwrap_or_default(),
+                    );
 
-                    if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version) {
-                        if cur_version.commit.as_deref() != Some(prev_ref.as_str())
-                            && cur_version.pretty_version.as_deref() != Some(prev_ref.as_str())
-                        {
-                            let mut previous = IndexMap::new();
-                            previous.insert(
-                                "version".to_string(),
-                                package.get_pretty_version().to_string(),
-                            );
-                            previous.insert("ref".to_string(), prev_ref.clone());
+                    let mut change = IndexMap::new();
+                    change.insert("previous".to_string(), previous);
+                    change.insert("current".to_string(), current);
 
-                            let mut current = IndexMap::new();
-                            current.insert(
-                                "version".to_string(),
-                                cur_version.pretty_version.clone().unwrap_or_default(),
-                            );
-                            current.insert(
-                                "ref".to_string(),
-                                cur_version.commit.clone().unwrap_or_default(),
-                            );
-
-                            let mut change = IndexMap::new();
-                            change.insert("previous".to_string(), previous);
-                            change.insert("current".to_string(), current);
-
-                            vcs_version_changes.insert(target_dir.clone(), change);
-                        }
-                    }
+                    vcs_version_changes.insert(target_dir.clone(), change);
                 }
             }
 
-            if let Some(dvcs_downloader) = downloader.as_dvcs_downloader_interface() {
-                if let Some(unpushed) =
+            if let Some(dvcs_downloader) = downloader.as_dvcs_downloader_interface()
+                && let Some(unpushed) =
                     dvcs_downloader.get_unpushed_changes(package.clone(), target_dir.clone())?
-                {
-                    unpushed_changes.insert(target_dir, unpushed);
-                }
+            {
+                unpushed_changes.insert(target_dir, unpushed);
             }
         }
 

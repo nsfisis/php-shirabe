@@ -41,6 +41,12 @@ pub struct Problem {
     pub(crate) section: i64,
 }
 
+impl Default for Problem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Problem {
     pub fn new() -> Self {
         Self {
@@ -101,7 +107,7 @@ impl Problem {
             };
 
             let packages = pool.compute_what_provides(&package_name, constraint);
-            if packages.len() == 0 {
+            if packages.is_empty() {
                 let missing = Self::get_missing_package_reason(
                     repository_set,
                     request,
@@ -193,7 +199,7 @@ impl Problem {
         }
     }
 
-    /// @internal
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn format_deduplicated_rules(
         rules: &Vec<std::rc::Rc<std::cell::RefCell<Rule>>>,
         indent: &str,
@@ -208,8 +214,7 @@ impl Problem {
         let mut templates: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
             IndexMap::new();
         let parser = VersionParser::new();
-        let deduplicatable_rule_types =
-            vec![rule::RULE_PACKAGE_REQUIRES, rule::RULE_PACKAGE_CONFLICT];
+        let deduplicatable_rule_types = [rule::RULE_PACKAGE_REQUIRES, rule::RULE_PACKAGE_CONFLICT];
         for rule in rules {
             let rule_ref = rule.borrow();
             let mut message = rule_ref.get_pretty_string(
@@ -248,9 +253,9 @@ impl Problem {
                 let version_key = parser.normalize(&m2, Some("")).unwrap_or_default();
                 templates
                     .entry(template.clone())
-                    .or_insert_with(IndexMap::new)
+                    .or_default()
                     .entry(pkg_key.clone())
-                    .or_insert_with(IndexMap::new)
+                    .or_default()
                     .insert(version_key, m2.clone());
                 let source_package = rule_ref.get_source_package(pool).unwrap();
                 for (version, pretty_version) in
@@ -263,7 +268,7 @@ impl Problem {
                         .unwrap()
                         .insert(version, pretty_version);
                 }
-            } else if message != "" {
+            } else if !message.is_empty() {
                 messages.push(message);
             }
         }
@@ -367,10 +372,7 @@ impl Problem {
 
         if !self.reason_seen.contains_key(&id) {
             self.reason_seen.insert(id, true);
-            self.reasons
-                .entry(self.section)
-                .or_insert_with(Vec::new)
-                .push(reason);
+            self.reasons.entry(self.section).or_default().push(reason);
         }
     }
 
@@ -403,7 +405,8 @@ impl Problem {
                 );
 
                 if defined("HHVM_VERSION")
-                    || (package_name == "hhvm" && pool.what_provides(package_name, None).len() > 0)
+                    || (package_name == "hhvm"
+                        && !pool.what_provides(package_name, None).is_empty())
                 {
                     return Ok((
                         msg,
@@ -562,64 +565,61 @@ impl Problem {
             }
         }
 
-        if let Some(c) = constraint {
-            if c.is_constraint()
-                && c.get_operator() == SimpleConstraint::STR_OP_EQ
-                && Preg::is_match3(r"{^dev-.*#.*}", &c.get_pretty_string(), None)
-            {
-                let new_constraint =
-                    Preg::replace(r"{ +as +([^,\s|]+)$}", "", &c.get_pretty_string());
-                let packages = repository_set.find_packages(
-                    package_name,
-                    Some(
-                        MultiConstraint::new(
-                            vec![
-                                AnyConstraint::Simple(SimpleConstraint::new(
-                                    SimpleConstraint::STR_OP_EQ.to_string(),
-                                    new_constraint.clone(),
-                                    None,
-                                )),
-                                AnyConstraint::Simple(SimpleConstraint::new(
-                                    SimpleConstraint::STR_OP_EQ.to_string(),
-                                    str_replace("#", "+", &new_constraint),
-                                    None,
-                                )),
-                            ],
-                            false,
-                            None,
-                        )
-                        .into(),
+        if let Some(c) = constraint
+            && c.is_constraint()
+            && c.get_operator() == SimpleConstraint::STR_OP_EQ
+            && Preg::is_match3(r"{^dev-.*#.*}", &c.get_pretty_string(), None)
+        {
+            let new_constraint = Preg::replace(r"{ +as +([^,\s|]+)$}", "", &c.get_pretty_string());
+            let packages = repository_set.find_packages(
+                package_name,
+                Some(
+                    MultiConstraint::new(
+                        vec![
+                            AnyConstraint::Simple(SimpleConstraint::new(
+                                SimpleConstraint::STR_OP_EQ.to_string(),
+                                new_constraint.clone(),
+                                None,
+                            )),
+                            AnyConstraint::Simple(SimpleConstraint::new(
+                                SimpleConstraint::STR_OP_EQ.to_string(),
+                                str_replace("#", "+", &new_constraint),
+                                None,
+                            )),
+                        ],
+                        false,
+                        None,
+                    )
+                    .into(),
+                ),
+                0,
+            )?;
+            if !packages.is_empty() {
+                return Ok((
+                    format!(
+                        "- Root composer.json requires {}{}, ",
+                        package_name,
+                        Self::constraint_to_text(constraint)
                     ),
-                    0,
-                )?;
-                if packages.len() > 0 {
-                    return Ok((
-                        format!(
-                            "- Root composer.json requires {}{}, ",
-                            package_name,
-                            Self::constraint_to_text(constraint)
+                    format!(
+                        "found {}. The # character in branch names is replaced by a + character. Make sure to require it as \"{}\".",
+                        Self::get_package_list(
+                            &packages,
+                            is_verbose,
+                            Some(pool),
+                            constraint,
+                            false
                         ),
-                        format!(
-                            "found {}. The # character in branch names is replaced by a + character. Make sure to require it as \"{}\".",
-                            Self::get_package_list(
-                                &packages,
-                                is_verbose,
-                                Some(pool),
-                                constraint,
-                                false
-                            ),
-                            str_replace("#", "+", &c.get_pretty_string())
-                        ),
-                    ));
-                }
+                        str_replace("#", "+", &c.get_pretty_string())
+                    ),
+                ));
             }
         }
 
         // first check if the actual requested package is found in normal conditions
         // if so it must mean it is rejected by another constraint than the one given here
-        let packages =
-            repository_set.find_packages(package_name, constraint.map(|c| c.clone()), 0)?;
-        if packages.len() > 0 {
+        let packages = repository_set.find_packages(package_name, constraint.cloned(), 0)?;
+        if !packages.is_empty() {
             let root_reqs = repository_set.get_root_requires();
             if root_reqs.contains_key(package_name) {
                 let filtered: Vec<&BasePackageHandle> = packages
@@ -635,7 +635,7 @@ impl Problem {
                         )
                     })
                     .collect();
-                if filtered.len() == 0 {
+                if filtered.is_empty() {
                     return Ok((
                         format!(
                             "- Root composer.json requires {}{}, ",
@@ -679,7 +679,7 @@ impl Problem {
                             )
                         })
                         .collect();
-                    if filtered.len() == 0 {
+                    if filtered.is_empty() {
                         return Ok((
                             format!(
                                 "- Root composer.json requires {}{}, ",
@@ -727,7 +727,7 @@ impl Problem {
                         )
                     })
                     .collect();
-                if filtered.len() == 0 {
+                if filtered.is_empty() {
                     return Ok((
                         format!(
                             "- Root composer.json requires {}{}, ",
@@ -753,11 +753,11 @@ impl Problem {
                 .iter()
                 .filter(|p| {
                     !p.get_repository()
-                        .map_or(false, |r| r.is::<LockArrayRepository>())
+                        .is_some_and(|r| r.is::<LockArrayRepository>())
                 })
                 .collect();
 
-            if non_locked_packages.len() == 0 {
+            if non_locked_packages.is_empty() {
                 return Ok((
                     format!(
                         "- Root composer.json requires {}{}, ",
@@ -863,17 +863,17 @@ impl Problem {
         // check if the package is found when bypassing stability checks
         let packages = repository_set.find_packages(
             package_name,
-            constraint.map(|c| c.clone()),
+            constraint.cloned(),
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         )?;
-        if packages.len() > 0 {
+        if !packages.is_empty() {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
-                constraint.map(|c| c.clone()),
+                constraint.cloned(),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
-            if all_repos_packages.len() > 0 {
+            if !all_repos_packages.is_empty() {
                 return Ok(Self::compute_check_for_lower_prio_repo(
                     pool,
                     is_verbose,
@@ -909,14 +909,14 @@ impl Problem {
             None,
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         )?;
-        if packages.len() > 0 {
+        if !packages.is_empty() {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
-                constraint.map(|c| c.clone()),
+                constraint.cloned(),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
-            if all_repos_packages.len() > 0 {
+            if !all_repos_packages.is_empty() {
                 return Ok(Self::compute_check_for_lower_prio_repo(
                     pool,
                     is_verbose,
@@ -929,23 +929,24 @@ impl Problem {
             }
 
             let mut suffix = String::new();
-            if let Some(c) = constraint {
-                if c.is_constraint() && c.get_version() == "dev-master" {
-                    for candidate in &packages {
-                        if in_array(
-                            PhpMixed::String(candidate.get_version().to_string()),
-                            &PhpMixed::List(vec![
-                                Box::new(PhpMixed::String("dev-default".to_string())),
-                                Box::new(PhpMixed::String("dev-main".to_string())),
-                            ]),
-                            true,
-                        ) {
-                            suffix = format!(
-                                " Perhaps dev-master was renamed to {}?",
-                                candidate.get_pretty_version()
-                            );
-                            break;
-                        }
+            if let Some(c) = constraint
+                && c.is_constraint()
+                && c.get_version() == "dev-master"
+            {
+                for candidate in &packages {
+                    if in_array(
+                        PhpMixed::String(candidate.get_version().to_string()),
+                        &PhpMixed::List(vec![
+                            Box::new(PhpMixed::String("dev-default".to_string())),
+                            Box::new(PhpMixed::String("dev-main".to_string())),
+                        ]),
+                        true,
+                    ) {
+                        suffix = format!(
+                            " Perhaps dev-master was renamed to {}?",
+                            candidate.get_pretty_version()
+                        );
+                        break;
                     }
                 }
             }
@@ -953,11 +954,11 @@ impl Problem {
             // check if the root package is a name match and hint the dependencies on root troubleshooting article
             let all_repos_packages = &packages;
             let top_package = all_repos_packages.first();
-            if let Some(tp) = top_package {
-                if tp.as_root().is_some() {
-                    suffix = " See https://getcomposer.org/dep-on-root for details and assistance."
-                        .to_string();
-                }
+            if let Some(tp) = top_package
+                && tp.as_root().is_some()
+            {
+                suffix = " See https://getcomposer.org/dep-on-root for details and assistance."
+                    .to_string();
             }
 
             return Ok((
@@ -1045,18 +1046,18 @@ impl Problem {
                 package.get_version().to_string(),
                 format!("{}{}", package.get_pretty_version(), alias_suffix),
             );
-            if pool.is_some() && constraint.is_some() {
-                for (version, pretty_version) in pool
-                    .unwrap()
-                    .get_removed_versions(&pkg_name, constraint.unwrap())
-                {
+            if let Some(pool) = pool
+                && let Some(constraint) = constraint
+            {
+                for (version, pretty_version) in pool.get_removed_versions(&pkg_name, constraint) {
                     entry.versions.insert(version, pretty_version);
                 }
             }
-            if pool.is_some() && use_removed_version_group {
-                for (version, pretty_version) in pool
-                    .unwrap()
-                    .get_removed_versions_by_package(&package.ptr_id().to_string())
+            if let Some(pool) = pool
+                && use_removed_version_group
+            {
+                for (version, pretty_version) in
+                    pool.get_removed_versions_by_package(&package.ptr_id().to_string())
                 {
                     entry.versions.insert(version, pretty_version);
                 }
@@ -1120,12 +1121,12 @@ impl Problem {
     ) -> Option<String> {
         let available = pool.what_provides(package_name, None);
 
-        if available.len() > 0 {
+        if !available.is_empty() {
             let mut selected: Option<&BasePackageHandle> = None;
             for pkg in &available {
                 if pkg
                     .get_repository()
-                    .map_or(false, |r| r.is::<PlatformRepository>())
+                    .is_some_and(|r| r.is::<PlatformRepository>())
                 {
                     selected = Some(pkg);
                     break;
@@ -1188,14 +1189,11 @@ impl Problem {
             if stripos(version, "dev-") == Some(0) {
                 by_major
                     .entry("dev".to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(pretty.clone());
             } else {
                 let key = Preg::replace(r"{^(\d+)\..*}", "$1", version);
-                by_major
-                    .entry(key)
-                    .or_insert_with(Vec::new)
-                    .push(pretty.clone());
+                by_major.entry(key).or_default().push(pretty.clone());
             }
         }
         for (major_version, versions_for_major) in by_major {
@@ -1255,7 +1253,7 @@ impl Problem {
         }
         let next_repo = next_repo.expect("next_repo must be set");
 
-        if higher_repo_packages.len() > 0 {
+        if !higher_repo_packages.is_empty() {
             let top_package = higher_repo_packages.first().unwrap();
             if top_package.as_root().is_some() {
                 return (
@@ -1366,45 +1364,38 @@ impl Problem {
 
     /// Turns a constraint into text usable in a sentence describing a request
     pub(crate) fn constraint_to_text(constraint: Option<&AnyConstraint>) -> String {
-        if let Some(c) = constraint {
-            if c.is_constraint()
-                && c.get_operator() == SimpleConstraint::STR_OP_EQ
-                && !str_starts_with(&c.get_version(), "dev-")
-            {
-                if !Preg::is_match3(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None) {
-                    return format!(" {} (exact version match)", c.get_pretty_string());
-                }
-
-                let mut versions = vec![c.get_pretty_string()];
-                let mut i = 3 - substr_count(&versions[0], ".");
-                while i > 0 {
-                    let last = versions.last().unwrap().clone();
-                    versions.push(format!("{}.0", last));
-                    i -= 1;
-                }
-
-                let last = versions.last().unwrap().clone();
-                let detail = if versions.len() > 1 {
-                    format!(
-                        "{} or {}",
-                        implode(
-                            ", ",
-                            &versions[..versions.len() - 1]
-                                .iter()
-                                .cloned()
-                                .collect::<Vec<_>>()
-                        ),
-                        last
-                    )
-                } else {
-                    versions[0].clone()
-                };
-                return format!(
-                    " {} (exact version match: {})",
-                    c.get_pretty_string(),
-                    detail
-                );
+        if let Some(c) = constraint
+            && c.is_constraint()
+            && c.get_operator() == SimpleConstraint::STR_OP_EQ
+            && !str_starts_with(c.get_version(), "dev-")
+        {
+            if !Preg::is_match3(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None) {
+                return format!(" {} (exact version match)", c.get_pretty_string());
             }
+
+            let mut versions = vec![c.get_pretty_string()];
+            let mut i = 3 - substr_count(&versions[0], ".");
+            while i > 0 {
+                let last = versions.last().unwrap().clone();
+                versions.push(format!("{}.0", last));
+                i -= 1;
+            }
+
+            let last = versions.last().unwrap().clone();
+            let detail = if versions.len() > 1 {
+                format!(
+                    "{} or {}",
+                    implode(", ", &versions[..versions.len() - 1]),
+                    last
+                )
+            } else {
+                versions[0].clone()
+            };
+            return format!(
+                " {} (exact version match: {})",
+                c.get_pretty_string(),
+                detail
+            );
         }
 
         match constraint {
@@ -1419,7 +1410,7 @@ impl Problem {
         max_providers: i64,
     ) -> anyhow::Result<Option<String>> {
         let providers = repository_set.get_providers(package_name)?;
-        if providers.len() > 0 {
+        if !providers.is_empty() {
             let provider_count = providers.len() as i64;
             let slice: Vec<crate::repository::ProviderInfo> = if provider_count > max_providers + 1
             {

@@ -12,6 +12,12 @@ pub struct Comparer {
     changed: IndexMap<String, Vec<String>>,
 }
 
+impl Default for Comparer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Comparer {
     pub fn new() -> Self {
         Self {
@@ -96,7 +102,7 @@ impl Comparer {
         }
         for (dir, value) in &destination {
             for (file, _hash) in value {
-                if !source.get(dir).map_or(false, |d| d.contains_key(file)) {
+                if !source.get(dir).is_some_and(|d| d.contains_key(file)) {
                     self.changed
                         .entry("added".to_string())
                         .or_default()
