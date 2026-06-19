@@ -64,8 +64,4 @@ pub trait InstallerInterface: std::fmt::Debug {
     fn as_plugin_installer_mut(&mut self) -> Option<&mut PluginInstaller> {
         None
     }
-
-    fn clone_box(&self) -> Box<dyn InstallerInterface> {
-        todo!()
-    }
 }

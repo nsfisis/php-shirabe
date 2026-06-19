@@ -33,11 +33,12 @@ use crate::util::r#loop::Loop;
 /// Package operation manager.
 #[derive(Debug)]
 pub struct InstallationManager {
-    /// @var list<InstallerInterface>
     installers: Vec<Box<dyn InstallerInterface>>,
-    /// @var array<string, InstallerInterface>
-    cache: IndexMap<String, Box<dyn InstallerInterface>>,
-    /// @var array<string, array<PackageInterface>>
+    /// Maps a package type to the index of its installer in `installers`. PHP caches the installer
+    /// instance itself; here we store an index instead to avoid sharing ownership of the boxed
+    /// installer. The index never dangles because both `add_installer` and `remove_installer`
+    /// clear the cache whenever `installers` changes.
+    cache: IndexMap<String, usize>,
     notifiable_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -68,16 +69,12 @@ impl InstallationManager {
     }
 
     /// Adds installer
-    ///
-    /// @param InstallerInterface $installer installer instance
     pub fn add_installer(&mut self, installer: Box<dyn InstallerInterface>) {
         array_unshift(&mut self.installers, installer);
         self.cache = IndexMap::new();
     }
 
     /// Removes installer
-    ///
-    /// @param InstallerInterface $installer installer instance
     pub fn remove_installer(&mut self, installer: &dyn InstallerInterface) {
         let target = installer as *const dyn InstallerInterface as *const ();
         let key = self
@@ -104,30 +101,20 @@ impl InstallationManager {
     }
 
     /// Returns installer for a specific package type.
-    ///
-    /// @param string $type package type
-    ///
-    /// @throws \InvalidArgumentException if installer for provided type is not registered
     pub fn get_installer(&mut self, r#type: &str) -> Result<&mut dyn InstallerInterface> {
         let r#type = strtolower(r#type);
 
-        if self.cache.contains_key(&r#type) {
-            return Ok(self.cache.get_mut(&r#type).unwrap().as_mut());
+        if let Some(&index) = self.cache.get(&r#type) {
+            return Ok(self.installers[index].as_mut());
         }
 
-        for installer in &self.installers {
-            if installer.supports(&r#type) {
-                // PHP: return $this->cache[$type] = $installer; — the cache holds the SAME
-                // installer instance as $this->installers.
-                // TODO(phase-c): faithfully sharing the instance requires storing installers as
-                // Rc<RefCell<dyn InstallerInterface>> (so the cache clones the Rc, not the value).
-                // That refactor is blocked because get_installer's result is used across `.await`
-                // points in download/install/update/uninstall, where a RefCell borrow cannot be
-                // held; it is coupled to the async/React-Promise execution rework this file's
-                // execute() path depends on. clone_box (itself a todo!()) is the placeholder.
-                self.cache.insert(r#type.clone(), installer.clone_box());
-                return Ok(self.cache.get_mut(&r#type).unwrap().as_mut());
-            }
+        let index = self
+            .installers
+            .iter()
+            .position(|installer| installer.supports(&r#type));
+        if let Some(index) = index {
+            self.cache.insert(r#type.clone(), index);
+            return Ok(self.installers[index].as_mut());
         }
 
         Err(InvalidArgumentException {
@@ -419,9 +406,6 @@ impl InstallationManager {
         Ok(())
     }
 
-    /// @param OperationInterface[] $operations    List of operations to execute in this batch
-    /// @param OperationInterface[] $allOperations Complete list of operations to be executed in the install job, used for event listeners
-    /// @phpstan-param array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
     async fn execute_batch(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
@@ -557,8 +541,6 @@ impl InstallationManager {
     }
 
     /// Executes download operation.
-    ///
-    /// @phpstan-return PromiseInterface<void|null>|null
     pub async fn download(&mut self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
         let installer = self.get_installer(&package.get_type()).ok()?;
 
@@ -566,8 +548,6 @@ impl InstallationManager {
     }
 
     /// Executes install operation.
-    ///
-    /// @phpstan-return PromiseInterface<void|null>|null
     pub async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
@@ -583,8 +563,6 @@ impl InstallationManager {
     }
 
     /// Executes update operation.
-    ///
-    /// @phpstan-return PromiseInterface<void|null>|null
     pub async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
@@ -615,8 +593,6 @@ impl InstallationManager {
     }
 
     /// Uninstalls package.
-    ///
-    /// @phpstan-return PromiseInterface<void|null>|null
     pub async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
@@ -654,8 +630,6 @@ impl InstallationManager {
     }
 
     /// Returns the installation path of a package
-    ///
-    /// @return string|null absolute path to install to, which does not end with a slash, or null if the package does not have anything installed on disk
     pub fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
         let installer = self.get_installer(&package.get_type()).ok()?;
 
@@ -803,7 +777,6 @@ impl InstallationManager {
         }
     }
 
-    /// @phpstan-param array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
     async fn run_cleanup(
         &mut self,
         cleanup_promises: &IndexMap<
