@@ -49,18 +49,21 @@ pub struct InitCommand {
 
     /// @var array<string, string>
     git_config: Option<IndexMap<String, String>>,
+    repos: Option<crate::repository::RepositoryInterfaceHandle>,
+    repository_sets:
+        IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
 }
 
 impl PackageDiscoveryTrait for InitCommand {
     fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle> {
-        todo!()
+        &mut self.repos
     }
 
     fn get_repository_sets_mut(
         &mut self,
     ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>
     {
-        todo!()
+        &mut self.repository_sets
     }
 
     fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -104,6 +107,8 @@ impl InitCommand {
         let mut command = InitCommand {
             base_command_data: BaseCommandData::new(None),
             git_config: None,
+            repos: None,
+            repository_sets: IndexMap::new(),
         };
         command
             .configure()
