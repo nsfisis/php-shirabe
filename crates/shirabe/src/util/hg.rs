@@ -22,10 +22,14 @@ pub struct Hg {
 impl Hg {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &Config,
-        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
-        todo!()
+        Self {
+            io,
+            config,
+            process,
+        }
     }
 
     pub fn run_command(

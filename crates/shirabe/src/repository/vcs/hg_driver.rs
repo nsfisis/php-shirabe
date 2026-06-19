@@ -85,8 +85,8 @@ impl HgDriver {
 
             let hg_utils = HgUtils::new(
                 self.inner.io.clone(),
-                &self.inner.config.borrow(),
-                &self.inner.process,
+                self.inner.config.clone(),
+                self.inner.process.clone(),
             );
 
             if is_dir(&self.repo_dir)
