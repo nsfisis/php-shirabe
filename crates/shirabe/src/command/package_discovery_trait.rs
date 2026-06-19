@@ -15,6 +15,7 @@ use shirabe_php_shim::{
     strpos, trim,
 };
 
+use crate::command::BaseCommand;
 use crate::composer::PartialComposerHandle;
 use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
@@ -33,30 +34,13 @@ use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
 
 /// @internal
-pub trait PackageDiscoveryTrait {
+pub trait PackageDiscoveryTrait: BaseCommand {
     // PHP: private $repos; private $repositorySets;
     // TODO(phase-b): trait fields require an associated state struct in Rust; expose via accessors
     fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle>;
     fn get_repository_sets_mut(
         &mut self,
     ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>;
-
-    // PHP: trait dependencies (provided by BaseCommand)
-    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
-    fn try_composer(&self) -> Option<PartialComposerHandle>;
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> PartialComposerHandle;
-    fn get_platform_requirement_filter(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> std::rc::Rc<
-        dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
-    >;
-
-    fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>>;
 
     fn get_repos(&mut self) -> crate::repository::RepositoryInterfaceHandle {
         if self.get_repos_mut().is_none() {
@@ -160,7 +144,7 @@ pub trait PackageDiscoveryTrait {
         fixed: bool,
     ) -> Result<Vec<String>> {
         if !requires.is_empty() {
-            let requires_norm = self.normalize_requirements(requires.clone());
+            let requires_norm = self.normalize_requirements(requires.clone())?;
             let mut result: Vec<String> = vec![];
             let io = self.get_io();
 
@@ -228,7 +212,7 @@ pub trait PackageDiscoveryTrait {
         let version_parser = VersionParser::new();
 
         // Collect existing packages
-        let composer = self.try_composer();
+        let composer = self.try_composer(None, None);
         let composer_ref = composer.as_ref().map(|c| c.borrow_partial());
         let repository_manager = composer_ref
             .as_ref()
@@ -491,7 +475,7 @@ pub trait PackageDiscoveryTrait {
         let platform_requirement_filter = if input.borrow().has_option("ignore-platform-reqs")
             && input.borrow().has_option("ignore-platform-req")
         {
-            self.get_platform_requirement_filter(input.clone())
+            self.get_platform_requirement_filter(input.clone())?
         } else {
             PlatformRequirementFilterFactory::ignore_nothing()
         };
@@ -803,7 +787,7 @@ pub trait PackageDiscoveryTrait {
         };
         let mut similar_packages: IndexMap<String, i64> = IndexMap::new();
 
-        let composer_for_installed = self.require_composer(None, None);
+        let composer_for_installed = self.require_composer(None, None)?;
         let composer_for_installed = composer_for_installed.borrow_partial();
         let repository_manager = composer_for_installed.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();

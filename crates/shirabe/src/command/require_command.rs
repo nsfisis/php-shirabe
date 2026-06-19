@@ -107,35 +107,6 @@ impl PackageDiscoveryTrait for RequireCommand {
     ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
         &mut self.repository_sets
     }
-
-    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-        todo!()
-    }
-
-    fn try_composer(&self) -> Option<PartialComposerHandle> {
-        todo!()
-    }
-
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> PartialComposerHandle {
-        todo!()
-    }
-
-    fn get_platform_requirement_filter(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> std::rc::Rc<
-        dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
-    > {
-        todo!()
-    }
-
-    fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>> {
-        todo!()
-    }
 }
 
 impl Command for RequireCommand {

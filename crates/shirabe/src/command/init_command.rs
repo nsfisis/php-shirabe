@@ -65,35 +65,6 @@ impl PackageDiscoveryTrait for InitCommand {
     {
         &mut self.repository_sets
     }
-
-    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-        todo!()
-    }
-
-    fn try_composer(&self) -> Option<PartialComposerHandle> {
-        todo!()
-    }
-
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> PartialComposerHandle {
-        todo!()
-    }
-
-    fn get_platform_requirement_filter(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> std::rc::Rc<
-        dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
-    > {
-        todo!()
-    }
-
-    fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>> {
-        todo!()
-    }
 }
 
 impl Default for InitCommand {
@@ -152,7 +123,7 @@ impl Command for InitCommand {
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let io = PackageDiscoveryTrait::get_io(self);
+        let io = self.get_io();
 
         let allowlist: Vec<String> = vec![
             "name".to_string(),
