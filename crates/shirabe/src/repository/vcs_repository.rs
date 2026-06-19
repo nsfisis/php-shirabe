@@ -79,7 +79,7 @@ pub struct VcsRepository {
 
 impl ConfigurableRepositoryInterface for VcsRepository {
     fn get_repo_config(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.repo_config.clone()
     }
 }
 

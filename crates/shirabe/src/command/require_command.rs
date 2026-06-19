@@ -65,6 +65,8 @@ pub struct RequireCommand {
     /// contents before modification if the lock file exists
     lock_backup: Option<String>,
     dependency_resolution_completed: bool,
+    repos: Option<crate::repository::RepositoryInterfaceHandle>,
+    repository_sets: IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>,
 }
 
 impl Default for RequireCommand {
@@ -85,6 +87,8 @@ impl RequireCommand {
             lock: String::new(),
             lock_backup: None,
             dependency_resolution_completed: false,
+            repos: None,
+            repository_sets: IndexMap::new(),
         };
         command
             .configure()
@@ -95,13 +99,13 @@ impl RequireCommand {
 
 impl PackageDiscoveryTrait for RequireCommand {
     fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle> {
-        todo!()
+        &mut self.repos
     }
 
     fn get_repository_sets_mut(
         &mut self,
     ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
-        todo!()
+        &mut self.repository_sets
     }
 
     fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
