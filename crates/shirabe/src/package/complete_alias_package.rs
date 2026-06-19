@@ -153,4 +153,8 @@ impl CompletePackageInterface for CompleteAliasPackage {
     fn set_archive_excludes(&mut self, excludes: Vec<String>) {
         self.alias_of.set_archive_excludes(excludes);
     }
+
+    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface {
+        self
+    }
 }

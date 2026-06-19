@@ -51,7 +51,5 @@ pub trait RootPackageInterface: CompletePackageInterface {
 
     fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>);
 
-    fn as_package_interface(&self) -> &dyn PackageInterface {
-        todo!()
-    }
+    fn as_package_interface(&self) -> &dyn PackageInterface;
 }

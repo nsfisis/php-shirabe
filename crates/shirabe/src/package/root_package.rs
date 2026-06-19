@@ -129,6 +129,10 @@ impl RootPackageInterface for RootPackage {
     fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>) {
         self.inner.inner.set_extra(extra);
     }
+
+    fn as_package_interface(&self) -> &dyn PackageInterface {
+        self
+    }
 }
 
 impl CompletePackageInterface for RootPackage {
@@ -230,6 +234,10 @@ impl CompletePackageInterface for RootPackage {
 
     fn set_archive_excludes(&mut self, excludes: Vec<String>) {
         CompletePackageInterface::set_archive_excludes(&mut self.inner, excludes)
+    }
+
+    fn as_package_interface(&self) -> &dyn PackageInterface {
+        self
     }
 }
 

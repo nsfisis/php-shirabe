@@ -146,6 +146,10 @@ impl RootPackageInterface for RootAliasPackage {
     fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>) {
         self.alias_of.set_extra(extra);
     }
+
+    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface {
+        self
+    }
 }
 
 impl CompletePackageInterface for RootAliasPackage {
@@ -247,5 +251,9 @@ impl CompletePackageInterface for RootAliasPackage {
 
     fn set_archive_excludes(&mut self, excludes: Vec<String>) {
         self.inner.set_archive_excludes(excludes);
+    }
+
+    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface {
+        self
     }
 }

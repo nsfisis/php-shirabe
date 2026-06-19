@@ -156,6 +156,10 @@ impl CompletePackageInterface for CompletePackage {
     fn get_archive_excludes(&self) -> Vec<String> {
         self.archive_excludes.clone()
     }
+
+    fn as_package_interface(&self) -> &dyn PackageInterface {
+        self
+    }
 }
 
 impl PackageInterface for CompletePackage {

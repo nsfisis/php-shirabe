@@ -56,7 +56,5 @@ pub trait CompletePackageInterface: PackageInterface {
 
     fn set_archive_excludes(&mut self, excludes: Vec<String>);
 
-    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface {
-        todo!()
-    }
+    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface;
 }
