@@ -1900,10 +1900,67 @@ where
 }
 
 pub fn array_replace_recursive(
-    _base: IndexMap<String, PhpMixed>,
-    _replacement: IndexMap<String, PhpMixed>,
+    mut base: IndexMap<String, PhpMixed>,
+    replacement: IndexMap<String, PhpMixed>,
 ) -> IndexMap<String, PhpMixed> {
-    todo!()
+    for (key, replacement_value) in replacement {
+        let merged = match base.get(&key) {
+            Some(base_value) => {
+                array_replace_recursive_value(base_value.clone(), replacement_value)
+            }
+            None => replacement_value,
+        };
+        base.insert(key, merged);
+    }
+    base
+}
+
+// PHP recurses only when both the existing and the replacing value are arrays;
+// otherwise the replacing value wins outright.
+fn array_replace_recursive_value(base: PhpMixed, replacement: PhpMixed) -> PhpMixed {
+    match (base, replacement) {
+        (PhpMixed::Array(base), PhpMixed::Array(replacement)) => {
+            PhpMixed::Array(array_replace_recursive_assoc(base, replacement))
+        }
+        (PhpMixed::List(base), PhpMixed::List(replacement)) => {
+            PhpMixed::List(array_replace_recursive_list(base, replacement))
+        }
+        (_, replacement) => replacement,
+    }
+}
+
+fn array_replace_recursive_assoc(
+    mut base: IndexMap<String, Box<PhpMixed>>,
+    replacement: IndexMap<String, Box<PhpMixed>>,
+) -> IndexMap<String, Box<PhpMixed>> {
+    for (key, replacement_value) in replacement {
+        let merged = match base.get(&key) {
+            Some(base_value) => Box::new(array_replace_recursive_value(
+                (**base_value).clone(),
+                *replacement_value,
+            )),
+            None => replacement_value,
+        };
+        base.insert(key, merged);
+    }
+    base
+}
+
+fn array_replace_recursive_list(
+    mut base: Vec<Box<PhpMixed>>,
+    replacement: Vec<Box<PhpMixed>>,
+) -> Vec<Box<PhpMixed>> {
+    for (index, replacement_value) in replacement.into_iter().enumerate() {
+        if index < base.len() {
+            base[index] = Box::new(array_replace_recursive_value(
+                (*base[index]).clone(),
+                *replacement_value,
+            ));
+        } else {
+            base.push(replacement_value);
+        }
+    }
+    base
 }
 
 pub const PHP_MAJOR_VERSION: i64 = 8;
