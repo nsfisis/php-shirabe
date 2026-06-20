@@ -15,7 +15,9 @@ macro_rules! stub {
 stub!(test_hg_guess_version_returns_data);
 stub!(test_guess_version_returns_data);
 stub!(test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch);
-stub!(test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming);
+stub!(
+    test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming
+);
 stub!(test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming_regex);
 stub!(test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming_when_on_non_feature_branch);
 stub!(test_detached_head_becomes_dev_hash);

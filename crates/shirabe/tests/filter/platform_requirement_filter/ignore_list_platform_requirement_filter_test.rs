@@ -23,7 +23,11 @@ fn data_is_ignored() -> Vec<(Vec<&'static str>, &'static str, bool)> {
         // 'php is not ignored if not listed'
         (vec!["ext-json", "monolog/monolog"], "php", false),
         // 'monolog/monolog is not ignored even if listed'
-        (vec!["ext-json", "monolog/monolog"], "monolog/monolog", false),
+        (
+            vec!["ext-json", "monolog/monolog"],
+            "monolog/monolog",
+            false,
+        ),
         // 'ext-json is ignored if ext-* is listed'
         (vec!["ext-*"], "ext-json", true),
         // 'php is ignored if php* is listed'

@@ -14,8 +14,8 @@ use shirabe::json::JsonFile;
 use shirabe::package::{Locker, RootPackageHandle, RootPackageInterfaceHandle};
 use shirabe::repository::RepositoryManager;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe::util::process_executor::ProcessExecutor;
 use shirabe::util::r#loop::Loop;
+use shirabe::util::process_executor::ProcessExecutor;
 
 fn null_io() -> Rc<RefCell<dyn IOInterface>> {
     Rc::new(RefCell::new(NullIO::new()))
@@ -43,9 +43,12 @@ fn installation_manager(io: &Rc<RefCell<dyn IOInterface>>) -> Rc<RefCell<Install
 #[test]
 fn test_set_get_package() {
     let mut composer = Composer::new();
-    let package: RootPackageInterfaceHandle =
-        RootPackageHandle::new("foo".to_string(), "1.0.0.0".to_string(), "1.0.0".to_string())
-            .into();
+    let package: RootPackageInterfaceHandle = RootPackageHandle::new(
+        "foo".to_string(),
+        "1.0.0.0".to_string(),
+        "1.0.0".to_string(),
+    )
+    .into();
     composer.set_package(package.clone());
 
     assert!(composer.get_package().ptr_eq(&package));

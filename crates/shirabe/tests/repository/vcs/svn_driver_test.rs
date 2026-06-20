@@ -23,7 +23,10 @@ fn test_support() {
         let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
         let config = Rc::new(RefCell::new(Config::new(true, None)));
 
-        assert_eq!(assertion, SvnDriver::supports(io, config, url, false).unwrap());
+        assert_eq!(
+            assertion,
+            SvnDriver::supports(io, config, url, false).unwrap()
+        );
     }
 }
 

@@ -17,9 +17,12 @@ fn create_composer_instance() -> ComposerHandle {
         ComposerHandle::from_rc_unchecked(Rc::new(RefCell::new(PartialOrFullComposer::new_full())));
     let config = Rc::new(RefCell::new(Config::new(true, None)));
     composer.borrow_mut().set_config(config);
-    let package: RootPackageInterfaceHandle =
-        RootPackageHandle::new("foo".to_string(), "1.0.0.0".to_string(), "1.0.0".to_string())
-            .into();
+    let package: RootPackageInterfaceHandle = RootPackageHandle::new(
+        "foo".to_string(),
+        "1.0.0.0".to_string(),
+        "1.0.0".to_string(),
+    )
+    .into();
     composer.borrow_mut().set_package(package);
     composer
 }
@@ -30,8 +33,7 @@ fn test_event_sets_originating_event() {
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
     let composer = create_composer_instance();
 
-    let originating_event =
-        BaseEvent::new("originatingEvent".to_string(), vec![], IndexMap::new());
+    let originating_event = BaseEvent::new("originatingEvent".to_string(), vec![], IndexMap::new());
 
     let mut script_event = Event::new(
         "test".to_string(),

@@ -4,7 +4,10 @@ use shirabe::util::ini_helper::IniHelper;
 use shirabe_php_shim::{PATH_SEPARATOR, putenv};
 
 fn set_env(paths: &[&str]) {
-    putenv(&format!("COMPOSER_ORIGINAL_INIS={}", paths.join(PATH_SEPARATOR)));
+    putenv(&format!(
+        "COMPOSER_ORIGINAL_INIS={}",
+        paths.join(PATH_SEPARATOR)
+    ));
 }
 
 #[test]

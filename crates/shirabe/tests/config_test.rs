@@ -12,10 +12,7 @@ fn repo(r#type: &str, url: &str) -> PhpMixed {
 }
 
 fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
-    pairs
-        .into_iter()
-        .map(|(k, v)| (k.to_string(), v))
-        .collect()
+    pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
 fn disable(name: &str) -> PhpMixed {
@@ -73,7 +70,10 @@ fn data_add_packagist_repository() -> Vec<Case> {
                 ("packagist.org", packagist()),
             ]),
             local: map(vec![]),
-            system: Some(map(vec![("example.com", repo("composer", "http://example.com"))])),
+            system: Some(map(vec![(
+                "example.com",
+                repo("composer", "http://example.com"),
+            )])),
         },
         // local config can disable repos by name and re-add them anonymously to bring them above system config
         Case {
@@ -85,7 +85,10 @@ fn data_add_packagist_repository() -> Vec<Case> {
                 ("0", disable("packagist.org")),
                 ("1", repo("composer", "http://packagist.org")),
             ]),
-            system: Some(map(vec![("example.com", repo("composer", "http://example.com"))])),
+            system: Some(map(vec![(
+                "example.com",
+                repo("composer", "http://example.com"),
+            )])),
         },
         // local config can override by name to bring a repo above system config
         Case {
@@ -93,8 +96,14 @@ fn data_add_packagist_repository() -> Vec<Case> {
                 ("packagist.org", repo("composer", "http://packagistnew.org")),
                 ("example.com", repo("composer", "http://example.com")),
             ]),
-            local: map(vec![("packagist.org", repo("composer", "http://packagistnew.org"))]),
-            system: Some(map(vec![("example.com", repo("composer", "http://example.com"))])),
+            local: map(vec![(
+                "packagist.org",
+                repo("composer", "http://packagistnew.org"),
+            )]),
+            system: Some(map(vec![(
+                "example.com",
+                repo("composer", "http://example.com"),
+            )])),
         },
         // local config redefining packagist.org by URL override it if no named keys are used
         Case {
@@ -104,8 +113,14 @@ fn data_add_packagist_repository() -> Vec<Case> {
         },
         // local config redefining packagist.org by URL override it also with named keys
         Case {
-            expected: map(vec![("example", repo("composer", "https://repo.packagist.org"))]),
-            local: map(vec![("example", repo("composer", "https://repo.packagist.org"))]),
+            expected: map(vec![(
+                "example",
+                repo("composer", "https://repo.packagist.org"),
+            )]),
+            local: map(vec![(
+                "example",
+                repo("composer", "https://repo.packagist.org"),
+            )]),
             system: None,
         },
         // incorrect local config does not cause ErrorException

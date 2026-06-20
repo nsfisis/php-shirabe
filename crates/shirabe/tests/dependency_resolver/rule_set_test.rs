@@ -48,12 +48,22 @@ fn test_add() {
     let learned0 = learned_rule();
 
     let mut rule_set = RuleSet::new();
-    rule_set.add(request0.clone(), RuleSet::TYPE_REQUEST).unwrap();
-    rule_set.add(learned0.clone(), RuleSet::TYPE_LEARNED).unwrap();
-    rule_set.add(request1.clone(), RuleSet::TYPE_REQUEST).unwrap();
+    rule_set
+        .add(request0.clone(), RuleSet::TYPE_REQUEST)
+        .unwrap();
+    rule_set
+        .add(learned0.clone(), RuleSet::TYPE_LEARNED)
+        .unwrap();
+    rule_set
+        .add(request1.clone(), RuleSet::TYPE_REQUEST)
+        .unwrap();
 
     let rules = rule_set.get_rules();
-    assert!(rules.get(&RuleSet::TYPE_PACKAGE).is_none_or(|v| v.is_empty()));
+    assert!(
+        rules
+            .get(&RuleSet::TYPE_PACKAGE)
+            .is_none_or(|v| v.is_empty())
+    );
     let request = &rules[&RuleSet::TYPE_REQUEST];
     assert_eq!(2, request.len());
     assert!(Rc::ptr_eq(&request[0], &request0));

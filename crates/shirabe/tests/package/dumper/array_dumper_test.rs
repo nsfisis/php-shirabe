@@ -21,7 +21,10 @@ fn test_required_information() {
     let config = ArrayDumper::new().dump(complete_package().into());
 
     let mut expected: IndexMap<String, PhpMixed> = IndexMap::new();
-    expected.insert("name".to_string(), PhpMixed::String("dummy/pkg".to_string()));
+    expected.insert(
+        "name".to_string(),
+        PhpMixed::String("dummy/pkg".to_string()),
+    );
     expected.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
     expected.insert(
         "version_normalized".to_string(),
