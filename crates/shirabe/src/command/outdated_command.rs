@@ -214,10 +214,23 @@ impl Command for OutdatedCommand {
         )?;
 
         let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(input));
-        // TODO(phase-c): proxying to ShowCommand via Application::run needs the shared shirabe
-        // Application handle (deferred with the Application shared-ownership work and registration).
-        let _ = (input, output);
-        todo!("outdated command proxy run pending shared Application handle")
+
+        let application = {
+            let application = self
+                .get_application()
+                .expect("a proxy command is always attached to its application");
+            let application = application.borrow();
+            application
+                .as_any()
+                .downcast_ref::<crate::console::application::Application>()
+                .expect("shirabe always installs its own Application")
+                .shared()
+        };
+
+        Ok(
+            crate::console::application::Application::run(&application, Some(input), Some(output))?
+                as i64,
+        )
     }
 
     fn initialize(

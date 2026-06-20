@@ -246,6 +246,14 @@ impl Application {
         Ok(application)
     }
 
+    /// Returns the shared handle to this application set up by `new_shared`. Proxy commands use it to
+    /// re-enter the run flow (PHP's `$this->getApplication()->run(...)`).
+    pub fn shared(&self) -> std::rc::Rc<std::cell::RefCell<Application>> {
+        self.me
+            .upgrade()
+            .expect("Application must be constructed through new_shared")
+    }
+
     /// Registers the default commands on a shared application (PHP's lazy `init()`), executed once
     /// with no application borrow held so each `set_application` can borrow back safely.
     fn init_shared(

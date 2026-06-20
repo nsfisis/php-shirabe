@@ -145,7 +145,6 @@ run_no_panic_tests! {
     run_init => "init",
     run_install => "install",
     run_licenses => "licenses",
-    #[ignore = "currently panics"]
     run_outdated => "outdated",
     run_prohibits => "prohibits",
     run_reinstall => "reinstall",
