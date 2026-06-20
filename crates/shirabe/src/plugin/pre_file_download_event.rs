@@ -15,7 +15,7 @@ pub struct PreFileDownloadEvent {
     custom_cache_key: Option<String>,
     r#type: String,
     context: PhpMixed,
-    transport_options: IndexMap<String, Box<PhpMixed>>,
+    transport_options: IndexMap<String, PhpMixed>,
 }
 
 impl PreFileDownloadEvent {
@@ -69,11 +69,11 @@ impl PreFileDownloadEvent {
         &self.context
     }
 
-    pub fn get_transport_options(&self) -> &IndexMap<String, Box<PhpMixed>> {
+    pub fn get_transport_options(&self) -> &IndexMap<String, PhpMixed> {
         &self.transport_options
     }
 
-    pub fn set_transport_options(&mut self, options: IndexMap<String, Box<PhpMixed>>) {
+    pub fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
         self.transport_options = options;
     }
 }

@@ -151,7 +151,7 @@ impl Command for SuggestsCommand {
             let platform_cfg = composer.get_config().borrow().get("platform");
             let platform_overrides: IndexMap<String, PhpMixed> = platform_cfg
                 .as_array()
-                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],

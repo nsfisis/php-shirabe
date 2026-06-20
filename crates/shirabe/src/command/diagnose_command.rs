@@ -144,8 +144,8 @@ impl Command for DiagnoseCommand {
                 ProcessExecutor::new(Some(io.clone())),
             )));
         }
-        let mut config_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        config_inner.insert("secure-http".to_string(), Box::new(PhpMixed::Bool(false)));
+        let mut config_inner = IndexMap::new();
+        config_inner.insert("secure-http".to_string(), PhpMixed::Bool(false));
         let mut secure_http_wrap: IndexMap<String, PhpMixed> = IndexMap::new();
         secure_http_wrap.insert("config".to_string(), PhpMixed::Array(config_inner));
         let mut config = config;
@@ -187,10 +187,8 @@ impl Command for DiagnoseCommand {
             .as_array()
             .cloned()
             .unwrap_or_default();
-        let platform_overrides_unboxed: indexmap::IndexMap<String, PhpMixed> = platform_overrides
-            .into_iter()
-            .map(|(k, v)| (k, *v))
-            .collect();
+        let platform_overrides_unboxed: indexmap::IndexMap<String, PhpMixed> =
+            platform_overrides.into_iter().collect();
         let mut platform_repo =
             PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
         let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
@@ -318,7 +316,7 @@ impl Command for DiagnoseCommand {
             {
                 let repo_arr_unboxed: indexmap::IndexMap<String, PhpMixed> = repo_arr
                     .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .map(|(k, v)| (k.clone(), v.clone()))
                     .collect();
                 let composer_repo = ComposerRepository::new(
                     repo_arr_unboxed,
@@ -555,7 +553,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let mut result_list: Vec<Box<PhpMixed>> = vec![];
+        let mut result_list: Vec<PhpMixed> = vec![];
         let mut tls_warning: Option<String> = None;
         if proto == "https" && config.get("disable-tls").as_bool() == Some(true) {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
@@ -571,15 +569,15 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(Box::new(PhpMixed::String(hint)));
+                            result_list.push(PhpMixed::String(hint));
                         }
                     }
 
-                    result_list.push(Box::new(PhpMixed::String(format!(
+                    result_list.push(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
                         std::any::type_name_of_val(te),
                         te.message
-                    ))));
+                    )));
                 } else {
                     return Err(e);
                 }
@@ -587,7 +585,7 @@ impl DiagnoseCommand {
         }
 
         if let Some(w) = tls_warning {
-            result_list.push(Box::new(PhpMixed::String(w)));
+            result_list.push(PhpMixed::String(w));
         }
 
         if !result_list.is_empty() {
@@ -603,7 +601,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let mut result_list: Vec<Box<PhpMixed>> = vec![];
+        let mut result_list: Vec<PhpMixed> = vec![];
         let mut tls_warning: Option<String> = None;
         if str_starts_with(url, "https://") && config.get("disable-tls").as_bool() == Some(true) {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
@@ -622,15 +620,15 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(Box::new(PhpMixed::String(hint)));
+                            result_list.push(PhpMixed::String(hint));
                         }
                     }
 
-                    result_list.push(Box::new(PhpMixed::String(format!(
+                    result_list.push(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
                         std::any::type_name_of_val(te),
                         te.message
-                    ))));
+                    )));
                 } else {
                     return Err(e);
                 }
@@ -638,7 +636,7 @@ impl DiagnoseCommand {
         }
 
         if let Some(w) = tls_warning {
-            result_list.push(Box::new(PhpMixed::String(w)));
+            result_list.push(PhpMixed::String(w));
         }
 
         if !result_list.is_empty() {
@@ -682,12 +680,12 @@ impl DiagnoseCommand {
             let first = provider_includes_arr
                 .values()
                 .next()
-                .map(|v| (**v).clone())
+                .map(|v| v.clone())
                 .unwrap_or(PhpMixed::Null);
             let hash_val = first
                 .as_array()
                 .and_then(|a| a.get("sha256"))
-                .map(|v| (**v).clone())
+                .map(|v| v.clone())
                 .unwrap_or(PhpMixed::Null);
             let path = str_replace(
                 "%hash%",
@@ -816,7 +814,7 @@ impl DiagnoseCommand {
             .and_then(|a| a.get("resources"))
             .and_then(|v| v.as_array())
             .and_then(|a| a.get("core"))
-            .map(|v| (**v).clone())
+            .map(|v| v.clone())
             .unwrap_or(PhpMixed::Null))
     }
 
@@ -848,7 +846,7 @@ impl DiagnoseCommand {
 
     fn check_pub_keys(&mut self, config: &Config) -> anyhow::Result<PhpMixed> {
         let home = config.get("home").as_string().unwrap_or("").to_string();
-        let mut errors: Vec<Box<PhpMixed>> = vec![];
+        let mut errors: Vec<PhpMixed> = vec![];
         let io = self.get_io();
 
         if file_exists(&format!("{}/keys.tags.pub", home))
@@ -863,9 +861,9 @@ impl DiagnoseCommand {
                 Keys::fingerprint(&format!("{}/keys.tags.pub", home))?
             ));
         } else {
-            errors.push(Box::new(PhpMixed::String(
+            errors.push(PhpMixed::String(
                 "<error>Missing pubkey for tags verification</error>".to_string(),
-            )));
+            ));
         }
 
         if file_exists(&format!("{}/keys.dev.pub", home)) {
@@ -874,15 +872,15 @@ impl DiagnoseCommand {
                 Keys::fingerprint(&format!("{}/keys.dev.pub", home))?
             ));
         } else {
-            errors.push(Box::new(PhpMixed::String(
+            errors.push(PhpMixed::String(
                 "<error>Missing pubkey for dev verification</error>".to_string(),
-            )));
+            ));
         }
 
         if !errors.is_empty() {
-            errors.push(Box::new(PhpMixed::String(
+            errors.push(PhpMixed::String(
                 "<error>Run composer self-update --update-keys to set them up</error>".to_string(),
-            )));
+            ));
         }
 
         Ok(if !errors.is_empty() {
@@ -1109,7 +1107,7 @@ impl DiagnoseCommand {
             had_error = true;
         } else {
             let result_list: Vec<PhpMixed> = match &result {
-                PhpMixed::List(l) => l.iter().map(|b| (**b).clone()).collect(),
+                PhpMixed::List(l) => l.clone(),
                 other => vec![other.clone()],
             };
             for message in &result_list {
@@ -1121,7 +1119,7 @@ impl DiagnoseCommand {
                 }
             }
             // re-wrap so the final output loop works the same
-            result = PhpMixed::List(result_list.into_iter().map(Box::new).collect());
+            result = PhpMixed::List(result_list);
         }
 
         if had_error {

@@ -102,24 +102,14 @@ impl Bitbucket {
 
     fn request_access_token(&mut self) -> anyhow::Result<bool> {
         let mut http = IndexMap::new();
-        http.insert(
-            "method".to_string(),
-            Box::new(PhpMixed::String("POST".to_string())),
-        );
+        http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
         http.insert(
             "content".to_string(),
-            Box::new(PhpMixed::String(
-                "grant_type=client_credentials".to_string(),
-            )),
+            PhpMixed::String("grant_type=client_credentials".to_string()),
         );
-        let mut options = IndexMap::new();
-        options.insert(
-            "retry-auth-failure".to_string(),
-            Box::new(PhpMixed::Bool(false)),
-        );
-        options.insert("http".to_string(), Box::new(PhpMixed::Array(http)));
-        let options: IndexMap<String, PhpMixed> =
-            options.into_iter().map(|(k, v)| (k, *v)).collect();
+        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
+        options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
+        options.insert("http".to_string(), PhpMixed::Array(http));
 
         let response = match self
             .http_downloader
@@ -198,7 +188,7 @@ impl Bitbucket {
             }
             .into());
         }
-        self.token = Some(token_map.into_iter().map(|(k, v)| (k, *v)).collect());
+        self.token = Some(token_map.into_iter().collect());
 
         Ok(true)
     }
@@ -389,12 +379,8 @@ impl Bitbucket {
             .get("expires_in")
             .and_then(|v| v.as_int())
             .ok_or_else(|| {
-                let token_mixed = PhpMixed::Array(
-                    token
-                        .iter()
-                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                        .collect(),
-                );
+                let token_mixed =
+                    PhpMixed::Array(token.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
                 LogicException {
                     message: format!(
                         "Expected a token configured with expires_in present, got {}",
@@ -405,22 +391,22 @@ impl Bitbucket {
             })?;
 
         let t = self.time.unwrap_or_else(time);
-        let mut consumer: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+        let mut consumer = IndexMap::new();
         consumer.insert(
             "consumer-key".to_string(),
-            Box::new(PhpMixed::String(consumer_key.to_string())),
+            PhpMixed::String(consumer_key.to_string()),
         );
         consumer.insert(
             "consumer-secret".to_string(),
-            Box::new(PhpMixed::String(consumer_secret.to_string())),
+            PhpMixed::String(consumer_secret.to_string()),
         );
         consumer.insert(
             "access-token".to_string(),
-            Box::new(token.get("access_token").cloned().unwrap_or(PhpMixed::Null)),
+            token.get("access_token").cloned().unwrap_or(PhpMixed::Null),
         );
         consumer.insert(
             "access-token-expiration".to_string(),
-            Box::new(PhpMixed::Int(t + expires_in)),
+            PhpMixed::Int(t + expires_in),
         );
 
         self.config
@@ -465,7 +451,7 @@ impl Bitbucket {
             return false;
         }
 
-        let access_token = match origin_config.get("access-token").map(|v| *v.clone()) {
+        let access_token = match origin_config.get("access-token").map(|v| v.clone()) {
             Some(t) => t,
             None => return false,
         };

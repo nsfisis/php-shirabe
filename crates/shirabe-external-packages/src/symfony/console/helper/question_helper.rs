@@ -155,7 +155,7 @@ impl QuestionHelper {
             if matches!(r, PhpMixed::Bool(false)) {
                 let is_blocked = shirabe_php_shim::stream_get_meta_data(&input_stream)
                     .get("blocked")
-                    .map(|v| (**v).clone())
+                    .cloned()
                     .unwrap_or(PhpMixed::Bool(true));
 
                 if !shirabe_php_shim::boolval(&is_blocked) {
@@ -236,23 +236,20 @@ impl QuestionHelper {
             if !choice_question.is_multiselect() {
                 return choices
                     .get(&default.to_string())
-                    .map(|v| (**v).clone())
+                    .cloned()
                     .unwrap_or(default);
             }
 
             let default_parts = shirabe_php_shim::explode(",", &default.to_string());
-            let mut resolved: indexmap::IndexMap<String, Box<PhpMixed>> = indexmap::IndexMap::new();
+            let mut resolved: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
             for (k, v) in default_parts.iter().enumerate() {
                 let v = if question.is_trimmable() {
                     shirabe_php_shim::trim(v, None)
                 } else {
                     v.clone()
                 };
-                let value = choices
-                    .get(&v)
-                    .map(|value| (**value).clone())
-                    .unwrap_or(PhpMixed::String(v));
-                resolved.insert(k.to_string(), Box::new(value));
+                let value = choices.get(&v).cloned().unwrap_or(PhpMixed::String(v));
+                resolved.insert(k.to_string(), value);
             }
 
             return PhpMixed::Array(resolved);
@@ -306,7 +303,7 @@ impl QuestionHelper {
             messages.push(format!(
                 "  [<{tag}>{}{padding}</{tag}>] {}",
                 PhpMixed::String(key.clone()),
-                (**value).clone(),
+                value.clone(),
             ));
         }
 
@@ -849,7 +846,7 @@ impl QuestionHelper {
         let stream_meta_data = shirabe_php_shim::stream_get_meta_data(input_stream);
         let seekable = stream_meta_data
             .get("seekable")
-            .map(|v| (**v).clone())
+            .cloned()
             .unwrap_or(PhpMixed::Bool(false));
         let mode = stream_meta_data
             .get("mode")

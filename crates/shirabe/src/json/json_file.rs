@@ -352,15 +352,10 @@ impl JsonFile {
         // A string-keyed `PhpMixed::Array` serializes as a JSON object, matching the (object) cast.
         let mut schema_data: PhpMixed = {
             let mut m = indexmap::IndexMap::new();
-            m.insert(
-                "$ref".to_string(),
-                Box::new(PhpMixed::String(schema_file.clone())),
-            );
+            m.insert("$ref".to_string(), PhpMixed::String(schema_file.clone()));
             m.insert(
                 "$schema".to_string(),
-                Box::new(PhpMixed::String(
-                    "https://json-schema.org/draft-04/schema#".to_string(),
-                )),
+                PhpMixed::String("https://json-schema.org/draft-04/schema#".to_string()),
             );
             PhpMixed::Array(m)
         };
@@ -368,32 +363,24 @@ impl JsonFile {
         if schema == Self::STRICT_SCHEMA && is_composer_schema_file {
             schema_data = json_decode(&file_get_contents(&schema_file).unwrap_or_default(), false)?;
             if let PhpMixed::Array(map) = &mut schema_data {
-                map.insert(
-                    "additionalProperties".to_string(),
-                    Box::new(PhpMixed::Bool(false)),
-                );
+                map.insert("additionalProperties".to_string(), PhpMixed::Bool(false));
                 map.insert(
                     "required".to_string(),
-                    Box::new(PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("name".to_string())),
-                        Box::new(PhpMixed::String("description".to_string())),
-                    ])),
+                    PhpMixed::List(vec![
+                        PhpMixed::String("name".to_string()),
+                        PhpMixed::String("description".to_string()),
+                    ]),
                 );
             }
         } else if schema == Self::AUTH_SCHEMA && is_composer_schema_file {
             let mut m = indexmap::IndexMap::new();
             m.insert(
                 "$ref".to_string(),
-                Box::new(PhpMixed::String(format!(
-                    "{}#/properties/config",
-                    schema_file,
-                ))),
+                PhpMixed::String(format!("{}#/properties/config", schema_file,)),
             );
             m.insert(
                 "$schema".to_string(),
-                Box::new(PhpMixed::String(
-                    "https://json-schema.org/draft-04/schema#".to_string(),
-                )),
+                PhpMixed::String("https://json-schema.org/draft-04/schema#".to_string()),
             );
             schema_data = PhpMixed::Array(m);
         }

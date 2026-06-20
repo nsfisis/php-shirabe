@@ -226,19 +226,18 @@ impl Command for LicensesCommand {
                         pkg_licenses.join(", ")
                     };
                     table.add_row(PhpMixed::List(vec![
-                        Box::new(PhpMixed::String(name)),
-                        Box::new(PhpMixed::String(package.get_full_pretty_version(
+                        PhpMixed::String(name),
+                        PhpMixed::String(package.get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev,
-                        ))),
-                        Box::new(PhpMixed::String(licenses_str)),
+                        )),
+                        PhpMixed::String(licenses_str),
                     ]));
                 }
                 table.render();
             }
             "json" => {
-                let mut dependencies: IndexMap<String, IndexMap<String, PhpMixed>> =
-                    IndexMap::new();
+                let mut dependencies: IndexMap<String, PhpMixed> = IndexMap::new();
                 for package in &packages {
                     let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
@@ -255,14 +254,12 @@ impl Command for LicensesCommand {
                     );
                     dep_info.insert(
                         "license".to_string(),
-                        PhpMixed::List(
-                            pkg_licenses
-                                .into_iter()
-                                .map(|l| Box::new(PhpMixed::String(l)))
-                                .collect(),
-                        ),
+                        PhpMixed::List(pkg_licenses.into_iter().map(PhpMixed::String).collect()),
                     );
-                    dependencies.insert(package.get_pretty_name().to_string(), dep_info);
+                    dependencies.insert(
+                        package.get_pretty_name().to_string(),
+                        PhpMixed::Array(dep_info),
+                    );
                 }
 
                 let mut output_map: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -283,34 +280,11 @@ impl Command for LicensesCommand {
                 let root_licenses = root.get_license();
                 output_map.insert(
                     "license".to_string(),
-                    PhpMixed::List(
-                        root_licenses
-                            .into_iter()
-                            .map(|l| Box::new(PhpMixed::String(l)))
-                            .collect(),
-                    ),
+                    PhpMixed::List(root_licenses.into_iter().map(PhpMixed::String).collect()),
                 );
-                output_map.insert(
-                    "dependencies".to_string(),
-                    PhpMixed::Array(
-                        dependencies
-                            .into_iter()
-                            .map(|(k, v)| {
-                                (
-                                    k,
-                                    Box::new(PhpMixed::Array(
-                                        v.into_iter().map(|(k2, v2)| (k2, Box::new(v2))).collect(),
-                                    )),
-                                )
-                            })
-                            .collect(),
-                    ),
-                );
+                output_map.insert("dependencies".to_string(), PhpMixed::Array(dependencies));
                 io.write(&JsonFile::encode(&PhpMixed::Array(
-                    output_map
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
+                    output_map.into_iter().collect(),
                 )));
             }
             "summary" => {
@@ -336,8 +310,8 @@ impl Command for LicensesCommand {
                     .iter()
                     .map(|(license, count)| {
                         PhpMixed::List(vec![
-                            Box::new(PhpMixed::String(license.clone())),
-                            Box::new(PhpMixed::String(count.to_string())),
+                            PhpMixed::String(license.clone()),
+                            PhpMixed::String(count.to_string()),
                         ])
                     })
                     .collect();

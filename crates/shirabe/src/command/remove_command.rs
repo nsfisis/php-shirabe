@@ -339,7 +339,7 @@ impl Command for RemoveCommand {
                     .filter_map(|(k, v)| v.as_string().map(|_| (k.clone(), k.clone())))
                     .collect();
                 for (name, canonical) in entries {
-                    section.insert(strtolower(&name), Box::new(PhpMixed::String(canonical)));
+                    section.insert(strtolower(&name), PhpMixed::String(canonical));
                 }
             }
         }

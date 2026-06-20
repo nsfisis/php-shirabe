@@ -76,10 +76,10 @@ impl JsonManipulator {
 
         // no link of that type yet
         if decoded.as_array().and_then(|a| a.get(r#type)).is_none() {
-            let mut arr: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+            let mut arr: IndexMap<String, PhpMixed> = IndexMap::new();
             arr.insert(
                 package.to_string(),
-                Box::new(PhpMixed::String(constraint.to_string())),
+                PhpMixed::String(constraint.to_string()),
             );
             return self.add_main_key(r#type, PhpMixed::Array(arr));
         }
@@ -228,11 +228,8 @@ impl JsonManipulator {
             && !name.is_empty()
         {
             // PHP: ['name' => $name] + $config — preserve $config keys
-            let mut merged: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            merged.insert(
-                "name".to_string(),
-                Box::new(PhpMixed::String(name.to_string())),
-            );
+            let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
+            merged.insert("name".to_string(), PhpMixed::String(name.to_string()));
             if let Some(arr) = config.as_array() {
                 for (k, v) in arr {
                     if !merged.contains_key(k) {
@@ -242,8 +239,8 @@ impl JsonManipulator {
             }
             PhpMixed::Array(merged)
         } else if config.as_bool() == Some(false) {
-            let mut m: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            m.insert(name.to_string(), Box::new(PhpMixed::Bool(false)));
+            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+            m.insert(name.to_string(), PhpMixed::Bool(false));
             PhpMixed::Array(m)
         } else {
             config
@@ -255,17 +252,17 @@ impl JsonManipulator {
     fn do_convert_repositories_from_assoc_to_list(&mut self) -> anyhow::Result<bool> {
         let decoded = json_decode(&self.contents, false)?;
 
-        let repositories_value: Option<Box<PhpMixed>> = decoded
+        let repositories_value: Option<PhpMixed> = decoded
             .as_object()
             .and_then(|o| o.to_array().get("repositories").cloned());
         let is_std_class = repositories_value
             .as_ref()
-            .map(|v| (&**v as &dyn std::any::Any).is::<StdClass>())
+            .map(|v| (v as &dyn std::any::Any).is::<StdClass>())
             .unwrap_or(false);
 
         if is_std_class {
             // delete from bottom to top, to ensure keys stay the same
-            let repos_arr: IndexMap<String, Box<PhpMixed>> = repositories_value
+            let repos_arr: IndexMap<String, PhpMixed> = repositories_value
                 .as_ref()
                 .and_then(|v| v.as_array().cloned())
                 .unwrap_or_default();
@@ -281,25 +278,25 @@ impl JsonManipulator {
 
             // re-add in order
             for (repository_name, repository) in &repos_arr {
-                let is_obj = (&**repository as &dyn std::any::Any).is::<StdClass>();
+                let is_obj = (repository as &dyn std::any::Any).is::<StdClass>();
                 if !is_obj {
-                    let mut m: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+                    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                     m.insert(repository_name.clone(), repository.clone());
                     if !self.add_list_item("repositories", PhpMixed::Array(m), true)? {
                         return Ok(false);
                     }
                 } else if is_numeric(&PhpMixed::String(repository_name.clone())) {
-                    if !self.add_list_item("repositories", (**repository).clone(), true)? {
+                    if !self.add_list_item("repositories", repository.clone(), true)? {
                         return Ok(false);
                     }
                 } else {
-                    let repo: IndexMap<String, Box<PhpMixed>> =
+                    let repo: IndexMap<String, PhpMixed> =
                         repository.as_array().cloned().unwrap_or_default();
                     // prepend name property
-                    let mut prepended: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+                    let mut prepended: IndexMap<String, PhpMixed> = IndexMap::new();
                     prepended.insert(
                         "name".to_string(),
-                        Box::new(PhpMixed::String(repository_name.clone())),
+                        PhpMixed::String(repository_name.clone()),
                     );
                     for (k, v) in &repo {
                         if !prepended.contains_key(k) {
@@ -468,11 +465,8 @@ impl JsonManipulator {
             && !is_numeric(&PhpMixed::String(name.to_string()))
             && !name.is_empty()
         {
-            let mut merged: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            merged.insert(
-                "name".to_string(),
-                Box::new(PhpMixed::String(name.to_string())),
-            );
+            let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
+            merged.insert("name".to_string(), PhpMixed::String(name.to_string()));
             if let Some(arr) = config.as_array() {
                 for (k, v) in arr {
                     if !merged.contains_key(k) {
@@ -482,8 +476,8 @@ impl JsonManipulator {
             }
             PhpMixed::Array(merged)
         } else if config.as_bool() == Some(false) {
-            let mut m: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            m.insert("name".to_string(), Box::new(PhpMixed::Bool(false)));
+            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+            m.insert("name".to_string(), PhpMixed::Bool(false));
             PhpMixed::Array(m)
         } else {
             config
@@ -498,15 +492,15 @@ impl JsonManipulator {
 
     fn do_remove_repository(&mut self, name: &str) -> anyhow::Result<bool> {
         let decoded = json_decode(&self.contents, false)?;
-        let repositories_value: Option<Box<PhpMixed>> = decoded
+        let repositories_value: Option<PhpMixed> = decoded
             .as_object()
             .and_then(|o| o.to_array().get("repositories").cloned());
         let is_assoc = repositories_value
             .as_ref()
-            .map(|v| (&**v as &dyn std::any::Any).is::<StdClass>())
+            .map(|v| (v as &dyn std::any::Any).is::<StdClass>())
             .unwrap_or(false);
 
-        let repos: IndexMap<String, Box<PhpMixed>> = repositories_value
+        let repos: IndexMap<String, PhpMixed> = repositories_value
             .as_ref()
             .and_then(|v| v.as_array().cloned())
             .unwrap_or_default();
@@ -548,7 +542,7 @@ impl JsonManipulator {
                     return Ok(true);
                 }
             } else {
-                let repository_as_array: IndexMap<String, Box<PhpMixed>> =
+                let repository_as_array: IndexMap<String, PhpMixed> =
                     repository.as_array().cloned().unwrap_or_default();
 
                 if repository_as_array
@@ -632,9 +626,9 @@ impl JsonManipulator {
         if in_array(
             PhpMixed::String(main_node.to_string()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("config".to_string())),
-                Box::new(PhpMixed::String("extra".to_string())),
-                Box::new(PhpMixed::String("scripts".to_string())),
+                PhpMixed::String("config".to_string()),
+                PhpMixed::String("extra".to_string()),
+                PhpMixed::String("scripts".to_string()),
             ]),
             false,
         ) && strpos(name, ".").is_some()
@@ -650,14 +644,14 @@ impl JsonManipulator {
         // no main node yet
         if decoded.as_array().and_then(|a| a.get(main_node)).is_none() {
             if let Some(ref sub) = sub_name {
-                let mut inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                inner.insert(sub.clone(), Box::new(value.clone()));
-                let mut outer: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                outer.insert(name_owned.clone(), Box::new(PhpMixed::Array(inner)));
+                let mut inner: IndexMap<String, PhpMixed> = IndexMap::new();
+                inner.insert(sub.clone(), value.clone());
+                let mut outer: IndexMap<String, PhpMixed> = IndexMap::new();
+                outer.insert(name_owned.clone(), PhpMixed::Array(inner));
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             } else {
-                let mut outer: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                outer.insert(name_owned.clone(), Box::new(value.clone()));
+                let mut outer: IndexMap<String, PhpMixed> = IndexMap::new();
+                outer.insert(name_owned.clone(), value.clone());
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             }
 
@@ -712,10 +706,7 @@ impl JsonManipulator {
                             cur_val = PhpMixed::Array(IndexMap::new());
                         }
                         if let Some(arr) = cur_val.as_array_mut() {
-                            arr.insert(
-                                sub_name_capture.clone().unwrap(),
-                                Box::new(value_local.clone()),
-                            );
+                            arr.insert(sub_name_capture.clone().unwrap(), value_local.clone());
                         }
                         value_local = cur_val;
                     }
@@ -748,8 +739,8 @@ impl JsonManipulator {
                 if content_present {
                     let mut value_local = value.clone();
                     if let Some(ref sub) = sub_name {
-                        let mut wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                        wrap.insert(sub.clone(), Box::new(value_local.clone()));
+                        let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
+                        wrap.insert(sub.clone(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
@@ -793,8 +784,8 @@ impl JsonManipulator {
                 } else {
                     let mut value_local = value.clone();
                     if let Some(ref sub) = sub_name {
-                        let mut wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                        wrap.insert(sub.clone(), Box::new(value_local.clone()));
+                        let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
+                        wrap.insert(sub.clone(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
@@ -844,7 +835,7 @@ impl JsonManipulator {
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
-        if main_node_value.map(|v| empty(v.as_ref())).unwrap_or(true) {
+        if main_node_value.map(|v| empty(v)).unwrap_or(true) {
             return Ok(true);
         }
 
@@ -873,9 +864,9 @@ impl JsonManipulator {
         if in_array(
             PhpMixed::String(main_node.to_string()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("config".to_string())),
-                Box::new(PhpMixed::String("extra".to_string())),
-                Box::new(PhpMixed::String("scripts".to_string())),
+                PhpMixed::String("config".to_string()),
+                PhpMixed::String("extra".to_string()),
+                PhpMixed::String("scripts".to_string()),
             ]),
             false,
         ) && strpos(name, ".").is_some()
@@ -1005,16 +996,13 @@ impl JsonManipulator {
                         .map(|a| a.is_empty())
                         .unwrap_or(false);
                     if now_empty {
-                        arr.insert(
-                            name_owned.clone(),
-                            Box::new(PhpMixed::Object(ArrayObject::new(None))),
-                        );
+                        arr.insert(name_owned.clone(), PhpMixed::Object(ArrayObject::new(None)));
                     }
                 }
                 let val = cur_val
                     .as_array()
                     .and_then(|a| a.get(&name_owned))
-                    .map(|v| (**v).clone())
+                    .cloned()
                     .unwrap_or(PhpMixed::Null);
                 self.add_sub_node(main_node, &name_owned, val, true)?;
             }
@@ -1056,7 +1044,7 @@ impl JsonManipulator {
                         if now_empty {
                             arr.insert(
                                 name_capture.clone(),
-                                Box::new(PhpMixed::Object(ArrayObject::new(None))),
+                                PhpMixed::Object(ArrayObject::new(None)),
                             );
                         }
                     }
@@ -1327,7 +1315,7 @@ impl JsonManipulator {
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
-        if main_node_value.map(|v| empty(v.as_ref())).unwrap_or(true) {
+        if main_node_value.map(|v| empty(v)).unwrap_or(true) {
             return Ok(true);
         }
 
@@ -1566,10 +1554,7 @@ impl JsonManipulator {
             return Ok(true);
         }
 
-        let value = decoded_arr
-            .get(key)
-            .map(|v| (**v).clone())
-            .unwrap_or(PhpMixed::Null);
+        let value = decoded_arr.get(key).cloned().unwrap_or(PhpMixed::Null);
         if is_array(&value) && value.as_array().map(|a| a.len()).unwrap_or(0) == 0 {
             return self.remove_main_key(key);
         }
@@ -1585,7 +1570,7 @@ impl JsonManipulator {
         {
             // PHP: (array) $data — coerce to array
             if let Some(obj) = data.as_object() {
-                data = PhpMixed::Array(obj.to_array());
+                data = PhpMixed::Array(obj.to_array().into_iter().collect());
             }
             was_object = true;
         }
@@ -1658,7 +1643,7 @@ impl ManipulatorFormatter {
             || (&data as &dyn std::any::Any).is::<ArrayObject>()
         {
             if let Some(obj) = data.as_object() {
-                data = PhpMixed::Array(obj.to_array());
+                data = PhpMixed::Array(obj.to_array().into_iter().collect());
             }
             was_object = true;
         }

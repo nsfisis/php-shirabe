@@ -33,7 +33,7 @@ impl StreamContextFactory {
             let mut o = IndexMap::new();
             o.insert(
                 "http".to_string(),
-                PhpMixed::Array(http.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                PhpMixed::Array(http.into_iter().collect()),
             );
             o
         };
@@ -57,12 +57,7 @@ impl StreamContextFactory {
             let fixed = Self::fix_http_header_field(&header);
             http.insert(
                 "header".to_string(),
-                Box::new(PhpMixed::List(
-                    fixed
-                        .into_iter()
-                        .map(|s| Box::new(PhpMixed::String(s)))
-                        .collect(),
-                )),
+                PhpMixed::List(fixed.into_iter().map(PhpMixed::String).collect()),
             );
         }
 
@@ -81,24 +76,24 @@ impl StreamContextFactory {
             .map(|a| a.contains_key("header"))
             .unwrap_or(false);
         if !has_header && let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-            http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
+            http.insert("header".to_string(), PhpMixed::List(vec![]));
         }
         // Convert string header to array
         let header_is_string = options
             .get("http")
             .and_then(|v| v.as_array())
             .and_then(|a| a.get("header"))
-            .map(|v| matches!(**v, PhpMixed::String(_)))
+            .map(|v| matches!(*v, PhpMixed::String(_)))
             .unwrap_or(false);
         if header_is_string
             && let Some(PhpMixed::Array(http)) = options.get_mut("http")
-            && let Some(PhpMixed::String(header_str)) = http.get("header").map(|v| *v.clone())
+            && let Some(PhpMixed::String(header_str)) = http.get("header").cloned()
         {
-            let parts: Vec<Box<PhpMixed>> = header_str
+            let parts: Vec<PhpMixed> = header_str
                 .split("\r\n")
-                .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                .map(|s| PhpMixed::String(s.to_string()))
                 .collect();
-            http.insert("header".to_string(), Box::new(PhpMixed::List(parts)));
+            http.insert("header".to_string(), PhpMixed::List(parts));
         }
 
         // Add stream proxy options if there is a proxy
@@ -135,18 +130,18 @@ impl StreamContextFactory {
                 let proxy_http = proxy_options.get("http");
                 if let Some(proxy_header) = proxy_http.and_then(|h| h.get("header"))
                     && let Some(PhpMixed::Array(http)) = options.get_mut("http")
-                    && let Some(PhpMixed::List(headers)) = http.get_mut("header").map(|v| &mut **v)
+                    && let Some(PhpMixed::List(headers)) = http.get_mut("header")
                 {
-                    headers.push(Box::new(proxy_header.clone()));
+                    headers.push(proxy_header.clone());
                 }
 
                 let proxy_options_flat: IndexMap<String, PhpMixed> = proxy_options
                     .iter()
                     .map(|(k, v)| {
-                        let inner: IndexMap<String, Box<PhpMixed>> = v
+                        let inner: IndexMap<String, PhpMixed> = v
                             .iter()
                             .filter(|(ik, _)| ik.as_str() != "header")
-                            .map(|(ik, iv)| (ik.clone(), Box::new(iv.clone())))
+                            .map(|(ik, iv)| (ik.clone(), iv.clone()))
                             .collect();
                         (k.clone(), PhpMixed::Array(inner))
                     })
@@ -180,8 +175,8 @@ impl StreamContextFactory {
             .get("http")
             .and_then(|v| v.as_array())
             .and_then(|a| a.get("header"))
-            .and_then(|v| match **v {
-                PhpMixed::List(ref list) => {
+            .and_then(|v| match v {
+                PhpMixed::List(list) => {
                     let joined: String = list
                         .iter()
                         .filter_map(|item| item.as_string())
@@ -221,9 +216,9 @@ impl StreamContextFactory {
                 },
             );
             if let Some(PhpMixed::Array(http)) = options.get_mut("http")
-                && let Some(PhpMixed::List(headers)) = http.get_mut("header").map(|v| &mut **v)
+                && let Some(PhpMixed::List(headers)) = http.get_mut("header")
             {
-                headers.push(Box::new(PhpMixed::String(user_agent)));
+                headers.push(PhpMixed::String(user_agent));
             }
         }
 
@@ -299,12 +294,7 @@ impl StreamContextFactory {
             let mut d = IndexMap::new();
             d.insert(
                 "ssl".to_string(),
-                PhpMixed::Array(
-                    ssl_defaults
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                ),
+                PhpMixed::Array(ssl_defaults.into_iter().collect()),
             );
             d
         };
@@ -314,18 +304,15 @@ impl StreamContextFactory {
         {
             let merged = array_replace_recursive(
                 match ssl_defaults_mixed {
-                    PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    PhpMixed::Array(a) => a,
                     _ => IndexMap::new(),
                 },
                 match ssl_options.clone() {
-                    PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    PhpMixed::Array(a) => a,
                     _ => IndexMap::new(),
                 },
             );
-            defaults.insert(
-                "ssl".to_string(),
-                PhpMixed::Array(merged.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-            );
+            defaults.insert("ssl".to_string(), PhpMixed::Array(merged));
         }
 
         // Attempt to find a local cafile or throw an exception if none pre-set.
@@ -337,11 +324,11 @@ impl StreamContextFactory {
             let result = CaBundle::get_system_ca_root_bundle_path(logger);
             if shirabe_php_shim::is_dir(&result) {
                 if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
-                    ssl.insert("capath".to_string(), Box::new(PhpMixed::String(result)));
+                    ssl.insert("capath".to_string(), PhpMixed::String(result));
                 }
             } else {
                 if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
-                    ssl.insert("cafile".to_string(), Box::new(PhpMixed::String(result)));
+                    ssl.insert("cafile".to_string(), PhpMixed::String(result));
                 }
             }
         }
@@ -378,10 +365,7 @@ impl StreamContextFactory {
 
         // Disable TLS compression to prevent CRIME attacks where supported.
         if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
-            ssl.insert(
-                "disable_compression".to_string(),
-                Box::new(PhpMixed::Bool(true)),
-            );
+            ssl.insert("disable_compression".to_string(), PhpMixed::Bool(true));
         }
 
         Ok(defaults)

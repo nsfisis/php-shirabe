@@ -84,7 +84,7 @@ impl RepositoryCommand {
         }
         if !packagist_present {
             let mut packagist_entry = IndexMap::new();
-            packagist_entry.insert("packagist.org".to_string(), Box::new(PhpMixed::Bool(false)));
+            packagist_entry.insert("packagist.org".to_string(), PhpMixed::Bool(false));
             repos.insert(repos.len().to_string(), PhpMixed::Array(packagist_entry));
         }
 
@@ -102,7 +102,7 @@ impl RepositoryCommand {
             if let PhpMixed::Array(ref repo_map) = *repo {
                 if repo_map.len() == 1
                     && let Some(first_val) = repo_map.values().next()
-                    && matches!(**first_val, PhpMixed::Bool(false))
+                    && matches!(*first_val, PhpMixed::Bool(false))
                 {
                     let first_key = repo_map.keys().next().unwrap();
                     io.write(&format!("[{}] <info>disabled</info>", first_key));
@@ -273,7 +273,7 @@ impl Command for RepositoryCommand {
             .get_path()
             .to_string();
         let config_data_map: IndexMap<String, PhpMixed> = match config_data {
-            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
         self.config
@@ -312,11 +312,8 @@ impl Command for RepositoryCommand {
                         }));
                     }
                     let mut m = IndexMap::new();
-                    m.insert(
-                        "type".to_string(),
-                        Box::new(PhpMixed::String(arg1_str.to_string())),
-                    );
-                    m.insert("url".to_string(), Box::new(PhpMixed::String(arg2.unwrap())));
+                    m.insert("type".to_string(), PhpMixed::String(arg1_str.to_string()));
+                    m.insert("url".to_string(), PhpMixed::String(arg2.unwrap()));
                     PhpMixed::Array(m)
                 };
 

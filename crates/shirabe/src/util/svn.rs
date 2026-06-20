@@ -371,7 +371,7 @@ impl Svn {
         let auth_for_host = auth_config
             .as_array()
             .and_then(|m| m.get(host_str))
-            .map(|v| (**v).clone());
+            .map(|v| v.clone());
         if let Some(entry) = auth_for_host
             && let Some(entry_arr) = entry.as_array()
         {
@@ -408,7 +408,7 @@ impl Svn {
         };
         let user_val = uri_arr
             .get("user")
-            .map(|v| (**v).clone())
+            .map(|v| v.clone())
             .unwrap_or(PhpMixed::Null);
         if empty(&user_val) {
             self.has_auth = Some(false);
@@ -417,7 +417,7 @@ impl Svn {
 
         let pass_val = uri_arr
             .get("pass")
-            .map(|v| (**v).clone())
+            .map(|v| v.clone())
             .unwrap_or(PhpMixed::Null);
         self.credentials = Some(SvnCredentials {
             username: user_val.as_string().unwrap_or("").to_string(),

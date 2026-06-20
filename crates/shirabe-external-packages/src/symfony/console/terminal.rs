@@ -210,12 +210,12 @@ impl Terminal {
 
         let descriptorspec: Vec<PhpMixed> = vec![
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String("pipe".to_string())),
-                Box::new(PhpMixed::String("w".to_string())),
+                PhpMixed::String("pipe".to_string()),
+                PhpMixed::String("w".to_string()),
             ]),
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String("pipe".to_string())),
-                Box::new(PhpMixed::String("w".to_string())),
+                PhpMixed::String("pipe".to_string()),
+                PhpMixed::String("w".to_string()),
             ]),
         ];
 
@@ -248,13 +248,10 @@ impl Terminal {
 /// Indexes into the `$pipes` array populated by proc_open.
 fn php_pipe(pipes: &PhpMixed, index: i64) -> PhpMixed {
     match pipes {
-        PhpMixed::List(list) => list
-            .get(index as usize)
-            .map(|v| (**v).clone())
-            .unwrap_or(PhpMixed::Null),
+        PhpMixed::List(list) => list.get(index as usize).cloned().unwrap_or(PhpMixed::Null),
         PhpMixed::Array(array) => array
             .get(&index.to_string())
-            .map(|v| (**v).clone())
+            .map(|v| v.clone())
             .unwrap_or(PhpMixed::Null),
         _ => PhpMixed::Null,
     }

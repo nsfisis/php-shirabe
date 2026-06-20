@@ -37,7 +37,7 @@ impl FilterRepository {
                     let names: Vec<String> = list
                         .iter()
                         .filter_map(|v| {
-                            if let PhpMixed::String(s) = v.as_ref() {
+                            if let PhpMixed::String(s) = v {
                                 Some(s.clone())
                             } else {
                                 None
@@ -67,7 +67,7 @@ impl FilterRepository {
                     let names: Vec<String> = list
                         .iter()
                         .filter_map(|v| {
-                            if let PhpMixed::String(s) = v.as_ref() {
+                            if let PhpMixed::String(s) = v {
                                 Some(s.clone())
                             } else {
                                 None

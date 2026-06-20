@@ -75,7 +75,7 @@ impl JsonDescriptor {
         };
         let mut description =
             ApplicationDescription::new(application.clone(), described_namespace.clone(), true);
-        let mut commands: Vec<Box<PhpMixed>> = vec![];
+        let mut commands: Vec<PhpMixed> = vec![];
 
         let short = matches!(options.get("short"), Some(PhpMixed::Bool(true)));
         let command_list: Vec<_> = description
@@ -84,25 +84,24 @@ impl JsonDescriptor {
             .map(|c| c.borrow().clone_box())
             .collect();
         for mut command in command_list {
-            commands.push(Box::new(PhpMixed::Array(
+            commands.push(PhpMixed::Array(
                 self.get_command_data(command.as_mut(), short)?
                     .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
                     .collect(),
-            )));
+            ));
         }
 
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         if "UNKNOWN" != application.borrow().get_name() {
-            let mut application_data: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+            let mut application_data: IndexMap<String, PhpMixed> = IndexMap::new();
             application_data.insert(
                 "name".to_string(),
-                Box::new(PhpMixed::String(application.borrow().get_name())),
+                PhpMixed::String(application.borrow().get_name()),
             );
             if "UNKNOWN" != application.borrow().get_version() {
                 application_data.insert(
                     "version".to_string(),
-                    Box::new(PhpMixed::String(application.borrow().get_version())),
+                    PhpMixed::String(application.borrow().get_version()),
                 );
             }
             data.insert("application".to_string(), PhpMixed::Array(application_data));
@@ -122,11 +121,7 @@ impl JsonDescriptor {
                     description
                         .get_namespaces()
                         .into_values()
-                        .map(|ns| {
-                            Box::new(PhpMixed::Array(
-                                ns.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                            ))
-                        })
+                        .map(|ns| PhpMixed::Array(ns.into_iter().collect()))
                         .collect(),
                 ),
             );
@@ -148,11 +143,8 @@ impl JsonDescriptor {
         };
 
         self.write(
-            &shirabe_php_shim::json_encode_ex(
-                &PhpMixed::Array(data.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                flags,
-            )
-            .unwrap_or_default(),
+            &shirabe_php_shim::json_encode_ex(&PhpMixed::Array(data.into_iter().collect()), flags)
+                .unwrap_or_default(),
             false,
         );
         Ok(())
@@ -258,39 +250,36 @@ impl JsonDescriptor {
         &self,
         definition: &InputDefinition,
     ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
-        let mut input_arguments: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+        let mut input_arguments: IndexMap<String, PhpMixed> = IndexMap::new();
         for (name, argument) in definition.get_arguments() {
             input_arguments.insert(
                 name.clone(),
-                Box::new(PhpMixed::Array(
+                PhpMixed::Array(
                     self.get_input_argument_data(argument)?
                         .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
                         .collect(),
-                )),
+                ),
             );
         }
 
-        let mut input_options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+        let mut input_options: IndexMap<String, PhpMixed> = IndexMap::new();
         for (name, option) in definition.get_options() {
             input_options.insert(
                 name.clone(),
-                Box::new(PhpMixed::Array(
+                PhpMixed::Array(
                     self.get_input_option_data(option, false)?
                         .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
                         .collect(),
-                )),
+                ),
             );
             if option.is_negatable() {
                 input_options.insert(
                     format!("no-{}", name),
-                    Box::new(PhpMixed::Array(
+                    PhpMixed::Array(
                         self.get_input_option_data(option, true)?
                             .into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
                             .collect(),
-                    )),
+                    ),
                 );
             }
         }
@@ -326,26 +315,16 @@ impl JsonDescriptor {
                     command
                         .get_aliases()
                         .into_iter()
-                        .map(|a| Box::new(PhpMixed::String(a)))
+                        .map(PhpMixed::String)
                         .collect(),
                 ),
             );
         } else {
             command.merge_application_definition(false);
 
-            let mut usage = vec![Box::new(PhpMixed::String(command.get_synopsis(false)))];
-            usage.extend(
-                command
-                    .get_usages()
-                    .into_iter()
-                    .map(|u| Box::new(PhpMixed::String(u))),
-            );
-            usage.extend(
-                command
-                    .get_aliases()
-                    .into_iter()
-                    .map(|a| Box::new(PhpMixed::String(a))),
-            );
+            let mut usage = vec![PhpMixed::String(command.get_synopsis(false))];
+            usage.extend(command.get_usages().into_iter().map(PhpMixed::String));
+            usage.extend(command.get_aliases().into_iter().map(PhpMixed::String));
             data.insert("usage".to_string(), PhpMixed::List(usage));
             data.insert(
                 "help".to_string(),
@@ -356,7 +335,6 @@ impl JsonDescriptor {
                 PhpMixed::Array(
                     self.get_input_definition_data(command.get_definition())?
                         .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
                         .collect(),
                 ),
             );

@@ -121,8 +121,8 @@ impl GitLabDriver {
         self.scheme = if in_array(
             PhpMixed::String(scheme_match.clone()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("https".to_string())),
-                Box::new(PhpMixed::String("http".to_string())),
+                PhpMixed::String("https".to_string()),
+                PhpMixed::String("http".to_string()),
             ]),
             true,
         ) {
@@ -169,9 +169,9 @@ impl GitLabDriver {
             if !in_array(
                 PhpMixed::String(protocol.to_string()),
                 &PhpMixed::List(vec![
-                    Box::new(PhpMixed::String("git".to_string())),
-                    Box::new(PhpMixed::String("http".to_string())),
-                    Box::new(PhpMixed::String("https".to_string())),
+                    PhpMixed::String("git".to_string()),
+                    PhpMixed::String("http".to_string()),
+                    PhpMixed::String("https".to_string()),
                 ]),
                 true,
             ) {
@@ -274,7 +274,7 @@ impl GitLabDriver {
                     .unwrap_or_default();
                 JsonFile::parse_json(Some(&res), None)?
                     .as_array()
-                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                    .map(|m| m.clone())
             } else {
                 let file_content = self.get_file_content("composer.json", identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(
@@ -290,13 +290,7 @@ impl GitLabDriver {
                         c.write(
                             identifier,
                             &JsonFile::encode_with_options(
-                                &PhpMixed::Array(
-                                    composer_map
-                                        .clone()
-                                        .into_iter()
-                                        .map(|(k, v)| (k, Box::new(v)))
-                                        .collect(),
-                                ),
+                                &PhpMixed::Array(composer_map.clone().into_iter().collect()),
                                 JsonEncodeOptions {
                                     pretty_print: false,
                                     ..Default::default()
@@ -330,7 +324,7 @@ impl GitLabDriver {
                         &PhpMixed::Array(
                             self.get_tags()?
                                 .into_iter()
-                                .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                                .map(|(k, v)| (k, PhpMixed::String(v)))
                                 .collect(),
                         ),
                         true,
@@ -343,7 +337,7 @@ impl GitLabDriver {
                                 self.get_branches()
                                     .unwrap_or_default()
                                     .into_iter()
-                                    .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                                    .map(|(k, v)| (k, PhpMixed::String(v)))
                                     .collect(),
                             ),
                             true,
@@ -363,11 +357,11 @@ impl GitLabDriver {
                     }) {
                         support.insert(
                             "source".to_string(),
-                            Box::new(PhpMixed::String(format!(
+                            PhpMixed::String(format!(
                                 "{}/-/tree/{}",
                                 PhpMixed::String(web_url),
                                 PhpMixed::String(label_str),
-                            ))),
+                            )),
                         );
                     }
                 }
@@ -394,10 +388,7 @@ impl GitLabDriver {
                     }) {
                         support.insert(
                             "issues".to_string(),
-                            Box::new(PhpMixed::String(format!(
-                                "{}/-/issues",
-                                PhpMixed::String(web_url),
-                            ))),
+                            PhpMixed::String(format!("{}/-/issues", PhpMixed::String(web_url),)),
                         );
                     }
                 }
@@ -610,8 +601,8 @@ impl GitLabDriver {
                 && !in_array(
                     PhpMixed::String(character.clone()),
                     &PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("-".to_string())),
-                        Box::new(PhpMixed::String("_".to_string())),
+                        PhpMixed::String("-".to_string()),
+                        PhpMixed::String("_".to_string()),
                     ]),
                     true,
                 ) {
@@ -644,7 +635,7 @@ impl GitLabDriver {
 
             if let PhpMixed::List(ref list) = data {
                 for datum in list {
-                    if let PhpMixed::Array(ref datum_map) = **datum {
+                    if let PhpMixed::Array(ref datum_map) = *datum {
                         let name = datum_map
                             .get("name")
                             .and_then(|v| v.as_string())
@@ -665,10 +656,7 @@ impl GitLabDriver {
                             .get("commit")
                             .and_then(|v| v.as_array())
                             .cloned()
-                            .unwrap_or_default()
-                            .into_iter()
-                            .map(|(k, v)| (k, *v))
-                            .collect();
+                            .unwrap_or_default();
                         self.commits.insert(commit_id, commit_data);
                     }
                 }
@@ -704,7 +692,7 @@ impl GitLabDriver {
             .map_err(|e| anyhow::anyhow!("{}", e.message))?
             .decode_json()?;
         self.project = match project {
-            PhpMixed::Array(m) => Some(m.into_iter().map(|(k, v)| (k, *v)).collect()),
+            PhpMixed::Array(m) => Some(m),
             _ => None,
         };
         let project = self.project.clone().unwrap_or_default();
@@ -871,12 +859,7 @@ impl GitLabDriver {
                             ));
                         }
 
-                        if !empty(
-                            &json_map
-                                .get("id")
-                                .cloned()
-                                .unwrap_or(Box::new(PhpMixed::Null)),
-                        ) {
+                        if !empty(&json_map.get("id").cloned().unwrap_or(PhpMixed::Null)) {
                             self.is_private = false;
                         }
 

@@ -14,8 +14,8 @@ pub enum PhpMixed {
     Int(i64),
     Float(f64),
     String(String),
-    List(Vec<Box<PhpMixed>>),
-    Array(IndexMap<String, Box<PhpMixed>>),
+    List(Vec<PhpMixed>),
+    Array(IndexMap<String, PhpMixed>),
     Object(ArrayObject),
 }
 
@@ -126,28 +126,28 @@ impl PhpMixed {
         }
     }
 
-    pub fn as_list(&self) -> Option<&Vec<Box<PhpMixed>>> {
+    pub fn as_list(&self) -> Option<&Vec<PhpMixed>> {
         match self {
             PhpMixed::List(l) => Some(l),
             _ => None,
         }
     }
 
-    pub fn as_array(&self) -> Option<&IndexMap<String, Box<PhpMixed>>> {
+    pub fn as_array(&self) -> Option<&IndexMap<String, PhpMixed>> {
         match self {
             PhpMixed::Array(a) => Some(a),
             _ => None,
         }
     }
 
-    pub fn as_array_mut(&mut self) -> Option<&mut IndexMap<String, Box<PhpMixed>>> {
+    pub fn as_array_mut(&mut self) -> Option<&mut IndexMap<String, PhpMixed>> {
         match self {
             PhpMixed::Array(a) => Some(a),
             _ => None,
         }
     }
 
-    pub fn as_list_mut(&mut self) -> Option<&mut Vec<Box<PhpMixed>>> {
+    pub fn as_list_mut(&mut self) -> Option<&mut Vec<PhpMixed>> {
         match self {
             PhpMixed::List(l) => Some(l),
             _ => None,
@@ -171,7 +171,7 @@ impl PhpMixed {
     }
 
     pub fn get(&self, key: &str) -> Option<&PhpMixed> {
-        self.as_array().and_then(|m| m.get(key).map(|v| v.as_ref()))
+        self.as_array().and_then(|m| m.get(key))
     }
 
     /// Treats PhpMixed::Null as None, everything else as Some.
@@ -275,12 +275,7 @@ where
     T: Into<PhpMixed>,
 {
     fn from(value: IndexMap<String, T>) -> Self {
-        PhpMixed::Array(
-            value
-                .into_iter()
-                .map(|(k, v)| (k, Box::new(v.into())))
-                .collect(),
-        )
+        PhpMixed::Array(value.into_iter().map(|(k, v)| (k, v.into())).collect())
     }
 }
 
@@ -289,7 +284,7 @@ where
     T: Into<PhpMixed>,
 {
     fn from(value: Vec<T>) -> Self {
-        PhpMixed::List(value.into_iter().map(|v| Box::new(v.into())).collect())
+        PhpMixed::List(value.into_iter().map(|v| v.into()).collect())
     }
 }
 
@@ -689,7 +684,7 @@ pub fn pack(_format: &str, _values: &[PhpMixed]) -> Vec<u8> {
     todo!()
 }
 
-pub fn unpack(_format: &str, _data: &[u8]) -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn unpack(_format: &str, _data: &[u8]) -> Option<IndexMap<String, PhpMixed>> {
     todo!()
 }
 
@@ -985,7 +980,7 @@ impl ZipArchive {
         todo!()
     }
 
-    pub fn stat_index(&self, _index: i64) -> Option<IndexMap<String, Box<PhpMixed>>> {
+    pub fn stat_index(&self, _index: i64) -> Option<IndexMap<String, PhpMixed>> {
         todo!()
     }
 
@@ -1046,8 +1041,8 @@ pub trait JsonSerializable {
 
 pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
     let values: Vec<&PhpMixed> = match haystack {
-        PhpMixed::List(items) => items.iter().map(|item| item.as_ref()).collect(),
-        PhpMixed::Array(map) => map.values().map(|item| item.as_ref()).collect(),
+        PhpMixed::List(items) => items.iter().collect(),
+        PhpMixed::Array(map) => map.values().collect(),
         _ => return false,
     };
 
@@ -1206,7 +1201,7 @@ pub fn substr_count(_haystack: &str, _needle: &str) -> i64 {
 pub fn openssl_x509_parse(
     _certificate: &str,
     _short_names: bool,
-) -> Option<IndexMap<String, Box<PhpMixed>>> {
+) -> Option<IndexMap<String, PhpMixed>> {
     todo!()
 }
 
@@ -1214,7 +1209,7 @@ pub fn openssl_get_publickey(_certificate: &str) -> Option<PhpMixed> {
     todo!()
 }
 
-pub fn openssl_pkey_get_details(_key: PhpMixed) -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn openssl_pkey_get_details(_key: PhpMixed) -> Option<IndexMap<String, PhpMixed>> {
     todo!()
 }
 
@@ -1284,7 +1279,7 @@ pub fn include_file(file: &str) -> PhpMixed {
 // TODO(php-runtime): the callback should be registered in PHP runtime.
 pub fn set_error_handler(_callback: fn(i64, &str, &str, i64) -> bool) {}
 
-pub fn debug_backtrace() -> Vec<IndexMap<String, Box<PhpMixed>>> {
+pub fn debug_backtrace() -> Vec<IndexMap<String, PhpMixed>> {
     todo!()
 }
 
@@ -1586,7 +1581,7 @@ pub struct CurlMultiHandle;
 #[derive(Debug)]
 pub struct CurlShareHandle;
 
-pub fn curl_version() -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn curl_version() -> Option<IndexMap<String, PhpMixed>> {
     todo!()
 }
 
@@ -1930,15 +1925,14 @@ fn array_replace_recursive_value(base: PhpMixed, replacement: PhpMixed) -> PhpMi
 }
 
 fn array_replace_recursive_assoc(
-    mut base: IndexMap<String, Box<PhpMixed>>,
-    replacement: IndexMap<String, Box<PhpMixed>>,
-) -> IndexMap<String, Box<PhpMixed>> {
+    mut base: IndexMap<String, PhpMixed>,
+    replacement: IndexMap<String, PhpMixed>,
+) -> IndexMap<String, PhpMixed> {
     for (key, replacement_value) in replacement {
         let merged = match base.get(&key) {
-            Some(base_value) => Box::new(array_replace_recursive_value(
-                (**base_value).clone(),
-                *replacement_value,
-            )),
+            Some(base_value) => {
+                array_replace_recursive_value(base_value.clone(), replacement_value)
+            }
             None => replacement_value,
         };
         base.insert(key, merged);
@@ -1947,13 +1941,12 @@ fn array_replace_recursive_assoc(
 }
 
 fn array_replace_recursive_list(
-    mut base: Vec<Box<PhpMixed>>,
-    replacement: Vec<Box<PhpMixed>>,
-) -> Vec<Box<PhpMixed>> {
+    mut base: Vec<PhpMixed>,
+    replacement: Vec<PhpMixed>,
+) -> Vec<PhpMixed> {
     for (index, replacement_value) in replacement.into_iter().enumerate() {
         if index < base.len() {
-            *base[index] =
-                array_replace_recursive_value((*base[index]).clone(), *replacement_value);
+            base[index] = array_replace_recursive_value(base[index].clone(), replacement_value);
         } else {
             base.push(replacement_value);
         }
@@ -2019,18 +2012,20 @@ fn json_value_to_php_mixed(value: serde_json::Value, assoc: bool) -> PhpMixed {
         serde_json::Value::Array(items) => PhpMixed::List(
             items
                 .into_iter()
-                .map(|item| Box::new(json_value_to_php_mixed(item, assoc)))
+                .map(|item| json_value_to_php_mixed(item, assoc))
                 .collect(),
         ),
         serde_json::Value::Object(entries) => {
-            let data: IndexMap<String, Box<PhpMixed>> = entries
+            let data: IndexMap<String, PhpMixed> = entries
                 .into_iter()
-                .map(|(k, v)| (k, Box::new(json_value_to_php_mixed(v, assoc))))
+                .map(|(k, v)| (k, json_value_to_php_mixed(v, assoc)))
                 .collect();
             if assoc {
                 PhpMixed::Array(data)
             } else {
-                PhpMixed::Object(ArrayObject { data })
+                PhpMixed::Object(ArrayObject {
+                    data: data.into_iter().collect(),
+                })
             }
         }
     }
@@ -2306,7 +2301,7 @@ where
 }
 
 pub fn array_filter_map<F>(
-    _array: &IndexMap<String, Box<PhpMixed>>,
+    _array: &IndexMap<String, PhpMixed>,
     _callback: F,
 ) -> IndexMap<String, PhpMixed>
 where
@@ -2314,8 +2309,8 @@ where
 {
     _array
         .iter()
-        .filter(|(_, v)| _callback(v.as_ref()))
-        .map(|(k, v)| (k.clone(), v.as_ref().clone()))
+        .filter(|&(_, v)| _callback(v))
+        .map(|(k, v)| (k.clone(), v.clone()))
         .collect()
 }
 
@@ -2604,7 +2599,7 @@ pub fn php_strip_whitespace(_path: &str) -> String {
 }
 
 // The shim does not raise PHP-level errors, so there is never a last error.
-pub fn error_get_last() -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn error_get_last() -> Option<IndexMap<String, PhpMixed>> {
     None
 }
 
@@ -2856,7 +2851,7 @@ pub fn fread(_handle: PhpMixed, _length: i64) -> Option<String> {
     todo!()
 }
 
-pub fn lstat(_filename: &str) -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn lstat(_filename: &str) -> Option<IndexMap<String, PhpMixed>> {
     todo!()
 }
 
@@ -2926,7 +2921,7 @@ pub const PHP_WINDOWS_VERSION_BUILD: i64 = 0;
 
 #[derive(Debug, Clone)]
 pub struct ArrayObject {
-    data: IndexMap<String, Box<PhpMixed>>,
+    data: IndexMap<String, PhpMixed>,
 }
 
 impl ArrayObject {
@@ -2934,7 +2929,7 @@ impl ArrayObject {
         todo!()
     }
 
-    pub fn to_array(&self) -> IndexMap<String, Box<PhpMixed>> {
+    pub fn to_array(&self) -> IndexMap<String, PhpMixed> {
         self.data.clone()
     }
 
@@ -2945,12 +2940,12 @@ impl ArrayObject {
 
 #[derive(Debug)]
 pub struct JsonObject {
-    data: IndexMap<String, Box<PhpMixed>>,
+    data: IndexMap<String, PhpMixed>,
 }
 
 #[derive(Debug)]
 pub struct StdClass {
-    pub data: IndexMap<String, Box<PhpMixed>>,
+    pub data: IndexMap<String, PhpMixed>,
 }
 
 #[derive(Debug, Clone)]
@@ -3020,7 +3015,7 @@ pub const PHP_OS: &str = match std::env::consts::OS.as_bytes() {
 pub fn instance_of<T>(_value: &PhpMixed) -> bool {
     todo!()
 }
-pub fn to_array(_value: PhpMixed) -> IndexMap<String, Box<PhpMixed>> {
+pub fn to_array(_value: PhpMixed) -> IndexMap<String, PhpMixed> {
     todo!()
 }
 pub fn to_string(_value: &PhpMixed) -> String {
@@ -3219,7 +3214,7 @@ pub fn fgetc(_resource: &PhpResource) -> Option<String> {
 pub fn ftell(_resource: &PhpResource) -> i64 {
     todo!()
 }
-pub fn stream_get_meta_data(_resource: &PhpResource) -> IndexMap<String, Box<PhpMixed>> {
+pub fn stream_get_meta_data(_resource: &PhpResource) -> IndexMap<String, PhpMixed> {
     todo!()
 }
 pub fn stream_set_blocking(_resource: &PhpResource, _enable: bool) -> bool {
@@ -3359,7 +3354,7 @@ pub fn directory_iterator(_path: &str) -> Vec<DirectoryIteratorEntry> {
     todo!()
 }
 
-pub fn array_key_last(_array: &IndexMap<String, Box<PhpMixed>>) -> usize {
+pub fn array_key_last(_array: &IndexMap<String, PhpMixed>) -> usize {
     todo!()
 }
 pub fn array_splice_mixed(

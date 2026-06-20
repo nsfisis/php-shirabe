@@ -149,11 +149,10 @@ impl Forgejo {
             cfg.get_config_source_mut()
                 .remove_config_setting(&setting_key)?;
         }
-        let value: shirabe_php_shim::PhpMixed =
-            shirabe_php_shim::PhpMixed::Array(indexmap::indexmap! {
-                "username".to_string() => Box::new(username.clone().into()),
-                "token".to_string() => Box::new(token.clone().into()),
-            });
+        let value = shirabe_php_shim::PhpMixed::Array(indexmap::indexmap! {
+            "username".to_string() => username.clone().into(),
+            "token".to_string() => token.clone().into(),
+        });
         if store_in_local_auth_config && has_local_auth {
             let mut cfg = self.config.borrow_mut();
             if let Some(local) = cfg.get_local_auth_config_source_mut() {

@@ -75,7 +75,7 @@ impl VcsDriverBase {
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
         let options: IndexMap<String, PhpMixed> = match options_mixed {
-            PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
         self.http_downloader
@@ -114,10 +114,7 @@ impl VcsDriverBase {
             _ => return Ok(None),
         };
 
-        // PHP arrays own their nested values; the Rust representation wraps them
-        // in Box<PhpMixed>. Unbox the outer level so callers can mutate keys.
-        let mut composer: IndexMap<String, PhpMixed> =
-            array.into_iter().map(|(k, v)| (k, *v)).collect();
+        let mut composer: IndexMap<String, PhpMixed> = array;
 
         if (!composer.contains_key("time")
             || composer
@@ -153,9 +150,7 @@ impl VcsDriverBase {
             && let Some(res) = self.cache.as_mut().and_then(|c| c.read(identifier))
         {
             let parsed = JsonFile::parse_json(Some(&res), None)?;
-            let composer: Option<IndexMap<String, PhpMixed>> = parsed
-                .as_array()
-                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+            let composer: Option<IndexMap<String, PhpMixed>> = parsed.as_array().map(|m| m.clone());
             self.info_cache
                 .insert(identifier.to_string(), composer.clone());
             return Ok(Some(composer));
@@ -219,7 +214,7 @@ pub trait VcsDriver: VcsDriverInterface {
             {
                 let parsed = JsonFile::parse_json(Some(&res), None)?;
                 let parsed_map: Option<IndexMap<String, PhpMixed>> = match parsed {
-                    PhpMixed::Array(a) => Some(a.into_iter().map(|(k, v)| (k, *v)).collect()),
+                    PhpMixed::Array(a) => Some(a),
                     _ => None,
                 };
                 self.info_cache_mut()
@@ -235,7 +230,7 @@ pub trait VcsDriver: VcsDriverInterface {
                 let composer_mixed = PhpMixed::Array(
                     composer_map
                         .iter()
-                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                        .map(|(k, v)| (k.clone(), v.clone()))
                         .collect(),
                 );
                 let encoded = JsonFile::encode_with_options(
@@ -273,7 +268,7 @@ pub trait VcsDriver: VcsDriverInterface {
         )?;
 
         let mut composer: IndexMap<String, PhpMixed> = match composer {
-            PhpMixed::Array(a) if !a.is_empty() => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(a) if !a.is_empty() => a,
             _ => return Ok(None),
         };
 
@@ -313,7 +308,7 @@ pub trait VcsDriver: VcsDriverInterface {
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
         let options: IndexMap<String, PhpMixed> = match options_mixed {
-            PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
         self.http_downloader()

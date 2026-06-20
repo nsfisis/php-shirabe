@@ -447,7 +447,7 @@ impl Application {
         let no_composer_json_commands_pm = PhpMixed::List(
             no_composer_json_commands
                 .iter()
-                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .map(|s| PhpMixed::String(s.clone()))
                 .collect(),
         );
         if new_work_dir.is_none()
@@ -547,9 +547,9 @@ impl Application {
         // avoid loading plugins/initializing the Composer instance earlier than necessary if no plugin command is needed
         // if showing the version, we never need plugin commands
         let mnp_list = PhpMixed::List(vec![
-            Box::new(PhpMixed::String("".to_string())),
-            Box::new(PhpMixed::String("list".to_string())),
-            Box::new(PhpMixed::String("help".to_string())),
+            PhpMixed::String("".to_string()),
+            PhpMixed::String("list".to_string()),
+            PhpMixed::String("help".to_string()),
         ]);
         let may_need_plugin_command = !input
             .borrow()
@@ -1111,7 +1111,7 @@ impl Application {
             let avast_detect_pm = PhpMixed::List(
                 avast_detect
                     .iter()
-                    .map(|s| Box::new(PhpMixed::String(s.clone())))
+                    .map(|s| PhpMixed::String(s.clone()))
                     .collect(),
             );
             if is_array(&avast_detect_pm) && !avast_detect.is_empty() {

@@ -10,7 +10,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug)]
 pub struct ChoiceQuestion {
     inner: Question,
-    choices: IndexMap<String, Box<PhpMixed>>,
+    choices: IndexMap<String, PhpMixed>,
     multiselect: bool,
     prompt: String,
     error_message: String,
@@ -22,7 +22,7 @@ impl ChoiceQuestion {
     /// `$default` The default answer to return.
     pub fn new(
         question: String,
-        choices: IndexMap<String, Box<PhpMixed>>,
+        choices: IndexMap<String, PhpMixed>,
         default: Option<PhpMixed>,
     ) -> Result<Self, LogicException> {
         if choices.is_empty() {
@@ -44,14 +44,14 @@ impl ChoiceQuestion {
         this.inner.set_validator(Some(validator));
         // setAutocompleterValues never throws for an array argument.
         this.inner
-            .set_autocompleter_values(Some(PhpMixed::Array(choices)))
+            .set_autocompleter_values(Some(PhpMixed::Array(choices.clone())))
             .expect("autocompleter cannot be set on a hidden question during construction");
 
         Ok(this)
     }
 
     /// Returns available choices.
-    pub fn get_choices(&self) -> &IndexMap<String, Box<PhpMixed>> {
+    pub fn get_choices(&self) -> &IndexMap<String, PhpMixed> {
         &self.choices
     }
 
@@ -151,7 +151,7 @@ impl ChoiceQuestion {
             for value in &selected_choices {
                 let mut results: Vec<String> = Vec::new();
                 for (key, choice) in &choices {
-                    if (**choice) == *value {
+                    if (*choice) == *value {
                         results.push(key.clone());
                     }
                 }
@@ -178,10 +178,10 @@ impl ChoiceQuestion {
                 if !is_assoc {
                     if let Some(found_key) = &result_key {
                         // $result = $choices[$result];
-                        result = (*choices[found_key]).clone();
+                        result = choices[found_key].clone();
                     } else if let Some(found) = choices.get(&shirabe_php_shim::strval(value)) {
                         // isset($choices[$value])
-                        result = (**found).clone();
+                        result = found.clone();
                     } else {
                         result = PhpMixed::Bool(false);
                     }
@@ -218,13 +218,11 @@ impl ChoiceQuestion {
             }
 
             if multiselect {
-                return Ok(PhpMixed::List(
-                    multiselect_choices.into_iter().map(Box::new).collect(),
-                ));
+                return Ok(PhpMixed::List(multiselect_choices));
             }
 
             Ok(shirabe_php_shim::current(PhpMixed::List(
-                multiselect_choices.into_iter().map(Box::new).collect(),
+                multiselect_choices,
             )))
         })
     }
@@ -232,7 +230,7 @@ impl ChoiceQuestion {
 
 /// array_search operates over the choice values as strings; this projects the
 /// choices map's values into the string-keyed form the shim expects.
-fn choices_as_str(choices: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, String> {
+fn choices_as_str(choices: &IndexMap<String, PhpMixed>) -> IndexMap<String, String> {
     choices
         .iter()
         .map(|(k, v)| (k.clone(), shirabe_php_shim::strval(v)))

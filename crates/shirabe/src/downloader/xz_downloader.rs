@@ -76,7 +76,7 @@ impl ArchiveDownloader for XzDownloader {
             PhpMixed::List(
                 command
                     .iter()
-                    .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                    .map(|s| PhpMixed::String(s.to_string()))
                     .collect(),
             ),
             Some(&mut ignored_output),

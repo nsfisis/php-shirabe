@@ -176,11 +176,8 @@ impl Git {
             let mut status: i64 = 0;
             for (counter, callable) in command_callables.iter().enumerate() {
                 let cmd = callable(url_arg);
-                *last_cmd = PhpMixed::List(
-                    cmd.iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
-                        .collect(),
-                );
+                *last_cmd =
+                    PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect());
                 let mut local_output = String::new();
                 let exec_cwd = if initial_clone && counter == 0 {
                     None
@@ -324,7 +321,7 @@ impl Git {
             &PhpMixed::List(
                 protocols_list
                     .iter()
-                    .map(|s| Box::new(PhpMixed::String(s.clone())))
+                    .map(|s| PhpMixed::String(s.clone()))
                     .collect(),
             ),
             true,
@@ -1321,11 +1318,11 @@ impl Git {
             if in_array(
                 PhpMixed::String(credential.clone()),
                 &PhpMixed::List(vec![
-                    Box::new(PhpMixed::String("private-token".to_string())),
-                    Box::new(PhpMixed::String("x-token-auth".to_string())),
-                    Box::new(PhpMixed::String("oauth2".to_string())),
-                    Box::new(PhpMixed::String("gitlab-ci-token".to_string())),
-                    Box::new(PhpMixed::String("x-oauth-basic".to_string())),
+                    PhpMixed::String("private-token".to_string()),
+                    PhpMixed::String("x-token-auth".to_string()),
+                    PhpMixed::String("oauth2".to_string()),
+                    PhpMixed::String("gitlab-ci-token".to_string()),
+                    PhpMixed::String("x-oauth-basic".to_string()),
                 ]),
                 false,
             ) {

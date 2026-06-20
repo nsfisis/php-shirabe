@@ -90,7 +90,7 @@ impl Locker {
     pub fn get_content_hash(composer_file_contents: &str) -> Result<String> {
         let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
         let content_map: IndexMap<String, PhpMixed> = match &content {
-            PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+            PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             _ => IndexMap::new(),
         };
 
@@ -124,7 +124,7 @@ impl Locker {
             _ => None,
         });
         if let Some(platform) = platform_value {
-            let mut config_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+            let mut config_map: IndexMap<String, PhpMixed> = IndexMap::new();
             config_map.insert("platform".to_string(), platform);
             relevant_content.insert("config".to_string(), PhpMixed::Array(config_map));
         }
@@ -134,12 +134,7 @@ impl Locker {
         Ok(hash(
             "md5",
             &JsonFile::encode_with_options(
-                &PhpMixed::Array(
-                    relevant_content
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                ),
+                &PhpMixed::Array(relevant_content.into_iter().collect()),
                 JsonEncodeOptions::none(),
             ),
         ))
@@ -162,7 +157,7 @@ impl Locker {
     pub fn is_fresh(&mut self) -> Result<bool> {
         let lock = self.lock_file.read()?;
         let lock_map: IndexMap<String, PhpMixed> = match lock {
-            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
 
@@ -213,7 +208,7 @@ impl Locker {
 
         let has_name = if let PhpMixed::List(list) = &locked_packages {
             list.first()
-                .map(|v| match v.as_ref() {
+                .map(|v| match v {
                     PhpMixed::Array(m) => m.contains_key("name"),
                     _ => false,
                 })
@@ -225,9 +220,9 @@ impl Locker {
             let mut package_by_name: IndexMap<String, BasePackageHandle> = IndexMap::new();
             if let PhpMixed::List(list) = locked_packages {
                 for info in list {
-                    if let PhpMixed::Array(m) = info.as_ref() {
+                    if let PhpMixed::Array(m) = info {
                         let info_map: IndexMap<String, PhpMixed> =
-                            m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect();
+                            m.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                         let package = self.loader.load(info_map, None)?;
                         packages.add_package(package.clone())?;
                         package_by_name.insert(package.get_name(), package.clone());
@@ -244,7 +239,7 @@ impl Locker {
                 && let PhpMixed::List(alias_list) = aliases
             {
                 for alias in alias_list {
-                    if let PhpMixed::Array(m) = alias.as_ref() {
+                    if let PhpMixed::Array(m) = alias {
                         let alias_pkg_name = m
                             .get("package")
                             .and_then(|v| v.as_string())
@@ -290,7 +285,7 @@ impl Locker {
         let lock_data = self.get_lock_data()?;
         if let Some(PhpMixed::List(list)) = lock_data.get("packages-dev") {
             for package in list {
-                if let PhpMixed::Array(m) = package.as_ref() {
+                if let PhpMixed::Array(m) = package {
                     names.push(strtolower(
                         m.get("name").and_then(|v| v.as_string()).unwrap_or(""),
                     ));
@@ -313,9 +308,7 @@ impl Locker {
                 "1.0.0",
                 Link::TYPE_REQUIRE,
                 match platform_value.unwrap() {
-                    PhpMixed::Array(m) => {
-                        m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect()
-                    }
+                    PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                     _ => IndexMap::new(),
                 },
             )?;
@@ -331,9 +324,7 @@ impl Locker {
                 "1.0.0",
                 Link::TYPE_REQUIRE,
                 match platform_dev_value.unwrap() {
-                    PhpMixed::Array(m) => {
-                        m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect()
-                    }
+                    PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                     _ => IndexMap::new(),
                 },
             )?;
@@ -414,7 +405,7 @@ impl Locker {
             .and_then(|v| match v {
                 PhpMixed::List(list) => Some(
                     list.iter()
-                        .filter_map(|v| match v.as_ref() {
+                        .filter_map(|v| match v {
                             PhpMixed::Array(m) => Some(
                                 m.iter()
                                     .map(|(k, v)| {
@@ -457,7 +448,7 @@ impl Locker {
 
         let data_php = self.lock_file.read()?;
         let data: IndexMap<String, PhpMixed> = match data_php {
-            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
         *self.lock_data_cache.borrow_mut() = Some(data.clone());
@@ -493,9 +484,9 @@ impl Locker {
                 if in_array(
                     PhpMixed::String(version),
                     &PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("dev-master".to_string())),
-                        Box::new(PhpMixed::String("dev-trunk".to_string())),
-                        Box::new(PhpMixed::String("dev-default".to_string())),
+                        PhpMixed::String("dev-master".to_string()),
+                        PhpMixed::String("dev-trunk".to_string()),
+                        PhpMixed::String("dev-default".to_string()),
                     ]),
                     true,
                 ) {
@@ -513,15 +504,15 @@ impl Locker {
         lock.insert(
             "_readme".to_string(),
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String(
+                PhpMixed::String(
                     "This file locks the dependencies of your project to a known state".to_string(),
-                )),
-                Box::new(PhpMixed::String(
+                ),
+                PhpMixed::String(
                     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies".to_string(),
-                )),
-                Box::new(PhpMixed::String(
+                ),
+                PhpMixed::String(
                     format!("This file is @{}ated automatically", "gener"),
-                )),
+                ),
             ]),
         );
         lock.insert(
@@ -536,11 +527,7 @@ impl Locker {
                 aliases
                     .iter()
                     .map(|m| {
-                        Box::new(PhpMixed::Array(
-                            m.iter()
-                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                .collect(),
-                        ))
+                        PhpMixed::Array(m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                     })
                     .collect(),
             ),
@@ -554,7 +541,7 @@ impl Locker {
             PhpMixed::Array(
                 stability_flags
                     .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(PhpMixed::Int(*v))))
+                    .map(|(k, v)| (k.clone(), PhpMixed::Int(*v)))
                     .collect(),
             ),
         );
@@ -573,7 +560,7 @@ impl Locker {
             PhpMixed::Array(
                 platform_reqs
                     .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
+                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
                     .collect(),
             ),
         );
@@ -582,19 +569,14 @@ impl Locker {
             PhpMixed::Array(
                 platform_dev_reqs
                     .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
+                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
                     .collect(),
             ),
         );
         if !platform_overrides.is_empty() {
             lock.insert(
                 "platform-overrides".to_string(),
-                PhpMixed::Array(
-                    platform_overrides
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                ),
+                PhpMixed::Array(platform_overrides.into_iter().collect()),
             );
         }
         lock.insert(
@@ -625,21 +607,20 @@ impl Locker {
             .unwrap_or(true);
         if !is_locked || differs {
             if write {
-                self.lock_file.write(PhpMixed::Array(
-                    lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                ))?;
+                self.lock_file
+                    .write(PhpMixed::Array(lock.into_iter().collect()))?;
                 *self.lock_data_cache.borrow_mut() = None;
                 self.virtual_file_written = false;
             } else {
                 self.virtual_file_written = true;
                 let parsed = JsonFile::parse_json(
                     Some(&JsonFile::encode(&PhpMixed::Array(
-                        lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                        lock.into_iter().collect(),
                     ))),
                     None,
                 )?;
                 let parsed_map: IndexMap<String, PhpMixed> = match parsed {
-                    PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    PhpMixed::Array(m) => m.into_iter().collect(),
                     _ => IndexMap::new(),
                 };
                 *self.lock_data_cache.borrow_mut() = Some(parsed_map);
@@ -682,7 +663,7 @@ impl Locker {
         let lock_mtime = filemtime(self.lock_file.get_path());
         let lock_data_php = self.lock_file.read()?;
         let mut lock_data: IndexMap<String, PhpMixed> = match lock_data_php {
-            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
         lock_data.insert(
@@ -694,10 +675,7 @@ impl Locker {
         }
 
         self.lock_file.write(PhpMixed::Array(
-            self.fixup_json_data_type(lock_data)
-                .into_iter()
-                .map(|(k, v)| (k, Box::new(v)))
-                .collect(),
+            self.fixup_json_data_type(lock_data).into_iter().collect(),
         ))?;
         *self.lock_data_cache.borrow_mut() = None;
         self.virtual_file_written = false;
@@ -729,9 +707,9 @@ impl Locker {
 
         if let Some(PhpMixed::Array(m)) = lock_data.get_mut("stability-flags") {
             let mut as_map: IndexMap<String, PhpMixed> =
-                m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect();
+                m.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
             ksort(&mut as_map);
-            *m = as_map.into_iter().map(|(k, v)| (k, Box::new(v))).collect();
+            *m = as_map.into_iter().collect();
         }
 
         lock_data
@@ -804,11 +782,7 @@ impl Locker {
         Ok(PhpMixed::List(
             locked
                 .into_iter()
-                .map(|m| {
-                    Box::new(PhpMixed::Array(
-                        m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                    ))
-                })
+                .map(|m| PhpMixed::Array(m.into_iter().collect()))
                 .collect(),
         ))
     }
@@ -834,8 +808,8 @@ impl Locker {
             && in_array(
                 PhpMixed::String(source_type.clone().unwrap_or_default()),
                 &PhpMixed::List(vec![
-                    Box::new(PhpMixed::String("git".to_string())),
-                    Box::new(PhpMixed::String("hg".to_string())),
+                    PhpMixed::String("git".to_string()),
+                    PhpMixed::String("hg".to_string()),
                 ]),
                 false,
             )
@@ -859,12 +833,7 @@ impl Locker {
                     let command = GitUtil::build_rev_list_command(&self.process, args);
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
-                        PhpMixed::List(
-                            command
-                                .into_iter()
-                                .map(|s| Box::new(PhpMixed::String(s)))
-                                .collect(),
-                        ),
+                        PhpMixed::List(command.into_iter().map(PhpMixed::String).collect()),
                         Some(&mut output),
                         path.as_deref(),
                     )? {
@@ -885,12 +854,12 @@ impl Locker {
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
                         PhpMixed::List(vec![
-                            Box::new(PhpMixed::String("hg".to_string())),
-                            Box::new(PhpMixed::String("log".to_string())),
-                            Box::new(PhpMixed::String("--template".to_string())),
-                            Box::new(PhpMixed::String("{date|hgdate}".to_string())),
-                            Box::new(PhpMixed::String("-r".to_string())),
-                            Box::new(PhpMixed::String(source_ref.clone())),
+                            PhpMixed::String("hg".to_string()),
+                            PhpMixed::String("log".to_string()),
+                            PhpMixed::String("--template".to_string()),
+                            PhpMixed::String("{date|hgdate}".to_string()),
+                            PhpMixed::String("-r".to_string()),
+                            PhpMixed::String(source_ref.clone()),
                         ]),
                         Some(&mut output),
                         path.as_deref(),

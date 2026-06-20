@@ -92,14 +92,14 @@ impl CompleteOrRootPackage {
 
 fn php_to_map(value: &PhpMixed) -> IndexMap<String, PhpMixed> {
     match value {
-        PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+        PhpMixed::Array(m) => m.clone(),
         _ => IndexMap::new(),
     }
 }
 
 fn php_to_string_vec(value: &PhpMixed) -> Vec<String> {
     match value {
-        PhpMixed::List(l) => l.iter().map(|v| strval(v)).collect(),
+        PhpMixed::List(l) => l.iter().map(strval).collect(),
         PhpMixed::Array(m) => m.values().map(|v| strval(v)).collect(),
         _ => Vec::new(),
     }
@@ -121,8 +121,8 @@ fn apply_link_setter(package: &mut Package, method: &str, links: IndexMap<String
 
 fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
     let entries: Vec<&PhpMixed> = match value {
-        PhpMixed::List(l) => l.iter().map(|v| v.as_ref()).collect(),
-        PhpMixed::Array(m) => m.values().map(|v| v.as_ref()).collect(),
+        PhpMixed::List(l) => l.iter().collect(),
+        PhpMixed::Array(m) => m.values().collect(),
         _ => Vec::new(),
     };
     entries
@@ -180,10 +180,7 @@ impl LoaderInterface for ArrayLoader {
                 package.get_pretty_version(),
                 opts.method,
                 match entry.unwrap() {
-                    PhpMixed::Array(arr) => arr
-                        .iter()
-                        .map(|(k, v)| (k.clone(), (**v).clone()))
-                        .collect(),
+                    PhpMixed::Array(arr) => arr.clone(),
                     _ => IndexMap::new(),
                 },
             )?;
@@ -231,13 +228,7 @@ impl ArrayLoader {
             return Err(UnexpectedValueException {
                 message: format!(
                     "Unknown package has no name defined ({}).",
-                    json_encode(&PhpMixed::Array(
-                        config
-                            .iter()
-                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                            .collect(),
-                    ))
-                    .unwrap_or_default()
+                    json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default()
                 ),
                 code: 0,
             }
@@ -347,18 +338,18 @@ impl ArrayLoader {
         if let Some(bin) = config.get("bin").cloned() {
             let mut bin_list = match bin {
                 PhpMixed::Array(_) | PhpMixed::List(_) => bin,
-                other => PhpMixed::List(vec![Box::new(other)]),
+                other => PhpMixed::List(vec![other]),
             };
             if let PhpMixed::List(ref mut list) = bin_list {
                 for item in list.iter_mut() {
                     if let Some(s) = item.as_string() {
-                        **item = PhpMixed::String(ltrim(s, Some("/")));
+                        *item = PhpMixed::String(ltrim(s, Some("/")));
                     }
                 }
             } else if let PhpMixed::Array(ref mut map) = bin_list {
                 for (_k, v) in map.iter_mut() {
                     if let Some(s) = v.as_string() {
-                        **v = PhpMixed::String(ltrim(s, Some("/")));
+                        *v = PhpMixed::String(ltrim(s, Some("/")));
                     }
                 }
             }
@@ -477,7 +468,7 @@ impl ArrayLoader {
                 if let Some(r) = reason.as_string()
                     && trim(r, None) == "self.version"
                 {
-                    **reason = PhpMixed::String(package.get_pretty_version().to_string());
+                    *reason = PhpMixed::String(package.get_pretty_version().to_string());
                     let _ = target;
                 }
             }
@@ -553,9 +544,9 @@ impl ArrayLoader {
             && let PhpMixed::Array(mut scripts_map) = scripts
         {
             for (event, listeners) in scripts_map.iter_mut() {
-                let listeners_array = match listeners.as_ref() {
+                let listeners_array = match &*listeners {
                     PhpMixed::Array(_) | PhpMixed::List(_) => listeners.clone(),
-                    other => Box::new(PhpMixed::List(vec![Box::new(other.clone())])),
+                    other => PhpMixed::List(vec![other.clone()]),
                 };
                 *listeners = listeners_array;
                 let _ = event;
@@ -602,7 +593,7 @@ impl ArrayLoader {
             && matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_))
         {
             let keywords_vec: Vec<String> = match keywords {
-                PhpMixed::List(list) => list.iter().map(|v| strval(v)).collect(),
+                PhpMixed::List(list) => list.iter().map(strval).collect(),
                 PhpMixed::Array(map) => map.values().map(|v| strval(v)).collect(),
                 _ => vec![],
             };
@@ -632,7 +623,7 @@ impl ArrayLoader {
         {
             let authors_vec: Vec<IndexMap<String, String>> = list
                 .iter()
-                .filter_map(|v| match v.as_ref() {
+                .filter_map(|v| match v {
                     PhpMixed::Array(m) => Some(
                         m.iter()
                             .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
@@ -660,10 +651,8 @@ impl ArrayLoader {
         {
             let funding_vec: Vec<IndexMap<String, PhpMixed>> = list
                 .iter()
-                .filter_map(|v| match v.as_ref() {
-                    PhpMixed::Array(m) => {
-                        Some(m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
-                    }
+                .filter_map(|v| match v {
+                    PhpMixed::Array(m) => Some(m.clone()),
                     _ => None,
                 })
                 .collect();
@@ -722,9 +711,7 @@ impl ArrayLoader {
             if let Some(entry) = config.get(*r#type) {
                 let mut links: IndexMap<String, Link> = IndexMap::new();
                 let entries: IndexMap<String, PhpMixed> = match entry {
-                    PhpMixed::Array(m) => {
-                        m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect()
-                    }
+                    PhpMixed::Array(m) => m.clone(),
                     _ => continue,
                 };
                 for (pretty_target, constraint) in entries {
@@ -892,8 +879,8 @@ impl ArrayLoader {
                 PhpMixed::Array(m) => m.get("branch-alias").cloned(),
                 _ => None,
             })
-            .and_then(|v| match v.as_ref() {
-                PhpMixed::Array(m) => Some(m.clone()),
+            .and_then(|v| match v {
+                PhpMixed::Array(m) => Some(m),
                 _ => None,
             });
 

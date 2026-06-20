@@ -92,7 +92,7 @@ impl SymfonyQuestionHelper {
                     OutputFormatter::escape(
                         &choices
                             .get(&default.to_string())
-                            .map(|v| (**v).clone())
+                            .cloned()
                             .unwrap_or(default.clone())
                             .to_string(),
                     )

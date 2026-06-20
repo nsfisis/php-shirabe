@@ -900,8 +900,7 @@ impl PluginManager {
                                 config.borrow_mut().get("allow-plugins").clone();
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
-                                allow_plugins
-                                    .insert(package.to_string(), Box::new(PhpMixed::Bool(allow)));
+                                allow_plugins.insert(package.to_string(), PhpMixed::Bool(allow));
                                 if config
                                     .borrow_mut()
                                     .get("sort-packages")
@@ -917,20 +916,16 @@ impl PluginManager {
                                         "allow-plugins",
                                         PhpMixed::Array(allow_plugins.clone()),
                                     )?;
-                                let mut inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+                                let mut inner = IndexMap::new();
                                 inner.insert(
                                     "allow-plugins".to_string(),
-                                    Box::new(PhpMixed::Array(allow_plugins)),
+                                    PhpMixed::Array(allow_plugins),
                                 );
-                                let mut config_section: IndexMap<String, Box<PhpMixed>> =
-                                    IndexMap::new();
-                                config_section
-                                    .insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
-                                let wrap: IndexMap<String, PhpMixed> =
-                                    config_section.into_iter().map(|(k, v)| (k, *v)).collect();
+                                let mut config_section = IndexMap::new();
+                                config_section.insert("config".to_string(), PhpMixed::Array(inner));
                                 config
                                     .borrow_mut()
-                                    .merge(&wrap, crate::config::Config::SOURCE_UNKNOWN);
+                                    .merge(&config_section, crate::config::Config::SOURCE_UNKNOWN);
                             }
                         }
 

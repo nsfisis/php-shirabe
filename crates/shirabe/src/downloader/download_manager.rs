@@ -510,7 +510,7 @@ impl DownloadManager {
                 &PhpMixed::List(
                     sources
                         .iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
+                        .map(|s| PhpMixed::String(s.clone()))
                         .collect(),
                 ),
                 true,

@@ -468,11 +468,7 @@ impl Auditor {
                     .set_horizontal(true)
                     .set_headers(headers.into_iter().map(|h| h.into()).collect());
                 table.add_row(ConsoleIO::sanitize(
-                    PhpMixed::List(
-                        row.into_iter()
-                            .map(|s| Box::new(PhpMixed::String(s)))
-                            .collect(),
-                    ),
+                    PhpMixed::List(row.into_iter().map(PhpMixed::String).collect()),
                     false,
                 ))??;
                 table
@@ -595,10 +591,8 @@ impl Auditor {
             };
             table.add_row(ConsoleIO::sanitize(
                 PhpMixed::List(vec![
-                    Box::new(PhpMixed::String(
-                        self.get_package_name_with_link(pkg.clone().into()),
-                    )),
-                    Box::new(PhpMixed::String(replacement)),
+                    PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
+                    PhpMixed::String(replacement),
                 ]),
                 false,
             ));

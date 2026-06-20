@@ -242,9 +242,9 @@ impl BumpCommand {
                 for (package, version) in packages {
                     let section = composer_definition
                         .entry(key.to_string())
-                        .or_insert_with(|| Box::new(PhpMixed::Array(indexmap::IndexMap::new())));
-                    if let PhpMixed::Array(map) = section.as_mut() {
-                        map.insert(package.clone(), Box::new(PhpMixed::String(version.clone())));
+                        .or_insert_with(|| PhpMixed::Array(indexmap::IndexMap::new()));
+                    if let PhpMixed::Array(map) = section {
+                        map.insert(package.clone(), PhpMixed::String(version.clone()));
                     }
                 }
             }

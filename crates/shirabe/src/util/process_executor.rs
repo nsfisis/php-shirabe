@@ -149,7 +149,7 @@ impl ProcessExecutor {
         let cmd = PhpMixed::List(
             command
                 .iter()
-                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .map(|s| PhpMixed::String(s.clone()))
                 .collect(),
         );
         let mut buf = PhpMixed::String(String::new());
@@ -352,9 +352,9 @@ impl ProcessExecutor {
                 git_env.insert("GIT_DIR".to_string(), cwd.unwrap().to_string());
                 self.run_process(
                     PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("git".to_string())),
-                        Box::new(PhpMixed::String("config".to_string())),
-                        Box::new(PhpMixed::String("safe.bareRepository".to_string())),
+                        PhpMixed::String("git".to_string()),
+                        PhpMixed::String("config".to_string()),
+                        PhpMixed::String("safe.bareRepository".to_string()),
                     ]),
                     cwd,
                     Some(git_env.clone()),
@@ -677,7 +677,7 @@ impl ProcessExecutor {
         } else if let PhpMixed::List(list) = command {
             let parts: Vec<String> = array_map(
                 |v| Self::escape(v.as_string().unwrap_or("")),
-                &list.iter().map(|b| (**b).clone()).collect::<Vec<_>>(),
+                &list.iter().cloned().collect::<Vec<_>>(),
             );
             implode(" ", &parts)
         } else {
@@ -810,7 +810,7 @@ impl ProcessExecutor {
             &PhpMixed::List(
                 Self::BUILTIN_CMD_COMMANDS
                     .iter()
-                    .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                    .map(|s| PhpMixed::String(s.to_string()))
                     .collect(),
             ),
             true,
@@ -870,21 +870,13 @@ impl IntoExecCommand for &String {
 
 impl IntoExecCommand for Vec<String> {
     fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(
-            self.into_iter()
-                .map(|s| Box::new(PhpMixed::String(s)))
-                .collect(),
-        )
+        PhpMixed::List(self.into_iter().map(PhpMixed::String).collect())
     }
 }
 
 impl IntoExecCommand for &Vec<String> {
     fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(
-            self.iter()
-                .map(|s| Box::new(PhpMixed::String(s.clone())))
-                .collect(),
-        )
+        PhpMixed::List(self.iter().map(|s| PhpMixed::String(s.clone())).collect())
     }
 }
 
@@ -892,7 +884,7 @@ impl<const N: usize> IntoExecCommand for &[&str; N] {
     fn into_exec_command(self) -> PhpMixed {
         PhpMixed::List(
             self.iter()
-                .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                .map(|s| PhpMixed::String(s.to_string()))
                 .collect(),
         )
     }
@@ -902,7 +894,7 @@ impl IntoExecCommand for &[&str] {
     fn into_exec_command(self) -> PhpMixed {
         PhpMixed::List(
             self.iter()
-                .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                .map(|s| PhpMixed::String(s.to_string()))
                 .collect(),
         )
     }
@@ -910,11 +902,7 @@ impl IntoExecCommand for &[&str] {
 
 impl IntoExecCommand for &[String] {
     fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(
-            self.iter()
-                .map(|s| Box::new(PhpMixed::String(s.clone())))
-                .collect(),
-        )
+        PhpMixed::List(self.iter().map(|s| PhpMixed::String(s.clone())).collect())
     }
 }
 

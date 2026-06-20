@@ -13,10 +13,10 @@ use shirabe_php_shim::{
     UnexpectedValueException, array_merge, in_array, json_encode_ex,
 };
 
-fn log_context(context: &[(&str, &str)]) -> IndexMap<String, Box<PhpMixed>> {
+fn log_context(context: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
     context
         .iter()
-        .map(|(k, v)| (k.to_string(), Box::new(PhpMixed::String(v.to_string()))))
+        .map(|(k, v)| (k.to_string(), PhpMixed::String(v.to_string())))
         .collect()
 }
 
@@ -132,11 +132,11 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         github_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![Box::new(PhpMixed::String(domain.clone()))]),
+                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("github-domains".to_string(), Box::new(merged));
-                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
+                    inner.insert("github-domains".to_string(), merged);
+                    let mut config_outer = IndexMap::new();
                     config_outer.insert("config".to_string(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
@@ -178,10 +178,10 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![Box::new(PhpMixed::String(domain.clone()))]),
+                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("gitlab-domains".to_string(), Box::new(merged));
+                    inner.insert("gitlab-domains".to_string(), merged);
                     let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
                     config_outer.insert("config".to_string(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
@@ -219,10 +219,10 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![Box::new(PhpMixed::String(domain.clone()))]),
+                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("gitlab-domains".to_string(), Box::new(merged));
+                    inner.insert("gitlab-domains".to_string(), merged);
                     let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
                     config_outer.insert("config".to_string(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
@@ -267,10 +267,10 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         forgejo_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![Box::new(PhpMixed::String(domain.clone()))]),
+                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("forgejo-domains".to_string(), Box::new(merged));
+                    inner.insert("forgejo-domains".to_string(), merged);
                     let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
                     config_outer.insert("config".to_string(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
@@ -344,17 +344,15 @@ pub trait BaseIO: IOInterface {
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
 
-                    let mut ssl_options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+                    let mut ssl_options = IndexMap::new();
                     if let Some(cert) = local_cert {
-                        ssl_options
-                            .insert("local_cert".to_string(), Box::new(PhpMixed::String(cert)));
+                        ssl_options.insert("local_cert".to_string(), PhpMixed::String(cert));
                     }
                     if let Some(pk) = local_pk {
-                        ssl_options.insert("local_pk".to_string(), Box::new(PhpMixed::String(pk)));
+                        ssl_options.insert("local_pk".to_string(), PhpMixed::String(pk));
                     }
                     if let Some(pass) = passphrase {
-                        ssl_options
-                            .insert("passphrase".to_string(), Box::new(PhpMixed::String(pass)));
+                        ssl_options.insert("passphrase".to_string(), PhpMixed::String(pass));
                     }
 
                     if !ssl_options.contains_key("local_cert") {
@@ -465,10 +463,10 @@ pub trait BaseIO: IOInterface {
         if in_array(
             level.clone(),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String(LogLevel::EMERGENCY.to_string())),
-                Box::new(PhpMixed::String(LogLevel::ALERT.to_string())),
-                Box::new(PhpMixed::String(LogLevel::CRITICAL.to_string())),
-                Box::new(PhpMixed::String(LogLevel::ERROR.to_string())),
+                PhpMixed::String(LogLevel::EMERGENCY.to_string()),
+                PhpMixed::String(LogLevel::ALERT.to_string()),
+                PhpMixed::String(LogLevel::CRITICAL.to_string()),
+                PhpMixed::String(LogLevel::ERROR.to_string()),
             ]),
             false,
         ) {

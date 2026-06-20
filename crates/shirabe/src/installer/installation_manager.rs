@@ -659,9 +659,9 @@ impl InstallationManager {
                         http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
                         http.insert(
                             "header".to_string(),
-                            PhpMixed::List(vec![Box::new(PhpMixed::String(
+                            PhpMixed::List(vec![PhpMixed::String(
                                 "Content-type: application/x-www-form-urlencoded".to_string(),
-                            ))]),
+                            )]),
                         );
                         let params_vec: Vec<(&str, &str)> = params
                             .iter()
@@ -674,9 +674,7 @@ impl InstallationManager {
                         http.insert("timeout".to_string(), PhpMixed::Int(3));
                         opts.insert(
                             "http".to_string(),
-                            PhpMixed::Array(
-                                http.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                            ),
+                            PhpMixed::Array(http.into_iter().collect()),
                         );
 
                         tokio::runtime::Runtime::new().unwrap().block_on(
@@ -714,12 +712,7 @@ impl InstallationManager {
                         }
                     }
                     if let Some(PhpMixed::List(downloads)) = post_data.get_mut("downloads") {
-                        downloads.push(Box::new(PhpMixed::Array(
-                            package_notification
-                                .into_iter()
-                                .map(|(k, v)| (k, Box::new(v)))
-                                .collect(),
-                        )));
+                        downloads.push(PhpMixed::Array(package_notification.into_iter().collect()));
                     }
                 }
 
@@ -729,26 +722,21 @@ impl InstallationManager {
                 http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
                 http.insert(
                     "header".to_string(),
-                    PhpMixed::List(vec![Box::new(PhpMixed::String(
+                    PhpMixed::List(vec![PhpMixed::String(
                         "Content-Type: application/json".to_string(),
-                    ))]),
+                    )]),
                 );
                 http.insert(
                     "content".to_string(),
                     PhpMixed::String(
-                        json_encode(&PhpMixed::Array(
-                            post_data
-                                .into_iter()
-                                .map(|(k, v)| (k, Box::new(v)))
-                                .collect(),
-                        ))
-                        .unwrap_or_default(),
+                        json_encode(&PhpMixed::Array(post_data.into_iter().collect()))
+                            .unwrap_or_default(),
                     ),
                 );
                 http.insert("timeout".to_string(), PhpMixed::Int(6));
                 opts.insert(
                     "http".to_string(),
-                    PhpMixed::Array(http.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                    PhpMixed::Array(http.into_iter().collect()),
                 );
 
                 tokio::runtime::Runtime::new().unwrap().block_on(

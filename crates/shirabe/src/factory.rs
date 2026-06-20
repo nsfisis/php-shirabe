@@ -259,7 +259,7 @@ impl Factory {
         );
         defaults.insert(
             "config".to_string(),
-            PhpMixed::Array(inner.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+            PhpMixed::Array(inner.into_iter().collect()),
         );
         config.merge(&defaults, Config::SOURCE_DEFAULT);
 
@@ -281,10 +281,7 @@ impl Factory {
                 None,
             )?;
             let read_data = match file.read()? {
-                PhpMixed::Array(map) => map
-                    .into_iter()
-                    .map(|(k, v)| (k, *v))
-                    .collect::<IndexMap<_, _>>(),
+                PhpMixed::Array(map) => map.into_iter().collect::<IndexMap<_, _>>(),
                 _ => IndexMap::new(),
             };
             let file_path_owned = file.get_path().to_string();
@@ -339,18 +336,13 @@ impl Factory {
                 None,
             )?;
             let read_data: IndexMap<String, PhpMixed> = match auth_file.read()? {
-                PhpMixed::Array(map) => map.into_iter().map(|(k, v)| (k, *v)).collect(),
+                PhpMixed::Array(map) => map.into_iter().collect(),
                 _ => IndexMap::new(),
             };
             let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
             wrapped.insert(
                 "config".to_string(),
-                PhpMixed::Array(
-                    read_data
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                ),
+                PhpMixed::Array(read_data.into_iter().collect()),
             );
             let auth_path_owned = auth_file.get_path().to_string();
             config.merge(&wrapped, &auth_path_owned);
@@ -510,7 +502,7 @@ impl Factory {
             local_config_data = file
                 .read()?
                 .as_array()
-                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();
             local_config_source = file.get_path().to_string();
         } else if let Some(LocalConfigInput::Data(data)) = local_config {
@@ -784,7 +776,7 @@ impl Factory {
                             let lock_contents = JsonFile::encode(&PhpMixed::Array(
                                 local_config_data
                                     .iter()
-                                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                    .map(|(k, v)| (k.clone(), v.clone()))
                                     .collect(),
                             ));
                             let locker = Locker::new(
@@ -1017,7 +1009,7 @@ impl Factory {
                     .map(|(k, v)| {
                         (
                             k,
-                            match *v {
+                            match v {
                                 PhpMixed::String(s) => s,
                                 _ => String::new(),
                             },
@@ -1375,7 +1367,7 @@ impl Factory {
                 );
                 http_downloader_options.insert(
                     "ssl".to_string(),
-                    PhpMixed::Array(ssl_map.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                    PhpMixed::Array(ssl_map.into_iter().collect()),
                 );
             }
             if "" != config.borrow_mut().get_str("capath").unwrap_or_default() {
@@ -1384,12 +1376,10 @@ impl Factory {
                     .and_then(|v| v.as_array())
                     .cloned()
                     .unwrap_or_default();
-                let mut ssl_map: IndexMap<String, Box<PhpMixed>> = existing_ssl;
+                let mut ssl_map = existing_ssl;
                 ssl_map.insert(
                     "capath".to_string(),
-                    Box::new(PhpMixed::String(
-                        config.borrow_mut().get_str("capath").unwrap_or_default(),
-                    )),
+                    PhpMixed::String(config.borrow_mut().get_str("capath").unwrap_or_default()),
                 );
                 http_downloader_options.insert("ssl".to_string(), PhpMixed::Array(ssl_map));
             }

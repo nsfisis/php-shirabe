@@ -211,7 +211,7 @@ impl ArgvInput {
         if self.inner.definition.has_argument(&PhpMixed::Int(c)) {
             let arg = self.inner.definition.get_argument(&PhpMixed::Int(c))?;
             let value = if arg.is_array() {
-                PhpMixed::List(vec![Box::new(PhpMixed::String(token.to_string()))])
+                PhpMixed::List(vec![PhpMixed::String(token.to_string())])
             } else {
                 PhpMixed::String(token.to_string())
             };
@@ -229,7 +229,7 @@ impl ArgvInput {
         {
             let arg = self.inner.definition.get_argument(&PhpMixed::Int(c - 1))?;
             if let Some(PhpMixed::List(list)) = self.inner.arguments.get_mut(arg.get_name()) {
-                list.push(Box::new(PhpMixed::String(token.to_string())));
+                list.push(PhpMixed::String(token.to_string()));
             }
 
         // unexpected argument
@@ -390,12 +390,12 @@ impl ArgvInput {
         if option.is_array() {
             match self.inner.options.get_mut(name) {
                 Some(PhpMixed::List(list)) => {
-                    list.push(Box::new(value));
+                    list.push(value);
                 }
                 _ => {
                     self.inner
                         .options
-                        .insert(name.to_string(), PhpMixed::List(vec![Box::new(value)]));
+                        .insert(name.to_string(), PhpMixed::List(vec![value]));
                 }
             }
         } else {

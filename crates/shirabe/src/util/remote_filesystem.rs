@@ -234,7 +234,7 @@ impl RemoteFilesystem {
         if let Some(http_opts) = options.get_mut("http")
             && let PhpMixed::Array(m) = http_opts
         {
-            m.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
+            m.insert("ignore_errors".to_string(), PhpMixed::Bool(true));
         }
 
         let mut degraded_packagist = false;
@@ -331,7 +331,7 @@ impl RemoteFilesystem {
                             .map(|s| json_decode(s, true).unwrap_or(PhpMixed::Null))
                             .unwrap_or(PhpMixed::Null);
                         let parsed_map: IndexMap<String, PhpMixed> = match parsed {
-                            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                            PhpMixed::Array(m) => m.into_iter().collect(),
                             _ => IndexMap::new(),
                         };
                         let _ = HttpDownloader::output_warnings(
@@ -854,10 +854,7 @@ impl RemoteFilesystem {
                 .entry("http".to_string())
                 .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
             if let PhpMixed::Array(m) = http_entry {
-                m.insert(
-                    "protocol_version".to_string(),
-                    Box::new(PhpMixed::Float(1.1)),
-                );
+                m.insert("protocol_version".to_string(), PhpMixed::Float(1.1));
             }
             headers.push("Connection: close".to_string());
         }
@@ -866,7 +863,7 @@ impl RemoteFilesystem {
             .get("http")
             .and_then(|v| v.as_array())
             .and_then(|m| m.get("header"))
-            .map(|v| matches!(v.as_ref(), PhpMixed::String(_)))
+            .map(|v| matches!(v, PhpMixed::String(_)))
             .unwrap_or(false);
         if header_is_string {
             let header_str = options["http"].as_array().unwrap()["header"]
@@ -877,12 +874,7 @@ impl RemoteFilesystem {
             if let Some(PhpMixed::Array(m)) = options.get_mut("http") {
                 m.insert(
                     "header".to_string(),
-                    Box::new(PhpMixed::List(
-                        split
-                            .into_iter()
-                            .map(|s| Box::new(PhpMixed::String(s)))
-                            .collect(),
-                    )),
+                    PhpMixed::List(split.into_iter().map(PhpMixed::String).collect()),
                 );
             }
         }
@@ -896,16 +888,16 @@ impl RemoteFilesystem {
             .entry("http".to_string())
             .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
         if let PhpMixed::Array(m) = http_entry {
-            m.insert("follow_location".to_string(), Box::new(PhpMixed::Int(0)));
+            m.insert("follow_location".to_string(), PhpMixed::Int(0));
         }
 
         for header in headers {
             if let Some(PhpMixed::Array(m)) = options.get_mut("http") {
                 let header_list = m
                     .entry("header".to_string())
-                    .or_insert_with(|| Box::new(PhpMixed::List(Vec::new())));
-                if let PhpMixed::List(l) = header_list.as_mut() {
-                    l.push(Box::new(PhpMixed::String(header)));
+                    .or_insert_with(|| PhpMixed::List(Vec::new()));
+                if let PhpMixed::List(l) = header_list {
+                    l.push(PhpMixed::String(header));
                 }
             }
         }

@@ -69,23 +69,20 @@ impl Config {
             "preferred-install".to_string(),
             PhpMixed::String("dist".to_string()),
         );
-        let mut audit: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        audit.insert(
-            "ignore".to_string(),
-            Box::new(PhpMixed::Array(IndexMap::new())),
-        );
+        let mut audit: IndexMap<String, PhpMixed> = IndexMap::new();
+        audit.insert("ignore".to_string(), PhpMixed::Array(IndexMap::new()));
         audit.insert(
             "abandoned".to_string(),
-            Box::new(PhpMixed::String(Auditor::ABANDONED_FAIL.to_string())),
+            PhpMixed::String(Auditor::ABANDONED_FAIL.to_string()),
         );
         c.insert("audit".to_string(), PhpMixed::Array(audit));
         c.insert("notify-on-install".to_string(), PhpMixed::Bool(true));
         c.insert(
             "github-protocols".to_string(),
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String("https".to_string())),
-                Box::new(PhpMixed::String("ssh".to_string())),
-                Box::new(PhpMixed::String("git".to_string())),
+                PhpMixed::String("https".to_string()),
+                PhpMixed::String("ssh".to_string()),
+                PhpMixed::String("git".to_string()),
             ]),
         );
         c.insert("gitlab-protocol".to_string(), PhpMixed::Null);
@@ -141,7 +138,7 @@ impl Config {
         );
         c.insert(
             "github-domains".to_string(),
-            PhpMixed::List(vec![Box::new(PhpMixed::String("github.com".to_string()))]),
+            PhpMixed::List(vec![PhpMixed::String("github.com".to_string())]),
         );
         c.insert(
             "bitbucket-expose-hostname".to_string(),
@@ -155,7 +152,7 @@ impl Config {
         c.insert("github-expose-hostname".to_string(), PhpMixed::Bool(true));
         c.insert(
             "gitlab-domains".to_string(),
-            PhpMixed::List(vec![Box::new(PhpMixed::String("gitlab.com".to_string()))]),
+            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
         );
         c.insert(
             "store-auths".to_string(),
@@ -198,7 +195,7 @@ impl Config {
         );
         c.insert(
             "forgejo-domains".to_string(),
-            PhpMixed::List(vec![Box::new(PhpMixed::String("codeberg.org".to_string()))]),
+            PhpMixed::List(vec![PhpMixed::String("codeberg.org".to_string())]),
         );
         c.insert(
             "forgejo-token".to_string(),
@@ -210,14 +207,11 @@ impl Config {
     /// @var array<string, mixed>
     pub fn default_repositories() -> IndexMap<String, PhpMixed> {
         let mut r: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut packagist: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        packagist.insert(
-            "type".to_string(),
-            Box::new(PhpMixed::String("composer".to_string())),
-        );
+        let mut packagist: IndexMap<String, PhpMixed> = IndexMap::new();
+        packagist.insert("type".to_string(), PhpMixed::String("composer".to_string()));
         packagist.insert(
             "url".to_string(),
-            Box::new(PhpMixed::String("https://repo.packagist.org".to_string())),
+            PhpMixed::String("https://repo.packagist.org".to_string()),
         );
         r.insert("packagist.org".to_string(), PhpMixed::Array(packagist));
         r
@@ -316,18 +310,18 @@ impl Config {
                 _ => IndexMap::new(),
             };
             for (key, val_box) in &config_section_map {
-                let val = (**val_box).clone();
+                let val = val_box.clone();
                 if in_array(
                     PhpMixed::String(key.clone()),
                     &PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("bitbucket-oauth".to_string())),
-                        Box::new(PhpMixed::String("github-oauth".to_string())),
-                        Box::new(PhpMixed::String("gitlab-oauth".to_string())),
-                        Box::new(PhpMixed::String("gitlab-token".to_string())),
-                        Box::new(PhpMixed::String("http-basic".to_string())),
-                        Box::new(PhpMixed::String("bearer".to_string())),
-                        Box::new(PhpMixed::String("client-certificate".to_string())),
-                        Box::new(PhpMixed::String("forgejo-token".to_string())),
+                        PhpMixed::String("bitbucket-oauth".to_string()),
+                        PhpMixed::String("github-oauth".to_string()),
+                        PhpMixed::String("gitlab-oauth".to_string()),
+                        PhpMixed::String("gitlab-token".to_string()),
+                        PhpMixed::String("http-basic".to_string()),
+                        PhpMixed::String("bearer".to_string()),
+                        PhpMixed::String("client-certificate".to_string()),
+                        PhpMixed::String("forgejo-token".to_string()),
                     ]),
                     true,
                 ) && self.config.contains_key(key)
@@ -338,9 +332,7 @@ impl Config {
                     self.set_source_of_config_value(&val, key, source);
                 } else if in_array(
                     PhpMixed::String(key.clone()),
-                    &PhpMixed::List(vec![Box::new(PhpMixed::String(
-                        "allow-plugins".to_string(),
-                    ))]),
+                    &PhpMixed::List(vec![PhpMixed::String("allow-plugins".to_string())]),
                     true,
                 ) && self.config.contains_key(key)
                     && is_array(self.config.get(key).unwrap_or(&PhpMixed::Null))
@@ -357,8 +349,8 @@ impl Config {
                 } else if in_array(
                     PhpMixed::String(key.clone()),
                     &PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("gitlab-domains".to_string())),
-                        Box::new(PhpMixed::String("github-domains".to_string())),
+                        PhpMixed::String("gitlab-domains".to_string()),
+                        PhpMixed::String("github-domains".to_string()),
                     ]),
                     true,
                 ) && self.config.contains_key(key)
@@ -375,12 +367,7 @@ impl Config {
                     let deduped = array_unique(&unique_list);
                     self.config.insert(
                         key.clone(),
-                        PhpMixed::List(
-                            deduped
-                                .into_iter()
-                                .map(|s| Box::new(PhpMixed::String(s)))
-                                .collect(),
-                        ),
+                        PhpMixed::List(deduped.into_iter().map(PhpMixed::String).collect()),
                     );
                     self.set_source_of_config_value(&val, key, source);
                 } else if key == "preferred-install" && self.config.contains_key(key) {
@@ -389,13 +376,13 @@ impl Config {
                     if is_array(&val) || is_array(&existing) {
                         if is_string(&val) {
                             let mut m = IndexMap::new();
-                            m.insert("*".to_string(), Box::new(val.clone()));
+                            m.insert("*".to_string(), val.clone());
                             val = PhpMixed::Array(m);
                         }
                         let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                         if is_string(&existing) {
                             let mut m = IndexMap::new();
-                            m.insert("*".to_string(), Box::new(existing));
+                            m.insert("*".to_string(), existing);
                             self.config.insert(key.clone(), PhpMixed::Array(m));
                             self.source_of_config_value
                                 .borrow_mut()
@@ -427,7 +414,6 @@ impl Config {
                         .and_then(|v| v.as_array())
                         .and_then(|m| m.get("ignore"))
                         .cloned()
-                        .map(|b| *b)
                         .unwrap_or(PhpMixed::List(vec![]));
                     let merged = array_merge(
                         self.config.get("audit").cloned().unwrap_or(PhpMixed::Null),
@@ -436,16 +422,14 @@ impl Config {
                     self.config.insert(key.clone(), merged);
                     self.set_source_of_config_value(&val, key, source);
                     let val_ignore = match &val {
-                        PhpMixed::Array(m) => m
-                            .get("ignore")
-                            .cloned()
-                            .map(|b| *b)
-                            .unwrap_or(PhpMixed::List(vec![])),
+                        PhpMixed::Array(m) => {
+                            m.get("ignore").cloned().unwrap_or(PhpMixed::List(vec![]))
+                        }
                         _ => PhpMixed::List(vec![]),
                     };
                     let new_ignores = array_merge(current_ignores, val_ignore);
                     if let Some(PhpMixed::Array(audit)) = self.config.get_mut("audit") {
-                        audit.insert("ignore".to_string(), Box::new(new_ignores));
+                        audit.insert("ignore".to_string(), new_ignores);
                     }
                 } else {
                     self.config.insert(key.clone(), val.clone());
@@ -467,7 +451,7 @@ impl Config {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
             let new_repos_map: IndexMap<String, PhpMixed> = match &repositories_section {
-                PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+                PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                 _ => IndexMap::new(),
             };
             let new_repos: IndexMap<String, PhpMixed> = new_repos_map.into_iter().rev().collect();
@@ -523,12 +507,7 @@ impl Config {
                     }
                     let found_key = array_search_mixed(
                         repository,
-                        &PhpMixed::Array(
-                            self.repositories
-                                .iter()
-                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                .collect(),
-                        ),
+                        &PhpMixed::Array(self.repositories.clone()),
                         true,
                     )
                     .and_then(|v| v.as_string().map(|s| s.to_string()))
@@ -758,10 +737,10 @@ impl Config {
                 if !in_array(
                     PhpMixed::String(value.clone()),
                     &PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("auto".to_string())),
-                        Box::new(PhpMixed::String("full".to_string())),
-                        Box::new(PhpMixed::String("proxy".to_string())),
-                        Box::new(PhpMixed::String("symlink".to_string())),
+                        PhpMixed::String("auto".to_string()),
+                        PhpMixed::String("full".to_string()),
+                        PhpMixed::String("proxy".to_string()),
+                        PhpMixed::String("symlink".to_string()),
                     ]),
                     false,
                 ) {
@@ -792,11 +771,11 @@ impl Config {
                     if !in_array(
                         PhpMixed::String(env_str.clone()),
                         &PhpMixed::List(vec![
-                            Box::new(PhpMixed::String("stash".to_string())),
-                            Box::new(PhpMixed::String("true".to_string())),
-                            Box::new(PhpMixed::String("false".to_string())),
-                            Box::new(PhpMixed::String("1".to_string())),
-                            Box::new(PhpMixed::String("0".to_string())),
+                            PhpMixed::String("stash".to_string()),
+                            PhpMixed::String("true".to_string()),
+                            PhpMixed::String("false".to_string()),
+                            PhpMixed::String("1".to_string()),
+                            PhpMixed::String("0".to_string()),
                         ]),
                         true,
                     ) {
@@ -861,7 +840,7 @@ impl Config {
                         &PhpMixed::String("git".to_string()),
                         &PhpMixed::Array(
                             map.into_iter()
-                                .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                                .map(|(k, v)| (k, PhpMixed::String(v)))
                                 .collect(),
                         ),
                         false,
@@ -887,10 +866,7 @@ impl Config {
                 }
 
                 Ok(PhpMixed::List(
-                    protos
-                        .into_iter()
-                        .map(|s| Box::new(PhpMixed::String(s)))
-                        .collect(),
+                    protos.into_iter().map(PhpMixed::String).collect(),
                 ))
             }
 
@@ -916,7 +892,7 @@ impl Config {
                         &PhpMixed::List(
                             valid_choices
                                 .iter()
-                                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                                .map(|s| PhpMixed::String(s.clone()))
                                 .collect(),
                         ),
                         true,
@@ -932,10 +908,7 @@ impl Config {
                         .into());
                     }
                     if let PhpMixed::Array(ref mut m) = result {
-                        m.insert(
-                            "abandoned".to_string(),
-                            Box::new(PhpMixed::String(abandoned_env_str)),
-                        );
+                        m.insert("abandoned".to_string(), PhpMixed::String(abandoned_env_str));
                     }
                 }
 
@@ -946,8 +919,8 @@ impl Config {
                     if !in_array(
                         PhpMixed::String(env_str.clone()),
                         &PhpMixed::List(vec![
-                            Box::new(PhpMixed::String("0".to_string())),
-                            Box::new(PhpMixed::String("1".to_string())),
+                            PhpMixed::String("0".to_string()),
+                            PhpMixed::String("1".to_string()),
                         ]),
                         true,
                     ) {
@@ -963,7 +936,7 @@ impl Config {
                     if let PhpMixed::Array(ref mut m) = result {
                         m.insert(
                             "block-abandoned".to_string(),
-                            Box::new(PhpMixed::Bool(env_str == "1")),
+                            PhpMixed::Bool(env_str == "1"),
                         );
                     }
                 }
@@ -987,17 +960,12 @@ impl Config {
         let mut all: IndexMap<String, PhpMixed> = IndexMap::new();
         all.insert(
             "repositories".to_string(),
-            PhpMixed::Array(
-                self.get_repositories()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
+            PhpMixed::Array(self.get_repositories()),
         );
         let keys: Vec<String> = self.config.keys().cloned().collect();
-        let mut config_section: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+        let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
         for key in keys {
-            config_section.insert(key.clone(), Box::new(self.get_with_flags(&key, flags)?));
+            config_section.insert(key.clone(), self.get_with_flags(&key, flags)?);
         }
         all.insert("config".to_string(), PhpMixed::Array(config_section));
 
@@ -1024,7 +992,7 @@ impl Config {
             let map = match config_value {
                 PhpMixed::Array(m) => m
                     .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .map(|(k, v)| (k.clone(), v.clone()))
                     .collect::<Vec<_>>(),
                 _ => vec![],
             };
@@ -1039,22 +1007,9 @@ impl Config {
         let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
         result.insert(
             "repositories".to_string(),
-            PhpMixed::Array(
-                self.get_repositories()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
+            PhpMixed::Array(self.get_repositories()),
         );
-        result.insert(
-            "config".to_string(),
-            PhpMixed::Array(
-                self.config
-                    .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                    .collect(),
-            ),
-        );
+        result.insert("config".to_string(), PhpMixed::Array(self.config.clone()));
         result
     }
 
@@ -1163,10 +1118,10 @@ impl Config {
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("http".to_string())),
-                Box::new(PhpMixed::String("git".to_string())),
-                Box::new(PhpMixed::String("ftp".to_string())),
-                Box::new(PhpMixed::String("svn".to_string())),
+                PhpMixed::String("http".to_string()),
+                PhpMixed::String("git".to_string()),
+                PhpMixed::String("ftp".to_string()),
+                PhpMixed::String("svn".to_string()),
             ]),
             false,
         ) {

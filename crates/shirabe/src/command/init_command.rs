@@ -137,12 +137,11 @@ impl Command for InitCommand {
             "license".to_string(),
             "autoload".to_string(),
         ];
-        let filtered_input: IndexMap<String, Box<PhpMixed>> = array_intersect_key(
+        let filtered_input: IndexMap<String, PhpMixed> = array_intersect_key(
             &input.borrow().get_options(),
             &array_flip_strings(&allowlist),
         )
         .into_iter()
-        .map(|(k, v)| (k, Box::new(v)))
         .collect();
         let mut options = shirabe_php_shim::array_filter_map(&filtered_input, |val: &PhpMixed| {
             !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
@@ -178,11 +177,7 @@ impl Command for InitCommand {
                 PhpMixed::List(
                     self.format_authors(&author)?
                         .into_iter()
-                        .map(|m| {
-                            Box::new(PhpMixed::Array(
-                                m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                            ))
-                        })
+                        .map(|m| PhpMixed::Array(m.into_iter().collect()))
                         .collect(),
                 ),
             );
@@ -211,12 +206,7 @@ impl Command for InitCommand {
                     .entry("repositories".to_string())
                     .or_insert_with(|| PhpMixed::List(vec![]));
                 if let PhpMixed::List(list) = entry {
-                    list.push(Box::new(PhpMixed::Array(
-                        repo_config
-                            .into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    )));
+                    list.push(PhpMixed::Array(repo_config.into_iter().collect()));
                 }
             }
         }
@@ -244,7 +234,7 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                        .map(|(k, v)| (k, PhpMixed::String(v)))
                         .collect(),
                 )
             }
@@ -271,7 +261,7 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                        .map(|(k, v)| (k, PhpMixed::String(v)))
                         .collect(),
                 )
             };
@@ -294,19 +284,15 @@ impl Command for InitCommand {
                 .unwrap_or("")
                 .to_string();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
-            let mut psr4: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            psr4.insert(format!("{}\\", namespace), Box::new(PhpMixed::String(ap)));
-            let mut autoload_obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            autoload_obj.insert("psr-4".to_string(), Box::new(PhpMixed::Array(psr4)));
+            let mut psr4 = IndexMap::new();
+            psr4.insert(format!("{}\\", namespace), PhpMixed::String(ap));
+            let mut autoload_obj = IndexMap::new();
+            autoload_obj.insert("psr-4".to_string(), PhpMixed::Array(psr4));
             options.insert("autoload".to_string(), PhpMixed::Array(autoload_obj));
         }
 
         let file_obj = JsonFile::new(Factory::get_composer_file()?, None, None)?;
-        let options_for_encode: IndexMap<String, Box<PhpMixed>> = options
-            .clone()
-            .into_iter()
-            .map(|(k, v)| (k, Box::new(v)))
-            .collect();
+        let options_for_encode: IndexMap<String, PhpMixed> = options.clone().into_iter().collect();
         let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()));
 
         if input.borrow().is_interactive() {
@@ -823,12 +809,7 @@ impl Command for InitCommand {
             };
             input.borrow_mut().set_option(
                 "require",
-                PhpMixed::List(
-                    requirements
-                        .into_iter()
-                        .map(|s| Box::new(PhpMixed::String(s)))
-                        .collect(),
-                ),
+                PhpMixed::List(requirements.into_iter().map(PhpMixed::String).collect()),
             );
 
             let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
@@ -858,12 +839,7 @@ impl Command for InitCommand {
                 };
             input.borrow_mut().set_option(
                 "require-dev",
-                PhpMixed::List(
-                    dev_requirements
-                        .into_iter()
-                        .map(|s| Box::new(PhpMixed::String(s)))
-                        .collect(),
-                ),
+                PhpMixed::List(dev_requirements.into_iter().map(PhpMixed::String).collect()),
             );
 
             // --autoload - input and validation

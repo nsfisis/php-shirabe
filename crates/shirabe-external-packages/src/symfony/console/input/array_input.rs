@@ -378,8 +378,8 @@ impl InputInterface for ArrayInput {
 /// PHP `(array) $values` cast: a string becomes a single-element array.
 fn to_array(values: PhpMixed) -> Vec<PhpMixed> {
     match values {
-        PhpMixed::List(list) => list.into_iter().map(|v| *v).collect(),
-        PhpMixed::Array(array) => array.into_iter().map(|(_, v)| *v).collect(),
+        PhpMixed::List(list) => list.into_iter().collect(),
+        PhpMixed::Array(array) => array.into_iter().map(|(_, v)| v).collect(),
         PhpMixed::Null => vec![],
         other => vec![other],
     }

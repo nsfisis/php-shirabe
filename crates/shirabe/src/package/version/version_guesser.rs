@@ -283,14 +283,14 @@ impl VersionGuesser {
                 &self.process,
                 array_merge(
                     PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("--format=%H".to_string())),
-                        Box::new(PhpMixed::String("-n1".to_string())),
-                        Box::new(PhpMixed::String("HEAD".to_string())),
+                        PhpMixed::String("--format=%H".to_string()),
+                        PhpMixed::String("-n1".to_string()),
+                        PhpMixed::String("HEAD".to_string()),
                     ]),
                     PhpMixed::List(
                         GitUtil::get_no_show_signature_flags(&self.process)
                             .into_iter()
-                            .map(|s| Box::new(PhpMixed::String(s)))
+                            .map(PhpMixed::String)
                             .collect(),
                     ),
                 )
@@ -474,7 +474,7 @@ impl VersionGuesser {
             &json_encode(&PhpMixed::Array(
                 package_config
                     .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                    .map(|(k, v)| (k.clone(), v.clone()))
                     .collect(),
             ))
             .unwrap_or_default(),

@@ -613,9 +613,9 @@ impl BaseCommand for BaseCommandData {
         }
 
         let val = input.borrow().get_option(opt_name)?;
-        let formats: Vec<Box<PhpMixed>> = Auditor::FORMATS
+        let formats: Vec<PhpMixed> = Auditor::FORMATS
             .iter()
-            .map(|s| Box::new(PhpMixed::String(s.to_string())))
+            .map(|s| PhpMixed::String(s.to_string()))
             .collect();
         if !in_array(val.clone(), &PhpMixed::List(formats), true) {
             return Err(InvalidArgumentException {
@@ -824,7 +824,7 @@ pub fn base_command_initialize(
                 PhpMixed::List(
                     explode(",", &ignore_str)
                         .into_iter()
-                        .map(|s| Box::new(PhpMixed::String(s)))
+                        .map(PhpMixed::String)
                         .collect(),
                 ),
             );

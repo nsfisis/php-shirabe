@@ -495,11 +495,7 @@ impl ClassLoader {
     pub fn as_array_iter(&self) -> Vec<(String, PhpMixed)> {
         let key = |name: &str| format!("\0Composer\\Autoload\\ClassLoader\0{}", name);
         let str_list = |v: &Vec<String>| {
-            PhpMixed::List(
-                v.iter()
-                    .map(|s| Box::new(PhpMixed::String(s.clone())))
-                    .collect(),
-            )
+            PhpMixed::List(v.iter().map(|s| PhpMixed::String(s.clone())).collect())
         };
 
         vec![
@@ -518,12 +514,12 @@ impl ClassLoader {
                         .map(|(k, inner)| {
                             (
                                 k.clone(),
-                                Box::new(PhpMixed::Array(
+                                PhpMixed::Array(
                                     inner
                                         .iter()
-                                        .map(|(k2, n)| (k2.clone(), Box::new(PhpMixed::Int(*n))))
+                                        .map(|(k2, n)| (k2.clone(), PhpMixed::Int(*n)))
                                         .collect(),
-                                )),
+                                ),
                             )
                         })
                         .collect(),
@@ -534,7 +530,7 @@ impl ClassLoader {
                 PhpMixed::Array(
                     self.prefix_dirs_psr4
                         .iter()
-                        .map(|(k, v)| (k.clone(), Box::new(str_list(v))))
+                        .map(|(k, v)| (k.clone(), str_list(v)))
                         .collect(),
                 ),
             ),
@@ -547,12 +543,12 @@ impl ClassLoader {
                         .map(|(k, inner)| {
                             (
                                 k.clone(),
-                                Box::new(PhpMixed::Array(
+                                PhpMixed::Array(
                                     inner
                                         .iter()
-                                        .map(|(k2, v)| (k2.clone(), Box::new(str_list(v))))
+                                        .map(|(k2, v)| (k2.clone(), str_list(v)))
                                         .collect(),
-                                )),
+                                ),
                             )
                         })
                         .collect(),
@@ -565,7 +561,7 @@ impl ClassLoader {
                 PhpMixed::Array(
                     self.class_map
                         .iter()
-                        .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
+                        .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
                         .collect(),
                 ),
             ),
@@ -578,7 +574,7 @@ impl ClassLoader {
                 PhpMixed::Array(
                     self.missing_classes
                         .iter()
-                        .map(|(k, b)| (k.clone(), Box::new(PhpMixed::Bool(*b))))
+                        .map(|(k, b)| (k.clone(), PhpMixed::Bool(*b)))
                         .collect(),
                 ),
             ),

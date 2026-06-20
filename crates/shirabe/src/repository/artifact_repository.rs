@@ -190,23 +190,17 @@ impl ArtifactRepository {
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert(
-            "type".to_string(),
-            Box::new(PhpMixed::String(file_type.to_string())),
-        );
-        dist.insert(
-            "url".to_string(),
-            Box::new(PhpMixed::String(url_normalized)),
-        );
-        dist.insert("shasum".to_string(), Box::new(PhpMixed::String(shasum)));
+        dist.insert("type".to_string(), PhpMixed::String(file_type.to_string()));
+        dist.insert("url".to_string(), PhpMixed::String(url_normalized));
+        dist.insert("shasum".to_string(), PhpMixed::String(shasum));
         if let Some(arr) = package.as_array_mut() {
-            arr.insert("dist".to_string(), Box::new(PhpMixed::Array(dist)));
+            arr.insert("dist".to_string(), PhpMixed::Array(dist));
         }
 
         let cfg: IndexMap<String, PhpMixed> = package
             .as_array()
             .cloned()
-            .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect())
+            .map(|m| m.into_iter().collect())
             .unwrap_or_default();
         match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),

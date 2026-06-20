@@ -899,7 +899,6 @@ impl Installer {
             .cloned()
             .unwrap_or_default()
             .into_iter()
-            .map(|(k, v)| (k, *v))
             .collect();
         let updated_lock = self.locker.borrow_mut().set_lock_data(
             lock_transaction.get_new_lock_packages(false, self.update_mirrors),
@@ -1271,7 +1270,6 @@ impl Installer {
                 .cloned()
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k, *v))
                 .collect()
         } else {
             self.locker

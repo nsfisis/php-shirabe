@@ -133,13 +133,13 @@ impl Question {
                     // array_merge(array_keys($values), array_values($values))
                     let mut merged: Vec<PhpMixed> =
                         array.keys().map(|k| PhpMixed::String(k.clone())).collect();
-                    merged.extend(array.values().map(|v| (**v).clone()));
+                    merged.extend(array.values().map(|v| v.clone()));
                     merged
                 } else {
                     // array_values($values)
                     match &values {
-                        PhpMixed::List(list) => list.iter().map(|v| (**v).clone()).collect(),
-                        PhpMixed::Array(array) => array.values().map(|v| (**v).clone()).collect(),
+                        PhpMixed::List(list) => list.iter().cloned().collect(),
+                        PhpMixed::Array(array) => array.values().map(|v| v.clone()).collect(),
                         _ => unreachable!(),
                     }
                 };
@@ -154,8 +154,8 @@ impl Question {
                 // Non-array iterables are not modeled by PhpMixed; extract any
                 // list/array elements, otherwise treat as an empty iterator.
                 let cached: Vec<PhpMixed> = match values {
-                    PhpMixed::List(list) => list.into_iter().map(|v| *v).collect(),
-                    PhpMixed::Array(array) => array.into_values().map(|v| *v).collect(),
+                    PhpMixed::List(list) => list.into_iter().collect(),
+                    PhpMixed::Array(array) => array.into_values().map(|v| v).collect(),
                     _ => Vec::new(),
                 };
                 Some(Box::new(move |_input: &str| Some(cached.clone())))

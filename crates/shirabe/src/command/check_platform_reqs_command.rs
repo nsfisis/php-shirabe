@@ -72,65 +72,63 @@ impl CheckPlatformReqsCommand {
                     let mut row = IndexMap::new();
                     row.insert(
                         "name".to_string(),
-                        Box::new(PhpMixed::String(result.platform_package.clone())),
+                        PhpMixed::String(result.platform_package.clone()),
                     );
                     row.insert(
                         "version".to_string(),
-                        Box::new(PhpMixed::String(result.version.clone())),
+                        PhpMixed::String(result.version.clone()),
                     );
                     row.insert(
                         "status".to_string(),
-                        Box::new(PhpMixed::String(strip_tags(&result.status))),
+                        PhpMixed::String(strip_tags(&result.status)),
                     );
                     if let Some(link) = &result.link {
                         let mut failed_req = IndexMap::new();
                         failed_req.insert(
                             "source".to_string(),
-                            Box::new(PhpMixed::String(link.get_source().to_string())),
+                            PhpMixed::String(link.get_source().to_string()),
                         );
                         failed_req.insert(
                             "type".to_string(),
-                            Box::new(PhpMixed::String(link.get_description().to_string())),
+                            PhpMixed::String(link.get_description().to_string()),
                         );
                         failed_req.insert(
                             "target".to_string(),
-                            Box::new(PhpMixed::String(link.get_target().to_string())),
+                            PhpMixed::String(link.get_target().to_string()),
                         );
                         failed_req.insert(
                             "constraint".to_string(),
-                            Box::new(PhpMixed::String(link.get_pretty_constraint().to_string())),
+                            PhpMixed::String(link.get_pretty_constraint().to_string()),
                         );
                         row.insert(
                             "failed_requirement".to_string(),
-                            Box::new(PhpMixed::Array(failed_req)),
+                            PhpMixed::Array(failed_req),
                         );
                     } else {
-                        row.insert("failed_requirement".to_string(), Box::new(PhpMixed::Null));
+                        row.insert("failed_requirement".to_string(), PhpMixed::Null);
                     }
                     let provider_str = strip_tags(&result.provider);
                     row.insert(
                         "provider".to_string(),
-                        Box::new(if provider_str.is_empty() {
+                        if provider_str.is_empty() {
                             PhpMixed::Null
                         } else {
                             PhpMixed::String(provider_str)
-                        }),
+                        },
                     );
                     PhpMixed::Array(row)
                 })
                 .collect();
 
-            io.write(&JsonFile::encode(&PhpMixed::List(
-                rows.into_iter().map(Box::new).collect(),
-            )));
+            io.write(&JsonFile::encode(&PhpMixed::List(rows)));
         } else {
             let rows: Vec<PhpMixed> = results
                 .iter()
                 .map(|result| {
                     PhpMixed::List(vec![
-                        Box::new(PhpMixed::String(result.platform_package.clone())),
-                        Box::new(PhpMixed::String(result.version.clone())),
-                        Box::new(if let Some(link) = &result.link {
+                        PhpMixed::String(result.platform_package.clone()),
+                        PhpMixed::String(result.version.clone()),
+                        if let Some(link) = &result.link {
                             PhpMixed::String(format!(
                                 "{} {} {} ({})",
                                 link.get_source(),
@@ -140,12 +138,12 @@ impl CheckPlatformReqsCommand {
                             ))
                         } else {
                             PhpMixed::String(String::new())
-                        }),
-                        Box::new(PhpMixed::String(
+                        },
+                        PhpMixed::String(
                             format!("{} {}", result.status, result.provider)
                                 .trim_end()
                                 .to_string(),
-                        )),
+                        ),
                     ])
                 })
                 .collect();

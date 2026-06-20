@@ -231,7 +231,7 @@ impl Problem {
                 &PhpMixed::List(
                     deduplicatable_rule_types
                         .iter()
-                        .map(|t| Box::new(PhpMixed::Int(*t)))
+                        .map(|t| PhpMixed::Int(*t))
                         .collect(),
                 ),
                 true,
@@ -937,8 +937,8 @@ impl Problem {
                     if in_array(
                         PhpMixed::String(candidate.get_version().to_string()),
                         &PhpMixed::List(vec![
-                            Box::new(PhpMixed::String("dev-default".to_string())),
-                            Box::new(PhpMixed::String("dev-main".to_string())),
+                            PhpMixed::String("dev-default".to_string()),
+                            PhpMixed::String("dev-main".to_string()),
                         ]),
                         true,
                     ) {

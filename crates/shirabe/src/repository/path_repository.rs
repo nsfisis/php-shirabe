@@ -82,7 +82,6 @@ impl PathRepository {
             .cloned()
             .unwrap_or_default()
             .into_iter()
-            .map(|(k, v)| (k, *v))
             .collect::<IndexMap<String, PhpMixed>>();
         if !options.contains_key("relative") {
             let filesystem = Filesystem::new(None);
@@ -152,16 +151,13 @@ impl PathRepository {
             let json = file_get_contents(&composer_file_path).unwrap_or_default();
             let parsed = JsonFile::parse_json(Some(&json), Some(&composer_file_path))?;
             let mut package: IndexMap<String, PhpMixed> = match parsed {
-                PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                PhpMixed::Array(m) => m.into_iter().collect(),
                 _ => IndexMap::new(),
             };
             let dist = {
-                let mut dist = IndexMap::new();
-                dist.insert(
-                    "type".to_string(),
-                    Box::new(PhpMixed::String("path".to_string())),
-                );
-                dist.insert("url".to_string(), Box::new(PhpMixed::String(url.clone())));
+                let mut dist: IndexMap<String, PhpMixed> = IndexMap::new();
+                dist.insert("type".to_string(), PhpMixed::String("path".to_string()));
+                dist.insert("url".to_string(), PhpMixed::String(url.clone()));
                 dist
             };
             package.insert("dist".to_string(), PhpMixed::Array(dist));
@@ -174,30 +170,27 @@ impl PathRepository {
                 .to_string();
             if reference == "none" {
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
-                    dist.insert("reference".to_string(), Box::new(PhpMixed::Null));
+                    dist.insert("reference".to_string(), PhpMixed::Null);
                 }
             } else if reference == "config" || reference == "auto" {
                 let options_mixed = PhpMixed::Array(
                     self.options
                         .iter()
-                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                        .map(|(k, v)| (k.clone(), v.clone()))
                         .collect(),
                 );
                 let ref_hash = hash("sha1", &format!("{}{}", json, serialize(&options_mixed)));
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
-                    dist.insert(
-                        "reference".to_string(),
-                        Box::new(PhpMixed::String(ref_hash)),
-                    );
+                    dist.insert("reference".to_string(), PhpMixed::String(ref_hash));
                 }
             }
 
             // copy symlink/relative options to transport options
-            let transport_options: IndexMap<String, Box<PhpMixed>> = self
+            let transport_options: IndexMap<String, PhpMixed> = self
                 .options
                 .iter()
                 .filter(|(k, _)| k.as_str() == "symlink" || k.as_str() == "relative")
-                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
             package.insert(
                 "transport-options".to_string(),
@@ -274,7 +267,7 @@ impl PathRepository {
                     .trim()
                     .to_string();
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
-                    dist.insert("reference".to_string(), Box::new(PhpMixed::String(ref_val)));
+                    dist.insert("reference".to_string(), PhpMixed::String(ref_val));
                 }
             }
 

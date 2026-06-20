@@ -338,10 +338,10 @@ impl DownloaderInterface for FileDownloader {
                                 && !in_array(
                                     PhpMixed::Int(te.get_code()),
                                     &PhpMixed::List(vec![
-                                        Box::new(PhpMixed::Int(500)),
-                                        Box::new(PhpMixed::Int(502)),
-                                        Box::new(PhpMixed::Int(503)),
-                                        Box::new(PhpMixed::Int(504)),
+                                        PhpMixed::Int(500),
+                                        PhpMixed::Int(502),
+                                        PhpMixed::Int(503),
+                                        PhpMixed::Int(504),
                                     ]),
                                     true,
                                 )

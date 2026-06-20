@@ -24,7 +24,7 @@ impl PackageRepository {
     pub fn new(config: IndexMap<String, PhpMixed>) -> Self {
         let package = config.get("package").cloned().unwrap_or(PhpMixed::Null);
         let config_list: Vec<PhpMixed> = match package {
-            PhpMixed::List(list) => list.into_iter().map(|p| *p).collect(),
+            PhpMixed::List(list) => list.into_iter().collect(),
             other => vec![other],
         };
 
@@ -33,7 +33,7 @@ impl PackageRepository {
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()))
         {
-            PhpMixed::Array(map) => map.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(map) => map,
             _ => IndexMap::new(),
         };
 
@@ -51,8 +51,8 @@ impl PackageRepository {
         let mut loader =
             ValidatingArrayLoader::new(Box::new(ArrayLoader::new(None, true)), true, None, 0);
         for package in &self.config {
-            let config_map: IndexMap<String, Box<PhpMixed>> = match package {
-                PhpMixed::Array(m) => m.clone(),
+            let config_map: IndexMap<String, PhpMixed> = match package {
+                PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                 _ => IndexMap::new(),
             };
             let package_loaded = match loader.load(config_map, "") {
@@ -104,8 +104,8 @@ impl AdvisoryProviderInterface for PackageRepository {
             };
             let mut items: Vec<AnySecurityAdvisory> = Vec::new();
             for data in list {
-                let data_map: IndexMap<String, PhpMixed> = match data.as_ref() {
-                    PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect(),
+                let data_map: IndexMap<String, PhpMixed> = match data {
+                    PhpMixed::Array(m) => m.clone(),
                     _ => continue,
                 };
                 let advisory =

@@ -136,12 +136,7 @@ impl ApplicationDescription {
             entry.insert("id".to_string(), PhpMixed::String(namespace.clone()));
             entry.insert(
                 "commands".to_string(),
-                PhpMixed::List(
-                    names
-                        .into_iter()
-                        .map(|n| Box::new(PhpMixed::String(n)))
-                        .collect(),
-                ),
+                PhpMixed::List(names.into_iter().map(PhpMixed::String).collect()),
             );
             self.namespaces.as_mut().unwrap().insert(namespace, entry);
         }

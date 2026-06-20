@@ -342,7 +342,7 @@ impl TextDescriptor {
                 for namespace in namespaces.values() {
                     if let Some(PhpMixed::List(ns_commands)) = namespace.get("commands") {
                         for c in ns_commands {
-                            if let PhpMixed::String(name) = c.as_ref()
+                            if let PhpMixed::String(name) = c
                                 && command_keys.contains(name)
                             {
                                 merged.push(CommandOrString::String(name.clone()));
@@ -369,7 +369,7 @@ impl TextDescriptor {
                 let ns_commands: Vec<String> = match namespace.get("commands") {
                     Some(PhpMixed::List(names)) => names
                         .iter()
-                        .filter_map(|n| match n.as_ref() {
+                        .filter_map(|n| match n {
                             PhpMixed::String(name) if commands.contains_key(name) => {
                                 Some(name.clone())
                             }
@@ -467,8 +467,8 @@ impl TextDescriptor {
             PhpMixed::Array(arr) => {
                 let mut arr = arr.clone();
                 for (_key, value) in arr.iter_mut() {
-                    if let PhpMixed::String(s) = value.as_ref() {
-                        **value = PhpMixed::String(OutputFormatter::escape(s)?);
+                    if let PhpMixed::String(s) = &*value {
+                        *value = PhpMixed::String(OutputFormatter::escape(s)?);
                     }
                 }
                 PhpMixed::Array(arr)
@@ -476,8 +476,8 @@ impl TextDescriptor {
             PhpMixed::List(list) => {
                 let mut list = list.clone();
                 for value in list.iter_mut() {
-                    if let PhpMixed::String(s) = value.as_ref() {
-                        **value = PhpMixed::String(OutputFormatter::escape(s)?);
+                    if let PhpMixed::String(s) = &*value {
+                        *value = PhpMixed::String(OutputFormatter::escape(s)?);
                     }
                 }
                 PhpMixed::List(list)

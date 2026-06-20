@@ -110,7 +110,7 @@ impl FilesystemRepository {
             let data = self.file.read()?;
             let packages_value = if let PhpMixed::Array(ref m) = data {
                 if m.contains_key("packages") {
-                    (*m.get("packages").unwrap().clone()).clone()
+                    m.get("packages").unwrap().clone()
                 } else {
                     data.clone()
                 }
@@ -163,30 +163,14 @@ impl FilesystemRepository {
         let mut loader = ArrayLoader::new(None, true);
         if let Some(packages_list) = packages.as_list() {
             for package_data in packages_list.iter() {
-                let cfg = (**package_data)
-                    .as_array()
-                    .cloned()
-                    .map(|m| {
-                        m.into_iter()
-                            .map(|(k, v)| (k, *v))
-                            .collect::<IndexMap<String, PhpMixed>>()
-                    })
-                    .unwrap_or_default();
+                let cfg = package_data.as_array().cloned().unwrap_or_default();
                 let package =
                     loader.load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))?;
                 self.inner.add_package(package)?;
             }
         } else if let Some(packages_array) = packages.as_array() {
             for (_, package_data) in packages_array.iter() {
-                let cfg = (**package_data)
-                    .as_array()
-                    .cloned()
-                    .map(|m| {
-                        m.into_iter()
-                            .map(|(k, v)| (k, *v))
-                            .collect::<IndexMap<String, PhpMixed>>()
-                    })
-                    .unwrap_or_default();
+                let cfg = package_data.as_array().cloned().unwrap_or_default();
                 let package =
                     loader.load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))?;
                 self.inner.add_package(package)?;
@@ -286,12 +270,7 @@ impl FilesystemRepository {
                 },
             );
             if let Some(PhpMixed::List(list)) = data.get_mut("packages") {
-                list.push(Box::new(PhpMixed::Array(
-                    pkg_array
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                )));
+                list.push(PhpMixed::Array(pkg_array.into_iter().collect()));
             }
 
             // only write to the files the names which are really installed, as we receive the full list
@@ -302,25 +281,25 @@ impl FilesystemRepository {
                     self.inner
                         .dev_package_names
                         .iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
+                        .map(|s| PhpMixed::String(s.clone()))
                         .collect(),
                 ),
                 true,
             ) && let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names")
             {
-                list.push(Box::new(PhpMixed::String(package.get_name().to_string())));
+                list.push(PhpMixed::String(package.get_name().to_string()));
             }
         }
 
         // PHP: sort($data['dev-package-names']);
         if let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names") {
-            usort(list, |a: &Box<PhpMixed>, b: &Box<PhpMixed>| -> i64 {
+            usort(list, |a: &PhpMixed, b: &PhpMixed| -> i64 {
                 shirabe_php_shim::strcmp(a.as_string().unwrap_or(""), b.as_string().unwrap_or(""))
             });
         }
         // PHP: usort($data['packages'], static function ($a, $b): int { return strcmp($a['name'], $b['name']); });
         if let Some(PhpMixed::List(list)) = data.get_mut("packages") {
-            usort(list, |a: &Box<PhpMixed>, b: &Box<PhpMixed>| -> i64 {
+            usort(list, |a: &PhpMixed, b: &PhpMixed| -> i64 {
                 let a_name = a
                     .as_array()
                     .and_then(|m| m.get("name"))
@@ -335,12 +314,8 @@ impl FilesystemRepository {
             });
         }
 
-        self.file.write(PhpMixed::Array(
-            data.clone()
-                .into_iter()
-                .map(|(k, v)| (k, Box::new(v)))
-                .collect(),
-        ))?;
+        self.file
+            .write(PhpMixed::Array(data.clone().into_iter().collect()))?;
 
         if self.dump_versions {
             let versions = self.generate_installed_versions(
@@ -403,7 +378,7 @@ impl FilesystemRepository {
                     evaluated
                         .as_array()
                         .cloned()
-                        .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect())
+                        .map(|m| m.into_iter().collect())
                         .unwrap_or_default(),
                 );
 
@@ -432,7 +407,7 @@ impl FilesystemRepository {
                     if !inner_arr.is_empty() {
                         let inner_map: IndexMap<String, PhpMixed> = inner_arr
                             .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .map(|(k, v)| (k.clone(), v.clone()))
                             .collect();
                         lines.push_str(&self.dump_to_php_code(&inner_map, level));
                     } else {
@@ -443,7 +418,7 @@ impl FilesystemRepository {
                         let inner_map: IndexMap<String, PhpMixed> = list
                             .iter()
                             .enumerate()
-                            .map(|(i, v)| (i.to_string(), (**v).clone()))
+                            .map(|(i, v)| (i.to_string(), v.clone()))
                             .collect();
                         lines.push_str(&self.dump_to_php_code(&inner_map, level));
                     } else {
@@ -493,7 +468,7 @@ impl FilesystemRepository {
             self.inner
                 .dev_package_names
                 .iter()
-                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .map(|s| PhpMixed::String(s.clone()))
                 .collect(),
         ));
         let mut packages: Vec<PackageInterfaceHandle> =
@@ -531,7 +506,6 @@ impl FilesystemRepository {
                     &dev_packages,
                 )
                 .into_iter()
-                .map(|(k, v)| (k, Box::new(v)))
                 .collect(),
             ),
         );
@@ -552,9 +526,7 @@ impl FilesystemRepository {
             if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
                 versions_map.insert(
                     package.get_name().to_string(),
-                    Box::new(PhpMixed::Array(
-                        dumped.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                    )),
+                    PhpMixed::Array(dumped.into_iter().collect()),
                 );
             }
         }
@@ -626,13 +598,13 @@ impl FilesystemRepository {
 
         if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
             for (_name, version) in versions_map.iter_mut() {
-                if let PhpMixed::Array(version_map) = version.as_mut() {
+                if let PhpMixed::Array(version_map) = version {
                     for key in ["aliases", "replaced", "provided"] {
-                        if let Some(boxed) = version_map.get_mut(key)
-                            && let PhpMixed::List(list) = boxed.as_mut()
+                        if let Some(entry) = version_map.get_mut(key)
+                            && let PhpMixed::List(list) = entry
                         {
                             // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
-                            usort(list, |a: &Box<PhpMixed>, b: &Box<PhpMixed>| -> i64 {
+                            usort(list, |a: &PhpMixed, b: &PhpMixed| -> i64 {
                                 shirabe_php_shim::strnatcmp(
                                     a.as_string().unwrap_or(""),
                                     b.as_string().unwrap_or(""),
@@ -871,28 +843,26 @@ impl RepositoryInterface for FilesystemRepository {
 fn versions_entry<'a>(
     versions: &'a mut IndexMap<String, PhpMixed>,
     target: &str,
-) -> &'a mut IndexMap<String, Box<PhpMixed>> {
+) -> &'a mut IndexMap<String, PhpMixed> {
     let versions_map = match versions.get_mut("versions") {
         Some(PhpMixed::Array(m)) => m,
         _ => unreachable!("versions['versions'] is always an array"),
     };
     match versions_map
         .entry(target.to_string())
-        .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())))
-        .as_mut()
+        .or_insert_with(|| PhpMixed::Array(IndexMap::new()))
     {
         PhpMixed::Array(m) => m,
         _ => unreachable!("versions['versions'][target] is always an array"),
     }
 }
 
-fn push_to_list(entry: &mut IndexMap<String, Box<PhpMixed>>, key: &str, value: String) {
+fn push_to_list(entry: &mut IndexMap<String, PhpMixed>, key: &str, value: String) {
     if let PhpMixed::List(list) = entry
         .entry(key.to_string())
-        .or_insert_with(|| Box::new(PhpMixed::List(vec![])))
-        .as_mut()
+        .or_insert_with(|| PhpMixed::List(vec![]))
     {
-        list.push(Box::new(PhpMixed::String(value)));
+        list.push(PhpMixed::String(value));
     }
 }
 
@@ -907,17 +877,14 @@ fn record_replace_or_provide(
     if !entry.contains_key("dev_requirement") {
         entry.insert(
             "dev_requirement".to_string(),
-            Box::new(PhpMixed::Bool(is_dev_package)),
+            PhpMixed::Bool(is_dev_package),
         );
     } else if !is_dev_package {
-        entry.insert(
-            "dev_requirement".to_string(),
-            Box::new(PhpMixed::Bool(false)),
-        );
+        entry.insert("dev_requirement".to_string(), PhpMixed::Bool(false));
     }
     let already_present = match entry.get(key) {
         Some(b) => matches!(
-            b.as_ref(),
+            b,
             PhpMixed::List(list) if list.iter().any(|v| v.as_string() == Some(value.as_str()))
         ),
         None => false,

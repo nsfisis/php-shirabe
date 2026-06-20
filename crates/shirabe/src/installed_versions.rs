@@ -55,12 +55,7 @@ impl InstalledVersions {
                 .cloned()
                 .unwrap_or_default();
             // PHP: array_keys($installed['versions'])
-            let keys: Vec<String> = array_keys(
-                &versions
-                    .into_iter()
-                    .map(|(k, v)| (k, *v))
-                    .collect::<IndexMap<String, PhpMixed>>(),
-            );
+            let keys: Vec<String> = array_keys(&versions);
             packages.push(keys);
         }
 
@@ -74,26 +69,12 @@ impl InstalledVersions {
             &PhpMixed::List(
                 packages
                     .into_iter()
-                    .map(|p| {
-                        Box::new(PhpMixed::List(
-                            p.into_iter()
-                                .map(|s| Box::new(PhpMixed::String(s)))
-                                .collect(),
-                        ))
-                    })
+                    .map(|p| PhpMixed::List(p.into_iter().map(PhpMixed::String).collect()))
                     .collect(),
             ),
         );
         let flipped = array_flip(&merged);
-        array_keys(
-            &flipped
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(k, v)| (k, *v))
-                .collect::<IndexMap<String, PhpMixed>>(),
-        )
+        array_keys(&flipped.as_array().cloned().unwrap_or_default())
     }
 
     /// Returns a list of all package names with a specific type e.g. 'library'
@@ -139,7 +120,7 @@ impl InstalledVersions {
                 let dev_requirement = package
                     .as_array()
                     .and_then(|a| a.get("dev_requirement"))
-                    .map(|v| v.as_ref().clone())
+                    .cloned()
                     .unwrap_or(PhpMixed::Null);
                 return include_dev_requirements
                     || matches!(dev_requirement, PhpMixed::Null)
@@ -197,15 +178,8 @@ impl InstalledVersions {
             }
             if pkg.contains_key("aliases") {
                 ranges = array_merge(
-                    PhpMixed::List(
-                        ranges
-                            .iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    ),
-                    pkg.get("aliases")
-                        .map(|v| (**v).clone())
-                        .unwrap_or(PhpMixed::Null),
+                    PhpMixed::List(ranges.iter().map(|s| PhpMixed::String(s.clone())).collect()),
+                    pkg.get("aliases").cloned().unwrap_or(PhpMixed::Null),
                 )
                 .as_list()
                 .map(|l| {
@@ -217,15 +191,8 @@ impl InstalledVersions {
             }
             if pkg.contains_key("replaced") {
                 ranges = array_merge(
-                    PhpMixed::List(
-                        ranges
-                            .iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    ),
-                    pkg.get("replaced")
-                        .map(|v| (**v).clone())
-                        .unwrap_or(PhpMixed::Null),
+                    PhpMixed::List(ranges.iter().map(|s| PhpMixed::String(s.clone())).collect()),
+                    pkg.get("replaced").cloned().unwrap_or(PhpMixed::Null),
                 )
                 .as_list()
                 .map(|l| {
@@ -237,15 +204,8 @@ impl InstalledVersions {
             }
             if pkg.contains_key("provided") {
                 ranges = array_merge(
-                    PhpMixed::List(
-                        ranges
-                            .iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    ),
-                    pkg.get("provided")
-                        .map(|v| (**v).clone())
-                        .unwrap_or(PhpMixed::Null),
+                    PhpMixed::List(ranges.iter().map(|s| PhpMixed::String(s.clone())).collect()),
+                    pkg.get("provided").cloned().unwrap_or(PhpMixed::Null),
                 )
                 .as_list()
                 .map(|l| {
@@ -386,7 +346,6 @@ impl InstalledVersions {
             .into_iter()
             .next()
             .and_then(|d| d.get("root").and_then(|v| v.as_array()).cloned())
-            .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect())
             .unwrap_or_default()
     }
 
@@ -480,11 +439,8 @@ impl InstalledVersions {
                 } else if is_file(&format!("{}/composer/installed.php", vendor_dir)) {
                     let required =
                         require_php_file(&format!("{}/composer/installed.php", vendor_dir,));
-                    let required_map: IndexMap<String, PhpMixed> = required
-                        .as_array()
-                        .cloned()
-                        .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect())
-                        .unwrap_or_default();
+                    let required_map: IndexMap<String, PhpMixed> =
+                        required.as_array().cloned().unwrap_or_default();
                     INSTALLED_BY_VENDOR
                         .lock()
                         .unwrap()
@@ -515,7 +471,7 @@ impl InstalledVersions {
                     *installed_static = required
                         .as_array()
                         .cloned()
-                        .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect());
+                        .map(|m| m.into_iter().collect());
                 } else {
                     *installed_static = Some(IndexMap::new());
                 }

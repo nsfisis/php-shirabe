@@ -237,7 +237,6 @@ impl ComposerRepository {
             .cloned()
             .unwrap_or_default()
             .into_iter()
-            .map(|(k, v)| (k, *v))
             .collect::<IndexMap<String, PhpMixed>>();
         let mut url = repo_config
             .get("url")
@@ -738,7 +737,7 @@ impl ComposerRepository {
                 // do not show virtual packages in results as they are not directly useful from a composer perspective
                 if let Some(v) = arr.get("virtual") {
                     // PHP's `empty()` is false when the value is truthy
-                    let is_empty = match &**v {
+                    let is_empty = match v {
                         PhpMixed::Null => true,
                         PhpMixed::Bool(false) => true,
                         PhpMixed::Int(0) => true,
@@ -753,11 +752,7 @@ impl ComposerRepository {
                     }
                 }
 
-                results.push(
-                    arr.iter()
-                        .map(|(k, v)| (k.clone(), (**v).clone()))
-                        .collect(),
-                );
+                results.push(arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
             }
 
             return Ok(results);
@@ -923,11 +918,8 @@ impl ComposerRepository {
             let advisory = PartialSecurityAdvisory::create(name, data, &parser)?;
             let is_full = matches!(advisory, AnySecurityAdvisory::Full(_));
             if !allow_partial_advisories && !is_full {
-                let data_mixed = PhpMixed::Array(
-                    data.iter()
-                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                        .collect(),
-                );
+                let data_mixed =
+                    PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
                 return Err(RuntimeException {
                     message: format!(
                         "Advisory for {} could not be loaded as a full advisory from {}{}{}",
@@ -976,7 +968,7 @@ impl ComposerRepository {
                 let response = spec
                     .as_list()
                     .and_then(|l| l.first())
-                    .map(|b| (**b).clone())
+                    .cloned()
                     .unwrap_or(PhpMixed::Null);
                 let response_arr = match response.as_array() {
                     Some(a) => a.clone(),
@@ -995,10 +987,8 @@ impl ComposerRepository {
                     let mut entries: Vec<AnySecurityAdvisory> = Vec::new();
                     for (_k, data_mixed) in sec_advs_arr.iter() {
                         if let Some(data) = data_mixed.as_array() {
-                            let data_map: IndexMap<String, PhpMixed> = data
-                                .iter()
-                                .map(|(k, v)| (k.clone(), (**v).clone()))
-                                .collect();
+                            let data_map: IndexMap<String, PhpMixed> =
+                                data.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                             if let Some(adv) = create(&data_map, &name, &package_constraint_map)? {
                                 entries.push(adv);
                             }
@@ -1018,30 +1008,27 @@ impl ComposerRepository {
                 .entry("http".to_string())
                 .or_insert(PhpMixed::Array(IndexMap::new()));
             if let PhpMixed::Array(http_map) = http_entry {
-                http_map.insert(
-                    "method".to_string(),
-                    Box::new(PhpMixed::String("POST".to_string())),
-                );
-                if let Some(header_box) = http_map.get("header") {
+                http_map.insert("method".to_string(), PhpMixed::String("POST".to_string()));
+                if let Some(header_val) = http_map.get("header") {
                     // cast to array
-                    let arr = match &**header_box {
+                    let arr = match header_val {
                         PhpMixed::List(l) => l.clone(),
-                        other => vec![Box::new(other.clone())],
+                        other => vec![other.clone()],
                     };
-                    http_map.insert("header".to_string(), Box::new(PhpMixed::List(arr)));
+                    http_map.insert("header".to_string(), PhpMixed::List(arr));
                 }
                 let mut headers = match http_map.get("header") {
-                    Some(b) => match &**b {
+                    Some(b) => match b {
                         PhpMixed::List(l) => l.clone(),
                         _ => vec![],
                     },
                     None => vec![],
                 };
-                headers.push(Box::new(PhpMixed::String(
+                headers.push(PhpMixed::String(
                     "Content-type: application/x-www-form-urlencoded".to_string(),
-                )));
-                http_map.insert("header".to_string(), Box::new(PhpMixed::List(headers)));
-                http_map.insert("timeout".to_string(), Box::new(PhpMixed::Int(10)));
+                ));
+                http_map.insert("header".to_string(), PhpMixed::List(headers));
+                http_map.insert("timeout".to_string(), PhpMixed::Int(10));
                 let packages_list: Vec<(String, String)> = package_constraint_map
                     .keys()
                     .map(|k| ("packages".to_string(), k.clone()))
@@ -1054,7 +1041,7 @@ impl ComposerRepository {
                     "&",
                     "=",
                 );
-                http_map.insert("content".to_string(), Box::new(PhpMixed::String(body)));
+                http_map.insert("content".to_string(), PhpMixed::String(body));
             }
 
             let response = self.http_downloader.borrow_mut().get(&api_url, options)?;
@@ -1087,10 +1074,8 @@ impl ComposerRepository {
                     let mut entries: Vec<AnySecurityAdvisory> = Vec::new();
                     for data_mixed in list.iter() {
                         if let Some(data) = data_mixed.as_array() {
-                            let data_map: IndexMap<String, PhpMixed> = data
-                                .iter()
-                                .map(|(k, v)| (k.clone(), (**v).clone()))
-                                .collect();
+                            let data_map: IndexMap<String, PhpMixed> =
+                                data.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                             if let Some(adv) = create(&data_map, name, &package_constraint_map)? {
                                 entries.push(adv);
                             }
@@ -1147,7 +1132,7 @@ impl ComposerRepository {
                     {
                         let entry: IndexMap<String, PhpMixed> = provider
                             .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .map(|(k, v)| (k.clone(), v.clone()))
                             .collect();
                         result.insert(name.to_string(), entry);
                     }
@@ -1343,10 +1328,8 @@ impl ComposerRepository {
                 if let Some(raw) = self.cache.read(&cache_key) {
                     let decoded = json_decode(&raw, true)?;
                     if let Some(arr) = decoded.as_array() {
-                        let map: IndexMap<String, PhpMixed> = arr
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect();
+                        let map: IndexMap<String, PhpMixed> =
+                            arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                         packages_opt = Some(map);
                         packages_source = Some(format!(
                             "cached file ({} originating from {})",
@@ -1363,10 +1346,8 @@ impl ComposerRepository {
                 // we already loaded some packages from this file, so assume it is fresh and avoid fetching it again
                 if already_loaded.contains_key(name) {
                     if let Some(arr) = &contents_arr {
-                        let map: IndexMap<String, PhpMixed> = arr
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect();
+                        let map: IndexMap<String, PhpMixed> =
+                            arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                         packages_opt = Some(map);
                         packages_source = Some(format!(
                             "cached file ({} originating from {})",
@@ -1382,10 +1363,8 @@ impl ComposerRepository {
                         self.fetch_file_if_last_modified(&url, &cache_key, last_modified)?;
                     match response {
                         FetchFileIfLastModifiedResult::NotModified => {
-                            let map: IndexMap<String, PhpMixed> = arr
-                                .iter()
-                                .map(|(k, v)| (k.clone(), (**v).clone()))
-                                .collect();
+                            let map: IndexMap<String, PhpMixed> =
+                                arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                             packages_opt = Some(map);
                             packages_source = Some(format!(
                                 "cached file ({} originating from {})",
@@ -1424,10 +1403,7 @@ impl ComposerRepository {
                                         Some(c) => PhpMixed::Int(c),
                                         None => PhpMixed::Null,
                                     },
-                                    &PhpMixed::List(vec![
-                                        Box::new(PhpMixed::Int(404)),
-                                        Box::new(PhpMixed::Int(499)),
-                                    ]),
+                                    &PhpMixed::List(vec![PhpMixed::Int(404), PhpMixed::Int(499)]),
                                     true,
                                 )
                             {
@@ -1466,23 +1442,14 @@ impl ComposerRepository {
                 .get(name)
                 .cloned()
                 .unwrap_or_default();
-            let entries_mixed: Vec<Box<PhpMixed>> = entries
+            let entries_mixed: Vec<PhpMixed> = entries
                 .into_iter()
-                .map(|m| {
-                    Box::new(PhpMixed::Array(
-                        m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                    ))
-                })
+                .map(|m| PhpMixed::Array(m.into_iter().collect()))
                 .collect();
             versions_map.insert("versions".to_string(), PhpMixed::List(entries_mixed));
             packages_inner.insert(
                 "packages".to_string(),
-                PhpMixed::Array(
-                    versions_map
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                ),
+                PhpMixed::Array(versions_map.into_iter().collect()),
             );
             packages = packages_inner;
             packages_source = Some(format!(
@@ -1501,9 +1468,9 @@ impl ComposerRepository {
             .unwrap_or_default();
         for (_pkg_key, versions_mixed) in packages_inner.iter() {
             // $versions can be either array<string, array> or list<array>
-            let iter_versions: Vec<PhpMixed> = match &**versions_mixed {
-                PhpMixed::Array(a) => a.values().map(|v| (**v).clone()).collect(),
-                PhpMixed::List(l) => l.iter().map(|v| (**v).clone()).collect(),
+            let iter_versions: Vec<PhpMixed> = match versions_mixed {
+                PhpMixed::Array(a) => a.values().map(|v| v.clone()).collect(),
+                PhpMixed::List(l) => l.clone(),
                 _ => continue,
             };
             for version_mixed in iter_versions.iter() {
@@ -1513,7 +1480,7 @@ impl ComposerRepository {
                 };
                 let mut version: IndexMap<String, PhpMixed> = version_arr
                     .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .map(|(k, v)| (k.clone(), v.clone()))
                     .collect();
                 let normalized_name = strtolower(
                     version
@@ -1735,14 +1702,8 @@ impl ComposerRepository {
 
             // [$response, $packagesSource] = $spec;
             let spec_list = spec.as_list().cloned().unwrap_or_default();
-            let response = spec_list
-                .first()
-                .map(|b| (**b).clone())
-                .unwrap_or(PhpMixed::Null);
-            let packages_source_val = spec_list
-                .get(1)
-                .map(|b| (**b).clone())
-                .unwrap_or(PhpMixed::Null);
+            let response = spec_list.first().cloned().unwrap_or(PhpMixed::Null);
+            let packages_source_val = spec_list.get(1).cloned().unwrap_or(PhpMixed::Null);
             let packages_source: Option<String> =
                 packages_source_val.as_string().map(|s| s.to_string());
             if response.is_null() {
@@ -1758,7 +1719,7 @@ impl ComposerRepository {
                 .and_then(|a| a.get(&real_name))
                 .cloned()
             {
-                Some(b) => *b,
+                Some(b) => b,
                 None => continue,
             };
 
@@ -1768,7 +1729,7 @@ impl ComposerRepository {
                     .filter_map(|v| {
                         v.as_array().map(|a| {
                             a.iter()
-                                .map(|(k, v)| (k.clone(), (**v).clone()))
+                                .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect::<IndexMap<String, PhpMixed>>()
                         })
                     })
@@ -1778,7 +1739,7 @@ impl ComposerRepository {
                     .filter_map(|v| {
                         v.as_array().map(|a| {
                             a.iter()
-                                .map(|(k, v)| (k.clone(), (**v).clone()))
+                                .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect::<IndexMap<String, PhpMixed>>()
                         })
                     })
@@ -1909,10 +1870,8 @@ impl ComposerRepository {
         if let Some(raw) = self.cache.read(&cache_key) {
             let decoded = json_decode(&raw, true)?;
             if let Some(arr) = decoded.as_array() {
-                let map: IndexMap<String, PhpMixed> = arr
-                    .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
-                    .collect();
+                let map: IndexMap<String, PhpMixed> =
+                    arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                 last_modified = map
                     .get("last-modified")
                     .and_then(|v| v.as_string())
@@ -1939,7 +1898,7 @@ impl ComposerRepository {
                 Url::sanitize(url.clone())
             );
             contents_opt
-                .map(|m| PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect()))
+                .map(|m| PhpMixed::Array(m.into_iter().collect()))
                 .unwrap_or(PhpMixed::Null)
         } else {
             response
@@ -1953,14 +1912,14 @@ impl ComposerRepository {
         let has_advisories = response_arr.is_some_and(|a| a.contains_key("security-advisories"));
         if !has_pkg && !has_advisories {
             return Ok(PhpMixed::List(vec![
-                Box::new(PhpMixed::Null),
-                Box::new(PhpMixed::String(packages_source)),
+                PhpMixed::Null,
+                PhpMixed::String(packages_source),
             ]));
         }
 
         Ok(PhpMixed::List(vec![
-            Box::new(response_data),
-            Box::new(PhpMixed::String(packages_source)),
+            response_data,
+            PhpMixed::String(packages_source),
         ]))
     }
 
@@ -2079,10 +2038,8 @@ impl ComposerRepository {
         if let Some(cached_raw) = self.cache.read("packages.json") {
             let cached_decoded = json_decode(&cached_raw, true)?;
             if let Some(arr) = cached_decoded.as_array() {
-                let cached_data: IndexMap<String, PhpMixed> = arr
-                    .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
-                    .collect();
+                let cached_data: IndexMap<String, PhpMixed> =
+                    arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                 let age = self.cache.get_age("packages.json");
                 if root_max_age.is_some() && age.is_some() && age.unwrap() <= root_max_age.unwrap()
                 {
@@ -2477,7 +2434,7 @@ impl ComposerRepository {
                         let decoded = json_decode(&raw, true)?;
                         decoded
                             .as_array()
-                            .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                             .unwrap_or_default()
                     } else {
                         self.fetch_file(&url, Some(&cache_key), Some(&sha256), false)?
@@ -2505,8 +2462,7 @@ impl ComposerRepository {
                 if let Some(versions) = pkg.get("versions").and_then(|v| v.as_array()) {
                     for (_, metadata) in versions.iter() {
                         if let Some(m) = metadata.as_array() {
-                            packages
-                                .push(m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+                            packages.push(m.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
                         }
                     }
                 }
@@ -2529,7 +2485,7 @@ impl ComposerRepository {
                     };
                     let metadata_map: IndexMap<String, PhpMixed> = metadata
                         .iter()
-                        .map(|(k, v)| (k.clone(), (**v).clone()))
+                        .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
                     packages.push(metadata_map.clone());
                     let meta_name = metadata_map
@@ -2566,7 +2522,7 @@ impl ComposerRepository {
                         let decoded = json_decode(&raw, true)?;
                         decoded
                             .as_array()
-                            .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                             .unwrap_or_default()
                     } else {
                         self.fetch_file(include, None, None, false)?
@@ -2724,13 +2680,8 @@ impl ComposerRepository {
                             m.into()
                         },
                     );
-                    pre_file_download_event.set_transport_options(
-                        self.options
-                            .clone()
-                            .into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    );
+                    pre_file_download_event
+                        .set_transport_options(self.options.clone().into_iter().collect());
                     let pre_file_download_event_name =
                         pre_file_download_event.get_name().to_string();
                     dispatcher.dispatch(
@@ -2741,7 +2692,7 @@ impl ComposerRepository {
                     options = pre_file_download_event
                         .get_transport_options()
                         .iter()
-                        .map(|(k, v)| (k.clone(), (**v).clone()))
+                        .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
                 }
 
@@ -2802,7 +2753,7 @@ impl ComposerRepository {
                 let decoded = response.decode_json()?;
                 let mut data_local: IndexMap<String, PhpMixed> = decoded
                     .as_array()
-                    .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                    .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                     .unwrap_or_default();
                 HttpDownloader::output_warnings(self.io.clone(), &self.url, &data_local);
 
@@ -2820,7 +2771,7 @@ impl ComposerRepository {
                         let as_mixed = PhpMixed::Array(
                             data_local
                                 .iter()
-                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect(),
                         );
                         json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none());
@@ -2870,7 +2821,7 @@ impl ComposerRepository {
                         )?;
                         let map: IndexMap<String, PhpMixed> = parsed
                             .as_array()
-                            .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                             .unwrap_or_default();
                         data = Some(map);
 
@@ -2921,13 +2872,8 @@ impl ComposerRepository {
                         m.into()
                     },
                 );
-                pre_file_download_event.set_transport_options(
-                    self.options
-                        .clone()
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                );
+                pre_file_download_event
+                    .set_transport_options(self.options.clone().into_iter().collect());
                 let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
                 dispatcher.dispatch(
                     Some(&pre_file_download_event_name),
@@ -2937,7 +2883,7 @@ impl ComposerRepository {
                 options = pre_file_download_event
                     .get_transport_options()
                     .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .map(|(k, v)| (k.clone(), v.clone()))
                     .collect();
             }
 
@@ -2947,24 +2893,24 @@ impl ComposerRepository {
                 .or_insert(PhpMixed::Array(IndexMap::new()));
             if let PhpMixed::Array(http_map) = http_entry {
                 if let Some(existing) = http_map.get("header") {
-                    let arr = match &**existing {
+                    let arr = match existing {
                         PhpMixed::List(l) => l.clone(),
-                        other => vec![Box::new(other.clone())],
+                        other => vec![other.clone()],
                     };
-                    http_map.insert("header".to_string(), Box::new(PhpMixed::List(arr)));
+                    http_map.insert("header".to_string(), PhpMixed::List(arr));
                 }
                 let mut headers = match http_map.get("header") {
-                    Some(b) => match &**b {
+                    Some(b) => match b {
                         PhpMixed::List(l) => l.clone(),
                         _ => vec![],
                     },
                     None => vec![],
                 };
-                headers.push(Box::new(PhpMixed::String(format!(
+                headers.push(PhpMixed::String(format!(
                     "If-Modified-Since: {}",
                     last_modified_time
-                ))));
-                http_map.insert("header".to_string(), Box::new(PhpMixed::List(headers)));
+                )));
+                http_map.insert("header".to_string(), PhpMixed::List(headers));
             }
 
             let mut response = self
@@ -3001,7 +2947,7 @@ impl ComposerRepository {
             let decoded = response.decode_json()?;
             let mut data: IndexMap<String, PhpMixed> = decoded
                 .as_array()
-                .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();
             HttpDownloader::output_warnings(self.io.clone(), &self.url, &data);
 
@@ -3009,11 +2955,8 @@ impl ComposerRepository {
             response.collect();
             if let Some(ref lmd) = last_modified_date {
                 data.insert("last-modified".to_string(), PhpMixed::String(lmd.clone()));
-                let as_mixed = PhpMixed::Array(
-                    data.iter()
-                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                        .collect(),
-                );
+                let as_mixed =
+                    PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
                 json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none());
             }
             if !self.cache.is_read_only() {
@@ -3066,9 +3009,7 @@ impl ComposerRepository {
         if self.packages_not_found_cache.contains_key(filename) {
             let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
             empty.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
-            return Ok(PhpMixed::Array(
-                empty.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-            ));
+            return Ok(PhpMixed::Array(empty.into_iter().collect()));
         }
 
         if self.fresh_metadata_urls.contains_key(filename) && last_modified_time.is_some() {
@@ -3091,13 +3032,8 @@ impl ComposerRepository {
                     m.into()
                 },
             );
-            pre_file_download_event.set_transport_options(
-                self.options
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            );
+            pre_file_download_event
+                .set_transport_options(self.options.clone().into_iter().collect());
             let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
             dispatcher.dispatch(
                 Some(&pre_file_download_event_name),
@@ -3107,7 +3043,7 @@ impl ComposerRepository {
             options = pre_file_download_event
                 .get_transport_options()
                 .iter()
-                .map(|(k, v)| (k.clone(), (**v).clone()))
+                .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
         }
 
@@ -3117,24 +3053,24 @@ impl ComposerRepository {
                 .or_insert(PhpMixed::Array(IndexMap::new()));
             if let PhpMixed::Array(http_map) = http_entry {
                 if let Some(existing) = http_map.get("header") {
-                    let arr = match &**existing {
+                    let arr = match existing {
                         PhpMixed::List(l) => l.clone(),
-                        other => vec![Box::new(other.clone())],
+                        other => vec![other.clone()],
                     };
-                    http_map.insert("header".to_string(), Box::new(PhpMixed::List(arr)));
+                    http_map.insert("header".to_string(), PhpMixed::List(arr));
                 }
                 let mut headers = match http_map.get("header") {
-                    Some(b) => match &**b {
+                    Some(b) => match b {
                         PhpMixed::List(l) => l.clone(),
                         _ => vec![],
                     },
                     None => vec![],
                 };
-                headers.push(Box::new(PhpMixed::String(format!(
+                headers.push(PhpMixed::String(format!(
                     "If-Modified-Since: {}",
                     last_modified_time
-                ))));
-                http_map.insert("header".to_string(), Box::new(PhpMixed::List(headers)));
+                )));
+                http_map.insert("header".to_string(), PhpMixed::List(headers));
             }
         }
 
@@ -3164,9 +3100,7 @@ impl ComposerRepository {
 
             let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
             empty.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
-            return Ok(PhpMixed::Array(
-                empty.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-            ));
+            return Ok(PhpMixed::Array(empty.into_iter().collect()));
         }
 
         let mut json = response.get_body().unwrap_or("").to_string();
@@ -3181,7 +3115,7 @@ impl ComposerRepository {
         let decoded = response.decode_json()?;
         let mut data: IndexMap<String, PhpMixed> = decoded
             .as_array()
-            .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
         HttpDownloader::output_warnings(self.io.clone(), &self.url, &data);
 
@@ -3189,11 +3123,8 @@ impl ComposerRepository {
         response.collect();
         if let Some(lmd) = last_modified_date {
             data.insert("last-modified".to_string(), PhpMixed::String(lmd));
-            let as_mixed = PhpMixed::Array(
-                data.iter()
-                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                    .collect(),
-            );
+            let as_mixed =
+                PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
             json = JsonFile::encode_with_options(
                 &as_mixed,
                 JsonEncodeOptions {
@@ -3207,9 +3138,7 @@ impl ComposerRepository {
         }
         self.fresh_metadata_urls.insert(filename.to_string(), true);
 
-        Ok(PhpMixed::Array(
-            data.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-        ))
+        Ok(PhpMixed::Array(data.into_iter().collect()))
     }
 
     /// The onRejected handler of `asyncFetchFile`: marks the package as not found / the repo as
@@ -3290,7 +3219,7 @@ impl ComposerRepository {
                     let version_package_name = strtolower(&name_str);
                     let version_map: IndexMap<String, PhpMixed> = version
                         .iter()
-                        .map(|(k, v)| (k.clone(), (**v).clone()))
+                        .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
                     self.partial_packages_by_name
                         .as_mut()

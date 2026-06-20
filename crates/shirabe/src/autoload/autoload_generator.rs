@@ -242,7 +242,7 @@ impl AutoloadGenerator {
                 PhpMixed::List(
                     dev_package_names
                         .iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
+                        .map(|s| PhpMixed::String(s.clone()))
                         .collect(),
                 )
             } else {
@@ -379,7 +379,7 @@ impl AutoloadGenerator {
                     .unwrap_or_default();
                 for (namespace, paths) in &map {
                     let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-                    entry.insert("paths".to_string(), (**paths).clone());
+                    entry.insert("paths".to_string(), paths.clone());
                     entry.insert("type".to_string(), PhpMixed::String(psr_type.to_string()));
                     namespaces_to_scan
                         .entry(namespace.clone())
@@ -1405,7 +1405,7 @@ impl AutoloadGenerator {
         let map = shirabe_php_shim::php_require(&format!("{}/autoload_namespaces.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
-                let paths: Vec<String> = if let PhpMixed::List(items) = (**path).clone() {
+                let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
                         .map(|i| i.as_string().unwrap_or("").to_string())
@@ -1420,7 +1420,7 @@ impl AutoloadGenerator {
         let map = shirabe_php_shim::php_require(&format!("{}/autoload_psr4.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
-                let paths: Vec<String> = if let PhpMixed::List(items) = (**path).clone() {
+                let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
                         .map(|i| i.as_string().unwrap_or("").to_string())
@@ -1613,8 +1613,8 @@ impl AutoloadGenerator {
         package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         r#type: &str,
         root_package: RootPackageInterfaceHandle,
-    ) -> IndexMap<String, Box<PhpMixed>> {
-        let mut autoloads: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+    ) -> IndexMap<String, PhpMixed> {
+        let mut autoloads: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut numeric_index: i64 = 0;
 
         for item in package_map {
@@ -1630,22 +1630,11 @@ impl AutoloadGenerator {
             let is_root = package.ptr_eq(&root_package.clone().into());
             if self.dev_mode.unwrap_or(false) && is_root {
                 let merged = array_merge_recursive(vec![
-                    PhpMixed::Array(
-                        autoload
-                            .into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    ),
-                    PhpMixed::Array(
-                        root_package
-                            .get_dev_autoload()
-                            .into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    ),
+                    PhpMixed::Array(autoload.into_iter().collect()),
+                    PhpMixed::Array(root_package.get_dev_autoload().into_iter().collect()),
                 ]);
                 autoload = match merged {
-                    PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    PhpMixed::Array(m) => m.into_iter().collect(),
                     _ => IndexMap::new(),
                 };
             }
@@ -1673,9 +1662,9 @@ impl AutoloadGenerator {
                     namespace
                 };
                 // PHP: foreach ((array) $paths as $path) — handles scalar by wrapping in an array
-                let path_list: Vec<PhpMixed> = match paths.as_ref() {
-                    PhpMixed::List(l) => l.iter().map(|b| (**b).clone()).collect(),
-                    PhpMixed::Array(a) => a.values().map(|b| (**b).clone()).collect(),
+                let path_list: Vec<PhpMixed> = match &paths {
+                    PhpMixed::List(l) => l.iter().cloned().collect(),
+                    PhpMixed::Array(a) => a.values().cloned().collect(),
                     other => vec![other.clone()],
                 };
                 for path in path_list {
@@ -1774,8 +1763,7 @@ impl AutoloadGenerator {
                             preg_quote(&strtr(&resolved_path, "\\", "/"), None),
                             p
                         );
-                        autoloads
-                            .insert(numeric_index.to_string(), Box::new(PhpMixed::String(entry)));
+                        autoloads.insert(numeric_index.to_string(), PhpMixed::String(entry));
                         numeric_index += 1;
                         continue;
                     }
@@ -1793,15 +1781,13 @@ impl AutoloadGenerator {
                     if r#type == "files" {
                         autoloads.insert(
                             self.get_file_identifier(package.clone(), &path_str),
-                            Box::new(PhpMixed::String(relative_path)),
+                            PhpMixed::String(relative_path),
                         );
                         continue;
                     }
                     if r#type == "classmap" {
-                        autoloads.insert(
-                            numeric_index.to_string(),
-                            Box::new(PhpMixed::String(relative_path)),
-                        );
+                        autoloads
+                            .insert(numeric_index.to_string(), PhpMixed::String(relative_path));
                         numeric_index += 1;
                         continue;
                     }
@@ -1809,9 +1795,9 @@ impl AutoloadGenerator {
                     // psr-0/psr-4: append to namespace's list
                     let entry = autoloads
                         .entry(namespace.clone())
-                        .or_insert_with(|| Box::new(PhpMixed::List(vec![])));
-                    if let PhpMixed::List(l) = entry.as_mut() {
-                        l.push(Box::new(PhpMixed::String(relative_path)));
+                        .or_insert_with(|| PhpMixed::List(vec![]));
+                    if let PhpMixed::List(l) = entry {
+                        l.push(PhpMixed::String(relative_path));
                     }
                 }
             }

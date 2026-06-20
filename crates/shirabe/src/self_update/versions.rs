@@ -131,15 +131,15 @@ impl Versions {
 
         if let PhpMixed::Array(ref map) = versions
             && let Some(channel_versions) = map.get(&effective_channel)
-            && let PhpMixed::List(ref list) = **channel_versions
+            && let PhpMixed::List(ref list) = *channel_versions
         {
             for version in list {
-                if let PhpMixed::Array(ref v) = **version {
+                if let PhpMixed::Array(ref v) = *version {
                     let min_php = v.get("min-php").and_then(|p| p.as_int()).unwrap_or(0);
                     if min_php <= PHP_VERSION_ID {
                         return Ok(Ok(v
                             .iter()
-                            .map(|(k, val)| (k.clone(), *val.clone()))
+                            .map(|(k, val)| (k.clone(), val.clone()))
                             .collect()));
                     }
                 }

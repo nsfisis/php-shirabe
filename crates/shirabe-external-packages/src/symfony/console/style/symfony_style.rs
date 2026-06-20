@@ -99,12 +99,7 @@ impl SymfonyStyle {
         self.auto_prepend_block();
         let block = self.create_block(messages, r#type, style, prefix, padding, escape);
         self.writeln(
-            PhpMixed::List(
-                block
-                    .into_iter()
-                    .map(|line| Box::new(PhpMixed::String(line)))
-                    .collect(),
-            ),
+            PhpMixed::List(block.into_iter().map(PhpMixed::String).collect()),
             OUTPUT_NORMAL,
         );
         self.new_line(1);
@@ -181,10 +176,7 @@ impl SymfonyStyle {
             row.push(shirabe_php_shim::current(value));
         }
 
-        self.horizontal_table(
-            headers,
-            vec![PhpMixed::List(row.into_iter().map(Box::new).collect())],
-        );
+        self.horizontal_table(headers, vec![PhpMixed::List(row.into_iter().collect())]);
     }
 
     pub fn progress_iterate(
@@ -506,11 +498,11 @@ impl StyleInterface for SymfonyStyle {
         self.auto_prepend_block();
         self.writeln(
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String(format!(
+                PhpMixed::String(format!(
                     "<comment>{}</>",
                     PhpMixed::String(OutputFormatter::escape_trailing_backslash(message),),
-                ))),
-                Box::new(PhpMixed::String(format!(
+                )),
+                PhpMixed::String(format!(
                     "<comment>{}</>",
                     PhpMixed::String(shirabe_php_shim::str_repeat(
                         "=",
@@ -519,7 +511,7 @@ impl StyleInterface for SymfonyStyle {
                             message,
                         )) as usize,
                     )),
-                ))),
+                )),
             ]),
             OUTPUT_NORMAL,
         );
@@ -531,11 +523,11 @@ impl StyleInterface for SymfonyStyle {
         self.auto_prepend_block();
         self.writeln(
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String(format!(
+                PhpMixed::String(format!(
                     "<comment>{}</>",
                     PhpMixed::String(OutputFormatter::escape_trailing_backslash(message),),
-                ))),
-                Box::new(PhpMixed::String(format!(
+                )),
+                PhpMixed::String(format!(
                     "<comment>{}</>",
                     PhpMixed::String(shirabe_php_shim::str_repeat(
                         "-",
@@ -544,7 +536,7 @@ impl StyleInterface for SymfonyStyle {
                             message,
                         )) as usize,
                     )),
-                ))),
+                )),
             ]),
             OUTPUT_NORMAL,
         );
@@ -560,7 +552,7 @@ impl StyleInterface for SymfonyStyle {
         );
 
         self.writeln(
-            PhpMixed::List(elements.into_iter().map(Box::new).collect()),
+            PhpMixed::List(elements.into_iter().collect()),
             OUTPUT_NORMAL,
         );
         self.new_line(1);
@@ -698,9 +690,8 @@ impl StyleInterface for SymfonyStyle {
         default: Option<PhpMixed>,
     ) -> PhpMixed {
         let default = if let Some(default) = default {
-            let values = shirabe_php_shim::array_flip(&PhpMixed::List(
-                choices.iter().cloned().map(Box::new).collect(),
-            ));
+            let values =
+                shirabe_php_shim::array_flip(&PhpMixed::List(choices.iter().cloned().collect()));
             // $default = $values[$default] ?? $default;
             let _ = values;
             Some(default)
@@ -710,10 +701,10 @@ impl StyleInterface for SymfonyStyle {
 
         // PHP: return $this->askQuestion(new ChoiceQuestion($question, $choices, $default));
         // ChoiceQuestion extends Question; see `confirm` for the polymorphism note.
-        let choices_map: indexmap::IndexMap<String, Box<PhpMixed>> = choices
+        let choices_map: indexmap::IndexMap<String, PhpMixed> = choices
             .into_iter()
             .enumerate()
-            .map(|(i, c)| (i.to_string(), Box::new(c)))
+            .map(|(i, c)| (i.to_string(), c))
             .collect();
         let _choice_question = ChoiceQuestion::new(question.to_string(), choices_map, default);
         self.ask_question(todo!())

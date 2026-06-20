@@ -143,12 +143,12 @@ impl CurlDownloader {
                     version
                         .as_ref()
                         .and_then(|v| v.get("version"))
-                        .map(|b| (**b).clone())
+                        .cloned()
                         .unwrap_or(PhpMixed::Null),
                     &PhpMixed::List(
                         BAD_MULTIPLEXING_CURL_VERSIONS
                             .iter()
-                            .map(|s| Box::new(PhpMixed::String((*s).to_string())))
+                            .map(|s| PhpMixed::String((*s).to_string()))
                             .collect(),
                     ),
                     true,
@@ -291,21 +291,11 @@ impl CurlDownloader {
             m
         };
         let merged = array_merge(
-            PhpMixed::Array(
-                defaults
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-            PhpMixed::Array(
-                attributes
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
+            PhpMixed::Array(defaults.into_iter().collect()),
+            PhpMixed::Array(attributes.into_iter().collect()),
         );
         let mut attributes: IndexMap<String, PhpMixed> = match merged {
-            PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
 
@@ -401,13 +391,13 @@ impl CurlDownloader {
             PhpMixed::Int(CURLPROTO_HTTP | CURLPROTO_HTTPS),
         );
 
-        if attributes.get("ipResolve").and_then(|v| v.as_int()) == Some(4) {
+        if attributes.get("ipResolve").and_then(PhpMixed::as_int) == Some(4) {
             curl_setopt(
                 &curl_handle,
                 CURLOPT_IPRESOLVE,
                 PhpMixed::Int(CURL_IPRESOLVE_V4),
             );
-        } else if attributes.get("ipResolve").and_then(|v| v.as_int()) == Some(6) {
+        } else if attributes.get("ipResolve").and_then(PhpMixed::as_int) == Some(6) {
             curl_setopt(
                 &curl_handle,
                 CURLOPT_IPRESOLVE,
@@ -433,31 +423,25 @@ impl CurlDownloader {
                 .entry("http".to_string())
                 .or_insert(PhpMixed::Array(IndexMap::new()));
             if let PhpMixed::Array(a) = http {
-                a.insert("header".to_string(), Box::new(PhpMixed::List(Vec::new())));
+                a.insert("header".to_string(), PhpMixed::List(Vec::new()));
             }
         }
 
         // $options['http']['header'] = array_diff($options['http']['header'], ['Connection: close']);
         // $options['http']['header'][] = 'Connection: keep-alive';
         if let Some(PhpMixed::Array(http)) = options.get_mut("http")
-            && let Some(boxed) = http.get_mut("header")
-            && let PhpMixed::List(list) = boxed.as_mut()
+            && let Some(PhpMixed::List(list)) = http.get_mut("header")
         {
             let headers: Vec<String> = list
                 .iter()
-                .filter_map(|b| match b.as_ref() {
+                .filter_map(|b| match b {
                     PhpMixed::String(s) => Some(s.clone()),
                     _ => None,
                 })
                 .collect();
             let diffed = array_diff(&headers, &["Connection: close".to_string()]);
-            let mut new_list: Vec<Box<PhpMixed>> = diffed
-                .into_iter()
-                .map(|s| Box::new(PhpMixed::String(s)))
-                .collect();
-            new_list.push(Box::new(PhpMixed::String(
-                "Connection: keep-alive".to_string(),
-            )));
+            let mut new_list: Vec<PhpMixed> = diffed.into_iter().map(PhpMixed::String).collect();
+            new_list.push(PhpMixed::String("Connection: keep-alive".to_string()));
             *list = new_list;
         }
 
@@ -515,11 +499,11 @@ impl CurlDownloader {
                 version
                     .as_ref()
                     .and_then(|v| v.get("version"))
-                    .map(|b| (**b).clone())
+                    .cloned()
                     .unwrap_or(PhpMixed::Null),
                 &PhpMixed::List(vec![
-                    Box::new(PhpMixed::String("8.7.0".to_string())),
-                    Box::new(PhpMixed::String("8.7.1".to_string())),
+                    PhpMixed::String("8.7.0".to_string()),
+                    PhpMixed::String("8.7.1".to_string()),
                 ]),
                 true,
             )
@@ -552,7 +536,7 @@ impl CurlDownloader {
                             .get(&r#type)
                             .and_then(|v| v.as_array())
                             .and_then(|a| a.get(name))
-                            .map(|b| (**b).clone())
+                            .cloned()
                             .unwrap_or(PhpMixed::Null);
                         let to_set = if matches!(val, PhpMixed::Bool(true)) {
                             PhpMixed::Int(2)
@@ -565,7 +549,7 @@ impl CurlDownloader {
                             .get(&r#type)
                             .and_then(|v| v.as_array())
                             .and_then(|a| a.get(name))
-                            .map(|b| (**b).clone())
+                            .cloned()
                             .unwrap_or(PhpMixed::Null);
                         curl_setopt(&curl_handle, *curl_option, val);
                     }
@@ -576,7 +560,7 @@ impl CurlDownloader {
         let ssl_options: IndexMap<String, PhpMixed> = options
             .get("ssl")
             .and_then(|v| v.as_array())
-            .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_else(IndexMap::new);
         let proxy_curl_options = proxy
             .get_curl_options(&ssl_options)
@@ -585,7 +569,7 @@ impl CurlDownloader {
 
         let progress = array_diff_key(
             match curl_getinfo(&curl_handle) {
-                PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+                PhpMixed::Array(a) => a,
                 _ => IndexMap::new(),
             },
             &time_info_static()
@@ -599,33 +583,10 @@ impl CurlDownloader {
         job.insert("origin".to_string(), PhpMixed::String(origin.to_string()));
         job.insert(
             "attributes".to_string(),
-            PhpMixed::Array(
-                attributes
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
+            PhpMixed::Array(attributes.clone()),
         );
-        job.insert(
-            "options".to_string(),
-            PhpMixed::Array(
-                original_options
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-        );
-        job.insert(
-            "progress".to_string(),
-            PhpMixed::Array(
-                progress
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-        );
+        job.insert("options".to_string(), PhpMixed::Array(original_options));
+        job.insert("progress".to_string(), PhpMixed::Array(progress.clone()));
         // curlHandle, headerHandle, bodyHandle, resolve, reject are PHP resources/callables;
         // stored as opaque PhpMixed::Null placeholders (real values live in Rust-side fields).
         // TODO(phase-c): storing the real \CurlHandle and the resolve/reject callables needs the
@@ -659,10 +620,10 @@ impl CurlDownloader {
             .get("http")
             .and_then(|v| v.as_array())
             .and_then(|a| a.get("header"))
-            .and_then(|b| match b.as_ref() {
+            .and_then(|b| match b {
                 PhpMixed::List(l) => Some(
                     l.iter()
-                        .filter_map(|x| match x.as_ref() {
+                        .filter_map(|x| match x {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
                         })
@@ -743,15 +704,13 @@ impl CurlDownloader {
 
         loop {
             let progress_read = curl_multi_info_read(&self.multi_handle);
-            let mut progress: IndexMap<String, Box<PhpMixed>> = match &progress_read {
+            let mut progress: IndexMap<String, PhpMixed> = match &progress_read {
                 PhpMixed::Array(a) => a.clone(),
                 _ => break,
             };
             // $curlHandle = $progress['handle']; $result = $progress['result']; $i = (int) $curlHandle;
-            let _curl_handle_placeholder: PhpMixed = progress
-                .get("handle")
-                .map(|b| (**b).clone())
-                .unwrap_or(PhpMixed::Null);
+            let _curl_handle_placeholder: PhpMixed =
+                progress.get("handle").cloned().unwrap_or(PhpMixed::Null);
             let result_code: i64 = progress.get("result").and_then(|b| b.as_int()).unwrap_or(0);
             // TODO(phase-c): the job id is `(int) $progress['handle']` — the integer id of the
             // \CurlHandle reported by curl_multi_info_read. Recovering it needs real curl handle
@@ -809,7 +768,7 @@ impl CurlDownloader {
                     if error.is_empty() && function_exists("curl_strerror") {
                         error = curl_strerror(errno).unwrap_or_default();
                     }
-                    progress.insert("error_code".to_string(), Box::new(PhpMixed::Int(errno)));
+                    progress.insert("error_code".to_string(), PhpMixed::Int(errno));
 
                     if errno == 28 /* CURLE_OPERATION_TIMEDOUT */
                         && PHP_VERSION_ID >= 70300
@@ -846,18 +805,18 @@ impl CurlDownloader {
                         && (in_array(
                             PhpMixed::Int(errno),
                             &PhpMixed::List(vec![
-                                Box::new(PhpMixed::Int(7 /* CURLE_COULDNT_CONNECT */)),
-                                Box::new(PhpMixed::Int(16 /* CURLE_HTTP2 */)),
-                                Box::new(PhpMixed::Int(92 /* CURLE_HTTP2_STREAM */)),
-                                Box::new(PhpMixed::Int(6 /* CURLE_COULDNT_RESOLVE_HOST */)),
-                                Box::new(PhpMixed::Int(28 /* CURLE_OPERATION_TIMEDOUT */)),
+                                PhpMixed::Int(7 /* CURLE_COULDNT_CONNECT */),
+                                PhpMixed::Int(16 /* CURLE_HTTP2 */),
+                                PhpMixed::Int(92 /* CURLE_HTTP2_STREAM */),
+                                PhpMixed::Int(6 /* CURLE_COULDNT_RESOLVE_HOST */),
+                                PhpMixed::Int(28 /* CURLE_OPERATION_TIMEDOUT */),
                             ]),
                             true,
                         ) || (in_array(
                             PhpMixed::Int(errno),
                             &PhpMixed::List(vec![
-                                Box::new(PhpMixed::Int(56 /* CURLE_RECV_ERROR */)),
-                                Box::new(PhpMixed::Int(35 /* CURLE_SSL_CONNECT_ERROR */)),
+                                PhpMixed::Int(56 /* CURLE_RECV_ERROR */),
+                                PhpMixed::Int(35 /* CURLE_SSL_CONNECT_ERROR */),
                             ]),
                             true,
                         ) && str_contains(&error, "Connection reset by peer")))
@@ -1011,7 +970,7 @@ impl CurlDownloader {
                                             .as_ref()
                                             .unwrap()
                                             .iter()
-                                            .map(|s| Box::new(PhpMixed::String(s.clone())))
+                                            .map(|s| PhpMixed::String(s.clone()))
                                             .collect()
                                     ),
                                     true
@@ -1046,10 +1005,7 @@ impl CurlDownloader {
                         status_code,
                         headers.clone().unwrap_or_default(),
                         contents.as_string().map(|s| s.to_string()),
-                        progress
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect(),
+                        progress.clone(),
                     ));
                     self.io.write_error3(
                         &format!(
@@ -1113,10 +1069,7 @@ impl CurlDownloader {
                         status_code,
                         headers.clone().unwrap_or_default(),
                         contents.as_string().map(|s| s.to_string()),
-                        progress
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect(),
+                        progress.clone(),
                     ));
                     self.io.write_error3(
                         &format!(
@@ -1144,7 +1097,7 @@ impl CurlDownloader {
                         self.io.clone(),
                         job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
                         &match json_decode(response_ref.inner.get_body().unwrap_or(""), true)? {
-                            PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+                            PhpMixed::Array(a) => a,
                             _ => IndexMap::new(),
                         },
                     )?;
@@ -1241,14 +1194,14 @@ impl CurlDownloader {
                         && in_array(
                             PhpMixed::Int(sc),
                             &PhpMixed::List(vec![
-                                Box::new(PhpMixed::Int(423)),
-                                Box::new(PhpMixed::Int(425)),
-                                Box::new(PhpMixed::Int(500)),
-                                Box::new(PhpMixed::Int(502)),
-                                Box::new(PhpMixed::Int(503)),
-                                Box::new(PhpMixed::Int(504)),
-                                Box::new(PhpMixed::Int(507)),
-                                Box::new(PhpMixed::Int(510)),
+                                PhpMixed::Int(423),
+                                PhpMixed::Int(425),
+                                PhpMixed::Int(500),
+                                PhpMixed::Int(502),
+                                PhpMixed::Int(503),
+                                PhpMixed::Int(504),
+                                PhpMixed::Int(507),
+                                PhpMixed::Int(510),
                             ]),
                             true,
                         )
@@ -1312,14 +1265,14 @@ impl CurlDownloader {
                     job.get("attributes")
                         .and_then(|v| v.as_array())
                         .and_then(|a| a.get("storeAuth"))
-                        .map(|b| (**b).clone()),
+                        .cloned(),
                     Some(PhpMixed::Bool(false))
                 ) {
                     let store_auth_val = job
                         .get("attributes")
                         .and_then(|v| v.as_array())
                         .and_then(|a| a.get("storeAuth"))
-                        .map(|b| (**b).clone())
+                        .cloned()
                         .unwrap_or(PhpMixed::Bool(false));
                     let store_auth = match store_auth_val {
                         PhpMixed::Bool(b) => StoreAuth::Bool(b),
@@ -1356,12 +1309,7 @@ impl CurlDownloader {
                     if let Some(r) = &response {
                         e.set_response(r.inner.get_body().map(|s| s.to_string()));
                     }
-                    e.set_response_info(
-                        progress
-                            .iter()
-                            .map(|(_, v)| (**v).clone())
-                            .collect::<Vec<_>>(),
-                    );
+                    e.set_response_info(progress.values().cloned().collect::<Vec<_>>());
                     self.reject_job(&job, anyhow::anyhow!(e.message));
                 }
                 Err(e) => {
@@ -1377,7 +1325,7 @@ impl CurlDownloader {
             // $progress = array_diff_key(curl_getinfo($curlHandle), self::$timeInfo);
             let progress_now = array_diff_key(
                 match curl_getinfo(/* TODO real handle */ &curl_init()) {
-                    PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    PhpMixed::Array(a) => a,
                     _ => IndexMap::new(),
                 },
                 &time_info_static()
@@ -1392,21 +1340,16 @@ impl CurlDownloader {
                 .and_then(|j| j.get("progress"))
                 .cloned()
                 .unwrap_or(PhpMixed::Null);
-            let prev_progress_map = match &prev_progress {
-                PhpMixed::Array(a) => a.clone(),
+            let prev_progress_map: IndexMap<String, PhpMixed> = match prev_progress {
+                PhpMixed::Array(a) => a,
                 _ => IndexMap::new(),
             };
-            let progress_now_boxed: IndexMap<String, Box<PhpMixed>> = progress_now
-                .clone()
-                .into_iter()
-                .map(|(k, v)| (k, Box::new(v)))
-                .collect();
 
-            if !maps_equal(&prev_progress_map, &progress_now_boxed) {
+            if !maps_equal(&prev_progress_map, &progress_now) {
                 if let Some(job) = self.jobs.get_mut(&i) {
                     job.insert(
                         "progress".to_string(),
-                        PhpMixed::Array(progress_now_boxed.clone()),
+                        PhpMixed::Array(progress_now.clone()),
                     );
                 }
 
@@ -1614,10 +1557,7 @@ impl CurlDownloader {
     ) -> anyhow::Result<Result<PromptAuthResult, TransportException>> {
         if in_array(
             PhpMixed::Int(response.inner.get_status_code()),
-            &PhpMixed::List(vec![
-                Box::new(PhpMixed::Int(401)),
-                Box::new(PhpMixed::Int(403)),
-            ]),
+            &PhpMixed::List(vec![PhpMixed::Int(401), PhpMixed::Int(403)]),
             false,
         ) && job
             .get("attributes")
@@ -1675,7 +1615,7 @@ impl CurlDownloader {
 
         // check for gitlab 404 when downloading archives
         let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-        let gitlab_domains_list: Vec<Box<PhpMixed>> = match gitlab_domains {
+        let gitlab_domains_list: Vec<PhpMixed> = match gitlab_domains {
             PhpMixed::List(l) => l,
             _ => Vec::new(),
         };
@@ -1754,15 +1694,10 @@ impl CurlDownloader {
         };
         let merged = array_merge(
             PhpMixed::Array(job_attrs),
-            PhpMixed::Array(
-                attributes
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
+            PhpMixed::Array(attributes.into_iter().collect()),
         );
         let attributes: IndexMap<String, PhpMixed> = match merged {
-            PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
         let origin = Url::get_origin(&self.config.borrow(), url);
@@ -1772,7 +1707,7 @@ impl CurlDownloader {
             .and_then(|v| v.as_string())
             .map(|s| s.to_string());
         let options = match job.get("options") {
-            Some(PhpMixed::Array(a)) => a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+            Some(PhpMixed::Array(a)) => a.clone(),
             _ => IndexMap::new(),
         };
         // PHP forwards the original job's resolve/reject callables into the restarted download.
@@ -1836,10 +1771,8 @@ impl CurlDownloader {
                     .to_lowercase(),
             ),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("application/json".to_string())),
-                Box::new(PhpMixed::String(
-                    "application/json; charset=utf-8".to_string(),
-                )),
+                PhpMixed::String("application/json".to_string()),
+                PhpMixed::String("application/json; charset=utf-8".to_string()),
             ]),
             true,
         ) {
@@ -1907,7 +1840,7 @@ impl CurlDownloader {
     }
 }
 
-fn maps_equal(a: &IndexMap<String, Box<PhpMixed>>, b: &IndexMap<String, Box<PhpMixed>>) -> bool {
+fn maps_equal(a: &IndexMap<String, PhpMixed>, b: &IndexMap<String, PhpMixed>) -> bool {
     if a.len() != b.len() {
         return false;
     }

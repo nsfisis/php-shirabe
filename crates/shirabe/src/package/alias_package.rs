@@ -135,9 +135,9 @@ impl AliasPackage {
         if in_array(
             PhpMixed::String(link_type.to_string()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String(Link::TYPE_CONFLICT.to_string())),
-                Box::new(PhpMixed::String(Link::TYPE_PROVIDE.to_string())),
-                Box::new(PhpMixed::String(Link::TYPE_REPLACE.to_string())),
+                PhpMixed::String(Link::TYPE_CONFLICT.to_string()),
+                PhpMixed::String(Link::TYPE_PROVIDE.to_string()),
+                PhpMixed::String(Link::TYPE_REPLACE.to_string()),
             ]),
             true,
         ) {

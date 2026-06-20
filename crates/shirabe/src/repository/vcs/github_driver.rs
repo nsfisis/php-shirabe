@@ -279,9 +279,7 @@ impl GitHubDriver {
                     .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
                 let parsed = JsonFile::parse_json(Some(&res), None)?;
-                parsed
-                    .as_array()
-                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                parsed.as_array().map(|m| m.clone())
             } else {
                 let file_content = self.get_file_content("composer.json", identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(
@@ -296,7 +294,7 @@ impl GitHubDriver {
                     let php_value: PhpMixed = PhpMixed::Array(
                         composer_map
                             .iter()
-                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                            .map(|(k, v)| (k.clone(), v.clone()))
                             .collect(),
                     );
                     self.inner.cache.as_mut().map(|c| {
@@ -337,7 +335,7 @@ impl GitHubDriver {
                         &PhpMixed::Array(
                             tags_map
                                 .into_iter()
-                                .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                                .map(|(k, v)| (k, PhpMixed::String(v)))
                                 .collect(),
                         ),
                         false,
@@ -349,7 +347,7 @@ impl GitHubDriver {
                             &PhpMixed::Array(
                                 branches_map
                                     .into_iter()
-                                    .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                                    .map(|(k, v)| (k, PhpMixed::String(v)))
                                     .collect(),
                             ),
                             false,
@@ -364,13 +362,13 @@ impl GitHubDriver {
                     }) {
                         support.insert(
                             "source".to_string(),
-                            Box::new(PhpMixed::String(format!(
+                            PhpMixed::String(format!(
                                 "https://{}/{}/{}/tree/{}",
                                 PhpMixed::String(self.inner.origin_url.clone()),
                                 PhpMixed::String(self.owner.clone()),
                                 PhpMixed::String(self.repository.clone()),
                                 PhpMixed::String(label_str),
-                            ))),
+                            )),
                         );
                     }
                 }
@@ -388,12 +386,12 @@ impl GitHubDriver {
                 {
                     support.insert(
                         "issues".to_string(),
-                        Box::new(PhpMixed::String(format!(
+                        PhpMixed::String(format!(
                             "https://{}/{}/{}/issues",
                             PhpMixed::String(self.inner.origin_url.clone()),
                             PhpMixed::String(self.owner.clone()),
                             PhpMixed::String(self.repository.clone()),
-                        ))),
+                        )),
                     );
                 }
                 if !composer.contains_key("abandoned") && self.is_archived {
@@ -711,11 +709,7 @@ impl GitHubDriver {
         let result_mixed = PhpMixed::List(
             result
                 .into_iter()
-                .map(|m| {
-                    Box::new(PhpMixed::Array(
-                        m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                    ))
-                })
+                .map(|m| PhpMixed::Array(m.into_iter().collect()))
                 .collect(),
         );
         self.funding_info = Some(result_mixed.clone());
@@ -854,7 +848,7 @@ impl GitHubDriver {
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
-                        if let PhpMixed::Array(ref tag_map) = **tag {
+                        if let PhpMixed::Array(ref tag_map) = *tag {
                             let name = tag_map
                                 .get("name")
                                 .and_then(|v| v.as_string())
@@ -904,7 +898,7 @@ impl GitHubDriver {
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
-                        if let PhpMixed::Array(ref branch_map) = **branch {
+                        if let PhpMixed::Array(ref branch_map) = *branch {
                             let ref_str = branch_map
                                 .get("ref")
                                 .and_then(|v| v.as_string())
@@ -1171,7 +1165,7 @@ impl GitHubDriver {
             Ok(response) => {
                 let data = response.decode_json()?;
                 self.repo_data = match data {
-                    PhpMixed::Array(m) => Some(m.into_iter().map(|(k, v)| (k, *v)).collect()),
+                    PhpMixed::Array(m) => Some(m),
                     _ => None,
                 };
             }

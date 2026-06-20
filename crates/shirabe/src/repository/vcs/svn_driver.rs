@@ -187,9 +187,8 @@ impl SvnDriver {
                 }
 
                 let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
-                let composer: Option<IndexMap<String, PhpMixed>> = parsed
-                    .as_array()
-                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+                let composer: Option<IndexMap<String, PhpMixed>> =
+                    parsed.as_array().map(|m| m.clone());
                 self.inner
                     .info_cache
                     .insert(identifier.to_string(), composer.clone());

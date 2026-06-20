@@ -304,8 +304,8 @@ impl Platform {
         if in_array(
             PhpMixed::String(strtoupper(&Self::get_env("MSYSTEM").unwrap_or_default())),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("MINGW32".to_string())),
-                Box::new(PhpMixed::String("MINGW64".to_string())),
+                PhpMixed::String("MINGW32".to_string()),
+                PhpMixed::String("MINGW64".to_string()),
             ]),
             true,
         ) {

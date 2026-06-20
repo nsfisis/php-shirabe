@@ -123,10 +123,10 @@ impl GitLab {
 
         if let Some(map) = auth_tokens.as_array() {
             if let Some(t) = map.get(origin_url) {
-                token = Some(*t.clone());
+                token = Some(t.clone());
             }
             if let Some(t) = map.get(bc_origin_url.as_str()) {
-                token = Some(*t.clone());
+                token = Some(t.clone());
             }
         }
 
@@ -439,34 +439,23 @@ impl GitLab {
             "",
             "&",
         );
-        let mut http_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        http_inner.insert(
-            "method".to_string(),
-            Box::new(PhpMixed::String("POST".to_string())),
-        );
+        let mut http_inner: IndexMap<String, PhpMixed> = IndexMap::new();
+        http_inner.insert("method".to_string(), PhpMixed::String("POST".to_string()));
         http_inner.insert(
             "header".to_string(),
-            Box::new(PhpMixed::List(
-                headers
-                    .into_iter()
-                    .map(|h| Box::new(PhpMixed::String(h)))
-                    .collect(),
-            )),
+            PhpMixed::List(headers.into_iter().map(PhpMixed::String).collect()),
         );
-        http_inner.insert("content".to_string(), Box::new(PhpMixed::String(data)));
-        let mut options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        options.insert(
-            "retry-auth-failure".to_string(),
-            Box::new(PhpMixed::Bool(false)),
-        );
-        options.insert("http".to_string(), Box::new(PhpMixed::Array(http_inner)));
+        http_inner.insert("content".to_string(), PhpMixed::String(data));
+        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
+        options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
+        options.insert("http".to_string(), PhpMixed::Array(http_inner));
 
         let token = self
             .http_downloader
             .borrow_mut()
             .get(
                 &format!("{}://{}/oauth/token", scheme, api_url),
-                options.into_iter().map(|(k, v)| (k, *v)).collect(),
+                options.into_iter().collect(),
             )?
             .decode_json()?;
 
@@ -522,34 +511,23 @@ impl GitLab {
             "",
             "&",
         );
-        let mut http_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        http_inner.insert(
-            "method".to_string(),
-            Box::new(PhpMixed::String("POST".to_string())),
-        );
+        let mut http_inner = IndexMap::new();
+        http_inner.insert("method".to_string(), PhpMixed::String("POST".to_string()));
         http_inner.insert(
             "header".to_string(),
-            Box::new(PhpMixed::List(
-                headers
-                    .into_iter()
-                    .map(|h| Box::new(PhpMixed::String(h)))
-                    .collect(),
-            )),
+            PhpMixed::List(headers.into_iter().map(PhpMixed::String).collect()),
         );
-        http_inner.insert("content".to_string(), Box::new(PhpMixed::String(data)));
-        let mut options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        options.insert(
-            "retry-auth-failure".to_string(),
-            Box::new(PhpMixed::Bool(false)),
-        );
-        options.insert("http".to_string(), Box::new(PhpMixed::Array(http_inner)));
+        http_inner.insert("content".to_string(), PhpMixed::String(data));
+        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
+        options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
+        options.insert("http".to_string(), PhpMixed::Array(http_inner));
 
         let token = self
             .http_downloader
             .borrow_mut()
             .get(
                 &format!("{}://{}/oauth/token", scheme, origin_url),
-                options.into_iter().map(|(k, v)| (k, *v)).collect(),
+                options.into_iter().collect(),
             )?
             .decode_json()?;
 
@@ -587,18 +565,15 @@ impl GitLab {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        let mut setting: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+        let mut setting = IndexMap::new();
         setting.insert(
             "expires-at".to_string(),
-            Box::new(PhpMixed::Int(created_at + expires_in)),
+            PhpMixed::Int(created_at + expires_in),
         );
-        setting.insert(
-            "refresh-token".to_string(),
-            Box::new(PhpMixed::String(refresh_token)),
-        );
+        setting.insert("refresh-token".to_string(), PhpMixed::String(refresh_token));
         setting.insert(
             "token".to_string(),
-            Box::new(PhpMixed::String(access_token.to_string())),
+            PhpMixed::String(access_token.to_string()),
         );
         PhpMixed::Array(setting)
     }

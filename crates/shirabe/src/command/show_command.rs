@@ -202,8 +202,8 @@ impl Command for ShowCommand {
         if !in_array(
             PhpMixed::String(format.clone()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("text".to_string())),
-                Box::new(PhpMixed::String("json".to_string())),
+                PhpMixed::String("text".to_string()),
+                PhpMixed::String("json".to_string()),
             ]),
             false,
         ) {
@@ -228,7 +228,7 @@ impl Command for ShowCommand {
                 .as_array()
                 .cloned()
             {
-                platform_overrides = p.into_iter().map(|(k, v)| (k, *v)).collect();
+                platform_overrides = p.into_iter().collect();
             }
         }
         let platform_repo =
@@ -533,7 +533,7 @@ impl Command for ShowCommand {
                     &PhpMixed::List(
                         self.get_root_requires()
                             .into_iter()
-                            .map(|s| Box::new(PhpMixed::String(s)))
+                            .map(PhpMixed::String)
                             .collect(),
                     ),
                     true,
@@ -600,15 +600,10 @@ impl Command for ShowCommand {
                     let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
                     wrapper.insert(
                         "installed".to_string(),
-                        PhpMixed::List(vec![Box::new(PhpMixed::Array(
-                            array_tree
-                                .into_iter()
-                                .map(|(k, v)| (k, Box::new(v)))
-                                .collect(),
-                        ))]),
+                        PhpMixed::List(vec![PhpMixed::Array(array_tree.into_iter().collect())]),
                     );
                     self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-                        wrapper.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                        wrapper.into_iter().collect(),
                     )));
                 } else {
                     self.display_package_tree(vec![array_tree]);
@@ -714,7 +709,7 @@ impl Command for ShowCommand {
                     &PhpMixed::List(
                         root_requires
                             .iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
+                            .map(|s| PhpMixed::String(s.clone()))
                             .collect(),
                     ),
                     true,
@@ -734,16 +729,12 @@ impl Command for ShowCommand {
                     PhpMixed::List(
                         array_tree
                             .into_iter()
-                            .map(|m| {
-                                Box::new(PhpMixed::Array(
-                                    m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                                ))
-                            })
+                            .map(|m| PhpMixed::Array(m.into_iter().collect()))
                             .collect(),
                     ),
                 );
                 self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-                    wrapper.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                    wrapper.into_iter().collect(),
                 )));
             } else {
                 self.display_package_tree(array_tree);
@@ -829,9 +820,7 @@ impl Command for ShowCommand {
                                 Some(list) => in_array(
                                     PhpMixed::String(p.get_name()),
                                     &PhpMixed::List(
-                                        list.iter()
-                                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                                            .collect(),
+                                        list.iter().map(|s| PhpMixed::String(s.clone())).collect(),
                                     ),
                                     true,
                                 ),
@@ -997,7 +986,7 @@ impl Command for ShowCommand {
                                 &PhpMixed::List(
                                     self.get_root_requires()
                                         .into_iter()
-                                        .map(|s| Box::new(PhpMixed::String(s)))
+                                        .map(PhpMixed::String)
                                         .collect(),
                                 ),
                                 true,
@@ -1192,11 +1181,9 @@ impl Command for ShowCommand {
                     PhpMixed::List(
                         v.iter()
                             .map(|m| {
-                                Box::new(PhpMixed::Array(
-                                    m.iter()
-                                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                        .collect(),
-                                ))
+                                PhpMixed::Array(
+                                    m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                                )
                             })
                             .collect(),
                     ),
@@ -1204,10 +1191,7 @@ impl Command for ShowCommand {
             }
             let io = self.get_io();
             io.write(&JsonFile::encode(&PhpMixed::Array(
-                json_map
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
+                json_map.into_iter().collect(),
             )));
         } else {
             if input.borrow().get_option("latest")?.as_bool() == Some(true)
@@ -1804,7 +1788,7 @@ impl ShowCommand {
                 if r#type == "psr-0" || r#type == "psr-4" {
                     if let PhpMixed::Array(map) = autoloads {
                         for (name, path) in map.iter() {
-                            let path_str = match &**path {
+                            let path_str = match &*path {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .filter_map(|p| p.as_string().map(|s| s.to_string()))
@@ -1957,10 +1941,7 @@ impl ShowCommand {
             .into_iter()
             .map(PhpMixed::String)
             .collect();
-        json.insert(
-            "keywords".to_string(),
-            PhpMixed::List(keywords.into_iter().map(Box::new).collect()),
-        );
+        json.insert("keywords".to_string(), PhpMixed::List(keywords));
         json.insert(
             "type".to_string(),
             PhpMixed::String(package.get_type().to_string()),
@@ -1978,7 +1959,7 @@ impl ShowCommand {
                 package
                     .get_names(true)
                     .into_iter()
-                    .map(|n| Box::new(PhpMixed::String(n)))
+                    .map(PhpMixed::String)
                     .collect(),
             ),
         );
@@ -2012,7 +1993,7 @@ impl ShowCommand {
             );
             json.insert(
                 "source".to_string(),
-                PhpMixed::Array(src.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                PhpMixed::Array(src.into_iter().collect()),
             );
         }
 
@@ -2032,7 +2013,7 @@ impl ShowCommand {
             );
             json.insert(
                 "dist".to_string(),
-                PhpMixed::Array(dst.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                PhpMixed::Array(dst.into_iter().collect()),
             );
         }
 
@@ -2082,7 +2063,7 @@ impl ShowCommand {
             }
             json.insert(
                 "suggests".to_string(),
-                PhpMixed::Array(s.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                PhpMixed::Array(s.into_iter().collect()),
             );
         }
 
@@ -2093,7 +2074,7 @@ impl ShowCommand {
             }
             json.insert(
                 "support".to_string(),
-                PhpMixed::Array(s.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                PhpMixed::Array(s.into_iter().collect()),
             );
         }
 
@@ -2106,7 +2087,7 @@ impl ShowCommand {
                     package
                         .get_include_paths()
                         .into_iter()
-                        .map(|p| Box::new(PhpMixed::String(p)))
+                        .map(PhpMixed::String)
                         .collect(),
                 ),
             );
@@ -2115,7 +2096,7 @@ impl ShowCommand {
         json = Self::append_links(json, package);
 
         self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-            json.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+            json.into_iter().collect(),
         )));
         Ok(())
     }
@@ -2143,10 +2124,7 @@ impl ShowCommand {
             .into_iter()
             .map(|(k, _)| PhpMixed::String(k))
             .collect();
-        json.insert(
-            "versions".to_string(),
-            PhpMixed::List(keys.into_iter().map(Box::new).collect()),
-        );
+        json.insert("versions".to_string(), PhpMixed::List(keys));
 
         json
     }
@@ -2183,15 +2161,12 @@ impl ShowCommand {
                             m.insert("name".to_string(), PhpMixed::String(name));
                             m.insert("osi".to_string(), PhpMixed::String(license_id));
                             m.insert("url".to_string(), PhpMixed::String(url));
-                            PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect())
+                            PhpMixed::Array(m.into_iter().collect())
                         }
                     }
                 })
                 .collect();
-            json.insert(
-                "licenses".to_string(),
-                PhpMixed::List(mapped.into_iter().map(Box::new).collect()),
-            );
+            json.insert("licenses".to_string(), PhpMixed::List(mapped));
         }
 
         json
@@ -2211,7 +2186,7 @@ impl ShowCommand {
 
                     if let PhpMixed::Array(map) = autoloads {
                         for (name, path) in map.iter() {
-                            let mut path_val = (**path).clone();
+                            let mut path_val = path.clone();
                             let is_empty_path = match &path_val {
                                 PhpMixed::String(s) => s.is_empty(),
                                 PhpMixed::Null => true,
@@ -2230,10 +2205,7 @@ impl ShowCommand {
                         }
                     }
 
-                    autoload.insert(
-                        r#type.clone(),
-                        PhpMixed::Array(psr.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                    );
+                    autoload.insert(r#type.clone(), PhpMixed::Array(psr.into_iter().collect()));
                 } else if r#type == "classmap" {
                     autoload.insert("classmap".to_string(), autoloads.clone());
                 }
@@ -2241,12 +2213,7 @@ impl ShowCommand {
 
             json.insert(
                 "autoload".to_string(),
-                PhpMixed::Array(
-                    autoload
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                ),
+                PhpMixed::Array(autoload.into_iter().collect()),
             );
         }
 
@@ -2281,7 +2248,7 @@ impl ShowCommand {
             }
             json.insert(
                 link_type.to_string(),
-                PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                PhpMixed::Array(m.into_iter().collect()),
             );
         }
 
@@ -2378,7 +2345,7 @@ impl ShowCommand {
                         &PhpMixed::Array(
                             require
                                 .iter()
-                                .map(|(k, v)| (k.clone(), Box::new((**v).clone())))
+                                .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect(),
                         ),
                         &packages_in_tree,
@@ -2432,22 +2399,13 @@ impl ShowCommand {
                     PhpMixed::List(
                         deep_children
                             .into_iter()
-                            .map(|m| {
-                                Box::new(PhpMixed::Array(
-                                    m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                                ))
-                            })
+                            .map(|m| PhpMixed::Array(m.into_iter().collect()))
                             .collect(),
                     ),
                 );
             }
 
-            children.push(PhpMixed::Array(
-                tree_child_desc
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ));
+            children.push(PhpMixed::Array(tree_child_desc.into_iter().collect()));
         }
         let mut tree: IndexMap<String, PhpMixed> = IndexMap::new();
         tree.insert(
@@ -2469,10 +2427,7 @@ impl ShowCommand {
         );
 
         if !children.is_empty() {
-            tree.insert(
-                "requires".to_string(),
-                PhpMixed::List(children.into_iter().map(Box::new).collect()),
-            );
+            tree.insert("requires".to_string(), PhpMixed::List(children));
         }
 
         tree
@@ -2524,7 +2479,7 @@ impl ShowCommand {
 
             let circular_warn = if in_array(
                 PhpMixed::String(require_name.clone()),
-                &PhpMixed::List(current_tree.iter().map(|v| Box::new(v.clone())).collect()),
+                &PhpMixed::List(current_tree.iter().cloned().collect()),
                 true,
             ) {
                 "(circular dependency aborted here)"
@@ -2578,7 +2533,7 @@ impl ShowCommand {
 
                 if !in_array(
                     PhpMixed::String(require_name.clone()),
-                    &PhpMixed::List(current_tree.iter().map(|v| Box::new(v.clone())).collect()),
+                    &PhpMixed::List(current_tree.iter().cloned().collect()),
                     true,
                 ) {
                     current_tree.push(PhpMixed::String(require_name.clone()));
@@ -2595,11 +2550,7 @@ impl ShowCommand {
                             PhpMixed::List(
                                 deep_children
                                     .into_iter()
-                                    .map(|m| {
-                                        Box::new(PhpMixed::Array(
-                                            m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                                        ))
-                                    })
+                                    .map(|m| PhpMixed::Array(m.into_iter().collect()))
                                     .collect(),
                             ),
                         );

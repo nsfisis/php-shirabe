@@ -82,7 +82,7 @@ impl AuditConfig {
         };
 
         for (key, value) in entries {
-            let (id, apply, reason) = match value.as_ref() {
+            let (id, apply, reason) = match value {
                 PhpMixed::String(reason_str) => {
                     (key.clone(), "all".to_string(), Some(reason_str.clone()))
                 }
@@ -136,21 +136,21 @@ impl AuditConfig {
 
         let ignore_raw = audit_config
             .and_then(|m| m.get("ignore"))
-            .map(|v| *v.clone())
+            .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_list_for_audit, ignore_list_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_raw)?;
 
         let ignore_abandoned_raw = audit_config
             .and_then(|m| m.get("ignore-abandoned"))
-            .map(|v| *v.clone())
+            .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_abandoned_for_audit, ignore_abandoned_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_abandoned_raw)?;
 
         let ignore_severity_raw = audit_config
             .and_then(|m| m.get("ignore-severity"))
-            .map(|v| *v.clone())
+            .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_severity_for_audit, ignore_severity_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_severity_raw)?;

@@ -110,10 +110,7 @@ impl RepositoryManager {
 
         if config.get("packagist").and_then(|v| v.as_bool()) == Some(false) {
             let config_json = json_encode(&PhpMixed::Array(
-                config
-                    .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                    .collect(),
+                config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             ))
             .unwrap_or_default();
             self.io.write_error(&format!("<warning>Repository \"{}\" ({}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or(""), config_json));

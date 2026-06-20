@@ -410,7 +410,7 @@ impl CreateProjectCommand {
                         PhpMixed::Array(
                             repo_config
                                 .iter()
-                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect(),
                         ),
                         false,
@@ -698,9 +698,8 @@ impl CreateProjectCommand {
         config.borrow_mut().set_base_dir(Some(directory.clone()));
         if !secure_http {
             let mut merge_map: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
-            let mut inner_map: indexmap::IndexMap<String, Box<PhpMixed>> =
-                indexmap::IndexMap::new();
-            inner_map.insert("secure-http".to_string(), Box::new(PhpMixed::Bool(false)));
+            let mut inner_map: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
+            inner_map.insert("secure-http".to_string(), PhpMixed::Bool(false));
             merge_map.insert("config".to_string(), PhpMixed::Array(inner_map));
             config
                 .borrow_mut()
@@ -843,7 +842,7 @@ impl CreateProjectCommand {
                         .entry("options".to_string())
                         .or_insert(PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(options_map) = options_entry {
-                        options_map.insert("symlink".to_string(), Box::new(PhpMixed::Bool(false)));
+                        options_map.insert("symlink".to_string(), PhpMixed::Bool(false));
                     }
                 }
 

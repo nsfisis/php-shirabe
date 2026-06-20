@@ -117,12 +117,7 @@ impl ConsoleIO {
                     )
                 })
                 .collect();
-            PhpMixed::List(
-                mapped
-                    .into_iter()
-                    .map(|s| Box::new(PhpMixed::String(s)))
-                    .collect(),
-            )
+            PhpMixed::List(mapped.into_iter().map(PhpMixed::String).collect())
         } else {
             messages
         };
@@ -326,12 +321,7 @@ impl ConsoleIO {
             _ => {}
         }
 
-        PhpMixed::Array(
-            sanitized
-                .into_iter()
-                .map(|(k, v)| (k, Box::new(v)))
-                .collect(),
-        )
+        PhpMixed::Array(sanitized.into_iter().collect())
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'
@@ -576,12 +566,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         error_message: String,
         multiselect: bool,
     ) -> PhpMixed {
-        let choices: PhpMixed = PhpMixed::List(
-            choices
-                .into_iter()
-                .map(|s| Box::new(PhpMixed::String(s)))
-                .collect(),
-        );
+        let choices: PhpMixed = PhpMixed::List(choices.into_iter().map(PhpMixed::String).collect());
         let _helper = self
             .helper_set
             .get("question")
@@ -590,17 +575,17 @@ impl IOInterfaceImmutable for ConsoleIO {
             .as_string()
             .unwrap_or("")
             .to_string();
-        // ChoiceQuestion::new expects an IndexMap<String, Box<PhpMixed>>; project the
+        // ChoiceQuestion::new expects an IndexMap<String, PhpMixed>; project the
         // sanitized choice list/map into the keyed form, preserving keys.
         let sanitized_choices_mixed = Self::sanitize(choices.clone(), true);
-        let sanitized_choices: IndexMap<String, Box<PhpMixed>> = match sanitized_choices_mixed {
+        let sanitized_choices: IndexMap<String, PhpMixed> = match sanitized_choices_mixed {
             PhpMixed::List(l) => l
                 .into_iter()
                 .enumerate()
                 .map(|(i, b)| (i.to_string(), b))
                 .collect(),
             PhpMixed::Array(a) => a,
-            other => indexmap! { "0".to_string() => Box::new(other) },
+            other => indexmap! { "0".to_string() => other },
         };
         let sanitized_default = if is_string(&default) {
             Some(Self::sanitize(default, true))
@@ -657,14 +642,14 @@ impl IOInterfaceImmutable for ConsoleIO {
         }
 
         let mut results: Vec<String> = vec![];
-        let result_list = result.as_list().cloned().unwrap_or_default();
+        let result_list: Vec<PhpMixed> = result.as_list().cloned().unwrap_or_default();
         let choice_list: Vec<(String, PhpMixed)> = match &choices {
             PhpMixed::List(l) => l
                 .iter()
                 .enumerate()
-                .map(|(i, v)| (i.to_string(), (**v).clone()))
+                .map(|(i, v)| (i.to_string(), v.clone()))
                 .collect(),
-            PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+            PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             _ => vec![],
         };
         for (index, choice) in &choice_list {
@@ -673,12 +658,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             }
         }
 
-        PhpMixed::List(
-            results
-                .into_iter()
-                .map(|s| Box::new(PhpMixed::String(s)))
-                .collect(),
-        )
+        PhpMixed::List(results.into_iter().map(PhpMixed::String).collect())
     }
 
     fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {

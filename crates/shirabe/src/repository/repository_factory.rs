@@ -82,10 +82,8 @@ impl RepositoryFactory {
 
         if repository.starts_with('{') {
             let parsed = JsonFile::parse_json(Some(repository), None)?;
-            let repo_config: IndexMap<String, PhpMixed> = parsed
-                .as_array()
-                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
-                .unwrap_or_default();
+            let repo_config: IndexMap<String, PhpMixed> =
+                parsed.as_array().map(|m| m.clone()).unwrap_or_default();
             return Ok(repo_config);
         }
 
@@ -120,15 +118,8 @@ impl RepositoryFactory {
             owned_rm = Self::manager(io, config, None, None, None)?;
             &mut owned_rm
         };
-        let repos = Self::create_repos(
-            rm,
-            vec![PhpMixed::Array(
-                repo_config
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            )],
-        )?;
+        let repos =
+            Self::create_repos(rm, vec![PhpMixed::Array(repo_config.into_iter().collect())])?;
         // PHP: return current($repos);
         let (_, first) = repos
             .into_iter()
@@ -276,7 +267,7 @@ impl RepositoryFactory {
                         .to_string();
                     let repo_config_map: IndexMap<String, PhpMixed> = repo_arr
                         .iter()
-                        .map(|(k, v)| (k.clone(), *v.clone()))
+                        .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
                     let name =
                         Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);

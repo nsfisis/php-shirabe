@@ -1094,10 +1094,10 @@ impl EventDispatcher {
         if is_array(cb)
             && let PhpMixed::Array(map) = cb
         {
-            let entries: Vec<&Box<PhpMixed>> = map.values().collect();
+            let entries: Vec<&PhpMixed> = map.values().collect();
             if entries.len() >= 2 {
-                let first = entries[0].as_ref();
-                let second = entries[1].as_ref();
+                let first = entries[0];
+                let second = entries[1];
                 let prefix = if is_string(first) {
                     if let PhpMixed::String(s) = first {
                         s.clone()

@@ -196,19 +196,19 @@ impl Cursor {
                     "echo 1 >/dev/null",
                     &vec![
                         shirabe_php_shim::PhpMixed::List(vec![
-                            Box::new(shirabe_php_shim::PhpMixed::String("file".to_string())),
-                            Box::new(shirabe_php_shim::PhpMixed::String("/dev/tty".to_string())),
-                            Box::new(shirabe_php_shim::PhpMixed::String("r".to_string())),
+                            shirabe_php_shim::PhpMixed::String("file".to_string()),
+                            shirabe_php_shim::PhpMixed::String("/dev/tty".to_string()),
+                            shirabe_php_shim::PhpMixed::String("r".to_string()),
                         ]),
                         shirabe_php_shim::PhpMixed::List(vec![
-                            Box::new(shirabe_php_shim::PhpMixed::String("file".to_string())),
-                            Box::new(shirabe_php_shim::PhpMixed::String("/dev/tty".to_string())),
-                            Box::new(shirabe_php_shim::PhpMixed::String("w".to_string())),
+                            shirabe_php_shim::PhpMixed::String("file".to_string()),
+                            shirabe_php_shim::PhpMixed::String("/dev/tty".to_string()),
+                            shirabe_php_shim::PhpMixed::String("w".to_string()),
                         ]),
                         shirabe_php_shim::PhpMixed::List(vec![
-                            Box::new(shirabe_php_shim::PhpMixed::String("file".to_string())),
-                            Box::new(shirabe_php_shim::PhpMixed::String("/dev/tty".to_string())),
-                            Box::new(shirabe_php_shim::PhpMixed::String("w".to_string())),
+                            shirabe_php_shim::PhpMixed::String("file".to_string()),
+                            shirabe_php_shim::PhpMixed::String("/dev/tty".to_string()),
+                            shirabe_php_shim::PhpMixed::String("w".to_string()),
                         ]),
                     ],
                     &mut pipes,

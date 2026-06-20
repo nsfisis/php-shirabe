@@ -126,8 +126,8 @@ impl Command for SearchCommand {
         if !in_array(
             PhpMixed::String(format.clone()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("text".to_string())),
-                Box::new(PhpMixed::String("json".to_string())),
+                PhpMixed::String("text".to_string()),
+                PhpMixed::String("json".to_string()),
             ]),
             false,
         ) {

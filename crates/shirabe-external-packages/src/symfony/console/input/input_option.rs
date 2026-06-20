@@ -52,7 +52,7 @@ impl InputOption {
                 let parts: Vec<String> = arr
                     .iter()
                     .filter_map(|v| {
-                        if let PhpMixed::String(s) = v.as_ref() {
+                        if let PhpMixed::String(s) = v {
                             Some(s.clone())
                         } else {
                             None

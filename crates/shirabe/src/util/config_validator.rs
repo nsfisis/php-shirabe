@@ -43,7 +43,7 @@ impl ConfigValidator {
             .expect("config file path is always local");
         let schema_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             manifest = Some(match json.read()? {
-                PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                PhpMixed::Array(m) => m,
                 _ => IndexMap::new(),
             });
             json.validate_schema(JsonFile::LAX_SCHEMA, None)?;
@@ -108,7 +108,7 @@ impl ConfigValidator {
                 PhpMixed::List(list) => list
                     .iter()
                     .filter_map(|v| {
-                        if let PhpMixed::String(s) = v.as_ref() {
+                        if let PhpMixed::String(s) = v {
                             Some(s.clone())
                         } else {
                             None
@@ -235,10 +235,10 @@ impl ConfigValidator {
             Some(PhpMixed::Array(m)) => m.clone(),
             _ => IndexMap::new(),
         };
-        let mut packages: IndexMap<String, Box<PhpMixed>> = require;
+        let mut packages: IndexMap<String, PhpMixed> = require;
         packages.extend(require_dev);
         for (package, version) in &packages {
-            if let PhpMixed::String(version_str) = version.as_ref()
+            if let PhpMixed::String(version_str) = version
                 && Preg::is_match(r"{#}", version_str)
             {
                 warnings.push(format!(
@@ -282,12 +282,12 @@ impl ConfigValidator {
 
         // check for empty psr-0/psr-4 namespace prefixes
         if let Some(PhpMixed::Array(autoload)) = manifest.get("autoload") {
-            if let Some(PhpMixed::Array(psr0)) = autoload.get("psr-0").map(|v| v.as_ref())
+            if let Some(PhpMixed::Array(psr0)) = autoload.get("psr-0")
                 && psr0.contains_key("")
             {
                 warnings.push("Defining autoload.psr-0 with an empty namespace prefix is a bad idea for performance".to_string());
             }
-            if let Some(PhpMixed::Array(psr4)) = autoload.get("psr-4").map(|v| v.as_ref())
+            if let Some(PhpMixed::Array(psr4)) = autoload.get("psr-4")
                 && psr4.contains_key("")
             {
                 warnings.push("Defining autoload.psr-4 with an empty namespace prefix is a bad idea for performance".to_string());
@@ -310,11 +310,7 @@ impl ConfigValidator {
                 PhpMixed::String("dummy/dummy".to_string()),
             );
         }
-        let manifest_boxed: IndexMap<String, Box<PhpMixed>> = manifest_for_load
-            .into_iter()
-            .map(|(k, v)| (k, Box::new(v)))
-            .collect();
-        match loader.load(manifest_boxed, "Composer\\Package\\CompletePackage") {
+        match loader.load(manifest_for_load, "Composer\\Package\\CompletePackage") {
             Ok(_) => {}
             Err(e) => {
                 if let Some(invalid_e) = e.downcast_ref::<InvalidPackageException>() {

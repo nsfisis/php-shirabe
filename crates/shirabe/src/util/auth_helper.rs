@@ -77,8 +77,8 @@ impl AuthHelper {
                     if in_array(
                         PhpMixed::String(input.clone()),
                         &PhpMixed::List(vec![
-                            Box::new(PhpMixed::String("y".to_string())),
-                            Box::new(PhpMixed::String("n".to_string())),
+                            PhpMixed::String("y".to_string()),
+                            PhpMixed::String("n".to_string()),
                         ]),
                         false,
                     ) {
@@ -106,7 +106,7 @@ impl AuthHelper {
                         .borrow()
                         .get_authentication(origin)
                         .into_iter()
-                        .map(|(k, v)| (k, Box::new(v.map_or(PhpMixed::Null, PhpMixed::String))))
+                        .map(|(k, v)| (k, v.map_or(PhpMixed::Null, PhpMixed::String)))
                         .collect(),
                 ),
             )?;
@@ -256,9 +256,9 @@ impl AuthHelper {
                 if in_array(
                     PhpMixed::String(password),
                     &PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("gitlab-ci-token".to_string())),
-                        Box::new(PhpMixed::String("private-token".to_string())),
-                        Box::new(PhpMixed::String("oauth2".to_string())),
+                        PhpMixed::String("gitlab-ci-token".to_string()),
+                        PhpMixed::String("private-token".to_string()),
+                        PhpMixed::String("oauth2".to_string()),
                     ]),
                     true,
                 ) {
@@ -463,7 +463,7 @@ impl AuthHelper {
                 false
             };
             if !http_has_header && let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
+                http.insert("header".to_string(), PhpMixed::List(vec![]));
             }
         }
 
@@ -475,7 +475,7 @@ impl AuthHelper {
             .and_then(|h| h.get("header"))
             .and_then(|v| v.as_list())
         {
-            Some(list) => list.iter().map(|b| (**b).clone()).collect(),
+            Some(list) => list.iter().cloned().collect(),
             None => vec![],
         };
 
@@ -504,11 +504,11 @@ impl AuthHelper {
                 if is_array(&custom_headers) {
                     if let Some(arr) = custom_headers.as_array() {
                         for header in arr.values() {
-                            headers.push((**header).clone());
+                            headers.push(header.clone());
                         }
                     } else if let Some(list) = custom_headers.as_list() {
                         for header in list {
-                            headers.push((**header).clone());
+                            headers.push(header.clone());
                         }
                     }
                     authentication_display_message =
@@ -527,9 +527,9 @@ impl AuthHelper {
             } else if in_array(
                 PhpMixed::String(password.clone()),
                 &PhpMixed::List(vec![
-                    Box::new(PhpMixed::String("oauth2".to_string())),
-                    Box::new(PhpMixed::String("private-token".to_string())),
-                    Box::new(PhpMixed::String("gitlab-ci-token".to_string())),
+                    PhpMixed::String("oauth2".to_string()),
+                    PhpMixed::String("private-token".to_string()),
+                    PhpMixed::String("gitlab-ci-token".to_string()),
                 ]),
                 true,
             ) && in_array(
@@ -539,7 +539,7 @@ impl AuthHelper {
                         .borrow_mut()
                         .get("gitlab-domains")
                         .as_array()
-                        .map(|a| a.values().cloned().collect())
+                        .map(|a| a.values().map(|v| v.clone()).collect())
                         .unwrap_or_default(),
                 ),
                 true,
@@ -605,8 +605,8 @@ impl AuthHelper {
         } else if in_array(
             PhpMixed::String(origin.to_string()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("api.bitbucket.org".to_string())),
-                Box::new(PhpMixed::String("api.github.com".to_string())),
+                PhpMixed::String("api.bitbucket.org".to_string()),
+                PhpMixed::String("api.github.com".to_string()),
             ]),
             true,
         ) {
@@ -615,10 +615,7 @@ impl AuthHelper {
 
         // write headers back into options['http']['header']
         if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-            http.insert(
-                "header".to_string(),
-                Box::new(PhpMixed::List(headers.into_iter().map(Box::new).collect())),
-            );
+            http.insert("header".to_string(), PhpMixed::List(headers));
         }
 
         Ok(options)

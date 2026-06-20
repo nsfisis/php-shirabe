@@ -308,9 +308,9 @@ impl Command for UpdateCommand {
             !in_array(
                 PhpMixed::String(package.clone()),
                 &PhpMixed::List(vec![
-                    Box::new(PhpMixed::String("lock".to_string())),
-                    Box::new(PhpMixed::String("nothing".to_string())),
-                    Box::new(PhpMixed::String("mirrors".to_string())),
+                    PhpMixed::String("lock".to_string()),
+                    PhpMixed::String("nothing".to_string()),
+                    PhpMixed::String("mirrors".to_string()),
                 ]),
                 true,
             )
@@ -700,9 +700,7 @@ impl UpdateCommand {
         let mut table = Table::new(output);
         table.set_headers(vec![PhpMixed::String("Selected packages".to_string())]);
         for package in &packages {
-            table.add_row(PhpMixed::List(vec![Box::new(PhpMixed::String(
-                package.clone(),
-            ))]));
+            table.add_row(PhpMixed::List(vec![PhpMixed::String(package.clone())]));
         }
         table.render();
 

@@ -178,7 +178,7 @@ impl Command for ConfigCommand {
             && !self.auth_config_file.as_ref().unwrap().borrow().exists()
         {
             touch(self.auth_config_file.as_ref().unwrap().borrow().get_path());
-            let mut empty_objs: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+            let mut empty_objs: IndexMap<String, PhpMixed> = IndexMap::new();
             for k in &[
                 "bitbucket-oauth",
                 "github-oauth",
@@ -188,10 +188,7 @@ impl Command for ConfigCommand {
                 "bearer",
                 "forgejo-token",
             ] {
-                empty_objs.insert(
-                    k.to_string(),
-                    Box::new(PhpMixed::Object(ArrayObject::new(None))),
-                );
+                empty_objs.insert(k.to_string(), PhpMixed::Object(ArrayObject::new(None)));
             }
             self.auth_config_file
                 .as_ref()
@@ -274,10 +271,7 @@ impl Command for ConfigCommand {
         if input.borrow().get_option("global")?.as_bool() != Some(true) {
             let config_read = self.config_file.as_ref().unwrap().borrow_mut().read()?;
             let config_map = match config_read {
-                PhpMixed::Array(m) => m
-                    .into_iter()
-                    .map(|(k, v)| (k, *v))
-                    .collect::<IndexMap<String, PhpMixed>>(),
+                PhpMixed::Array(m) => m,
                 _ => IndexMap::new(),
             };
             self.config.as_mut().unwrap().borrow_mut().merge(
@@ -313,7 +307,7 @@ impl Command for ConfigCommand {
             let all_map = self.config.as_ref().unwrap().borrow_mut().all(0)?;
             let raw_map = self.config.as_ref().unwrap().borrow().raw();
             let to_mixed = |m: IndexMap<String, PhpMixed>| -> PhpMixed {
-                PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect())
+                PhpMixed::Array(m.into_iter().collect())
             };
             self.list_configuration(
                 to_mixed(all_map),
@@ -399,7 +393,7 @@ impl Command for ConfigCommand {
                         .as_ref()
                         .and_then(|r| r.as_array().and_then(|a| a.get(&repo_key)))
                     {
-                        Some(v) => (**v).clone(),
+                        Some(v) => v.clone(),
                         None => {
                             return Err(InvalidArgumentException {
                                 message: format!("There is no {} repository defined", repo_key),
@@ -430,7 +424,7 @@ impl Command for ConfigCommand {
                         && let Some(v) = arr.get(&new_key)
                     {
                         r#match = true;
-                        cursor = (**v).clone();
+                        cursor = v.clone();
                         key_acc = None;
                     }
                 }
@@ -478,11 +472,11 @@ impl Command for ConfigCommand {
                         .and_then(|a| a.get(&setting_key))
                         .and_then(|v| v.as_array())
                         .and_then(|a| a.get("type"))
-                        .map(|v| (**v).clone());
+                        .cloned();
                     if let Some(tv) = type_value {
                         let type_array = match &tv {
                             PhpMixed::List(_) | PhpMixed::Array(_) => tv,
-                            other => PhpMixed::List(vec![Box::new(other.clone())]),
+                            other => PhpMixed::List(vec![other.clone()]),
                         };
                         let type_strings: Vec<String> = type_array
                             .as_list()
@@ -503,7 +497,12 @@ impl Command for ConfigCommand {
                 .is_some()
                 && in_array(setting_key.as_str().into(), &properties.into(), true)
             {
-                value = (**raw_data.as_array().unwrap().get(&setting_key).unwrap()).clone();
+                value = raw_data
+                    .as_array()
+                    .unwrap()
+                    .get(&setting_key)
+                    .unwrap()
+                    .clone();
                 source = self
                     .config_file
                     .as_ref()
@@ -744,15 +743,9 @@ impl Command for ConfigCommand {
             }
 
             if 2 == values.len() {
-                let mut repo: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                repo.insert(
-                    "type".to_string(),
-                    Box::new(PhpMixed::String(values[0].clone())),
-                );
-                repo.insert(
-                    "url".to_string(),
-                    Box::new(PhpMixed::String(values[1].clone())),
-                );
+                let mut repo: IndexMap<String, PhpMixed> = IndexMap::new();
+                repo.insert("type".to_string(), PhpMixed::String(values[0].clone()));
+                repo.insert("url".to_string(), PhpMixed::String(values[1].clone()));
                 self.config_source.as_mut().unwrap().add_repository(
                     &matches[1],
                     PhpMixed::Array(repo),
@@ -820,7 +813,7 @@ impl Command for ConfigCommand {
                         current_value = current_value
                             .as_array()
                             .and_then(|a| a.get(bit))
-                            .map(|v| (**v).clone())
+                            .cloned()
                             .unwrap_or(PhpMixed::Null);
                     }
                     if is_array(&current_value) && is_array(&value) {
@@ -833,7 +826,7 @@ impl Command for ConfigCommand {
                             );
                         } else {
                             // PHP "+" operator on arrays: keep keys from left, fill from right
-                            let mut merged: IndexMap<String, Box<PhpMixed>> =
+                            let mut merged: IndexMap<String, PhpMixed> =
                                 value.as_array().cloned().unwrap_or_default();
                             if let Some(cv) = current_value.as_array() {
                                 for (k, v) in cv {
@@ -945,12 +938,8 @@ impl Command for ConfigCommand {
                 return Ok(0);
             }
 
-            let mut value: PhpMixed = PhpMixed::List(
-                values
-                    .iter()
-                    .map(|s| Box::new(PhpMixed::String(s.clone())))
-                    .collect(),
-            );
+            let mut value: PhpMixed =
+                PhpMixed::List(values.iter().map(|s| PhpMixed::String(s.clone())).collect());
             if input.borrow().get_option("json")?.as_bool() == Some(true) {
                 value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                 if !is_array(&value) {
@@ -972,7 +961,7 @@ impl Command for ConfigCommand {
                     .and_then(|a| a.get("audit"))
                     .and_then(|v| v.as_array())
                     .and_then(|a| a.get(&key_suffix))
-                    .map(|v| (**v).clone())
+                    .cloned()
                     .unwrap_or(PhpMixed::Null);
 
                 if !current_value.is_null() && is_array(&current_value) && is_array(&value) {
@@ -984,7 +973,7 @@ impl Command for ConfigCommand {
                         );
                     } else if !array_is_list(&current_value) && !array_is_list(&value) {
                         // Both are associative arrays (objects), merge them
-                        let mut merged: IndexMap<String, Box<PhpMixed>> =
+                        let mut merged: IndexMap<String, PhpMixed> =
                             value.as_array().cloned().unwrap_or_default();
                         if let Some(cv) = current_value.as_array() {
                             for (k, v) in cv {
@@ -1048,14 +1037,14 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
-                let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+                let mut obj: IndexMap<String, PhpMixed> = IndexMap::new();
                 obj.insert(
                     "consumer-key".to_string(),
-                    Box::new(PhpMixed::String(values[0].clone())),
+                    PhpMixed::String(values[0].clone()),
                 );
                 obj.insert(
                     "consumer-secret".to_string(),
-                    Box::new(PhpMixed::String(values[1].clone())),
+                    PhpMixed::String(values[1].clone()),
                 );
                 self.auth_config_source
                     .as_mut()
@@ -1066,15 +1055,9 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
-                let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                obj.insert(
-                    "username".to_string(),
-                    Box::new(PhpMixed::String(values[0].clone())),
-                );
-                obj.insert(
-                    "token".to_string(),
-                    Box::new(PhpMixed::String(values[1].clone())),
-                );
+                let mut obj: IndexMap<String, PhpMixed> = IndexMap::new();
+                obj.insert("username".to_string(), PhpMixed::String(values[0].clone()));
+                obj.insert("token".to_string(), PhpMixed::String(values[1].clone()));
                 self.auth_config_source
                     .as_mut()
                     .unwrap()
@@ -1120,15 +1103,9 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
-                let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                obj.insert(
-                    "username".to_string(),
-                    Box::new(PhpMixed::String(values[0].clone())),
-                );
-                obj.insert(
-                    "password".to_string(),
-                    Box::new(PhpMixed::String(values[1].clone())),
-                );
+                let mut obj: IndexMap<String, PhpMixed> = IndexMap::new();
+                obj.insert("username".to_string(), PhpMixed::String(values[0].clone()));
+                obj.insert("password".to_string(), PhpMixed::String(values[1].clone()));
                 self.auth_config_source
                     .as_mut()
                     .unwrap()
@@ -1143,7 +1120,7 @@ impl Command for ConfigCommand {
                 }
 
                 // Validate headers format
-                let mut formatted_headers: Vec<Box<PhpMixed>> = vec![];
+                let mut formatted_headers: Vec<PhpMixed> = vec![];
                 for header in &values {
                     if !is_string(&PhpMixed::String(header.clone())) {
                         return Err(RuntimeException {
@@ -1168,7 +1145,7 @@ impl Command for ConfigCommand {
                         .into());
                     }
 
-                    formatted_headers.push(Box::new(PhpMixed::String(header.clone())));
+                    formatted_headers.push(PhpMixed::String(header.clone()));
                 }
 
                 self.config_source
@@ -1194,15 +1171,9 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
-                let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                obj.insert(
-                    "username".to_string(),
-                    Box::new(PhpMixed::String(values[0].clone())),
-                );
-                obj.insert(
-                    "token".to_string(),
-                    Box::new(PhpMixed::String(values[1].clone())),
-                );
+                let mut obj: IndexMap<String, PhpMixed> = IndexMap::new();
+                obj.insert("username".to_string(), PhpMixed::String(values[0].clone()));
+                obj.insert("token".to_string(), PhpMixed::String(values[1].clone()));
                 self.auth_config_source
                     .as_mut()
                     .unwrap()
@@ -1225,12 +1196,7 @@ impl Command for ConfigCommand {
             }
 
             let value: PhpMixed = if values.len() > 1 {
-                PhpMixed::List(
-                    values
-                        .iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
-                        .collect(),
-                )
+                PhpMixed::List(values.iter().map(|s| PhpMixed::String(s.clone())).collect())
             } else {
                 PhpMixed::String(values[0].clone())
             };
@@ -1354,12 +1320,8 @@ impl ConfigCommand {
         method: &str,
     ) -> anyhow::Result<()> {
         let (validator, normalizer) = callbacks;
-        let values_mixed = PhpMixed::List(
-            values
-                .iter()
-                .map(|s| Box::new(PhpMixed::String(s.clone())))
-                .collect(),
-        );
+        let values_mixed =
+            PhpMixed::List(values.iter().map(|s| PhpMixed::String(s.clone())).collect());
         let validation = validator(&values_mixed);
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
@@ -1413,12 +1375,9 @@ impl ConfigCommand {
                 continue;
             }
 
-            let raw_val = raw_contents_arr
-                .get(key)
-                .map(|v| (**v).clone())
-                .unwrap_or(PhpMixed::Null);
+            let raw_val = raw_contents_arr.get(key).cloned().unwrap_or(PhpMixed::Null);
 
-            let value_inner = (**value).clone();
+            let value_inner = value.clone();
 
             if is_array(&value_inner)
                 && (!is_numeric(&key_first_key(&value_inner).unwrap_or_default().into())
@@ -2177,7 +2136,7 @@ fn flatten_setting_keys(config: PhpMixed, prefix: &str) -> Vec<String> {
         // sub-keys of repository-keys must not be added to completion
         if is_array(value) && !array_is_list(value) && prefix != "repositories." {
             keys.push(flatten_setting_keys(
-                (**value).clone(),
+                value.clone(),
                 &format!("{}{}.", prefix, key),
             ));
         }

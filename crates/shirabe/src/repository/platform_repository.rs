@@ -325,7 +325,7 @@ impl PlatformRepository {
                 loaded_extensions
                     .iter()
                     .enumerate()
-                    .map(|(i, s)| (i.to_string(), Box::new(PhpMixed::String(s.clone()))))
+                    .map(|(i, s)| (i.to_string(), PhpMixed::String(s.clone())))
                     .collect(),
             ),
             true,
@@ -824,13 +824,13 @@ impl PlatformRepository {
                             Box::new(|_args| PhpMixed::Null),
                             vec![
                                 PhpMixed::List(vec![
-                                    Box::new(PhpMixed::String("ResourceBundle".to_string())),
-                                    Box::new(PhpMixed::String("create".to_string())),
+                                    PhpMixed::String("ResourceBundle".to_string()),
+                                    PhpMixed::String("create".to_string()),
                                 ]),
                                 PhpMixed::List(vec![
-                                    Box::new(PhpMixed::String("root".to_string())),
-                                    Box::new(PhpMixed::String("ICUDATA".to_string())),
-                                    Box::new(PhpMixed::Bool(false)),
+                                    PhpMixed::String("root".to_string()),
+                                    PhpMixed::String("ICUDATA".to_string()),
+                                    PhpMixed::Bool(false),
                                 ]),
                             ],
                         );
@@ -857,8 +857,8 @@ impl PlatformRepository {
                         let intl_char_versions = self.runtime.invoke(
                             Box::new(|_args| PhpMixed::Null),
                             vec![PhpMixed::List(vec![
-                                Box::new(PhpMixed::String("IntlChar".to_string())),
-                                Box::new(PhpMixed::String("getUnicodeVersion".to_string())),
+                                PhpMixed::String("IntlChar".to_string()),
+                                PhpMixed::String("getUnicodeVersion".to_string()),
                             ])],
                         );
                         let sliced =
@@ -1840,7 +1840,7 @@ impl PlatformRepository {
         match value {
             PhpMixed::List(list) => list
                 .iter()
-                .map(|v| match v.as_ref() {
+                .map(|v| match v {
                     PhpMixed::String(s) => s.clone(),
                     PhpMixed::Int(i) => i.to_string(),
                     PhpMixed::Float(f) => f.to_string(),
@@ -1849,7 +1849,7 @@ impl PlatformRepository {
                 .collect(),
             PhpMixed::Array(m) => m
                 .values()
-                .map(|v| match v.as_ref() {
+                .map(|v| match v {
                     PhpMixed::String(s) => s.clone(),
                     PhpMixed::Int(i) => i.to_string(),
                     PhpMixed::Float(f) => f.to_string(),

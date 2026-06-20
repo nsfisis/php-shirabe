@@ -111,7 +111,6 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .cloned()
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k, *v))
                 .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
                 PlatformRepository::new(vec![], platform_overrides)?,
@@ -379,13 +378,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
         let table_as_mixed: Vec<PhpMixed> = table
             .into_iter()
-            .map(|row| {
-                PhpMixed::List(
-                    row.into_iter()
-                        .map(|s| Box::new(PhpMixed::String(s)))
-                        .collect(),
-                )
-            })
+            .map(|row| PhpMixed::List(row.into_iter().map(PhpMixed::String).collect()))
             .collect();
         self.render_table(table_as_mixed, output);
     }

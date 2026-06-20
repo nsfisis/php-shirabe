@@ -454,7 +454,7 @@ impl HttpDownloader {
                         _ => None,
                     })
                     .cloned();
-                if let Some(PhpMixed::List(list)) = http_header.as_deref() {
+                if let Some(PhpMixed::List(list)) = http_header.as_ref() {
                     let joined = implode(
                         "",
                         &list
@@ -463,7 +463,7 @@ impl HttpDownloader {
                             .collect::<Vec<_>>(),
                     );
                     stripos(&joined, "if-modified-since").is_some()
-                } else if let Some(PhpMixed::Array(m)) = http_header.as_deref() {
+                } else if let Some(PhpMixed::Array(m)) = http_header.as_ref() {
                     let joined = implode(
                         "",
                         &m.values()
@@ -718,7 +718,7 @@ impl HttpDownloader {
             if let Some(PhpMixed::List(list)) = entry {
                 for spec in list {
                     let r#type = substr(key, 0, Some(-1));
-                    if let PhpMixed::Array(spec_map) = spec.as_ref() {
+                    if let PhpMixed::Array(spec_map) = spec {
                         let constraint = version_parser.parse_constraints(
                             spec_map
                                 .get("versions")
@@ -769,15 +769,12 @@ impl HttpDownloader {
         {
             Silencer::suppress(None);
             let mut ctx_options: IndexMap<String, PhpMixed> = IndexMap::new();
-            let mut ssl_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            ssl_map.insert("verify_peer".to_string(), Box::new(PhpMixed::Bool(false)));
+            let mut ssl_map: IndexMap<String, PhpMixed> = IndexMap::new();
+            ssl_map.insert("verify_peer".to_string(), PhpMixed::Bool(false));
             ctx_options.insert("ssl".to_string(), PhpMixed::Array(ssl_map));
-            let mut http_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            http_map.insert(
-                "follow_location".to_string(),
-                Box::new(PhpMixed::Bool(false)),
-            );
-            http_map.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
+            let mut http_map: IndexMap<String, PhpMixed> = IndexMap::new();
+            http_map.insert("follow_location".to_string(), PhpMixed::Bool(false));
+            http_map.insert("ignore_errors".to_string(), PhpMixed::Bool(true));
             ctx_options.insert("http".to_string(), PhpMixed::Array(http_map));
             // TODO(phase-c): file_get_contents only takes a path; the stream context arg is dropped
             // until the PHP stream-context layer is modeled.

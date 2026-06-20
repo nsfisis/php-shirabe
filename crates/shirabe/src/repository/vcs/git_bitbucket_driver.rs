@@ -198,7 +198,7 @@ impl GitBitbucketDriver {
                 PhpMixed::Array(m) => m.get("branches"),
                 _ => None,
             })
-            .and_then(|v| match v.as_ref() {
+            .and_then(|v| match v {
                 PhpMixed::Array(m) => m.get("href").and_then(|v| v.as_string()).map(String::from),
                 _ => None,
             })
@@ -209,7 +209,7 @@ impl GitBitbucketDriver {
                 PhpMixed::Array(m) => m.get("tags"),
                 _ => None,
             })
-            .and_then(|v| match v.as_ref() {
+            .and_then(|v| match v {
                 PhpMixed::Array(m) => m.get("href").and_then(|v| v.as_string()).map(String::from),
                 _ => None,
             })
@@ -220,7 +220,7 @@ impl GitBitbucketDriver {
                 PhpMixed::Array(m) => m.get("html"),
                 _ => None,
             })
-            .and_then(|v| match v.as_ref() {
+            .and_then(|v| match v {
                 PhpMixed::Array(m) => m.get("href").and_then(|v| v.as_string()).map(String::from),
                 _ => None,
             })
@@ -236,7 +236,7 @@ impl GitBitbucketDriver {
             .map(String::from);
 
         self.repo_data = match repo_data {
-            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            PhpMixed::Array(m) => m,
             _ => IndexMap::new(),
         };
 
@@ -259,7 +259,7 @@ impl GitBitbucketDriver {
                 if let Some(res) = res {
                     composer = JsonFile::parse_json(Some(&res), None)?
                         .as_array()
-                        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+                        .map(|m| m.clone());
                     true
                 } else {
                     false
@@ -279,12 +279,7 @@ impl GitBitbucketDriver {
                         identifier,
                         &JsonFile::encode_with_options(
                             &PhpMixed::Array(
-                                composer
-                                    .clone()
-                                    .unwrap_or_default()
-                                    .into_iter()
-                                    .map(|(k, v)| (k, Box::new(v)))
-                                    .collect(),
+                                composer.clone().unwrap_or_default().into_iter().collect(),
                             ),
                             JsonEncodeOptions {
                                 pretty_print: false,
@@ -316,7 +311,7 @@ impl GitBitbucketDriver {
                         &PhpMixed::String(identifier.to_string()),
                         &PhpMixed::Array(
                             tags.iter()
-                                .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
+                                .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
                                 .collect(),
                         ),
                         false,
@@ -327,9 +322,7 @@ impl GitBitbucketDriver {
                             &PhpMixed::Array(
                                 branches_for_search
                                     .iter()
-                                    .map(|(k, v)| {
-                                        (k.clone(), Box::new(PhpMixed::String(v.clone())))
-                                    })
+                                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
                                     .collect(),
                             ),
                             false,
@@ -354,25 +347,25 @@ impl GitBitbucketDriver {
                         if let PhpMixed::Array(support_map) = support_entry {
                             support_map.insert(
                                 "source".to_string(),
-                                Box::new(PhpMixed::String(format!(
+                                PhpMixed::String(format!(
                                     "https://{}/{}/{}/src",
                                     PhpMixed::String(self.inner.origin_url.clone()),
                                     PhpMixed::String(self.owner.clone()),
                                     PhpMixed::String(self.repository.clone()),
-                                ))),
+                                )),
                             );
                         }
                     } else if let PhpMixed::Array(support_map) = support_entry {
                         support_map.insert(
                             "source".to_string(),
-                            Box::new(PhpMixed::String(format!(
+                            PhpMixed::String(format!(
                                 "https://{}/{}/{}/src/{}/?at={}",
                                 PhpMixed::String(self.inner.origin_url.clone()),
                                 PhpMixed::String(self.owner.clone()),
                                 PhpMixed::String(self.repository.clone()),
                                 PhpMixed::String(hash.unwrap()),
                                 PhpMixed::String(label.clone()),
-                            ))),
+                            )),
                         );
                     }
                 }
@@ -390,12 +383,12 @@ impl GitBitbucketDriver {
                     if let PhpMixed::Array(support_map) = support_entry {
                         support_map.insert(
                             "issues".to_string(),
-                            Box::new(PhpMixed::String(format!(
+                            PhpMixed::String(format!(
                                 "https://{}/{}/{}/issues",
                                 PhpMixed::String(self.inner.origin_url.clone()),
                                 PhpMixed::String(self.owner.clone()),
                                 PhpMixed::String(self.repository.clone()),
-                            ))),
+                            )),
                         );
                     }
                 }
@@ -555,7 +548,7 @@ impl GitBitbucketDriver {
                 let values = tags_data.get("values").cloned();
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
-                        if let PhpMixed::Array(m) = data.as_ref() {
+                        if let PhpMixed::Array(m) = data {
                             let name = m
                                 .get("name")
                                 .and_then(|v| v.as_string())
@@ -563,7 +556,7 @@ impl GitBitbucketDriver {
                                 .to_string();
                             let hash = m
                                 .get("target")
-                                .and_then(|v| match v.as_ref() {
+                                .and_then(|v| match v {
                                     PhpMixed::Array(m) => m.get("hash"),
                                     _ => None,
                                 })
@@ -636,7 +629,7 @@ impl GitBitbucketDriver {
                 let values = branch_data.get("values").cloned();
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
-                        if let PhpMixed::Array(m) = data.as_ref() {
+                        if let PhpMixed::Array(m) = data {
                             let name = m
                                 .get("name")
                                 .and_then(|v| v.as_string())
@@ -644,7 +637,7 @@ impl GitBitbucketDriver {
                                 .to_string();
                             let hash = m
                                 .get("target")
-                                .and_then(|v| match v.as_ref() {
+                                .and_then(|v| match v {
                                     PhpMixed::Array(m) => m.get("hash"),
                                     _ => None,
                                 })
@@ -702,10 +695,7 @@ impl GitBitbucketDriver {
                     let code = te.get_code();
                     let in_set = in_array(
                         PhpMixed::Int(code),
-                        &PhpMixed::List(vec![
-                            Box::new(PhpMixed::Int(403)),
-                            Box::new(PhpMixed::Int(404)),
-                        ]),
+                        &PhpMixed::List(vec![PhpMixed::Int(403), PhpMixed::Int(404)]),
                         true,
                     );
                     if in_set
@@ -783,13 +773,13 @@ impl GitBitbucketDriver {
     }
 
     /// @param  array<array{name: string, href: string}> $cloneLinks
-    fn parse_clone_urls(&mut self, clone_links: Option<Box<PhpMixed>>) {
-        let list = match clone_links.as_deref() {
-            Some(PhpMixed::List(l)) => l.clone(),
+    fn parse_clone_urls(&mut self, clone_links: Option<PhpMixed>) {
+        let list = match clone_links {
+            Some(PhpMixed::List(l)) => l,
             _ => return,
         };
         for clone_link in list {
-            if let PhpMixed::Array(m) = clone_link.as_ref()
+            if let PhpMixed::Array(m) = clone_link
                 && m.get("name").and_then(|v| v.as_string()) == Some("https")
             {
                 // Format: https://(user@)bitbucket.org/{user}/{repo}

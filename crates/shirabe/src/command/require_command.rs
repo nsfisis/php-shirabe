@@ -284,7 +284,7 @@ impl Command for RequireCommand {
         let platform_overrides = composer.get_config().borrow_mut().get("platform");
         let platform_overrides_map: IndexMap<String, PhpMixed> = platform_overrides
             .as_array()
-            .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
         // initialize self.repos as it is used by the PackageDiscoveryTrait
         let platform_repo =
@@ -708,7 +708,7 @@ impl RequireCommand {
             .and_then(|v| v.as_array())
         {
             for (k, v) in r {
-                require.insert(k.clone(), (**v).clone());
+                require.insert(k.clone(), v.clone());
             }
         }
 
@@ -717,7 +717,7 @@ impl RequireCommand {
             .and_then(|v| v.as_array())
         {
             for (k, v) in r {
-                require_dev.insert(k.clone(), (**v).clone());
+                require_dev.insert(k.clone(), v.clone());
             }
         }
 
@@ -726,7 +726,7 @@ impl RequireCommand {
                 PhpMixed::List(
                     array_keys(&require)
                         .into_iter()
-                        .map(|k| Box::new(PhpMixed::String(k)))
+                        .map(PhpMixed::String)
                         .collect(),
                 ),
                 PhpMixed::String("require".to_string()),
@@ -735,7 +735,7 @@ impl RequireCommand {
                 PhpMixed::List(
                     array_keys(&require_dev)
                         .into_iter()
-                        .map(|k| Box::new(PhpMixed::String(k)))
+                        .map(PhpMixed::String)
                         .collect(),
                 ),
                 PhpMixed::String("require-dev".to_string()),
@@ -1196,16 +1196,16 @@ impl RequireCommand {
         }
 
         let composer_definition_mixed = json.borrow_mut().read().unwrap_or_default();
-        let mut composer_definition: IndexMap<String, Box<PhpMixed>> = composer_definition_mixed
+        let mut composer_definition = composer_definition_mixed
             .as_array()
             .cloned()
             .unwrap_or_default();
         for (package, version) in new {
             let section = composer_definition
                 .entry(require_key.to_string())
-                .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())));
+                .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
             if let Some(section) = section.as_array_mut() {
-                section.insert(package.clone(), Box::new(PhpMixed::String(version.clone())));
+                section.insert(package.clone(), PhpMixed::String(version.clone()));
             }
             if let Some(section) = composer_definition
                 .get_mut(remove_key)

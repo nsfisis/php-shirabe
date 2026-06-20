@@ -107,11 +107,7 @@ impl Filesystem {
         let result = self
             .get_process()
             .execute(
-                PhpMixed::List(
-                    cmd.iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
-                        .collect(),
-                ),
+                PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
                 Some(&mut output),
                 (),
             )
@@ -152,11 +148,7 @@ impl Filesystem {
         let process = self
             .get_process()
             .execute_async(
-                PhpMixed::List(
-                    cmd.iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
-                        .collect(),
-                ),
+                PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
                 (),
             )
             .await?;

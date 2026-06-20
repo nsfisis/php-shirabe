@@ -77,9 +77,9 @@ impl ClassMapGenerator {
         if !in_array(
             PhpMixed::String(autoload_type.to_string()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::String("psr-0".to_string())),
-                Box::new(PhpMixed::String("psr-4".to_string())),
-                Box::new(PhpMixed::String("classmap".to_string())),
+                PhpMixed::String("psr-0".to_string()),
+                PhpMixed::String("psr-4".to_string()),
+                PhpMixed::String("classmap".to_string()),
             ]),
             true,
         ) {
@@ -161,7 +161,7 @@ impl ClassMapGenerator {
                 &PhpMixed::List(
                     self.extensions
                         .iter()
-                        .map(|e| Box::new(PhpMixed::String(e.clone())))
+                        .map(|e| PhpMixed::String(e.clone()))
                         .collect(),
                 ),
                 true,

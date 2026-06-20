@@ -489,7 +489,7 @@ impl NoProxyPattern {
         inner.insert("max_range".to_string(), PhpMixed::Int(max));
         options.insert(
             "options".to_string(),
-            PhpMixed::Array(inner.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+            PhpMixed::Array(inner.into_iter().collect()),
         );
 
         !matches!(

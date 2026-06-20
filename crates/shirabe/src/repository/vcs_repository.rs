@@ -796,7 +796,7 @@ impl VcsRepository {
                 match dist {
                     Some(m) => PhpMixed::Array(
                         m.into_iter()
-                            .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                            .map(|(k, v)| (k, PhpMixed::String(v)))
                             .collect(),
                     ),
                     None => PhpMixed::Null,
@@ -810,7 +810,7 @@ impl VcsRepository {
                 PhpMixed::Array(
                     source
                         .into_iter()
-                        .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
+                        .map(|(k, v)| (k, PhpMixed::String(v)))
                         .collect(),
                 ),
             );
@@ -960,9 +960,9 @@ impl VcsRepository {
         in_array(
             PhpMixed::Int(e.get_code()),
             &PhpMixed::List(vec![
-                Box::new(PhpMixed::Int(401)),
-                Box::new(PhpMixed::Int(403)),
-                Box::new(PhpMixed::Int(429)),
+                PhpMixed::Int(401),
+                PhpMixed::Int(403),
+                PhpMixed::Int(429),
             ]),
             true,
         ) || e.get_code() >= 500

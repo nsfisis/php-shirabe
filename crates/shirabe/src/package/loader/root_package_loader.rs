@@ -129,27 +129,18 @@ impl RootPackageLoader {
 
             if let Some(commit_hash) = commit {
                 let mut source = IndexMap::new();
-                source.insert(
-                    "type".to_string(),
-                    Box::new(PhpMixed::String(String::new())),
-                );
-                source.insert("url".to_string(), Box::new(PhpMixed::String(String::new())));
+                source.insert("type".to_string(), PhpMixed::String(String::new()));
+                source.insert("url".to_string(), PhpMixed::String(String::new()));
                 source.insert(
                     "reference".to_string(),
-                    Box::new(PhpMixed::String(commit_hash.clone())),
+                    PhpMixed::String(commit_hash.clone()),
                 );
                 config.insert("source".to_string(), PhpMixed::Array(source));
 
                 let mut dist = IndexMap::new();
-                dist.insert(
-                    "type".to_string(),
-                    Box::new(PhpMixed::String(String::new())),
-                );
-                dist.insert("url".to_string(), Box::new(PhpMixed::String(String::new())));
-                dist.insert(
-                    "reference".to_string(),
-                    Box::new(PhpMixed::String(commit_hash)),
-                );
+                dist.insert("type".to_string(), PhpMixed::String(String::new()));
+                dist.insert("url".to_string(), PhpMixed::String(String::new()));
+                dist.insert("reference".to_string(), PhpMixed::String(commit_hash));
                 config.insert("dist".to_string(), PhpMixed::Array(dist));
             }
         }
@@ -249,7 +240,7 @@ impl RootPackageLoader {
             real_package.set_config(
                 pkg_config
                     .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .map(|(k, v)| (k.clone(), v.clone()))
                     .collect(),
             );
         }

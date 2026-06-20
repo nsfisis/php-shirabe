@@ -76,8 +76,8 @@ impl RunScriptCommand {
             .iter()
             .map(|(name, desc)| {
                 PhpMixed::List(vec![
-                    Box::new(PhpMixed::String(format!("  {}", name))),
-                    Box::new(PhpMixed::String(desc.clone())),
+                    PhpMixed::String(format!("  {}", name)),
+                    PhpMixed::String(desc.clone()),
                 ])
             })
             .collect();

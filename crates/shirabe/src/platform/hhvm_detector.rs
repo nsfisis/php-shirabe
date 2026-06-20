@@ -64,7 +64,7 @@ impl HhvmDetector {
                         "echo HHVM_VERSION;",
                     ]
                     .into_iter()
-                    .map(|s| Box::new(shirabe_php_shim::PhpMixed::String(s.to_string())))
+                    .map(|s| shirabe_php_shim::PhpMixed::String(s.to_string()))
                     .collect(),
                 );
                 let exit_code = executor

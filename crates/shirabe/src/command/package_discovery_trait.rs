@@ -255,7 +255,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         &PhpMixed::List(
                             existing_packages
                                 .iter()
-                                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                                .map(|s| PhpMixed::String(s.clone()))
                                 .collect(),
                         ),
                         true,
@@ -678,7 +678,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     &PhpMixed::List(
                         similar
                             .iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
+                            .map(|s| PhpMixed::String(s.clone()))
                             .collect(),
                     ),
                     true,

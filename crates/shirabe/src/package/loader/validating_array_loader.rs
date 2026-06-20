@@ -28,7 +28,7 @@ pub struct ValidatingArrayLoader {
     version_parser: VersionParser,
     errors: Vec<String>,
     warnings: Vec<String>,
-    config: IndexMap<String, Box<PhpMixed>>,
+    config: IndexMap<String, PhpMixed>,
     flags: i64,
 }
 
@@ -64,7 +64,7 @@ impl ValidatingArrayLoader {
 
     pub fn load(
         &mut self,
-        config: IndexMap<String, Box<PhpMixed>>,
+        config: IndexMap<String, PhpMixed>,
         class: &str,
     ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
         self.errors = Vec::new();
@@ -86,7 +86,7 @@ impl ValidatingArrayLoader {
                 if !is_string(&version_val) {
                     self.config.insert(
                         "version".to_string(),
-                        Box::new(PhpMixed::String(php_to_string(&version_val))),
+                        PhpMixed::String(php_to_string(&version_val)),
                     );
                 }
                 let version_str = self
@@ -113,16 +113,16 @@ impl ValidatingArrayLoader {
             .cloned()
             && let Some(platform_val) = config_section.get("platform")
         {
-            let platform_array: IndexMap<String, Box<PhpMixed>> = match platform_val.as_ref() {
+            let platform_array: IndexMap<String, PhpMixed> = match platform_val {
                 PhpMixed::Array(m) => m.clone(),
                 other => {
                     let mut m = IndexMap::new();
-                    m.insert("0".to_string(), Box::new(other.clone()));
+                    m.insert("0".to_string(), other.clone());
                     m
                 }
             };
             for (key, platform) in &platform_array {
-                if let PhpMixed::Bool(false) = platform.as_ref() {
+                if let PhpMixed::Bool(false) = platform {
                     continue;
                 }
                 if !is_string(platform) {
@@ -181,11 +181,11 @@ impl ValidatingArrayLoader {
             let license_val = self.config["license"].clone();
             // validate main data types
             if is_array(&license_val) || is_string(&license_val) {
-                let mut licenses: IndexMap<String, Box<PhpMixed>> = match license_val.as_ref() {
+                let mut licenses: IndexMap<String, PhpMixed> = match &license_val {
                     PhpMixed::Array(m) => m.clone(),
                     other => {
                         let mut m = IndexMap::new();
-                        m.insert("0".to_string(), Box::new(other.clone()));
+                        m.insert("0".to_string(), other.clone());
                         m
                     }
                 };
@@ -196,7 +196,7 @@ impl ValidatingArrayLoader {
                     if !is_string(&license) {
                         self.warnings.push(format!(
                             "License {} should be a string.",
-                            PhpMixed::String(json_encode(&*license).unwrap_or_default()),
+                            PhpMixed::String(json_encode(&license).unwrap_or_default()),
                         ));
                         licenses.shift_remove(index);
                     }
@@ -238,19 +238,17 @@ impl ValidatingArrayLoader {
                     }
                 }
 
-                let reindexed: Vec<Box<PhpMixed>> = array_values(&licenses);
-                let mut reindexed_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+                let reindexed: Vec<PhpMixed> = array_values(&licenses);
+                let mut reindexed_map: IndexMap<String, PhpMixed> = IndexMap::new();
                 for (i, v) in reindexed.into_iter().enumerate() {
                     reindexed_map.insert(i.to_string(), v);
                 }
-                self.config.insert(
-                    "license".to_string(),
-                    Box::new(PhpMixed::Array(reindexed_map)),
-                );
+                self.config
+                    .insert("license".to_string(), PhpMixed::Array(reindexed_map));
             } else {
                 self.warnings.push(format!(
                     "License must be a string or array of strings, got {}.",
-                    PhpMixed::String(json_encode(&*license_val).unwrap_or_default(),),
+                    PhpMixed::String(json_encode(&license_val).unwrap_or_default(),),
                 ));
                 self.config.shift_remove("license");
             }
@@ -269,9 +267,7 @@ impl ValidatingArrayLoader {
                         key,
                         get_debug_type(&author)
                     ));
-                    if let Some(PhpMixed::Array(m)) =
-                        self.config.get_mut("authors").map(|v| v.as_mut())
-                    {
+                    if let Some(PhpMixed::Array(m)) = self.config.get_mut("authors") {
                         m.shift_remove(key);
                     }
                     continue;
@@ -285,10 +281,9 @@ impl ValidatingArrayLoader {
                             "authors.{}.{} : invalid value, must be a string",
                             key, author_data
                         ));
-                        if let Some(PhpMixed::Array(authors)) =
-                            self.config.get_mut("authors").map(|v| v.as_mut())
+                        if let Some(PhpMixed::Array(authors)) = self.config.get_mut("authors")
                             && let Some(author_entry) = authors.get_mut(key)
-                            && let PhpMixed::Array(am) = author_entry.as_mut()
+                            && let PhpMixed::Array(am) = author_entry
                         {
                             am.shift_remove(author_data);
                         }
@@ -306,10 +301,9 @@ impl ValidatingArrayLoader {
                         "authors.{}.homepage : invalid value ({}), must be an http/https URL",
                         key, homepage_str
                     ));
-                    if let Some(PhpMixed::Array(authors)) =
-                        self.config.get_mut("authors").map(|v| v.as_mut())
+                    if let Some(PhpMixed::Array(authors)) = self.config.get_mut("authors")
                         && let Some(author_entry) = authors.get_mut(key)
-                        && let PhpMixed::Array(am) = author_entry.as_mut()
+                        && let PhpMixed::Array(am) = author_entry
                     {
                         am.shift_remove("homepage");
                     }
@@ -326,10 +320,9 @@ impl ValidatingArrayLoader {
                         "authors.{}.email : invalid value ({}), must be a valid email address",
                         key, email_str
                     ));
-                    if let Some(PhpMixed::Array(authors)) =
-                        self.config.get_mut("authors").map(|v| v.as_mut())
+                    if let Some(PhpMixed::Array(authors)) = self.config.get_mut("authors")
                         && let Some(author_entry) = authors.get_mut(key)
-                        && let PhpMixed::Array(am) = author_entry.as_mut()
+                        && let PhpMixed::Array(am) = author_entry
                     {
                         am.shift_remove("email");
                     }
@@ -343,8 +336,7 @@ impl ValidatingArrayLoader {
                     .map(|m| m.len())
                     .unwrap_or(0);
                 if current_author_len == 0
-                    && let Some(PhpMixed::Array(authors)) =
-                        self.config.get_mut("authors").map(|v| v.as_mut())
+                    && let Some(PhpMixed::Array(authors)) = self.config.get_mut("authors")
                 {
                     authors.shift_remove(key);
                 }
@@ -378,9 +370,7 @@ impl ValidatingArrayLoader {
                 {
                     self.errors
                         .push(format!("support.{} : invalid value, must be a string", key));
-                    if let Some(PhpMixed::Array(support)) =
-                        self.config.get_mut("support").map(|v| v.as_mut())
-                    {
+                    if let Some(PhpMixed::Array(support)) = self.config.get_mut("support") {
                         support.shift_remove(key);
                     }
                 }
@@ -400,9 +390,7 @@ impl ValidatingArrayLoader {
                     "support.email : invalid value ({}), must be a valid email address",
                     email_str
                 ));
-                if let Some(PhpMixed::Array(support)) =
-                    self.config.get_mut("support").map(|v| v.as_mut())
-                {
+                if let Some(PhpMixed::Array(support)) = self.config.get_mut("support") {
                     support.shift_remove("email");
                 }
             }
@@ -421,9 +409,7 @@ impl ValidatingArrayLoader {
                         "support.irc : invalid value ({}), must be a irc://<server>/<channel> or ircs:// URL",
                         irc_str
                     ));
-                if let Some(PhpMixed::Array(support)) =
-                    self.config.get_mut("support").map(|v| v.as_mut())
-                {
+                if let Some(PhpMixed::Array(support)) = self.config.get_mut("support") {
                     support.shift_remove("irc");
                 }
             }
@@ -445,9 +431,7 @@ impl ValidatingArrayLoader {
                         "support.{} : invalid value ({}), must be an http/https URL",
                         key, url_str
                     ));
-                    if let Some(PhpMixed::Array(support)) =
-                        self.config.get_mut("support").map(|v| v.as_mut())
-                    {
+                    if let Some(PhpMixed::Array(support)) = self.config.get_mut("support") {
                         support.shift_remove(key);
                     }
                 }
@@ -474,9 +458,7 @@ impl ValidatingArrayLoader {
                         key,
                         get_debug_type(&funding_option)
                     ));
-                    if let Some(PhpMixed::Array(funding)) =
-                        self.config.get_mut("funding").map(|v| v.as_mut())
-                    {
+                    if let Some(PhpMixed::Array(funding)) = self.config.get_mut("funding") {
                         funding.shift_remove(key);
                     }
                     continue;
@@ -493,10 +475,9 @@ impl ValidatingArrayLoader {
                             "funding.{}.{} : invalid value, must be a string",
                             key, funding_data
                         ));
-                        if let Some(PhpMixed::Array(funding)) =
-                            self.config.get_mut("funding").map(|v| v.as_mut())
+                        if let Some(PhpMixed::Array(funding)) = self.config.get_mut("funding")
                             && let Some(entry) = funding.get_mut(key)
-                            && let PhpMixed::Array(em) = entry.as_mut()
+                            && let PhpMixed::Array(em) = entry
                         {
                             em.shift_remove(funding_data);
                         }
@@ -514,10 +495,9 @@ impl ValidatingArrayLoader {
                         "funding.{}.url : invalid value ({}), must be an http/https URL",
                         key, url_str
                     ));
-                    if let Some(PhpMixed::Array(funding)) =
-                        self.config.get_mut("funding").map(|v| v.as_mut())
+                    if let Some(PhpMixed::Array(funding)) = self.config.get_mut("funding")
                         && let Some(entry) = funding.get_mut(key)
-                        && let PhpMixed::Array(em) = entry.as_mut()
+                        && let PhpMixed::Array(em) = entry
                     {
                         em.shift_remove("url");
                     }
@@ -531,8 +511,7 @@ impl ValidatingArrayLoader {
                     .map(|m| m.is_empty())
                     .unwrap_or(true);
                 if entry_empty
-                    && let Some(PhpMixed::Array(funding)) =
-                        self.config.get_mut("funding").map(|v| v.as_mut())
+                    && let Some(PhpMixed::Array(funding)) = self.config.get_mut("funding")
                 {
                     funding.shift_remove(key);
                 }
@@ -557,9 +536,9 @@ impl ValidatingArrayLoader {
             }
 
             if self.config.contains_key("php-ext") {
-                let mut php_ext: IndexMap<String, Box<PhpMixed>> =
-                    match self.config.shift_remove("php-ext").unwrap().as_ref() {
-                        PhpMixed::Array(m) => m.clone(),
+                let mut php_ext: IndexMap<String, PhpMixed> =
+                    match self.config.shift_remove("php-ext").unwrap() {
+                        PhpMixed::Array(m) => m,
                         _ => IndexMap::new(),
                     };
 
@@ -605,7 +584,7 @@ impl ValidatingArrayLoader {
 
                 if let Some(v) = php_ext.get("build-path").cloned()
                     && !is_string(&v)
-                    && !matches!(v.as_ref(), PhpMixed::Null)
+                    && !matches!(v, PhpMixed::Null)
                 {
                     self.errors.push(format!(
                         "php-ext.build-path : should be a string or null, {} given",
@@ -628,7 +607,7 @@ impl ValidatingArrayLoader {
                             "pre-packaged-source",
                             "pre-packaged-binary",
                         ];
-                        let defined_download_url_methods: IndexMap<String, Box<PhpMixed>> =
+                        let defined_download_url_methods: IndexMap<String, PhpMixed> =
                             if is_array(&v) {
                                 v.as_array().unwrap().clone()
                             } else {
@@ -709,7 +688,7 @@ impl ValidatingArrayLoader {
                                             get_debug_type(&os_family)
                                         ));
                                         if let Some(PhpMixed::Array(arr)) =
-                                            php_ext.get_mut(field_name).map(|v| v.as_mut())
+                                            php_ext.get_mut(field_name)
                                         {
                                             arr.shift_remove(key);
                                         }
@@ -724,7 +703,7 @@ impl ValidatingArrayLoader {
                                             valid_os_families.join(", ")
                                         ));
                                         if let Some(PhpMixed::Array(arr)) =
-                                            php_ext.get_mut(field_name).map(|v| v.as_mut())
+                                            php_ext.get_mut(field_name)
                                         {
                                             arr.shift_remove(key);
                                         }
@@ -767,7 +746,7 @@ impl ValidatingArrayLoader {
                                     get_debug_type(&option)
                                 ));
                                 if let Some(PhpMixed::Array(arr)) =
-                                    php_ext.get_mut("configure-options").map(|v| v.as_mut())
+                                    php_ext.get_mut("configure-options")
                                 {
                                     arr.shift_remove(key);
                                 }
@@ -781,7 +760,7 @@ impl ValidatingArrayLoader {
                                     key
                                 ));
                                 if let Some(PhpMixed::Array(arr)) =
-                                    php_ext.get_mut("configure-options").map(|v| v.as_mut())
+                                    php_ext.get_mut("configure-options")
                                 {
                                     arr.shift_remove(key);
                                 }
@@ -796,7 +775,7 @@ impl ValidatingArrayLoader {
                                     get_debug_type(&name_val)
                                 ));
                                 if let Some(PhpMixed::Array(arr)) =
-                                    php_ext.get_mut("configure-options").map(|v| v.as_mut())
+                                    php_ext.get_mut("configure-options")
                                 {
                                     arr.shift_remove(key);
                                 }
@@ -812,9 +791,9 @@ impl ValidatingArrayLoader {
                                         get_debug_type(&needs_value)
                                     ));
                                 if let Some(PhpMixed::Array(co)) =
-                                    php_ext.get_mut("configure-options").map(|v| v.as_mut())
+                                    php_ext.get_mut("configure-options")
                                     && let Some(entry) = co.get_mut(key)
-                                    && let PhpMixed::Array(em) = entry.as_mut()
+                                    && let PhpMixed::Array(em) = entry
                                 {
                                     em.shift_remove("needs-value");
                                 }
@@ -829,9 +808,9 @@ impl ValidatingArrayLoader {
                                         get_debug_type(&description)
                                     ));
                                 if let Some(PhpMixed::Array(co)) =
-                                    php_ext.get_mut("configure-options").map(|v| v.as_mut())
+                                    php_ext.get_mut("configure-options")
                                     && let Some(entry) = co.get_mut(key)
-                                    && let PhpMixed::Array(em) = entry.as_mut()
+                                    && let PhpMixed::Array(em) = entry
                                 {
                                     em.shift_remove("description");
                                 }
@@ -852,7 +831,7 @@ impl ValidatingArrayLoader {
                 // If php-ext is now empty, unset it
                 if !php_ext.is_empty() {
                     self.config
-                        .insert("php-ext".to_string(), Box::new(PhpMixed::Array(php_ext)));
+                        .insert("php-ext".to_string(), PhpMixed::Array(php_ext));
                 }
             }
         }
@@ -876,9 +855,7 @@ impl ValidatingArrayLoader {
                             "{}.{} : a package cannot set a {} on itself",
                             link_type, package, link_type
                         ));
-                        if let Some(PhpMixed::Array(arr)) =
-                            self.config.get_mut(link_type).map(|v| v.as_mut())
-                        {
+                        if let Some(PhpMixed::Array(arr)) = self.config.get_mut(link_type) {
                             arr.shift_remove(&package);
                         }
                         continue;
@@ -896,29 +873,27 @@ impl ValidatingArrayLoader {
                             "{}.{} : invalid value, must be a string containing a version constraint",
                             link_type, package
                         ));
-                        if let Some(PhpMixed::Array(arr)) =
-                            self.config.get_mut(link_type).map(|v| v.as_mut())
-                        {
+                        if let Some(PhpMixed::Array(arr)) = self.config.get_mut(link_type) {
                             arr.shift_remove(&package);
                         }
                     } else if constraint.as_string().unwrap_or("") != "self.version" {
                         let constraint_str = constraint.as_string().unwrap_or("").to_string();
-                        let link_constraint =
-                            match self.version_parser.parse_constraints(&constraint_str) {
-                                Ok(c) => c,
-                                Err(e) => {
-                                    self.errors.push(format!(
-                                        "{}.{} : invalid version constraint ({})",
-                                        link_type, package, e
-                                    ));
-                                    if let Some(PhpMixed::Array(arr)) =
-                                        self.config.get_mut(link_type).map(|v| v.as_mut())
-                                    {
-                                        arr.shift_remove(&package);
-                                    }
-                                    continue;
+                        let link_constraint = match self
+                            .version_parser
+                            .parse_constraints(&constraint_str)
+                        {
+                            Ok(c) => c,
+                            Err(e) => {
+                                self.errors.push(format!(
+                                    "{}.{} : invalid version constraint ({})",
+                                    link_type, package, e
+                                ));
+                                if let Some(PhpMixed::Array(arr)) = self.config.get_mut(link_type) {
+                                    arr.shift_remove(&package);
                                 }
-                            };
+                                continue;
+                            }
+                        };
 
                         // check requires for unbound constraints on non-platform packages
                         if (self.flags & Self::CHECK_UNBOUND_CONSTRAINTS) != 0
@@ -970,23 +945,15 @@ impl ValidatingArrayLoader {
                             .and_then(|v| v.as_array())
                             .cloned()
                             .unwrap_or_default();
-                        let replace_map_flat: IndexMap<String, PhpMixed> = replace_map
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect();
-                        let conflict_map_flat: IndexMap<String, PhpMixed> = conflict_map
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect();
+                        let replace_map_flat: IndexMap<String, PhpMixed> = replace_map;
+                        let conflict_map_flat: IndexMap<String, PhpMixed> = conflict_map;
                         let keys = array_intersect_key(&replace_map_flat, &conflict_map_flat);
                         if !keys.is_empty() {
                             self.errors.push(format!(
                                 "{}.{} : you cannot conflict with a package that is also replaced, as replace already creates an implicit conflict rule",
                                 link_type, package
                             ));
-                            if let Some(PhpMixed::Array(arr)) =
-                                self.config.get_mut(link_type).map(|v| v.as_mut())
-                            {
+                            if let Some(PhpMixed::Array(arr)) = self.config.get_mut(link_type) {
                                 arr.shift_remove(&package);
                             }
                         }
@@ -1006,9 +973,7 @@ impl ValidatingArrayLoader {
                         "suggest.{} : invalid value, must be a string describing why the package is suggested",
                         package
                     ));
-                    if let Some(PhpMixed::Array(arr)) =
-                        self.config.get_mut("suggest").map(|v| v.as_mut())
-                    {
+                    if let Some(PhpMixed::Array(arr)) = self.config.get_mut("suggest") {
                         arr.shift_remove(package);
                     }
                 }
@@ -1054,9 +1019,7 @@ impl ValidatingArrayLoader {
                         r#type,
                         types.join(", ")
                     ));
-                    if let Some(PhpMixed::Array(arr)) =
-                        self.config.get_mut("autoload").map(|v| v.as_mut())
-                    {
+                    if let Some(PhpMixed::Array(arr)) = self.config.get_mut("autoload") {
                         arr.shift_remove(r#type);
                     }
                 }
@@ -1088,8 +1051,7 @@ impl ValidatingArrayLoader {
             );
             // Unset the psr-4 setting, since unsetting target-dir might
             // interfere with other settings.
-            if let Some(PhpMixed::Array(arr)) = self.config.get_mut("autoload").map(|v| v.as_mut())
-            {
+            if let Some(PhpMixed::Array(arr)) = self.config.get_mut("autoload") {
                 arr.shift_remove("psr-4");
             }
         }
@@ -1191,13 +1153,12 @@ impl ValidatingArrayLoader {
                         self.warnings.push(format!(
                             "extra.branch-alias.{} : the target branch ({}) must be a string, \"{}\" received.",
                             source_branch,
-                            json_encode(&**target_branch).unwrap_or_default(),
+                            json_encode(target_branch).unwrap_or_default(),
                             get_debug_type(target_branch)
                         ));
-                        if let Some(PhpMixed::Array(extra)) =
-                            self.config.get_mut("extra").map(|v| v.as_mut())
+                        if let Some(PhpMixed::Array(extra)) = self.config.get_mut("extra")
                             && let Some(ba) = extra.get_mut("branch-alias")
-                            && let PhpMixed::Array(bam) = ba.as_mut()
+                            && let PhpMixed::Array(bam) = ba
                         {
                             bam.shift_remove(source_branch);
                         }
@@ -1212,10 +1173,9 @@ impl ValidatingArrayLoader {
                             "extra.branch-alias.{} : the target branch ({}) must end in -dev",
                             source_branch, target_branch_str
                         ));
-                        if let Some(PhpMixed::Array(extra)) =
-                            self.config.get_mut("extra").map(|v| v.as_mut())
+                        if let Some(PhpMixed::Array(extra)) = self.config.get_mut("extra")
                             && let Some(ba) = extra.get_mut("branch-alias")
-                            && let PhpMixed::Array(bam) = ba.as_mut()
+                            && let PhpMixed::Array(bam) = ba
                         {
                             bam.shift_remove(source_branch);
                         }
@@ -1234,10 +1194,9 @@ impl ValidatingArrayLoader {
                             "extra.branch-alias.{} : the target branch ({}) must be a parseable number like 2.0-dev",
                             source_branch, target_branch_str
                         ));
-                        if let Some(PhpMixed::Array(extra)) =
-                            self.config.get_mut("extra").map(|v| v.as_mut())
+                        if let Some(PhpMixed::Array(extra)) = self.config.get_mut("extra")
                             && let Some(ba) = extra.get_mut("branch-alias")
-                            && let PhpMixed::Array(bam) = ba.as_mut()
+                            && let PhpMixed::Array(bam) = ba
                         {
                             bam.shift_remove(source_branch);
                         }
@@ -1258,10 +1217,9 @@ impl ValidatingArrayLoader {
                                 "extra.branch-alias.{} : the target branch ({}) is not a valid numeric alias for this version",
                                 source_branch, target_branch_str
                             ));
-                        if let Some(PhpMixed::Array(extra)) =
-                            self.config.get_mut("extra").map(|v| v.as_mut())
+                        if let Some(PhpMixed::Array(extra)) = self.config.get_mut("extra")
                             && let Some(ba) = extra.get_mut("branch-alias")
-                            && let PhpMixed::Array(bam) = ba.as_mut()
+                            && let PhpMixed::Array(bam) = ba
                         {
                             bam.shift_remove(source_branch);
                         }
@@ -1274,17 +1232,14 @@ impl ValidatingArrayLoader {
             return Err(anyhow::anyhow!(InvalidPackageException::new(
                 self.errors.clone(),
                 self.warnings.clone(),
-                config
-                    .iter()
-                    .map(|(k, v)| (k.clone(), (**v).clone()))
-                    .collect(),
+                config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             )));
         }
 
         let package = self.loader.load(
             self.config
                 .iter()
-                .map(|(k, v)| (k.clone(), (**v).clone()))
+                .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             Some(class.to_string()),
         )?;
@@ -1459,7 +1414,7 @@ impl ValidatingArrayLoader {
         }
 
         let mut pass = true;
-        let entries: Vec<(String, Box<PhpMixed>)> = self.config[property]
+        let entries: Vec<(String, PhpMixed)> = self.config[property]
             .as_array()
             .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
@@ -1471,9 +1426,7 @@ impl ValidatingArrayLoader {
                     key,
                     get_debug_type(&value)
                 ));
-                if let Some(PhpMixed::Array(arr)) =
-                    self.config.get_mut(property).map(|v| v.as_mut())
-                {
+                if let Some(PhpMixed::Array(arr)) = self.config.get_mut(property) {
                     arr.shift_remove(&key);
                 }
                 pass = false;
@@ -1488,9 +1441,7 @@ impl ValidatingArrayLoader {
                         "{}.{} : invalid value ({}), must match {}",
                         property, key, value_str, regex_str
                     ));
-                    if let Some(PhpMixed::Array(arr)) =
-                        self.config.get_mut(property).map(|v| v.as_mut())
-                    {
+                    if let Some(PhpMixed::Array(arr)) = self.config.get_mut(property) {
                         arr.shift_remove(&key);
                     }
                     pass = false;
@@ -1549,9 +1500,9 @@ impl ValidatingArrayLoader {
         true
     }
 
-    fn is_empty_array(val: Option<&Box<PhpMixed>>) -> bool {
+    fn is_empty_array(val: Option<&PhpMixed>) -> bool {
         match val {
-            Some(v) => match v.as_ref() {
+            Some(v) => match v {
                 PhpMixed::Array(m) => m.is_empty(),
                 PhpMixed::Null => true,
                 PhpMixed::Bool(false) => true,

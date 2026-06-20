@@ -246,7 +246,7 @@ impl ForgejoDriver {
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
-                        if let PhpMixed::Array(ref arr) = **branch {
+                        if let PhpMixed::Array(ref arr) = *branch {
                             let name = arr
                                 .get("name")
                                 .and_then(|v| v.as_string())
@@ -289,7 +289,7 @@ impl ForgejoDriver {
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
-                        if let PhpMixed::Array(ref arr) = **tag {
+                        if let PhpMixed::Array(ref arr) = *tag {
                             let name = arr
                                 .get("name")
                                 .and_then(|v| v.as_string())
@@ -341,9 +341,7 @@ impl ForgejoDriver {
             let composer = if self.inner.should_cache(identifier) {
                 if let Some(res) = self.inner.cache.as_mut().and_then(|c| c.read(identifier)) {
                     let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
-                    parsed
-                        .as_array()
-                        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                    parsed.as_array().map(|m| m.clone())
                 } else {
                     let file_content = self.get_file_content("composer.json", identifier)?;
                     let c = VcsDriverBase::finish_base_composer_information(
@@ -358,7 +356,7 @@ impl ForgejoDriver {
                             &PhpMixed::Array(
                                 composer_map
                                     .iter()
-                                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                    .map(|(k, v)| (k.clone(), v.clone()))
                                     .collect(),
                             ),
                             JsonEncodeOptions {
@@ -423,8 +421,7 @@ impl ForgejoDriver {
                     };
 
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
-                        support
-                            .insert("source".to_string(), Box::new(PhpMixed::String(source_url)));
+                        support.insert("source".to_string(), PhpMixed::String(source_url));
                     }
                 }
 
@@ -442,8 +439,7 @@ impl ForgejoDriver {
                             .unwrap_or_default()
                     );
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
-                        support
-                            .insert("issues".to_string(), Box::new(PhpMixed::String(issues_url)));
+                        support.insert("issues".to_string(), PhpMixed::String(issues_url));
                     }
                 }
 
@@ -574,9 +570,7 @@ impl ForgejoDriver {
                     return Ok(());
                 }
                 if let PhpMixed::Array(ref arr) = data {
-                    let map: IndexMap<String, PhpMixed> =
-                        arr.iter().map(|(k, v)| (k.clone(), *v.clone())).collect();
-                    self.repository_data = Some(ForgejoRepositoryData::from_remote_data(&map)?);
+                    self.repository_data = Some(ForgejoRepositoryData::from_remote_data(arr)?);
                 }
             }
         }

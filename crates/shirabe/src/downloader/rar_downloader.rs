@@ -89,7 +89,7 @@ impl ArchiveDownloader for RarDownloader {
                 PhpMixed::List(
                     command
                         .iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
+                        .map(|s| PhpMixed::String(s.clone()))
                         .collect(),
                 ),
                 Some(&mut process_output),
