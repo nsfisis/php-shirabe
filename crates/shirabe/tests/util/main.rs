@@ -1,3 +1,4 @@
+mod config_validator_test;
 mod forgejo_url_test;
 mod http;
 mod platform_test;
