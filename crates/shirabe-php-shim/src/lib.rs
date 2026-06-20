@@ -1053,8 +1053,17 @@ pub fn json_encode<T: serde::Serialize + ?Sized>(_value: &T) -> Option<String> {
     todo!()
 }
 
-pub fn dirname(_path: &str) -> String {
-    todo!()
+pub fn dirname(path: &str) -> String {
+    if path.is_empty() {
+        return String::new();
+    }
+    match std::path::Path::new(path).parent() {
+        // No parent: the root itself, or a path made up solely of slashes.
+        None => "/".to_string(),
+        // Path::parent yields an empty path where PHP's dirname returns ".".
+        Some(parent) if parent.as_os_str().is_empty() => ".".to_string(),
+        Some(parent) => parent.to_str().expect("input was valid UTF-8").to_string(),
+    }
 }
 
 pub fn stream_get_contents(_stream: PhpMixed) -> Option<String> {

@@ -129,7 +129,6 @@ run_no_panic_tests! {
     run_audit => "audit",
     #[ignore = "currently panics"]
     run_browse => "browse",
-    #[ignore = "currently panics"]
     run_bump => "bump",
     #[ignore = "currently panics"]
     run_check_platform_reqs => "check-platform-reqs",
@@ -182,6 +181,5 @@ run_no_panic_tests! {
     run_suggests => "suggests",
     #[ignore = "currently panics"]
     run_update => "update",
-    #[ignore = "currently panics"]
     run_validate => "validate",
 }
