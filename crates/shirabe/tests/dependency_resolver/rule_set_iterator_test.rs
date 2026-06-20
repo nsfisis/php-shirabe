@@ -1,1 +1,86 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetIteratorTest.php
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use indexmap::IndexMap;
+use shirabe::dependency_resolver::generic_rule::GenericRule;
+use shirabe::dependency_resolver::rule::{RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Rule};
+use shirabe::dependency_resolver::rule_set::RuleSet;
+use shirabe::dependency_resolver::rule_set_iterator::RuleSetIterator;
+use shirabe_semver::constraint::MatchAllConstraint;
+
+type Rules = IndexMap<i64, Vec<Rc<RefCell<Rule>>>>;
+
+fn root_require_rule() -> Rc<RefCell<Rule>> {
+    Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
+        vec![],
+        RULE_ROOT_REQUIRE,
+        ReasonData::RootRequire {
+            package_name: String::new(),
+            constraint: MatchAllConstraint::new(None).into(),
+        },
+    ))))
+}
+
+// Mirrors the original setUp().
+fn make_rules() -> Rules {
+    let mut rules: Rules = IndexMap::new();
+    rules.insert(
+        RuleSet::TYPE_REQUEST,
+        vec![root_require_rule(), root_require_rule()],
+    );
+    rules.insert(
+        RuleSet::TYPE_LEARNED,
+        vec![Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
+            vec![],
+            RULE_LEARNED,
+            ReasonData::Int(1),
+        ))))],
+    );
+    rules.insert(RuleSet::TYPE_PACKAGE, vec![]);
+    rules
+}
+
+#[test]
+fn test_foreach() {
+    let rules = make_rules();
+    let mut rule_set_iterator = RuleSetIterator::new(rules.clone());
+
+    let mut result: Vec<Rc<RefCell<Rule>>> = Vec::new();
+    while rule_set_iterator.valid() {
+        result.push(rule_set_iterator.current());
+        rule_set_iterator.next();
+    }
+
+    let expected = vec![
+        rules[&RuleSet::TYPE_REQUEST][0].clone(),
+        rules[&RuleSet::TYPE_REQUEST][1].clone(),
+        rules[&RuleSet::TYPE_LEARNED][0].clone(),
+    ];
+
+    assert_eq!(expected.len(), result.len());
+    for (e, r) in expected.iter().zip(result.iter()) {
+        assert!(Rc::ptr_eq(e, r));
+    }
+}
+
+#[test]
+fn test_keys() {
+    let rules = make_rules();
+    let mut rule_set_iterator = RuleSetIterator::new(rules);
+
+    let mut result: Vec<i64> = Vec::new();
+    while rule_set_iterator.valid() {
+        result.push(rule_set_iterator.key());
+        rule_set_iterator.next();
+    }
+
+    let expected = vec![
+        RuleSet::TYPE_REQUEST,
+        RuleSet::TYPE_REQUEST,
+        RuleSet::TYPE_LEARNED,
+    ];
+
+    assert_eq!(expected, result);
+}
