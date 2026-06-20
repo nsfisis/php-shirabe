@@ -1,4 +1,5 @@
 mod config_validator_test;
+mod error_handler_test;
 mod forgejo_url_test;
 mod http;
 mod metadata_minifier_test;
