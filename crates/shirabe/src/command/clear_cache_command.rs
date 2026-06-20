@@ -1,25 +1,22 @@
 //! ref: composer/src/Composer/Command/ClearCacheCommand.php
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::realpath;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
+use crate::cache::Cache;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::composer;
-use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {
@@ -68,20 +65,120 @@ impl Command for ClearCacheCommand {
 
     fn execute(
         &mut self,
-        _input: Rc<RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        // PHP: $config = $this->tryComposer()?->getConfig() ?? Factory::createConfig(); then
-        // iterate the cache-* paths and clear/gc each via Cache.
-        // TODO(phase-c): two blockers. (1) The first statement calls self.try_composer(), which is
-        // a deferred todo!() (it needs get_application() -> the Symfony command registry). (2) The
-        // two config sources differ in ownership — composer.get_config() is Rc<RefCell<Config>>
-        // while Factory::create_config() returns an owned Config — so a shared Config model is
-        // needed before the per-path Cache logic can read both uniformly.
-        let _ = composer::VERSION;
-        let _: IndexMap<String, String> = IndexMap::new();
-        let _ = Factory::create_config(None, None);
-        todo!("ClearCacheCommand::execute pending try_composer + Config sharing model")
+        let composer = self.try_composer(None, None);
+        // composer.getConfig() yields an Rc<RefCell<Config>>; Factory::createConfig() an owned
+        // Config. Keep whichever applies alive in a local and read both through a shared &Config.
+        let config_rc = composer.as_ref().map(|c| c.borrow_partial().get_config());
+        let created_config = if config_rc.is_none() {
+            Some(Factory::create_config(None, None)?)
+        } else {
+            None
+        };
+        let config_guard = config_rc.as_ref().map(|rc| rc.borrow());
+        let config: &Config = match (config_guard.as_deref(), created_config.as_ref()) {
+            (Some(config), _) => config,
+            (None, Some(config)) => config,
+            (None, None) => unreachable!(),
+        };
+
+        let io = self.get_io();
+
+        let gc = input.borrow().get_option("gc")?.as_bool().unwrap_or(false);
+
+        let cache_paths: [(&str, String); 4] = [
+            (
+                "cache-vcs-dir",
+                config
+                    .get("cache-vcs-dir")
+                    .as_string()
+                    .unwrap_or("")
+                    .to_string(),
+            ),
+            (
+                "cache-repo-dir",
+                config
+                    .get("cache-repo-dir")
+                    .as_string()
+                    .unwrap_or("")
+                    .to_string(),
+            ),
+            (
+                "cache-files-dir",
+                config
+                    .get("cache-files-dir")
+                    .as_string()
+                    .unwrap_or("")
+                    .to_string(),
+            ),
+            (
+                "cache-dir",
+                config
+                    .get("cache-dir")
+                    .as_string()
+                    .unwrap_or("")
+                    .to_string(),
+            ),
+        ];
+
+        for (key, cache_path) in cache_paths {
+            // only individual dirs get garbage collected
+            if key == "cache-dir" && gc {
+                continue;
+            }
+
+            let cache_path = match realpath(&cache_path) {
+                Some(path) => path,
+                None => {
+                    io.write_error(&format!(
+                        "<info>Cache directory does not exist ({key}): {cache_path}</info>"
+                    ));
+                    continue;
+                }
+            };
+            let mut cache = Cache::new(io.clone(), &cache_path, None, None, false);
+            cache.set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
+            if !cache.is_enabled() {
+                io.write_error(&format!(
+                    "<info>Cache is not enabled ({key}): {cache_path}</info>"
+                ));
+                continue;
+            }
+
+            if gc {
+                io.write_error(&format!(
+                    "<info>Garbage-collecting cache ({key}): {cache_path}</info>"
+                ));
+                if key == "cache-files-dir" {
+                    cache.gc(
+                        config.get("cache-files-ttl").as_int().unwrap_or(0),
+                        config.get("cache-files-maxsize").as_int().unwrap_or(0),
+                    );
+                } else if key == "cache-repo-dir" {
+                    cache.gc(
+                        config.get("cache-ttl").as_int().unwrap_or(0),
+                        1024 * 1024 * 1024, // 1GB, this should almost never clear anything that is not outdated
+                    );
+                } else if key == "cache-vcs-dir" {
+                    cache.gc_vcs_cache(config.get("cache-ttl").as_int().unwrap_or(0));
+                }
+            } else {
+                io.write_error(&format!(
+                    "<info>Clearing cache ({key}): {cache_path}</info>"
+                ));
+                cache.clear();
+            }
+        }
+
+        if gc {
+            io.write_error("<info>All caches garbage-collected.</info>");
+        } else {
+            io.write_error("<info>All caches cleared.</info>");
+        }
+
+        Ok(0)
     }
 
     fn initialize(
