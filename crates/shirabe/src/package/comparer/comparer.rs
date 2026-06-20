@@ -79,7 +79,10 @@ impl Comparer {
         shirabe_php_shim::chdir(&current_directory);
         shirabe_php_shim::chdir(&self.update);
         if !Self::do_tree(".", &mut destination) {
-            std::process::exit(0);
+            // PHP calls `exit` here, but this is almost certainly a bug. The source branch above
+            // handles the same failure with `return`, and there is no reason for the destination
+            // branch to terminate the whole process. We treat it as `return`.
+            return;
         }
         shirabe_php_shim::chdir(&current_directory);
         for (dir, value) in &source {
