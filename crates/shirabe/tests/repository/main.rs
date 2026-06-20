@@ -4,4 +4,5 @@ mod test_case;
 mod array_repository_test;
 mod composite_repository_test;
 mod installed_repository_test;
+mod repository_factory_test;
 mod vcs;
