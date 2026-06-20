@@ -1408,8 +1408,8 @@ pub fn hash_file(_algo: &str, _filename: &str) -> Option<String> {
     todo!()
 }
 
-pub fn filesize(_path: &str) -> Option<i64> {
-    std::fs::metadata(_path).ok().map(|m| m.len() as i64)
+pub fn filesize(path: impl AsRef<std::path::Path>) -> Option<i64> {
+    std::fs::metadata(path).ok().map(|m| m.len() as i64)
 }
 
 pub fn json_encode_ex<T: serde::Serialize + ?Sized>(value: &T, flags: i64) -> Option<String> {
@@ -1453,8 +1453,8 @@ pub fn strnatcasecmp(_s1: &str, _s2: &str) -> i64 {
     todo!()
 }
 
-pub fn file_exists(_path: &str) -> bool {
-    std::path::Path::new(_path).exists()
+pub fn file_exists(path: impl AsRef<std::path::Path>) -> bool {
+    path.as_ref().exists()
 }
 
 // TODO(phase-c): PHP's is_writable() resolves to access(2) with W_OK, honoring the effective
@@ -1467,8 +1467,8 @@ pub fn is_writable(_path: &str) -> bool {
     }
 }
 
-pub fn unlink(_path: &str) -> bool {
-    std::fs::remove_file(_path).is_ok()
+pub fn unlink(path: impl AsRef<std::path::Path>) -> bool {
+    std::fs::remove_file(path).is_ok()
 }
 
 pub fn file_put_contents(_path: &str, _data: &[u8]) -> Option<i64> {
@@ -1693,8 +1693,8 @@ pub fn bin2hex(_data: &[u8]) -> String {
     _data.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-pub fn is_dir(_path: &str) -> bool {
-    std::path::Path::new(_path).is_dir()
+pub fn is_dir(path: impl AsRef<std::path::Path>) -> bool {
+    path.as_ref().is_dir()
 }
 
 pub fn file_get_contents(_path: &str) -> Option<String> {
@@ -1851,8 +1851,8 @@ pub fn array_intersect_key(
         .collect()
 }
 
-pub fn is_file(_path: &str) -> bool {
-    std::path::Path::new(_path).is_file()
+pub fn is_file(path: impl AsRef<std::path::Path>) -> bool {
+    path.as_ref().is_file()
 }
 
 pub fn spl_object_hash<T: ?Sized>(_object: &T) -> String {
@@ -2156,12 +2156,12 @@ pub fn rtrim(s: &str, chars: Option<&str>) -> String {
     String::from_utf8_lossy(&bytes[..end]).into_owned()
 }
 
-pub fn rmdir(_dir: &str) -> bool {
-    std::fs::remove_dir(_dir).is_ok()
+pub fn rmdir(dir: impl AsRef<std::path::Path>) -> bool {
+    std::fs::remove_dir(dir).is_ok()
 }
 
-pub fn is_link(_path: &str) -> bool {
-    std::fs::symlink_metadata(_path)
+pub fn is_link(path: impl AsRef<std::path::Path>) -> bool {
+    std::fs::symlink_metadata(path)
         .map(|m| m.file_type().is_symlink())
         .unwrap_or(false)
 }
@@ -2394,8 +2394,11 @@ pub fn mkdir(_pathname: &str, _mode: u32, _recursive: bool) -> bool {
     todo!()
 }
 
-pub fn rename(_old_name: &str, _new_name: &str) -> bool {
-    std::fs::rename(_old_name, _new_name).is_ok()
+pub fn rename(
+    old_name: impl AsRef<std::path::Path>,
+    new_name: impl AsRef<std::path::Path>,
+) -> bool {
+    std::fs::rename(old_name, new_name).is_ok()
 }
 
 pub fn clearstatcache() {
@@ -2781,7 +2784,7 @@ impl RecursiveIteratorFileInfo {
 }
 
 pub fn recursive_directory_iterator(
-    _path: &str,
+    _path: impl AsRef<std::path::Path>,
     _flags: i64,
 ) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
     todo!()

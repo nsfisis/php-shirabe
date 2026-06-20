@@ -6,13 +6,13 @@ use crate::php_file_parser::PhpFileParser;
 use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
-use shirabe_external_packages::symfony::finder::SplFileInfo;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
     PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, is_string,
     pathinfo, preg_quote, realpath, sprintf, str_replace, str_starts_with, stream_get_wrappers,
     strlen, strpos, strrpos, strtr, substr,
 };
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ClassMapGenerator {
@@ -111,10 +111,10 @@ impl ClassMapGenerator {
             base_path = None;
         }
 
-        let files: Vec<SplFileInfo> = if is_string(&path) {
+        let files: Vec<PathBuf> = if is_string(&path) {
             let path_str = path.as_string().unwrap_or("");
             if is_file(path_str) {
-                vec![SplFileInfo::new(path_str)]
+                vec![PathBuf::from(path_str)]
             } else if is_dir(path_str) || strpos(path_str, "*").is_some() {
                 let ext_pattern = format!(
                     "/\\.(?:{})$/",
@@ -154,7 +154,15 @@ impl ClassMapGenerator {
         let cwd = realpath(&getcwd().unwrap_or_default()).unwrap_or_default();
 
         for file in files {
-            let mut file_path = file.get_pathname();
+            let mut file_path = match file.to_str() {
+                Some(s) => s.to_string(),
+                None => {
+                    return Err(anyhow::anyhow!(RuntimeException {
+                        message: format!("Path contains invalid UTF-8: {}", file.display()),
+                        code: 0,
+                    }));
+                }
+            };
             let ext = pathinfo(PhpMixed::String(file_path.clone()), PATHINFO_EXTENSION);
             if !in_array(
                 ext,
@@ -179,7 +187,7 @@ impl ClassMapGenerator {
 
             if file_path.is_empty() {
                 return Err(anyhow::anyhow!(LogicException {
-                    message: format!("Got an empty $filePath for {}", file.get_pathname()),
+                    message: format!("Got an empty $filePath for {}", file.display()),
                     code: 0,
                 }));
             }

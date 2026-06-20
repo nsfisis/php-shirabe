@@ -14,6 +14,7 @@ use shirabe_php_shim::{
     is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
 };
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::advisory::AuditConfig;
@@ -559,14 +560,14 @@ impl CreateProjectCommand {
             }
 
             // PHP: try { $dirs = iterator_to_array($finder); ... } catch (\Exception $e) { ... }
-            let dirs: Vec<String> = finder.iter().map(|f| f.get_pathname()).collect();
+            let dirs: Vec<PathBuf> = finder.iter().collect();
             drop(finder);
             let mut had_error: Option<anyhow::Error> = None;
             for dir in &dirs {
                 if !fs.remove_directory(dir)? {
                     had_error = Some(
                         RuntimeException {
-                            message: format!("Could not remove {}", dir),
+                            message: format!("Could not remove {}", dir.display()),
                             code: 0,
                         }
                         .into(),

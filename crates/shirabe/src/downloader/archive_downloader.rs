@@ -2,11 +2,12 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::finder::{Finder, SplFileInfo};
+use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, PhpMixed, RuntimeException, basename, bin2hex, file_exists, is_dir,
-    random_bytes, realpath,
+    DIRECTORY_SEPARATOR, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes,
+    realpath,
 };
+use std::path::{Path, PathBuf};
 
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::downloader::DownloaderInterface;
@@ -167,15 +168,15 @@ pub trait ArchiveDownloader {
                 let single_dir_at_top_level = content_dir.len() == 1
                     && content_dir
                         .first()
-                        .map(|file| is_dir(&file.get_pathname()))
+                        .map(|file| is_dir(file))
                         .unwrap_or(false);
 
                 if rename_as_one {
                     // if the target $path is clear, we can rename the whole package in one go instead of looping over the contents
-                    let extracted_dir = if single_dir_at_top_level {
-                        content_dir.first().unwrap().get_pathname()
+                    let extracted_dir: PathBuf = if single_dir_at_top_level {
+                        content_dir.first().unwrap().clone()
                     } else {
-                        temporary_dir.clone()
+                        PathBuf::from(&temporary_dir)
                     };
                     self.inner()
                         .filesystem
@@ -183,12 +184,17 @@ pub trait ArchiveDownloader {
                         .rename(&extracted_dir, path)?;
                 } else {
                     // only one dir in the archive, extract its contents out of it
-                    let mut from = temporary_dir.clone();
+                    let mut from = PathBuf::from(&temporary_dir);
                     if single_dir_at_top_level {
-                        from = content_dir.first().unwrap().get_pathname();
+                        from = content_dir.first().unwrap().clone();
                     }
 
-                    rename_recursively(&self.inner().filesystem, package.clone(), &from, path)?;
+                    rename_recursively(
+                        &self.inner().filesystem,
+                        package.clone(),
+                        &from,
+                        Path::new(path),
+                    )?;
                 }
 
                 self.inner()
@@ -242,14 +248,14 @@ fn install_cleanup(
 }
 
 /// Returns the folder content, excluding .DS_Store
-fn get_folder_content(dir: &str) -> Vec<SplFileInfo> {
+fn get_folder_content(dir: impl AsRef<Path>) -> Vec<PathBuf> {
     let mut finder = Finder::create();
     finder
         .ignore_vcs(false)
         .ignore_dot_files(false)
         .not_name(".DS_Store")
         .depth(0)
-        .r#in(dir);
+        .r#in(dir.as_ref());
 
     finder.iter().collect()
 }
@@ -262,37 +268,32 @@ fn get_folder_content(dir: &str) -> Vec<SplFileInfo> {
 fn rename_recursively(
     filesystem: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
     package: PackageInterfaceHandle,
-    from: &str,
-    to: &str,
+    from: &Path,
+    to: &Path,
 ) -> Result<()> {
     let content_dir = get_folder_content(from);
 
     // move files back out of the temp dir
     for file in &content_dir {
-        let file = file.get_pathname();
-        if is_dir(&format!("{}/{}", to, basename(&file))) {
-            if !is_dir(&file) {
+        let target = to.join(
+            file.file_name()
+                .expect("Finder always yields entries with a file name"),
+        );
+        if is_dir(&target) {
+            if !is_dir(file) {
                 return Err(RuntimeException {
                     message: format!(
-                        "Installing {} would lead to overwriting the {}/{} directory with a file from the package, invalid operation.",
+                        "Installing {} would lead to overwriting the {} directory with a file from the package, invalid operation.",
                         package,
-                        to,
-                        basename(&file)
+                        target.display()
                     ),
                     code: 0,
                 }
                 .into());
             }
-            rename_recursively(
-                filesystem,
-                package.clone(),
-                &file,
-                &format!("{}/{}", to, basename(&file)),
-            )?;
+            rename_recursively(filesystem, package.clone(), file, &target)?;
         } else {
-            filesystem
-                .borrow_mut()
-                .rename(&file, &format!("{}/{}", to, basename(&file)))?;
+            filesystem.borrow_mut().rename(file, &target)?;
         }
     }
 

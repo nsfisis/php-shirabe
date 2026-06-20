@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/finder/Finder.php
 
-use crate::symfony::finder::SplFileInfo;
+use std::path::{Path, PathBuf};
 
 /// Helper trait so `Finder::exclude` accepts both single strings and slices
 /// (PHP's variadic / array argument compatibility).
@@ -42,7 +42,7 @@ impl Finder {
         todo!()
     }
 
-    pub fn r#in(&mut self, _dirs: &str) -> &mut Self {
+    pub fn r#in(&mut self, _dirs: impl AsRef<Path>) -> &mut Self {
         todo!()
     }
 
@@ -80,7 +80,7 @@ impl Finder {
 
     pub fn sort<F>(&mut self, _comparator: F) -> &mut Self
     where
-        F: FnMut(&SplFileInfo, &SplFileInfo) -> i64,
+        F: FnMut(&PathBuf, &PathBuf) -> i64,
     {
         todo!()
     }
@@ -101,7 +101,7 @@ impl Finder {
         todo!()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = SplFileInfo> {
+    pub fn iter(&self) -> impl Iterator<Item = PathBuf> {
         todo!();
         std::iter::empty()
     }
@@ -116,8 +116,8 @@ impl Finder {
 }
 
 impl IntoIterator for &Finder {
-    type Item = SplFileInfo;
-    type IntoIter = std::vec::IntoIter<SplFileInfo>;
+    type Item = PathBuf;
+    type IntoIter = std::vec::IntoIter<PathBuf>;
 
     fn into_iter(self) -> Self::IntoIter {
         todo!()
@@ -132,22 +132,22 @@ impl FinderIterator {
         todo!()
     }
 
-    pub fn current(&self) -> SplFileInfo {
+    pub fn current(&self) -> PathBuf {
         todo!()
     }
 }
 
 impl Iterator for FinderIterator {
-    type Item = SplFileInfo;
+    type Item = PathBuf;
 
-    fn next(&mut self) -> Option<SplFileInfo> {
+    fn next(&mut self) -> Option<PathBuf> {
         todo!()
     }
 }
 
 impl IntoIterator for Finder {
-    type Item = SplFileInfo;
-    type IntoIter = std::vec::IntoIter<SplFileInfo>;
+    type Item = PathBuf;
+    type IntoIter = std::vec::IntoIter<PathBuf>;
 
     fn into_iter(self) -> Self::IntoIter {
         todo!()
@@ -155,8 +155,8 @@ impl IntoIterator for Finder {
 }
 
 impl IntoIterator for &mut Finder {
-    type Item = SplFileInfo;
-    type IntoIter = std::vec::IntoIter<SplFileInfo>;
+    type Item = PathBuf;
+    type IntoIter = std::vec::IntoIter<PathBuf>;
 
     fn into_iter(self) -> Self::IntoIter {
         todo!()

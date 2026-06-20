@@ -7,9 +7,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
-    array_map, array_merge, call_user_func, file_get_contents, filemtime, function_exists, hash,
-    in_array, is_array, is_int, ksort, realpath, reset_first, sprintf, strcmp, strtolower, touch2,
-    trim, usort,
+    array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array, is_int,
+    ksort, realpath, reset_first, sprintf, strcmp, strtolower, touch2, trim, usort,
 };
 
 use crate::installer::InstallationManager;
@@ -1005,11 +1004,4 @@ struct SetEntry {
     repo: LockArrayRepositoryHandle,
     method: String,
     description: String,
-}
-
-// Suppress unused-import warnings for items kept for parity with the PHP source.
-#[allow(dead_code)]
-fn _use_parity() {
-    let _ = is_array;
-    let _: PhpMixed = call_user_func("", &[]);
 }

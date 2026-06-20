@@ -8,9 +8,9 @@ use std::sync::{LazyLock, Mutex};
 use crate::util::Silencer;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
-    PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, array_shift,
-    file_exists, filesize, get_class, hash, hash_file, in_array, is_dir, is_executable, parse_url,
-    pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+    PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, file_exists,
+    filesize, get_class, hash, hash_file, in_array, is_dir, is_executable, parse_url, pathinfo,
+    realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
 
 use crate::cache::Cache;
@@ -800,18 +800,4 @@ struct UrlEntry {
     base: String,
     processed: String,
     cache_key: String,
-}
-
-// Suppress unused-import warnings for items kept for parity with the PHP source.
-#[allow(dead_code)]
-fn _use_parity() {
-    let _ = filesize;
-    let _ = hash_file;
-    let _ = in_array;
-    let _ = usleep;
-    let _ = array_shift::<u8>;
-    let _ = UnexpectedValueException {
-        message: String::new(),
-        code: 0,
-    };
 }

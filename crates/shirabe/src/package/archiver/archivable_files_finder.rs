@@ -77,11 +77,7 @@ impl ArchivableFilesFinder {
             .ignore_dot_files(false)
             .sort_by_name();
 
-        let inner_iter: Box<dyn Iterator<Item = PathBuf>> = Box::new(
-            finder
-                .get_iterator()
-                .map(|f| PathBuf::from(f.get_pathname())),
-        );
+        let inner_iter: Box<dyn Iterator<Item = PathBuf>> = Box::new(finder.get_iterator());
 
         Ok(Self { finder, inner_iter })
     }

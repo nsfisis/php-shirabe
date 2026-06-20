@@ -325,14 +325,14 @@ impl Cache {
                 expire.format(date_format_to_strftime("Y-m-d H:i:s"))
             ));
             for file in &mut finder {
-                let _ = self.filesystem.borrow_mut().unlink(&file.get_pathname());
+                let _ = self.filesystem.borrow_mut().unlink(&file);
             }
 
             let mut total_size = self.filesystem.borrow_mut().size(&self.root).unwrap_or(0);
             if total_size > max_size {
                 let mut iterator = self.get_finder().sort_by_accessed_time().get_iterator();
                 while total_size > max_size && iterator.valid() {
-                    let filepath = iterator.current().get_pathname();
+                    let filepath = iterator.current();
                     total_size -= self.filesystem.borrow_mut().size(&filepath).unwrap_or(0);
                     let _ = self.filesystem.borrow_mut().unlink(&filepath);
                     iterator.next();
@@ -361,10 +361,7 @@ impl Cache {
                     expire.format(date_format_to_strftime("Y-m-d H:i:s"))
                 ));
             for file in &mut finder {
-                let _ = self
-                    .filesystem
-                    .borrow_mut()
-                    .remove_directory(&file.get_pathname());
+                let _ = self.filesystem.borrow_mut().remove_directory(&file);
             }
 
             *CACHE_COLLECTED.lock().unwrap() = Some(true);

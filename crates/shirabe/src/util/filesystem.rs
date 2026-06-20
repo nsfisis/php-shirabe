@@ -14,6 +14,8 @@ use shirabe_php_shim::{
     substr_count, symlink, touch, unlink, usleep, var_export,
 };
 
+use std::path::Path;
+
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
@@ -30,7 +32,8 @@ impl Filesystem {
         }
     }
 
-    pub fn remove(&mut self, file: &str) -> anyhow::Result<bool> {
+    pub fn remove(&mut self, file: impl AsRef<Path>) -> anyhow::Result<bool> {
+        let file = file.as_ref();
         if is_dir(file) {
             return self.remove_directory(file);
         }
@@ -76,7 +79,7 @@ impl Filesystem {
                 .r#in(dir);
 
             for path in finder.iter() {
-                self.remove(&path.get_pathname())?;
+                self.remove(path)?;
             }
         }
         Ok(())
@@ -86,7 +89,16 @@ impl Filesystem {
     ///
     /// Uses the process component if proc_open is enabled on the PHP
     /// installation.
-    pub fn remove_directory(&mut self, directory: &str) -> anyhow::Result<bool> {
+    pub fn remove_directory(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
+        // TODO(phase-c):
+        // This path is matched against a regex (remove_edge_cases) and passed to an
+        // `rm -rf`/`rmdir` subprocess via the String-based ProcessExecutor, so it has to be
+        // representable as UTF-8.
+        let directory = directory.as_ref();
+        let directory = directory.to_str().ok_or_else(|| RuntimeException {
+            message: format!("Path contains invalid UTF-8: {}", directory.display()),
+            code: 0,
+        })?;
         let edge_case_result = self.remove_edge_cases(directory, true)?;
         if let Some(r) = edge_case_result {
             return Ok(r);
@@ -256,7 +268,7 @@ impl Filesystem {
                 .into());
             }
 
-            if is_link(directory) && !self.unlink_implementation(directory) {
+            if is_link(directory) && !self.unlink_implementation(Path::new(directory)) {
                 return Err(RuntimeException {
                     message: format!(
                         "Could not delete symbolic link {}: {}",
@@ -305,7 +317,8 @@ impl Filesystem {
     }
 
     /// Attempts to unlink a file and in case of failure retries after 350ms on windows
-    pub fn unlink(&self, path: &str) -> anyhow::Result<bool> {
+    pub fn unlink(&self, path: impl AsRef<Path>) -> anyhow::Result<bool> {
+        let path = path.as_ref();
         let mut unlinked = self.unlink_implementation(path);
         if !unlinked {
             // retry after a bit on windows since it tends to be touchy with mass removals
@@ -318,7 +331,7 @@ impl Filesystem {
                 let error = error_get_last();
                 let mut message = format!(
                     "Could not delete {}: {}",
-                    path,
+                    path.display(),
                     error
                         .as_ref()
                         .and_then(|m| m.get("message"))
@@ -337,7 +350,8 @@ impl Filesystem {
     }
 
     /// Attempts to rmdir a file and in case of failure retries after 350ms on windows
-    pub fn rmdir(&self, path: &str) -> anyhow::Result<bool> {
+    pub fn rmdir(&self, path: impl AsRef<Path>) -> anyhow::Result<bool> {
+        let path = path.as_ref();
         let mut deleted = rmdir(path);
         if !deleted {
             // retry after a bit on windows since it tends to be touchy with mass removals
@@ -350,7 +364,7 @@ impl Filesystem {
                 let error = error_get_last();
                 let mut message = format!(
                     "Could not delete {}: {}",
-                    path,
+                    path.display(),
                     error
                         .as_ref()
                         .and_then(|m| m.get("message"))
@@ -443,10 +457,28 @@ impl Filesystem {
         Ok(result)
     }
 
-    pub fn rename(&mut self, source: &str, target: &str) -> anyhow::Result<()> {
+    pub fn rename(
+        &mut self,
+        source: impl AsRef<Path>,
+        target: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let source = source.as_ref();
+        let target = target.as_ref();
         if rename(source, target) {
             return Ok(());
         }
+
+        // TODO(phase-c):
+        // The fallbacks below (copy_then_remove and the mv/xcopy subprocesses) operate on
+        // path strings, so beyond this point the paths have to be representable as UTF-8.
+        let source = source.to_str().ok_or_else(|| RuntimeException {
+            message: format!("Path contains invalid UTF-8: {}", source.display()),
+            code: 0,
+        })?;
+        let target = target.to_str().ok_or_else(|| RuntimeException {
+            message: format!("Path contains invalid UTF-8: {}", target.display()),
+            code: 0,
+        })?;
 
         if !function_exists("proc_open") {
             return self.copy_then_remove(source, target);
@@ -651,10 +683,11 @@ impl Filesystem {
 
     /// Returns size of a file or directory specified by path. If a directory is
     /// given, its size will be computed recursively.
-    pub fn size(&self, path: &str) -> anyhow::Result<i64> {
+    pub fn size(&self, path: impl AsRef<Path>) -> anyhow::Result<i64> {
+        let path = path.as_ref();
         if !file_exists(path) {
             return Err(RuntimeException {
-                message: format!("{} does not exist.", path),
+                message: format!("{} does not exist.", path.display()),
                 code: 0,
             }
             .into());
@@ -795,7 +828,7 @@ impl Filesystem {
         false
     }
 
-    pub(crate) fn directory_size(&self, directory: &str) -> anyhow::Result<i64> {
+    pub(crate) fn directory_size(&self, directory: &Path) -> anyhow::Result<i64> {
         let it =
             shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS)?;
         let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::CHILD_FIRST);
@@ -823,7 +856,7 @@ impl Filesystem {
     /// delete symbolic link implementation (commonly known as "unlink()")
     ///
     /// symbolic links on windows which link to directories need rmdir instead of unlink
-    fn unlink_implementation(&self, path: &str) -> bool {
+    fn unlink_implementation(&self, path: &Path) -> bool {
         if Platform::is_windows() && is_dir(path) && is_link(path) {
             return rmdir(path);
         }
