@@ -4,3 +4,4 @@ mod test_case;
 mod pool_test;
 mod request_test;
 mod rule_set_iterator_test;
+mod rule_test;
