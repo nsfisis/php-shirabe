@@ -2,6 +2,7 @@ mod config_validator_test;
 mod error_handler_test;
 mod forgejo_url_test;
 mod http;
+mod http_downloader_test;
 mod metadata_minifier_test;
 mod no_proxy_pattern_test;
 mod package_sorter_test;
