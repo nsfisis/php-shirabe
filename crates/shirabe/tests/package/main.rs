@@ -6,5 +6,6 @@ mod base_package_test;
 mod complete_package_test;
 mod dumper;
 mod loader;
+mod locker_test;
 mod root_alias_package_test;
 mod version;
