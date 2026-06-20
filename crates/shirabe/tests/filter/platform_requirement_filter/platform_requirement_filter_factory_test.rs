@@ -18,7 +18,8 @@ fn test_from_bool_or_list() {
     );
 
     // 'false creates IgnoreNothingFilter'
-    let filter = PlatformRequirementFilterFactory::from_bool_or_list(PhpMixed::Bool(false)).unwrap();
+    let filter =
+        PlatformRequirementFilterFactory::from_bool_or_list(PhpMixed::Bool(false)).unwrap();
     assert!(
         filter
             .as_any()

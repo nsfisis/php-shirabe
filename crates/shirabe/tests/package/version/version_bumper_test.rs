@@ -1,8 +1,8 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionBumperTest.php
 
 use indexmap::IndexMap;
-use shirabe::package::package::Package;
 use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
+use shirabe::package::package::Package;
 use shirabe::package::version::version_bumper::VersionBumper;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::version_parser::VersionParser;
@@ -36,7 +36,10 @@ fn test_bump_requirement() {
         let handle: PackageInterfaceHandle = PackageHandle::from_package(package).into();
 
         let new_constraint = version_bumper
-            .bump_requirement(&version_parser.parse_constraints(requirement).unwrap(), handle)
+            .bump_requirement(
+                &version_parser.parse_constraints(requirement).unwrap(),
+                handle,
+            )
             .unwrap();
 
         // assert that the recommended version is what we expect
@@ -44,8 +47,12 @@ fn test_bump_requirement() {
     }
 }
 
-fn provide_bump_requirement_tests() -> Vec<(&'static str, &'static str, &'static str, Option<&'static str>)>
-{
+fn provide_bump_requirement_tests() -> Vec<(
+    &'static str,
+    &'static str,
+    &'static str,
+    Option<&'static str>,
+)> {
     // constraint, version, expected recommendation, [branch-alias]
     vec![
         ("^1.0", "1.2.1", "^1.2.1", None),
@@ -57,7 +64,12 @@ fn provide_bump_requirement_tests() -> Vec<(&'static str, &'static str, &'static
         ("^1.2 || ^2.3", "1.3.2", "^1.3.2 || ^2.3", None),
         ("^1.2 || ^2.3", "2.4.0", "^1.2 || ^2.4", None),
         ("^1.2 || ^2.3 || ^2", "2.4.0", "^1.2 || ^2.4 || ^2.4", None),
-        ("^1.2 || ^2.3.3 || ^2", "2.4.0", "^1.2 || ^2.4.0 || ^2.4", None),
+        (
+            "^1.2 || ^2.3.3 || ^2",
+            "2.4.0",
+            "^1.2 || ^2.4.0 || ^2.4",
+            None,
+        ),
         ("^3@dev", "3.2.x-dev", "^3.2@dev", None),
         ("~2", "2.1-beta.1", "~2", None),
         ("dev-main", "dev-foo", "dev-main", None),

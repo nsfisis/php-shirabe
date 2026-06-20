@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/IO/BufferIOTest.php
 
-use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::IOInterfaceImmutable;
+use shirabe::io::buffer_io::BufferIO;
 use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_php_shim::PhpMixed;
 

@@ -6,7 +6,10 @@ use shirabe::platform::runtime::Runtime;
 #[ignore = "Runtime::parse_html_extension_info reaches a todo!() in the php-shim (html_entity_decode)"]
 fn test_parse_extension_info() {
     for (html_input, expected_output) in provide_extension_infos() {
-        assert_eq!(expected_output, Runtime::parse_html_extension_info(html_input));
+        assert_eq!(
+            expected_output,
+            Runtime::parse_html_extension_info(html_input)
+        );
     }
 }
 

@@ -39,5 +39,8 @@ fn test_create_invalid() {
 fn test_generate_ssh_url() {
     let forgejo_url = ForgejoUrl::create("git@codeberg.org:acme/repo.git").unwrap();
 
-    assert_eq!("git@codeberg.org:acme/repo.git", forgejo_url.generate_ssh_url());
+    assert_eq!(
+        "git@codeberg.org:acme/repo.git",
+        forgejo_url.generate_ssh_url()
+    );
 }

@@ -1,7 +1,9 @@
 //! ref: composer/tests/Composer/Test/Util/SilencerTest.php
 
 use shirabe::util::silencer::Silencer;
-use shirabe_php_shim::{E_USER_WARNING, RuntimeException, error_reporting, microtime, trigger_error};
+use shirabe_php_shim::{
+    E_USER_WARNING, RuntimeException, error_reporting, microtime, trigger_error,
+};
 
 /// Test succeeds when no warnings are emitted externally, and original level is restored.
 #[test]

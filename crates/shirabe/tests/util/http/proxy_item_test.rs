@@ -56,6 +56,9 @@ fn data_formatting() -> Vec<(&'static str, &'static str)> {
         // 'removes-user'
         ("http://user@proxy.com:6180", "http://***@proxy.com:6180"),
         // 'removes-user-pass'
-        ("http://user:p%40ss@proxy.com:6180", "http://***:***@proxy.com:6180"),
+        (
+            "http://user:p%40ss@proxy.com:6180",
+            "http://***:***@proxy.com:6180",
+        ),
     ]
 }

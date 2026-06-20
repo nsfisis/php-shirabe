@@ -43,9 +43,12 @@ fn test_config_validator_commit_ref_warning() {
 fn test_config_validator_warns_on_script_description_for_nonexistent_script() {
     let warnings = validate(&fixture("composer_scripts-descriptions.json"));
 
-    assert!(warnings.contains(
-        &"Description for non-existent script \"phpcsxxx\" found in \"scripts-descriptions\"".to_string()
-    ));
+    assert!(
+        warnings.contains(
+            &"Description for non-existent script \"phpcsxxx\" found in \"scripts-descriptions\""
+                .to_string()
+        )
+    );
 }
 
 #[test]

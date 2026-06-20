@@ -20,7 +20,10 @@ fn test_parse_name_version_pairs() {
     for (input, result) in provide_parse_name_version_pairs_data() {
         let version_parser = VersionParser::new();
 
-        assert_eq!(result, version_parser.parse_name_version_pairs(input).unwrap());
+        assert_eq!(
+            result,
+            version_parser.parse_name_version_pairs(input).unwrap()
+        );
     }
 }
 
