@@ -20,6 +20,7 @@ fastrand = "2.4.1"
 indexmap = { version = "2.14.0", features = ["serde"] }
 md5 = "0.7.0"
 regex = "1.12.3"
+reqwest = "0.13.4"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
 sha1 = "0.10.6"

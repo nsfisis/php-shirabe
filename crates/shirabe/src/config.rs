@@ -1123,7 +1123,7 @@ impl Config {
                 PhpMixed::String("ftp".to_string()),
                 PhpMixed::String("svn".to_string()),
             ]),
-            false,
+            true,
         ) {
             if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
                 if scheme.as_deref() == Some("svn") {
