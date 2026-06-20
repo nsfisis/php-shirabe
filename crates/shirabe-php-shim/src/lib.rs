@@ -1916,8 +1916,45 @@ pub fn sys_get_temp_dir() -> String {
     std::env::temp_dir().to_string_lossy().into_owned()
 }
 
-pub fn json_decode(_s: &str, _assoc: bool) -> anyhow::Result<PhpMixed> {
-    todo!()
+// PHP's two-argument `json_decode`: without JSON_THROW_ON_ERROR it never throws,
+// returning null on malformed input. With `assoc` false, JSON objects decode to
+// stdClass-equivalent ArrayObject values; with `assoc` true, to associative arrays.
+pub fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
+    match serde_json::from_str::<serde_json::Value>(s) {
+        Ok(value) => Ok(json_value_to_php_mixed(value, assoc)),
+        Err(_) => Ok(PhpMixed::Null),
+    }
+}
+
+fn json_value_to_php_mixed(value: serde_json::Value, assoc: bool) -> PhpMixed {
+    match value {
+        serde_json::Value::Null => PhpMixed::Null,
+        serde_json::Value::Bool(b) => PhpMixed::Bool(b),
+        serde_json::Value::Number(n) => match n.as_i64() {
+            Some(i) => PhpMixed::Int(i),
+            // Integers beyond i64 and any fractional/exponent number decode to float,
+            // matching PHP's default (non-bigint) behaviour.
+            None => PhpMixed::Float(n.as_f64().unwrap_or(0.0)),
+        },
+        serde_json::Value::String(s) => PhpMixed::String(s),
+        serde_json::Value::Array(items) => PhpMixed::List(
+            items
+                .into_iter()
+                .map(|item| Box::new(json_value_to_php_mixed(item, assoc)))
+                .collect(),
+        ),
+        serde_json::Value::Object(entries) => {
+            let data: IndexMap<String, Box<PhpMixed>> = entries
+                .into_iter()
+                .map(|(k, v)| (k, Box::new(json_value_to_php_mixed(v, assoc))))
+                .collect();
+            if assoc {
+                PhpMixed::Array(data)
+            } else {
+                PhpMixed::Object(ArrayObject { data })
+            }
+        }
+    }
 }
 
 pub fn http_build_query_mixed(
