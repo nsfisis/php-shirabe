@@ -71,8 +71,8 @@ pub fn preg_match_all(pattern: &str, subject: &str) -> Vec<Vec<String>> {
     let group_count = re.captures_len();
     let mut groups: Vec<Vec<String>> = vec![Vec::new(); group_count];
     for caps in re.captures_iter(subject) {
-        for g in 0..group_count {
-            groups[g].push(
+        for (g, group) in groups.iter_mut().enumerate() {
+            group.push(
                 caps.get(g)
                     .map(|m| m.as_str().to_string())
                     .unwrap_or_default(),
@@ -348,8 +348,7 @@ pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<
     };
 
     let mut last = 0usize;
-    let mut delims = 0usize;
-    for caps in re.captures_iter(subject) {
+    for (delims, caps) in re.captures_iter(subject).enumerate() {
         if delims >= max_delims {
             break;
         }
@@ -365,7 +364,6 @@ pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<
             }
         }
         last = m.end();
-        delims += 1;
     }
     push(&subject[last..], &mut result);
 

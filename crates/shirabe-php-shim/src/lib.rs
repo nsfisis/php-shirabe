@@ -1952,10 +1952,8 @@ fn array_replace_recursive_list(
 ) -> Vec<Box<PhpMixed>> {
     for (index, replacement_value) in replacement.into_iter().enumerate() {
         if index < base.len() {
-            base[index] = Box::new(array_replace_recursive_value(
-                (*base[index]).clone(),
-                *replacement_value,
-            ));
+            *base[index] =
+                array_replace_recursive_value((*base[index]).clone(), *replacement_value);
         } else {
             base.push(replacement_value);
         }

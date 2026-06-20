@@ -174,8 +174,7 @@ impl Git {
             let mut outputs: Vec<String> = vec![];
 
             let mut status: i64 = 0;
-            let mut counter: i64 = 0;
-            for callable in &command_callables {
+            for (counter, callable) in command_callables.iter().enumerate() {
                 let cmd = callable(url_arg);
                 *last_cmd = PhpMixed::List(
                     cmd.iter()
@@ -195,7 +194,6 @@ impl Git {
                 if status != 0 {
                     break;
                 }
-                counter += 1;
             }
 
             if collect_outputs && let Some(out) = command_output {

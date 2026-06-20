@@ -167,7 +167,7 @@ impl RuleSetGenerator {
                 work_queue.push_back(alias_of.clone());
                 let rule = self.create_require_rule(
                     package.clone(),
-                    &[alias_of.clone()],
+                    std::slice::from_ref(&alias_of),
                     rule::RULE_PACKAGE_ALIAS,
                     rule::ReasonData::BasePackage(package.clone()),
                 );
@@ -176,7 +176,7 @@ impl RuleSetGenerator {
                 // aliases must be installed with their main package, so create a rule the other way around as well
                 let inverse_rule = self.create_require_rule(
                     alias_of.clone(),
-                    &[package.clone()],
+                    std::slice::from_ref(&package),
                     rule::RULE_PACKAGE_INVERSE_ALIAS,
                     rule::ReasonData::BasePackage(alias_of.clone()),
                 );
@@ -325,7 +325,7 @@ impl RuleSetGenerator {
             self.add_rules_for_package(package.clone(), platform_requirement_filter);
 
             let rule = self.create_install_one_of_rule(
-                &[package.clone()],
+                std::slice::from_ref(package),
                 rule::RULE_FIXED,
                 rule::ReasonData::Fixed {
                     package: package.clone(),

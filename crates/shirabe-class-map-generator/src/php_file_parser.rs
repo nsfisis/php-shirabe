@@ -131,13 +131,13 @@ impl PhpFileParser {
                     continue;
                 }
 
-                let name: String = if name.starts_with(':') {
+                let name: String = if let Some(stripped) = name.strip_prefix(':') {
                     // This is an XHP class, https://github.com/facebook/xhp
                     "xhp".to_string()
                         + &str_replace_array(
                             &["-".to_string(), ":".to_string()],
                             &["_".to_string(), "__".to_string()],
-                            &name[1..],
+                            stripped,
                         )
                 } else if matches
                     .get(&CaptureKey::ByName("type".to_owned()))

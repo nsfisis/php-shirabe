@@ -462,8 +462,8 @@ pub trait VcsDownloader:
     }
 
     fn prepare_urls(&self, mut urls: Vec<String>) -> Vec<String> {
-        for index in 0..urls.len() {
-            let mut url = urls[index].clone();
+        for url_entry in &mut urls {
+            let mut url = url_entry.clone();
             if Filesystem::is_local_path(&url) {
                 // realpath() below will not understand
                 // url that starts with "file://"
@@ -479,10 +479,10 @@ pub trait VcsDownloader:
                     url = rawurldecode(&url);
                 }
 
-                urls[index] = realpath(&url).unwrap_or_default();
+                *url_entry = realpath(&url).unwrap_or_default();
 
                 if is_file_protocol {
-                    urls[index] = format!("{}{}", file_protocol, urls[index]);
+                    *url_entry = format!("{}{}", file_protocol, url_entry);
                 }
             }
         }

@@ -1022,11 +1022,11 @@ impl Table {
 
     fn copy_row(&self, rows: &[PhpMixed], line: i64) -> Vec<PhpMixed> {
         let mut row = Self::to_row_vec(rows[line as usize].clone());
-        for cell_key in 0..row.len() {
-            let cell_value = row[cell_key].clone();
-            row[cell_key] = PhpMixed::from("");
+        for cell in &mut row {
+            let cell_value = cell.clone();
+            *cell = PhpMixed::from("");
             if shirabe_php_shim::instance_of::<TableCell>(&cell_value) {
-                row[cell_key] = Self::table_cell_to_mixed(TableCell::new2(
+                *cell = Self::table_cell_to_mixed(TableCell::new2(
                     "",
                     Self::table_cell_options_colspan(Self::cell_colspan(&cell_value)),
                 ));

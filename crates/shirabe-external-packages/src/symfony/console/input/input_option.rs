@@ -27,8 +27,8 @@ impl InputOption {
         description: String,
         default: PhpMixed,
     ) -> anyhow::Result<Self> {
-        let name = if name.starts_with("--") {
-            name[2..].to_string()
+        let name = if let Some(stripped) = name.strip_prefix("--") {
+            stripped.to_string()
         } else {
             name.to_string()
         };

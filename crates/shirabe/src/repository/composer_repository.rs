@@ -1698,7 +1698,7 @@ impl ComposerRepository {
                 || StabilityFilter::is_package_acceptable(
                     acceptable_stabilities.unwrap(),
                     stability_flags.unwrap(),
-                    &[name.clone()],
+                    std::slice::from_ref(&name),
                     "dev",
                 )
             {

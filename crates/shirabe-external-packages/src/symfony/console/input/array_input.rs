@@ -129,9 +129,11 @@ impl ArrayInput {
 
         default
     }
+}
 
-    /// Returns a stringified representation of the args passed to the command.
-    pub fn to_string(&self) -> String {
+/// Returns a stringified representation of the args passed to the command.
+impl std::fmt::Display for ArrayInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut params: Vec<String> = vec![];
         for (param, val) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
@@ -183,9 +185,11 @@ impl ArrayInput {
             }
         }
 
-        shirabe_php_shim::implode(" ", &params)
+        write!(f, "{}", shirabe_php_shim::implode(" ", &params))
     }
+}
 
+impl ArrayInput {
     fn parse(&mut self) -> anyhow::Result<()> {
         // Clone to avoid borrowing self while mutating; PHP iterates over a copy semantically.
         let parameters = self.parameters.clone();

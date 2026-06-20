@@ -520,9 +520,11 @@ impl ArgvInput {
 
         default
     }
+}
 
-    /// Returns a stringified representation of the args passed to the command.
-    pub fn to_string(&self) -> String {
+/// Returns a stringified representation of the args passed to the command.
+impl std::fmt::Display for ArgvInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tokens: Vec<String> = self
             .tokens
             .iter()
@@ -544,7 +546,7 @@ impl ArgvInput {
             })
             .collect();
 
-        shirabe_php_shim::implode(" ", &tokens)
+        write!(f, "{}", shirabe_php_shim::implode(" ", &tokens))
     }
 }
 

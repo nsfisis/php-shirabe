@@ -604,8 +604,8 @@ impl GitLabDriver {
     fn url_encode_all(&self, string: &str) -> String {
         let mut encoded = String::new();
         let bytes: Vec<char> = string.chars().collect();
-        for i in 0..bytes.len() {
-            let character = bytes[i].to_string();
+        for byte in &bytes {
+            let character = byte.to_string();
             let final_character = if !ctype_alnum(&character)
                 && !in_array(
                     PhpMixed::String(character.clone()),
