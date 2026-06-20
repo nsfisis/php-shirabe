@@ -1,2 +1,9 @@
+mod forgejo_driver_test;
 mod fossil_driver_test;
+mod git_bitbucket_driver_test;
+mod git_driver_test;
+mod github_driver_test;
+mod gitlab_driver_test;
 mod hg_driver_test;
+mod perforce_driver_test;
+mod svn_driver_test;
