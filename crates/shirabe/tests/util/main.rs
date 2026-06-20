@@ -1,6 +1,9 @@
 mod config_validator_test;
 mod error_handler_test;
+mod forgejo_test;
 mod forgejo_url_test;
+mod github_test;
+mod gitlab_test;
 mod http;
 mod http_downloader_test;
 mod ini_helper_test;
