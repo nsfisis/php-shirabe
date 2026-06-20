@@ -1,5 +1,9 @@
 mod archive_downloader_test;
+mod download_manager_test;
+mod file_downloader_test;
 mod fossil_downloader_test;
+mod git_downloader_test;
 mod hg_downloader_test;
 mod perforce_downloader_test;
 mod xz_downloader_test;
+mod zip_downloader_test;
