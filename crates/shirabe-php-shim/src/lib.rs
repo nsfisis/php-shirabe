@@ -1457,8 +1457,14 @@ pub fn file_exists(_path: &str) -> bool {
     std::path::Path::new(_path).exists()
 }
 
+// TODO(phase-c): PHP's is_writable() resolves to access(2) with W_OK, honoring the effective
+// user/group and ACLs. This std-only approximation only inspects the permission bits, so it can
+// diverge for files the current user does not own. Refine with a syscall (libc/rustix) crate later.
 pub fn is_writable(_path: &str) -> bool {
-    todo!()
+    match std::fs::metadata(_path) {
+        Ok(meta) => !meta.permissions().readonly(),
+        Err(_) => false,
+    }
 }
 
 pub fn unlink(_path: &str) -> bool {
