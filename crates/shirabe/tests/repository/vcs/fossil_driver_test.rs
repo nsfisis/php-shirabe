@@ -11,7 +11,10 @@ use shirabe::repository::vcs::FossilDriver;
 fn support_provider() -> Vec<(&'static str, bool)> {
     vec![
         ("http://fossil.kd2.org/kd2fw/", true),
-        ("https://chiselapp.com/user/rkeene/repository/flint/index", true),
+        (
+            "https://chiselapp.com/user/rkeene/repository/flint/index",
+            true,
+        ),
         ("ssh://fossil.kd2.org/kd2fw.fossil", true),
     ]
 }

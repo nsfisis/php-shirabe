@@ -60,8 +60,10 @@ fn test_generate_repository_name() {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
             .collect();
-        let existing_repos: IndexMap<String, ()> =
-            existing_keys.into_iter().map(|k| (k.to_string(), ())).collect();
+        let existing_repos: IndexMap<String, ()> = existing_keys
+            .into_iter()
+            .map(|k| (k.to_string(), ()))
+            .collect();
 
         assert_eq!(
             expected,

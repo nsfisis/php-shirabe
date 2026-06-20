@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleTest.php
 
-use shirabe::dependency_resolver::{
-    GenericRule, RULE_ROOT_REQUIRE, ReasonData, Rule, RuleSet,
-};
+use shirabe::dependency_resolver::{GenericRule, RULE_ROOT_REQUIRE, ReasonData, Rule, RuleSet};
 use shirabe_semver::constraint::MatchAllConstraint;
 
 fn root_require_reason() -> ReasonData {
@@ -13,7 +11,11 @@ fn root_require_reason() -> ReasonData {
 }
 
 fn generic_rule(literals: Vec<i64>) -> Rule {
-    Rule::Generic(GenericRule::new(literals, RULE_ROOT_REQUIRE, root_require_reason()))
+    Rule::Generic(GenericRule::new(
+        literals,
+        RULE_ROOT_REQUIRE,
+        root_require_reason(),
+    ))
 }
 
 #[test]

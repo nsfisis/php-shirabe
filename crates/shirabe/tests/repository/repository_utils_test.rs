@@ -107,7 +107,12 @@ fn provide_filter_require_tests() -> Vec<FilterCase> {
         },
         // 'simple require'
         FilterCase {
-            requirer: load_with("requirer/pkg", "1.0.0", "require", vec![("required/a", "*")]),
+            requirer: load_with(
+                "requirer/pkg",
+                "1.0.0",
+                "require",
+                vec![("required/a", "*")],
+            ),
             expected: vec!["a"],
             include_require_dev: false,
         },
@@ -124,7 +129,12 @@ fn provide_filter_require_tests() -> Vec<FilterCase> {
         },
         // 'require transitive deps and aliases are included'
         FilterCase {
-            requirer: load_with("requirer/pkg", "1.0.0", "require", vec![("required/b", "*")]),
+            requirer: load_with(
+                "requirer/pkg",
+                "1.0.0",
+                "require",
+                vec![("required/b", "*")],
+            ),
             expected: vec!["b", "c", "c-alias"],
             include_require_dev: false,
         },
@@ -148,8 +158,11 @@ fn test_filter_required_packages() {
     for case in provide_filter_require_tests() {
         let pkgs = build_packages();
         let packages: Vec<PackageInterfaceHandle> = pkgs.values().cloned().collect();
-        let expected: Vec<PackageInterfaceHandle> =
-            case.expected.iter().map(|name| pkgs[*name].clone()).collect();
+        let expected: Vec<PackageInterfaceHandle> = case
+            .expected
+            .iter()
+            .map(|name| pkgs[*name].clone())
+            .collect();
 
         let result = RepositoryUtils::filter_required_packages(
             &packages,

@@ -7,5 +7,6 @@ mod composite_repository_test;
 mod filter_repository_test;
 mod installed_repository_test;
 mod repository_factory_test;
+mod repository_manager_test;
 mod repository_utils_test;
 mod vcs;

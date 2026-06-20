@@ -1,4 +1,5 @@
 mod about_command_test;
+mod archive_command_test;
 mod audit_command_test;
 mod check_platform_reqs_command_test;
 mod clear_cache_command_test;
@@ -9,3 +10,4 @@ mod reinstall_command_test;
 mod search_command_test;
 mod self_update_command_test;
 mod status_command_test;
+mod validate_command_test;

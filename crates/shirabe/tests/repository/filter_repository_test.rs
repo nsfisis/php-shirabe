@@ -22,19 +22,31 @@ fn array_repo() -> RepositoryInterfaceHandle {
     RepositoryInterfaceHandle::new(repo)
 }
 
-fn config(only: Option<&[&str]>, exclude: Option<&[&str]>) -> IndexMap<String, shirabe_php_shim::PhpMixed> {
+fn config(
+    only: Option<&[&str]>,
+    exclude: Option<&[&str]>,
+) -> IndexMap<String, shirabe_php_shim::PhpMixed> {
     use shirabe_php_shim::PhpMixed;
     let mut c: IndexMap<String, PhpMixed> = IndexMap::new();
     if let Some(only) = only {
         c.insert(
             "only".to_string(),
-            PhpMixed::List(only.iter().map(|s| PhpMixed::String(s.to_string())).collect()),
+            PhpMixed::List(
+                only.iter()
+                    .map(|s| PhpMixed::String(s.to_string()))
+                    .collect(),
+            ),
         );
     }
     if let Some(exclude) = exclude {
         c.insert(
             "exclude".to_string(),
-            PhpMixed::List(exclude.iter().map(|s| PhpMixed::String(s.to_string())).collect()),
+            PhpMixed::List(
+                exclude
+                    .iter()
+                    .map(|s| PhpMixed::String(s.to_string()))
+                    .collect(),
+            ),
         );
     }
     c
@@ -45,7 +57,10 @@ fn match_all() -> AnyConstraint {
 }
 
 fn stabilities() -> IndexMap<String, i64> {
-    STABILITIES.iter().map(|(k, v)| (k.to_string(), *v)).collect()
+    STABILITIES
+        .iter()
+        .map(|(k, v)| (k.to_string(), *v))
+        .collect()
 }
 
 #[test]
