@@ -35,7 +35,12 @@ fn provide_openssl_versions() -> Vec<(&'static str, &'static str, bool, Option<&
         ("1.2.3zh-fips", "1.2.3.34", true, None),
         ("1.2.3zh-fips-dev", "1.2.3.34-dev", true, None),
         // Additional cases
-        ("1.2.3zh-fips-rc3", "1.2.3.34-rc3", true, Some("1.2.3.34-RC3")),
+        (
+            "1.2.3zh-fips-rc3",
+            "1.2.3.34-rc3",
+            true,
+            Some("1.2.3.34-RC3"),
+        ),
         ("1.2.3zh-alpha10-fips", "1.2.3.34-alpha10", true, None),
         ("1.1.1l (Schannel)", "1.1.1.12", false, None),
         // Check that alphabetical patch levels overflow correctly

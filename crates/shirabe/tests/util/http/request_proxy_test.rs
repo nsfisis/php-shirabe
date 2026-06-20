@@ -64,7 +64,11 @@ fn test_get_status() {
     let cases: Vec<(Option<&str>, Option<&str>, &str)> = vec![
         (None, Some(format), ""),
         (Some("http://proxy.com:80"), None, "http://proxy.com:80"),
-        (Some("http://proxy.com:80"), Some(format), "proxy (http://proxy.com:80)"),
+        (
+            Some("http://proxy.com:80"),
+            Some(format),
+            "proxy (http://proxy.com:80)",
+        ),
     ];
 
     for (url, format, expected) in cases {
@@ -92,7 +96,10 @@ fn test_get_curl_options() {
             Some("http://proxy.com:80"),
             None,
             curl_options(&[
-                (CURLOPT_PROXY, PhpMixed::String("http://proxy.com:80".to_string())),
+                (
+                    CURLOPT_PROXY,
+                    PhpMixed::String("http://proxy.com:80".to_string()),
+                ),
                 (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
             ]),
         ),
@@ -100,10 +107,16 @@ fn test_get_curl_options() {
             Some("http://proxy.com:80"),
             Some("user:p%40ss"),
             curl_options(&[
-                (CURLOPT_PROXY, PhpMixed::String("http://proxy.com:80".to_string())),
+                (
+                    CURLOPT_PROXY,
+                    PhpMixed::String("http://proxy.com:80".to_string()),
+                ),
                 (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
                 (CURLOPT_PROXYAUTH, PhpMixed::Int(CURLAUTH_BASIC)),
-                (CURLOPT_PROXYUSERPWD, PhpMixed::String("user:p%40ss".to_string())),
+                (
+                    CURLOPT_PROXYUSERPWD,
+                    PhpMixed::String("user:p%40ss".to_string()),
+                ),
             ]),
         ),
     ];
@@ -118,20 +131,34 @@ fn test_get_curl_options() {
 #[ignore = "secure proxies require curl_version, which is a todo!() in the php-shim"]
 fn test_get_curl_options_with_ssl() {
     let mut cafile_opts: IndexMap<String, PhpMixed> = IndexMap::new();
-    cafile_opts.insert("cafile".to_string(), PhpMixed::String("/certs/bundle.pem".to_string()));
+    cafile_opts.insert(
+        "cafile".to_string(),
+        PhpMixed::String("/certs/bundle.pem".to_string()),
+    );
 
     let mut capath_opts: IndexMap<String, PhpMixed> = IndexMap::new();
     capath_opts.insert("capath".to_string(), PhpMixed::String("/certs".to_string()));
 
-    let cases: Vec<(&str, Option<&str>, IndexMap<String, PhpMixed>, IndexMap<i64, PhpMixed>)> = vec![
+    let cases: Vec<(
+        &str,
+        Option<&str>,
+        IndexMap<String, PhpMixed>,
+        IndexMap<i64, PhpMixed>,
+    )> = vec![
         (
             "https://proxy.com:443",
             None,
             cafile_opts,
             curl_options(&[
-                (CURLOPT_PROXY, PhpMixed::String("https://proxy.com:443".to_string())),
+                (
+                    CURLOPT_PROXY,
+                    PhpMixed::String("https://proxy.com:443".to_string()),
+                ),
                 (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
-                (CURLOPT_PROXY_CAINFO, PhpMixed::String("/certs/bundle.pem".to_string())),
+                (
+                    CURLOPT_PROXY_CAINFO,
+                    PhpMixed::String("/certs/bundle.pem".to_string()),
+                ),
             ]),
         ),
         (
@@ -139,10 +166,16 @@ fn test_get_curl_options_with_ssl() {
             Some("user:p%40ss"),
             capath_opts,
             curl_options(&[
-                (CURLOPT_PROXY, PhpMixed::String("https://proxy.com:443".to_string())),
+                (
+                    CURLOPT_PROXY,
+                    PhpMixed::String("https://proxy.com:443".to_string()),
+                ),
                 (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
                 (CURLOPT_PROXYAUTH, PhpMixed::Int(CURLAUTH_BASIC)),
-                (CURLOPT_PROXYUSERPWD, PhpMixed::String("user:p%40ss".to_string())),
+                (
+                    CURLOPT_PROXYUSERPWD,
+                    PhpMixed::String("user:p%40ss".to_string()),
+                ),
                 (CURLOPT_PROXY_CAPATH, PhpMixed::String("/certs".to_string())),
             ]),
         ),

@@ -17,7 +17,10 @@ pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
 }
 
 /// ref: TestCase::getAliasPackage (default class CompleteAliasPackage)
-pub fn get_alias_package(package: &PackageInterfaceHandle, version: &str) -> PackageInterfaceHandle {
+pub fn get_alias_package(
+    package: &PackageInterfaceHandle,
+    version: &str,
+) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
     let complete = CompletePackageHandle::from_rc_unchecked(package.as_rc().clone());
     CompleteAliasPackageHandle::new(complete, norm_version, version.to_string()).into()

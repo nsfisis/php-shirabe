@@ -127,12 +127,20 @@ fn test_search() {
 
     assert_eq!(
         vec![("foo".to_string(), None, Abandoned::No)],
-        reprs(&repo.search("foo".to_string(), SEARCH_FULLTEXT, None).unwrap())
+        reprs(
+            &repo
+                .search("foo".to_string(), SEARCH_FULLTEXT, None)
+                .unwrap()
+        )
     );
 
     assert_eq!(
         vec![("bar".to_string(), None, Abandoned::No)],
-        reprs(&repo.search("bar".to_string(), SEARCH_FULLTEXT, None).unwrap())
+        reprs(
+            &repo
+                .search("bar".to_string(), SEARCH_FULLTEXT, None)
+                .unwrap()
+        )
     );
 
     assert!(
@@ -160,15 +168,23 @@ fn test_search_with_package_type() {
         vec![("foo".to_string(), None, Abandoned::No)],
         reprs(
             &repo
-                .search("foo".to_string(), SEARCH_FULLTEXT, Some("library".to_string()))
+                .search(
+                    "foo".to_string(),
+                    SEARCH_FULLTEXT,
+                    Some("library".to_string())
+                )
                 .unwrap()
         )
     );
 
     assert!(
-        repo.search("bar".to_string(), SEARCH_FULLTEXT, Some("package".to_string()))
-            .unwrap()
-            .is_empty()
+        repo.search(
+            "bar".to_string(),
+            SEARCH_FULLTEXT,
+            Some("package".to_string())
+        )
+        .unwrap()
+        .is_empty()
     );
 
     assert_eq!(
@@ -197,8 +213,16 @@ fn test_search_with_abandoned_packages() {
     assert_eq!(
         vec![
             ("foo1".to_string(), None, Abandoned::Yes),
-            ("foo2".to_string(), None, Abandoned::Replacement("bar".to_string())),
+            (
+                "foo2".to_string(),
+                None,
+                Abandoned::Replacement("bar".to_string())
+            ),
         ],
-        reprs(&repo.search("foo".to_string(), SEARCH_FULLTEXT, None).unwrap())
+        reprs(
+            &repo
+                .search("foo".to_string(), SEARCH_FULLTEXT, None)
+                .unwrap()
+        )
     );
 }

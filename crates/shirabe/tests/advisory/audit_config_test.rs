@@ -107,7 +107,10 @@ fn test_mixed_formats() {
             ("CVE-2024-5678", s("Simple reason")),
             (
                 "CVE-2024-9999",
-                arr(vec![("apply", s("audit")), ("reason", s("Detailed reason"))]),
+                arr(vec![
+                    ("apply", s("audit")),
+                    ("reason", s("Detailed reason")),
+                ]),
             ),
             ("CVE-2024-8888", arr(vec![("apply", s("block"))])),
         ]),

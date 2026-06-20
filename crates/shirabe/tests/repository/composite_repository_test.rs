@@ -100,8 +100,7 @@ fn test_get_packages() {
 
 #[test]
 fn test_add_repository() {
-    let mut repo =
-        CompositeRepository::new(vec![array_repo(vec![get_package("foo", "1")])]);
+    let mut repo = CompositeRepository::new(vec![array_repo(vec![get_package("foo", "1")])]);
 
     assert_eq!(1, repo.count().unwrap());
     repo.add_repository(array_repo(vec![
@@ -127,6 +126,10 @@ fn test_no_repositories() {
     let mut repo = CompositeRepository::new(vec![]);
 
     assert!(repo.find_packages("foo", None).unwrap().is_empty());
-    assert!(repo.search("foo".to_string(), SEARCH_FULLTEXT, None).unwrap().is_empty());
+    assert!(
+        repo.search("foo".to_string(), SEARCH_FULLTEXT, None)
+            .unwrap()
+            .is_empty()
+    );
     assert!(repo.get_packages().unwrap().is_empty());
 }

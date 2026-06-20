@@ -47,8 +47,11 @@ fn test_sorting_does_nothing_with_no_dependencies() {
     assert_eq!(expected, names(&sorted_packages));
 }
 
-fn sorting_orders_dependencies_higher_than_package_cases()
--> Vec<(Vec<PackageInterfaceHandle>, Vec<&'static str>, IndexMap<String, i64>)> {
+fn sorting_orders_dependencies_higher_than_package_cases() -> Vec<(
+    Vec<PackageInterfaceHandle>,
+    Vec<&'static str>,
+    IndexMap<String, i64>,
+)> {
     vec![
         // one package is dep
         (
