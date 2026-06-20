@@ -533,14 +533,14 @@ impl VersionGuesser {
                         },
                         &scm_cmdline,
                     );
-                    let process = tokio::runtime::Runtime::new()
+                    let mut process = tokio::runtime::Runtime::new()
                         .unwrap()
                         .block_on(self.process.borrow_mut().execute_async(&cmd_line, path))?;
                     if !process.is_successful() {
                         continue;
                     }
 
-                    let output = process.get_output();
+                    let output = process.get_output()?;
                     // overwrite existing if we have a shorter diff, or we have an equal diff and an index that comes later in the array (i.e. older version)
                     // as newer versions typically have more commits, if the feature branch is based on a newer branch it should have a longer diff to the old version
                     // but if it doesn't and they have equal diffs, then it probably is based on the old version

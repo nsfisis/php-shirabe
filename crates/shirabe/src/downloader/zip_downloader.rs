@@ -135,7 +135,7 @@ impl ZipDownloader {
             .execute_async(&command, ())
             .await;
         match process_result {
-            Ok(process) => {
+            Ok(mut process) => {
                 if !process.is_successful() {
                     if self.cleanup_executed.contains_key(&package.get_name()) {
                         return Err(RuntimeException {
@@ -148,7 +148,7 @@ impl ZipDownloader {
                         .into());
                     }
 
-                    let output = process.get_error_output();
+                    let output = process.get_error_output()?;
                     let output =
                         str_replace(&format!(", {}.zip or {}.ZIP", file, file), "", &output);
 

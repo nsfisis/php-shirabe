@@ -157,7 +157,7 @@ impl Filesystem {
             vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
         };
 
-        let process = self
+        let mut process = self
             .get_process()
             .execute_async(
                 PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),

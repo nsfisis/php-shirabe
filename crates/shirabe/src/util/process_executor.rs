@@ -221,9 +221,9 @@ impl ProcessExecutor {
                 &command_str,
                 cwd,
                 env.clone(),
-                None,
+                PhpMixed::Null,
                 Some(Self::get_timeout() as f64),
-            );
+            )?;
         } else if let PhpMixed::List(ref list) = command {
             let mut cmd_vec: Vec<String> = list
                 .iter()
@@ -238,9 +238,9 @@ impl ProcessExecutor {
                 cmd_vec,
                 cwd.map(String::from),
                 env,
-                None,
+                PhpMixed::Null,
                 Some(Self::get_timeout() as f64),
-            );
+            )?;
         } else {
             return Err(LogicException {
                 message: "Invalid command type".to_string(),
@@ -291,20 +291,23 @@ impl ProcessExecutor {
             }),
         );
 
-        let result: Result<()> = {
-            let _ = process.run(/* callback */ Some(Box::new(|_t: &str, _b: &str| {})));
+        let result: Result<()> = (|| -> Result<()> {
+            process.run(
+                /* callback */ Some(Box::new(|_t: &str, _b: &str| false)),
+                IndexMap::new(),
+            )?;
 
             let output_is_callable_inner = output.as_deref().map(is_callable).unwrap_or(false);
             if self.capture_output
                 && !output_is_callable_inner
                 && let Some(out) = output.as_mut()
             {
-                **out = PhpMixed::String(process.get_output());
+                **out = PhpMixed::String(process.get_output()?);
             }
 
-            self.error_output = process.get_error_output();
+            self.error_output = process.get_error_output()?;
             Ok(())
-        };
+        })();
         let final_result: Result<()> = match result {
             Ok(()) => Ok(()),
             Err(e) => {
@@ -467,23 +470,23 @@ impl ProcessExecutor {
         self.output_command_run(&command, cwd.as_deref(), true);
 
         let process_result: Result<Process> = (if is_string(&command) {
-            Ok(Process::from_shell_commandline(
+            Process::from_shell_commandline(
                 command.as_string().unwrap_or(""),
                 cwd.as_deref(),
                 None,
-                None,
+                PhpMixed::Null,
                 Some(Self::get_timeout() as f64),
-            ))
+            )
         } else if let PhpMixed::List(ref list) = command {
-            Ok(Process::new(
+            Process::new(
                 list.iter()
                     .map(|v| v.as_string().unwrap_or("").to_string())
                     .collect(),
                 cwd.clone(),
                 None,
-                None,
+                PhpMixed::Null,
                 Some(Self::get_timeout() as f64),
-            ))
+            )
         } else {
             Err(LogicException {
                 message: "Invalid command type".to_string(),
@@ -509,10 +512,20 @@ impl ProcessExecutor {
         }
 
         // PHP: $process->start($callback); — we operate on the stored job.process directly
-        if let Some(job) = self.jobs.get_mut(&id)
+        let start_result = if let Some(job) = self.jobs.get_mut(&id)
             && let Some(p) = job.process.as_mut()
         {
-            p.start(None);
+            p.start(None, IndexMap::new())
+        } else {
+            Ok(())
+        };
+        if let Err(e) = start_result {
+            // PHP: $job['reject']($e) — record the rejection and settle the job as failed.
+            if let Some(job) = self.jobs.get_mut(&id) {
+                job.status = Self::STATUS_FAILED;
+                job.exception = Some(e);
+            }
+            self.mark_job_done();
         }
     }
 
@@ -571,8 +584,8 @@ impl ProcessExecutor {
             if status == Self::STATUS_STARTED && has_process {
                 let is_running = self
                     .jobs
-                    .get(id)
-                    .and_then(|j| j.process.as_ref())
+                    .get_mut(id)
+                    .and_then(|j| j.process.as_mut())
                     .map(|p| p.is_running())
                     .unwrap_or(false);
                 if !is_running {
@@ -580,8 +593,8 @@ impl ProcessExecutor {
                     // marks the job completed/failed based on the process exit status.
                     let successful = self
                         .jobs
-                        .get(id)
-                        .and_then(|j| j.process.as_ref())
+                        .get_mut(id)
+                        .and_then(|j| j.process.as_mut())
                         .map(|p| p.is_successful())
                         .unwrap_or(false);
                     if let Some(job) = self.jobs.get_mut(id) {
@@ -594,7 +607,7 @@ impl ProcessExecutor {
                     self.mark_job_done();
                 }
 
-                if let Some(p) = self.jobs.get(id).and_then(|j| j.process.as_ref()) {
+                if let Some(p) = self.jobs.get_mut(id).and_then(|j| j.process.as_mut()) {
                     p.check_timeout()?;
                 }
             }

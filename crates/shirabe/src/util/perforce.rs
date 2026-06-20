@@ -382,7 +382,7 @@ impl Perforce {
         Ok(true)
     }
 
-    pub fn connect_client(&mut self) {
+    pub fn connect_client(&mut self) -> Result<()> {
         let p4_create_client_command =
             self.generate_p4_command(vec!["client".to_string(), "-i".to_string()], true);
 
@@ -390,10 +390,13 @@ impl Perforce {
             p4_create_client_command,
             None,
             None,
-            file_get_contents(&self.get_p4_client_spec()),
+            file_get_contents(&self.get_p4_client_spec())
+                .map(PhpMixed::String)
+                .unwrap_or(PhpMixed::Null),
             None,
-        );
-        process.run(None);
+        )?;
+        process.run(None, indexmap::IndexMap::new())?;
+        Ok(())
     }
 
     pub fn sync_code_base(&mut self, source_reference: Option<&str>) -> Result<()> {
@@ -531,12 +534,20 @@ impl Perforce {
         }
     }
 
-    pub fn windows_login(&mut self, password: Option<&str>) -> i64 {
+    pub fn windows_login(&mut self, password: Option<&str>) -> Result<i64> {
         let command = self.generate_p4_command(vec!["login".to_string(), "-a".to_string()], true);
 
-        let mut process = Process::new(command, None, None, password.map(|s| s.to_string()), None);
+        let mut process = Process::new(
+            command,
+            None,
+            None,
+            password
+                .map(|s| PhpMixed::String(s.to_string()))
+                .unwrap_or(PhpMixed::Null),
+            None,
+        )?;
 
-        process.run(None)
+        process.run(None, indexmap::IndexMap::new())
     }
 
     pub fn p4_login(&mut self) -> Result<()> {
@@ -544,13 +555,19 @@ impl Perforce {
         if !self.is_logged_in()? {
             let password = self.query_p4_password();
             if self.windows_flag {
-                self.windows_login(password.as_deref());
+                self.windows_login(password.as_deref())?;
             } else {
                 let command =
                     self.generate_p4_command(vec!["login".to_string(), "-a".to_string()], false);
 
-                let mut process = Process::new(command, None, None, password, None);
-                process.run(None);
+                let mut process = Process::new(
+                    command,
+                    None,
+                    None,
+                    password.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
+                    None,
+                )?;
+                process.run(None, indexmap::IndexMap::new())?;
 
                 if !process.is_successful() {
                     return Err(Exception {

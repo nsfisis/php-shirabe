@@ -3467,15 +3467,62 @@ pub fn stdin() -> PhpResource {
     PhpResource::Stdin
 }
 
-// TODO(phase-c): reports proc_open as unavailable, so callers (terminal size and
-// tty detection) fall back to their defaults. A real implementation requires a
-// non-lossy signature able to hold the child process and its pipes; defer it to
-// the broader process-subsystem work (ProcessExecutor).
-pub fn proc_open(_command: &str, _descriptorspec: &Vec<PhpMixed>, _pipes: &mut PhpMixed) -> bool {
-    false
+// TODO(phase-c): reports proc_open as unavailable (returns false), so callers fall back to
+// their defaults. A real implementation requires holding the child process and its pipes; defer
+// it to the broader process-subsystem work (ProcessExecutor).
+pub fn proc_open(
+    _command: &str,
+    _descriptorspec: &[PhpMixed],
+    _pipes: &mut PhpMixed,
+    _cwd: Option<&str>,
+    _env: Option<&[String]>,
+    _options: Option<&IndexMap<String, PhpMixed>>,
+) -> PhpMixed {
+    PhpMixed::Bool(false)
 }
-pub fn proc_close(_process: bool) -> i64 {
+pub fn proc_close(_process: PhpMixed) -> i64 {
     -1
+}
+pub fn proc_get_status(_process: &PhpMixed) -> IndexMap<String, PhpMixed> {
+    todo!()
+}
+pub fn proc_terminate(_process: &PhpMixed, _signal: i64) -> bool {
+    todo!()
+}
+pub fn posix_kill(_pid: i64, _signal: i64) -> bool {
+    todo!()
+}
+pub fn uniqid(_prefix: &str, _more_entropy: bool) -> String {
+    todo!()
+}
+pub fn ftruncate(_stream: &PhpMixed, _size: i64) -> bool {
+    todo!()
+}
+/// PHP `ftell()` over a PhpMixed stream resource. (`ftell` itself is already defined for the
+/// `PhpResource`-typed stream API used elsewhere.)
+pub fn ftell_stream(_stream: &PhpMixed) -> i64 {
+    todo!()
+}
+pub const SEEK_SET: i64 = 0;
+pub const SEEK_CUR: i64 = 1;
+pub const SEEK_END: i64 = 2;
+pub fn fseek3(_stream: PhpMixed, _offset: i64, _whence: i64) -> i64 {
+    todo!()
+}
+pub fn stream_get_contents3(_stream: PhpMixed, _max_length: i64, _offset: i64) -> Option<String> {
+    todo!()
+}
+/// PHP `getenv()` with no argument: all environment variables.
+pub fn getenv_all() -> IndexMap<String, String> {
+    todo!()
+}
+/// PHP superglobal `$_ENV`.
+pub fn php_env() -> IndexMap<String, PhpMixed> {
+    todo!()
+}
+/// PHP superglobal `$_SERVER`.
+pub fn php_server() -> IndexMap<String, PhpMixed> {
+    todo!()
 }
 
 pub fn sapi_windows_vt100_support(_resource: &PhpResource) -> bool {

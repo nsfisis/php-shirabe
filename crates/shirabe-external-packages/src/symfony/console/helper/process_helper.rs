@@ -85,7 +85,13 @@ impl ProcessHelper {
                         ProcessHelperCmdElement::Process(_) => unreachable!(),
                     })
                     .collect();
-                process = Process::new(command, None, None, None, Some(60.0));
+                process = Process::new(
+                    command,
+                    None,
+                    None,
+                    shirabe_php_shim::PhpMixed::Null,
+                    Some(60.0),
+                )?;
                 cmd = vec![];
             }
             Some(ProcessHelperCmdElement::Process(_)) => {
@@ -124,7 +130,23 @@ impl ProcessHelper {
         };
 
         // PHP passes the remaining `$cmd` array as the `$env` argument to Process::run.
-        process.run(callback);
+        let env: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> = cmd
+            .iter()
+            .enumerate()
+            .filter_map(|(i, element)| match element {
+                ProcessHelperCmdElement::String(s) => {
+                    Some((i.to_string(), shirabe_php_shim::PhpMixed::String(s.clone())))
+                }
+                ProcessHelperCmdElement::Process(_) => None,
+            })
+            .collect();
+        let callback: Option<Box<dyn FnMut(&str, &str) -> bool>> = callback.map(|mut cb| {
+            Box::new(move |r#type: &str, buffer: &str| -> bool {
+                cb(r#type, buffer);
+                false
+            }) as Box<dyn FnMut(&str, &str) -> bool>
+        });
+        process.run(callback, env)?;
 
         if verbosity <= output.borrow().get_verbosity() {
             let message = if process.is_successful() {
@@ -183,7 +205,7 @@ impl ProcessHelper {
         error: Option<&str>,
         callback: Option<Box<dyn FnMut(&str, &str)>>,
     ) -> anyhow::Result<Process> {
-        let process = self.run(
+        let mut process = self.run(
             output,
             cmd,
             error,
@@ -192,7 +214,7 @@ impl ProcessHelper {
         )?;
 
         if !process.is_successful() {
-            anyhow::bail!(ProcessFailedException::new(&process));
+            anyhow::bail!(ProcessFailedException::new(&mut process)?);
         }
 
         Ok(process)

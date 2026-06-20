@@ -226,8 +226,9 @@ impl Terminal {
         };
 
         let mut pipes = PhpMixed::Null;
-        let process = shirabe_php_shim::proc_open(command, &descriptorspec, &mut pipes);
-        if !process {
+        let process =
+            shirabe_php_shim::proc_open(command, &descriptorspec, &mut pipes, None, None, None);
+        if !shirabe_php_shim::php_truthy(&process) {
             return None;
         }
 

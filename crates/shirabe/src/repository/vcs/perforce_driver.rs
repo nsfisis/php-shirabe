@@ -60,7 +60,7 @@ impl PerforceDriver {
         self.perforce.as_mut().unwrap().p4_login()?;
         self.perforce.as_mut().unwrap().check_stream();
         self.perforce.as_mut().unwrap().write_p4_client_spec()?;
-        self.perforce.as_mut().unwrap().connect_client();
+        self.perforce.as_mut().unwrap().connect_client()?;
 
         Ok(())
     }
