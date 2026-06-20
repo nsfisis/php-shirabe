@@ -763,8 +763,28 @@ pub fn parse_url_all(_url: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn pathinfo(_path: PhpMixed, _option: i64) -> PhpMixed {
-    todo!()
+pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
+    let path = path.as_string().unwrap_or("");
+    let component = match option {
+        PATHINFO_DIRNAME => dirname(path),
+        PATHINFO_BASENAME => basename(path),
+        PATHINFO_EXTENSION => {
+            let base = basename(path);
+            match base.rfind('.') {
+                Some(index) => base[index + 1..].to_string(),
+                None => String::new(),
+            }
+        }
+        PATHINFO_FILENAME => {
+            let base = basename(path);
+            match base.rfind('.') {
+                Some(index) => base[..index].to_string(),
+                None => base,
+            }
+        }
+        _ => unreachable!("pathinfo called with an unsupported single-component option"),
+    };
+    PhpMixed::String(component)
 }
 
 pub fn strtr(str: &str, from: &str, to: &str) -> String {
