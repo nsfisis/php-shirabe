@@ -1137,8 +1137,24 @@ pub fn function_exists(name: &str) -> bool {
     )
 }
 
+/// Normalizes an mbstring encoding label to a canonical spelling (e.g. `utf8` -> `UTF-8`).
+fn canonical_encoding(name: &str) -> String {
+    match name.to_ascii_uppercase().replace('-', "").as_str() {
+        "UTF8" => "UTF-8".to_string(),
+        "ASCII" | "USASCII" => "ASCII".to_string(),
+        _ => name.to_ascii_uppercase(),
+    }
+}
+
 pub fn mb_convert_encoding(_string: Vec<u8>, _to_encoding: &str, _from_encoding: &str) -> String {
-    todo!()
+    let to = canonical_encoding(_to_encoding);
+    let from = canonical_encoding(_from_encoding);
+    // ASCII is a subset of UTF-8, so converting among ASCII/UTF-8 is a byte-level no-op. Other
+    // encodings need conversion tables that have not been ported yet.
+    if matches!(to.as_str(), "UTF-8" | "ASCII") && matches!(from.as_str(), "UTF-8" | "ASCII") {
+        return String::from_utf8_lossy(&_string).into_owned();
+    }
+    todo!("mb_convert_encoding {} -> {}", from, to)
 }
 
 pub fn touch(_path: &str) -> bool {
@@ -2145,7 +2161,32 @@ pub fn is_link(_path: &str) -> bool {
 }
 
 pub fn str_pad(_input: &str, _length: usize, _pad_string: &str, _pad_type: i64) -> String {
-    todo!()
+    // PHP str_pad() works on bytes: it pads up to `length` bytes by repeating `pad_string`.
+    let input_len = _input.len();
+    if _length <= input_len || _pad_string.is_empty() {
+        return _input.to_string();
+    }
+    let pad = _pad_string.as_bytes();
+    let make = |n: usize| -> Vec<u8> { (0..n).map(|i| pad[i % pad.len()]).collect() };
+    let total = _length - input_len;
+    let mut out: Vec<u8> = Vec::with_capacity(_length);
+    match _pad_type {
+        STR_PAD_LEFT => {
+            out.extend(make(total));
+            out.extend_from_slice(_input.as_bytes());
+        }
+        STR_PAD_BOTH => {
+            let left = total / 2;
+            out.extend(make(left));
+            out.extend_from_slice(_input.as_bytes());
+            out.extend(make(total - left));
+        }
+        _ => {
+            out.extend_from_slice(_input.as_bytes());
+            out.extend(make(total));
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub const STR_PAD_LEFT: i64 = 0;
@@ -2626,7 +2667,57 @@ pub fn php_require(_file: &str) -> PhpMixed {
 }
 
 pub fn intval(_value: &PhpMixed) -> i64 {
-    todo!()
+    // Single-argument PHP intval(), i.e. base 10.
+    match _value {
+        PhpMixed::Null => 0,
+        PhpMixed::Bool(b) => *b as i64,
+        PhpMixed::Int(i) => *i,
+        PhpMixed::Float(f) => {
+            if f.is_finite() {
+                *f as i64
+            } else {
+                0
+            }
+        }
+        PhpMixed::String(s) => {
+            // Skip leading whitespace, read an optional sign and the leading run of digits,
+            // stopping at the first non-digit; no leading digits yields 0. Overflow saturates.
+            let bytes = s.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            let mut negative = false;
+            if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
+                negative = bytes[i] == b'-';
+                i += 1;
+            }
+            let start = i;
+            let mut acc: i64 = 0;
+            let mut overflow = false;
+            while i < bytes.len() && bytes[i].is_ascii_digit() {
+                let digit = (bytes[i] - b'0') as i64;
+                acc = acc
+                    .checked_mul(10)
+                    .and_then(|v| v.checked_add(digit))
+                    .unwrap_or_else(|| {
+                        overflow = true;
+                        0
+                    });
+                i += 1;
+            }
+            if i == start {
+                return 0;
+            }
+            if overflow {
+                return if negative { i64::MIN } else { i64::MAX };
+            }
+            if negative { -acc } else { acc }
+        }
+        PhpMixed::List(items) => (!items.is_empty()) as i64,
+        PhpMixed::Array(array) => (!array.is_empty()) as i64,
+        PhpMixed::Object(_) => 1,
+    }
 }
 
 #[derive(Debug)]
@@ -3054,10 +3145,21 @@ pub fn mb_detect_encoding(
     _encodings: Option<Vec<String>>,
     _strict: bool,
 ) -> Option<String> {
-    todo!()
+    // PHP's default detection order is ASCII then UTF-8. `_s` is already valid UTF-8, so detection
+    // reduces to: pure-ASCII content matches "ASCII", anything else matches "UTF-8".
+    let order = _encodings.unwrap_or_else(|| vec!["ASCII".to_string(), "UTF-8".to_string()]);
+    for enc in order {
+        match canonical_encoding(&enc).as_str() {
+            "ASCII" if _s.is_ascii() => return Some(enc),
+            "UTF-8" => return Some(enc),
+            _ => {}
+        }
+    }
+    None
 }
-pub fn mb_strwidth(_s: &str, _encoding: Option<&str>) -> i64 {
-    todo!()
+pub fn mb_strwidth(s: &str, _encoding: Option<&str>) -> i64 {
+    // TODO(phase-c): calculate actual width
+    s.len() as i64
 }
 pub fn mb_substr(_s: &str, _start: i64, _length: Option<i64>, _encoding: Option<&str>) -> String {
     todo!()
@@ -3066,7 +3168,12 @@ pub fn mb_str_split(_s: &str, _length: i64) -> Vec<String> {
     todo!()
 }
 pub fn mb_convert_variables(_to: &str, _from: &str, _vars: &mut Vec<String>) -> Option<String> {
-    todo!()
+    // Converts each variable in place from `_from` to `_to`, returning the source encoding (PHP
+    // returns the detected source encoding; here `_from` is a single named encoding).
+    for v in _vars.iter_mut() {
+        *v = mb_convert_encoding(std::mem::take(v).into_bytes(), _to, _from);
+    }
+    Some(_from.to_string())
 }
 
 pub fn ceil(_v: f64) -> f64 {
@@ -3082,7 +3189,16 @@ pub fn byte_at(s: &str, i: usize) -> u8 {
     s.as_bytes().get(i).copied().unwrap_or(0)
 }
 pub fn str_split(_s: &str, _length: i64) -> Vec<String> {
-    todo!()
+    // PHP str_split() chunks the string by bytes into pieces of `length` bytes.
+    let length = _length.max(1) as usize;
+    let bytes = _s.as_bytes();
+    if bytes.is_empty() {
+        return vec![String::new()];
+    }
+    bytes
+        .chunks(length)
+        .map(|c| String::from_utf8_lossy(c).into_owned())
+        .collect()
 }
 pub fn stripcslashes(_s: &str) -> String {
     todo!()
@@ -3374,7 +3490,40 @@ pub fn str_replace_arr(_search: &[&str], _replace: &str, _subject: &str) -> Stri
 }
 
 pub fn php_exception_get_code(_error: &anyhow::Error) -> i32 {
-    todo!()
+    // PHP's Throwable::getCode(). anyhow::Error carries the concrete exception type, so enumerate
+    // the flat standard exception structs and read their `code` field; everything else defaults to
+    // 0, matching PHP's default exception code.
+    if let Some(e) = _error.downcast_ref::<Exception>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<RuntimeException>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<UnexpectedValueException>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<InvalidArgumentException>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<TypeError>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<LogicException>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<BadMethodCallException>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<OutOfBoundsException>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<ErrorException>() {
+        return e.code as i32;
+    }
+    if let Some(e) = _error.downcast_ref::<PharException>() {
+        return e.code as i32;
+    }
+    0
 }
 pub fn sscanf(_subject: &str, _format: &str, _a: &mut i64, _b: &mut i64) -> i64 {
     todo!()

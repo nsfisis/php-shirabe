@@ -2351,16 +2351,14 @@ impl Application {
         self.do_render_throwable(e, output.clone());
 
         if let Some(running_command) = &self.running_command {
+            // PHP: sprintf('<info>%s</info>', OutputFormatter::escape(sprintf($synopsis, $this->getName())))
+            // A command synopsis carries no printf conversion specifier, so the inner sprintf is an
+            // identity over the synopsis and the application-name argument is never substituted.
+            let synopsis = running_command.borrow_mut().get_synopsis(false);
             output.borrow().writeln(
                 &[format!(
                     "<info>{}</info>",
-                    PhpMixed::from(
-                        OutputFormatter::escape(&shirabe_php_shim::sprintf(
-                            &running_command.borrow_mut().get_synopsis(false),
-                            &[PhpMixed::from(self.get_name())],
-                        ))
-                        .unwrap(),
-                    ),
+                    OutputFormatter::escape(&synopsis).unwrap(),
                 )],
                 output_interface::VERBOSITY_QUIET,
             );
@@ -2376,12 +2374,101 @@ impl Application {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
         // do { ... } while ($e = $e->getPrevious());
-        // TODO(review): PHP walks the exception chain via getPrevious() and reads getMessage(),
-        // getCode(), getFile(), getLine(), getTrace(). anyhow::Error exposes a source() chain but
-        // not file/line/trace; faithful rendering of the trace needs a Throwable-equivalent.
-        let _ = output;
-        let _ = e;
-        todo!("render exception chain (getMessage/getCode/getFile/getLine/getTrace/getPrevious)")
+        // PHP walks getPrevious(); anyhow models the exception chain as the source chain, which
+        // `anyhow::Error::chain()` yields head-first.
+        for e in e.chain() {
+            let message = shirabe_php_shim::trim(&e.to_string(), None);
+            let verbosity = output.borrow().get_verbosity();
+
+            let mut len;
+            let mut title = String::new();
+            if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
+                let class = throwable_debug_type(e);
+                let code = throwable_get_code(e);
+                title = format!(
+                    "  [{}{}]  ",
+                    class,
+                    if code != 0 {
+                        format!(" ({})", code)
+                    } else {
+                        String::new()
+                    }
+                );
+                len = Helper::width(&title);
+            } else {
+                len = 0;
+            }
+
+            // PHP rewrites `@anonymous\0` markers via class_exists/get_parent_class/class_implements.
+            // Rust error messages never carry PHP's anonymous-class marker and those reflection
+            // primitives have no Rust equivalent, so the branch is unreachable here.
+            // TODO(review): port the @anonymous rewrite if it ever becomes relevant.
+
+            let width = if self.terminal.get_width() != 0 {
+                self.terminal.get_width() - 1
+            } else {
+                i64::MAX
+            };
+            let mut lines: Vec<(String, i64)> = Vec::new();
+            let split = if !message.is_empty() {
+                shirabe_php_shim::preg_split(r"/\r?\n/", &message)
+            } else {
+                Vec::new()
+            };
+            for line in split {
+                for line in self.split_string_by_width(&line, width - 4) {
+                    // pre-format lines to get the right string length
+                    let line_length = Helper::width(&line) + 4;
+                    lines.push((line, line_length));
+                    len = shirabe_php_shim::max(line_length, len);
+                }
+            }
+
+            let mut messages: Vec<String> = Vec::new();
+            if !throwable_is_exception_interface(e)
+                || output_interface::VERBOSITY_VERBOSE <= verbosity
+            {
+                // TODO(review): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
+                // the 'n/a' fallback PHP itself uses when they are unavailable. The real source
+                // location cannot be reproduced (it would be a Rust path, not Composer's PHP path).
+                messages.push(format!(
+                    "<comment>{}</comment>",
+                    OutputFormatter::escape(&format!("In {} line {}:", "n/a", "n/a")).unwrap()
+                ));
+            }
+            let empty_line = format!(
+                "<error>{}</error>",
+                shirabe_php_shim::str_repeat(" ", len as usize)
+            );
+            messages.push(empty_line.clone());
+            if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
+                messages.push(format!(
+                    "<error>{}{}</error>",
+                    title,
+                    shirabe_php_shim::str_repeat(
+                        " ",
+                        std::cmp::max(0, len - Helper::width(&title)) as usize
+                    )
+                ));
+            }
+            for (line, line_length) in &lines {
+                messages.push(format!(
+                    "<error>  {}  {}</error>",
+                    OutputFormatter::escape(line).unwrap(),
+                    shirabe_php_shim::str_repeat(" ", (len - line_length) as usize)
+                ));
+            }
+            messages.push(empty_line);
+            messages.push(String::new());
+
+            output
+                .borrow()
+                .writeln(&messages, output_interface::VERBOSITY_QUIET);
+
+            // PHP renders the `Exception trace:` block (getTrace()) at -v or higher. A PHP backtrace
+            // has no faithful Rust equivalent, so this block is intentionally never ported; verbose
+            // output simply omits the trace.
+        }
     }
 
     /// Configures the input and output instances based on the user arguments and options.
@@ -2988,6 +3075,108 @@ fn is_exception_interface(e: &anyhow::Error) -> bool {
             .is_some()
         || e.downcast_ref::<InvalidOptionException>().is_some()
         || e.downcast_ref::<MissingInputException>().is_some()
+}
+
+/// `is_exception_interface` for a node of the `anyhow::Error` source chain (`&dyn Error`), used
+/// while walking the getPrevious() chain in `do_render_throwable`.
+fn throwable_is_exception_interface(e: &(dyn std::error::Error + 'static)) -> bool {
+    e.downcast_ref::<CommandNotFoundException>().is_some()
+        || e.downcast_ref::<NamespaceNotFoundException>().is_some()
+        || e.downcast_ref::<ConsoleLogicException>().is_some()
+        || e.downcast_ref::<ConsoleRuntimeException>().is_some()
+        || e.downcast_ref::<ConsoleInvalidArgumentException>()
+            .is_some()
+        || e.downcast_ref::<InvalidOptionException>().is_some()
+        || e.downcast_ref::<MissingInputException>().is_some()
+}
+
+/// PHP's `$e->getCode()` for a node of the source chain. Enumerates the flat standard exception
+/// structs that carry a `code`; everything else defaults to PHP's 0.
+fn throwable_get_code(e: &(dyn std::error::Error + 'static)) -> i64 {
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::Exception>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::RuntimeException>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::UnexpectedValueException>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::InvalidArgumentException>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::TypeError>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::LogicException>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::BadMethodCallException>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::OutOfBoundsException>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::ErrorException>() {
+        return e.code;
+    }
+    if let Some(e) = e.downcast_ref::<shirabe_php_shim::PharException>() {
+        return e.code;
+    }
+    0
+}
+
+/// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
+/// is verbose. PHP returns the exception's fully-qualified class name; Rust has no runtime FQCN, so
+/// this maps the enumerable exception types to their PHP class names and falls back to `Exception`.
+/// TODO(review): the fully-qualified name (e.g. `Composer\...`) cannot be reproduced faithfully.
+fn throwable_debug_type(e: &(dyn std::error::Error + 'static)) -> String {
+    let name = if e
+        .downcast_ref::<shirabe_php_shim::RuntimeException>()
+        .is_some()
+    {
+        "RuntimeException"
+    } else if e
+        .downcast_ref::<shirabe_php_shim::UnexpectedValueException>()
+        .is_some()
+    {
+        "UnexpectedValueException"
+    } else if e
+        .downcast_ref::<shirabe_php_shim::InvalidArgumentException>()
+        .is_some()
+    {
+        "InvalidArgumentException"
+    } else if e.downcast_ref::<shirabe_php_shim::TypeError>().is_some() {
+        "TypeError"
+    } else if e
+        .downcast_ref::<shirabe_php_shim::LogicException>()
+        .is_some()
+    {
+        "LogicException"
+    } else if e
+        .downcast_ref::<shirabe_php_shim::BadMethodCallException>()
+        .is_some()
+    {
+        "BadMethodCallException"
+    } else if e
+        .downcast_ref::<shirabe_php_shim::OutOfBoundsException>()
+        .is_some()
+    {
+        "OutOfBoundsException"
+    } else if e
+        .downcast_ref::<shirabe_php_shim::ErrorException>()
+        .is_some()
+    {
+        "ErrorException"
+    } else if e
+        .downcast_ref::<shirabe_php_shim::PharException>()
+        .is_some()
+    {
+        "PharException"
+    } else {
+        "Exception"
+    };
+    name.to_string()
 }
 
 /// Helper mirroring PHP's `$e instanceof CommandNotFoundException`.
