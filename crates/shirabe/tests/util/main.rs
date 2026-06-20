@@ -8,5 +8,6 @@ mod package_sorter_test;
 mod platform_test;
 mod silencer_test;
 mod tar_test;
+mod tls_helper_test;
 mod url_test;
 mod zip_test;
