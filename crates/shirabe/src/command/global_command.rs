@@ -180,7 +180,7 @@ impl Command for GlobalCommand {
         }
 
         if args.len() < 2 {
-            return self.run(input, output);
+            return self.base_run(input, output);
         }
 
         let sub_input = self.prepare_subcommand_input(input, false)?;

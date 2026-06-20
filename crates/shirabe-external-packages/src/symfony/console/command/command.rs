@@ -394,6 +394,18 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
+        self.base_run(input, output)
+    }
+
+    /// The base-class (`Command`) body of `run`, as PHP's `Command::run`. Proxy commands such as
+    /// `GlobalCommand` override `run` but still call `base_run` to delegate to the base behavior,
+    /// matching PHP's `parent::run($input, $output)`. It must not be overridden, or the late
+    /// binding of `initialize`/`interact`/`execute` to the concrete command breaks.
+    fn base_run(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         // add the application arguments and options
         self.merge_application_definition(true);
 

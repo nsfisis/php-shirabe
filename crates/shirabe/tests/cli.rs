@@ -149,7 +149,7 @@ run_no_panic_tests! {
     run_exec => "exec",
     #[ignore = "currently panics"]
     run_fund => "fund",
-    #[ignore = "stack overflow aborts the process (uncatchable)"]
+    #[ignore = "currently panics"]
     run_global => "global",
     #[ignore = "currently panics"]
     run_init => "init",
