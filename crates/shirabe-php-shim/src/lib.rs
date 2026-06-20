@@ -3150,6 +3150,25 @@ pub fn exit(status: i64) -> ! {
     std::process::exit(status as i32);
 }
 
+/// Models PHP's `exit`/`die` language construct propagated as a recoverable error so the actual
+/// process termination happens at a single top-level site instead of deep in the call stack.
+///
+/// Like PHP's `exit`, this must NOT be caught by ported `try`/`catch` blocks: any broad catch on
+/// the propagation path has to re-raise it untouched, and only the outermost handler converts it
+/// into the process exit code.
+#[derive(Debug)]
+pub struct ExitException {
+    pub code: i64,
+}
+
+impl std::fmt::Display for ExitException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "exit({})", self.code)
+    }
+}
+
+impl std::error::Error for ExitException {}
+
 pub fn is_resource_value(_resource: &PhpResource) -> bool {
     true
 }

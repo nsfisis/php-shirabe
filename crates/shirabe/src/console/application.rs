@@ -953,6 +953,13 @@ impl Application {
         let outcome = match result_outcome {
             Ok(r) => Ok(r),
             Err(e) => {
+                // PHP's `exit` bypasses parent::doRun()'s catch entirely; re-raise it untouched so
+                // the GitHub Actions annotation and error hints below are skipped.
+                if e.downcast_ref::<shirabe_php_shim::ExitException>()
+                    .is_some()
+                {
+                    return Err(e);
+                }
                 if let Some(see) = e.downcast_ref::<ScriptExecutionException>() {
                     if application.borrow().get_disable_plugins_by_default()
                         && application.borrow().is_running_as_root()
@@ -1203,7 +1210,10 @@ impl Application {
                         if required {
                             self.io.write_error(&e.to_string());
                             if self.are_exceptions_caught() {
-                                std::process::exit(1);
+                                // PHP calls `exit(1)` here, terminating before parent::run() can
+                                // re-render the exception. Propagate it as an ExitException so the
+                                // top-level handler turns it into exit code 1 without re-rendering.
+                                return Err(shirabe_php_shim::ExitException { code: 1 }.into());
                             }
                             return Err(e);
                         }
@@ -1471,6 +1481,12 @@ impl Application {
         let exit_code = match result {
             Ok(exit_code) => exit_code,
             Err(e) => {
+                // PHP's `exit` bypasses Symfony's try/catch: it never renders and forces the exit
+                // code it carries. The message, if any, has already been written at the exit site.
+                if let Some(exit) = e.downcast_ref::<shirabe_php_shim::ExitException>() {
+                    return Ok(exit.code as i32);
+                }
+
                 if !application.borrow().catch_exceptions {
                     return Err(e);
                 }
