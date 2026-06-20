@@ -133,7 +133,6 @@ run_no_panic_tests! {
     #[ignore = "currently panics"]
     run_clear_cache => "clear-cache",
     run_config => "config",
-    #[ignore = "currently panics"]
     run_create_project => "create-project",
     run_depends => "depends",
     #[ignore = "currently panics"]

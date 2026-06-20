@@ -1027,6 +1027,7 @@ name = "shirabe-external-packages"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "chrono",
  "indexmap",
  "regex",
  "shirabe-php-shim",
