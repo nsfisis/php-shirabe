@@ -468,8 +468,12 @@ pub fn is_scalar(_value: &PhpMixed) -> bool {
     )
 }
 
-pub fn is_numeric(_value: &PhpMixed) -> bool {
-    todo!()
+pub fn is_numeric(value: &PhpMixed) -> bool {
+    match value {
+        PhpMixed::Int(_) | PhpMixed::Float(_) => true,
+        PhpMixed::String(s) => is_numeric_string(s),
+        _ => false,
+    }
 }
 
 pub fn strtotime(_time: &str) -> Option<i64> {
