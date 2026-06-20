@@ -152,16 +152,12 @@ run_no_panic_tests! {
     run_repository => "repository",
     #[ignore = "currently panics"]
     run_require => "require",
-    #[ignore = "currently panics"]
     run_run_script => "run-script",
-    #[ignore = "currently panics"]
     run_search => "search",
     run_self_update => "self-update",
-    #[ignore = "currently panics"]
     run_show => "show",
     run_status => "status",
     run_suggests => "suggests",
-    #[ignore = "currently panics"]
     run_update => "update",
     run_validate => "validate",
 }
