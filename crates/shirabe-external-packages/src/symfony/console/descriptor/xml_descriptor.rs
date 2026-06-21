@@ -12,20 +12,7 @@ use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
-// NOTE: This descriptor relies on the PHP standard classes \DOMDocument and \DOMNode.
-// No equivalent has been introduced into the project yet, so every DOM operation is left
-// as todo!() pending a decision on how to model the DOM types. The type `DOMDocument` /
-// `DOMNode` placeholders below stand in for those PHP classes.
-
-/// Placeholder for the PHP standard class \DOMDocument.
-#[derive(Debug)]
-pub struct DOMDocument;
-
-/// Placeholder for the PHP standard class \DOMNode.
-#[derive(Debug)]
-pub struct DOMNode;
+use shirabe_php_shim::{DOMDocument, DOMNode, PhpMixed};
 
 /// XML descriptor.
 ///
@@ -37,48 +24,45 @@ pub struct XmlDescriptor {
 
 impl XmlDescriptor {
     pub fn get_input_definition_document(&self, definition: &InputDefinition) -> DOMDocument {
-        let dom: DOMDocument = todo!("new \\DOMDocument('1.0', 'UTF-8')");
-        let definition_xml: DOMNode = todo!("$dom->createElement('definition')");
-        // $dom->appendChild($definitionXML)
+        let dom = DOMDocument::new("1.0", "UTF-8");
+        let definition_xml = dom.append_child(dom.create_element("definition"));
 
-        let arguments_xml: DOMNode = todo!("$dom->createElement('arguments')");
-        // $definitionXML->appendChild($argumentsXML)
+        let arguments_xml = definition_xml.append_child(dom.create_element("arguments"));
         for argument in definition.get_arguments().values() {
-            self.append_document(&arguments_xml, &self.get_input_argument_document(argument));
+            let argument_xml = self.get_input_argument_document(argument);
+            self.append_document(&arguments_xml, &argument_xml.as_node());
         }
 
-        let options_xml: DOMNode = todo!("$dom->createElement('options')");
-        // $definitionXML->appendChild($optionsXML)
+        let options_xml = definition_xml.append_child(dom.create_element("options"));
         for option in definition.get_options().values() {
-            self.append_document(&options_xml, &self.get_input_option_document(option));
+            let option_xml = self.get_input_option_document(option);
+            self.append_document(&options_xml, &option_xml.as_node());
         }
 
         dom
     }
 
     pub fn get_command_document(&self, command: &mut dyn Command, short: bool) -> DOMDocument {
-        let dom: DOMDocument = todo!("new \\DOMDocument('1.0', 'UTF-8')");
-        let command_xml: DOMNode = todo!("$dom->createElement('command')");
-        // $dom->appendChild($commandXML)
+        let dom = DOMDocument::new("1.0", "UTF-8");
+        let command_xml = dom.append_child(dom.create_element("command"));
 
-        // $commandXML->setAttribute('id', $command->getName())
-        let _ = command.get_name();
-        // $commandXML->setAttribute('name', $command->getName())
-        // $commandXML->setAttribute('hidden', $command->isHidden() ? 1 : 0)
-        let _ = command.is_hidden();
+        let name = command.get_name().unwrap_or_default();
+        command_xml.set_attribute("id", &name);
+        command_xml.set_attribute("name", &name);
+        command_xml.set_attribute("hidden", if command.is_hidden() { "1" } else { "0" });
 
-        let usages_xml: DOMNode = todo!("$dom->createElement('usages'); appendChild");
+        let usages_xml = command_xml.append_child(dom.create_element("usages"));
 
-        let _description_xml: DOMNode = todo!("$dom->createElement('description'); appendChild");
-        // $descriptionXML->appendChild($dom->createTextNode(str_replace("\n", "\n ", $command->getDescription())))
-        let _ = shirabe_php_shim::str_replace("\n", "\n ", &command.get_description());
+        let description_xml = command_xml.append_child(dom.create_element("description"));
+        description_xml.append_child(dom.create_text_node(&shirabe_php_shim::str_replace(
+            "\n",
+            "\n ",
+            &command.get_description(),
+        )));
 
         if short {
             for usage in command.get_aliases() {
-                let _ = usage;
-                // $usagesXML->appendChild($dom->createElement('usage', $usage))
-                let _ = &usages_xml;
-                todo!("createElement('usage', $usage) and append");
+                usages_xml.append_child(dom.create_element_with_value("usage", &usage));
             }
         } else {
             command.merge_application_definition(false);
@@ -87,22 +71,23 @@ impl XmlDescriptor {
             usages.extend(command.get_aliases());
             usages.extend(command.get_usages());
             for usage in usages {
-                let _ = usage;
-                todo!("createElement('usage', $usage) and append");
+                usages_xml.append_child(dom.create_element_with_value("usage", &usage));
             }
 
-            let _help_xml: DOMNode = todo!("$dom->createElement('help'); appendChild");
-            // $helpXML->appendChild($dom->createTextNode(str_replace("\n", "\n ", $command->getProcessedHelp())))
-            let _ = shirabe_php_shim::str_replace("\n", "\n ", &command.get_processed_help());
+            let help_xml = command_xml.append_child(dom.create_element("help"));
+            help_xml.append_child(dom.create_text_node(&shirabe_php_shim::str_replace(
+                "\n",
+                "\n ",
+                &command.get_processed_help(),
+            )));
 
             let command_definition = command.get_definition().clone();
             let definition_xml = self.get_input_definition_document(&command_definition);
-            let _ = definition_xml;
-            // $this->appendDocument($commandXML, $definitionXML->getElementsByTagName('definition')->item(0))
-            self.append_document(
-                &command_xml,
-                todo!("$definitionXML->getElementsByTagName('definition')->item(0)"),
-            );
+            let definition_node = definition_xml
+                .get_elements_by_tag_name("definition")
+                .item(0)
+                .expect("input definition document always contains a <definition> element");
+            self.append_document(&command_xml, &definition_node);
         }
 
         dom
@@ -114,25 +99,25 @@ impl XmlDescriptor {
         namespace: Option<String>,
         short: bool,
     ) -> DOMDocument {
-        let dom: DOMDocument = todo!("new \\DOMDocument('1.0', 'UTF-8')");
-        let root_xml: DOMNode = todo!("$dom->createElement('symfony'); appendChild");
+        let dom = DOMDocument::new("1.0", "UTF-8");
+        let root_xml = dom.append_child(dom.create_element("symfony"));
 
-        if "UNKNOWN" != application.borrow().get_name() {
-            // $rootXml->setAttribute('name', $application->getName())
-            if "UNKNOWN" != application.borrow().get_version() {
-                // $rootXml->setAttribute('version', $application->getVersion())
+        let app_name = application.borrow().get_name();
+        if app_name != "UNKNOWN" {
+            root_xml.set_attribute("name", &app_name);
+            let app_version = application.borrow().get_version();
+            if app_version != "UNKNOWN" {
+                root_xml.set_attribute("version", &app_version);
             }
         }
 
-        let commands_xml: DOMNode =
-            todo!("$dom->createElement('commands'); appendChild to rootXml");
+        let commands_xml = root_xml.append_child(dom.create_element("commands"));
 
         let mut description =
             ApplicationDescription::new(application.clone(), namespace.clone(), true);
 
         if let Some(ref namespace) = namespace {
-            let _ = namespace;
-            // $commandsXML->setAttribute('namespace', $namespace)
+            commands_xml.set_attribute("namespace", namespace);
         }
 
         let command_list: Vec<_> = description
@@ -141,31 +126,29 @@ impl XmlDescriptor {
             .map(|c| c.borrow().clone_box())
             .collect();
         for mut command in command_list {
-            self.append_document(
-                &commands_xml,
-                &self.get_command_document(command.as_mut(), short),
-            );
+            let command_xml = self.get_command_document(command.as_mut(), short);
+            self.append_document(&commands_xml, &command_xml.as_node());
         }
 
         if namespace.is_none() {
-            let _namespaces_xml: DOMNode =
-                todo!("$dom->createElement('namespaces'); appendChild to rootXml");
-            let _ = &root_xml;
+            let namespaces_xml = root_xml.append_child(dom.create_element("namespaces"));
 
-            for namespace_description in description.get_namespaces().values() {
-                let _namespace_array_xml: DOMNode =
-                    todo!("$dom->createElement('namespace'); append; setAttribute('id', ...)");
-                let _ = match namespace_description.get("id") {
-                    Some(PhpMixed::String(s)) => s.clone(),
-                    _ => String::new(),
+            let namespaces = description.get_namespaces();
+            for namespace_description in namespaces.values() {
+                let namespace_array_xml =
+                    namespaces_xml.append_child(dom.create_element("namespace"));
+                let id = match namespace_description.get("id") {
+                    Some(PhpMixed::String(s)) => s.as_str(),
+                    _ => "",
                 };
+                namespace_array_xml.set_attribute("id", id);
 
                 if let Some(PhpMixed::List(names)) = namespace_description.get("commands") {
                     for name in names {
-                        let _ = name.as_string();
-                        // $commandXML = $dom->createElement('command'); append;
-                        // $commandXML->appendChild($dom->createTextNode($name))
-                        todo!("create command element with text node $name");
+                        let command_xml =
+                            namespace_array_xml.append_child(dom.create_element("command"));
+                        command_xml
+                            .append_child(dom.create_text_node(name.as_string().unwrap_or("")));
                     }
                 }
             }
@@ -226,41 +209,36 @@ impl XmlDescriptor {
     }
 
     /// Appends document children to parent node.
-    ///
-    /// In PHP `DOMDocument` extends `DOMNode`; the placeholder model accepts a
-    /// `DOMDocument` for `imported_parent` to match the call sites.
-    fn append_document(&self, parent_node: &DOMNode, imported_parent: &DOMDocument) {
-        let _ = (parent_node, imported_parent);
-        // foreach ($importedParent->childNodes as $childNode) {
-        //     $parentNode->appendChild($parentNode->ownerDocument->importNode($childNode, true));
-        // }
-        todo!("DOM import/append of child nodes");
+    fn append_document(&self, parent_node: &DOMNode, imported_parent: &DOMNode) {
+        for child_node in imported_parent.child_nodes() {
+            parent_node.append_child(parent_node.owner_document().import_node(&child_node, true));
+        }
     }
 
     /// Writes DOM document.
     fn write_document(&self, dom: DOMDocument) {
-        // $dom->formatOutput = true;
-        // $this->write($dom->saveXML());
-        let xml: String = todo!("$dom->saveXML() with formatOutput = true");
-        let _ = dom;
+        dom.set_format_output(true);
+        let mut buf = Vec::new();
+        dom.save_xml(&mut buf)
+            .expect("serializing XML to an in-memory buffer cannot fail");
+        let xml = String::from_utf8(buf).expect("DOM serialization yields valid UTF-8");
         self.write(&xml, false);
     }
 
     fn get_input_argument_document(&self, argument: &InputArgument) -> DOMDocument {
-        let dom: DOMDocument = todo!("new \\DOMDocument('1.0', 'UTF-8')");
+        let dom = DOMDocument::new("1.0", "UTF-8");
 
-        // $objectXML = $dom->createElement('argument'); appendChild
-        // $objectXML->setAttribute('name', $argument->getName())
-        let _ = argument.get_name();
-        // $objectXML->setAttribute('is_required', $argument->isRequired() ? 1 : 0)
-        let _ = argument.is_required();
-        // $objectXML->setAttribute('is_array', $argument->isArray() ? 1 : 0)
-        let _ = argument.is_array();
-        // $descriptionXML = $dom->createElement('description'); append;
-        // $descriptionXML->appendChild($dom->createTextNode($argument->getDescription()))
-        let _ = argument.get_description();
+        let object_xml = dom.append_child(dom.create_element("argument"));
+        object_xml.set_attribute("name", argument.get_name());
+        object_xml.set_attribute(
+            "is_required",
+            if argument.is_required() { "1" } else { "0" },
+        );
+        object_xml.set_attribute("is_array", if argument.is_array() { "1" } else { "0" });
+        let description_xml = object_xml.append_child(dom.create_element("description"));
+        description_xml.append_child(dom.create_text_node(argument.get_description()));
 
-        // $defaultsXML = $dom->createElement('defaults'); append
+        let defaults_xml = object_xml.append_child(dom.create_element("defaults"));
         let defaults: Vec<String> = match argument.get_default() {
             PhpMixed::List(_) | PhpMixed::Array(_) => {
                 self.default_values_as_strings(argument.get_default())
@@ -272,49 +250,54 @@ impl XmlDescriptor {
             _ => vec![],
         };
         for default in defaults {
-            let _ = default;
-            // $defaultXML = $dom->createElement('default'); append;
-            // $defaultXML->appendChild($dom->createTextNode($default))
-            todo!("create default element with text node");
+            let default_xml = defaults_xml.append_child(dom.create_element("default"));
+            default_xml.append_child(dom.create_text_node(&default));
         }
 
         dom
     }
 
     fn get_input_option_document(&self, option: &InputOption) -> DOMDocument {
-        let dom: DOMDocument = todo!("new \\DOMDocument('1.0', 'UTF-8')");
+        let dom = DOMDocument::new("1.0", "UTF-8");
 
-        // $objectXML = $dom->createElement('option'); appendChild
-        // $objectXML->setAttribute('name', '--'.$option->getName())
-        let _ = format!("--{}", option.get_name());
+        let object_xml = dom.append_child(dom.create_element("option"));
+        object_xml.set_attribute("name", &format!("--{}", option.get_name()));
         let pos = shirabe_php_shim::strpos(option.get_shortcut().unwrap_or(""), "|");
         if let Some(pos) = pos {
-            // $objectXML->setAttribute('shortcut', '-'.substr($option->getShortcut(), 0, $pos))
-            let _ = format!(
-                "-{}",
-                shirabe_php_shim::substr(option.get_shortcut().unwrap(), 0, Some(pos as i64))
+            object_xml.set_attribute(
+                "shortcut",
+                &format!(
+                    "-{}",
+                    shirabe_php_shim::substr(option.get_shortcut().unwrap(), 0, Some(pos as i64))
+                ),
             );
-            // $objectXML->setAttribute('shortcuts', '-'.str_replace('|', '|-', $option->getShortcut()))
-            let _ = format!(
-                "-{}",
-                shirabe_php_shim::str_replace("|", "|-", option.get_shortcut().unwrap())
+            object_xml.set_attribute(
+                "shortcuts",
+                &format!(
+                    "-{}",
+                    shirabe_php_shim::str_replace("|", "|-", option.get_shortcut().unwrap())
+                ),
             );
         } else {
-            // $objectXML->setAttribute('shortcut', $option->getShortcut() ? '-'.$option->getShortcut() : '')
-            let _ = match option.get_shortcut() {
-                Some(s) => format!("-{}", s),
-                None => String::new(),
-            };
+            object_xml.set_attribute(
+                "shortcut",
+                &match option.get_shortcut() {
+                    Some(s) => format!("-{}", s),
+                    None => String::new(),
+                },
+            );
         }
-        // $objectXML->setAttribute('accept_value', $option->acceptValue() ? 1 : 0)
-        let _ = option.accept_value();
-        // $objectXML->setAttribute('is_value_required', $option->isValueRequired() ? 1 : 0)
-        let _ = option.is_value_required();
-        // $objectXML->setAttribute('is_multiple', $option->isArray() ? 1 : 0)
-        let _ = option.is_array();
-        // $descriptionXML = $dom->createElement('description'); append;
-        // $descriptionXML->appendChild($dom->createTextNode($option->getDescription()))
-        let _ = option.get_description();
+        object_xml.set_attribute(
+            "accept_value",
+            if option.accept_value() { "1" } else { "0" },
+        );
+        object_xml.set_attribute(
+            "is_value_required",
+            if option.is_value_required() { "1" } else { "0" },
+        );
+        object_xml.set_attribute("is_multiple", if option.is_array() { "1" } else { "0" });
+        let description_xml = object_xml.append_child(dom.create_element("description"));
+        description_xml.append_child(dom.create_text_node(option.get_description()));
 
         if option.accept_value() {
             let defaults: Vec<String> = match option.get_default() {
@@ -327,27 +310,27 @@ impl XmlDescriptor {
                 }
                 _ => vec![],
             };
-            // $defaultsXML = $dom->createElement('defaults'); append
+            let defaults_xml = object_xml.append_child(dom.create_element("defaults"));
 
             if !defaults.is_empty() {
                 for default in defaults {
-                    let _ = default;
-                    // $defaultXML = $dom->createElement('default'); append;
-                    // $defaultXML->appendChild($dom->createTextNode($default))
-                    todo!("create default element with text node");
+                    let default_xml = defaults_xml.append_child(dom.create_element("default"));
+                    default_xml.append_child(dom.create_text_node(&default));
                 }
             }
         }
 
         if option.is_negatable() {
-            // $objectXML = $dom->createElement('option'); $dom->appendChild
-            // $objectXML->setAttribute('name', '--no-'.$option->getName())
-            let _ = format!("--no-{}", option.get_name());
-            // setAttribute('shortcut', ''); setAttribute('accept_value', 0);
-            // setAttribute('is_value_required', 0); setAttribute('is_multiple', 0);
-            // $descriptionXML = $dom->createElement('description'); append;
-            // $descriptionXML->appendChild($dom->createTextNode('Negate the "--'.$option->getName().'" option'))
-            let _ = format!("Negate the \"--{}\" option", option.get_name());
+            let object_xml = dom.append_child(dom.create_element("option"));
+            object_xml.set_attribute("name", &format!("--no-{}", option.get_name()));
+            object_xml.set_attribute("shortcut", "");
+            object_xml.set_attribute("accept_value", "0");
+            object_xml.set_attribute("is_value_required", "0");
+            object_xml.set_attribute("is_multiple", "0");
+            let description_xml = object_xml.append_child(dom.create_element("description"));
+            description_xml.append_child(
+                dom.create_text_node(&format!("Negate the \"--{}\" option", option.get_name())),
+            );
         }
 
         dom
