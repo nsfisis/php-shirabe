@@ -22,6 +22,7 @@ mod stream;
 mod string;
 mod url;
 mod var;
+mod xml;
 mod zip;
 
 pub use array::*;
@@ -48,6 +49,7 @@ pub use stream::*;
 pub use string::*;
 pub use url::*;
 pub use var::*;
+pub use xml::*;
 pub use zip::*;
 
 use indexmap::IndexMap;
