@@ -26,7 +26,7 @@ pub mod self_update;
 pub mod util;
 
 pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
-    use crate::console::Application;
+    use crate::console::ApplicationHandle;
     use crate::util::Platform;
     use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
     use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
@@ -39,10 +39,10 @@ pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
             .unwrap_or_default(),
     );
 
-    let application = Application::new_shared("Composer".to_string(), String::new())?;
+    let application = ApplicationHandle::new("Composer".to_string(), String::new())?;
     let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?))
         as std::rc::Rc<std::cell::RefCell<dyn InputInterface>>;
-    Application::run(&application, Some(input), None)
+    application.run(Some(input), None)
 }
 
 #[cfg(test)]

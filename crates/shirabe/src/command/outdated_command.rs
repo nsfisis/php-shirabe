@@ -227,10 +227,7 @@ impl Command for OutdatedCommand {
                 .shared()
         };
 
-        Ok(
-            crate::console::application::Application::run(&application, Some(input), Some(output))?
-                as i64,
-        )
+        Ok(application.run(Some(input), Some(output))? as i64)
     }
 
     fn initialize(

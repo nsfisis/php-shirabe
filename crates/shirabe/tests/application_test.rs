@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use shirabe::command::about_command::AboutCommand;
 use shirabe::command::self_update_command::SelfUpdateCommand;
-use shirabe::console::application::Application;
+use shirabe::console::application::ApplicationHandle;
 use shirabe::util::platform::Platform;
 use shirabe_external_packages::symfony::console::command::Command;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
@@ -54,12 +54,9 @@ fn test_dev_warning_suppressed_for_self_update() {
         return;
     }
 
-    let application = Rc::new(RefCell::new(Application::new(
-        "Composer".to_string(),
-        "".to_string(),
-    )));
+    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
     let command: Rc<RefCell<dyn Command>> = Rc::new(RefCell::new(SelfUpdateCommand::new()));
-    application.borrow_mut().add(command).unwrap();
+    application.add(command).unwrap();
 
     let output = Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
     let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
@@ -70,7 +67,7 @@ fn test_dev_warning_suppressed_for_self_update() {
         .unwrap(),
     ));
     let output_trait: Rc<RefCell<dyn OutputInterface>> = output.clone();
-    Application::do_run(&application, input, output_trait).unwrap();
+    application.do_run(input, output_trait).unwrap();
 
     assert_eq!(
         "This instance of Composer does not have the self-update command.\n\
@@ -85,12 +82,9 @@ fn test_process_isolation_works_multiple_times() {
     let _tear_down = TearDown;
     set_up();
 
-    let application = Rc::new(RefCell::new(Application::new(
-        "Composer".to_string(),
-        "".to_string(),
-    )));
+    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
     let command: Rc<RefCell<dyn Command>> = Rc::new(RefCell::new(AboutCommand::new()));
-    application.borrow_mut().add(command).unwrap();
+    application.add(command).unwrap();
 
     let input1: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
         ArrayInput::new(
@@ -101,10 +95,7 @@ fn test_process_isolation_works_multiple_times() {
     ));
     let output1: Rc<RefCell<dyn OutputInterface>> =
         Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    assert_eq!(
-        0,
-        Application::do_run(&application, input1, output1).unwrap()
-    );
+    assert_eq!(0, application.do_run(input1, output1).unwrap());
 
     let input2: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
         ArrayInput::new(
@@ -115,10 +106,7 @@ fn test_process_isolation_works_multiple_times() {
     ));
     let output2: Rc<RefCell<dyn OutputInterface>> =
         Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    assert_eq!(
-        0,
-        Application::do_run(&application, input2, output2).unwrap()
-    );
+    assert_eq!(0, application.do_run(input2, output2).unwrap());
 }
 
 #[ignore = "Application::set_auto_exit / set_catch_errors and the initTempComposer test helper do not exist"]

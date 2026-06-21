@@ -132,10 +132,9 @@ pub struct Application {
     terminal: Terminal,
     default_command: String,
     single_command: bool,
-    initialized: bool,
     signal_registry: Option<SignalRegistry>,
     signals_to_dispatch_event: Vec<i64>,
-
+    // $initialized is omitted. See ApplicationHandle::init().
     pub(crate) composer: Option<PartialComposerHandle>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     has_plugin_commands: bool,
@@ -150,7 +149,13 @@ pub struct Application {
 }
 
 impl Application {
-    const LOGO: &'static str = "   ______\n  / ____/___  ____ ___  ____  ____  ________  _____\n / /   / __ \\/ __ `__ \\/ __ \\/ __ \\/ ___/ _ \\/ ___/\n/ /___/ /_/ / / / / / / /_/ / /_/ (__  )  __/ /\n\\____/\\____/_/ /_/ /_/ .___/\\____/____/\\___/_/\n                    /_/\n";
+    const LOGO: &'static str = r#"   ______
+  / ____/___  ____ ___  ____  ____  ________  _____
+ / /   / __ \/ __ `__ \/ __ \/ __ \/ ___/ _ \/ ___/
+/ /___/ /_/ / / / / / / /_/ / /_/ (__  )  __/ /
+\____/\____/_/ /_/ /_/ .___/\____/____/\___/_/
+                    /_/
+"#;
 
     pub fn new(name: String, mut version: String) -> Self {
         static SHUTDOWN_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
@@ -205,7 +210,6 @@ impl Application {
             terminal: Terminal::new(),
             default_command: "list".to_string(),
             single_command: false,
-            initialized: false,
             signal_registry: None,
             signals_to_dispatch_event: Vec::new(),
             composer: None,
@@ -228,58 +232,1670 @@ impl Application {
         this
     }
 
-    /// Builds the application inside a shared `Rc<RefCell<…>>` and registers the default commands.
-    ///
-    /// Commands hold a back-pointer to their application, which shares this very `RefCell`. So the
-    /// whole run flow is driven through the `Rc` (never a long-lived `borrow_mut`), and command
-    /// registration happens here — before any borrow is taken — so `set_application` can borrow the
-    /// application without a re-entrant conflict.
-    pub fn new_shared(
-        name: String,
-        version: String,
-    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Application>>> {
-        let application =
-            std::rc::Rc::new(std::cell::RefCell::new(Application::new(name, version)));
-        application.borrow_mut().me = std::rc::Rc::downgrade(&application);
-        Application::init_shared(&application)?;
-        Ok(application)
+    /// Returns the shared handle to this application set up by `ApplicationHandle::new`. Proxy
+    /// commands use it to re-enter the run flow (PHP's `$this->getApplication()->run(...)`).
+    pub fn shared(&self) -> ApplicationHandle {
+        ApplicationHandle(
+            self.me
+                .upgrade()
+                .expect("Application must be constructed through ApplicationHandle::new"),
+        )
     }
 
-    /// Returns the shared handle to this application set up by `new_shared`. Proxy commands use it to
-    /// re-enter the run flow (PHP's `$this->getApplication()->run(...)`).
-    pub fn shared(&self) -> std::rc::Rc<std::cell::RefCell<Application>> {
-        self.me
-            .upgrade()
-            .expect("Application must be constructed through new_shared")
-    }
-
-    /// Registers the default commands on a shared application (PHP's lazy `init()`), executed once
-    /// with no application borrow held so each `set_application` can borrow back safely.
-    fn init_shared(
-        application: &std::rc::Rc<std::cell::RefCell<Application>>,
-    ) -> anyhow::Result<()> {
+    fn get_new_working_dir(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> anyhow::Result<Option<String>> {
+        let working_dir = input
+            .borrow()
+            .get_parameter_option(
+                PhpMixed::from(vec!["--working-dir", "-d"]),
+                PhpMixed::Null,
+                true,
+            )
+            .as_string()
+            .map(|s| s.to_string());
+        if let Some(ref wd) = working_dir
+            && !is_dir(wd)
         {
-            let mut app = application.borrow_mut();
-            if app.initialized {
-                return Ok(());
+            return Err(RuntimeException {
+                message: format!(
+                    "Invalid working directory specified, {} does not exist.",
+                    wd
+                ),
+                code: 0,
             }
-            app.initialized = true;
+            .into());
         }
 
-        let commands = application.borrow().get_default_commands();
-        for command in commands {
-            Application::add_shared(application, command)?;
+        Ok(working_dir)
+    }
+
+    fn hint_common_errors(
+        &mut self,
+        exception: &anyhow::Error,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
+        let is_logic_or_error = exception.downcast_ref::<ShimLogicException>().is_some();
+        if is_logic_or_error
+            && output.borrow().get_verbosity() < output_interface::VERBOSITY_VERBOSE
+        {
+            output
+                .borrow_mut()
+                .set_verbosity(output_interface::VERBOSITY_VERBOSE);
+        }
+
+        Silencer::suppress(None);
+        // Compute the disk-space hint message first; emit it via io afterwards to
+        // avoid overlapping borrows of self (get_composer needs &mut self).
+        let disk_hint_msg: Option<String> = (|| -> anyhow::Result<Option<String>> {
+            let composer = self.get_composer(false, Some(true), None)?;
+            if let Some(composer) = composer && function_exists("disk_free_space") {
+                let composer = composer.borrow_partial();
+                let config = composer.get_config();
+
+                let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
+                let mut dir = config
+                    .borrow_mut()
+                    .get("home")
+                    .as_string()
+                    .unwrap_or("")
+                    .to_string();
+                let df = disk_free_space(&dir);
+                let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
+                if !hit {
+                    dir = config
+                        .borrow_mut()
+                        .get("vendor-dir")
+                        .as_string()
+                        .unwrap_or("")
+                        .to_string();
+                    let df = disk_free_space(&dir);
+                    hit = df.map(|d| d < min_space_free).unwrap_or(false);
+                }
+                if !hit {
+                    dir = sys_get_temp_dir();
+                    let df = disk_free_space(&dir);
+                    hit = df.map(|d| d < min_space_free).unwrap_or(false);
+                }
+                if hit {
+                    return Ok(Some(format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir)));
+                }
+            }
+            Ok(None)
+        })()
+        .ok()
+        .flatten();
+        Silencer::restore();
+
+        let io = self.get_io();
+        if let Some(msg) = &disk_hint_msg {
+            io.write_error3(msg, true, io_interface::QUIET);
+        }
+
+        let message = exception.to_string();
+        if exception.downcast_ref::<TransportException>().is_some()
+            && str_contains(&message, "Unable to use a proxy")
+        {
+            io.write_error3(
+                "<error>The following exception indicates your proxy is misconfigured</error>",
+                true,
+                io_interface::QUIET,
+            );
+            io.write_error3("<error>Check https://getcomposer.org/doc/faqs/how-to-use-composer-behind-a-proxy.md for details</error>", true, io_interface::QUIET);
+        }
+
+        if Platform::is_windows()
+            && exception.downcast_ref::<TransportException>().is_some()
+            && str_contains(&message, "unable to get local issuer certificate")
+        {
+            let avast_detect = glob("C:\\Program Files\\Avast*");
+            let avast_detect_pm = PhpMixed::List(
+                avast_detect
+                    .iter()
+                    .map(|s| PhpMixed::String(s.clone()))
+                    .collect(),
+            );
+            if is_array(&avast_detect_pm) && !avast_detect.is_empty() {
+                io.write_error3("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
+                io.write_error3(
+                    "<error>Check https://getcomposer.org/local-issuer for details</error>",
+                    true,
+                    io_interface::QUIET,
+                );
+            } else {
+                io.write_error3("<error>The following exception indicates a possible issue with a Firewall/Antivirus</error>", true, io_interface::QUIET);
+                io.write_error3(
+                    "<error>Check https://getcomposer.org/local-issuer for details</error>",
+                    true,
+                    io_interface::QUIET,
+                );
+            }
+        }
+
+        if Platform::is_windows()
+            && strpos(&message, "The system cannot find the path specified").is_some()
+        {
+            io.write_error3("<error>The following exception may be caused by a stale entry in your cmd.exe AutoRun</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#-the-system-cannot-find-the-path-specified-windows- for details</error>", true, io_interface::QUIET);
+        }
+
+        if strpos(&message, "fork failed - Cannot allocate memory").is_some() {
+            io.write_error3("<error>The following exception is caused by a lack of memory or swap, or not having swap configured</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", true, io_interface::QUIET);
+        }
+
+        if exception
+            .downcast_ref::<ProcessTimedOutException>()
+            .is_some()
+        {
+            io.write_error3(
+                "<error>The following exception is caused by a process timeout</error>",
+                true,
+                io_interface::QUIET,
+            );
+            io.write_error3("<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>", true, io_interface::QUIET);
+        }
+
+        if self.get_disable_plugins_by_default()
+            && self.is_running_as_root()
+            && !self.io.is_interactive()
+        {
+            io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", true, io_interface::QUIET);
+        } else if exception
+            .downcast_ref::<CommandNotFoundException>()
+            .is_some()
+            && self.get_disable_plugins_by_default()
+        {
+            io.write_error3("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, io_interface::QUIET);
+        }
+
+        let hints = HttpDownloader::get_exception_hints(exception).unwrap_or_default();
+        if !hints.is_empty() {
+            for hint in &hints {
+                io.write_error3(hint, true, io_interface::QUIET);
+            }
+        }
+    }
+
+    pub fn get_composer(
+        &mut self,
+        required: bool,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> anyhow::Result<Option<PartialComposerHandle>> {
+        let disable_plugins = disable_plugins.unwrap_or(self.disable_plugins_by_default);
+        let disable_scripts = disable_scripts.unwrap_or(self.disable_scripts_by_default);
+
+        if self.composer.is_none() {
+            let io_for_factory: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+                if Platform::is_input_completion_process() {
+                    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+                } else {
+                    self.io.clone()
+                };
+            let disable_plugins_enum = if disable_plugins {
+                crate::factory::DisablePlugins::All
+            } else {
+                crate::factory::DisablePlugins::None
+            };
+            match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
+                Ok(c) => self.composer = Some(c.upcast()),
+                Err(e) => {
+                    if e.downcast_ref::<JsonValidationException>().is_some()
+                        || e.downcast_ref::<RuntimeException>().is_some()
+                    {
+                        if required {
+                            return Err(e);
+                        }
+                    } else {
+                        if required {
+                            self.io.write_error(&e.to_string());
+                            if self.are_exceptions_caught() {
+                                // PHP calls `exit(1)` here, terminating before parent::run() can
+                                // re-render the exception. Propagate it as an ExitException so the
+                                // top-level handler turns it into exit code 1 without re-rendering.
+                                return Err(shirabe_php_shim::ExitException { code: 1 }.into());
+                            }
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(self.composer.clone())
+    }
+
+    /// Removes the cached composer instance
+    pub fn reset_composer(&mut self) {
+        self.composer = None;
+        let io = self.get_io();
+        if let Some(base_io) = io.borrow_mut().as_base_io_mut() {
+            base_io.reset_authentications();
+        }
+    }
+
+    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+        self.io.clone()
+    }
+
+    pub fn get_help(&self) -> String {
+        format!("{}{}", Self::LOGO, self.base_get_help())
+    }
+
+    /// Initializes all the composer commands.
+    pub(crate) fn get_default_commands(
+        &self,
+    ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
+        let mut commands = self.base_get_default_commands();
+        let composer_commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![
+            std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ConfigCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(DependsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ProhibitsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(InitCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(InstallCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(CreateProjectCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(UpdateCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(SearchCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ValidateCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(AuditCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ShowCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(SuggestsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RequireCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(DumpAutoloadCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(StatusCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ArchiveCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(DiagnoseCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RunScriptCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(LicensesCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(GlobalCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ClearCacheCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RemoveCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(HomeCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ExecCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(OutdatedCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(CheckPlatformReqsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(FundCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ReinstallCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(BumpCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RepositoryCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(SelfUpdateCommand::new())),
+        ];
+        commands.extend(composer_commands);
+        commands
+    }
+
+    /// This ensures we can find the correct command name even if a global input option is present before it
+    ///
+    /// e.g. "composer -d foo bar" should detect bar as the command name, and not foo
+    fn get_command_name_before_binding(
+        &mut self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> anyhow::Result<Option<String>> {
+        let input = input.borrow().dup();
+        // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
+        match input.borrow_mut().bind(&self.get_definition().borrow()) {
+            Ok(()) => {}
+            Err(e) => {
+                // Errors must be ignored, full binding/validation happens later when the command is known.
+                if !is_exception_interface(&e) {
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(input.borrow().get_first_argument())
+    }
+
+    pub fn get_long_version(&self) -> String {
+        let mut branch_alias_string = String::new();
+        if !composer::BRANCH_ALIAS_VERSION.is_empty()
+            && composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
+        {
+            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION,);
+        }
+
+        format!(
+            "<info>{}</info> version <comment>{}{}</comment> {}",
+            self.get_name(),
+            self.get_version(),
+            branch_alias_string,
+            composer::RELEASE_DATE,
+        )
+    }
+
+    pub(crate) fn get_default_input_definition(&self) -> anyhow::Result<InputDefinition> {
+        let mut definition = self.base_get_default_input_definition();
+        definition.add_option(InputOption::new(
+            "--profile",
+            PhpMixed::Null,
+            Some(InputOption::VALUE_NONE),
+            "Display timing and memory usage information".to_string(),
+            PhpMixed::Null,
+        )?)?;
+        definition.add_option(InputOption::new(
+            "--no-plugins",
+            PhpMixed::Null,
+            Some(InputOption::VALUE_NONE),
+            "Whether to disable plugins.".to_string(),
+            PhpMixed::Null,
+        )?)?;
+        definition.add_option(InputOption::new(
+            "--no-scripts",
+            PhpMixed::Null,
+            Some(InputOption::VALUE_NONE),
+            "Skips the execution of all scripts defined in composer.json file.".to_string(),
+            PhpMixed::Null,
+        )?)?;
+        definition.add_option(InputOption::new(
+            "--working-dir",
+            PhpMixed::from("-d"),
+            Some(InputOption::VALUE_REQUIRED),
+            "If specified, use the given directory as working directory.".to_string(),
+            PhpMixed::Null,
+        )?)?;
+        definition.add_option(InputOption::new(
+            "--no-cache",
+            PhpMixed::Null,
+            Some(InputOption::VALUE_NONE),
+            "Prevent use of the cache".to_string(),
+            PhpMixed::Null,
+        )?)?;
+
+        Ok(definition)
+    }
+
+    fn get_plugin_commands(&mut self) -> anyhow::Result<Vec<Box<dyn SymfonyCommand>>> {
+        // TODO(plugin): plugin command discovery is part of the plugin API
+        let commands: Vec<Box<dyn SymfonyCommand>> = vec![];
+
+        // TODO(phase-c): discovering plugin-provided commands walks the PluginManager and
+        // downcasts each plugin's CommandProvider capability — this is the Plugin API surface,
+        // which is intentionally unimplemented (see TODO(plugin) above). Returns an empty list
+        // until the plugin capability model exists.
+
+        Ok(commands)
+    }
+
+    /// Get the working directory at startup time
+    pub fn get_initial_working_directory(&self) -> Option<String> {
+        self.initial_working_directory.clone()
+    }
+
+    pub fn get_disable_plugins_by_default(&self) -> bool {
+        self.disable_plugins_by_default
+    }
+
+    pub fn get_disable_scripts_by_default(&self) -> bool {
+        self.disable_scripts_by_default
+    }
+
+    fn get_use_parent_dir_config_value(&self) -> PhpMixed {
+        let config = match Factory::create_config(Some(self.io.clone()), None) {
+            Ok(c) => c,
+            Err(_) => return PhpMixed::Bool(false),
+        };
+
+        config.get("use-parent-dir").clone()
+    }
+
+    fn is_running_as_root(&self) -> bool {
+        function_exists("posix_getuid") && posix_getuid() == 0
+    }
+
+    pub fn set_command_loader(&mut self, command_loader: Box<dyn CommandLoaderInterface>) {
+        self.command_loader = Some(command_loader);
+    }
+
+    pub fn get_signal_registry(&self) -> anyhow::Result<&SignalRegistry> {
+        match &self.signal_registry {
+            None => Err(ConsoleRuntimeException(shirabe_php_shim::RuntimeException {
+                message: "Signals are not supported. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string(),
+                code: 0,
+            })
+            .into()),
+            Some(signal_registry) => Ok(signal_registry),
+        }
+    }
+
+    pub fn set_signals_to_dispatch_event(&mut self, signals_to_dispatch_event: Vec<i64>) {
+        self.signals_to_dispatch_event = signals_to_dispatch_event;
+    }
+
+    pub fn set_helper_set(&mut self, helper_set: std::rc::Rc<std::cell::RefCell<HelperSet>>) {
+        self.helper_set = Some(helper_set);
+    }
+
+    /// Get the helper set associated with the command.
+    pub fn get_helper_set(&mut self) -> std::rc::Rc<std::cell::RefCell<HelperSet>> {
+        if self.helper_set.is_none() {
+            self.helper_set = Some(self.get_default_helper_set());
+        }
+
+        self.helper_set.as_ref().unwrap().clone()
+    }
+
+    pub fn set_definition(&mut self, definition: std::rc::Rc<std::cell::RefCell<InputDefinition>>) {
+        self.definition = Some(definition);
+    }
+
+    /// Gets the InputDefinition related to this Application.
+    pub fn get_definition(&mut self) -> std::rc::Rc<std::cell::RefCell<InputDefinition>> {
+        if self.definition.is_none() {
+            // `get_default_input_definition` is the Composer override (returns a Result because the
+            // Rust `InputOption::new` is fallible); the option modes are constants that cannot fail,
+            // so unwrapping mirrors the PHP call that never throws here.
+            self.definition = Some(std::rc::Rc::new(std::cell::RefCell::new(
+                self.get_default_input_definition().unwrap(),
+            )));
+        }
+
+        if self.single_command {
+            let input_definition = self.definition.as_ref().unwrap().clone();
+            input_definition
+                .borrow_mut()
+                .set_arguments(Vec::new())
+                .unwrap();
+
+            return input_definition;
+        }
+
+        self.definition.as_ref().unwrap().clone()
+    }
+
+    /// Adds suggestions to `suggestions` for the current completion input (e.g. option or argument).
+    pub fn complete(
+        &mut self,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        if CompletionInput::TYPE_ARGUMENT_VALUE == input.get_completion_type()
+            && input.get_completion_name().as_deref() == Some("command")
+        {
+            let mut command_names: Vec<PhpMixed> = Vec::new();
+            for (name, command) in self.all(None)? {
+                // skip hidden commands and aliased commands as they already get added below
+                if command.borrow().is_hidden() || command.borrow().get_name() != Some(name.clone())
+                {
+                    continue;
+                }
+                command_names.push(PhpMixed::from(
+                    command.borrow().get_name().unwrap_or_default(),
+                ));
+                for name in command.borrow().get_aliases() {
+                    command_names.push(PhpMixed::from(name));
+                }
+            }
+            // array_filter($commandNames)
+            let filtered: Vec<shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion> =
+                command_names
+                    .into_iter()
+                    .filter(shirabe_php_shim::php_truthy)
+                    .map(|n| {
+                        shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion::String(
+                            shirabe_php_shim::php_to_string(&n),
+                        )
+                    })
+                    .collect();
+            suggestions.suggest_values(filtered);
+
+            return Ok(());
+        }
+
+        if CompletionInput::TYPE_OPTION_NAME == input.get_completion_type() {
+            // $suggestions->suggestOptions($this->getDefinition()->getOptions());
+            // TODO(review): get_options() yields Rc<InputOption> (shared, non-Clone) while
+            // suggest_options() consumes owned InputOption values; an ownership/clone strategy
+            // for InputOption is needed.
+            suggestions.suggest_options(todo!("owned options from get_definition().get_options()"));
+
+            return Ok(());
         }
 
         Ok(())
     }
 
-    /// Adds a command object to a shared application (PHP's `add()`), without holding an application
-    /// borrow while calling into the command, so `set_application` can borrow back safely.
-    pub fn add_shared(
-        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+    /// Gets the help message (Symfony base; `parent::getHelp`).
+    pub fn base_get_help(&self) -> String {
+        self.get_long_version()
+    }
+
+    /// Gets whether to catch exceptions or not during commands execution.
+    pub fn are_exceptions_caught(&self) -> bool {
+        self.catch_exceptions
+    }
+
+    /// Sets whether to catch exceptions or not during commands execution.
+    pub fn set_catch_exceptions(&mut self, boolean: bool) {
+        self.catch_exceptions = boolean;
+    }
+
+    /// Gets the name of the application.
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    /// Sets the application name.
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
+    /// Gets the application version.
+    pub fn get_version(&self) -> String {
+        self.version.clone()
+    }
+
+    /// Sets the application version.
+    pub fn set_version(&mut self, version: &str) {
+        self.version = version.to_string();
+    }
+
+    /// Returns a registered command by name or alias.
+    ///
+    /// Throws CommandNotFoundException when given command name does not exist.
+    pub fn get(
+        &mut self,
+        name: &str,
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
+        if !self.has(name) {
+            return Err(CommandNotFoundException::new(
+                format!(
+                    "The command \"{}\" does not exist.",
+                    PhpMixed::from(name.to_string()),
+                ),
+                Vec::new(),
+                0,
+            )
+            .into());
+        }
+
+        // When the command has a different name than the one used at the command loader level
+        if !self.commands.contains_key(name) {
+            return Err(CommandNotFoundException::new(
+                format!(
+                    "The \"{}\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\".",
+                    PhpMixed::from(name.to_string()),
+                ),
+                Vec::new(),
+                0,
+            )
+            .into());
+        }
+
+        let command = self.commands[name].clone();
+
+        if self.want_helps {
+            self.want_helps = false;
+
+            let help_command = self.get("help")?;
+            help_command
+                .borrow_mut()
+                .as_any_mut()
+                .downcast_mut::<HelpCommand>()
+                .expect("the help command is a HelpCommand instance")
+                .set_command(command);
+
+            return Ok(help_command);
+        }
+
+        Ok(command)
+    }
+
+    /// Returns true if the command exists, false otherwise.
+    pub fn has(&mut self, name: &str) -> bool {
+        if self.commands.contains_key(name) {
+            return true;
+        }
+
+        if let Some(command_loader) = &self.command_loader
+            && command_loader.has(name)
+        {
+            let command = command_loader.get(name);
+            // $this->add($this->commandLoader->get($name))
+            // TODO(review): command_loader.get() returns Box<dyn SymfonyCommand> while add() expects
+            // Rc<RefCell<dyn SymfonyCommand>>; the loader return type needs reconciliation.
+            let _ = command;
+            return self
+                .shared()
+                .add(todo!(
+                    "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name)"
+                ))
+                .map(|c| c.is_some())
+                .unwrap_or(false);
+        }
+
+        false
+    }
+
+    /// Returns an array of all unique namespaces used by currently registered commands.
+    ///
+    /// It does not return the global namespace which always exists.
+    pub fn get_namespaces(&mut self) -> anyhow::Result<Vec<String>> {
+        let mut namespaces: Vec<Vec<String>> = Vec::new();
+        for command in self.all(None)?.values() {
+            if command.borrow().is_hidden() {
+                continue;
+            }
+
+            namespaces.push(
+                self.extract_all_namespaces(&command.borrow().get_name().unwrap_or_default()),
+            );
+
+            for alias in command.borrow().get_aliases() {
+                namespaces.push(self.extract_all_namespaces(&alias));
+            }
+        }
+
+        // array_values(array_unique(array_filter(array_merge([], ...$namespaces))))
+        let mut merged: Vec<String> = Vec::new();
+        for ns in namespaces {
+            merged.extend(ns);
+        }
+        let merged: Vec<String> = merged.into_iter().filter(|s| !s.is_empty()).collect();
+        let mut seen = std::collections::HashSet::new();
+        let unique: Vec<String> = merged
+            .into_iter()
+            .filter(|s| seen.insert(s.clone()))
+            .collect();
+
+        Ok(unique)
+    }
+
+    /// Finds a registered namespace by a name or an abbreviation.
+    ///
+    /// Throws NamespaceNotFoundException when namespace is incorrect or ambiguous.
+    pub fn find_namespace(&mut self, namespace: &str) -> anyhow::Result<String> {
+        let all_namespaces = self.get_namespaces()?;
+        // implode('[^:]*:', array_map('preg_quote', explode(':', $namespace))).'[^:]*'
+        let parts: Vec<String> = shirabe_php_shim::explode(":", namespace)
+            .into_iter()
+            .map(|p| shirabe_php_shim::preg_quote(&p, None))
+            .collect();
+        let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
+        let namespaces = shirabe_php_shim::preg_grep(&format!("{{^{}}}", expr), &all_namespaces);
+
+        if namespaces.is_empty() {
+            let mut message = format!(
+                "There are no commands defined in the \"{}\" namespace.",
+                PhpMixed::from(namespace.to_string()),
+            );
+
+            let alternatives = self.find_alternatives(namespace, &all_namespaces);
+            if !alternatives.is_empty() {
+                if alternatives.len() == 1 {
+                    message.push_str("\n\nDid you mean this?\n    ");
+                } else {
+                    message.push_str("\n\nDid you mean one of these?\n    ");
+                }
+
+                message.push_str(&shirabe_php_shim::implode("\n    ", &alternatives));
+            }
+
+            return Err(NamespaceNotFoundException(CommandNotFoundException::new(
+                message,
+                alternatives,
+                0,
+            ))
+            .into());
+        }
+
+        let exact = namespaces.iter().any(|n| n == namespace);
+        if namespaces.len() > 1 && !exact {
+            return Err(NamespaceNotFoundException(CommandNotFoundException::new(
+                format!(
+                    "The namespace \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
+                    PhpMixed::from(namespace.to_string()),
+                    PhpMixed::from(self.get_abbreviation_suggestions(&namespaces)),
+                ),
+                namespaces.clone(),
+                0,
+            ))
+            .into());
+        }
+
+        // $exact ? $namespace : reset($namespaces)
+        if exact {
+            Ok(namespace.to_string())
+        } else {
+            Ok(namespaces[0].clone())
+        }
+    }
+
+    /// Finds a command by name or alias.
+    ///
+    /// Contrary to get, this command tries to find the best match if you give it an
+    /// abbreviation of a name or alias.
+    ///
+    /// Throws CommandNotFoundException when command name is incorrect or ambiguous.
+    pub fn find(
+        &mut self,
+        name: &str,
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
+        let mut aliases: IndexMap<String, String> = IndexMap::new();
+
+        let commands_snapshot: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> =
+            self.commands.values().cloned().collect();
+        for command in &commands_snapshot {
+            // A command's run() can re-enter find() (e.g. HelpCommand looks up the command it
+            // describes). That command is mutably borrowed for the duration of its run(), so it
+            // cannot be borrowed here. It is safe to skip: find() always completes this alias pass
+            // before returning a command, so any command currently executing already had its
+            // aliases registered in the earlier find() call that located it.
+            // TODO: this work-around could be solved.
+            let Ok(borrowed) = command.try_borrow() else {
+                continue;
+            };
+            let aliases = borrowed.get_aliases();
+            drop(borrowed);
+            for alias in aliases {
+                if !self.has(&alias) {
+                    self.commands.insert(alias, command.clone());
+                }
+            }
+        }
+
+        if self.has(name) {
+            return self.get(name);
+        }
+
+        // $allCommands = commandLoader ? array_merge(loader->getNames(), array_keys(commands)) : array_keys(commands)
+        let all_commands: Vec<String> = match &self.command_loader {
+            Some(command_loader) => {
+                let mut all = command_loader.get_names();
+                all.extend(self.commands.keys().cloned());
+                all
+            }
+            None => self.commands.keys().cloned().collect(),
+        };
+
+        let parts: Vec<String> = shirabe_php_shim::explode(":", name)
+            .into_iter()
+            .map(|p| shirabe_php_shim::preg_quote(&p, None))
+            .collect();
+        let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
+        let mut commands = shirabe_php_shim::preg_grep(&format!("{{^{}}}", expr), &all_commands);
+
+        if commands.is_empty() {
+            commands = shirabe_php_shim::preg_grep(&format!("{{^{}}}i", expr), &all_commands);
+        }
+
+        // if no commands matched or we just matched namespaces
+        if commands.is_empty()
+            || shirabe_php_shim::preg_grep(&format!("{{^{}$}}i", expr), &commands).is_empty()
+        {
+            if let Some(pos) = shirabe_php_shim::strrpos(name, ":") {
+                // check if a namespace exists and contains commands
+                self.find_namespace(&name[..pos])?;
+            }
+
+            let mut message = format!(
+                "SymfonyCommand \"{}\" is not defined.",
+                PhpMixed::from(name.to_string()),
+            );
+
+            let mut alternatives = self.find_alternatives(name, &all_commands);
+            if !alternatives.is_empty() {
+                // remove hidden commands
+                let mut filtered: Vec<String> = Vec::new();
+                for alt in alternatives {
+                    if !self.get(&alt)?.borrow().is_hidden() {
+                        filtered.push(alt);
+                    }
+                }
+                alternatives = filtered;
+
+                if alternatives.len() == 1 {
+                    message.push_str("\n\nDid you mean this?\n    ");
+                } else {
+                    message.push_str("\n\nDid you mean one of these?\n    ");
+                }
+                message.push_str(&shirabe_php_shim::implode("\n    ", &alternatives));
+            }
+
+            return Err(CommandNotFoundException::new(message, alternatives, 0).into());
+        }
+
+        // filter out aliases for commands which are already on the list
+        if commands.len() > 1 {
+            // $commandList = commandLoader ? array_merge(array_flip(loader->getNames()), commands) : commands
+            // TODO(review): $commandList mixes flipped loader names (string => int) with
+            // SymfonyCommand
+            // instances; this heterogeneous PHP array needs a typed representation. The alias
+            // de-duplication and the loader->get() lazy materialization are left to design.
+            let mut command_list: IndexMap<
+                String,
+                std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
+            > = self.commands.clone();
+
+            let commands_clone = commands.clone();
+            let mut new_commands: Vec<String> = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for name_or_alias in commands {
+                if !command_list.contains_key(&name_or_alias) {
+                    let loaded = self.command_loader.as_ref().unwrap().get(&name_or_alias);
+                    let _ = loaded;
+                    command_list.insert(
+                        name_or_alias.clone(),
+                        todo!(
+                            "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name_or_alias)"
+                        ),
+                    );
+                }
+
+                let command_name = command_list[&name_or_alias]
+                    .borrow()
+                    .get_name()
+                    .unwrap_or_default();
+
+                aliases.insert(name_or_alias.clone(), command_name.clone());
+
+                let keep = command_name == name_or_alias || !commands_clone.contains(&command_name);
+                if keep && seen.insert(name_or_alias.clone()) {
+                    new_commands.push(name_or_alias);
+                }
+            }
+            commands = new_commands;
+
+            if commands.len() > 1 {
+                let usable_width = self.terminal.get_width() - 10;
+                let abbrevs: Vec<String> = commands.clone();
+                let mut max_len: i64 = 0;
+                for abbrev in &abbrevs {
+                    max_len = std::cmp::max(Helper::width(abbrev), max_len);
+                }
+                let mut formatted_abbrevs: Vec<PhpMixed> = Vec::new();
+                for cmd in commands.clone() {
+                    if command_list[&cmd].borrow().is_hidden() {
+                        // unset($commands[array_search($cmd, $commands)])
+                        if let Some(idx) = commands.iter().position(|c| *c == cmd) {
+                            commands.remove(idx);
+                        }
+                        formatted_abbrevs.push(PhpMixed::Bool(false));
+                        continue;
+                    }
+
+                    let abbrev = format!(
+                        "{} {}",
+                        shirabe_php_shim::str_pad(
+                            &cmd,
+                            max_len as usize,
+                            " ",
+                            shirabe_php_shim::STR_PAD_RIGHT
+                        ),
+                        command_list[&cmd].borrow().get_description()
+                    );
+
+                    if Helper::width(&abbrev) > usable_width {
+                        formatted_abbrevs.push(PhpMixed::from(format!(
+                            "{}...",
+                            Helper::substr(&abbrev, 0, Some(usable_width - 3))
+                        )));
+                    } else {
+                        formatted_abbrevs.push(PhpMixed::from(abbrev));
+                    }
+                }
+
+                if commands.len() > 1 {
+                    let filtered: Vec<String> = formatted_abbrevs
+                        .iter()
+                        .filter(|a| shirabe_php_shim::php_truthy(a))
+                        .map(shirabe_php_shim::php_to_string)
+                        .collect();
+                    let suggestions = self.get_abbreviation_suggestions(&filtered);
+
+                    return Err(CommandNotFoundException::new(
+                        format!(
+                            "SymfonyCommand \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
+                            PhpMixed::from(name.to_string()),
+                            PhpMixed::from(suggestions),
+                        ),
+                        commands.clone(),
+                        0,
+                    )
+                    .into());
+                }
+            }
+        }
+
+        // $command = $this->get(reset($commands));
+        let command = self.get(&commands[0])?;
+
+        if command.borrow().is_hidden() {
+            return Err(CommandNotFoundException::new(
+                format!(
+                    "The command \"{}\" does not exist.",
+                    PhpMixed::from(name.to_string()),
+                ),
+                Vec::new(),
+                0,
+            )
+            .into());
+        }
+
+        Ok(command)
+    }
+
+    /// Gets the commands (registered in the given namespace if provided).
+    ///
+    /// The array keys are the full names and the values the command instances.
+    pub fn all(
+        &mut self,
+        namespace: Option<&str>,
+    ) -> anyhow::Result<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
+        if namespace.is_none() {
+            if self.command_loader.is_none() {
+                return Ok(self.commands.clone());
+            }
+
+            let mut commands = self.commands.clone();
+            let names = self.command_loader.as_ref().unwrap().get_names();
+            for name in names {
+                if !commands.contains_key(&name) && self.has(&name) {
+                    commands.insert(name.clone(), self.get(&name)?);
+                }
+            }
+
+            return Ok(commands);
+        }
+
+        let namespace = namespace.unwrap();
+        let mut commands: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> =
+            IndexMap::new();
+        let entries: Vec<(String, std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)> = self
+            .commands
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        for (name, command) in entries {
+            if namespace
+                == self.extract_namespace(
+                    &name,
+                    Some(shirabe_php_shim::substr_count(namespace, ":") + 1),
+                )
+            {
+                commands.insert(name, command);
+            }
+        }
+
+        if self.command_loader.is_some() {
+            let names = self.command_loader.as_ref().unwrap().get_names();
+            for name in names {
+                if !commands.contains_key(&name)
+                    && namespace
+                        == self.extract_namespace(
+                            &name,
+                            Some(shirabe_php_shim::substr_count(namespace, ":") + 1),
+                        )
+                    && self.has(&name)
+                {
+                    commands.insert(name.clone(), self.get(&name)?);
+                }
+            }
+        }
+
+        Ok(commands)
+    }
+
+    /// Returns an array of possible abbreviations given a set of names.
+    pub fn get_abbreviations(names: Vec<String>) -> IndexMap<String, Vec<String>> {
+        let mut abbrevs: IndexMap<String, Vec<String>> = IndexMap::new();
+        for name in names {
+            let mut len = shirabe_php_shim::strlen(&name);
+            while len > 0 {
+                let abbrev = shirabe_php_shim::substr(&name, 0, Some(len));
+                abbrevs.entry(abbrev).or_default().push(name.clone());
+                len -= 1;
+            }
+        }
+
+        abbrevs
+    }
+
+    pub fn render_throwable(
+        &self,
+        e: &anyhow::Error,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
+        output
+            .borrow()
+            .writeln(&["".to_string()], output_interface::VERBOSITY_QUIET);
+
+        self.do_render_throwable(e, output.clone());
+
+        if let Some(running_command) = &self.running_command {
+            // PHP: sprintf('<info>%s</info>', OutputFormatter::escape(sprintf($synopsis, $this->getName())))
+            // A command synopsis carries no printf conversion specifier, so the inner sprintf is an
+            // identity over the synopsis and the application-name argument is never substituted.
+            let synopsis = running_command.borrow_mut().get_synopsis(false);
+            output.borrow().writeln(
+                &[format!(
+                    "<info>{}</info>",
+                    OutputFormatter::escape(&synopsis).unwrap(),
+                )],
+                output_interface::VERBOSITY_QUIET,
+            );
+            output
+                .borrow()
+                .writeln(&["".to_string()], output_interface::VERBOSITY_QUIET);
+        }
+    }
+
+    pub fn do_render_throwable(
+        &self,
+        e: &anyhow::Error,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
+        // do { ... } while ($e = $e->getPrevious());
+        // PHP walks getPrevious(); anyhow models the exception chain as the source chain, which
+        // `anyhow::Error::chain()` yields head-first.
+        for e in e.chain() {
+            let message = shirabe_php_shim::trim(&e.to_string(), None);
+            let verbosity = output.borrow().get_verbosity();
+
+            let mut len;
+            let mut title = String::new();
+            if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
+                let class = throwable_debug_type(e);
+                let code = throwable_get_code(e);
+                title = format!(
+                    "  [{}{}]  ",
+                    class,
+                    if code != 0 {
+                        format!(" ({})", code)
+                    } else {
+                        String::new()
+                    }
+                );
+                len = Helper::width(&title);
+            } else {
+                len = 0;
+            }
+
+            // PHP rewrites `@anonymous\0` markers via class_exists/get_parent_class/class_implements.
+            // Rust error messages never carry PHP's anonymous-class marker and those reflection
+            // primitives have no Rust equivalent, so the branch is unreachable here.
+            // TODO(review): port the @anonymous rewrite if it ever becomes relevant.
+
+            let width = if self.terminal.get_width() != 0 {
+                self.terminal.get_width() - 1
+            } else {
+                i64::MAX
+            };
+            let mut lines: Vec<(String, i64)> = Vec::new();
+            let split = if !message.is_empty() {
+                shirabe_php_shim::preg_split(r"/\r?\n/", &message)
+            } else {
+                Vec::new()
+            };
+            for line in split {
+                for line in self.split_string_by_width(&line, width - 4) {
+                    // pre-format lines to get the right string length
+                    let line_length = Helper::width(&line) + 4;
+                    lines.push((line, line_length));
+                    len = std::cmp::max(line_length, len);
+                }
+            }
+
+            let mut messages: Vec<String> = Vec::new();
+            if !throwable_is_exception_interface(e)
+                || output_interface::VERBOSITY_VERBOSE <= verbosity
+            {
+                // TODO(review): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
+                // the 'n/a' fallback PHP itself uses when they are unavailable. The real source
+                // location cannot be reproduced (it would be a Rust path, not Composer's PHP path).
+                messages.push(format!(
+                    "<comment>{}</comment>",
+                    OutputFormatter::escape(&format!("In {} line {}:", "n/a", "n/a")).unwrap()
+                ));
+            }
+            let empty_line = format!(
+                "<error>{}</error>",
+                shirabe_php_shim::str_repeat(" ", len as usize)
+            );
+            messages.push(empty_line.clone());
+            if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
+                messages.push(format!(
+                    "<error>{}{}</error>",
+                    title,
+                    shirabe_php_shim::str_repeat(
+                        " ",
+                        (len - Helper::width(&title)).max(0) as usize
+                    )
+                ));
+            }
+            for (line, line_length) in &lines {
+                messages.push(format!(
+                    "<error>  {}  {}</error>",
+                    OutputFormatter::escape(line).unwrap(),
+                    shirabe_php_shim::str_repeat(" ", (len - line_length) as usize)
+                ));
+            }
+            messages.push(empty_line);
+            messages.push(String::new());
+
+            output
+                .borrow()
+                .writeln(&messages, output_interface::VERBOSITY_QUIET);
+
+            // PHP renders the `Exception trace:` block (getTrace()) at -v or higher. A PHP backtrace
+            // has no faithful Rust equivalent, so this block is intentionally never ported; verbose
+            // output simply omits the trace.
+        }
+    }
+
+    /// Configures the input and output instances based on the user arguments and options.
+    pub fn configure_io(
+        &self,
+        input: &std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        if input.borrow().has_parameter_option(
+            PhpMixed::from(vec![PhpMixed::from("--ansi".to_string())]),
+            true,
+        ) {
+            output.borrow().set_decorated(true);
+        } else if input.borrow().has_parameter_option(
+            PhpMixed::from(vec![PhpMixed::from("--no-ansi".to_string())]),
+            true,
+        ) {
+            output.borrow().set_decorated(false);
+        }
+
+        if input.borrow().has_parameter_option(
+            PhpMixed::from(vec![
+                PhpMixed::from("--no-interaction".to_string()),
+                PhpMixed::from("-n".to_string()),
+            ]),
+            true,
+        ) {
+            input.borrow_mut().set_interactive(false);
+        }
+
+        let mut shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY").unwrap_or_default();
+        let shell_verbosity_int: i64 = shell_verbosity.parse().unwrap_or(0);
+        let mut shell_verbosity: i64 = shell_verbosity_int;
+        match shell_verbosity_int {
+            -1 => {
+                output
+                    .borrow()
+                    .set_verbosity(output_interface::VERBOSITY_QUIET);
+            }
+            1 => {
+                output
+                    .borrow()
+                    .set_verbosity(output_interface::VERBOSITY_VERBOSE);
+            }
+            2 => {
+                output
+                    .borrow()
+                    .set_verbosity(output_interface::VERBOSITY_VERY_VERBOSE);
+            }
+            3 => {
+                output
+                    .borrow()
+                    .set_verbosity(output_interface::VERBOSITY_DEBUG);
+            }
+            _ => {
+                shell_verbosity = 0;
+            }
+        }
+
+        if input.borrow().has_parameter_option(
+            PhpMixed::from(vec![
+                PhpMixed::from("--quiet".to_string()),
+                PhpMixed::from("-q".to_string()),
+            ]),
+            true,
+        ) {
+            output
+                .borrow()
+                .set_verbosity(output_interface::VERBOSITY_QUIET);
+            shell_verbosity = -1;
+        } else if input
+            .borrow()
+            .has_parameter_option(PhpMixed::from("-vvv".to_string()), true)
+            || input
+                .borrow()
+                .has_parameter_option(PhpMixed::from("--verbose=3".to_string()), true)
+            || input.borrow().get_parameter_option(
+                PhpMixed::from("--verbose".to_string()),
+                PhpMixed::Bool(false),
+                true,
+            ) == PhpMixed::from(3i64)
+        {
+            output
+                .borrow()
+                .set_verbosity(output_interface::VERBOSITY_DEBUG);
+            shell_verbosity = 3;
+        } else if input
+            .borrow()
+            .has_parameter_option(PhpMixed::from("-vv".to_string()), true)
+            || input
+                .borrow()
+                .has_parameter_option(PhpMixed::from("--verbose=2".to_string()), true)
+            || input.borrow().get_parameter_option(
+                PhpMixed::from("--verbose".to_string()),
+                PhpMixed::Bool(false),
+                true,
+            ) == PhpMixed::from(2i64)
+        {
+            output
+                .borrow()
+                .set_verbosity(output_interface::VERBOSITY_VERY_VERBOSE);
+            shell_verbosity = 2;
+        } else if input
+            .borrow()
+            .has_parameter_option(PhpMixed::from("-v".to_string()), true)
+            || input
+                .borrow()
+                .has_parameter_option(PhpMixed::from("--verbose=1".to_string()), true)
+            || input
+                .borrow()
+                .has_parameter_option(PhpMixed::from("--verbose".to_string()), true)
+            || shirabe_php_shim::php_truthy(&input.borrow().get_parameter_option(
+                PhpMixed::from("--verbose".to_string()),
+                PhpMixed::Bool(false),
+                true,
+            ))
+        {
+            output
+                .borrow()
+                .set_verbosity(output_interface::VERBOSITY_VERBOSE);
+            shell_verbosity = 1;
+        }
+
+        if shell_verbosity == -1 {
+            input.borrow_mut().set_interactive(false);
+        }
+
+        if shirabe_php_shim::function_exists("putenv") {
+            shirabe_php_shim::putenv(&format!("SHELL_VERBOSITY={}", shell_verbosity));
+        }
+        shirabe_php_shim::env_set("SHELL_VERBOSITY", shell_verbosity.to_string());
+        shirabe_php_shim::server_set("SHELL_VERBOSITY", shell_verbosity.to_string());
+
+        let _ = &mut shell_verbosity;
+
+        Ok(())
+    }
+
+    /// Gets the name of the command based on input.
+    pub fn get_command_name(&self, input: &dyn InputInterface) -> Option<String> {
+        if self.single_command {
+            Some(self.default_command.clone())
+        } else {
+            input.get_first_argument()
+        }
+    }
+
+    /// Gets the default input definition (Symfony base; `parent::getDefaultInputDefinition`).
+    pub fn base_get_default_input_definition(&self) -> InputDefinition {
+        use shirabe_external_packages::symfony::console::input::input_definition::DefinitionItem;
+        InputDefinition::new(vec![
+            DefinitionItem::InputArgument(
+                InputArgument::new(
+                    "command".to_string(),
+                    Some(InputArgument::REQUIRED),
+                    "The command to execute".to_string(),
+                    PhpMixed::Null,
+                )
+                .unwrap(),
+            ),
+            DefinitionItem::InputOption(
+                InputOption::new(
+                    "--help",
+                    PhpMixed::from("-h".to_string()),
+                    Some(InputOption::VALUE_NONE),
+                    format!(
+                        "Display help for the given command. When no command is given display help for the <info>{}</info> command",
+                        self.default_command
+                    ),
+                    PhpMixed::Null,
+                )
+                .unwrap(),
+            ),
+            DefinitionItem::InputOption(
+                InputOption::new(
+                    "--quiet",
+                    PhpMixed::from("-q".to_string()),
+                    Some(InputOption::VALUE_NONE),
+                    "Do not output any message".to_string(),
+                    PhpMixed::Null,
+                )
+                .unwrap(),
+            ),
+            DefinitionItem::InputOption(
+                InputOption::new(
+                    "--verbose",
+                    PhpMixed::from("-v|vv|vvv".to_string()),
+                    Some(InputOption::VALUE_NONE),
+                    "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug".to_string(),
+                    PhpMixed::Null,
+                )
+                .unwrap(),
+            ),
+            DefinitionItem::InputOption(
+                InputOption::new(
+                    "--version",
+                    PhpMixed::from("-V".to_string()),
+                    Some(InputOption::VALUE_NONE),
+                    "Display this application version".to_string(),
+                    PhpMixed::Null,
+                )
+                .unwrap(),
+            ),
+            DefinitionItem::InputOption(
+                InputOption::new(
+                    "--ansi",
+                    PhpMixed::from("".to_string()),
+                    Some(InputOption::VALUE_NEGATABLE),
+                    "Force (or disable --no-ansi) ANSI output".to_string(),
+                    PhpMixed::Null,
+                )
+                .unwrap(),
+            ),
+            DefinitionItem::InputOption(
+                InputOption::new(
+                    "--no-interaction",
+                    PhpMixed::from("-n".to_string()),
+                    Some(InputOption::VALUE_NONE),
+                    "Do not ask any interactive question".to_string(),
+                    PhpMixed::Null,
+                )
+                .unwrap(),
+            ),
+        ])
+        .unwrap()
+    }
+
+    /// Gets the default commands that should always be available (Symfony base;
+    /// `parent::getDefaultCommands`).
+    pub fn base_get_default_commands(
+        &self,
+    ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
+        use shirabe_external_packages::symfony::console::command::complete_command::CompleteCommand;
+        use shirabe_external_packages::symfony::console::command::dump_completion_command::DumpCompletionCommand;
+        use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
+        use shirabe_external_packages::symfony::console::command::list_command::ListCommand;
+
+        vec![
+            std::rc::Rc::new(std::cell::RefCell::new(HelpCommand::new()))
+                as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
+            std::rc::Rc::new(std::cell::RefCell::new(ListCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(
+                CompleteCommand::new(IndexMap::new())
+                    .expect("CompleteCommand with default outputs is valid"),
+            )),
+            std::rc::Rc::new(std::cell::RefCell::new(DumpCompletionCommand::new())),
+        ]
+    }
+
+    /// Gets the default helper set with the helpers that should always be available.
+    pub fn get_default_helper_set(&self) -> std::rc::Rc<std::cell::RefCell<HelperSet>> {
+        let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
+        let helpers: IndexMap<HelperSetKey, std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> = {
+            let mut m: IndexMap<
+                HelperSetKey,
+                std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>,
+            > = IndexMap::new();
+            m.insert(
+                HelperSetKey::Int(0),
+                std::rc::Rc::new(std::cell::RefCell::new(FormatterHelper::default())),
+            );
+            m.insert(
+                HelperSetKey::Int(1),
+                std::rc::Rc::new(std::cell::RefCell::new(DebugFormatterHelper::default())),
+            );
+            m.insert(
+                HelperSetKey::Int(2),
+                std::rc::Rc::new(std::cell::RefCell::new(ProcessHelper::default())),
+            );
+            m.insert(
+                HelperSetKey::Int(3),
+                std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default())),
+            );
+            m
+        };
+        HelperSet::new(&helper_set, helpers);
+        helper_set
+    }
+
+    /// Returns abbreviated suggestions in string format.
+    fn get_abbreviation_suggestions(&self, abbrevs: &[String]) -> String {
+        format!("    {}", shirabe_php_shim::implode("\n    ", abbrevs))
+    }
+
+    /// Returns the namespace part of the command name.
+    ///
+    /// This method is not part of public API and should not be used directly.
+    pub fn extract_namespace(&self, name: &str, limit: Option<i64>) -> String {
+        // $parts = explode(':', $name, -1);
+        let parts = shirabe_php_shim::explode_limit(":", name, -1);
+
+        // implode(':', null === $limit ? $parts : array_slice($parts, 0, $limit))
+        match limit {
+            None => shirabe_php_shim::implode(":", &parts),
+            Some(limit) => {
+                let sliced: Vec<String> = parts.into_iter().take(limit.max(0) as usize).collect();
+                shirabe_php_shim::implode(":", &sliced)
+            }
+        }
+    }
+
+    /// Finds alternative of $name among $collection, if nothing is found in
+    /// $collection, try in $abbrevs.
+    fn find_alternatives(&self, name: &str, collection: &[String]) -> Vec<String> {
+        let threshold = 1e3;
+        let mut alternatives: IndexMap<String, f64> = IndexMap::new();
+
+        let mut collection_parts: IndexMap<String, Vec<String>> = IndexMap::new();
+        for item in collection {
+            collection_parts.insert(item.clone(), shirabe_php_shim::explode(":", item));
+        }
+
+        for (i, subname) in shirabe_php_shim::explode(":", name).into_iter().enumerate() {
+            for (collection_name, parts) in &collection_parts {
+                let exists = alternatives.contains_key(collection_name);
+                if parts.get(i).is_none() && exists {
+                    *alternatives.get_mut(collection_name).unwrap() += threshold;
+                    continue;
+                } else if parts.get(i).is_none() {
+                    continue;
+                }
+
+                let lev = shirabe_php_shim::levenshtein(&subname, &parts[i]) as f64;
+                if lev <= shirabe_php_shim::strlen(&subname) as f64 / 3.0
+                    || (!subname.is_empty() && parts[i].contains(&subname))
+                {
+                    let v = if exists {
+                        alternatives[collection_name] + lev
+                    } else {
+                        lev
+                    };
+                    alternatives.insert(collection_name.clone(), v);
+                } else if exists {
+                    *alternatives.get_mut(collection_name).unwrap() += threshold;
+                }
+            }
+        }
+
+        for item in collection {
+            let lev = shirabe_php_shim::levenshtein(name, item) as f64;
+            if lev <= shirabe_php_shim::strlen(name) as f64 / 3.0 || item.contains(name) {
+                let v = if alternatives.contains_key(item) {
+                    alternatives[item] - lev
+                } else {
+                    lev
+                };
+                alternatives.insert(item.clone(), v);
+            }
+        }
+
+        // array_filter($alternatives, fn($lev) => $lev < 2 * $threshold)
+        alternatives.retain(|_, lev| *lev < 2.0 * threshold);
+        // ksort($alternatives, SORT_NATURAL | SORT_FLAG_CASE)
+        let mut keys: Vec<String> = alternatives.keys().cloned().collect();
+        shirabe_php_shim::sort_natural_flag_case(&mut keys);
+
+        keys
+    }
+
+    /// Sets the default SymfonyCommand name.
+    pub fn set_default_command(
+        &mut self,
+        command_name: &str,
+        is_single_command: bool,
+    ) -> anyhow::Result<&mut Self> {
+        // $this->defaultCommand = explode('|', ltrim($commandName, '|'))[0];
+        let trimmed = shirabe_php_shim::ltrim(command_name, Some("|"));
+        self.default_command = shirabe_php_shim::explode("|", &trimmed)
+            .into_iter()
+            .next()
+            .unwrap_or_default();
+
+        if is_single_command {
+            // Ensure the command exist
+            self.find(command_name)?;
+
+            self.single_command = true;
+        }
+
+        Ok(self)
+    }
+
+    pub fn is_single_command(&self) -> bool {
+        self.single_command
+    }
+
+    fn split_string_by_width(&self, string: &str, width: i64) -> Vec<String> {
+        // str_split is not suitable for multi-byte characters, we should use preg_split to get char array properly.
+        let encoding = match shirabe_php_shim::mb_detect_encoding(string, None, true) {
+            None => return shirabe_php_shim::str_split(string, width),
+            Some(encoding) => encoding,
+        };
+
+        let utf8_string = shirabe_php_shim::mb_convert_encoding(string.into(), "utf8", &encoding);
+        let mut lines: Vec<String> = Vec::new();
+        let mut line = String::new();
+
+        let mut offset = 0i64;
+        let mut m: indexmap::IndexMap<shirabe_php_shim::CaptureKey, Option<String>> =
+            indexmap::IndexMap::new();
+        while shirabe_php_shim::preg_match2(
+            r"/.{1,10000}/u",
+            &utf8_string,
+            &mut m,
+            0,
+            offset as usize,
+        ) {
+            let m0 = m[&shirabe_php_shim::CaptureKey::ByIndex(0)]
+                .as_deref()
+                .unwrap_or("");
+            offset += shirabe_php_shim::strlen(m0);
+
+            let chunk = m0;
+            for char in chunk
+                .char_indices()
+                .map(|(i, c)| &chunk[i..i + c.len_utf8()])
+            {
+                // test if $char could be appended to current line
+                if shirabe_php_shim::mb_strwidth(&format!("{}{}", line, char), Some("utf8"))
+                    <= width
+                {
+                    line.push_str(char);
+                    continue;
+                }
+                // if not, push current line to array and make new line
+                lines.push(shirabe_php_shim::str_pad(
+                    &line,
+                    width as usize,
+                    " ",
+                    shirabe_php_shim::STR_PAD_RIGHT,
+                ));
+                line = char.to_string();
+            }
+        }
+
+        lines.push(if !lines.is_empty() {
+            shirabe_php_shim::str_pad(&line, width as usize, " ", shirabe_php_shim::STR_PAD_RIGHT)
+        } else {
+            line.clone()
+        });
+
+        shirabe_php_shim::mb_convert_variables(&encoding, "utf8", &mut lines);
+
+        lines
+    }
+
+    /// Returns all namespaces of the command name.
+    fn extract_all_namespaces(&self, name: &str) -> Vec<String> {
+        // -1 as third argument is needed to skip the command short name when exploding
+        let parts = shirabe_php_shim::explode_limit(":", name, -1);
+        let mut namespaces: Vec<String> = Vec::new();
+
+        for part in parts {
+            if !namespaces.is_empty() {
+                let last = namespaces.last().unwrap().clone();
+                namespaces.push(format!("{}:{}", last, part));
+            } else {
+                namespaces.push(part);
+            }
+        }
+
+        namespaces
+    }
+}
+
+/// Shared handle to an `Application`.
+///
+/// PHP `Application` instances are shared by reference — commands hold a back-pointer to their
+/// owning application that aliases this very `RefCell`. The whole run flow is therefore driven
+/// through this handle with short-lived borrows, so a command callback never re-borrows the
+/// application while it is already borrowed. Mirrors the Composer handle pattern (`ComposerHandle`).
+#[derive(Debug, Clone)]
+pub struct ApplicationHandle(std::rc::Rc<std::cell::RefCell<Application>>);
+
+impl ApplicationHandle {
+    /// Builds the application inside a shared handle and registers the default commands.
+    ///
+    /// Commands hold a back-pointer to their application, which shares this very `RefCell`. So the
+    /// whole run flow is driven through the handle (never a long-lived `borrow_mut`), and command
+    /// registration happens here — before any borrow is taken — so `set_application` can borrow the
+    /// application without a re-entrant conflict.
+    pub fn new(name: String, version: String) -> anyhow::Result<ApplicationHandle> {
+        let application = ApplicationHandle(std::rc::Rc::new(std::cell::RefCell::new(
+            Application::new(name, version),
+        )));
+        application.0.borrow_mut().me = std::rc::Rc::downgrade(&application.0);
+        application.init()?;
+        Ok(application)
+    }
+
+    /// Registers the default commands. It is called lazily with $this->initialized flag in PHP,
+    /// but called once from new() in Rust.
+    fn init(&self) -> anyhow::Result<()> {
+        let commands = self.0.borrow().get_default_commands();
+        for command in commands {
+            self.add(command)?;
+        }
+
+        Ok(())
+    }
+
+    /// Adds a command object.
+    ///
+    /// If a command with the same name already exists, it will be overridden.
+    /// If the command is not enabled it will not be added.
+    ///
+    /// Takes the shared application handle rather than `&mut self` so no application borrow is held
+    /// while calling into the command, letting `set_application` borrow back safely.
+    pub fn add(
+        &self,
         command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
     ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
+        let application = &self.0;
         command.borrow_mut().set_application(Some(
             application.clone() as std::rc::Rc<std::cell::RefCell<dyn BaseApplication>>
         ));
@@ -321,7 +1937,7 @@ impl Application {
     }
 
     pub fn run(
-        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+        &self,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i32> {
@@ -333,14 +1949,15 @@ impl Application {
             ),
         };
 
-        Application::base_run(application, input, output)
+        self.base_run(input, output)
     }
 
     pub fn do_run(
-        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
+        let application = &self.0;
         application.borrow_mut().disable_plugins_by_default = input
             .borrow()
             .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
@@ -919,7 +2536,7 @@ impl Application {
                 let _ = start_time.unwrap();
             }
 
-            let result = Application::base_do_run(application, input.clone(), output.clone())?;
+            let result = self.base_do_run(input.clone(), output.clone())?;
 
             if input
                 .borrow()
@@ -1006,442 +2623,16 @@ impl Application {
 
         outcome
     }
-
-    fn get_new_working_dir(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Option<String>> {
-        let working_dir = input
-            .borrow()
-            .get_parameter_option(
-                PhpMixed::from(vec!["--working-dir", "-d"]),
-                PhpMixed::Null,
-                true,
-            )
-            .as_string()
-            .map(|s| s.to_string());
-        if let Some(ref wd) = working_dir
-            && !is_dir(wd)
-        {
-            return Err(RuntimeException {
-                message: format!(
-                    "Invalid working directory specified, {} does not exist.",
-                    wd
-                ),
-                code: 0,
-            }
-            .into());
-        }
-
-        Ok(working_dir)
-    }
-
-    fn hint_common_errors(
-        &mut self,
-        exception: &anyhow::Error,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
-        let is_logic_or_error = exception.downcast_ref::<ShimLogicException>().is_some();
-        if is_logic_or_error
-            && output.borrow().get_verbosity() < output_interface::VERBOSITY_VERBOSE
-        {
-            output
-                .borrow_mut()
-                .set_verbosity(output_interface::VERBOSITY_VERBOSE);
-        }
-
-        Silencer::suppress(None);
-        // Compute the disk-space hint message first; emit it via io afterwards to
-        // avoid overlapping borrows of self (get_composer needs &mut self).
-        let disk_hint_msg: Option<String> = (|| -> anyhow::Result<Option<String>> {
-            let composer = self.get_composer(false, Some(true), None)?;
-            if let Some(composer) = composer && function_exists("disk_free_space") {
-                let composer = composer.borrow_partial();
-                let config = composer.get_config();
-
-                let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
-                let mut dir = config
-                    .borrow_mut()
-                    .get("home")
-                    .as_string()
-                    .unwrap_or("")
-                    .to_string();
-                let df = disk_free_space(&dir);
-                let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
-                if !hit {
-                    dir = config
-                        .borrow_mut()
-                        .get("vendor-dir")
-                        .as_string()
-                        .unwrap_or("")
-                        .to_string();
-                    let df = disk_free_space(&dir);
-                    hit = df.map(|d| d < min_space_free).unwrap_or(false);
-                }
-                if !hit {
-                    dir = sys_get_temp_dir();
-                    let df = disk_free_space(&dir);
-                    hit = df.map(|d| d < min_space_free).unwrap_or(false);
-                }
-                if hit {
-                    return Ok(Some(format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir)));
-                }
-            }
-            Ok(None)
-        })()
-        .ok()
-        .flatten();
-        Silencer::restore();
-
-        let io = self.get_io();
-        if let Some(msg) = &disk_hint_msg {
-            io.write_error3(msg, true, io_interface::QUIET);
-        }
-
-        let message = exception.to_string();
-        if exception.downcast_ref::<TransportException>().is_some()
-            && str_contains(&message, "Unable to use a proxy")
-        {
-            io.write_error3(
-                "<error>The following exception indicates your proxy is misconfigured</error>",
-                true,
-                io_interface::QUIET,
-            );
-            io.write_error3("<error>Check https://getcomposer.org/doc/faqs/how-to-use-composer-behind-a-proxy.md for details</error>", true, io_interface::QUIET);
-        }
-
-        if Platform::is_windows()
-            && exception.downcast_ref::<TransportException>().is_some()
-            && str_contains(&message, "unable to get local issuer certificate")
-        {
-            let avast_detect = glob("C:\\Program Files\\Avast*");
-            let avast_detect_pm = PhpMixed::List(
-                avast_detect
-                    .iter()
-                    .map(|s| PhpMixed::String(s.clone()))
-                    .collect(),
-            );
-            if is_array(&avast_detect_pm) && !avast_detect.is_empty() {
-                io.write_error3("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
-                io.write_error3(
-                    "<error>Check https://getcomposer.org/local-issuer for details</error>",
-                    true,
-                    io_interface::QUIET,
-                );
-            } else {
-                io.write_error3("<error>The following exception indicates a possible issue with a Firewall/Antivirus</error>", true, io_interface::QUIET);
-                io.write_error3(
-                    "<error>Check https://getcomposer.org/local-issuer for details</error>",
-                    true,
-                    io_interface::QUIET,
-                );
-            }
-        }
-
-        if Platform::is_windows()
-            && strpos(&message, "The system cannot find the path specified").is_some()
-        {
-            io.write_error3("<error>The following exception may be caused by a stale entry in your cmd.exe AutoRun</error>", true, io_interface::QUIET);
-            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#-the-system-cannot-find-the-path-specified-windows- for details</error>", true, io_interface::QUIET);
-        }
-
-        if strpos(&message, "fork failed - Cannot allocate memory").is_some() {
-            io.write_error3("<error>The following exception is caused by a lack of memory or swap, or not having swap configured</error>", true, io_interface::QUIET);
-            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", true, io_interface::QUIET);
-        }
-
-        if exception
-            .downcast_ref::<ProcessTimedOutException>()
-            .is_some()
-        {
-            io.write_error3(
-                "<error>The following exception is caused by a process timeout</error>",
-                true,
-                io_interface::QUIET,
-            );
-            io.write_error3("<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>", true, io_interface::QUIET);
-        }
-
-        if self.get_disable_plugins_by_default()
-            && self.is_running_as_root()
-            && !self.io.is_interactive()
-        {
-            io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", true, io_interface::QUIET);
-        } else if exception
-            .downcast_ref::<CommandNotFoundException>()
-            .is_some()
-            && self.get_disable_plugins_by_default()
-        {
-            io.write_error3("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, io_interface::QUIET);
-        }
-
-        let hints = HttpDownloader::get_exception_hints(exception).unwrap_or_default();
-        if !hints.is_empty() {
-            for hint in &hints {
-                io.write_error3(hint, true, io_interface::QUIET);
-            }
-        }
-    }
-
-    pub fn get_composer(
-        &mut self,
-        required: bool,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> anyhow::Result<Option<PartialComposerHandle>> {
-        let disable_plugins = disable_plugins.unwrap_or(self.disable_plugins_by_default);
-        let disable_scripts = disable_scripts.unwrap_or(self.disable_scripts_by_default);
-
-        if self.composer.is_none() {
-            let io_for_factory: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-                if Platform::is_input_completion_process() {
-                    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
-                } else {
-                    self.io.clone()
-                };
-            let disable_plugins_enum = if disable_plugins {
-                crate::factory::DisablePlugins::All
-            } else {
-                crate::factory::DisablePlugins::None
-            };
-            match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
-                Ok(c) => self.composer = Some(c.upcast()),
-                Err(e) => {
-                    if e.downcast_ref::<JsonValidationException>().is_some()
-                        || e.downcast_ref::<RuntimeException>().is_some()
-                    {
-                        if required {
-                            return Err(e);
-                        }
-                    } else {
-                        if required {
-                            self.io.write_error(&e.to_string());
-                            if self.are_exceptions_caught() {
-                                // PHP calls `exit(1)` here, terminating before parent::run() can
-                                // re-render the exception. Propagate it as an ExitException so the
-                                // top-level handler turns it into exit code 1 without re-rendering.
-                                return Err(shirabe_php_shim::ExitException { code: 1 }.into());
-                            }
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(self.composer.clone())
-    }
-
-    /// Removes the cached composer instance
-    pub fn reset_composer(&mut self) {
-        self.composer = None;
-        let io = self.get_io();
-        if let Some(base_io) = io.borrow_mut().as_base_io_mut() {
-            base_io.reset_authentications();
-        }
-    }
-
-    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-        self.io.clone()
-    }
-
-    pub fn get_help(&self) -> String {
-        format!("{}{}", Self::LOGO, self.base_get_help())
-    }
-
-    /// Initializes all the composer commands.
-    pub(crate) fn get_default_commands(
-        &self,
-    ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        let mut commands = self.base_get_default_commands();
-        let composer_commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![
-            std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ConfigCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(DependsCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ProhibitsCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(InitCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(InstallCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(CreateProjectCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(UpdateCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(SearchCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ValidateCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(AuditCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ShowCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(SuggestsCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(RequireCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(DumpAutoloadCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(StatusCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ArchiveCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(DiagnoseCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(RunScriptCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(LicensesCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(GlobalCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ClearCacheCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(RemoveCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(HomeCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ExecCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(OutdatedCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(CheckPlatformReqsCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(FundCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(ReinstallCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(BumpCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(RepositoryCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(SelfUpdateCommand::new())),
-        ];
-        commands.extend(composer_commands);
-        commands
-    }
-
-    /// This ensures we can find the correct command name even if a global input option is present before it
-    ///
-    /// e.g. "composer -d foo bar" should detect bar as the command name, and not foo
-    fn get_command_name_before_binding(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Option<String>> {
-        let input = input.borrow().dup();
-        // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
-        match input.borrow_mut().bind(&self.get_definition().borrow()) {
-            Ok(()) => {}
-            Err(e) => {
-                // Errors must be ignored, full binding/validation happens later when the command is known.
-                if !is_exception_interface(&e) {
-                    return Err(e);
-                }
-            }
-        }
-
-        Ok(input.borrow().get_first_argument())
-    }
-
-    pub fn get_long_version(&self) -> String {
-        let mut branch_alias_string = String::new();
-        if !composer::BRANCH_ALIAS_VERSION.is_empty()
-            && composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
-        {
-            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION,);
-        }
-
-        format!(
-            "<info>{}</info> version <comment>{}{}</comment> {}",
-            self.get_name(),
-            self.get_version(),
-            branch_alias_string,
-            composer::RELEASE_DATE,
-        )
-    }
-
-    pub(crate) fn get_default_input_definition(&self) -> anyhow::Result<InputDefinition> {
-        let mut definition = self.base_get_default_input_definition();
-        definition.add_option(InputOption::new(
-            "--profile",
-            PhpMixed::Null,
-            Some(InputOption::VALUE_NONE),
-            "Display timing and memory usage information".to_string(),
-            PhpMixed::Null,
-        )?)?;
-        definition.add_option(InputOption::new(
-            "--no-plugins",
-            PhpMixed::Null,
-            Some(InputOption::VALUE_NONE),
-            "Whether to disable plugins.".to_string(),
-            PhpMixed::Null,
-        )?)?;
-        definition.add_option(InputOption::new(
-            "--no-scripts",
-            PhpMixed::Null,
-            Some(InputOption::VALUE_NONE),
-            "Skips the execution of all scripts defined in composer.json file.".to_string(),
-            PhpMixed::Null,
-        )?)?;
-        definition.add_option(InputOption::new(
-            "--working-dir",
-            PhpMixed::from("-d"),
-            Some(InputOption::VALUE_REQUIRED),
-            "If specified, use the given directory as working directory.".to_string(),
-            PhpMixed::Null,
-        )?)?;
-        definition.add_option(InputOption::new(
-            "--no-cache",
-            PhpMixed::Null,
-            Some(InputOption::VALUE_NONE),
-            "Prevent use of the cache".to_string(),
-            PhpMixed::Null,
-        )?)?;
-
-        Ok(definition)
-    }
-
-    fn get_plugin_commands(&mut self) -> anyhow::Result<Vec<Box<dyn SymfonyCommand>>> {
-        // TODO(plugin): plugin command discovery is part of the plugin API
-        let commands: Vec<Box<dyn SymfonyCommand>> = vec![];
-
-        // TODO(phase-c): discovering plugin-provided commands walks the PluginManager and
-        // downcasts each plugin's CommandProvider capability — this is the Plugin API surface,
-        // which is intentionally unimplemented (see TODO(plugin) above). Returns an empty list
-        // until the plugin capability model exists.
-
-        Ok(commands)
-    }
-
-    /// Get the working directory at startup time
-    pub fn get_initial_working_directory(&self) -> Option<String> {
-        self.initial_working_directory.clone()
-    }
-
-    pub fn get_disable_plugins_by_default(&self) -> bool {
-        self.disable_plugins_by_default
-    }
-
-    pub fn get_disable_scripts_by_default(&self) -> bool {
-        self.disable_scripts_by_default
-    }
-
-    fn get_use_parent_dir_config_value(&self) -> PhpMixed {
-        let config = match Factory::create_config(Some(self.io.clone()), None) {
-            Ok(c) => c,
-            Err(_) => return PhpMixed::Bool(false),
-        };
-
-        config.get("use-parent-dir").clone()
-    }
-
-    fn is_running_as_root(&self) -> bool {
-        function_exists("posix_getuid") && posix_getuid() == 0
-    }
 }
 
-/// Methods inherited from `Symfony\Component\Console\Application`. They live in the same `impl`
-/// surface as the Composer overrides above so that polymorphic `self.*` calls dispatch to the
-/// Composer version when one exists. Methods that Composer overrides while still calling `parent::`
-/// are carried here under a `base_` prefix (`base_run`, `base_do_run`, `base_get_help`,
-/// `base_get_default_input_definition`, `base_get_default_commands`).
-impl Application {
-    pub fn set_command_loader(&mut self, command_loader: Box<dyn CommandLoaderInterface>) {
-        self.command_loader = Some(command_loader);
-    }
-
-    pub fn get_signal_registry(&self) -> anyhow::Result<&SignalRegistry> {
-        match &self.signal_registry {
-            None => Err(ConsoleRuntimeException(shirabe_php_shim::RuntimeException {
-                message: "Signals are not supported. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string(),
-                code: 0,
-            })
-            .into()),
-            Some(signal_registry) => Ok(signal_registry),
-        }
-    }
-
-    pub fn set_signals_to_dispatch_event(&mut self, signals_to_dispatch_event: Vec<i64>) {
-        self.signals_to_dispatch_event = signals_to_dispatch_event;
-    }
-
+impl ApplicationHandle {
     /// Runs the current application (Symfony base; `parent::run`).
     pub fn base_run(
-        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+        &self,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i32> {
+        let application = &self.0;
         if shirabe_php_shim::function_exists("putenv") {
             let (height, width) = {
                 let app = application.borrow();
@@ -1480,7 +2671,7 @@ impl Application {
         let result = (|| -> anyhow::Result<i32> {
             application.borrow_mut().configure_io(&input, &output)?;
 
-            let exit_code = Application::do_run(application, input.clone(), output.clone())?;
+            let exit_code = self.do_run(input.clone(), output.clone())?;
 
             Ok(exit_code)
         })();
@@ -1520,10 +2711,11 @@ impl Application {
 
     /// Runs the current application (Symfony base; `parent::doRun`).
     pub fn base_do_run(
-        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
+        let application = &self.0;
         if input.borrow().has_parameter_option(
             PhpMixed::from(vec![
                 PhpMixed::from("--version".to_string()),
@@ -1673,938 +2865,22 @@ impl Application {
         application.borrow_mut().running_command = Some(command.clone());
         // do_run_command invokes the command's run(), which calls back into the application
         // (mergeApplicationDefinition etc.); it must run with no application borrow held.
-        let exit_code = Application::do_run_command(
-            application,
-            command.clone(),
-            input.clone(),
-            output.clone(),
-        )?;
+        let exit_code = self.do_run_command(command.clone(), input.clone(), output.clone())?;
         application.borrow_mut().running_command = None;
 
         Ok(exit_code)
-    }
-
-    pub fn set_helper_set(&mut self, helper_set: std::rc::Rc<std::cell::RefCell<HelperSet>>) {
-        self.helper_set = Some(helper_set);
-    }
-
-    /// Get the helper set associated with the command.
-    pub fn get_helper_set(&mut self) -> std::rc::Rc<std::cell::RefCell<HelperSet>> {
-        if self.helper_set.is_none() {
-            self.helper_set = Some(self.get_default_helper_set());
-        }
-
-        self.helper_set.as_ref().unwrap().clone()
-    }
-
-    pub fn set_definition(&mut self, definition: std::rc::Rc<std::cell::RefCell<InputDefinition>>) {
-        self.definition = Some(definition);
-    }
-
-    /// Gets the InputDefinition related to this Application.
-    pub fn get_definition(&mut self) -> std::rc::Rc<std::cell::RefCell<InputDefinition>> {
-        if self.definition.is_none() {
-            // `get_default_input_definition` is the Composer override (returns a Result because the
-            // Rust `InputOption::new` is fallible); the option modes are constants that cannot fail,
-            // so unwrapping mirrors the PHP call that never throws here.
-            self.definition = Some(std::rc::Rc::new(std::cell::RefCell::new(
-                self.get_default_input_definition().unwrap(),
-            )));
-        }
-
-        if self.single_command {
-            let input_definition = self.definition.as_ref().unwrap().clone();
-            input_definition
-                .borrow_mut()
-                .set_arguments(Vec::new())
-                .unwrap();
-
-            return input_definition;
-        }
-
-        self.definition.as_ref().unwrap().clone()
-    }
-
-    /// Adds suggestions to `suggestions` for the current completion input (e.g. option or argument).
-    pub fn complete(
-        &mut self,
-        input: &CompletionInput,
-        suggestions: &mut CompletionSuggestions,
-    ) -> anyhow::Result<()> {
-        if CompletionInput::TYPE_ARGUMENT_VALUE == input.get_completion_type()
-            && input.get_completion_name().as_deref() == Some("command")
-        {
-            let mut command_names: Vec<PhpMixed> = Vec::new();
-            for (name, command) in self.all(None)? {
-                // skip hidden commands and aliased commands as they already get added below
-                if command.borrow().is_hidden() || command.borrow().get_name() != Some(name.clone())
-                {
-                    continue;
-                }
-                command_names.push(PhpMixed::from(
-                    command.borrow().get_name().unwrap_or_default(),
-                ));
-                for name in command.borrow().get_aliases() {
-                    command_names.push(PhpMixed::from(name));
-                }
-            }
-            // array_filter($commandNames)
-            let filtered: Vec<shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion> =
-                command_names
-                    .into_iter()
-                    .filter(shirabe_php_shim::php_truthy)
-                    .map(|n| {
-                        shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion::String(
-                            shirabe_php_shim::php_to_string(&n),
-                        )
-                    })
-                    .collect();
-            suggestions.suggest_values(filtered);
-
-            return Ok(());
-        }
-
-        if CompletionInput::TYPE_OPTION_NAME == input.get_completion_type() {
-            // $suggestions->suggestOptions($this->getDefinition()->getOptions());
-            // TODO(review): get_options() yields Rc<InputOption> (shared, non-Clone) while
-            // suggest_options() consumes owned InputOption values; an ownership/clone strategy
-            // for InputOption is needed.
-            suggestions.suggest_options(todo!("owned options from get_definition().get_options()"));
-
-            return Ok(());
-        }
-
-        Ok(())
-    }
-
-    /// Gets the help message (Symfony base; `parent::getHelp`).
-    pub fn base_get_help(&self) -> String {
-        self.get_long_version()
-    }
-
-    /// Gets whether to catch exceptions or not during commands execution.
-    pub fn are_exceptions_caught(&self) -> bool {
-        self.catch_exceptions
-    }
-
-    /// Sets whether to catch exceptions or not during commands execution.
-    pub fn set_catch_exceptions(&mut self, boolean: bool) {
-        self.catch_exceptions = boolean;
-    }
-
-    /// Gets the name of the application.
-    pub fn get_name(&self) -> String {
-        self.name.clone()
-    }
-
-    /// Sets the application name.
-    pub fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
-    }
-
-    /// Gets the application version.
-    pub fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
-    /// Sets the application version.
-    pub fn set_version(&mut self, version: &str) {
-        self.version = version.to_string();
     }
 
     /// Adds an array of command objects.
     ///
     /// If a SymfonyCommand is not enabled it will not be added.
     pub fn add_commands(
-        &mut self,
+        &self,
         commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>,
     ) -> anyhow::Result<()> {
         for command in commands {
             self.add(command)?;
         }
-        Ok(())
-    }
-
-    /// Adds a command object.
-    ///
-    /// If a command with the same name already exists, it will be overridden.
-    /// If the command is not enabled it will not be added.
-    pub fn add(
-        &mut self,
-        command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
-    ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
-        self.init()?;
-
-        // TODO(review): $command->setApplication($this) needs an Rc<RefCell<Application>> to the
-        // current instance. Application is held by value here; the self-reference required to set
-        // the command's back-pointer needs the shared-ownership design (Phase C).
-        command
-            .borrow_mut()
-            .set_application(todo!("Rc<RefCell<Application>> of self"));
-
-        if !command.borrow().is_enabled() {
-            command.borrow_mut().set_application(None);
-
-            return Ok(None);
-        }
-
-        // LazyCommand is intentionally not ported.
-        command.borrow().get_definition();
-
-        if command.borrow().get_name().is_none() {
-            return Err(ConsoleLogicException(shirabe_php_shim::LogicException {
-                message: format!(
-                    "The command defined in \"{}\" cannot have an empty name.",
-                    PhpMixed::from(shirabe_php_shim::get_debug_type_obj(&command,)),
-                ),
-                code: 0,
-            })
-            .into());
-        }
-
-        let name = command.borrow().get_name().unwrap();
-        self.commands.insert(name, command.clone());
-
-        for alias in command.borrow().get_aliases() {
-            self.commands.insert(alias, command.clone());
-        }
-
-        Ok(Some(command))
-    }
-
-    /// Returns a registered command by name or alias.
-    ///
-    /// Throws CommandNotFoundException when given command name does not exist.
-    pub fn get(
-        &mut self,
-        name: &str,
-    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        self.init()?;
-
-        if !self.has(name) {
-            return Err(CommandNotFoundException::new(
-                format!(
-                    "The command \"{}\" does not exist.",
-                    PhpMixed::from(name.to_string()),
-                ),
-                Vec::new(),
-                0,
-            )
-            .into());
-        }
-
-        // When the command has a different name than the one used at the command loader level
-        if !self.commands.contains_key(name) {
-            return Err(CommandNotFoundException::new(
-                format!(
-                    "The \"{}\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\".",
-                    PhpMixed::from(name.to_string()),
-                ),
-                Vec::new(),
-                0,
-            )
-            .into());
-        }
-
-        let command = self.commands[name].clone();
-
-        if self.want_helps {
-            self.want_helps = false;
-
-            let help_command = self.get("help")?;
-            help_command
-                .borrow_mut()
-                .as_any_mut()
-                .downcast_mut::<HelpCommand>()
-                .expect("the help command is a HelpCommand instance")
-                .set_command(command);
-
-            return Ok(help_command);
-        }
-
-        Ok(command)
-    }
-
-    /// Returns true if the command exists, false otherwise.
-    pub fn has(&mut self, name: &str) -> bool {
-        self.init().unwrap();
-
-        if self.commands.contains_key(name) {
-            return true;
-        }
-
-        if let Some(command_loader) = &self.command_loader
-            && command_loader.has(name)
-        {
-            let command = command_loader.get(name);
-            // $this->add($this->commandLoader->get($name))
-            // TODO(review): command_loader.get() returns Box<dyn SymfonyCommand> while add() expects
-            // Rc<RefCell<dyn SymfonyCommand>>; the loader return type needs reconciliation.
-            let _ = command;
-            return self
-                .add(todo!(
-                    "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name)"
-                ))
-                .map(|c| c.is_some())
-                .unwrap_or(false);
-        }
-
-        false
-    }
-
-    /// Returns an array of all unique namespaces used by currently registered commands.
-    ///
-    /// It does not return the global namespace which always exists.
-    pub fn get_namespaces(&mut self) -> anyhow::Result<Vec<String>> {
-        let mut namespaces: Vec<Vec<String>> = Vec::new();
-        for command in self.all(None)?.values() {
-            if command.borrow().is_hidden() {
-                continue;
-            }
-
-            namespaces.push(
-                self.extract_all_namespaces(&command.borrow().get_name().unwrap_or_default()),
-            );
-
-            for alias in command.borrow().get_aliases() {
-                namespaces.push(self.extract_all_namespaces(&alias));
-            }
-        }
-
-        // array_values(array_unique(array_filter(array_merge([], ...$namespaces))))
-        let mut merged: Vec<String> = Vec::new();
-        for ns in namespaces {
-            merged.extend(ns);
-        }
-        let merged: Vec<String> = merged.into_iter().filter(|s| !s.is_empty()).collect();
-        let mut seen = std::collections::HashSet::new();
-        let unique: Vec<String> = merged
-            .into_iter()
-            .filter(|s| seen.insert(s.clone()))
-            .collect();
-
-        Ok(unique)
-    }
-
-    /// Finds a registered namespace by a name or an abbreviation.
-    ///
-    /// Throws NamespaceNotFoundException when namespace is incorrect or ambiguous.
-    pub fn find_namespace(&mut self, namespace: &str) -> anyhow::Result<String> {
-        let all_namespaces = self.get_namespaces()?;
-        // implode('[^:]*:', array_map('preg_quote', explode(':', $namespace))).'[^:]*'
-        let parts: Vec<String> = shirabe_php_shim::explode(":", namespace)
-            .into_iter()
-            .map(|p| shirabe_php_shim::preg_quote(&p, None))
-            .collect();
-        let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
-        let namespaces = shirabe_php_shim::preg_grep(&format!("{{^{}}}", expr), &all_namespaces);
-
-        if namespaces.is_empty() {
-            let mut message = format!(
-                "There are no commands defined in the \"{}\" namespace.",
-                PhpMixed::from(namespace.to_string()),
-            );
-
-            let alternatives = self.find_alternatives(namespace, &all_namespaces);
-            if !alternatives.is_empty() {
-                if alternatives.len() == 1 {
-                    message.push_str("\n\nDid you mean this?\n    ");
-                } else {
-                    message.push_str("\n\nDid you mean one of these?\n    ");
-                }
-
-                message.push_str(&shirabe_php_shim::implode("\n    ", &alternatives));
-            }
-
-            return Err(NamespaceNotFoundException(CommandNotFoundException::new(
-                message,
-                alternatives,
-                0,
-            ))
-            .into());
-        }
-
-        let exact = namespaces.iter().any(|n| n == namespace);
-        if namespaces.len() > 1 && !exact {
-            return Err(NamespaceNotFoundException(CommandNotFoundException::new(
-                format!(
-                    "The namespace \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                    PhpMixed::from(namespace.to_string()),
-                    PhpMixed::from(self.get_abbreviation_suggestions(&namespaces)),
-                ),
-                namespaces.clone(),
-                0,
-            ))
-            .into());
-        }
-
-        // $exact ? $namespace : reset($namespaces)
-        if exact {
-            Ok(namespace.to_string())
-        } else {
-            Ok(namespaces[0].clone())
-        }
-    }
-
-    /// Finds a command by name or alias.
-    ///
-    /// Contrary to get, this command tries to find the best match if you give it an
-    /// abbreviation of a name or alias.
-    ///
-    /// Throws CommandNotFoundException when command name is incorrect or ambiguous.
-    pub fn find(
-        &mut self,
-        name: &str,
-    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        self.init()?;
-
-        let mut aliases: IndexMap<String, String> = IndexMap::new();
-
-        let commands_snapshot: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> =
-            self.commands.values().cloned().collect();
-        for command in &commands_snapshot {
-            // A command's run() can re-enter find() (e.g. HelpCommand looks up the command it
-            // describes). That command is mutably borrowed for the duration of its run(), so it
-            // cannot be borrowed here. It is safe to skip: find() always completes this alias pass
-            // before returning a command, so any command currently executing already had its
-            // aliases registered in the earlier find() call that located it.
-            // TODO: this work-around could be solved.
-            let Ok(borrowed) = command.try_borrow() else {
-                continue;
-            };
-            let aliases = borrowed.get_aliases();
-            drop(borrowed);
-            for alias in aliases {
-                if !self.has(&alias) {
-                    self.commands.insert(alias, command.clone());
-                }
-            }
-        }
-
-        if self.has(name) {
-            return self.get(name);
-        }
-
-        // $allCommands = commandLoader ? array_merge(loader->getNames(), array_keys(commands)) : array_keys(commands)
-        let all_commands: Vec<String> = match &self.command_loader {
-            Some(command_loader) => {
-                let mut all = command_loader.get_names();
-                all.extend(self.commands.keys().cloned());
-                all
-            }
-            None => self.commands.keys().cloned().collect(),
-        };
-
-        let parts: Vec<String> = shirabe_php_shim::explode(":", name)
-            .into_iter()
-            .map(|p| shirabe_php_shim::preg_quote(&p, None))
-            .collect();
-        let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
-        let mut commands = shirabe_php_shim::preg_grep(&format!("{{^{}}}", expr), &all_commands);
-
-        if commands.is_empty() {
-            commands = shirabe_php_shim::preg_grep(&format!("{{^{}}}i", expr), &all_commands);
-        }
-
-        // if no commands matched or we just matched namespaces
-        if commands.is_empty()
-            || shirabe_php_shim::preg_grep(&format!("{{^{}$}}i", expr), &commands).is_empty()
-        {
-            if let Some(pos) = shirabe_php_shim::strrpos(name, ":") {
-                // check if a namespace exists and contains commands
-                self.find_namespace(&name[..pos])?;
-            }
-
-            let mut message = format!(
-                "SymfonyCommand \"{}\" is not defined.",
-                PhpMixed::from(name.to_string()),
-            );
-
-            let mut alternatives = self.find_alternatives(name, &all_commands);
-            if !alternatives.is_empty() {
-                // remove hidden commands
-                let mut filtered: Vec<String> = Vec::new();
-                for alt in alternatives {
-                    if !self.get(&alt)?.borrow().is_hidden() {
-                        filtered.push(alt);
-                    }
-                }
-                alternatives = filtered;
-
-                if alternatives.len() == 1 {
-                    message.push_str("\n\nDid you mean this?\n    ");
-                } else {
-                    message.push_str("\n\nDid you mean one of these?\n    ");
-                }
-                message.push_str(&shirabe_php_shim::implode("\n    ", &alternatives));
-            }
-
-            return Err(CommandNotFoundException::new(message, alternatives, 0).into());
-        }
-
-        // filter out aliases for commands which are already on the list
-        if commands.len() > 1 {
-            // $commandList = commandLoader ? array_merge(array_flip(loader->getNames()), commands) : commands
-            // TODO(review): $commandList mixes flipped loader names (string => int) with
-            // SymfonyCommand
-            // instances; this heterogeneous PHP array needs a typed representation. The alias
-            // de-duplication and the loader->get() lazy materialization are left to design.
-            let mut command_list: IndexMap<
-                String,
-                std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
-            > = self.commands.clone();
-
-            let commands_clone = commands.clone();
-            let mut new_commands: Vec<String> = Vec::new();
-            let mut seen = std::collections::HashSet::new();
-            for name_or_alias in commands {
-                if !command_list.contains_key(&name_or_alias) {
-                    let loaded = self.command_loader.as_ref().unwrap().get(&name_or_alias);
-                    let _ = loaded;
-                    command_list.insert(
-                        name_or_alias.clone(),
-                        todo!(
-                            "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name_or_alias)"
-                        ),
-                    );
-                }
-
-                let command_name = command_list[&name_or_alias]
-                    .borrow()
-                    .get_name()
-                    .unwrap_or_default();
-
-                aliases.insert(name_or_alias.clone(), command_name.clone());
-
-                let keep = command_name == name_or_alias || !commands_clone.contains(&command_name);
-                if keep && seen.insert(name_or_alias.clone()) {
-                    new_commands.push(name_or_alias);
-                }
-            }
-            commands = new_commands;
-
-            if commands.len() > 1 {
-                let usable_width = self.terminal.get_width() - 10;
-                let abbrevs: Vec<String> = commands.clone();
-                let mut max_len: i64 = 0;
-                for abbrev in &abbrevs {
-                    max_len = std::cmp::max(Helper::width(abbrev), max_len);
-                }
-                let mut formatted_abbrevs: Vec<PhpMixed> = Vec::new();
-                for cmd in commands.clone() {
-                    if command_list[&cmd].borrow().is_hidden() {
-                        // unset($commands[array_search($cmd, $commands)])
-                        if let Some(idx) = commands.iter().position(|c| *c == cmd) {
-                            commands.remove(idx);
-                        }
-                        formatted_abbrevs.push(PhpMixed::Bool(false));
-                        continue;
-                    }
-
-                    let abbrev = format!(
-                        "{} {}",
-                        shirabe_php_shim::str_pad(
-                            &cmd,
-                            max_len as usize,
-                            " ",
-                            shirabe_php_shim::STR_PAD_RIGHT
-                        ),
-                        command_list[&cmd].borrow().get_description()
-                    );
-
-                    if Helper::width(&abbrev) > usable_width {
-                        formatted_abbrevs.push(PhpMixed::from(format!(
-                            "{}...",
-                            Helper::substr(&abbrev, 0, Some(usable_width - 3))
-                        )));
-                    } else {
-                        formatted_abbrevs.push(PhpMixed::from(abbrev));
-                    }
-                }
-
-                if commands.len() > 1 {
-                    let filtered: Vec<String> = formatted_abbrevs
-                        .iter()
-                        .filter(|a| shirabe_php_shim::php_truthy(a))
-                        .map(shirabe_php_shim::php_to_string)
-                        .collect();
-                    let suggestions = self.get_abbreviation_suggestions(&filtered);
-
-                    return Err(CommandNotFoundException::new(
-                        format!(
-                            "SymfonyCommand \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                            PhpMixed::from(name.to_string()),
-                            PhpMixed::from(suggestions),
-                        ),
-                        commands.clone(),
-                        0,
-                    )
-                    .into());
-                }
-            }
-        }
-
-        // $command = $this->get(reset($commands));
-        let command = self.get(&commands[0])?;
-
-        if command.borrow().is_hidden() {
-            return Err(CommandNotFoundException::new(
-                format!(
-                    "The command \"{}\" does not exist.",
-                    PhpMixed::from(name.to_string()),
-                ),
-                Vec::new(),
-                0,
-            )
-            .into());
-        }
-
-        Ok(command)
-    }
-
-    /// Gets the commands (registered in the given namespace if provided).
-    ///
-    /// The array keys are the full names and the values the command instances.
-    pub fn all(
-        &mut self,
-        namespace: Option<&str>,
-    ) -> anyhow::Result<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
-        self.init()?;
-
-        if namespace.is_none() {
-            if self.command_loader.is_none() {
-                return Ok(self.commands.clone());
-            }
-
-            let mut commands = self.commands.clone();
-            let names = self.command_loader.as_ref().unwrap().get_names();
-            for name in names {
-                if !commands.contains_key(&name) && self.has(&name) {
-                    commands.insert(name.clone(), self.get(&name)?);
-                }
-            }
-
-            return Ok(commands);
-        }
-
-        let namespace = namespace.unwrap();
-        let mut commands: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> =
-            IndexMap::new();
-        let entries: Vec<(String, std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)> = self
-            .commands
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        for (name, command) in entries {
-            if namespace
-                == self.extract_namespace(
-                    &name,
-                    Some(shirabe_php_shim::substr_count(namespace, ":") + 1),
-                )
-            {
-                commands.insert(name, command);
-            }
-        }
-
-        if self.command_loader.is_some() {
-            let names = self.command_loader.as_ref().unwrap().get_names();
-            for name in names {
-                if !commands.contains_key(&name)
-                    && namespace
-                        == self.extract_namespace(
-                            &name,
-                            Some(shirabe_php_shim::substr_count(namespace, ":") + 1),
-                        )
-                    && self.has(&name)
-                {
-                    commands.insert(name.clone(), self.get(&name)?);
-                }
-            }
-        }
-
-        Ok(commands)
-    }
-
-    /// Returns an array of possible abbreviations given a set of names.
-    pub fn get_abbreviations(names: Vec<String>) -> IndexMap<String, Vec<String>> {
-        let mut abbrevs: IndexMap<String, Vec<String>> = IndexMap::new();
-        for name in names {
-            let mut len = shirabe_php_shim::strlen(&name);
-            while len > 0 {
-                let abbrev = shirabe_php_shim::substr(&name, 0, Some(len));
-                abbrevs.entry(abbrev).or_default().push(name.clone());
-                len -= 1;
-            }
-        }
-
-        abbrevs
-    }
-
-    pub fn render_throwable(
-        &self,
-        e: &anyhow::Error,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
-        output
-            .borrow()
-            .writeln(&["".to_string()], output_interface::VERBOSITY_QUIET);
-
-        self.do_render_throwable(e, output.clone());
-
-        if let Some(running_command) = &self.running_command {
-            // PHP: sprintf('<info>%s</info>', OutputFormatter::escape(sprintf($synopsis, $this->getName())))
-            // A command synopsis carries no printf conversion specifier, so the inner sprintf is an
-            // identity over the synopsis and the application-name argument is never substituted.
-            let synopsis = running_command.borrow_mut().get_synopsis(false);
-            output.borrow().writeln(
-                &[format!(
-                    "<info>{}</info>",
-                    OutputFormatter::escape(&synopsis).unwrap(),
-                )],
-                output_interface::VERBOSITY_QUIET,
-            );
-            output
-                .borrow()
-                .writeln(&["".to_string()], output_interface::VERBOSITY_QUIET);
-        }
-    }
-
-    pub fn do_render_throwable(
-        &self,
-        e: &anyhow::Error,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
-        // do { ... } while ($e = $e->getPrevious());
-        // PHP walks getPrevious(); anyhow models the exception chain as the source chain, which
-        // `anyhow::Error::chain()` yields head-first.
-        for e in e.chain() {
-            let message = shirabe_php_shim::trim(&e.to_string(), None);
-            let verbosity = output.borrow().get_verbosity();
-
-            let mut len;
-            let mut title = String::new();
-            if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
-                let class = throwable_debug_type(e);
-                let code = throwable_get_code(e);
-                title = format!(
-                    "  [{}{}]  ",
-                    class,
-                    if code != 0 {
-                        format!(" ({})", code)
-                    } else {
-                        String::new()
-                    }
-                );
-                len = Helper::width(&title);
-            } else {
-                len = 0;
-            }
-
-            // PHP rewrites `@anonymous\0` markers via class_exists/get_parent_class/class_implements.
-            // Rust error messages never carry PHP's anonymous-class marker and those reflection
-            // primitives have no Rust equivalent, so the branch is unreachable here.
-            // TODO(review): port the @anonymous rewrite if it ever becomes relevant.
-
-            let width = if self.terminal.get_width() != 0 {
-                self.terminal.get_width() - 1
-            } else {
-                i64::MAX
-            };
-            let mut lines: Vec<(String, i64)> = Vec::new();
-            let split = if !message.is_empty() {
-                shirabe_php_shim::preg_split(r"/\r?\n/", &message)
-            } else {
-                Vec::new()
-            };
-            for line in split {
-                for line in self.split_string_by_width(&line, width - 4) {
-                    // pre-format lines to get the right string length
-                    let line_length = Helper::width(&line) + 4;
-                    lines.push((line, line_length));
-                    len = std::cmp::max(line_length, len);
-                }
-            }
-
-            let mut messages: Vec<String> = Vec::new();
-            if !throwable_is_exception_interface(e)
-                || output_interface::VERBOSITY_VERBOSE <= verbosity
-            {
-                // TODO(review): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
-                // the 'n/a' fallback PHP itself uses when they are unavailable. The real source
-                // location cannot be reproduced (it would be a Rust path, not Composer's PHP path).
-                messages.push(format!(
-                    "<comment>{}</comment>",
-                    OutputFormatter::escape(&format!("In {} line {}:", "n/a", "n/a")).unwrap()
-                ));
-            }
-            let empty_line = format!(
-                "<error>{}</error>",
-                shirabe_php_shim::str_repeat(" ", len as usize)
-            );
-            messages.push(empty_line.clone());
-            if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
-                messages.push(format!(
-                    "<error>{}{}</error>",
-                    title,
-                    shirabe_php_shim::str_repeat(
-                        " ",
-                        (len - Helper::width(&title)).max(0) as usize
-                    )
-                ));
-            }
-            for (line, line_length) in &lines {
-                messages.push(format!(
-                    "<error>  {}  {}</error>",
-                    OutputFormatter::escape(line).unwrap(),
-                    shirabe_php_shim::str_repeat(" ", (len - line_length) as usize)
-                ));
-            }
-            messages.push(empty_line);
-            messages.push(String::new());
-
-            output
-                .borrow()
-                .writeln(&messages, output_interface::VERBOSITY_QUIET);
-
-            // PHP renders the `Exception trace:` block (getTrace()) at -v or higher. A PHP backtrace
-            // has no faithful Rust equivalent, so this block is intentionally never ported; verbose
-            // output simply omits the trace.
-        }
-    }
-
-    /// Configures the input and output instances based on the user arguments and options.
-    pub fn configure_io(
-        &self,
-        input: &std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<()> {
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![PhpMixed::from("--ansi".to_string())]),
-            true,
-        ) {
-            output.borrow().set_decorated(true);
-        } else if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![PhpMixed::from("--no-ansi".to_string())]),
-            true,
-        ) {
-            output.borrow().set_decorated(false);
-        }
-
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![
-                PhpMixed::from("--no-interaction".to_string()),
-                PhpMixed::from("-n".to_string()),
-            ]),
-            true,
-        ) {
-            input.borrow_mut().set_interactive(false);
-        }
-
-        let mut shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY").unwrap_or_default();
-        let shell_verbosity_int: i64 = shell_verbosity.parse().unwrap_or(0);
-        let mut shell_verbosity: i64 = shell_verbosity_int;
-        match shell_verbosity_int {
-            -1 => {
-                output
-                    .borrow()
-                    .set_verbosity(output_interface::VERBOSITY_QUIET);
-            }
-            1 => {
-                output
-                    .borrow()
-                    .set_verbosity(output_interface::VERBOSITY_VERBOSE);
-            }
-            2 => {
-                output
-                    .borrow()
-                    .set_verbosity(output_interface::VERBOSITY_VERY_VERBOSE);
-            }
-            3 => {
-                output
-                    .borrow()
-                    .set_verbosity(output_interface::VERBOSITY_DEBUG);
-            }
-            _ => {
-                shell_verbosity = 0;
-            }
-        }
-
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![
-                PhpMixed::from("--quiet".to_string()),
-                PhpMixed::from("-q".to_string()),
-            ]),
-            true,
-        ) {
-            output
-                .borrow()
-                .set_verbosity(output_interface::VERBOSITY_QUIET);
-            shell_verbosity = -1;
-        } else if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from("-vvv".to_string()), true)
-            || input
-                .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose=3".to_string()), true)
-            || input.borrow().get_parameter_option(
-                PhpMixed::from("--verbose".to_string()),
-                PhpMixed::Bool(false),
-                true,
-            ) == PhpMixed::from(3i64)
-        {
-            output
-                .borrow()
-                .set_verbosity(output_interface::VERBOSITY_DEBUG);
-            shell_verbosity = 3;
-        } else if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from("-vv".to_string()), true)
-            || input
-                .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose=2".to_string()), true)
-            || input.borrow().get_parameter_option(
-                PhpMixed::from("--verbose".to_string()),
-                PhpMixed::Bool(false),
-                true,
-            ) == PhpMixed::from(2i64)
-        {
-            output
-                .borrow()
-                .set_verbosity(output_interface::VERBOSITY_VERY_VERBOSE);
-            shell_verbosity = 2;
-        } else if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from("-v".to_string()), true)
-            || input
-                .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose=1".to_string()), true)
-            || input
-                .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose".to_string()), true)
-            || shirabe_php_shim::php_truthy(&input.borrow().get_parameter_option(
-                PhpMixed::from("--verbose".to_string()),
-                PhpMixed::Bool(false),
-                true,
-            ))
-        {
-            output
-                .borrow()
-                .set_verbosity(output_interface::VERBOSITY_VERBOSE);
-            shell_verbosity = 1;
-        }
-
-        if shell_verbosity == -1 {
-            input.borrow_mut().set_interactive(false);
-        }
-
-        if shirabe_php_shim::function_exists("putenv") {
-            shirabe_php_shim::putenv(&format!("SHELL_VERBOSITY={}", shell_verbosity));
-        }
-        shirabe_php_shim::env_set("SHELL_VERBOSITY", shell_verbosity.to_string());
-        shirabe_php_shim::server_set("SHELL_VERBOSITY", shell_verbosity.to_string());
-
-        let _ = &mut shell_verbosity;
-
         Ok(())
     }
 
@@ -2615,11 +2891,12 @@ impl Application {
     ///
     /// Returns 0 if everything went fine, or an error code.
     pub fn do_run_command(
-        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+        &self,
         command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
+        let application = &self.0;
         if let Some(helper_set) = command.borrow().get_helper_set() {
             for (_alias, helper) in helper_set.borrow().get_iterator() {
                 // if ($helper instanceof InputAwareInterface) $helper->setInput($input);
@@ -2666,345 +2943,6 @@ impl Application {
             .borrow_mut()
             .run(input.clone(), output.clone())
             .map(|c| c as i32)
-    }
-
-    /// Gets the name of the command based on input.
-    pub fn get_command_name(&self, input: &dyn InputInterface) -> Option<String> {
-        if self.single_command {
-            Some(self.default_command.clone())
-        } else {
-            input.get_first_argument()
-        }
-    }
-
-    /// Gets the default input definition (Symfony base; `parent::getDefaultInputDefinition`).
-    pub fn base_get_default_input_definition(&self) -> InputDefinition {
-        use shirabe_external_packages::symfony::console::input::input_definition::DefinitionItem;
-        InputDefinition::new(vec![
-            DefinitionItem::InputArgument(
-                InputArgument::new(
-                    "command".to_string(),
-                    Some(InputArgument::REQUIRED),
-                    "The command to execute".to_string(),
-                    PhpMixed::Null,
-                )
-                .unwrap(),
-            ),
-            DefinitionItem::InputOption(
-                InputOption::new(
-                    "--help",
-                    PhpMixed::from("-h".to_string()),
-                    Some(InputOption::VALUE_NONE),
-                    format!(
-                        "Display help for the given command. When no command is given display help for the <info>{}</info> command",
-                        self.default_command
-                    ),
-                    PhpMixed::Null,
-                )
-                .unwrap(),
-            ),
-            DefinitionItem::InputOption(
-                InputOption::new(
-                    "--quiet",
-                    PhpMixed::from("-q".to_string()),
-                    Some(InputOption::VALUE_NONE),
-                    "Do not output any message".to_string(),
-                    PhpMixed::Null,
-                )
-                .unwrap(),
-            ),
-            DefinitionItem::InputOption(
-                InputOption::new(
-                    "--verbose",
-                    PhpMixed::from("-v|vv|vvv".to_string()),
-                    Some(InputOption::VALUE_NONE),
-                    "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug".to_string(),
-                    PhpMixed::Null,
-                )
-                .unwrap(),
-            ),
-            DefinitionItem::InputOption(
-                InputOption::new(
-                    "--version",
-                    PhpMixed::from("-V".to_string()),
-                    Some(InputOption::VALUE_NONE),
-                    "Display this application version".to_string(),
-                    PhpMixed::Null,
-                )
-                .unwrap(),
-            ),
-            DefinitionItem::InputOption(
-                InputOption::new(
-                    "--ansi",
-                    PhpMixed::from("".to_string()),
-                    Some(InputOption::VALUE_NEGATABLE),
-                    "Force (or disable --no-ansi) ANSI output".to_string(),
-                    PhpMixed::Null,
-                )
-                .unwrap(),
-            ),
-            DefinitionItem::InputOption(
-                InputOption::new(
-                    "--no-interaction",
-                    PhpMixed::from("-n".to_string()),
-                    Some(InputOption::VALUE_NONE),
-                    "Do not ask any interactive question".to_string(),
-                    PhpMixed::Null,
-                )
-                .unwrap(),
-            ),
-        ])
-        .unwrap()
-    }
-
-    /// Gets the default commands that should always be available (Symfony base;
-    /// `parent::getDefaultCommands`).
-    pub fn base_get_default_commands(
-        &self,
-    ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        use shirabe_external_packages::symfony::console::command::complete_command::CompleteCommand;
-        use shirabe_external_packages::symfony::console::command::dump_completion_command::DumpCompletionCommand;
-        use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
-        use shirabe_external_packages::symfony::console::command::list_command::ListCommand;
-
-        vec![
-            std::rc::Rc::new(std::cell::RefCell::new(HelpCommand::new()))
-                as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
-            std::rc::Rc::new(std::cell::RefCell::new(ListCommand::new())),
-            std::rc::Rc::new(std::cell::RefCell::new(
-                CompleteCommand::new(IndexMap::new())
-                    .expect("CompleteCommand with default outputs is valid"),
-            )),
-            std::rc::Rc::new(std::cell::RefCell::new(DumpCompletionCommand::new())),
-        ]
-    }
-
-    /// Gets the default helper set with the helpers that should always be available.
-    pub fn get_default_helper_set(&self) -> std::rc::Rc<std::cell::RefCell<HelperSet>> {
-        let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
-        let helpers: IndexMap<HelperSetKey, std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> = {
-            let mut m: IndexMap<
-                HelperSetKey,
-                std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>,
-            > = IndexMap::new();
-            m.insert(
-                HelperSetKey::Int(0),
-                std::rc::Rc::new(std::cell::RefCell::new(FormatterHelper::default())),
-            );
-            m.insert(
-                HelperSetKey::Int(1),
-                std::rc::Rc::new(std::cell::RefCell::new(DebugFormatterHelper::default())),
-            );
-            m.insert(
-                HelperSetKey::Int(2),
-                std::rc::Rc::new(std::cell::RefCell::new(ProcessHelper::default())),
-            );
-            m.insert(
-                HelperSetKey::Int(3),
-                std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default())),
-            );
-            m
-        };
-        HelperSet::new(&helper_set, helpers);
-        helper_set
-    }
-
-    /// Returns abbreviated suggestions in string format.
-    fn get_abbreviation_suggestions(&self, abbrevs: &[String]) -> String {
-        format!("    {}", shirabe_php_shim::implode("\n    ", abbrevs))
-    }
-
-    /// Returns the namespace part of the command name.
-    ///
-    /// This method is not part of public API and should not be used directly.
-    pub fn extract_namespace(&self, name: &str, limit: Option<i64>) -> String {
-        // $parts = explode(':', $name, -1);
-        let parts = shirabe_php_shim::explode_limit(":", name, -1);
-
-        // implode(':', null === $limit ? $parts : array_slice($parts, 0, $limit))
-        match limit {
-            None => shirabe_php_shim::implode(":", &parts),
-            Some(limit) => {
-                let sliced: Vec<String> = parts.into_iter().take(limit.max(0) as usize).collect();
-                shirabe_php_shim::implode(":", &sliced)
-            }
-        }
-    }
-
-    /// Finds alternative of $name among $collection, if nothing is found in
-    /// $collection, try in $abbrevs.
-    fn find_alternatives(&self, name: &str, collection: &[String]) -> Vec<String> {
-        let threshold = 1e3;
-        let mut alternatives: IndexMap<String, f64> = IndexMap::new();
-
-        let mut collection_parts: IndexMap<String, Vec<String>> = IndexMap::new();
-        for item in collection {
-            collection_parts.insert(item.clone(), shirabe_php_shim::explode(":", item));
-        }
-
-        for (i, subname) in shirabe_php_shim::explode(":", name).into_iter().enumerate() {
-            for (collection_name, parts) in &collection_parts {
-                let exists = alternatives.contains_key(collection_name);
-                if parts.get(i).is_none() && exists {
-                    *alternatives.get_mut(collection_name).unwrap() += threshold;
-                    continue;
-                } else if parts.get(i).is_none() {
-                    continue;
-                }
-
-                let lev = shirabe_php_shim::levenshtein(&subname, &parts[i]) as f64;
-                if lev <= shirabe_php_shim::strlen(&subname) as f64 / 3.0
-                    || (!subname.is_empty() && parts[i].contains(&subname))
-                {
-                    let v = if exists {
-                        alternatives[collection_name] + lev
-                    } else {
-                        lev
-                    };
-                    alternatives.insert(collection_name.clone(), v);
-                } else if exists {
-                    *alternatives.get_mut(collection_name).unwrap() += threshold;
-                }
-            }
-        }
-
-        for item in collection {
-            let lev = shirabe_php_shim::levenshtein(name, item) as f64;
-            if lev <= shirabe_php_shim::strlen(name) as f64 / 3.0 || item.contains(name) {
-                let v = if alternatives.contains_key(item) {
-                    alternatives[item] - lev
-                } else {
-                    lev
-                };
-                alternatives.insert(item.clone(), v);
-            }
-        }
-
-        // array_filter($alternatives, fn($lev) => $lev < 2 * $threshold)
-        alternatives.retain(|_, lev| *lev < 2.0 * threshold);
-        // ksort($alternatives, SORT_NATURAL | SORT_FLAG_CASE)
-        let mut keys: Vec<String> = alternatives.keys().cloned().collect();
-        shirabe_php_shim::sort_natural_flag_case(&mut keys);
-
-        keys
-    }
-
-    /// Sets the default SymfonyCommand name.
-    pub fn set_default_command(
-        &mut self,
-        command_name: &str,
-        is_single_command: bool,
-    ) -> anyhow::Result<&mut Self> {
-        // $this->defaultCommand = explode('|', ltrim($commandName, '|'))[0];
-        let trimmed = shirabe_php_shim::ltrim(command_name, Some("|"));
-        self.default_command = shirabe_php_shim::explode("|", &trimmed)
-            .into_iter()
-            .next()
-            .unwrap_or_default();
-
-        if is_single_command {
-            // Ensure the command exist
-            self.find(command_name)?;
-
-            self.single_command = true;
-        }
-
-        Ok(self)
-    }
-
-    pub fn is_single_command(&self) -> bool {
-        self.single_command
-    }
-
-    fn split_string_by_width(&self, string: &str, width: i64) -> Vec<String> {
-        // str_split is not suitable for multi-byte characters, we should use preg_split to get char array properly.
-        let encoding = match shirabe_php_shim::mb_detect_encoding(string, None, true) {
-            None => return shirabe_php_shim::str_split(string, width),
-            Some(encoding) => encoding,
-        };
-
-        let utf8_string = shirabe_php_shim::mb_convert_encoding(string.into(), "utf8", &encoding);
-        let mut lines: Vec<String> = Vec::new();
-        let mut line = String::new();
-
-        let mut offset = 0i64;
-        let mut m: indexmap::IndexMap<shirabe_php_shim::CaptureKey, Option<String>> =
-            indexmap::IndexMap::new();
-        while shirabe_php_shim::preg_match2(
-            r"/.{1,10000}/u",
-            &utf8_string,
-            &mut m,
-            0,
-            offset as usize,
-        ) {
-            let m0 = m[&shirabe_php_shim::CaptureKey::ByIndex(0)]
-                .as_deref()
-                .unwrap_or("");
-            offset += shirabe_php_shim::strlen(m0);
-
-            let chunk = m0;
-            for char in chunk
-                .char_indices()
-                .map(|(i, c)| &chunk[i..i + c.len_utf8()])
-            {
-                // test if $char could be appended to current line
-                if shirabe_php_shim::mb_strwidth(&format!("{}{}", line, char), Some("utf8"))
-                    <= width
-                {
-                    line.push_str(char);
-                    continue;
-                }
-                // if not, push current line to array and make new line
-                lines.push(shirabe_php_shim::str_pad(
-                    &line,
-                    width as usize,
-                    " ",
-                    shirabe_php_shim::STR_PAD_RIGHT,
-                ));
-                line = char.to_string();
-            }
-        }
-
-        lines.push(if !lines.is_empty() {
-            shirabe_php_shim::str_pad(&line, width as usize, " ", shirabe_php_shim::STR_PAD_RIGHT)
-        } else {
-            line.clone()
-        });
-
-        shirabe_php_shim::mb_convert_variables(&encoding, "utf8", &mut lines);
-
-        lines
-    }
-
-    /// Returns all namespaces of the command name.
-    fn extract_all_namespaces(&self, name: &str) -> Vec<String> {
-        // -1 as third argument is needed to skip the command short name when exploding
-        let parts = shirabe_php_shim::explode_limit(":", name, -1);
-        let mut namespaces: Vec<String> = Vec::new();
-
-        for part in parts {
-            if !namespaces.is_empty() {
-                let last = namespaces.last().unwrap().clone();
-                namespaces.push(format!("{}:{}", last, part));
-            } else {
-                namespaces.push(part);
-            }
-        }
-
-        namespaces
-    }
-
-    fn init(&mut self) -> anyhow::Result<()> {
-        if self.initialized {
-            return Ok(());
-        }
-        self.initialized = true;
-
-        for command in self.get_default_commands() {
-            self.add(command)?;
-        }
-
-        Ok(())
     }
 }
 
