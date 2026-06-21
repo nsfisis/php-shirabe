@@ -252,16 +252,6 @@ impl PhpMixed {
             v => Ok(v),
         }
     }
-
-    /// PHP duck-typed helper-set entry. Real implementation lives in QuestionHelper.
-    pub fn ask(
-        &self,
-        _input: &dyn std::any::Any,
-        _output: &mut dyn std::any::Any,
-        _question: &dyn std::any::Any,
-    ) -> PhpMixed {
-        todo!()
-    }
 }
 
 impl From<()> for PhpMixed {
