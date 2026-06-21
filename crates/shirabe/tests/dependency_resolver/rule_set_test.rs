@@ -3,10 +3,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use indexmap::IndexMap;
 use shirabe::dependency_resolver::{
-    GenericRule, RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Rule, RuleSet,
+    GenericRule, Pool, RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Request, Rule, RuleSet,
 };
-use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe::repository::RepositorySet;
+use shirabe_semver::constraint::{MatchAllConstraint, MatchNoneConstraint};
+
+use crate::test_case::get_package;
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {
@@ -156,10 +160,54 @@ fn test_get_iterator_without() {
     assert!(Rc::ptr_eq(&iterator.current(), &rule2));
 }
 
-// In PHP this mocks RepositorySet and Request to build the pretty string. The mocked
-// collaborators cannot be reproduced here, and add() also reaches hash_raw (todo!()).
+// The constraint is MatchNoneConstraint, so what_provides returns no packages and the
+// "No package found" branch is taken; the RepositorySet/Request collaborators are never
+// actually consulted (PHP mocks them with the constructor disabled).
 #[test]
-#[ignore = "getPrettyString needs mocked RepositorySet/Request, and add() reaches hash_raw (todo!())"]
+#[ignore]
 fn test_pretty_string() {
-    todo!()
+    let p = get_package("foo", "2.1");
+    let mut pool = Pool::new(
+        vec![p.clone()],
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+
+    let repository_set = RepositorySet::new(
+        "stable",
+        IndexMap::new(),
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+    let request = Request::new(None);
+
+    let mut rule_set = RuleSet::new();
+    let literal = p.get_id();
+    let rule = Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
+        vec![literal],
+        RULE_ROOT_REQUIRE,
+        ReasonData::RootRequire {
+            package_name: "foo/bar".to_string(),
+            constraint: MatchNoneConstraint::new(None).into(),
+        },
+    ))));
+
+    rule_set.add(rule, RuleSet::TYPE_REQUEST).unwrap();
+
+    let pretty = rule_set
+        .get_pretty_string(
+            Some(&repository_set),
+            Some(&request),
+            Some(&mut pool),
+            false,
+        )
+        .unwrap();
+    assert!(
+        pretty.contains("REQUEST : No package found to satisfy root composer.json require foo/bar")
+    );
 }

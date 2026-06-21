@@ -59,8 +59,8 @@ impl Drop for TearDown {
 // In PHP these mock Cache::getFinder() to feed the gc() routine a controlled set of
 // files. getFinder is pub(crate) and cannot be overridden from a test, so the
 // finder-driven removal paths cannot be exercised faithfully here.
+#[ignore = "requires mocking Cache::get_finder (pub(crate), PHPUnit MockObject) to feed gc() a controlled Finder iterator; not overridable from a test"]
 #[test]
-#[ignore = "mocks Cache::getFinder to drive gc(); getFinder cannot be overridden from a test"]
 fn test_remove_outdated_files() {
     let SetUp { root, files, cache } = set_up();
     let _tear_down = TearDown::new(root.path().to_path_buf());
@@ -68,8 +68,8 @@ fn test_remove_outdated_files() {
     todo!()
 }
 
+#[ignore = "requires mocking Cache::get_finder (pub(crate), PHPUnit MockObject) to feed gc() a controlled Finder iterator; not overridable from a test"]
 #[test]
-#[ignore = "mocks Cache::getFinder to drive gc(); getFinder cannot be overridden from a test"]
 fn test_remove_files_when_cache_is_too_large() {
     let SetUp { root, files, cache } = set_up();
     let _tear_down = TearDown::new(root.path().to_path_buf());

@@ -7,7 +7,7 @@ fn set_up() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_basic_run() {
     set_up();
 
@@ -15,7 +15,7 @@ fn test_basic_run() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_no_dev() {
     set_up();
 
@@ -23,7 +23,7 @@ fn test_no_dev() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_format_json() {
     set_up();
 
@@ -31,7 +31,7 @@ fn test_format_json() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_format_summary() {
     set_up();
 
@@ -39,7 +39,7 @@ fn test_format_summary() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_format_unknown() {
     set_up();
 
@@ -47,7 +47,7 @@ fn test_format_unknown() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_locked() {
     set_up();
 
@@ -55,7 +55,7 @@ fn test_locked() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_locked_no_dev() {
     set_up();
 
@@ -63,7 +63,7 @@ fn test_locked_no_dev() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer / create_installed_json / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
 fn test_locked_without_lock_file() {
     set_up();
 

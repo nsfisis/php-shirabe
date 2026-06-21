@@ -16,7 +16,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[ignore = "mocks an IOInterface with a writeError expectation and a Config returning disable-tls=true; mocking is not available"]
+#[ignore = "requires PHPUnit-style mocks: an IOInterface mock verifying writeError is called exactly once with the exact warning, plus a Config mock stubbing get('disable-tls')=>true; no such mock/expectation infrastructure (e.g. mockall) exists"]
 fn test_default_values_are_as_expected() {
     let _tear_down = TearDown;
 

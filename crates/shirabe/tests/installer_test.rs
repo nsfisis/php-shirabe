@@ -22,28 +22,28 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+#[ignore = "requires PHPUnit getMockBuilder mocks of DownloadManager/Config/EventDispatcher/HttpDownloader/JsonFile/AutoloadGenerator plus an unported InstallationManagerMock and the provideInstaller data provider; no mocking infrastructure exists"]
 fn test_installer() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+#[ignore = "delegates to unported do_test_integration which needs FactoryMock, InstalledFilesystemRepositoryMock, the loadIntegrationTests .test-fixture loader and a symfony console Application; none exist in the Rust port"]
 fn test_slow_integration() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+#[ignore = "delegates to unported do_test_integration which needs FactoryMock, InstalledFilesystemRepositoryMock, the loadIntegrationTests .test-fixture loader and a symfony console Application; none exist in the Rust port"]
 fn test_integration_with_pool_optimizer() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+#[ignore = "delegates to unported do_test_integration which needs FactoryMock, InstalledFilesystemRepositoryMock, the loadIntegrationTests .test-fixture loader and a symfony console Application; none exist in the Rust port"]
 fn test_integration_with_raw_pool() {
     let _tear_down = TearDown;
     todo!()

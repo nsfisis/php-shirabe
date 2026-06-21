@@ -6,7 +6,7 @@ use shirabe::autoload::class_loader::ClassLoader;
 // class_exists(). There is no equivalent runtime notion of loading and defining a
 // class in Rust, so this case cannot be ported faithfully.
 #[test]
-#[ignore = "relies on PHP loadClass()/class_exists() runtime class loading, which has no Rust equivalent"]
+#[ignore = "depends on PHP runtime class_exists() to verify loadClass defined a class; no Rust equivalent"]
 fn test_load_class() {
     todo!()
 }
@@ -20,7 +20,7 @@ fn test_get_prefixes_with_no_psr0_configuration() {
 // In PHP this serializes the loader and unserializes it, then compares every getter.
 // PHP serialize()/unserialize() has no Rust equivalent here.
 #[test]
-#[ignore = "relies on PHP serialize()/unserialize() round-tripping of the ClassLoader, which is not ported"]
+#[ignore = "depends on PHP serialize()/unserialize() round-trip of ClassLoader; no Rust equivalent"]
 fn test_serializability() {
     todo!()
 }

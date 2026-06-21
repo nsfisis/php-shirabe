@@ -5,7 +5,7 @@ use shirabe::repository::RepositoryFactory;
 use shirabe_php_shim::PhpMixed;
 
 #[test]
-#[ignore = "mocks IO/Config/HttpDownloader/EventDispatcher and reads the private repositoryClasses via reflection; not portable"]
+#[ignore = "PHP test uses ReflectionProperty to read the private RepositoryManager::repository_classes field; no public accessor for repository_classes keys exists in the Rust impl"]
 fn test_manager_with_all_repository_types() {
     todo!()
 }

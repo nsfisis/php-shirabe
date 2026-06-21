@@ -16,7 +16,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "ApplicationTester / get_application_tester helper not implemented"]
 fn test_clear_cache_command_success() {
     let _tear_down = TearDown;
 
@@ -24,7 +24,7 @@ fn test_clear_cache_command_success() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "ApplicationTester / get_application_tester helper not implemented"]
 fn test_clear_cache_command_with_option_garbage_collection() {
     let _tear_down = TearDown;
 
@@ -32,7 +32,7 @@ fn test_clear_cache_command_with_option_garbage_collection() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "ApplicationTester / get_application_tester helper not implemented"]
 fn test_clear_cache_command_with_option_no_cache() {
     let _tear_down = TearDown;
 

@@ -22,14 +22,14 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[ignore = "not yet ported (builds composer.phar and runs the functional .test fixtures via the binary)"]
+#[ignore = "depends on unported bin/compile phar build (./bin/compile) and running composer.phar as a subprocess"]
 fn test_build_phar() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "not yet ported (builds composer.phar and runs the functional .test fixtures via the binary)"]
+#[ignore = "depends on unported functional-test harness (parseTestFile/cleanOutput) running the built composer.phar as a subprocess"]
 fn test_integration() {
     let _tear_down = TearDown;
     todo!()

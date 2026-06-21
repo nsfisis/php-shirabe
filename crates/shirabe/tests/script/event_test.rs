@@ -60,7 +60,7 @@ fn test_event_sets_originating_event() {
 // Event cannot be passed as the originating event (it is not polymorphic), and
 // the test cannot be expressed faithfully.
 #[test]
-#[ignore = "set_originating_event takes a concrete event_dispatcher::Event; a Script Event cannot be passed as originating event, and calculate_originating_event is todo!()"]
+#[ignore = "Event::set_originating_event takes a concrete event_dispatcher::Event, so a nested script::Event cannot be passed as originating event; the recursive calculate_originating_event behavior is not expressible"]
 fn test_event_calculates_nested_originating_event() {
     todo!()
 }

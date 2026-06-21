@@ -1,8 +1,25 @@
 //! ref: composer/tests/Composer/Test/ConfigTest.php
 
 use indexmap::IndexMap;
+use shirabe::advisory::Auditor;
 use shirabe::config::Config;
+use shirabe::util::Platform;
 use shirabe_php_shim::PhpMixed;
+
+/// Builds a `['config' => {...}]` map for `Config::merge`.
+fn config_section(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
+    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+    m.insert("config".to_string(), PhpMixed::Array(map(pairs)));
+    m
+}
+
+/// PHP assertEquals on associative arrays compares pairs irrespective of order.
+fn assert_map_equals(expected: &IndexMap<String, PhpMixed>, actual: &IndexMap<String, PhpMixed>) {
+    assert_eq!(expected.len(), actual.len());
+    for (key, value) in expected {
+        assert_eq!(Some(value), actual.get(key), "key {key:?}");
+    }
+}
 
 fn repo(r#type: &str, url: &str) -> PhpMixed {
     let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -166,134 +183,588 @@ fn test_add_packagist_repository() {
 // htaccess-protect, var/realpath replacement, oauth, audit, ...) without the env isolation
 // their setUp/tearDown provides, or exercise plugin-config merge details. They are not
 // ported yet.
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_preferred_install_as_string() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![(
+            "preferred-install",
+            PhpMixed::String("source".to_string()),
+        )]),
+        "test",
+    );
+    config.merge(
+        &config_section(vec![(
+            "preferred-install",
+            PhpMixed::String("dist".to_string()),
+        )]),
+        "test",
+    );
+
+    assert_eq!(
+        PhpMixed::String("dist".to_string()),
+        config.get("preferred-install")
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_merge_preferred_install() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![(
+            "preferred-install",
+            PhpMixed::String("dist".to_string()),
+        )]),
+        "test",
+    );
+    config.merge(
+        &config_section(vec![(
+            "preferred-install",
+            PhpMixed::Array(map(vec![("foo/*", PhpMixed::String("source".to_string()))])),
+        )]),
+        "test",
+    );
+
+    // This assertion needs to make sure full wildcard preferences are placed last
+    // Handled by composer because we convert string preferences for BC, all other
+    // care for ordering and collision prevention is up to the user
+    let expected = map(vec![
+        ("foo/*", PhpMixed::String("source".to_string())),
+        ("*", PhpMixed::String("dist".to_string())),
+    ]);
+    match config.get("preferred-install") {
+        PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
+        other => panic!("expected array, got {other:?}"),
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_merge_github_oauth() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![(
+            "github-oauth",
+            PhpMixed::Array(map(vec![("foo", PhpMixed::String("bar".to_string()))])),
+        )]),
+        "test",
+    );
+    config.merge(
+        &config_section(vec![(
+            "github-oauth",
+            PhpMixed::Array(map(vec![("bar", PhpMixed::String("baz".to_string()))])),
+        )]),
+        "test",
+    );
+
+    let expected = map(vec![
+        ("foo", PhpMixed::String("bar".to_string())),
+        ("bar", PhpMixed::String("baz".to_string())),
+    ]);
+    match config.get("github-oauth") {
+        PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
+        other => panic!("expected array, got {other:?}"),
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_var_replacement() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![
+            ("a", PhpMixed::String("b".to_string())),
+            ("c", PhpMixed::String("{$a}".to_string())),
+        ]),
+        "test",
+    );
+    config.merge(
+        &config_section(vec![
+            ("bin-dir", PhpMixed::String("$HOME".to_string())),
+            ("cache-dir", PhpMixed::String("~/foo/".to_string())),
+        ]),
+        "test",
+    );
+
+    let home_raw = Platform::get_env("HOME")
+        .filter(|s| !s.is_empty())
+        .or_else(|| Platform::get_env("USERPROFILE"))
+        .unwrap_or_default();
+    let home = home_raw.trim_end_matches(['\\', '/']).to_string();
+    assert_eq!(PhpMixed::String("b".to_string()), config.get("c"));
+    assert_eq!(PhpMixed::String(home.clone()), config.get("bin-dir"));
+    assert_eq!(
+        PhpMixed::String(format!("{}/foo", home)),
+        config.get("cache-dir")
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_realpath_replacement() {
-    todo!()
+    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    config.merge(
+        &config_section(vec![
+            ("bin-dir", PhpMixed::String("$HOME/foo".to_string())),
+            ("cache-dir", PhpMixed::String("/baz/".to_string())),
+            ("vendor-dir", PhpMixed::String("vendor".to_string())),
+        ]),
+        "test",
+    );
+
+    let home_raw = Platform::get_env("HOME")
+        .filter(|s| !s.is_empty())
+        .or_else(|| Platform::get_env("USERPROFILE"))
+        .unwrap_or_default();
+    let home = home_raw.trim_end_matches(['\\', '/']).to_string();
+    assert_eq!(
+        PhpMixed::String("/foo/bar/vendor".to_string()),
+        config.get("vendor-dir")
+    );
+    assert_eq!(
+        PhpMixed::String(format!("{}/foo", home)),
+        config.get("bin-dir")
+    );
+    assert_eq!(
+        PhpMixed::String("/baz".to_string()),
+        config.get("cache-dir")
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_stream_wrapper_dirs() {
-    todo!()
+    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    config.merge(
+        &config_section(vec![(
+            "cache-dir",
+            PhpMixed::String("s3://baz/".to_string()),
+        )]),
+        "test",
+    );
+
+    assert_eq!(
+        PhpMixed::String("s3://baz".to_string()),
+        config.get("cache-dir")
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_fetching_relative_paths() {
-    todo!()
+    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    config.merge(
+        &config_section(vec![
+            ("bin-dir", PhpMixed::String("{$vendor-dir}/foo".to_string())),
+            ("vendor-dir", PhpMixed::String("vendor".to_string())),
+        ]),
+        "test",
+    );
+
+    assert_eq!(
+        PhpMixed::String("/foo/bar/vendor".to_string()),
+        config.get("vendor-dir")
+    );
+    assert_eq!(
+        PhpMixed::String("/foo/bar/vendor/foo".to_string()),
+        config.get("bin-dir")
+    );
+    assert_eq!(
+        PhpMixed::String("vendor".to_string()),
+        config
+            .get_with_flags("vendor-dir", Config::RELATIVE_PATHS)
+            .unwrap()
+    );
+    assert_eq!(
+        PhpMixed::String("vendor/foo".to_string()),
+        config
+            .get_with_flags("bin-dir", Config::RELATIVE_PATHS)
+            .unwrap()
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_override_github_protocols() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![(
+            "github-protocols",
+            PhpMixed::List(vec![
+                PhpMixed::String("https".to_string()),
+                PhpMixed::String("ssh".to_string()),
+            ]),
+        )]),
+        "test",
+    );
+    config.merge(
+        &config_section(vec![(
+            "github-protocols",
+            PhpMixed::List(vec![PhpMixed::String("https".to_string())]),
+        )]),
+        "test",
+    );
+
+    assert_eq!(
+        PhpMixed::List(vec![PhpMixed::String("https".to_string())]),
+        config.get("github-protocols")
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_git_disabled_by_default_in_github_protocols() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![(
+            "github-protocols",
+            PhpMixed::List(vec![
+                PhpMixed::String("https".to_string()),
+                PhpMixed::String("git".to_string()),
+            ]),
+        )]),
+        "test",
+    );
+    assert_eq!(
+        PhpMixed::List(vec![PhpMixed::String("https".to_string())]),
+        config.get("github-protocols")
+    );
+
+    config.merge(
+        &config_section(vec![("secure-http", PhpMixed::Bool(false))]),
+        "test",
+    );
+    assert_eq!(
+        PhpMixed::List(vec![
+            PhpMixed::String("https".to_string()),
+            PhpMixed::String("git".to_string()),
+        ]),
+        config.get("github-protocols")
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_allowed_urls_pass() {
-    todo!()
+    let urls = vec![
+        "https://packagist.org",
+        "git@github.com:composer/composer.git",
+        "hg://user:pass@my.satis/satis",
+        "\\\\myserver\\myplace.git",
+        "file://myserver.localhost/mygit.git",
+        "file://example.org/mygit.git",
+        "git:Department/Repo.git",
+        "ssh://[user@]host.xz[:port]/path/to/repo.git/",
+    ];
+    for url in urls {
+        let mut config = Config::new(false, None);
+        config
+            .prohibit_url_by_config(url, None, &IndexMap::new())
+            .unwrap();
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_prohibited_urls_throw_exception() {
-    todo!()
+    let urls = vec![
+        "http://packagist.org",
+        "http://10.1.0.1/satis",
+        "http://127.0.0.1/satis",
+        "http://\u{1F49B}@example.org",
+        "svn://localhost/trunk",
+        "svn://will.not.resolve/trunk",
+        "svn://192.168.0.1/trunk",
+        "svn://1.2.3.4/trunk",
+        "git://5.6.7.8/git.git",
+    ];
+    for url in urls {
+        let mut config = Config::new(false, None);
+        let err = config
+            .prohibit_url_by_config(url, None, &IndexMap::new())
+            .unwrap_err();
+        assert!(
+            err.to_string().contains(&format!(
+                "Your configuration does not allow connections to {url}"
+            )),
+            "url {url:?}: {err}"
+        );
+    }
 }
 
+#[ignore = "requires getIOMock with expects() output expectations; no IO mocking infrastructure exists"]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_prohibited_urls_warning_verify_peer() {
     todo!()
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_disable_tls_can_be_overridden() {
-    todo!()
+    let mut config = Config::new(true, None);
+    config.merge(
+        &config_section(vec![("disable-tls", PhpMixed::String("false".to_string()))]),
+        "test",
+    );
+    assert_eq!(PhpMixed::Bool(false), config.get("disable-tls"));
+    config.merge(
+        &config_section(vec![("disable-tls", PhpMixed::String("true".to_string()))]),
+        "test",
+    );
+    assert_eq!(PhpMixed::Bool(true), config.get("disable-tls"));
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_process_timeout() {
-    todo!()
+    Platform::put_env("COMPOSER_PROCESS_TIMEOUT", "0");
+    let config = Config::new(true, None);
+    let result = config.get("process-timeout");
+    Platform::clear_env("COMPOSER_PROCESS_TIMEOUT");
+
+    assert_eq!(PhpMixed::Int(0), result);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_htaccess_protect() {
-    todo!()
+    Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
+    let config = Config::new(true, None);
+    let result = config.get("htaccess-protect");
+    Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
+
+    assert_eq!(PhpMixed::Bool(false), result);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_get_source_of_value() {
-    todo!()
+    Platform::clear_env("COMPOSER_PROCESS_TIMEOUT");
+
+    let mut config = Config::new(true, None);
+
+    assert_eq!(
+        Config::SOURCE_DEFAULT,
+        config.get_source_of_value("process-timeout").as_str()
+    );
+
+    config.merge(
+        &config_section(vec![("process-timeout", PhpMixed::Int(1))]),
+        "phpunit-test",
+    );
+
+    assert_eq!(
+        "phpunit-test",
+        config.get_source_of_value("process-timeout").as_str()
+    );
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_get_source_of_value_env_variables() {
-    todo!()
+    Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
+    let mut config = Config::new(true, None);
+    let result = config.get_source_of_value("htaccess-protect");
+    Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
+
+    assert_eq!("COMPOSER_HTACCESS_PROTECT", result.as_str());
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_audit() {
-    todo!()
+    let mut config = Config::new(true, None);
+    let result = config.get("audit");
+    let result = result.as_array().unwrap();
+    assert!(result.contains_key("abandoned"));
+    assert!(result.contains_key("ignore"));
+    assert_eq!(
+        Some(&PhpMixed::String(Auditor::ABANDONED_FAIL.to_string())),
+        result.get("abandoned")
+    );
+    assert_eq!(
+        Some(&PhpMixed::Array(IndexMap::new())),
+        result.get("ignore")
+    );
+
+    Platform::put_env("COMPOSER_AUDIT_ABANDONED", Auditor::ABANDONED_IGNORE);
+    let result = config.get("audit");
+    Platform::clear_env("COMPOSER_AUDIT_ABANDONED");
+    let result = result.as_array().unwrap();
+    assert!(result.contains_key("abandoned"));
+    assert!(result.contains_key("ignore"));
+    assert_eq!(
+        Some(&PhpMixed::String(Auditor::ABANDONED_IGNORE.to_string())),
+        result.get("abandoned")
+    );
+    assert_eq!(
+        Some(&PhpMixed::Array(IndexMap::new())),
+        result.get("ignore")
+    );
+
+    config.merge(
+        &config_section(vec![(
+            "audit",
+            PhpMixed::Array(map(vec![(
+                "ignore",
+                PhpMixed::List(vec![
+                    PhpMixed::String("A".to_string()),
+                    PhpMixed::String("B".to_string()),
+                ]),
+            )])),
+        )]),
+        "test",
+    );
+    config.merge(
+        &config_section(vec![(
+            "audit",
+            PhpMixed::Array(map(vec![(
+                "ignore",
+                PhpMixed::List(vec![
+                    PhpMixed::String("A".to_string()),
+                    PhpMixed::String("C".to_string()),
+                ]),
+            )])),
+        )]),
+        "test",
+    );
+    let result = config.get("audit");
+    let result = result.as_array().unwrap();
+    assert!(result.contains_key("ignore"));
+    assert_eq!(
+        Some(&PhpMixed::List(vec![
+            PhpMixed::String("A".to_string()),
+            PhpMixed::String("B".to_string()),
+            PhpMixed::String("A".to_string()),
+            PhpMixed::String("C".to_string()),
+        ])),
+        result.get("ignore")
+    );
+
+    // Test COMPOSER_SECURITY_BLOCKING_ABANDONED env var
+    Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "1");
+    let result = config.get("audit");
+    Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
+    let result = result.as_array().unwrap();
+    assert!(result.contains_key("block-abandoned"));
+    assert_eq!(Some(&PhpMixed::Bool(true)), result.get("block-abandoned"));
+
+    Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "0");
+    let result = config.get("audit");
+    Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
+    let result = result.as_array().unwrap();
+    assert!(result.contains_key("block-abandoned"));
+    assert_eq!(Some(&PhpMixed::Bool(false)), result.get("block-abandoned"));
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_get_defaults_to_an_empty_array() {
-    todo!()
+    let config = Config::new(true, None);
+    let keys = [
+        "bitbucket-oauth",
+        "github-oauth",
+        "gitlab-oauth",
+        "gitlab-token",
+        "forgejo-token",
+        "http-basic",
+        "bearer",
+    ];
+    for key in keys {
+        let value = config.get(key);
+        match value {
+            PhpMixed::Array(m) => assert_eq!(0, m.len(), "key {key:?}"),
+            other => panic!("key {key:?}: expected array, got {other:?}"),
+        }
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_merges_plugin_config() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![(
+            "allow-plugins",
+            PhpMixed::Array(map(vec![("some/plugin", PhpMixed::Bool(true))])),
+        )]),
+        "test",
+    );
+    match config.get("allow-plugins") {
+        PhpMixed::Array(actual) => {
+            assert_map_equals(&map(vec![("some/plugin", PhpMixed::Bool(true))]), &actual)
+        }
+        other => panic!("expected array, got {other:?}"),
+    }
+
+    config.merge(
+        &config_section(vec![(
+            "allow-plugins",
+            PhpMixed::Array(map(vec![("another/plugin", PhpMixed::Bool(true))])),
+        )]),
+        "test",
+    );
+    match config.get("allow-plugins") {
+        PhpMixed::Array(actual) => assert_map_equals(
+            &map(vec![
+                ("some/plugin", PhpMixed::Bool(true)),
+                ("another/plugin", PhpMixed::Bool(true)),
+            ]),
+            &actual,
+        ),
+        other => panic!("expected array, got {other:?}"),
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_overrides_global_boolean_plugins_config() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![("allow-plugins", PhpMixed::Bool(true))]),
+        "test",
+    );
+    assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins"));
+
+    config.merge(
+        &config_section(vec![(
+            "allow-plugins",
+            PhpMixed::Array(map(vec![("another/plugin", PhpMixed::Bool(true))])),
+        )]),
+        "test",
+    );
+    match config.get("allow-plugins") {
+        PhpMixed::Array(actual) => assert_map_equals(
+            &map(vec![("another/plugin", PhpMixed::Bool(true))]),
+            &actual,
+        ),
+        other => panic!("expected array, got {other:?}"),
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
 fn test_allows_all_plugins_from_local_boolean() {
-    todo!()
+    let mut config = Config::new(false, None);
+    config.merge(
+        &config_section(vec![(
+            "allow-plugins",
+            PhpMixed::Array(map(vec![("some/plugin", PhpMixed::Bool(true))])),
+        )]),
+        "test",
+    );
+    match config.get("allow-plugins") {
+        PhpMixed::Array(actual) => {
+            assert_map_equals(&map(vec![("some/plugin", PhpMixed::Bool(true))]), &actual)
+        }
+        other => panic!("expected array, got {other:?}"),
+    }
+
+    config.merge(
+        &config_section(vec![("allow-plugins", PhpMixed::Bool(true))]),
+        "test",
+    );
+    assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins"));
 }

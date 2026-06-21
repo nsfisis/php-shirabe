@@ -28,19 +28,19 @@ impl Drop for TearDown {
 // ZipArchiver::archive builds a zip via ZipArchive, which is todo!() in the php-shim.
 
 #[test]
-#[ignore = "ZipArchiver::archive builds a zip via ZipArchive, which is todo!() in the php-shim"]
+#[ignore = "ArchiverTestCase infrastructure (setup_package/setup_dummy_repo/test_dir) not ported; ZipArchive shim lacks get_from_name"]
 fn test_simple_files() {
     todo!()
 }
 
 #[test]
-#[ignore = "ZipArchiver::archive builds a zip via ZipArchive, which is todo!() in the php-shim"]
+#[ignore = "ArchiverTestCase infrastructure (setup_package/setup_dummy_repo/test_dir) not ported; ZipArchive shim lacks get_from_name"]
 fn test_gitignore_exclude_negation() {
     todo!()
 }
 
 #[test]
-#[ignore = "ZipArchiver::archive builds a zip via ZipArchive, which is todo!() in the php-shim"]
+#[ignore = "ArchiverTestCase infrastructure (setup_package/setup_dummy_repo/test_dir) not ported; ZipArchive shim lacks get_from_name"]
 fn test_folder_with_backslashes() {
     todo!()
 }

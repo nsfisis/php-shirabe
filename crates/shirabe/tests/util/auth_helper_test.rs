@@ -10,121 +10,121 @@ fn set_up() {
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_without_auth_credentials() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_bearer_password() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_github_token() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_gitlab_oath_token() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_options_for_client_certificate() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_gitlab_private_token() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_bitbucket_oath_token() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_bitbucket_public_url() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_basic_http_authentication() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn(); no mocking framework"]
 fn test_add_authentication_header_with_custom_headers() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config in setUp; no mocking framework"]
 fn test_is_public_bit_bucket_download_with_bitbucket_public_url() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config in setUp; no mocking framework"]
 fn test_is_public_bit_bucket_download_with_non_bitbucket_public_url() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock Config/ConfigSourceInterface with expects()/willReturn(); no mocking framework"]
 fn test_store_auth_automatically() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config/ConfigSourceInterface with willReturnCallback(); no mocking framework"]
 fn test_store_auth_with_prompt_yes_answer() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config/ConfigSourceInterface with willReturnCallback(); no mocking framework"]
 fn test_store_auth_with_prompt_no_answer() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config/ConfigSourceInterface with willReturnCallback(); no mocking framework"]
 fn test_store_auth_with_prompt_invalid_answer() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config with expects()/willReturnMap(); no mocking framework"]
 fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface/Config with willReturnMap()/willReturnCallback(); no mocking framework"]
 fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface with expects()/willReturn() plus set_error_handler; no mocking framework"]
 fn test_add_authentication_header_is_working() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config to drive AuthHelper; mocking is not available"]
+#[ignore = "requires PHPUnit mock IOInterface in setUp plus set_error_handler deprecation capture; no mocking framework"]
 fn test_add_authentication_header_deprecation() {
     todo!()
 }

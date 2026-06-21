@@ -1,13 +1,13 @@
 //! ref: composer/tests/Composer/Test/Command/DiagnoseCommandTest.php
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer and get_application_tester (ApplicationTester) infrastructure"]
 fn test_cmd_fail() {
     todo!()
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "missing TestCase::init_temp_composer and get_application_tester (ApplicationTester) infrastructure"]
 fn test_cmd_success() {
     todo!()
 }

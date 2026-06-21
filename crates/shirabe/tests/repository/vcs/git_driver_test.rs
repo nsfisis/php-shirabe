@@ -64,7 +64,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock/expects) and Reflection setRepoDir, neither available"]
 fn test_get_root_identifier_from_remote_local_repository() {
     let SetUp {
         home,
@@ -76,7 +76,7 @@ fn test_get_root_identifier_from_remote_local_repository() {
 }
 
 #[test]
-#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock/expects), IO mock and Reflection setRepoDir, none available"]
 fn test_get_root_identifier_from_remote() {
     let SetUp {
         home,
@@ -88,7 +88,7 @@ fn test_get_root_identifier_from_remote() {
 }
 
 #[test]
-#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock/expects) and Reflection setRepoDir, neither available"]
 fn test_get_root_identifier_from_local_with_network_disabled() {
     let SetUp {
         home,
@@ -100,7 +100,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
 }
 
 #[test]
-#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock/expects), IOInterface mock and Reflection setRepoDir, none available"]
 fn test_get_branches_filter_invalid_branch_names() {
     let SetUp {
         home,
@@ -112,7 +112,7 @@ fn test_get_branches_filter_invalid_branch_names() {
 }
 
 #[test]
-#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock) and IOInterface/HttpDownloader mocks, none available"]
 fn test_file_get_content_invalid_identifier() {
     let SetUp {
         home,
@@ -124,7 +124,7 @@ fn test_file_get_content_invalid_identifier() {
 }
 
 #[test]
-#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock) and IOInterface/HttpDownloader mocks, none available"]
 fn test_get_change_date_invalid_identifier() {
     let SetUp {
         home,

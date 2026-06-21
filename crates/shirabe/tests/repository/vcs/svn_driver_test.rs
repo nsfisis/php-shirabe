@@ -77,8 +77,8 @@ fn test_support() {
 
 // Constructs an SvnDriver and runs an svn command via a mocked ProcessExecutor; mocking is
 // not available here.
+#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock/expects) and IOInterface/HttpDownloader mocks, none available"]
 #[test]
-#[ignore = "constructs an SvnDriver and mocks a ProcessExecutor for the svn invocation"]
 fn test_wrong_credentials_in_url() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());

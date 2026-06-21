@@ -5,13 +5,13 @@
 // available, and a real HttpDownloader reaches curl_multi_init (todo!()).
 
 #[test]
-#[ignore = "mocks IO/Config/HttpDownloader for the auth flow; a real HttpDownloader reaches curl_multi_init (todo!())"]
+#[ignore = "requires getIOMock/getHttpDownloaderMock and getMockBuilder mocks of Config/JsonConfigSource with expects()/willReturn(); no mocking infrastructure exists"]
 fn test_username_password_authentication_flow() {
     todo!()
 }
 
 #[test]
-#[ignore = "mocks IO/Config/HttpDownloader for the auth flow; a real HttpDownloader reaches curl_multi_init (todo!())"]
+#[ignore = "requires getIOMock/getHttpDownloaderMock and getMockBuilder mocks of Config/JsonConfigSource with expects()/willReturn(); no mocking infrastructure exists"]
 fn test_username_password_failure() {
     todo!()
 }

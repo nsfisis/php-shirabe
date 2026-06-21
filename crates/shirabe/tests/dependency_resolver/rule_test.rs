@@ -1,7 +1,15 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleTest.php
 
-use shirabe::dependency_resolver::{GenericRule, RULE_ROOT_REQUIRE, ReasonData, Rule, RuleSet};
+use indexmap::IndexMap;
+use shirabe::dependency_resolver::{
+    GenericRule, Pool, RULE_PACKAGE_REQUIRES, RULE_ROOT_REQUIRE, ReasonData, Request, Rule, RuleSet,
+};
+use shirabe::package::Link;
+use shirabe::repository::RepositorySet;
+use shirabe_php_shim::{PHP_VERSION_ID, hash_raw, unpack};
 use shirabe_semver::constraint::MatchAllConstraint;
+
+use crate::test_case::get_package;
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {
@@ -18,10 +26,23 @@ fn generic_rule(literals: Vec<i64>) -> Rule {
     ))
 }
 
+#[ignore]
 #[test]
-#[ignore = "Rule::get_hash reaches shirabe_php_shim::hash_raw, which is todo!()"]
 fn test_get_hash() {
-    todo!()
+    let rule = generic_rule(vec![123]);
+
+    let algo = if PHP_VERSION_ID > 80100 {
+        "xxh3"
+    } else {
+        "sha1"
+    };
+    let binary = hash_raw(algo, "123");
+    let hash = unpack("ihash", &binary).unwrap();
+
+    assert_eq!(
+        hash.get("hash").unwrap().as_int(),
+        rule.get_hash().unwrap().as_int()
+    );
 }
 
 #[test]
@@ -85,10 +106,56 @@ fn test_is_assertions() {
     assert!(rule2.is_assertion());
 }
 
-// In PHP this mocks RepositorySet and Request and passes a Link reason to build the
-// pretty string. The mocked collaborators cannot be reproduced here.
+// PHP mocks RepositorySet and Request with the constructor disabled; the RULE_PACKAGE_REQUIRES
+// branch with a non-empty requires list never consults them, so real minimal instances suffice.
+#[ignore]
 #[test]
-#[ignore = "getPrettyString needs mocked RepositorySet and Request; mocking is not available"]
 fn test_pretty_string() {
-    todo!()
+    let p1 = get_package("foo", "2.1");
+    let p2 = get_package("baz", "1.1");
+    let mut pool = Pool::new(
+        vec![p1.clone(), p2.clone()],
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+
+    let repository_set = RepositorySet::new(
+        "stable",
+        IndexMap::new(),
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+    let request = Request::new(None);
+
+    let empty_constraint = MatchAllConstraint::new(Some("*".to_string()));
+
+    let rule = Rule::Generic(GenericRule::new(
+        vec![p1.get_id(), -p2.get_id()],
+        RULE_PACKAGE_REQUIRES,
+        ReasonData::Link(Link::new(
+            "baz".to_string(),
+            "foo".to_string(),
+            empty_constraint.into(),
+            None,
+            "*".to_string(),
+        )),
+    ));
+
+    assert_eq!(
+        "baz 1.1 relates to foo * -> satisfiable by foo[2.1].",
+        rule.get_pretty_string(
+            &repository_set,
+            &request,
+            &mut pool,
+            false,
+            &IndexMap::new(),
+            &vec![],
+        )
+        .unwrap()
+    );
 }

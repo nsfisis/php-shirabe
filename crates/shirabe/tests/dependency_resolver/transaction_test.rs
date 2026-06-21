@@ -1,10 +1,7 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/TransactionTest.php
 
-// Transaction::new sorts operations via shirabe_php_shim::uasort_map, which is todo!().
-// The fixture also calls setRequires/setProvides on non-root packages, which the public
-// handle API does not allow, so the scenario cannot be expressed faithfully yet.
 #[test]
-#[ignore = "Transaction::new reaches uasort_map (todo!()); fixture needs link setters on non-root packages"]
+#[ignore = "CompletePackageHandle lacks set_type/set_requires/set_provides/set_extra; these setters exist only on RootPackageHandle, so the non-root package fixture cannot be expressed"]
 fn test_transaction_generation_and_sorting() {
     todo!()
 }

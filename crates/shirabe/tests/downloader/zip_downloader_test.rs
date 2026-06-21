@@ -47,8 +47,8 @@ impl Drop for TearDown {
 
 // These construct a ZipDownloader with a mocked IO/HttpDownloader/ProcessExecutor and rely
 // on ZipArchive extraction (todo!() in the php-shim) plus mocked unzip behaviour.
+#[ignore = "requires PHPUnit mocks of IOInterface/Config/PackageInterface; set_up() is todo!() and real HttpDownloader reaches curl_multi_init todo!(); no mocking framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_error_messages() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -56,8 +56,8 @@ fn test_error_messages() {
     todo!()
 }
 
+#[ignore = "requires setPrivateProperty reflection on hasZipArchive/zipArchiveObject, a MockedZipDownloader subclass, and a getMockBuilder('ZipArchive') mock; no mocking/reflection framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_zip_archive_only_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -65,8 +65,8 @@ fn test_zip_archive_only_failed() {
     todo!()
 }
 
+#[ignore = "requires setPrivateProperty reflection on hasZipArchive/zipArchiveObject, a MockedZipDownloader subclass, and a getMockBuilder('ZipArchive') mock throwing ErrorException; no mocking/reflection framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_zip_archive_extract_only_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -74,8 +74,8 @@ fn test_zip_archive_extract_only_failed() {
     todo!()
 }
 
+#[ignore = "requires setPrivateProperty reflection on hasZipArchive/zipArchiveObject, a MockedZipDownloader subclass, and a getMockBuilder('ZipArchive') mock; no mocking/reflection framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_zip_archive_only_good() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -83,8 +83,8 @@ fn test_zip_archive_only_good() {
     todo!()
 }
 
+#[ignore = "requires setPrivateProperty reflection on isWindows/hasZipArchive/unzipCommands, a MockedZipDownloader subclass, and getMockBuilder mocks of Process/ProcessExecutor::executeAsync; no mocking/reflection framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_system_unzip_only_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -92,8 +92,8 @@ fn test_system_unzip_only_failed() {
     todo!()
 }
 
+#[ignore = "requires setPrivateProperty reflection on isWindows/hasZipArchive/unzipCommands, a MockedZipDownloader subclass, and getMockBuilder mocks of Process/ProcessExecutor::executeAsync; no mocking/reflection framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_system_unzip_only_good() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -101,8 +101,8 @@ fn test_system_unzip_only_good() {
     todo!()
 }
 
+#[ignore = "requires setPrivateProperty reflection on isWindows/hasZipArchive/zipArchiveObject, a MockedZipDownloader subclass, and getMockBuilder mocks of Process/ProcessExecutor/ZipArchive; no mocking/reflection framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_non_windows_fallback_good() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -110,8 +110,8 @@ fn test_non_windows_fallback_good() {
     todo!()
 }
 
+#[ignore = "requires setPrivateProperty reflection on isWindows/hasZipArchive/zipArchiveObject, a MockedZipDownloader subclass, and getMockBuilder mocks of Process/ProcessExecutor/ZipArchive; no mocking/reflection framework"]
 #[test]
-#[ignore = "mocks IO/HttpDownloader/ProcessExecutor and uses ZipArchive (todo!())"]
 fn test_non_windows_fallback_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());

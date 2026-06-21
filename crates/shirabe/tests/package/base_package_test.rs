@@ -35,8 +35,8 @@ fn test_set_another_repository() {
 // on an abstract BasePackage to drive getFullPrettyVersion(). Reproducing those exact
 // getter values requires mocking; a real package cannot carry the pretty version
 // "PrettyVersion" together with isDev() == true.
+#[ignore = "requires mocking isDev/getSourceType/getPrettyVersion/getSourceReference on an abstract BasePackage; no mock infrastructure exists and a real package cannot carry prettyVersion \"PrettyVersion\" with isDev() == true"]
 #[test]
-#[ignore = "mocks isDev/getSourceType/getPrettyVersion/getSourceReference on an abstract BasePackage; not reproducible with a real package"]
 fn test_format_version_for_dev_package() {
     todo!()
 }

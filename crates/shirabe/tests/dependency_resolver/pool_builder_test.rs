@@ -3,7 +3,7 @@
 // testPoolBuilder is a large fixture-driven case that loads packages from test inputs and
 // builds a Pool; constraint parsing uses a look-around regex the regex crate cannot compile.
 #[test]
-#[ignore = "not yet ported (fixture-driven PoolBuilder; constraint parsing uses a look-around regex)"]
+#[ignore = "ArrayLoader::load (single-package, pub) and Pool::count are not exposed: the loadPackage closure calls $loader->load($data) per package and getPackageResultSet uses count($pool)"]
 fn test_pool_builder() {
     todo!()
 }

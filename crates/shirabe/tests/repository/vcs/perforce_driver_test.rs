@@ -108,8 +108,8 @@ fn test_supports_returns_false_no_deep_check() {
 
 // The remaining cases mock Perforce, the repository config and IO to drive initialization,
 // composer-file detection and cleanup; mocking is not available here.
+#[ignore]
 #[test]
-#[ignore = "mocks Perforce/repository/IO; mocking is not available"]
 fn test_initialize_captures_variables_from_repo_config() {
     let SetUp {
         test_path,
@@ -122,20 +122,29 @@ fn test_initialize_captures_variables_from_repo_config() {
         driver,
     } = set_up();
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
-    let _ = (
-        &config,
-        &repo_config,
-        &io,
-        &process,
-        &http_downloader,
-        &perforce,
-        &driver,
-    );
-    todo!()
+    let _ = (&io, &process, &http_downloader, &perforce, &driver);
+
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let config = Rc::new(RefCell::new(config));
+    let http_downloader = Rc::new(RefCell::new(shirabe::util::HttpDownloader::new(
+        io.clone(),
+        config.clone(),
+        IndexMap::new(),
+        false,
+    )));
+    let process = Rc::new(RefCell::new(shirabe::util::ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
+
+    let mut driver = PerforceDriver::new(repo_config, io, config, http_downloader, process);
+    driver.initialize().unwrap();
+    assert_eq!(TEST_URL, driver.get_url());
+    assert_eq!(TEST_DEPOT, driver.get_depot());
+    assert_eq!(TEST_BRANCH, driver.get_branch());
 }
 
+#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to assert p4Login/checkStream/writeP4ClientSpec/connectClient are each called once; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
-#[ignore = "mocks Perforce/repository/IO; mocking is not available"]
 fn test_initialize_logs_in_and_connects_client() {
     let SetUp {
         test_path,
@@ -160,8 +169,8 @@ fn test_initialize_logs_in_and_connects_client() {
     todo!()
 }
 
+#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to stub getComposerInformation; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
-#[ignore = "mocks Perforce/repository/IO; mocking is not available"]
 fn test_has_composer_file_returns_false_on_no_composer_file() {
     let SetUp {
         test_path,
@@ -186,8 +195,8 @@ fn test_has_composer_file_returns_false_on_no_composer_file() {
     todo!()
 }
 
+#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to stub getComposerInformation; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
-#[ignore = "mocks Perforce/repository/IO; mocking is not available"]
 fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
     let SetUp {
         test_path,
@@ -212,8 +221,8 @@ fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
     todo!()
 }
 
+#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to assert cleanupClientSpec is called once; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
-#[ignore = "mocks Perforce/repository/IO; mocking is not available"]
 fn test_cleanup() {
     let SetUp {
         test_path,

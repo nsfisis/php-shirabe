@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/AboutCommandTest.php
 
 #[test]
-#[ignore = "requires the ApplicationTester harness (TestCase::getApplicationTester), which is not yet ported"]
+#[ignore = "missing get_application_tester (ApplicationTester) infrastructure and Application::get_display/set_auto_exit"]
 fn test_about() {
     todo!()
 }

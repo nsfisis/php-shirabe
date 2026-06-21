@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/HomeCommandTest.php
 
 #[test]
-#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+#[ignore = "init_temp_composer / create_installed_json / get_application_tester (ApplicationTester) helpers not implemented"]
 fn test_home_command_with_show_flag() {
     todo!()
 }

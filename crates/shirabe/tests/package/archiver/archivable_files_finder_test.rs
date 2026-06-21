@@ -26,20 +26,20 @@ impl Drop for TearDown {
 
 // These set up a temp directory tree (including a git repo) and assert the files the finder
 // selects with manual/git/skip excludes; the git-backed fixture setup is not ported.
+#[ignore = "setUp needs TestCase::getUniqueTmpDirectory to build the on-disk fixture tree; not ported"]
 #[test]
-#[ignore = "needs a temp directory tree and git-backed fixtures to drive ArchivableFilesFinder; not ported"]
 fn test_manual_excludes() {
     todo!()
 }
 
+#[ignore = "setUp needs TestCase::getUniqueTmpDirectory plus skipIfNotExecutable/Process::fromShellCommandline/PharData/RecursiveIteratorIterator; none ported"]
 #[test]
-#[ignore = "needs a temp directory tree and git-backed fixtures to drive ArchivableFilesFinder; not ported"]
 fn test_git_excludes() {
     todo!()
 }
 
+#[ignore = "setUp needs TestCase::getUniqueTmpDirectory to build the on-disk fixture tree; not ported"]
 #[test]
-#[ignore = "needs a temp directory tree and git-backed fixtures to drive ArchivableFilesFinder; not ported"]
 fn test_skip_excludes() {
     todo!()
 }

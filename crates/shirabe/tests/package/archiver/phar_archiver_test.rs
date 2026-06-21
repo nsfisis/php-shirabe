@@ -1,13 +1,13 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/PharArchiverTest.php
 
+#[ignore = "setUp/setupDummyRepo need TestCase::getUniqueTmpDirectory plus Filesystem to build the on-disk fixture tree; not ported"]
 #[test]
-#[ignore = "PharArchiver::archive builds a tar via PharData, which is todo!() in the php-shim"]
 fn test_tar_archive() {
     todo!()
 }
 
+#[ignore = "setUp/setupDummyRepo need TestCase::getUniqueTmpDirectory plus Filesystem to build the on-disk fixture tree; not ported"]
 #[test]
-#[ignore = "PharArchiver::archive builds a zip via ZipArchive, which is todo!() in the php-shim"]
 fn test_zip_archive() {
     todo!()
 }

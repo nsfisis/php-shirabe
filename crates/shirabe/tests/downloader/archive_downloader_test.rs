@@ -5,37 +5,37 @@
 // packages.
 
 #[test]
-#[ignore = "constructs an ArchiveDownloader (HttpDownloader reaches curl_multi_init, todo!()) with a mocked subclass/package"]
+#[ignore = "FileDownloader::get_file_name is pub(crate); not reachable from the integration test crate"]
 fn test_get_file_name() {
     todo!()
 }
 
 #[test]
-#[ignore = "constructs an ArchiveDownloader (HttpDownloader reaches curl_multi_init, todo!()) with a mocked subclass/package"]
+#[ignore = "FileDownloader::process_url is pub(crate); not reachable from the integration test crate"]
 fn test_process_url() {
     todo!()
 }
 
 #[test]
-#[ignore = "constructs an ArchiveDownloader (HttpDownloader reaches curl_multi_init, todo!()) with a mocked subclass/package"]
+#[ignore = "FileDownloader::process_url is pub(crate); not reachable from the integration test crate"]
 fn test_process_url2() {
     todo!()
 }
 
 #[test]
-#[ignore = "constructs an ArchiveDownloader (HttpDownloader reaches curl_multi_init, todo!()) with a mocked subclass/package"]
+#[ignore = "FileDownloader::process_url is pub(crate); not reachable from the integration test crate"]
 fn test_process_url3() {
     todo!()
 }
 
 #[test]
-#[ignore = "constructs an ArchiveDownloader (HttpDownloader reaches curl_multi_init, todo!()) with a mocked subclass/package"]
+#[ignore = "FileDownloader::process_url is pub(crate); not reachable from the integration test crate"]
 fn test_process_url_rewrite_dist() {
     todo!()
 }
 
 #[test]
-#[ignore = "constructs an ArchiveDownloader (HttpDownloader reaches curl_multi_init, todo!()) with a mocked subclass/package"]
+#[ignore = "FileDownloader::process_url is pub(crate); not reachable from the integration test crate"]
 fn test_process_url_rewrite_bitbucket_dist() {
     todo!()
 }

@@ -93,7 +93,7 @@ fn test_supports() {
 // Forgejo API responses; mocking is not available, and a real HttpDownloader reaches
 // curl_multi_init (todo!()).
 #[test]
-#[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock) and the IOInterface MockObject are not ported"]
 fn test_public_repository() {
     let SetUp {
         home,
@@ -107,7 +107,7 @@ fn test_public_repository() {
 }
 
 #[test]
-#[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock) and the IOInterface MockObject are not ported"]
 fn test_get_branches() {
     let SetUp {
         home,
@@ -121,7 +121,7 @@ fn test_get_branches() {
 }
 
 #[test]
-#[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock) and the IOInterface MockObject are not ported"]
 fn test_get_tags() {
     let SetUp {
         home,
@@ -135,7 +135,7 @@ fn test_get_tags() {
 }
 
 #[test]
-#[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock) and the IOInterface MockObject are not ported"]
 fn test_get_empty_file_content() {
     let SetUp {
         home,

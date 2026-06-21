@@ -83,7 +83,7 @@ fn test_dump_abandoned_replacement() {
 // arrays, a DateTime and Link maps, then checks the corresponding dumped key. Reproducing
 // that dynamic dispatch faithfully would require per-case wiring for every property type.
 #[test]
-#[ignore = "exercises ~25 dynamic set<Property> calls over heterogeneous value types; not reproduced here"]
+#[ignore = "RootPackageHandle lacks set_type/set_release_date/set_binaries/set_php_ext setters required by the data provider's type/time/bin/php-ext cases"]
 fn test_keys() {
     todo!()
 }

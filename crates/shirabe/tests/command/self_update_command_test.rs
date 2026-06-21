@@ -7,7 +7,7 @@ fn set_up() -> String {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester harness, which is not yet ported"]
+#[ignore = "depends on initTempComposer, composer-test.phar fixture, and Symfony Process to spawn the phar; none ported"]
 fn test_successful_update() {
     let _phar = set_up();
 
@@ -15,7 +15,7 @@ fn test_successful_update() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester harness, which is not yet ported"]
+#[ignore = "depends on initTempComposer, composer-test.phar fixture, and Symfony Process to spawn the phar; none ported"]
 fn test_update_to_specific_version() {
     let _phar = set_up();
 
@@ -23,7 +23,7 @@ fn test_update_to_specific_version() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester harness, which is not yet ported"]
+#[ignore = "depends on getApplicationTester (ApplicationTester) which is not ported"]
 fn test_update_with_invalid_option_throws_exception() {
     let _phar = set_up();
 
@@ -31,7 +31,7 @@ fn test_update_with_invalid_option_throws_exception() {
 }
 
 #[test]
-#[ignore = "requires the ApplicationTester harness, which is not yet ported"]
+#[ignore = "depends on initTempComposer, composer-test.phar fixture, and Symfony Process to spawn the phar; none ported"]
 fn test_update_to_different_channel() {
     let _phar = set_up();
 

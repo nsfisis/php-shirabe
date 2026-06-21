@@ -80,7 +80,7 @@ fn test_supports() {
 // (curl_multi_init is todo!() in the php-shim) and a mocked ProcessExecutor to feed
 // hg command output, neither of which is available here.
 #[test]
-#[ignore = "needs an HgDriver instance (HttpDownloader reaches curl_multi_init, todo!()) and a mocked ProcessExecutor"]
+#[ignore = "requires getProcessExecutorMock with expects() hg branches/bookmarks command-sequence assertions and a getMockBuilder HttpDownloader mock; no ProcessExecutorMock/HttpDownloader mocking infrastructure exists"]
 fn test_get_branches_filter_invalid_branch_names() {
     let SetUp { home, config, io } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -89,7 +89,7 @@ fn test_get_branches_filter_invalid_branch_names() {
 }
 
 #[test]
-#[ignore = "needs an HgDriver instance (HttpDownloader reaches curl_multi_init, todo!()) and a mocked ProcessExecutor"]
+#[ignore = "requires getProcessExecutorMock and a getMockBuilder HttpDownloader mock to construct HgDriver; no ProcessExecutorMock/HttpDownloader mocking infrastructure exists"]
 fn test_file_get_content_invalid_identifier() {
     let SetUp { home, config, io } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -98,7 +98,7 @@ fn test_file_get_content_invalid_identifier() {
 }
 
 #[test]
-#[ignore = "needs an HgDriver instance (HttpDownloader reaches curl_multi_init, todo!()) and a mocked ProcessExecutor"]
+#[ignore = "requires getProcessExecutorMock and a getMockBuilder HttpDownloader mock to construct HgDriver; no ProcessExecutorMock/HttpDownloader mocking infrastructure exists"]
 fn test_get_change_date_invalid_identifier() {
     let SetUp { home, config, io } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());

@@ -35,7 +35,7 @@ impl Drop for TearDown {
 // curl_multi_init (todo!()), and ProcessExecutor mocking is not available.
 
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs PHPUnit mocks of IOInterface/Config/Filesystem/PackageInterface for getDownloaderMock; not available"]
 fn test_download_for_package_without_source_reference() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -44,7 +44,7 @@ fn test_download_for_package_without_source_reference() {
 }
 
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs ProcessExecutorMock with expects() command-sequence assertions and PHPUnit PackageInterface mock; not available"]
 fn test_download() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -53,7 +53,7 @@ fn test_download() {
 }
 
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs PHPUnit mocks of IOInterface/Config/Filesystem/PackageInterface for getDownloaderMock; not available"]
 fn test_updatefor_package_without_source_reference() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -62,7 +62,7 @@ fn test_updatefor_package_without_source_reference() {
 }
 
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs ProcessExecutorMock with expects() command-sequence assertions and PHPUnit PackageInterface mock; not available"]
 fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -71,7 +71,7 @@ fn test_update() {
 }
 
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs ProcessExecutorMock and PHPUnit Filesystem mock with removeDirectoryAsync expectation; not available"]
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -80,7 +80,7 @@ fn test_remove() {
 }
 
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs PHPUnit mocks of IOInterface/Config/Filesystem for getDownloaderMock; not available"]
 fn test_get_installation_source() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());

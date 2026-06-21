@@ -1,17 +1,23 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/DefaultPolicyTest.php
 
 use indexmap::IndexMap;
+use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
+use shirabe::package::handle::{CompleteAliasPackageHandle, CompletePackageHandle};
 use shirabe::repository::array_repository::ArrayRepository;
+use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
 use shirabe::util::platform::Platform;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
+
+use crate::test_case::get_package;
 
 #[allow(dead_code)]
 struct Fixtures {
     repository_set: RepositorySet,
     repo: ArrayRepository,
-    repo_locked: LockArrayRepository,
+    repo_locked: LockArrayRepositoryHandle,
     policy: DefaultPolicy,
 }
 
@@ -25,7 +31,7 @@ fn set_up() -> Fixtures {
         IndexMap::new(),
     );
     let repo = ArrayRepository::new(vec![]).unwrap();
-    let repo_locked = LockArrayRepository::new(vec![]).unwrap();
+    let repo_locked = LockArrayRepositoryHandle::new(LockArrayRepository::new(vec![]).unwrap());
 
     let policy = DefaultPolicy::new(false, false, None);
 
@@ -48,141 +54,558 @@ impl Drop for TearDown {
     }
 }
 
-// These build a Pool from packages and exercise DefaultPolicy::selectPreferredPackages.
-// Constructing the packages/constraints parses versions through a look-around regex the
-// regex crate cannot compile, and the setup mirrors the solver fixtures.
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_single() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a = get_package("A", "1.0");
+    fixtures.repo.add_package(package_a.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a.get_id()];
+    let expected = vec![package_a.get_id()];
+
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_newest() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a1 = get_package("A", "1.0");
+    let package_a2 = get_package("A", "2.0");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a1.get_id(), package_a2.get_id()];
+    let expected = vec![package_a2.get_id()];
+
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_newest_picks_latest() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a1 = get_package("A", "1.0.0");
+    let package_a2 = get_package("A", "1.0.1-alpha");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a1.get_id(), package_a2.get_id()];
+    let expected = vec![package_a2.get_id()];
+
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_newest_picks_latest_stable_with_prefer_stable() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a1 = get_package("A", "1.0.0");
+    let package_a2 = get_package("A", "1.0.1-alpha");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a1.get_id(), package_a2.get_id()];
+    let expected = vec![package_a1.get_id()];
+
+    let policy = DefaultPolicy::new(true, false, None);
+    let selected = policy.select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_lowest_with_prefer_dev_over_prerelease() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+
+    for stability in ["alpha1", "beta1", "RC1"] {
+        let mut fixtures = set_up();
+
+        Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1");
+        let dev_package = get_package("A", "dev-master");
+        let prerelease_package = get_package("A", &format!("1.0.0-{}", stability));
+        fixtures.repo.add_package(dev_package.clone()).unwrap();
+        fixtures
+            .repo
+            .add_package(prerelease_package.clone())
+            .unwrap();
+        fixtures
+            .repository_set
+            .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+            .unwrap();
+
+        let pool = fixtures
+            .repository_set
+            .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+            .unwrap();
+
+        let literals = vec![dev_package.get_id(), prerelease_package.get_id()];
+        let expected = vec![dev_package.get_id()];
+
+        let policy = DefaultPolicy::new(true, true, None);
+        let selected = policy.select_preferred_packages(&pool, literals, None);
+
+        assert_eq!(expected, selected);
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_lowest_prefers_prerelease_over_dev() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+
+    for stability in ["alpha1", "beta1", "RC1"] {
+        let mut fixtures = set_up();
+
+        let dev_package = get_package("A", "dev-master");
+        let prerelease_package = get_package("A", &format!("1.0.0-{}", stability));
+        fixtures.repo.add_package(dev_package.clone()).unwrap();
+        fixtures
+            .repo
+            .add_package(prerelease_package.clone())
+            .unwrap();
+        fixtures
+            .repository_set
+            .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+            .unwrap();
+
+        let pool = fixtures
+            .repository_set
+            .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+            .unwrap();
+
+        let literals = vec![prerelease_package.get_id(), dev_package.get_id()];
+        let expected = vec![prerelease_package.get_id()];
+
+        let policy = DefaultPolicy::new(true, true, None);
+        let selected = policy.select_preferred_packages(&pool, literals, None);
+
+        assert_eq!(expected, selected);
+    }
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1");
+    let stable_package = get_package("A", "1.0.0");
+    let dev_package = get_package("A", "dev-master");
+    fixtures.repo.add_package(stable_package.clone()).unwrap();
+    fixtures.repo.add_package(dev_package.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![stable_package.get_id(), dev_package.get_id()];
+    let expected = vec![stable_package.get_id()];
+
+    let policy = DefaultPolicy::new(true, true, None);
+    let selected = policy.select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_newest_with_dev_picks_non_dev() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a1 = get_package("A", "dev-foo");
+    let package_a2 = get_package("A", "1.0.0");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a1.get_id(), package_a2.get_id()];
+    let expected = vec![package_a2.get_id()];
+
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_newest_with_preferred_version_picks_preferred_version_if_available() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a1 = get_package("A", "1.0.0");
+    let package_a2 = get_package("A", "1.1.0");
+    let package_a2b = get_package("A", "1.1.0");
+    let package_a3 = get_package("A", "1.2.0");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures.repo.add_package(package_a2b.clone()).unwrap();
+    fixtures.repo.add_package(package_a3.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![
+        package_a1.get_id(),
+        package_a2.get_id(),
+        package_a2b.get_id(),
+        package_a3.get_id(),
+    ];
+    let expected = vec![package_a2.get_id(), package_a2b.get_id()];
+
+    let mut preferred = IndexMap::new();
+    preferred.insert("a".to_string(), "1.1.0.0".to_string());
+    let policy = DefaultPolicy::new(false, false, Some(preferred));
+    let selected = policy.select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a1 = get_package("A", "1.0.0");
+    let package_a2 = get_package("A", "1.2.0");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a1.get_id(), package_a2.get_id()];
+    let expected = vec![package_a2.get_id()];
+
+    let mut preferred = IndexMap::new();
+    preferred.insert("a".to_string(), "1.1.0.0".to_string());
+    let policy = DefaultPolicy::new(false, false, Some(preferred));
+    let selected = policy.select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a1 = get_package("A", "1.0.0");
+    let package_a2 = get_package("A", "1.2.0");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a1.get_id(), package_a2.get_id()];
+    let expected = vec![package_a1.get_id()];
+
+    let mut preferred = IndexMap::new();
+    preferred.insert("a".to_string(), "1.1.0.0".to_string());
+    let policy = DefaultPolicy::new(false, true, Some(preferred));
+    let selected = policy.select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_repository_ordering_affects_priority() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let repo1 = ArrayRepository::new(vec![]).unwrap();
+    let repo2 = ArrayRepository::new(vec![]).unwrap();
+
+    let package1 = get_package("A", "1.0");
+    let package2 = get_package("A", "1.1");
+    let package3 = get_package("A", "1.1");
+    let package4 = get_package("A", "1.2");
+    repo1.add_package(package1.clone()).unwrap();
+    repo1.add_package(package2.clone()).unwrap();
+    repo2.add_package(package3.clone()).unwrap();
+    repo2.add_package(package4.clone()).unwrap();
+
+    let repo1_handle = RepositoryInterfaceHandle::new(repo1);
+    let repo2_handle = RepositoryInterfaceHandle::new(repo2);
+
+    fixtures
+        .repository_set
+        .add_repository(repo1_handle.clone())
+        .unwrap();
+    fixtures
+        .repository_set
+        .add_repository(repo2_handle.clone())
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![
+        package1.get_id(),
+        package2.get_id(),
+        package3.get_id(),
+        package4.get_id(),
+    ];
+    let expected = vec![package2.get_id()];
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals.clone(), None);
+
+    assert_eq!(expected, selected);
+
+    let mut repository_set = RepositorySet::new(
+        "dev",
+        IndexMap::new(),
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+    repository_set.add_repository(repo2_handle).unwrap();
+    repository_set.add_repository(repo1_handle).unwrap();
+
+    let pool = repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let expected = vec![package4.get_id()];
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_local_repos_first() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let repo_important = ArrayRepository::new(vec![]).unwrap();
+
+    let package_a = get_package("A", "dev-master");
+    let package_a_alias = CompleteAliasPackageHandle::new(
+        CompletePackageHandle::from_rc_unchecked(package_a.as_rc().clone()),
+        "2.1.9999999.9999999-dev".to_string(),
+        "2.1.x-dev".to_string(),
+    );
+    let package_a_important = get_package("A", "dev-feature-a");
+    let package_a_alias_important = CompleteAliasPackageHandle::new(
+        CompletePackageHandle::from_rc_unchecked(package_a_important.as_rc().clone()),
+        "2.1.9999999.9999999-dev".to_string(),
+        "2.1.x-dev".to_string(),
+    );
+    let package_a2_important = get_package("A", "dev-master");
+    let package_a2_alias_important = CompleteAliasPackageHandle::new(
+        CompletePackageHandle::from_rc_unchecked(package_a2_important.as_rc().clone()),
+        "2.1.9999999.9999999-dev".to_string(),
+        "2.1.x-dev".to_string(),
+    );
+    package_a_alias_important.set_root_package_alias(true);
+
+    fixtures.repo.add_package(package_a).unwrap();
+    fixtures
+        .repo
+        .add_package(package_a_alias.clone().into())
+        .unwrap();
+    repo_important.add_package(package_a_important).unwrap();
+    repo_important
+        .add_package(package_a_alias_important.clone().into())
+        .unwrap();
+    repo_important.add_package(package_a2_important).unwrap();
+    repo_important
+        .add_package(package_a2_alias_important.into())
+        .unwrap();
+
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(repo_important))
+        .unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+    fixtures
+        .repository_set
+        .add_repository(fixtures.repo_locked.clone().into())
+        .unwrap();
+
+    let mut pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let constraint = AnyConstraint::Simple(SimpleConstraint::new(
+        "=".to_string(),
+        "2.1.9999999.9999999-dev".to_string(),
+        None,
+    ));
+    let packages = pool.what_provides("a", Some(&constraint));
+    assert!(!packages.is_empty());
+    let mut literals = vec![];
+    for package in &packages {
+        literals.push(package.get_id());
+    }
+
+    let expected = vec![package_a_alias_important.get_id()];
+
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
+#[ignore = "set_provides/set_replaces only exist on RootPackage handles; CompletePackage from get_package has no set_provides"]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_all_providers() {
     let _tear_down = TearDown;
     let _fixtures = set_up();
     todo!()
 }
 
+#[ignore = "set_provides/set_replaces only exist on RootPackage handles; CompletePackage from get_package has no set_replaces"]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_prefer_non_replacing_from_same_repo() {
     let _tear_down = TearDown;
     let _fixtures = set_up();
     todo!()
 }
 
+#[ignore = "set_replaces only exists on RootPackage handles; CompletePackage from get_package has no set_replaces"]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_prefer_replacing_package_from_same_vendor() {
     let _tear_down = TearDown;
     let _fixtures = set_up();
     todo!()
 }
 
+#[ignore]
 #[test]
-#[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
 fn test_select_lowest() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let policy = DefaultPolicy::new(false, true, None);
+
+    let package_a1 = get_package("A", "1.0");
+    let package_a2 = get_package("A", "2.0");
+    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .unwrap();
+
+    let literals = vec![package_a1.get_id(), package_a2.get_id()];
+    let expected = vec![package_a1.get_id()];
+
+    let selected = policy.select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }

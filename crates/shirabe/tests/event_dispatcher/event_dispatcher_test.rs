@@ -18,105 +18,105 @@ impl Drop for TearDown {
 // listeners (executing CLI/PHP callbacks); mocking and the script-execution machinery are
 // not available here.
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires PHPUnit getMockBuilder onlyMethods(getListeners) override and getIOMock, which have no Rust equivalent"]
 fn test_listener_exceptions_are_caught() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock and getMockBuilder onlyMethods(getListeners) override, which have no Rust equivalent"]
 fn test_dispatcher_can_execute_single_command_line_script() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getMockBuilder mocks for AutoloadGenerator/RepositoryManager/RootPackageInterface/Event, which have no Rust equivalent"]
 fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getMockBuilder mocks for RepositoryManager/InstallationManager and PHP callable listeners ([\\$this, 'method']), which have no Rust equivalent"]
 fn test_dispatcher_remove_listener() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock and getMockBuilder onlyMethods(getListeners) override, which have no Rust equivalent"]
 fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock and getMockBuilder onlyMethods(getListeners) override, which have no Rust equivalent"]
 fn test_dispatcher_can_put_env() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock and getMockBuilder onlyMethods(getListeners) override, which have no Rust equivalent"]
 fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock, getMockBuilder onlyMethods(getListeners) override and ReflectionMethod(getPhpExecCommand), which have no Rust equivalent"]
 fn test_dispatcher_support_for_additional_args() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock and getMockBuilder onlyMethods(getListeners) returnCallback override, which have no Rust equivalent"]
 fn test_dispatcher_can_execute_composer_script_groups() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock and getMockBuilder onlyMethods(getListeners) returnCallback override, which have no Rust equivalent"]
 fn test_recursion_in_scripts_names() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock, getIOMock and getMockBuilder onlyMethods(getListeners) returnCallback override, which have no Rust equivalent"]
 fn test_dispatcher_detect_infinite_recursion() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getMockBuilder IOInterface mock with writeError/writeRaw expectations and onlyMethods(getListeners) override, which have no Rust equivalent"]
 fn test_dispatcher_outputs_command() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getIOMock and getMockBuilder onlyMethods(getListeners) override, which have no Rust equivalent"]
 fn test_dispatcher_outputs_error_on_failed_command() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getProcessExecutorMock, getMockBuilder onlyMethods(getListeners) override and LockTransaction mock, which have no Rust equivalent"]
 fn test_dispatcher_installer_events() {
     let _tear_down = TearDown;
     todo!()
 }
 
 #[test]
-#[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
+#[ignore = "requires getMockBuilder mocks for RootPackageInterface and Event, which have no Rust equivalent"]
 fn test_dispatcher_doesnt_return_skipped_scripts() {
     let _tear_down = TearDown;
     todo!()

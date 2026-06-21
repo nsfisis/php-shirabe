@@ -44,8 +44,8 @@ impl Drop for TearDown {
 // These construct a GitDownloader with a mocked IO/Config and a mocked ProcessExecutor to
 // feed git command output; mocking is not available, and a real HttpDownloader reaches
 // curl_multi_init (todo!()).
+#[ignore = "requires getProcessExecutorMock/getIOMock and getMockBuilder PackageInterface mock; no ProcessExecutorMock/IOMock mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_download_for_package_without_source_reference() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -53,8 +53,8 @@ fn test_download_for_package_without_source_reference() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_download() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -62,8 +62,8 @@ fn test_download() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and initGitVersion reflection on Git::version static cache; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_download_with_cache() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -71,8 +71,8 @@ fn test_download_with_cache() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -80,8 +80,8 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and pushUrlProvider dataProvider; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -89,8 +89,8 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_download_throws_runtime_exception_if_git_command_fails() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -98,8 +98,8 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock/getDownloaderMock and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_updatefor_package_without_source_reference() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -107,8 +107,8 @@ fn test_updatefor_package_without_source_reference() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -116,8 +116,8 @@ fn test_update() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_update_with_new_repo_url() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -125,8 +125,8 @@ fn test_update_with_new_repo_url() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_update_throws_runtime_exception_if_git_command_fails() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -134,8 +134,8 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock with expects() command expectations and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but_is_able_to_recover()
  {
     let working_dir = set_up();
@@ -144,8 +144,8 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
     todo!()
 }
 
+#[ignore = "requires getIOMock with expects() output expectations, getProcessExecutorMock and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_downgrade_shows_appropriate_message() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -153,8 +153,8 @@ fn test_downgrade_shows_appropriate_message() {
     todo!()
 }
 
+#[ignore = "requires getIOMock with expects() output expectations, getProcessExecutorMock and getMockBuilder PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_not_using_downgrading_with_references() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -162,8 +162,8 @@ fn test_not_using_downgrading_with_references() {
     todo!()
 }
 
+#[ignore = "requires getProcessExecutorMock, getMockBuilder Filesystem mock with removeDirectoryAsync expectation and PackageInterface mock; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
@@ -171,8 +171,8 @@ fn test_remove() {
     todo!()
 }
 
+#[ignore = "requires getDownloaderMock which mocks IOInterface/Filesystem via getMockBuilder; no mocking infrastructure exists"]
 #[test]
-#[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
 fn test_get_installation_source() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());

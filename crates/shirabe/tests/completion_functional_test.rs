@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/CompletionFunctionalTest.php
 
 #[test]
-#[ignore = "requires the console completion harness (Application + CompletionInput), which is not yet ported"]
+#[ignore = "CommandCompletionTester (Symfony Console test helper) is not implemented in the port"]
 fn test_complete() {
     todo!()
 }

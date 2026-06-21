@@ -103,7 +103,7 @@ fn test_supports() {
 // Bitbucket API responses; mocking is not available, and a real HttpDownloader reaches
 // curl_multi_init (todo!()).
 #[test]
-#[ignore = "constructs a GitBitbucketDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs IOInterface mock (getMockBuilder) and getHttpDownloaderMock/HttpDownloaderMock (not ported); set_up()'s io and http_downloader are todo!() and real HttpDownloader hits todo!() curl I/O"]
 fn test_get_root_identifier_wrong_scm_type() {
     let SetUp {
         home,
@@ -116,7 +116,7 @@ fn test_get_root_identifier_wrong_scm_type() {
 }
 
 #[test]
-#[ignore = "constructs a GitBitbucketDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs IOInterface mock (getMockBuilder) and getHttpDownloaderMock/HttpDownloaderMock (not ported); set_up()'s io and http_downloader are todo!() and real HttpDownloader hits todo!() curl I/O"]
 fn test_driver() {
     let SetUp {
         home,
@@ -129,7 +129,7 @@ fn test_driver() {
 }
 
 #[test]
-#[ignore = "constructs a GitBitbucketDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs IOInterface mock (getMockBuilder) and getHttpDownloaderMock/HttpDownloaderMock (not ported); depends on test_driver's driver and set_up()'s todo!() mocks"]
 fn test_get_params() {
     let SetUp {
         home,
@@ -142,7 +142,7 @@ fn test_get_params() {
 }
 
 #[test]
-#[ignore = "constructs a GitBitbucketDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs IOInterface mock (getMockBuilder) and getHttpDownloaderMock/HttpDownloaderMock (not ported); set_up()'s io and http_downloader are todo!()"]
 fn test_initialize_invalid_repository_url() {
     let SetUp {
         home,
@@ -155,7 +155,7 @@ fn test_initialize_invalid_repository_url() {
 }
 
 #[test]
-#[ignore = "constructs a GitBitbucketDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
+#[ignore = "needs IOInterface mock (getMockBuilder) and getHttpDownloaderMock/HttpDownloaderMock (not ported); set_up()'s io and http_downloader are todo!() and real HttpDownloader hits todo!() curl I/O"]
 fn test_invalid_support_data() {
     let SetUp {
         home,

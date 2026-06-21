@@ -13,21 +13,21 @@ fn set_up() {
 }
 
 #[test]
-#[ignore = "ArtifactRepository reads archives via ZipArchive/PharData, which are todo!() in the php-shim"]
+#[ignore = "ArtifactRepository exposes no public get_packages(); it does not impl RepositoryInterface and initialize/scan_directory are private"]
 fn test_extracts_configs_from_zip_archives() {
     set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "ArtifactRepository reads archives via ZipArchive/PharData, which are todo!() in the php-shim"]
+#[ignore = "ArtifactRepository exposes no public get_packages(); it does not impl RepositoryInterface and initialize/scan_directory are private"]
 fn test_absolute_repo_url_creates_absolute_url_packages() {
     set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "ArtifactRepository reads archives via ZipArchive/PharData, which are todo!() in the php-shim"]
+#[ignore = "ArtifactRepository exposes no public get_packages(); it does not impl RepositoryInterface and initialize/scan_directory are private"]
 fn test_relative_repo_url_creates_relative_url_packages() {
     set_up();
     todo!()

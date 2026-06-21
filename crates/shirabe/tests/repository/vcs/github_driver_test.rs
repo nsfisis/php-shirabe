@@ -84,7 +84,7 @@ fn test_supports() {
 // GitHub API responses; mocking is not available, and a real HttpDownloader reaches
 // curl_multi_init (todo!()).
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, the IOInterface MockObject (askAndHideAnswer/setAuthentication), and setAttribute reflection are not ported"]
 fn test_private_repository() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -92,7 +92,7 @@ fn test_private_repository() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, the IOInterface MockObject, and setAttribute reflection are not ported"]
 fn test_public_repository() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -100,7 +100,7 @@ fn test_public_repository() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, the IOInterface MockObject, and setAttribute reflection are not ported"]
 fn test_public_repository2() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -108,7 +108,7 @@ fn test_public_repository2() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, the IOInterface MockObject, and setAttribute reflection are not ported"]
 fn test_invalid_support_data() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -116,7 +116,7 @@ fn test_invalid_support_data() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, the IOInterface MockObject, setAttribute reflection, and the fundingUrlProvider data provider are not ported"]
 fn test_funding_format() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -124,7 +124,7 @@ fn test_funding_format() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, the IOInterface MockObject, and setAttribute reflection are not ported"]
 fn test_public_repository_archived() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -132,7 +132,7 @@ fn test_public_repository_archived() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, and the IOInterface MockObject are not ported"]
 fn test_private_repository_no_interaction() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -140,7 +140,7 @@ fn test_private_repository_no_interaction() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "IOInterface MockObject (getMockBuilder) and HttpDownloader MockObject (getMockBuilder) plus the invalidUrlProvider data provider are not ported"]
 fn test_initialize_invalid_repo_url() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -148,7 +148,7 @@ fn test_initialize_invalid_repo_url() {
 }
 
 #[test]
-#[ignore = "constructs a GitHubDriver and mocks the HttpDownloader/IO (curl_multi_init todo!())"]
+#[ignore = "HttpDownloaderMock (getHttpDownloaderMock), ProcessExecutorMock, and the IOInterface MockObject are not ported"]
 fn test_get_empty_file_content() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
