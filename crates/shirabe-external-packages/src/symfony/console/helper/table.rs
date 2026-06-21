@@ -990,10 +990,10 @@ impl Table {
                         Self::vec_set(&mut row, *column, unmerged_row[column].clone());
                     }
                 }
-                shirabe_php_shim::array_splice_mixed(
+                shirabe_php_shim::array_splice(
                     &mut rows,
                     unmerged_row_key,
-                    0,
+                    Some(0),
                     vec![Self::from_row_vec(row)],
                 );
             }

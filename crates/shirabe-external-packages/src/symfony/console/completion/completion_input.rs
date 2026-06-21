@@ -135,13 +135,11 @@ impl CompletionInput {
 
             let argument_value = self.inner.inner.arguments[&current_argument_name].clone();
             self.completion_name = Some(current_argument_name.clone());
-            if let PhpMixed::Array(argument_value) = &argument_value {
-                self.completion_value = if !argument_value.is_empty() {
-                    argument_value[shirabe_php_shim::array_key_last(argument_value)].to_string()
-                } else {
-                    // null
-                    String::new()
-                };
+            if let PhpMixed::List(argument_value) = &argument_value {
+                self.completion_value = argument_value
+                    .last()
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
             } else {
                 self.completion_value = argument_value.to_string();
             }

@@ -144,8 +144,17 @@ pub fn array_diff(_array1: &[String], _array2: &[String]) -> Vec<String> {
         .collect()
 }
 
-pub fn array_unique<T: Clone>(_array: &[T]) -> Vec<T> {
-    todo!()
+// PHP's default array_unique flag is SORT_STRING, comparing elements as
+// strings. For the `String`/`&str`-like element types used by every caller,
+// `PartialEq` is equivalent. First occurrence is kept, matching PHP.
+pub fn array_unique<T: Clone + PartialEq>(array: &[T]) -> Vec<T> {
+    let mut result: Vec<T> = Vec::new();
+    for item in array {
+        if !result.contains(item) {
+            result.push(item.clone());
+        }
+    }
+    result
 }
 
 pub fn array_intersect_key(
@@ -376,12 +385,13 @@ pub fn array_is_list(array: &PhpMixed) -> bool {
 }
 
 pub fn array_splice<T>(
-    _array: &mut Vec<T>,
-    _offset: i64,
-    _length: Option<i64>,
-    _replacement: Vec<T>,
+    array: &mut Vec<T>,
+    offset: i64,
+    length: Option<i64>,
+    replacement: Vec<T>,
 ) -> Vec<T> {
-    todo!()
+    let (start, end) = php_slice_bounds(array.len() as i64, offset, length);
+    array.splice(start..end, replacement).collect()
 }
 
 pub fn array_pop_first<T>(array: &mut Vec<T>) -> Option<T> {
@@ -392,8 +402,113 @@ pub fn array_pop_first<T>(array: &mut Vec<T>) -> Option<T> {
     }
 }
 
-pub fn array_merge_recursive(_arrays: Vec<PhpMixed>) -> PhpMixed {
-    todo!()
+pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
+    let mut acc: Vec<(MergeKey, PhpMixed)> = Vec::new();
+    let mut next_int: i64 = 0;
+    for arr in arrays {
+        merge_recursive_into(&mut acc, &mut next_int, arr);
+    }
+    merge_build(acc)
+}
+
+#[derive(Clone)]
+enum MergeKey {
+    Int(i64),
+    Str(String),
+}
+
+// Split a PHP array value into (key, value) entries. Integer and integer-like
+// string keys become `Int`, everything else stays `Str`, matching how PHP
+// normalises array keys.
+fn merge_entries(value: PhpMixed) -> Vec<(MergeKey, PhpMixed)> {
+    match value {
+        PhpMixed::List(items) => items
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| (MergeKey::Int(i as i64), v))
+            .collect(),
+        PhpMixed::Array(map) => map
+            .into_iter()
+            .map(|(k, v)| (merge_parse_key(k), v))
+            .collect(),
+        _ => panic!("array_merge_recursive(): Argument must be of type array"),
+    }
+}
+
+fn merge_parse_key(key: String) -> MergeKey {
+    if let Ok(n) = key.parse::<i64>() {
+        if n.to_string() == key {
+            return MergeKey::Int(n);
+        }
+    }
+    MergeKey::Str(key)
+}
+
+// Wrap a scalar into a single-element list, mirroring PHP's behaviour of
+// promoting a non-array value to an array before a recursive merge.
+fn merge_wrap_array(value: PhpMixed) -> PhpMixed {
+    match value {
+        PhpMixed::List(_) | PhpMixed::Array(_) => value,
+        scalar => PhpMixed::List(vec![scalar]),
+    }
+}
+
+fn merge_recursive_into(acc: &mut Vec<(MergeKey, PhpMixed)>, next_int: &mut i64, src: PhpMixed) {
+    for (key, value) in merge_entries(src) {
+        match key {
+            MergeKey::Int(_) => {
+                acc.push((MergeKey::Int(*next_int), value));
+                *next_int += 1;
+            }
+            MergeKey::Str(s) => {
+                let existing = acc
+                    .iter()
+                    .position(|(k, _)| matches!(k, MergeKey::Str(es) if *es == s));
+                match existing {
+                    Some(pos) => {
+                        let merged = merge_two_recursive(acc[pos].1.clone(), value);
+                        acc[pos].1 = merged;
+                    }
+                    None => acc.push((MergeKey::Str(s), value)),
+                }
+            }
+        }
+    }
+}
+
+fn merge_two_recursive(a: PhpMixed, b: PhpMixed) -> PhpMixed {
+    let mut acc = merge_entries(merge_wrap_array(a));
+    let mut next_int = acc
+        .iter()
+        .filter_map(|(k, _)| match k {
+            MergeKey::Int(n) => Some(*n + 1),
+            MergeKey::Str(_) => None,
+        })
+        .max()
+        .unwrap_or(0);
+    merge_recursive_into(&mut acc, &mut next_int, merge_wrap_array(b));
+    merge_build(acc)
+}
+
+// Re-assemble entries into a PhpMixed, preferring a `List` when the keys are a
+// dense 0..n integer sequence (PHP renders such an array as a list).
+fn merge_build(acc: Vec<(MergeKey, PhpMixed)>) -> PhpMixed {
+    let is_list = acc
+        .iter()
+        .enumerate()
+        .all(|(i, (k, _))| matches!(k, MergeKey::Int(n) if *n == i as i64));
+    if is_list {
+        PhpMixed::List(acc.into_iter().map(|(_, v)| v).collect())
+    } else {
+        PhpMixed::Array(
+            acc.into_iter()
+                .map(|(k, v)| match k {
+                    MergeKey::Int(n) => (n.to_string(), v),
+                    MergeKey::Str(s) => (s, v),
+                })
+                .collect(),
+        )
+    }
 }
 
 pub fn array_slice<V: Clone>(
@@ -442,19 +557,6 @@ pub fn array_diff_key(
         .collect()
 }
 
-pub fn array_key_last(_array: &IndexMap<String, PhpMixed>) -> usize {
-    todo!()
-}
-
-pub fn array_splice_mixed(
-    _array: &mut Vec<PhpMixed>,
-    _offset: i64,
-    _length: i64,
-    _replacement: Vec<PhpMixed>,
-) {
-    todo!()
-}
-
 /// Map a PHP array key (always stored as a `String` here) back to its PHP value
 /// type: an integer-like key becomes an int, anything else stays a string.
 fn php_key_to_mixed(key: &str) -> PhpMixed {
@@ -498,8 +600,8 @@ pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
     values.iter().any(|value| **value == needle)
 }
 
-pub fn krsort<V>(_array: &mut IndexMap<i64, V>) {
-    todo!()
+pub fn krsort<V>(array: &mut IndexMap<i64, V>) {
+    array.sort_by(|k1, _, k2, _| k2.cmp(k1));
 }
 
 pub fn uasort<T, F>(array: &mut Vec<T>, compare: F)
@@ -522,8 +624,14 @@ pub fn sort<T: Ord>(_array: &mut Vec<T>) {
     _array.sort();
 }
 
-pub fn sort_with_flags<T: Ord>(_array: &mut Vec<T>, _flags: i64) {
-    todo!()
+pub fn sort_with_flags<T: Ord>(array: &mut Vec<T>, flags: i64) {
+    if flags != SORT_REGULAR {
+        // TODO(phase-d): flag-specific comparison (SORT_NUMERIC/SORT_STRING/
+        // SORT_NATURAL/SORT_FLAG_CASE) cannot be expressed for a generic
+        // `T: Ord` element. No caller passes a non-regular flag yet.
+        todo!("sort() with flags other than SORT_REGULAR");
+    }
+    array.sort();
 }
 
 pub const SORT_REGULAR: i64 = 0;
@@ -540,12 +648,25 @@ where
     _array.sort_by(|a, b| compare(a, b).cmp(&0));
 }
 
-pub fn ksort<V>(_array: &mut IndexMap<String, V>) {
-    todo!()
+pub fn ksort<V>(array: &mut IndexMap<String, V>) {
+    array.sort_by(|k1, _, k2, _| php_sort_regular_key(k1, k2));
 }
 
-pub fn asort<V: Ord>(_array: &mut IndexMap<String, V>) {
-    todo!()
+// PHP's default SORT_REGULAR comparison for array keys: two integer-like keys
+// compare numerically, otherwise byte-wise as strings.
+// TODO(phase-d): full SORT_REGULAR semantics for mixed integer/non-numeric-string
+// keys are not reproduced; every current caller uses homogeneous string keys.
+fn php_sort_regular_key(a: &str, b: &str) -> std::cmp::Ordering {
+    if let (Ok(na), Ok(nb)) = (a.parse::<i64>(), b.parse::<i64>()) {
+        if na.to_string() == a && nb.to_string() == b {
+            return na.cmp(&nb);
+        }
+    }
+    a.cmp(b)
+}
+
+pub fn asort<V: Ord>(array: &mut IndexMap<String, V>) {
+    array.sort_by(|_, v1, _, v2| v1.cmp(v2));
 }
 
 pub fn uksort<V, F>(array: &mut IndexMap<String, V>, callback: F)
@@ -556,8 +677,8 @@ where
     array.sort_by(|k1, _, k2, _| callback(k1, k2).cmp(&0));
 }
 
-pub fn sort_natural_flag_case(_values: &mut Vec<String>) {
-    todo!()
+pub fn sort_natural_flag_case(values: &mut Vec<String>) {
+    values.sort_by(|a, b| crate::strnatcasecmp(a, b).cmp(&0));
 }
 
 pub fn count_mixed(value: &PhpMixed) -> i64 {
