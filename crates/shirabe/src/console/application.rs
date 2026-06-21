@@ -911,7 +911,7 @@ impl Application {
                 .borrow()
                 .has_parameter_option(PhpMixed::from(vec!["--profile"]), false)
             {
-                start_time = Some(microtime(true));
+                start_time = Some(microtime());
                 // PHP: $this->io->enableDebugging($startTime).
                 // TODO(phase-c): enableDebugging exists only on ConsoleIO, not on IOInterface,
                 // and self.io is still the NullIO because the ConsoleIO construction above is
@@ -951,7 +951,7 @@ impl Application {
                     "<info>Memory usage: {}MiB (peak: {}MiB), time: {}s</info>",
                     round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2),
                     round((memory_get_peak_usage(false) as f64) / 1024.0 / 1024.0, 2),
-                    round(microtime(true) - st, 2)
+                    round(microtime() - st, 2)
                 ));
             }
 

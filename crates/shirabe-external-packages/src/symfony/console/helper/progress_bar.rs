@@ -391,7 +391,7 @@ impl ProgressBar {
         } else {
             0.0
         };
-        let time_interval = shirabe_php_shim::microtime(true) - self.last_write_time;
+        let time_interval = shirabe_php_shim::microtime() - self.last_write_time;
 
         // Draw regardless of other limits
         if self.max == step {
@@ -534,7 +534,7 @@ impl ProgressBar {
         }
 
         self.previous_message = Some(original_message);
-        self.last_write_time = shirabe_php_shim::microtime(true);
+        self.last_write_time = shirabe_php_shim::microtime();
 
         self.output
             .borrow()

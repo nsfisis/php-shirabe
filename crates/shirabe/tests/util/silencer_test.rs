@@ -32,9 +32,8 @@ fn test_silencer() {
 
 /// Test whether exception from silent callbacks are correctly forwarded.
 #[test]
-#[ignore = "microtime is todo!() in the php-shim"]
 fn test_silenced_exception() {
-    let verification = format!("{}", microtime(false));
+    let verification = format!("{}", microtime());
     let err = Silencer::call(|| -> anyhow::Result<()> {
         Err(RuntimeException {
             message: verification.clone(),

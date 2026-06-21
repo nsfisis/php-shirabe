@@ -259,13 +259,13 @@ impl Solver {
 
         self.io
             .write_error3("Resolving dependencies through SAT", true, crate::io::DEBUG);
-        let before = microtime(true);
+        let before = microtime();
         self.run_sat()?;
         self.io.write_error3("", true, crate::io::DEBUG);
         self.io.write_error3(
             &format!(
                 "Dependency resolution completed in {:.3} seconds",
-                microtime(true) - before,
+                microtime() - before,
             ),
             true,
             crate::io::VERBOSE,

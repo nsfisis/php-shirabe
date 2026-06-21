@@ -1060,7 +1060,7 @@ impl PoolBuilder {
 
         self.io.debug("Running pool optimizer.", &[]);
 
-        let before = microtime(true);
+        let before = microtime();
         let total = pool.get_packages().len() as f64;
 
         let pool = self
@@ -1078,7 +1078,7 @@ impl PoolBuilder {
         self.io.write3(
             &format!(
                 "Pool optimizer completed in {:.3} seconds",
-                (microtime(true) - before),
+                (microtime() - before),
             ),
             true,
             io_interface::VERY_VERBOSE,
@@ -1109,7 +1109,7 @@ impl PoolBuilder {
 
         self.io.debug("Running security advisory pool filter.", &[]);
 
-        let before = microtime(true);
+        let before = microtime();
         let total = pool.get_packages().len() as f64;
 
         let repos_owned: Vec<RepositoryInterfaceHandle> = repositories.to_vec();
@@ -1128,7 +1128,7 @@ impl PoolBuilder {
         self.io.write3(
             &format!(
                 "Security advisory pool filter completed in {:.3} seconds",
-                (microtime(true) - before),
+                (microtime() - before),
             ),
             true,
             io_interface::VERY_VERBOSE,

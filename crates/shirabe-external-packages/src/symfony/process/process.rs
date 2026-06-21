@@ -318,7 +318,7 @@ impl Process {
         }
 
         self.reset_process_data();
-        self.starttime = Some(php::microtime(true));
+        self.starttime = Some(php::microtime());
         self.last_output_time = self.starttime;
         let has_callback = callback.is_some();
         self.callback = Some(self.build_callback(callback));
@@ -847,14 +847,14 @@ impl Process {
 
     /// Stops the process.
     pub fn stop(&mut self, timeout: f64, signal: Option<i64>) -> Option<i64> {
-        let timeout_micro = php::microtime(true) + timeout;
+        let timeout_micro = php::microtime() + timeout;
         if self.is_running() {
             // given SIGTERM may not be defined and that "proc_terminate" uses the constant value
             // and not the constant itself, we use the same here
             let _ = self.do_signal(15, false);
             loop {
                 php::usleep(1000);
-                if !(self.is_running() && php::microtime(true) < timeout_micro) {
+                if !(self.is_running() && php::microtime() < timeout_micro) {
                     break;
                 }
             }
@@ -880,7 +880,7 @@ impl Process {
 
     /// Adds a line to the STDOUT stream.
     pub fn add_output(&mut self, line: &str) {
-        self.last_output_time = Some(php::microtime(true));
+        self.last_output_time = Some(php::microtime());
 
         php::fseek3(self.stdout.clone(), 0, php::SEEK_END);
         php::fwrite(self.stdout.clone(), line, line.len() as i64);
@@ -889,7 +889,7 @@ impl Process {
 
     /// Adds a line to the STDERR stream.
     pub fn add_error_output(&mut self, line: &str) {
-        self.last_output_time = Some(php::microtime(true));
+        self.last_output_time = Some(php::microtime());
 
         php::fseek3(self.stderr.clone(), 0, php::SEEK_END);
         php::fwrite(self.stderr.clone(), line, line.len() as i64);
@@ -1039,7 +1039,7 @@ impl Process {
         }
 
         if let Some(timeout) = self.timeout {
-            if timeout < php::microtime(true) - self.starttime.unwrap_or(0.0) {
+            if timeout < php::microtime() - self.starttime.unwrap_or(0.0) {
                 self.stop(0.0, None);
 
                 return Err(ProcessTimedOutException::new(
@@ -1051,7 +1051,7 @@ impl Process {
         }
 
         if let Some(idle_timeout) = self.idle_timeout {
-            if idle_timeout < php::microtime(true) - self.last_output_time.unwrap_or(0.0) {
+            if idle_timeout < php::microtime() - self.last_output_time.unwrap_or(0.0) {
                 self.stop(0.0, None);
 
                 return Err(ProcessTimedOutException::new(

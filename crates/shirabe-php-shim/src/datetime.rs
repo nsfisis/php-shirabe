@@ -32,8 +32,11 @@ pub fn time() -> i64 {
         .as_secs() as i64
 }
 
-pub fn microtime(_get_as_float: bool) -> f64 {
-    todo!()
+pub fn microtime() -> f64 {
+    let duration = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+    duration.as_secs_f64()
 }
 
 // PHP defaults to "UTC" when no default timezone has been configured.

@@ -96,7 +96,7 @@ impl ConsoleIO {
 
         let messages = if let Some(start_time) = self.start_time {
             let memory_usage = (shirabe_php_shim::memory_get_usage() as f64) / 1024.0 / 1024.0;
-            let time_spent = microtime(true) - start_time;
+            let time_spent = microtime() - start_time;
             // PHP: array_map(fn ($message): string => sprintf(...), (array) $messages)
             let arr: Vec<String> = match &messages {
                 PhpMixed::String(s) => vec![s.clone()],
