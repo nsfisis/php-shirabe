@@ -1,5 +1,11 @@
 //! ref: composer/tests/Composer/Test/Installer/SuggestedPackagesReporterTest.php
 
+/// Builds an IO mock and a SuggestedPackagesReporter over it. The IO mock
+/// (`getIOMock`) is not available here, so this remains a stub.
+fn set_up() {
+    todo!()
+}
+
 // These construct a SuggestedPackagesReporter with a mocked IO and assert its accumulated
 // suggestions and formatted output; mocking is not available here.
 macro_rules! stub {

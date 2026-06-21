@@ -2,6 +2,13 @@
 
 // These mock IO/Config to drive AuthHelper's header/option building and interactive auth
 // storage; mocking is not available here.
+
+#[allow(dead_code)]
+fn set_up() {
+    // Builds mocked IOInterface/Config and a real AuthHelper; mocking is not available.
+    todo!()
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]

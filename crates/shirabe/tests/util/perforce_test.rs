@@ -2,6 +2,14 @@
 
 // These mock IO and a ProcessExecutor to drive Perforce client/stream/command behaviour;
 // mocking is not available here.
+
+#[allow(dead_code)]
+fn set_up() {
+    // Builds mocked ProcessExecutor/IO, the test repo config, and a Windows-flagged Perforce;
+    // mocking is not available.
+    todo!()
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]

@@ -1,5 +1,10 @@
 //! ref: composer/tests/Composer/Test/Downloader/FileDownloaderTest.php
 
+fn set_up() {
+    // The HttpDownloader mock (disableOriginalConstructor) is not ported.
+    todo!()
+}
+
 // These construct a FileDownloader with a mocked IO/HttpDownloader (curl_multi_init todo!())
 // and a mocked Cache/Package to drive download/checksum behaviour.
 macro_rules! stub {
@@ -7,6 +12,7 @@ macro_rules! stub {
         #[test]
         #[ignore = "mocks IO/HttpDownloader (curl_multi_init todo!()) and Cache/Package"]
         fn $name() {
+            set_up();
             todo!()
         }
     };

@@ -3,11 +3,25 @@
 // setUpBeforeClass reflects into ClassLoader::registeredLoaders and the cases load
 // installed.php fixtures via InstalledVersions::reload; the reflection and fixture loading
 // are not ported.
+
+use tempfile::TempDir;
+
+fn set_up() -> TempDir {
+    let root = TempDir::new().unwrap();
+
+    // Loading the installed_relative.php fixture and InstalledVersions::reload are not ported.
+    todo!();
+
+    #[allow(unreachable_code)]
+    root
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]
         #[ignore = "needs reflection into ClassLoader::registeredLoaders and installed.php fixtures (not ported)"]
         fn $name() {
+            let _root = set_up();
             todo!()
         }
     };

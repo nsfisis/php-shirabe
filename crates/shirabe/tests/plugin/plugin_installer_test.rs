@@ -1,5 +1,26 @@
 //! ref: composer/tests/Composer/Test/Plugin/PluginInstallerTest.php
 
+/// Builds the Composer instance from mocked DownloadManager/RepositoryManager/
+/// InstallationManager/EventDispatcher and an InstalledRepository mock, plus the
+/// plugin fixtures temp directory. The mocks and the plugin machinery are not
+/// available here, so this remains a stub.
+fn set_up() {
+    todo!()
+}
+
+/// Removes the fixtures directory created by `set_up`, which is itself a stub.
+fn tear_down() {
+    todo!()
+}
+
+struct TearDown;
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 // The plugin system requires the PHP runtime to load and instantiate plugin classes; the
 // PluginManager/PluginInstaller is intentionally not implemented yet (TODO(plugin)).
 macro_rules! stub {

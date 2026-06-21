@@ -1,5 +1,10 @@
 //! ref: composer/tests/Composer/Test/Downloader/DownloadManagerTest.php
 
+fn set_up() {
+    // The Filesystem and IO mocks are not ported.
+    todo!()
+}
+
 // These mock IO and individual downloaders to drive DownloadManager's selection/download/
 // update/remove logic; mocking is not available here.
 macro_rules! stub {
@@ -7,6 +12,7 @@ macro_rules! stub {
         #[test]
         #[ignore = "mocks IO and individual downloaders to drive DownloadManager; mocking is not available"]
         fn $name() {
+            set_up();
             todo!()
         }
     };

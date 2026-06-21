@@ -1,10 +1,18 @@
 //! ref: composer/tests/Composer/Test/Command/LicensesCommandTest.php
 
+fn set_up() {
+    // Builds the temp project and installed.json/composer.lock fixtures via
+    // initTempComposer/createInstalledJson/createComposerLock, none of which are ported yet.
+    todo!()
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]
         #[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
         fn $name() {
+            set_up();
+
             todo!()
         }
     };

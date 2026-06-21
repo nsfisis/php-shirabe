@@ -10,8 +10,7 @@ use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 use crate::test_case::get_package;
 
-/// ref: FilterRepositoryTest::setUp
-fn array_repo() -> RepositoryInterfaceHandle {
+fn set_up() -> RepositoryInterfaceHandle {
     let repo = ArrayRepository::new(vec![
         get_package("foo/aaa", "1.0.0"),
         get_package("foo/bbb", "1.0.0"),
@@ -86,7 +85,7 @@ fn test_repo_matching() {
     ];
 
     for (expected, cfg) in cases {
-        let mut repo = FilterRepository::new(array_repo(), cfg).unwrap();
+        let mut repo = FilterRepository::new(set_up(), cfg).unwrap();
         let packages = repo.get_packages().unwrap();
         let names: Vec<String> = packages.iter().map(|p| p.get_name()).collect();
 
@@ -97,12 +96,12 @@ fn test_repo_matching() {
 
 #[test]
 fn test_both_filters_disallowed() {
-    assert!(FilterRepository::new(array_repo(), config(Some(&[]), Some(&[]))).is_err());
+    assert!(FilterRepository::new(set_up(), config(Some(&[]), Some(&[]))).is_err());
 }
 
 #[test]
 fn test_security_advisories_disabled_in_child() {
-    let mut repo = FilterRepository::new(array_repo(), config(Some(&["foo/*"]), None)).unwrap();
+    let mut repo = FilterRepository::new(set_up(), config(Some(&["foo/*"]), None)).unwrap();
 
     assert!(!repo.has_security_advisories().unwrap());
 
@@ -116,7 +115,7 @@ fn test_security_advisories_disabled_in_child() {
 
 #[test]
 fn test_canonical_default_true() {
-    let mut repo = FilterRepository::new(array_repo(), config(None, None)).unwrap();
+    let mut repo = FilterRepository::new(set_up(), config(None, None)).unwrap();
 
     let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
     map.insert("foo/aaa".to_string(), Some(match_all()));
@@ -133,7 +132,7 @@ fn test_non_canonical() {
     use shirabe_php_shim::PhpMixed;
     let mut cfg: IndexMap<String, PhpMixed> = IndexMap::new();
     cfg.insert("canonical".to_string(), PhpMixed::Bool(false));
-    let mut repo = FilterRepository::new(array_repo(), cfg).unwrap();
+    let mut repo = FilterRepository::new(set_up(), cfg).unwrap();
 
     let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
     map.insert("foo/aaa".to_string(), Some(match_all()));

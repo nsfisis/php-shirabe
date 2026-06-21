@@ -3,10 +3,70 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::ForgejoDriver;
+use shirabe::util::filesystem::Filesystem;
+use shirabe_php_shim::PhpMixed;
+use tempfile::TempDir;
+
+struct SetUp {
+    home: TempDir,
+    config: Config,
+    // The IOInterface and HttpDownloader mocks are not ported.
+    io: (),
+    http_downloader: (),
+}
+
+fn set_up() -> SetUp {
+    let home = TempDir::new().unwrap();
+    let mut config = Config::new(true, None);
+    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    config_section.insert(
+        "home".to_string(),
+        PhpMixed::String(home.path().to_string_lossy().into_owned()),
+    );
+    config_section.insert(
+        "forgejo-domains".to_string(),
+        PhpMixed::List(vec![PhpMixed::String("codeberg.org".to_string())]),
+    );
+    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    config.merge(&top, Config::SOURCE_UNKNOWN);
+
+    let io = ();
+    let http_downloader = ();
+
+    SetUp {
+        home,
+        config,
+        io,
+        http_downloader,
+    }
+}
+
+fn tear_down(home: &std::path::Path) {
+    let mut fs = Filesystem::new(None);
+    fs.remove_directory(home).unwrap();
+}
+
+struct TearDown {
+    home: std::path::PathBuf,
+}
+
+impl TearDown {
+    fn new(home: std::path::PathBuf) -> Self {
+        TearDown { home }
+    }
+}
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down(&self.home);
+    }
+}
 
 fn supports_provider() -> Vec<(bool, &'static str)> {
     vec![
@@ -35,23 +95,55 @@ fn test_supports() {
 #[test]
 #[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
 fn test_public_repository() {
+    let SetUp {
+        home,
+        config,
+        io,
+        http_downloader,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf());
+    let _ = (&config, &io, &http_downloader);
     todo!()
 }
 
 #[test]
 #[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
 fn test_get_branches() {
+    let SetUp {
+        home,
+        config,
+        io,
+        http_downloader,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf());
+    let _ = (&config, &io, &http_downloader);
     todo!()
 }
 
 #[test]
 #[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
 fn test_get_tags() {
+    let SetUp {
+        home,
+        config,
+        io,
+        http_downloader,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf());
+    let _ = (&config, &io, &http_downloader);
     todo!()
 }
 
 #[test]
 #[ignore = "constructs a ForgejoDriver and mocks the HttpDownloader (curl_multi_init todo!())"]
 fn test_get_empty_file_content() {
+    let SetUp {
+        home,
+        config,
+        io,
+        http_downloader,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf());
+    let _ = (&config, &io, &http_downloader);
     todo!()
 }

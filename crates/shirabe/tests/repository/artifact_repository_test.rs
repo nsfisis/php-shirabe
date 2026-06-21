@@ -3,20 +3,32 @@
 // ArtifactRepository::getPackages scans the fixture directory and opens each archive via
 // ZipArchive / PharData, both of which are todo!() in the php-shim.
 
+use shirabe_php_shim::extension_loaded;
+
+fn set_up() {
+    if !extension_loaded("zip") {
+        // markTestSkipped('You need the zip extension to run this test.')
+        todo!()
+    }
+}
+
 #[test]
 #[ignore = "ArtifactRepository reads archives via ZipArchive/PharData, which are todo!() in the php-shim"]
 fn test_extracts_configs_from_zip_archives() {
+    set_up();
     todo!()
 }
 
 #[test]
 #[ignore = "ArtifactRepository reads archives via ZipArchive/PharData, which are todo!() in the php-shim"]
 fn test_absolute_repo_url_creates_absolute_url_packages() {
+    set_up();
     todo!()
 }
 
 #[test]
 #[ignore = "ArtifactRepository reads archives via ZipArchive/PharData, which are todo!() in the php-shim"]
 fn test_relative_repo_url_creates_relative_url_packages() {
+    set_up();
     todo!()
 }

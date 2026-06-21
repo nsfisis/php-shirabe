@@ -2,6 +2,13 @@
 
 // These mock IO/Config/ProcessExecutor to drive Git::runCommand and mirror syncing; mocking
 // is not available here.
+
+#[allow(dead_code)]
+fn set_up() {
+    // Builds mocked IO/Config/ProcessExecutor/Filesystem and a real Git; mocking is not available.
+    todo!()
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]

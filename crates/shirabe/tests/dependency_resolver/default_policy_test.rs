@@ -1,5 +1,53 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/DefaultPolicyTest.php
 
+use indexmap::IndexMap;
+use shirabe::dependency_resolver::default_policy::DefaultPolicy;
+use shirabe::repository::array_repository::ArrayRepository;
+use shirabe::repository::lock_array_repository::LockArrayRepository;
+use shirabe::repository::repository_set::RepositorySet;
+use shirabe::util::platform::Platform;
+
+#[allow(dead_code)]
+struct Fixtures {
+    repository_set: RepositorySet,
+    repo: ArrayRepository,
+    repo_locked: LockArrayRepository,
+    policy: DefaultPolicy,
+}
+
+fn set_up() -> Fixtures {
+    let repository_set = RepositorySet::new(
+        "dev",
+        IndexMap::new(),
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+    let repo = ArrayRepository::new(vec![]).unwrap();
+    let repo_locked = LockArrayRepository::new(vec![]).unwrap();
+
+    let policy = DefaultPolicy::new(false, false, None);
+
+    Fixtures {
+        repository_set,
+        repo,
+        repo_locked,
+        policy,
+    }
+}
+
+fn tear_down() {
+    Platform::clear_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE");
+}
+
+struct TearDown;
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 // These build a Pool from packages and exercise DefaultPolicy::selectPreferredPackages.
 // Constructing the packages/constraints parses versions through a look-around regex the
 // regex crate cannot compile, and the setup mirrors the solver fixtures.
@@ -8,6 +56,8 @@ macro_rules! stub {
         #[test]
         #[ignore = "not yet ported (DefaultPolicy over a Pool; constraint parsing uses a look-around regex)"]
         fn $name() {
+            let _tear_down = TearDown;
+            let _fixtures = set_up();
             todo!()
         }
     };

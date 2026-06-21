@@ -1,10 +1,27 @@
 //! ref: composer/tests/Composer/Test/Command/GlobalCommandTest.php
 
+use shirabe::util::platform::Platform;
+
+fn tear_down() {
+    Platform::clear_env("COMPOSER_HOME");
+    Platform::clear_env("COMPOSER");
+}
+
+struct TearDown;
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]
         #[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
         fn $name() {
+            let _tear_down = TearDown;
+
             todo!()
         }
     };

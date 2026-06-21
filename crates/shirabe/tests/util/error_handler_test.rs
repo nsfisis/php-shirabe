@@ -5,6 +5,27 @@
 // trigger those by undefined-index access / array_merge misuse. There is no equivalent
 // runtime mechanism in Rust to port faithfully.
 
+#[allow(dead_code)]
+fn set_up() {
+    // ErrorHandler::register() installs a PHP set_error_handler; no Rust equivalent.
+    todo!()
+}
+
+#[allow(dead_code)]
+fn tear_down() {
+    // restore_error_handler() is PHP runtime machinery; no Rust equivalent.
+    todo!()
+}
+
+#[allow(dead_code)]
+struct TearDown;
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 #[test]
 #[ignore = "relies on PHP's set_error_handler converting an undefined-array-key notice into an ErrorException; no Rust equivalent"]
 fn test_error_handler_capture_notice() {

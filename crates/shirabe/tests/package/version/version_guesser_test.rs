@@ -1,5 +1,26 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php
 
+#[allow(dead_code)]
+fn set_up() {
+    // Resets GitUtil's cached `version` static via ReflectionProperty; the static is not
+    // exposed here and reflection-based mutation has no ported equivalent.
+    todo!()
+}
+
+#[allow(dead_code)]
+fn tear_down() {
+    todo!()
+}
+
+#[allow(dead_code)]
+struct TearDown;
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 // These drive VersionGuesser with a mocked ProcessExecutor feeding git/hg command output;
 // mocking is not available here.
 macro_rules! stub {

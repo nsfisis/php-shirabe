@@ -1,5 +1,27 @@
 //! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php
 
+/// Creates the working/vendor temp directories, switches into the working dir, and
+/// builds the AutoloadGenerator from a mocked Config/InstallationManager/
+/// InstalledRepository/EventDispatcher and a BufferIO. The mocks and temp-dir
+/// helpers are not available here, so this remains a stub.
+fn set_up() {
+    todo!()
+}
+
+/// Restores the original working directory and removes the working/vendor
+/// directories created by `set_up`, which is itself a stub.
+fn tear_down() {
+    todo!()
+}
+
+struct TearDown;
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 // These exercise AutoloadGenerator end-to-end: they build packages, write fixture files to
 // a temp dir, run dump() through a mocked InstalledRepository/EventDispatcher and compare
 // the generated autoload files. The integration setup (fixtures, mocks, filesystem) is not

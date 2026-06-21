@@ -1,5 +1,11 @@
 //! ref: composer/tests/Composer/Test/Installer/InstallationManagerTest.php
 
+/// Builds mocked Loop/repository/IO. The mocks are not available here, so this
+/// remains a stub.
+fn set_up() {
+    todo!()
+}
+
 // These mock individual installers, the repository and IO to drive InstallationManager's
 // add/execute/install/update/uninstall logic; mocking is not available here.
 macro_rules! stub {

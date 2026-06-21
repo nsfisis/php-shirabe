@@ -6,6 +6,10 @@ use shirabe::package::handle::{CompletePackageHandle, RootPackageHandle};
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::version_parser::VersionParser;
 
+fn set_up() -> ArrayDumper {
+    ArrayDumper::new()
+}
+
 fn complete_package() -> CompletePackageHandle {
     let norm = VersionParser.normalize("1.0.0", None).unwrap();
     CompletePackageHandle::new("dummy/pkg".to_string(), norm, "1.0.0".to_string())
@@ -18,7 +22,8 @@ fn root_package() -> RootPackageHandle {
 
 #[test]
 fn test_required_information() {
-    let config = ArrayDumper::new().dump(complete_package().into());
+    let dumper = set_up();
+    let config = dumper.dump(complete_package().into());
 
     let mut expected: IndexMap<String, PhpMixed> = IndexMap::new();
     expected.insert(
@@ -37,10 +42,11 @@ fn test_required_information() {
 
 #[test]
 fn test_root_package() {
+    let dumper = set_up();
     let package = root_package();
     package.set_minimum_stability("dev".to_string());
 
-    let config = ArrayDumper::new().dump(package.into());
+    let config = dumper.dump(package.into());
 
     assert_eq!(
         Some(&PhpMixed::String("dev".to_string())),
@@ -50,20 +56,22 @@ fn test_root_package() {
 
 #[test]
 fn test_dump_abandoned() {
+    let dumper = set_up();
     let package = complete_package();
     package.set_abandoned(PhpMixed::Bool(true));
 
-    let config = ArrayDumper::new().dump(package.into());
+    let config = dumper.dump(package.into());
 
     assert_eq!(Some(&PhpMixed::Bool(true)), config.get("abandoned"));
 }
 
 #[test]
 fn test_dump_abandoned_replacement() {
+    let dumper = set_up();
     let package = complete_package();
     package.set_abandoned(PhpMixed::String("foo/bar".to_string()));
 
-    let config = ArrayDumper::new().dump(package.into());
+    let config = dumper.dump(package.into());
 
     assert_eq!(
         Some(&PhpMixed::String("foo/bar".to_string())),

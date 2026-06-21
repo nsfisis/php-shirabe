@@ -13,6 +13,13 @@ use shirabe::repository::{InstalledArrayRepository, RepositoryInterface};
 
 use crate::test_case::get_package;
 
+/// Builds mocked repository/IO and a MetapackageInstaller over them. The mocks
+/// are not available here; the live tests below intentionally diverge to use a
+/// real InstalledArrayRepository instead, so this stub is not injected.
+fn set_up() {
+    todo!()
+}
+
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
         .build()

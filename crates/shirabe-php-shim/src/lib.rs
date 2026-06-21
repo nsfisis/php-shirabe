@@ -2324,18 +2324,28 @@ pub fn getenv(_name: &str) -> Option<String> {
     std::env::var(_name).ok()
 }
 
-// TODO(phase-c): only the simple `^(\w+)=(.+)$` form is supported.
+// TODO(phase-c): only the simple `^(\w+)(=(.+))?$` form is supported.
 pub fn putenv(setting: &str) -> bool {
     let is_word =
         |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
-    let Some((name, value)) = setting.split_once('=') else {
-        panic!("putenv: unsupported setting format: {setting:?}");
-    };
-    if !is_word(name) {
-        panic!("putenv: unsupported setting format: {setting:?}");
-    }
-    unsafe {
-        std::env::set_var(name, value);
+    // A setting without `=` deletes the variable, mirroring PHP's putenv('NAME').
+    match setting.split_once('=') {
+        Some((name, value)) => {
+            if !is_word(name) {
+                panic!("putenv: unsupported setting format: {setting:?}");
+            }
+            unsafe {
+                std::env::set_var(name, value);
+            }
+        }
+        None => {
+            if !is_word(setting) {
+                panic!("putenv: unsupported setting format: {setting:?}");
+            }
+            unsafe {
+                std::env::remove_var(setting);
+            }
+        }
     }
     true
 }

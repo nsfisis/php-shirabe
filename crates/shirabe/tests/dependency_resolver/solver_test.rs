@@ -1,5 +1,46 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/SolverTest.php
 
+use indexmap::IndexMap;
+use shirabe::dependency_resolver::default_policy::DefaultPolicy;
+use shirabe::dependency_resolver::request::Request;
+use shirabe::repository::array_repository::ArrayRepository;
+use shirabe::repository::handle::LockArrayRepositoryHandle;
+use shirabe::repository::lock_array_repository::LockArrayRepository;
+use shirabe::repository::repository_set::RepositorySet;
+
+#[allow(dead_code)]
+struct Fixtures {
+    repo_set: RepositorySet,
+    repo: ArrayRepository,
+    repo_locked: LockArrayRepositoryHandle,
+    request: Request,
+    policy: DefaultPolicy,
+}
+
+fn set_up() -> Fixtures {
+    let repo_set = RepositorySet::new(
+        "stable",
+        IndexMap::new(),
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+    let repo = ArrayRepository::new(vec![]).unwrap();
+    let repo_locked = LockArrayRepositoryHandle::new(LockArrayRepository::new(vec![]).unwrap());
+
+    let request = Request::new(Some(repo_locked.clone()));
+    let policy = DefaultPolicy::new(false, false, None);
+
+    Fixtures {
+        repo_set,
+        repo,
+        repo_locked,
+        request,
+        policy,
+    }
+}
+
 // These run the dependency Solver over packages/requests built from version constraints,
 // whose parsing goes through a look-around regex the regex crate cannot compile; the setup
 // also mirrors the larger solver fixtures.
@@ -8,6 +49,7 @@ macro_rules! stub {
         #[test]
         #[ignore = "not yet ported (runs the Solver; constraint parsing uses a look-around regex)"]
         fn $name() {
+            let _fixtures = set_up();
             todo!()
         }
     };

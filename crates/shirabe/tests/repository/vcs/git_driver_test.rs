@@ -4,11 +4,76 @@
 // that reaches curl_multi_init, todo!()) to feed git command output; mocking is not
 // available here.
 
+use indexmap::IndexMap;
+use shirabe::config::Config;
+use shirabe::util::filesystem::Filesystem;
+use shirabe::util::platform::Platform;
+use shirabe_php_shim::PhpMixed;
+use tempfile::TempDir;
+
+struct SetUp {
+    home: TempDir,
+    config: Config,
+    network_env: Option<String>,
+}
+
+fn set_up() -> SetUp {
+    let home = TempDir::new().unwrap();
+    let mut config = Config::new(true, None);
+    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    config_section.insert(
+        "home".to_string(),
+        PhpMixed::String(home.path().to_string_lossy().into_owned()),
+    );
+    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    config.merge(&top, Config::SOURCE_UNKNOWN);
+    let network_env = Platform::get_env("COMPOSER_DISABLE_NETWORK");
+
+    SetUp {
+        home,
+        config,
+        network_env,
+    }
+}
+
+fn tear_down(home: &std::path::Path, network_env: &Option<String>) {
+    let mut fs = Filesystem::new(None);
+    fs.remove_directory(home).unwrap();
+    match network_env {
+        None => Platform::clear_env("COMPOSER_DISABLE_NETWORK"),
+        Some(network_env) => Platform::put_env("COMPOSER_DISABLE_NETWORK", network_env),
+    }
+}
+
+struct TearDown {
+    home: std::path::PathBuf,
+    network_env: Option<String>,
+}
+
+impl TearDown {
+    fn new(home: std::path::PathBuf, network_env: Option<String>) -> Self {
+        TearDown { home, network_env }
+    }
+}
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down(&self.home, &self.network_env);
+    }
+}
+
 macro_rules! git_stub {
     ($name:ident) => {
         #[test]
         #[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
         fn $name() {
+            let SetUp {
+                home,
+                config: _,
+                network_env,
+            } = set_up();
+            let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
             todo!()
         }
     };

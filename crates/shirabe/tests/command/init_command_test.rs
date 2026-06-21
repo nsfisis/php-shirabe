@@ -3,11 +3,20 @@
 // The author/namespace/git-config helpers are protected methods exercised via reflection
 // in PHP; the run cases need the ApplicationTester. Neither is available here.
 
+use shirabe_php_shim::server_set;
+
+fn set_up() {
+    server_set("COMPOSER_DEFAULT_AUTHOR", "John Smith".to_string());
+    server_set("COMPOSER_DEFAULT_EMAIL", "john@example.com".to_string());
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]
         #[ignore = "needs the ApplicationTester harness or reflection into protected InitCommand helpers"]
         fn $name() {
+            set_up();
+
             todo!()
         }
     };

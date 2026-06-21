@@ -2,6 +2,13 @@
 
 // These mock IO/Config/HttpDownloader to drive Bitbucket's OAuth/access-token flow; mocking
 // is not available and a real HttpDownloader reaches curl_multi_init (todo!()).
+
+#[allow(dead_code)]
+fn set_up() {
+    // Builds mocked IO/HttpDownloader/Config and records time(); mocking is not available.
+    todo!()
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]

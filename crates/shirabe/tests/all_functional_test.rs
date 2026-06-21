@@ -3,11 +3,30 @@
 // These build the composer.phar and run the .test integration fixtures by invoking the
 // composer binary as a subprocess; the phar build and functional-test harness are not
 // ported.
+
+// setUp only does cwd management (chdir into Fixtures/functional), which is intentionally
+// not ported, so it has no portable body.
+
+// The chdir back to oldcwd is cwd management (not ported); the removeDirectory of testDir
+// targets a path produced by the unported functional-test run.
+fn tear_down() {
+    todo!()
+}
+
+struct TearDown;
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 macro_rules! stub {
     ($name:ident) => {
         #[test]
         #[ignore = "not yet ported (builds composer.phar and runs the functional .test fixtures via the binary)"]
         fn $name() {
+            let _tear_down = TearDown;
             todo!()
         }
     };

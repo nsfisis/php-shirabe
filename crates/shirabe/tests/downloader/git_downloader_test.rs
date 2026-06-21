@@ -1,5 +1,46 @@
 //! ref: composer/tests/Composer/Test/Downloader/GitDownloaderTest.php
 
+use shirabe::util::filesystem::Filesystem;
+use tempfile::TempDir;
+
+fn set_up() -> TempDir {
+    // skipIfNotExecutable('git')
+    let () = todo!();
+    // initGitVersion('1.0.0') resets the Composer\Util\Git static version cache via
+    // reflection; the static cache is not reachable from a test here.
+    #[allow(unreachable_code)]
+    {
+        let _fs = Filesystem::new(None);
+        TempDir::new().unwrap()
+    }
+}
+
+fn tear_down(working_dir: &std::path::Path) {
+    if working_dir.is_dir() {
+        let mut fs = Filesystem::new(None);
+        fs.remove_directory(working_dir).unwrap();
+    }
+    // initGitVersion(false) resets the Composer\Util\Git static version cache via
+    // reflection; the static cache is not reachable from a test here.
+    todo!()
+}
+
+struct TearDown {
+    working_dir: std::path::PathBuf,
+}
+
+impl TearDown {
+    fn new(working_dir: std::path::PathBuf) -> Self {
+        TearDown { working_dir }
+    }
+}
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down(&self.working_dir);
+    }
+}
+
 // These construct a GitDownloader with a mocked IO/Config and a mocked ProcessExecutor to
 // feed git command output; mocking is not available, and a real HttpDownloader reaches
 // curl_multi_init (todo!()).
@@ -8,6 +49,9 @@ macro_rules! stub {
         #[test]
         #[ignore = "mocks ProcessExecutor/IO and needs an HttpDownloader (curl_multi_init todo!())"]
         fn $name() {
+            let working_dir = set_up();
+            let _tear_down = TearDown::new(working_dir.path().to_path_buf());
+            let _ = &working_dir;
             todo!()
         }
     };

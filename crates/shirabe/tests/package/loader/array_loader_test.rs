@@ -1,5 +1,11 @@
 //! ref: composer/tests/Composer/Test/Package/Loader/ArrayLoaderTest.php
 
+use shirabe::package::loader::ArrayLoader;
+
+fn set_up() -> ArrayLoader {
+    ArrayLoader::new(None, false)
+}
+
 // ArrayLoader::load parses version/link constraints through a look-around regex the regex
 // crate cannot compile.
 macro_rules! stub {
@@ -7,6 +13,7 @@ macro_rules! stub {
         #[test]
         #[ignore = "ArrayLoader::load parses constraints via a look-around regex the regex crate cannot compile"]
         fn $name() {
+            let _loader = set_up();
             todo!()
         }
     };

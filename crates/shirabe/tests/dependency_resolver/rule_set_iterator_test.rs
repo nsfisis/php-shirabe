@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::generic_rule::GenericRule;
+use shirabe::dependency_resolver::pool::Pool;
 use shirabe::dependency_resolver::rule::{RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Rule};
 use shirabe::dependency_resolver::rule_set::RuleSet;
 use shirabe::dependency_resolver::rule_set_iterator::RuleSetIterator;
@@ -23,8 +24,16 @@ fn root_require_rule() -> Rc<RefCell<Rule>> {
     ))))
 }
 
-// Mirrors the original setUp().
-fn make_rules() -> Rules {
+fn set_up() -> (Pool, Rules) {
+    let pool = Pool::new(
+        vec![],
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+
     let mut rules: Rules = IndexMap::new();
     rules.insert(
         RuleSet::TYPE_REQUEST,
@@ -39,12 +48,13 @@ fn make_rules() -> Rules {
         ))))],
     );
     rules.insert(RuleSet::TYPE_PACKAGE, vec![]);
-    rules
+
+    (pool, rules)
 }
 
 #[test]
 fn test_foreach() {
-    let rules = make_rules();
+    let (_pool, rules) = set_up();
     let mut rule_set_iterator = RuleSetIterator::new(rules.clone());
 
     let mut result: Vec<Rc<RefCell<Rule>>> = Vec::new();
@@ -67,7 +77,7 @@ fn test_foreach() {
 
 #[test]
 fn test_keys() {
-    let rules = make_rules();
+    let (_pool, rules) = set_up();
     let mut rule_set_iterator = RuleSetIterator::new(rules);
 
     let mut result: Vec<i64> = Vec::new();

@@ -1,5 +1,19 @@
 //! ref: composer/tests/Composer/Test/EventDispatcher/EventDispatcherTest.php
 
+use shirabe::util::platform::Platform;
+
+fn tear_down() {
+    Platform::clear_env("COMPOSER_SKIP_SCRIPTS");
+}
+
+struct TearDown;
+
+impl Drop for TearDown {
+    fn drop(&mut self) {
+        tear_down();
+    }
+}
+
 // These build an EventDispatcher with a mocked Composer/IO/ProcessExecutor and run script
 // listeners (executing CLI/PHP callbacks); mocking and the script-execution machinery are
 // not available here.
@@ -8,6 +22,7 @@ macro_rules! stub {
         #[test]
         #[ignore = "mocks Composer/IO/ProcessExecutor and executes script listeners; not ported"]
         fn $name() {
+            let _tear_down = TearDown;
             todo!()
         }
     };
