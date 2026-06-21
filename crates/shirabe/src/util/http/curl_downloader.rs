@@ -19,8 +19,8 @@ use shirabe_php_shim::{
     curl_multi_add_handle, curl_multi_exec, curl_multi_info_read, curl_multi_init,
     curl_multi_select, curl_multi_setopt, curl_setopt, curl_setopt_array, curl_share_init,
     curl_share_setopt, curl_strerror, curl_version, defined, explode, fclose, fopen,
-    function_exists, implode, in_array, ini_get, is_resource, json_decode, max, parse_url,
-    preg_quote, rename, rewind, rtrim, sprintf, str_contains, stream_get_contents,
+    function_exists, implode, in_array, ini_get, is_resource, json_decode, parse_url, preg_quote,
+    rename, rewind, rtrim, sprintf, str_contains, stream_get_contents,
     stream_get_contents_with_max, stripos, strpos, substr, unlink_silent, usleep, var_export,
 };
 
@@ -369,14 +369,14 @@ impl CurlDownloader {
         curl_setopt(
             &curl_handle,
             CURLOPT_TIMEOUT,
-            PhpMixed::Int(max(
+            PhpMixed::Int(
                 ini_get("default_socket_timeout")
                     .as_deref()
                     .unwrap_or("0")
                     .parse::<i64>()
-                    .unwrap_or(0),
-                300,
-            )),
+                    .unwrap_or(0)
+                    .max(300),
+            ),
         );
         curl_setopt(&curl_handle, CURLOPT_WRITEHEADER, header_handle.clone());
         curl_setopt(&curl_handle, CURLOPT_FILE, body_handle.clone());

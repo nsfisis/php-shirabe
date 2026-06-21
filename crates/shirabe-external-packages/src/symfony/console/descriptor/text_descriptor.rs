@@ -529,7 +529,7 @@ impl TextDescriptor {
         for option in options {
             // "-" + shortcut + ", --" + name
             let mut name_length = 1
-                + std::cmp::max(Helper::width(option.get_shortcut().unwrap_or("")), 1)
+                + Helper::width(option.get_shortcut().unwrap_or("")).max(1)
                 + 4
                 + Helper::width(option.get_name());
             if option.is_negatable() {

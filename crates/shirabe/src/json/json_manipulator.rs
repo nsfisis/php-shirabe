@@ -6,7 +6,7 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     ArrayObject, InvalidArgumentException, LogicException, PhpMixed, StdClass, addcslashes,
     array_key_exists, array_keys, array_reverse, count, empty, explode, implode, in_array,
-    is_array, is_int, is_numeric, json_decode, max, preg_quote, rtrim, str_contains, str_repeat,
+    is_array, is_int, is_numeric, json_decode, preg_quote, rtrim, str_contains, str_repeat,
     str_replace, strlen, strnatcmp, strpos, substr, trim, uksort,
 };
 
@@ -351,7 +351,7 @@ impl JsonManipulator {
             list_regex = Some(format!(
                 "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?\"repositories\"\\s*:\\s*\\[\\s*((?&json)\\s*+,\\s*+){{{}}})(?P<repository>(?&object))(?P<end>.*)}}sx",
                 Self::DEFINES,
-                max(0, i_val)
+                i_val.max(0)
             ));
         }
 
@@ -1251,7 +1251,7 @@ impl JsonManipulator {
         let list_skip_to_item_regex = format!(
             "{{{}^(?P<start>\\[\\s*((?&json)\\s*+,\\s*?){{{}}})(?P<space_before_item>(\\s*))(?P<end>.*)}}sx",
             Self::DEFINES,
-            max(0, index)
+            index.max(0)
         );
 
         let value_capture = value.clone();

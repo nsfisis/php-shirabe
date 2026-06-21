@@ -7,8 +7,8 @@ use crate::util::Silencer;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, chr,
-    extension_loaded, file_get_contents, function_exists, implode, is_numeric, max, min,
-    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
+    extension_loaded, file_get_contents, function_exists, implode, is_numeric, rawurldecode,
+    stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -148,13 +148,12 @@ impl HttpDownloader {
             None => PhpMixed::Bool(false),
         };
         if is_numeric(&max_jobs_env_mixed) {
-            max_jobs = max(
-                1,
-                min(
-                    50,
-                    max_jobs_env.as_deref().unwrap_or("0").parse().unwrap_or(0),
-                ),
-            );
+            max_jobs = max_jobs_env
+                .as_deref()
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0)
+                .clamp(1, 50);
         }
 
         Self {

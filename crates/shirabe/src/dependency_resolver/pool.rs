@@ -3,7 +3,7 @@
 use std::fmt;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{STR_PAD_LEFT, abs, str_pad};
+use shirabe_php_shim::{STR_PAD_LEFT, str_pad};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -280,7 +280,7 @@ impl Pool {
     }
 
     pub fn literal_to_package(&self, literal: i64) -> BasePackageHandle {
-        let package_id = abs(literal);
+        let package_id = literal.abs();
 
         self.package_by_id(package_id)
     }

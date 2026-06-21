@@ -16,8 +16,8 @@ use shirabe_php_shim::{
     PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count, curl_version, defined,
     disk_free_space, extension_loaded, file_exists, filter_var, function_exists, get_class,
     get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
-    is_array, is_string, key, max, ob_get_clean, ob_start, phpinfo, reset, rtrim, sprintf,
-    str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
+    is_array, is_string, key, ob_get_clean, ob_start, phpinfo, reset, rtrim, sprintf, str_contains,
+    str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1141,9 +1141,9 @@ impl DiagnoseCommand {
         }
         // Apply exit code updates after io borrow ends
         if had_error {
-            self.exit_code = max(prev_exit_code, 2);
+            self.exit_code = prev_exit_code.max(2);
         } else if had_warning {
-            self.exit_code = max(prev_exit_code, 1);
+            self.exit_code = prev_exit_code.max(1);
         }
     }
 

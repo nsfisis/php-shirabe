@@ -9,7 +9,7 @@ use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PATH_SEPARATOR, PHP_VERSION_ID, PhpMixed,
     RuntimeException, array_pop, array_push, array_search_in_vec, array_splice, class_exists,
     count_mixed, defined, file_exists, get_class, hash, implode, ini_get, is_a, is_array,
-    is_callable, is_object, is_string, krsort, max, method_exists, preg_quote, realpath,
+    is_callable, is_object, is_string, krsort, method_exists, preg_quote, realpath,
     spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
     sprintf, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper,
     substr, trim,
@@ -763,7 +763,7 @@ impl EventDispatcher {
                 }
             }
 
-            return_max = max(return_max, r#return);
+            return_max = std::cmp::max(return_max, r#return);
 
             if event.is_propagation_stopped() {
                 break;

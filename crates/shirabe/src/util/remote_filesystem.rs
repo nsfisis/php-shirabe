@@ -778,10 +778,9 @@ impl RemoteFilesystem {
             }
             x if x == STREAM_NOTIFY_PROGRESS => {
                 if self.bytes_max > 0 && self.progress {
-                    let progression = std::cmp::min(
-                        100_i64,
-                        ((bytes_transferred as f64 / self.bytes_max as f64) * 100.0).round() as i64,
-                    );
+                    let progression = (((bytes_transferred as f64 / self.bytes_max as f64) * 100.0)
+                        .round() as i64)
+                        .min(100_i64);
 
                     if 0 == progression % 5
                         && 100 != progression

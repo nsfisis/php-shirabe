@@ -56,7 +56,7 @@ use shirabe_php_shim::{
     date_default_timezone_get, date_default_timezone_set, defined, dirname, disk_free_space,
     error_get_last, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, get_class, getcwd, getmypid, glob, in_array, ini_set, is_array, is_dir,
-    is_file, is_string, is_subclass_of, json_decode, max, memory_get_peak_usage, memory_get_usage,
+    is_file, is_string, is_subclass_of, json_decode, memory_get_peak_usage, memory_get_usage,
     method_exists, microtime, php_uname, posix_getuid, random_bytes, realpath,
     register_shutdown_function, restore_error_handler, round, sprintf, str_contains, str_replace,
     strpos, strtoupper, sys_get_temp_dir, time, unlink,
@@ -2428,7 +2428,7 @@ impl Application {
                     // pre-format lines to get the right string length
                     let line_length = Helper::width(&line) + 4;
                     lines.push((line, line_length));
-                    len = shirabe_php_shim::max(line_length, len);
+                    len = std::cmp::max(line_length, len);
                 }
             }
 
@@ -2455,7 +2455,7 @@ impl Application {
                     title,
                     shirabe_php_shim::str_repeat(
                         " ",
-                        std::cmp::max(0, len - Helper::width(&title)) as usize
+                        (len - Helper::width(&title)).max(0) as usize
                     )
                 ));
             }

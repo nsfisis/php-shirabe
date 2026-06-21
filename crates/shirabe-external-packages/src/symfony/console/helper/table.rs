@@ -558,7 +558,7 @@ impl Table {
                 );
             }
 
-            let title_start = shirabe_php_shim::intdiv(markup_length - title_length, 2);
+            let title_start = (markup_length - title_length) / 2;
             if shirabe_php_shim::mb_detect_encoding(&markup, None, true).is_none() {
                 markup = shirabe_php_shim::substr_replace(
                     &markup,
@@ -1087,9 +1087,8 @@ impl Table {
                             if text_length > 0 {
                                 let content_columns = shirabe_php_shim::mb_str_split(
                                     &text_content,
-                                    shirabe_php_shim::ceil(
-                                        text_length as f64 / Self::cell_colspan(&cell) as f64,
-                                    ) as i64,
+                                    (text_length as f64 / Self::cell_colspan(&cell) as f64).ceil()
+                                        as i64,
                                 );
                                 for (position, content) in content_columns.into_iter().enumerate() {
                                     Self::vec_set(

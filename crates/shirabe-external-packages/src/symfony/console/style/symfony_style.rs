@@ -61,7 +61,7 @@ impl SymfonyStyle {
             let w = Terminal::new().get_width();
             if w != 0 { w } else { MAX_LINE_LENGTH }
         };
-        let line_length = shirabe_php_shim::min(
+        let line_length = std::cmp::min(
             width - (std::path::MAIN_SEPARATOR == '\\') as i64,
             MAX_LINE_LENGTH,
         );
@@ -350,7 +350,7 @@ impl SymfonyStyle {
                     &mut *self.get_formatter().borrow_mut(),
                     &message,
                 ));
-            let message_line_length = shirabe_php_shim::min(
+            let message_line_length = std::cmp::min(
                 self.line_length - prefix_length - indent_length + decoration_length,
                 self.line_length,
             );
@@ -392,14 +392,12 @@ impl SymfonyStyle {
             *line = format!("{}{}", prefix, line);
             line.push_str(&shirabe_php_shim::str_repeat(
                 " ",
-                shirabe_php_shim::max(
-                    self.line_length
-                        - Helper::width(&Helper::remove_decoration(
-                            &mut *self.output.borrow().get_formatter().borrow_mut(),
-                            line,
-                        )),
-                    0,
-                ) as usize,
+                (self.line_length
+                    - Helper::width(&Helper::remove_decoration(
+                        &mut *self.output.borrow().get_formatter().borrow_mut(),
+                        line,
+                    )))
+                .max(0) as usize,
             ));
 
             if let Some(style) = style {

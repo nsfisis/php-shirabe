@@ -14,8 +14,8 @@ use shirabe_external_packages::symfony::process::exception::RuntimeException as 
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, array_intersect, array_map, call_user_func,
     defined, escapeshellarg, explode, implode, in_array, is_array, is_callable, is_dir, is_numeric,
-    is_string, max, min, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower,
-    strtr_array, substr_replace, trim, usleep,
+    is_string, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
+    substr_replace, trim, usleep,
 };
 
 use crate::io::IOInterface;
@@ -540,13 +540,12 @@ impl ProcessExecutor {
             None => PhpMixed::Null,
         };
         if is_numeric(&max_jobs_env_mixed) {
-            self.max_jobs = max(
-                1,
-                min(
-                    50,
-                    max_jobs_env.as_deref().unwrap_or("0").parse().unwrap_or(0),
-                ),
-            );
+            self.max_jobs = max_jobs_env
+                .as_deref()
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0)
+                .clamp(1, 50);
         } else {
             self.max_jobs = 10;
         }

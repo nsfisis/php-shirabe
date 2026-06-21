@@ -5,7 +5,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_key_exists, is_array, max, sprintf, stripos, strrpos, strtr,
+    PhpMixed, RuntimeException, array_key_exists, is_array, sprintf, stripos, strrpos, strtr,
     substr, trim,
 };
 
@@ -362,7 +362,7 @@ impl SvnDriver {
                                 } else {
                                     let identifier = self.build_identifier(
                                         &format!("/{}/{}", self.tags_path, path),
-                                        max(last_rev, rev),
+                                        std::cmp::max(last_rev, rev),
                                     );
                                     tags.insert(path.trim_end_matches('/').to_string(), identifier);
                                 }
@@ -451,7 +451,7 @@ impl SvnDriver {
                                 } else {
                                     let identifier = self.build_identifier(
                                         &format!("/{}/{}", self.branches_path, path),
-                                        max(last_rev, rev),
+                                        std::cmp::max(last_rev, rev),
                                     );
                                     branches
                                         .insert(path.trim_end_matches('/').to_string(), identifier);

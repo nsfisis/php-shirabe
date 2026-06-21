@@ -7,7 +7,7 @@ use std::rc::Rc;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, abs, array_filter, array_keys, array_shift,
+    LogicException, PhpMixed, RuntimeException, array_filter, array_keys, array_shift,
     array_values, implode, is_object,
 };
 use shirabe_semver::constraint::AnyConstraint;
@@ -554,7 +554,7 @@ impl Rule {
                     let mut installed_packages: Vec<BasePackageHandle> = vec![];
                     let mut removable_packages: Vec<BasePackageHandle> = vec![];
                     for literal in &literals {
-                        if installed_map.contains_key(&abs(*literal).to_string()) {
+                        if installed_map.contains_key(&literal.abs().to_string()) {
                             installed_packages.push(pool.literal_to_package(*literal));
                         } else {
                             removable_packages.push(pool.literal_to_package(*literal));

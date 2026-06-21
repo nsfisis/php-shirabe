@@ -14,8 +14,7 @@ use shirabe_php_shim::{
     E_USER_DEPRECATED, FILTER_VALIDATE_URL, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed,
     RuntimeException, array_key_exists, array_merge, array_reverse, array_search_mixed,
     array_unique, current, empty, filter_var, implode, in_array, is_array, is_int, is_string, key,
-    max, parse_url, php_to_string, reset, rtrim, strtolower, strtoupper, strtr, substr,
-    trigger_error,
+    parse_url, php_to_string, reset, rtrim, strtolower, strtoupper, strtr, substr, trigger_error,
 };
 use std::cell::RefCell;
 
@@ -587,7 +586,7 @@ impl Config {
                     } else {
                         val.clone()
                     };
-                    return Ok(PhpMixed::Int(max(0, raw.as_int().unwrap_or(0))));
+                    return Ok(PhpMixed::Int(raw.as_int().unwrap_or(0).max(0)));
                 }
 
                 let raw_val = if matches!(val, PhpMixed::Bool(false)) {
@@ -647,10 +646,13 @@ impl Config {
             }
 
             // ints without env var support
-            "cache-ttl" => Ok(PhpMixed::Int(max(
-                0,
-                self.config.get(key).and_then(|v| v.as_int()).unwrap_or(0),
-            ))),
+            "cache-ttl" => Ok(PhpMixed::Int(
+                self.config
+                    .get(key)
+                    .and_then(|v| v.as_int())
+                    .unwrap_or(0)
+                    .max(0),
+            )),
 
             // numbers with kb/mb/gb support, without env var support
             "cache-files-maxsize" => {
@@ -697,7 +699,7 @@ impl Config {
                     }
                 }
 
-                Ok(PhpMixed::Int(max(0, size as i64)))
+                Ok(PhpMixed::Int((size as i64).max(0)))
             }
 
             // special cases below
@@ -706,7 +708,7 @@ impl Config {
                 if let Some(v) = v
                     && !v.is_null()
                 {
-                    return Ok(PhpMixed::Int(max(0, v.as_int().unwrap_or(0))));
+                    return Ok(PhpMixed::Int(v.as_int().unwrap_or(0).max(0)));
                 }
 
                 self.get_with_flags("cache-ttl", 0)

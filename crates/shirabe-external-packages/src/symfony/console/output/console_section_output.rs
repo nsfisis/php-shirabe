@@ -92,9 +92,9 @@ impl ConsoleSectionOutput {
     /// @internal
     pub fn add_content(&self, input: &str) {
         for line_content in shirabe_php_shim::explode(shirabe_php_shim::PHP_EOL, input) {
-            let count = shirabe_php_shim::ceil(
-                self.get_display_length(&line_content) as f64 / self.terminal.get_width() as f64,
-            );
+            let count = (self.get_display_length(&line_content) as f64
+                / self.terminal.get_width() as f64)
+                .ceil();
             self.lines
                 .set(self.lines.get() + if count != 0.0 { count as i64 } else { 1 });
             self.content.borrow_mut().push(line_content);

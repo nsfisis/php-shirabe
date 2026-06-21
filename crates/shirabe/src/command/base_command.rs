@@ -13,7 +13,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     AsAny, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array, is_string, max,
+    UnexpectedValueException, count, explode, in_array, is_string,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -590,7 +590,7 @@ impl BaseCommand for BaseCommandData {
         if Platform::is_windows() {
             width -= 1;
         } else {
-            width = max(80, width);
+            width = width.max(80);
         }
 
         width

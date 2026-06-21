@@ -6,8 +6,8 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     FILTER_VALIDATE_INT, FILTER_VALIDATE_IP, PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed,
     RuntimeException, array_key_exists, chr, empty, explode, filter_var, filter_var_with_options,
-    floor, inet_pton, ltrim, parse_url, str_pad, str_repeat, stripos, strlen, strpbrk, strpos,
-    substr, substr_count, unpack,
+    inet_pton, ltrim, parse_url, str_pad, str_repeat, stripos, strlen, strpbrk, strpos, substr,
+    substr_count, unpack,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -314,7 +314,7 @@ impl NoProxyPattern {
     fn ip_get_mask(&self, prefix: i64, size: i64) -> Vec<u8> {
         let mut mask = String::new();
 
-        let ones = floor(prefix as f64 / 8.0) as i64;
+        let ones = (prefix as f64 / 8.0).floor() as i64;
         if ones != 0 {
             mask = str_repeat(&chr(255), ones as usize);
         }

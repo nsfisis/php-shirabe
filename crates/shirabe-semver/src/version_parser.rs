@@ -446,7 +446,7 @@ impl VersionParser {
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
-            let high_position = std::cmp::max(1, position - 1);
+            let high_position = (position - 1).max(1);
             let high_version = format!(
                 "{}-dev",
                 self.manipulate_version_string(&matches, high_position, 1, "0")

@@ -7,9 +7,9 @@ use chrono::Utc;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
-    ErrorException, abs, bin2hex, clearstatcache, date_format_to_strftime, dirname,
-    disk_free_space, file_exists, file_get_contents, file_put_contents, filemtime, function_exists,
-    hash_file, is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,
+    ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
+    file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,
+    is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,
 };
 
 use crate::io::IOInterface;
@@ -308,7 +308,7 @@ impl Cache {
             if file_exists(&full_path)
                 && let Some(mtime) = filemtime(&full_path)
             {
-                return Some(abs(time() - mtime));
+                return Some((time() - mtime).abs());
             }
         }
 

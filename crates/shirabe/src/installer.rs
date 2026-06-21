@@ -37,7 +37,7 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_flip, array_map, array_merge, array_unique, array_values,
     clone, count, defined, gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array,
-    intval, is_dir, is_numeric, is_string, max, sprintf, strcmp, strpos, strtolower, touch, usort,
+    intval, is_dir, is_numeric, is_string, sprintf, strcmp, strpos, strtolower, touch, usort,
 };
 use shirabe_semver;
 

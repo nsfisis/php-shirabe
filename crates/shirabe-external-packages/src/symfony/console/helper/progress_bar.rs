@@ -225,11 +225,10 @@ impl ProgressBar {
     }
 
     pub fn get_bar_offset(&self) -> f64 {
-        shirabe_php_shim::floor(if self.max != 0 {
+        f64::floor(if self.max != 0 {
             self.percent * self.bar_width as f64
         } else if self.redraw_freq.is_none() {
-            ((shirabe_php_shim::min(5, self.bar_width / 15) * self.write_count) % self.bar_width)
-                as f64
+            (((self.bar_width / 15).min(5) * self.write_count) % self.bar_width) as f64
         } else {
             (self.step % self.bar_width) as f64
         })
@@ -260,7 +259,7 @@ impl ProgressBar {
     }
 
     pub fn set_bar_width(&mut self, size: i64) {
-        self.bar_width = shirabe_php_shim::max(1, size);
+        self.bar_width = size.max(1);
     }
 
     pub fn get_bar_width(&self) -> i64 {
@@ -309,7 +308,7 @@ impl ProgressBar {
     ///
     /// `$freq` The frequency in steps
     pub fn set_redraw_frequency(&mut self, freq: Option<i64>) {
-        self.redraw_freq = freq.map(|freq| shirabe_php_shim::max(1, freq));
+        self.redraw_freq = freq.map(|freq| freq.max(1));
     }
 
     pub fn min_seconds_between_redraws(&mut self, seconds: f64) {
@@ -416,7 +415,7 @@ impl ProgressBar {
 
     pub fn set_max_steps(&mut self, max: i64) {
         self.format = None;
-        self.max = shirabe_php_shim::max(0, max);
+        self.max = max.max(0);
         self.step_width = if self.max != 0 {
             Helper::width(&self.max.to_string())
         } else {
@@ -512,9 +511,9 @@ impl ProgressBar {
                             message_line,
                         ));
                         if message_line_length > self.terminal.get_width() {
-                            line_count += shirabe_php_shim::floor(
-                                message_line_length as f64 / self.terminal.get_width() as f64,
-                            ) as i64;
+                            line_count += (message_line_length as f64
+                                / self.terminal.get_width() as f64)
+                                .floor() as i64;
                         }
                     }
                     todo!("$this->output->clear($lineCount); (ConsoleSectionOutput)");
@@ -699,7 +698,7 @@ impl ProgressBar {
             Box::new(
                 |bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
                     Ok(Ok(shirabe_php_shim::PhpMixed::Float(
-                        shirabe_php_shim::floor(bar.get_progress_percent() * 100.0),
+                        (bar.get_progress_percent() * 100.0).floor(),
                     )))
                 },
             ),
