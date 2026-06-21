@@ -9,7 +9,6 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_external_packages::symfony::console::application::Application as BaseApplication;
 use shirabe_external_packages::symfony::console::command::Command as SymfonyCommand;
 use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
-use shirabe_external_packages::symfony::console::command::lazy_command::LazyCommand;
 use shirabe_external_packages::symfony::console::command::signalable_command_interface::SignalableCommandInterface;
 use shirabe_external_packages::symfony::console::command_loader::command_loader_interface::CommandLoaderInterface;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
@@ -291,7 +290,7 @@ impl Application {
             return Ok(None);
         }
 
-        // if (!$command instanceof LazyCommand) { $command->getDefinition(); }
+        // LazyCommand is intentionally not ported.
         command.borrow().get_definition();
 
         if command.borrow().get_name().is_none() {
@@ -1669,11 +1668,7 @@ impl Application {
             }
         }
 
-        // if ($command instanceof LazyCommand) $command = $command->getCommand();
-        // TODO(review): LazyCommand is a distinct type from SymfonyCommand here; PHP unwraps the real
-        // command. The `commands` map stores Rc<RefCell<dyn SymfonyCommand>>, so the LazyCommand-unwrap path
-        // needs a design decision about how lazy commands are represented.
-        let _ = std::marker::PhantomData::<LazyCommand>;
+        // LazyCommand is intentionally not ported.
 
         application.borrow_mut().running_command = Some(command.clone());
         // do_run_command invokes the command's run(), which calls back into the application
@@ -1853,9 +1848,7 @@ impl Application {
             return Ok(None);
         }
 
-        // if (!$command instanceof LazyCommand) { $command->getDefinition(); }
-        // TODO(review): LazyCommand vs SymfonyCommand type distinction; eager definition probe omitted
-        // pending lazy-command representation decision.
+        // LazyCommand is intentionally not ported.
         command.borrow().get_definition();
 
         if command.borrow().get_name().is_none() {

@@ -8,7 +8,6 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::symfony::console::command::command::{Command, CommandData};
-use crate::symfony::console::command::lazy_command::LazyCommand;
 use crate::symfony::console::completion::completion_input::CompletionInput;
 use crate::symfony::console::completion::completion_suggestions::{
     CompletionSuggestions, StringOrSuggestion,
@@ -139,10 +138,8 @@ impl CompleteCommand {
     }
 }
 
-/// \get_class($command instanceof LazyCommand ? $command->getCommand() : $command)
 fn get_class_of_command(command: &Rc<RefCell<dyn Command>>) -> String {
-    let borrowed = command.borrow();
-    let _is_lazy = (*borrowed).as_any().downcast_ref::<LazyCommand>().is_some();
+    // LazyCommand is intentionally not ported.
     // TODO: get_class() takes a PhpMixed but the command is a `dyn Command`; reflecting the
     // concrete class name of a trait object requires a class-name hook on Command (Phase C).
     todo!()
