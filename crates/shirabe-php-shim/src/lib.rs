@@ -1,4 +1,3 @@
-mod apcu;
 mod array;
 mod compress;
 mod curl;
@@ -25,7 +24,6 @@ mod url;
 mod var;
 mod zip;
 
-pub use apcu::*;
 pub use array::*;
 pub use compress::*;
 pub use curl::*;

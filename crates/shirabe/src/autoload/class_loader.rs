@@ -4,9 +4,9 @@ use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, FILTER_VALIDATE_BOOLEAN, InvalidArgumentException, PhpMixed, apcu_add,
-    apcu_fetch, array_merge, array_values, call_user_func_array, defined, file_exists, filter_var,
-    function_exists, include_file, ini_get, spl_autoload_register, spl_autoload_unregister,
+    DIRECTORY_SEPARATOR, FILTER_VALIDATE_BOOLEAN, InvalidArgumentException, PhpMixed, array_merge,
+    array_values, call_user_func_array, defined, file_exists, filter_var, function_exists,
+    include_file, ini_get, spl_autoload_register, spl_autoload_unregister,
     stream_resolve_include_path, strlen, strpos, strrpos, strtr, substr,
 };
 
@@ -273,16 +273,9 @@ impl ClassLoader {
     }
 
     /// APCu prefix to use to cache found/not-found classes, if the extension is enabled.
-    pub fn set_apcu_prefix(&mut self, apcu_prefix: Option<String>) {
-        self.apcu_prefix = if function_exists("apcu_fetch")
-            && filter_var(
-                &ini_get("apc.enabled").unwrap_or_default(),
-                FILTER_VALIDATE_BOOLEAN,
-            ) {
-            apcu_prefix
-        } else {
-            None
-        };
+    pub fn set_apcu_prefix(&mut self, _apcu_prefix: Option<String>) {
+        // APCu is not available in Rust.
+        self.apcu_prefix = None;
     }
 
     /// The APCu prefix in use, or null if APCu caching is not enabled.
@@ -355,11 +348,7 @@ impl ClassLoader {
             return None;
         }
         if let Some(apcu_prefix) = &self.apcu_prefix {
-            let mut hit = false;
-            let file = apcu_fetch(&format!("{}{}", apcu_prefix, class), &mut hit);
-            if hit {
-                return file.as_string().map(String::from);
-            }
+            // No-op; APCu is not available in Rust.
         }
 
         let mut file = self.find_file_with_extension(class, ".php");
@@ -370,13 +359,7 @@ impl ClassLoader {
         }
 
         if let Some(apcu_prefix) = &self.apcu_prefix {
-            apcu_add(
-                &format!("{}{}", apcu_prefix, class),
-                match file.as_ref() {
-                    Some(s) => PhpMixed::String(s.clone()),
-                    None => PhpMixed::Bool(false),
-                },
-            );
+            // No-op; APCu is not available in Rust.
         }
 
         if file.is_none() {
