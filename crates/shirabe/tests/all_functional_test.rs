@@ -21,16 +21,16 @@ impl Drop for TearDown {
     }
 }
 
-macro_rules! stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "not yet ported (builds composer.phar and runs the functional .test fixtures via the binary)"]
-        fn $name() {
-            let _tear_down = TearDown;
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "not yet ported (builds composer.phar and runs the functional .test fixtures via the binary)"]
+fn test_build_phar() {
+    let _tear_down = TearDown;
+    todo!()
 }
 
-stub!(test_build_phar);
-stub!(test_integration);
+#[test]
+#[ignore = "not yet ported (builds composer.phar and runs the functional .test fixtures via the binary)"]
+fn test_integration() {
+    let _tear_down = TearDown;
+    todo!()
+}

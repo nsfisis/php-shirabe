@@ -4,30 +4,104 @@
 // HttpDownloader reaches curl_multi_init, todo!()), or — for testSupports — rely on the
 // gitlab-domains configured in setUp plus the openssl extension, which are not modeled.
 
-macro_rules! gitlab_stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_initialize() {
+    todo!()
 }
 
-gitlab_stub!(test_initialize);
-gitlab_stub!(test_initialize_public_project);
-gitlab_stub!(test_initialize_public_project_as_anonymous);
-gitlab_stub!(test_initialize_with_port_number);
-gitlab_stub!(test_invalid_support_data);
-gitlab_stub!(test_get_dist);
-gitlab_stub!(test_get_source);
-gitlab_stub!(test_get_source_given_public_project);
-gitlab_stub!(test_get_tags);
-gitlab_stub!(test_get_paginated_refs);
-gitlab_stub!(test_get_branches);
-gitlab_stub!(test_supports);
-gitlab_stub!(test_gitlab_sub_directory);
-gitlab_stub!(test_gitlab_sub_group);
-gitlab_stub!(test_gitlab_sub_directory_sub_group);
-gitlab_stub!(test_forwards_options);
-gitlab_stub!(test_protocol_override_repository_url_generation);
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_initialize_public_project() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_initialize_public_project_as_anonymous() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_initialize_with_port_number() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_invalid_support_data() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_get_dist() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_get_source() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_get_source_given_public_project() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_get_tags() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_get_paginated_refs() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_get_branches() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_supports() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_gitlab_sub_directory() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_gitlab_sub_group() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_gitlab_sub_directory_sub_group() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_forwards_options() {
+    todo!()
+}
+
+#[test]
+#[ignore = "GitLabDriver tests mock HttpDownloader/IO (curl_multi_init todo!()) or need setUp gitlab-domains config"]
+fn test_protocol_override_repository_url_generation() {
+    todo!()
+}

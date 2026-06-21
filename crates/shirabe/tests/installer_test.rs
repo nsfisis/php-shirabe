@@ -21,18 +21,30 @@ impl Drop for TearDown {
     }
 }
 
-macro_rules! stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
-        fn $name() {
-            let _tear_down = TearDown;
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+fn test_installer() {
+    let _tear_down = TearDown;
+    todo!()
 }
 
-stub!(test_installer);
-stub!(test_slow_integration);
-stub!(test_integration_with_pool_optimizer);
-stub!(test_integration_with_raw_pool);
+#[test]
+#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+fn test_slow_integration() {
+    let _tear_down = TearDown;
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+fn test_integration_with_pool_optimizer() {
+    let _tear_down = TearDown;
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (end-to-end Installer integration over fixtures; constraint parsing uses a look-around regex)"]
+fn test_integration_with_raw_pool() {
+    let _tear_down = TearDown;
+    todo!()
+}

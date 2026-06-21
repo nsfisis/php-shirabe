@@ -167,35 +167,134 @@ fn test_add_packagist_repository() {
 // htaccess-protect, var/realpath replacement, oauth, audit, ...) without the env isolation
 // their setUp/tearDown provides, or exercise plugin-config merge details. They are not
 // ported yet.
-macro_rules! stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_preferred_install_as_string() {
+    todo!()
 }
 
-stub!(test_preferred_install_as_string);
-stub!(test_merge_preferred_install);
-stub!(test_merge_github_oauth);
-stub!(test_var_replacement);
-stub!(test_realpath_replacement);
-stub!(test_stream_wrapper_dirs);
-stub!(test_fetching_relative_paths);
-stub!(test_override_github_protocols);
-stub!(test_git_disabled_by_default_in_github_protocols);
-stub!(test_allowed_urls_pass);
-stub!(test_prohibited_urls_throw_exception);
-stub!(test_prohibited_urls_warning_verify_peer);
-stub!(test_disable_tls_can_be_overridden);
-stub!(test_process_timeout);
-stub!(test_htaccess_protect);
-stub!(test_get_source_of_value);
-stub!(test_get_source_of_value_env_variables);
-stub!(test_audit);
-stub!(test_get_defaults_to_an_empty_array);
-stub!(test_merges_plugin_config);
-stub!(test_overrides_global_boolean_plugins_config);
-stub!(test_allows_all_plugins_from_local_boolean);
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_merge_preferred_install() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_merge_github_oauth() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_var_replacement() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_realpath_replacement() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_stream_wrapper_dirs() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_fetching_relative_paths() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_override_github_protocols() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_git_disabled_by_default_in_github_protocols() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_allowed_urls_pass() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_prohibited_urls_throw_exception() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_prohibited_urls_warning_verify_peer() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_disable_tls_can_be_overridden() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_process_timeout() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_htaccess_protect() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_get_source_of_value() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_get_source_of_value_env_variables() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_audit() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_get_defaults_to_an_empty_array() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_merges_plugin_config() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_overrides_global_boolean_plugins_config() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (env-dependent without the setUp/tearDown isolation, or plugin-config merge details)"]
+fn test_allows_all_plugins_from_local_boolean() {
+    todo!()
+}

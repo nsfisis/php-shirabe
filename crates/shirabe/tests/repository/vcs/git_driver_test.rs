@@ -63,25 +63,74 @@ impl Drop for TearDown {
     }
 }
 
-macro_rules! git_stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
-        fn $name() {
-            let SetUp {
-                home,
-                config: _,
-                network_env,
-            } = set_up();
-            let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+fn test_get_root_identifier_from_remote_local_repository() {
+    let SetUp {
+        home,
+        config: _,
+        network_env,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
+    todo!()
 }
 
-git_stub!(test_get_root_identifier_from_remote_local_repository);
-git_stub!(test_get_root_identifier_from_remote);
-git_stub!(test_get_root_identifier_from_local_with_network_disabled);
-git_stub!(test_get_branches_filter_invalid_branch_names);
-git_stub!(test_file_get_content_invalid_identifier);
-git_stub!(test_get_change_date_invalid_identifier);
+#[test]
+#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+fn test_get_root_identifier_from_remote() {
+    let SetUp {
+        home,
+        config: _,
+        network_env,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
+    todo!()
+}
+
+#[test]
+#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+fn test_get_root_identifier_from_local_with_network_disabled() {
+    let SetUp {
+        home,
+        config: _,
+        network_env,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
+    todo!()
+}
+
+#[test]
+#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+fn test_get_branches_filter_invalid_branch_names() {
+    let SetUp {
+        home,
+        config: _,
+        network_env,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
+    todo!()
+}
+
+#[test]
+#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+fn test_file_get_content_invalid_identifier() {
+    let SetUp {
+        home,
+        config: _,
+        network_env,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
+    todo!()
+}
+
+#[test]
+#[ignore = "constructs a GitDriver and mocks a ProcessExecutor/HttpDownloader (curl_multi_init todo!())"]
+fn test_get_change_date_invalid_identifier() {
+    let SetUp {
+        home,
+        config: _,
+        network_env,
+    } = set_up();
+    let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
+    todo!()
+}

@@ -15,23 +15,66 @@ impl Drop for TearDown {
     }
 }
 
-macro_rules! stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
-        fn $name() {
-            let _tear_down = TearDown;
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_global() {
+    let _tear_down = TearDown;
 
-            todo!()
-        }
-    };
+    todo!()
 }
 
-stub!(test_global);
-stub!(test_cannot_create_home);
-stub!(test_global_show);
-stub!(test_global_show_without_packages);
-stub!(test_global_require);
-stub!(test_global_update);
-stub!(test_global_changes_directory);
-stub!(test_global_missing_command_name);
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_cannot_create_home() {
+    let _tear_down = TearDown;
+
+    todo!()
+}
+
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_global_show() {
+    let _tear_down = TearDown;
+
+    todo!()
+}
+
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_global_show_without_packages() {
+    let _tear_down = TearDown;
+
+    todo!()
+}
+
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_global_require() {
+    let _tear_down = TearDown;
+
+    todo!()
+}
+
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_global_update() {
+    let _tear_down = TearDown;
+
+    todo!()
+}
+
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_global_changes_directory() {
+    let _tear_down = TearDown;
+
+    todo!()
+}
+
+#[test]
+#[ignore = "requires the ApplicationTester/initTempComposer harness, which is not yet ported"]
+fn test_global_missing_command_name() {
+    let _tear_down = TearDown;
+
+    todo!()
+}

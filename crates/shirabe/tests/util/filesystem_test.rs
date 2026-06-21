@@ -51,25 +51,74 @@ impl Drop for TearDown {
     }
 }
 
-macro_rules! stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_find_shortest_path_code() {
+    todo!()
 }
 
-stub!(test_find_shortest_path_code);
-stub!(test_find_shortest_path);
-stub!(test_remove_directory_php);
-stub!(test_file_size);
-stub!(test_directory_size);
-stub!(test_normalize_path);
-stub!(test_unlink_symlinked_directory);
-stub!(test_remove_symlinked_directory_with_trailing_slash);
-stub!(test_junctions);
-stub!(test_override_junctions);
-stub!(test_copy);
-stub!(test_copy_then_remove);
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_find_shortest_path() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_remove_directory_php() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_file_size() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_directory_size() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_normalize_path() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_unlink_symlinked_directory() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_remove_symlinked_directory_with_trailing_slash() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_junctions() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_override_junctions() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_copy() {
+    todo!()
+}
+
+#[test]
+#[ignore = "not yet ported (Filesystem path helpers plus on-disk size/copy/symlink/junction fixtures)"]
+fn test_copy_then_remove() {
+    todo!()
+}

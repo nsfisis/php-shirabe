@@ -82,74 +82,150 @@ fn test_parse_error_detect_missing_colon() {
 // The encode cases assert JsonFile::encode output for specific PHP flag combinations and
 // data shapes (incl. stdClass vs array). Faithful flag mapping and value modeling are not
 // reproduced here.
-macro_rules! encode_stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_simple_json_string() {
+    todo!()
 }
 
-encode_stub!(test_simple_json_string);
-encode_stub!(test_trailing_backslash);
-encode_stub!(test_format_empty_array);
-encode_stub!(test_escape);
-encode_stub!(test_unicode);
-encode_stub!(test_only_unicode);
-encode_stub!(test_escaped_slashes);
-encode_stub!(test_escaped_backslashes);
-encode_stub!(test_escaped_unicode);
-encode_stub!(test_double_escaped_unicode);
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_trailing_backslash() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_format_empty_array() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_escape() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_unicode() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_only_unicode() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_escaped_slashes() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_escaped_backslashes() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_escaped_unicode() {
+    todo!()
+}
+
+#[test]
+#[ignore = "asserts JsonFile::encode output for specific PHP flag/value combinations; not reproduced here"]
+fn test_double_escaped_unicode() {
+    todo!()
+}
 
 // These read a fixture composer.json and assert read/write indentation behaviour.
-macro_rules! indentation_stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "reads a fixture file and asserts indentation behaviour of JsonFile read/write"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "reads a fixture file and asserts indentation behaviour of JsonFile read/write"]
+fn test_preserve_indentation_after_read() {
+    todo!()
 }
 
-indentation_stub!(test_preserve_indentation_after_read);
-indentation_stub!(test_overwrites_indentation_by_default);
+#[test]
+#[ignore = "reads a fixture file and asserts indentation behaviour of JsonFile read/write"]
+fn test_overwrites_indentation_by_default() {
+    todo!()
+}
 
 // validateSchema needs the bundled JSON schema and the json-schema validator plus fixtures.
-macro_rules! schema_stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
+fn test_schema_validation() {
+    todo!()
 }
 
-schema_stub!(test_schema_validation);
-schema_stub!(test_schema_validation_error);
-schema_stub!(test_schema_validation_lax_additional_properties);
-schema_stub!(test_schema_validation_lax_required);
-schema_stub!(test_custom_schema_validation_lax);
-schema_stub!(test_custom_schema_validation_strict);
-schema_stub!(test_auth_schema_validation_with_custom_data_source);
+#[test]
+#[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
+fn test_schema_validation_error() {
+    todo!()
+}
+
+#[test]
+#[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
+fn test_schema_validation_lax_additional_properties() {
+    todo!()
+}
+
+#[test]
+#[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
+fn test_schema_validation_lax_required() {
+    todo!()
+}
+
+#[test]
+#[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
+fn test_custom_schema_validation_lax() {
+    todo!()
+}
+
+#[test]
+#[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
+fn test_custom_schema_validation_strict() {
+    todo!()
+}
+
+#[test]
+#[ignore = "needs JsonFile::validateSchema (json-schema validation) and the schema/fixtures"]
+fn test_auth_schema_validation_with_custom_data_source() {
+    todo!()
+}
 
 // The merge-conflict cases build large lock-file structures (with VCS conflict markers) and
 // assert the resulting ParsingException; the fixtures are sizeable and not reproduced here.
-macro_rules! merge_stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "builds a large lock-file structure with VCS merge markers; not reproduced here"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "builds a large lock-file structure with VCS merge markers; not reproduced here"]
+fn test_composer_lock_file_merge_conflict_simple() {
+    todo!()
 }
 
-merge_stub!(test_composer_lock_file_merge_conflict_simple);
-merge_stub!(test_composer_lock_file_merge_conflict_simple_crlf);
-merge_stub!(test_composer_lock_file_merge_conflict_complex);
-merge_stub!(test_composer_lock_file_merge_conflict_complex_crlf);
-merge_stub!(test_composer_lock_file_merge_conflict_extended);
+#[test]
+#[ignore = "builds a large lock-file structure with VCS merge markers; not reproduced here"]
+fn test_composer_lock_file_merge_conflict_simple_crlf() {
+    todo!()
+}
+
+#[test]
+#[ignore = "builds a large lock-file structure with VCS merge markers; not reproduced here"]
+fn test_composer_lock_file_merge_conflict_complex() {
+    todo!()
+}
+
+#[test]
+#[ignore = "builds a large lock-file structure with VCS merge markers; not reproduced here"]
+fn test_composer_lock_file_merge_conflict_complex_crlf() {
+    todo!()
+}
+
+#[test]
+#[ignore = "builds a large lock-file structure with VCS merge markers; not reproduced here"]
+fn test_composer_lock_file_merge_conflict_extended() {
+    todo!()
+}

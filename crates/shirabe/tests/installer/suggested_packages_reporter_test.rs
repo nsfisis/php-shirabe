@@ -8,24 +8,68 @@ fn set_up() {
 
 // These construct a SuggestedPackagesReporter with a mocked IO and assert its accumulated
 // suggestions and formatted output; mocking is not available here.
-macro_rules! stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
-        fn $name() {
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_constructor() {
+    todo!()
 }
 
-stub!(test_constructor);
-stub!(test_get_packages_empty_by_default);
-stub!(test_get_packages);
-stub!(test_add_package_appends);
-stub!(test_add_suggestions_from_package);
-stub!(test_output);
-stub!(test_output_with_no_suggestion_reason);
-stub!(test_output_ignores_formatting);
-stub!(test_output_multiple_packages);
-stub!(test_output_skip_installed_packages);
-stub!(test_output_not_getting_installed_packages_when_no_suggestions);
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_get_packages_empty_by_default() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_get_packages() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_add_package_appends() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_add_suggestions_from_package() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_output() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_output_with_no_suggestion_reason() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_output_ignores_formatting() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_output_multiple_packages() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_output_skip_installed_packages() {
+    todo!()
+}
+
+#[test]
+#[ignore = "mocks IO to drive SuggestedPackagesReporter output; mocking is not available"]
+fn test_output_not_getting_installed_packages_when_no_suggestions() {
+    todo!()
+}

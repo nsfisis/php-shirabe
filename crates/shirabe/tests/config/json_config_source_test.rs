@@ -33,22 +33,58 @@ impl Drop for TearDown {
 
 // JsonConfigSource edits composer.json through JsonManipulator, whose text-rewriting
 // operations reach addcslashes (todo!()) in the php-shim.
-macro_rules! stub {
-    ($name:ident) => {
-        #[test]
-        #[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
-        fn $name() {
-            let _tear_down = set_up();
-            todo!()
-        }
-    };
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_add_repository() {
+    let _tear_down = set_up();
+    todo!()
 }
 
-stub!(test_add_repository);
-stub!(test_add_repository_as_list);
-stub!(test_add_repository_with_options);
-stub!(test_remove_repository);
-stub!(test_add_packagist_repository_with_false_value);
-stub!(test_remove_packagist);
-stub!(test_add_link);
-stub!(test_remove_link);
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_add_repository_as_list() {
+    let _tear_down = set_up();
+    todo!()
+}
+
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_add_repository_with_options() {
+    let _tear_down = set_up();
+    todo!()
+}
+
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_remove_repository() {
+    let _tear_down = set_up();
+    todo!()
+}
+
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_add_packagist_repository_with_false_value() {
+    let _tear_down = set_up();
+    todo!()
+}
+
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_remove_packagist() {
+    let _tear_down = set_up();
+    todo!()
+}
+
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_add_link() {
+    let _tear_down = set_up();
+    todo!()
+}
+
+#[test]
+#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+fn test_remove_link() {
+    let _tear_down = set_up();
+    todo!()
+}
