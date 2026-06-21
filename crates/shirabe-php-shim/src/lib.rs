@@ -167,7 +167,7 @@ impl PhpMixed {
 
     /// PHP loose boolean cast `(bool) $value`.
     pub fn to_bool(&self) -> bool {
-        todo!()
+        php_truthy(self)
     }
 
     pub fn get(&self, key: &str) -> Option<&PhpMixed> {
@@ -599,16 +599,49 @@ pub fn max_i64(_a: i64, _b: i64) -> i64 {
     _a.max(_b)
 }
 
-pub fn count_mixed(_value: &PhpMixed) -> i64 {
-    todo!()
+pub fn count_mixed(value: &PhpMixed) -> i64 {
+    count(value) as i64
 }
 
-pub fn array_slice_mixed(_value: &PhpMixed, _offset: i64, _length: Option<i64>) -> PhpMixed {
-    todo!()
+/// Resolve PHP array_slice/substr-style (offset, length) into a `[start, end)`
+/// pair of indices, honouring negative offsets and lengths.
+fn php_slice_bounds(len: i64, offset: i64, length: Option<i64>) -> (usize, usize) {
+    let start = if offset < 0 {
+        (len + offset).max(0)
+    } else {
+        offset.min(len)
+    };
+    let end = match length {
+        None => len,
+        Some(l) if l < 0 => (len + l).max(start),
+        Some(l) => (start + l).min(len),
+    };
+    (start as usize, end as usize)
 }
 
-pub fn array_slice_strs(_value: &[String], _offset: i64, _length: Option<i64>) -> Vec<String> {
-    todo!()
+pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
+    match value {
+        PhpMixed::List(items) => {
+            let (start, end) = php_slice_bounds(items.len() as i64, offset, length);
+            PhpMixed::List(items[start..end].to_vec())
+        }
+        PhpMixed::Array(map) => {
+            let (start, end) = php_slice_bounds(map.len() as i64, offset, length);
+            PhpMixed::Array(
+                map.iter()
+                    .skip(start)
+                    .take(end - start)
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect(),
+            )
+        }
+        _ => panic!("array_slice(): Argument #1 ($array) must be of type array"),
+    }
+}
+
+pub fn array_slice_strs(value: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
+    let (start, end) = php_slice_bounds(value.len() as i64, offset, length);
+    value[start..end].to_vec()
 }
 
 pub fn empty(value: &PhpMixed) -> bool {
@@ -1127,8 +1160,9 @@ pub const JSON_UNESCAPED_SLASHES: i64 = 64;
 pub const JSON_PRETTY_PRINT: i64 = 128;
 pub const JSON_THROW_ON_ERROR: i64 = 4194304;
 
-pub fn json_encode<T: serde::Serialize + ?Sized>(_value: &T) -> Option<String> {
-    todo!()
+pub fn json_encode<T: serde::Serialize + ?Sized>(value: &T) -> Option<String> {
+    // PHP's json_encode() with no flags escapes slashes and non-ASCII characters.
+    json_encode_ex(value, 0)
 }
 
 pub fn dirname(path: &str) -> String {
@@ -1245,20 +1279,70 @@ pub fn chmod(_path: &str, _mode: u32) -> bool {
     todo!()
 }
 
-pub fn strpbrk(_haystack: &str, _char_list: &str) -> Option<String> {
-    todo!()
+pub fn strpbrk(haystack: &str, char_list: &str) -> Option<String> {
+    let set = char_list.as_bytes();
+    let bytes = haystack.as_bytes();
+    for i in 0..bytes.len() {
+        if set.contains(&bytes[i]) {
+            return Some(String::from_utf8_lossy(&bytes[i..]).into_owned());
+        }
+    }
+    None
 }
 
-pub fn rawurldecode(_s: &str) -> String {
-    todo!()
+fn hex_digit_value(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
 }
 
-pub fn rawurlencode(_s: &str) -> String {
-    todo!()
+pub fn rawurldecode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(h), Some(l)) =
+                (hex_digit_value(bytes[i + 1]), hex_digit_value(bytes[i + 2]))
+            {
+                out.push((h << 4) | l);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
-pub fn urlencode(_s: &str) -> String {
-    todo!()
+pub fn rawurlencode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{:02X}", b));
+        }
+    }
+    out
+}
+
+pub fn urlencode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.') {
+            out.push(b as char);
+        } else if b == b' ' {
+            out.push('+');
+        } else {
+            out.push_str(&format!("%{:02X}", b));
+        }
+    }
+    out
 }
 
 pub fn base64_encode(_data: &str) -> String {
@@ -1269,8 +1353,12 @@ pub fn base64_decode(_data: &str) -> Option<Vec<u8>> {
     todo!()
 }
 
-pub fn substr_count(_haystack: &str, _needle: &str) -> i64 {
-    todo!()
+pub fn substr_count(haystack: &str, needle: &str) -> i64 {
+    if needle.is_empty() {
+        panic!("substr_count(): Argument #2 ($needle) cannot be empty");
+    }
+    // str::matches counts non-overlapping occurrences, matching PHP's substr_count.
+    haystack.matches(needle).count() as i64
 }
 
 pub fn openssl_x509_parse(
@@ -1381,7 +1469,8 @@ pub const PHP_VERSION: &str = "8.1.0";
 pub const STDERR: i64 = 2;
 
 pub fn is_resource(_value: &PhpMixed) -> bool {
-    todo!()
+    // PhpMixed has no resource variant, so a PhpMixed is never a resource.
+    false
 }
 
 #[derive(Debug)]
@@ -1418,8 +1507,28 @@ impl RarArchive {
     }
 }
 
-pub fn array_fill_keys(_keys: PhpMixed, _value: PhpMixed) -> PhpMixed {
-    todo!()
+/// Map a PHP array key (always stored as a `String` here) back to its PHP value
+/// type: an integer-like key becomes an int, anything else stays a string.
+fn php_key_to_mixed(key: &str) -> PhpMixed {
+    if let Ok(n) = key.parse::<i64>() {
+        if n.to_string() == key {
+            return PhpMixed::Int(n);
+        }
+    }
+    PhpMixed::String(key.to_string())
+}
+
+pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
+    let entries: Vec<&PhpMixed> = match &keys {
+        PhpMixed::List(items) => items.iter().collect(),
+        PhpMixed::Array(map) => map.values().collect(),
+        _ => panic!("array_fill_keys(): Argument #1 ($keys) must be of type array"),
+    };
+    let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
+    for key in entries {
+        result.insert(php_to_string(key), value.clone());
+    }
+    PhpMixed::Array(result)
 }
 
 /// PHP `array_merge`.
@@ -1434,8 +1543,38 @@ pub fn array_fill_keys(_keys: PhpMixed, _value: PhpMixed) -> PhpMixed {
 /// and integer keys (e.g. an AliasPackage's provides/replaces, where
 /// self.version expansion appends links under "0","1",... keys). See the typed
 /// [`array_merge_map`] variant used by such call sites.
-pub fn array_merge(_array1: PhpMixed, _array2: PhpMixed) -> PhpMixed {
-    todo!()
+pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
+    let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut next_int: i64 = 0;
+    for array in [array1, array2] {
+        match array {
+            PhpMixed::List(items) => {
+                for value in items {
+                    result.insert(next_int.to_string(), value);
+                    next_int += 1;
+                }
+            }
+            PhpMixed::Array(map) => {
+                for (key, value) in map {
+                    if let Ok(n) = key.parse::<i64>() {
+                        if n.to_string() == key {
+                            result.insert(next_int.to_string(), value);
+                            next_int += 1;
+                            continue;
+                        }
+                    }
+                    result.insert(key, value);
+                }
+            }
+            _ => panic!("array_merge(): Argument must be of type array"),
+        }
+    }
+    let is_list = result.keys().enumerate().all(|(i, k)| *k == i.to_string());
+    if is_list {
+        PhpMixed::List(result.into_values().collect())
+    } else {
+        PhpMixed::Array(result)
+    }
 }
 
 /// PHP `array_merge` for a string-keyed map that MAY also contain integer-like
@@ -1447,10 +1586,24 @@ pub fn array_merge(_array1: PhpMixed, _array2: PhpMixed) -> PhpMixed {
 /// and renumbered sequentially across both inputs. A naive `IndexMap::insert`
 /// per entry is INCORRECT because it would collide on shared integer keys.
 pub fn array_merge_map<V>(
-    _array1: IndexMap<String, V>,
-    _array2: IndexMap<String, V>,
+    array1: IndexMap<String, V>,
+    array2: IndexMap<String, V>,
 ) -> IndexMap<String, V> {
-    todo!()
+    let mut result: IndexMap<String, V> = IndexMap::new();
+    let mut next_int: i64 = 0;
+    for array in [array1, array2] {
+        for (key, value) in array {
+            if let Ok(n) = key.parse::<i64>() {
+                if n.to_string() == key {
+                    result.insert(next_int.to_string(), value);
+                    next_int += 1;
+                    continue;
+                }
+            }
+            result.insert(key, value);
+        }
+    }
+    result
 }
 
 pub fn substr_replace(_string: &str, _replace: &str, _start: usize, _length: usize) -> String {
@@ -1597,9 +1750,28 @@ pub fn explode(delimiter: &str, string: &str) -> Vec<String> {
     string.split(delimiter).map(|s| s.to_string()).collect()
 }
 
+fn explode_limit_impl(delimiter: &str, string: &str, limit: i64) -> Vec<String> {
+    if limit > 0 {
+        string
+            .splitn(limit as usize, delimiter)
+            .map(|s| s.to_string())
+            .collect()
+    } else if limit == 0 {
+        // PHP treats a zero limit as 1: the whole string is returned as one element.
+        vec![string.to_string()]
+    } else {
+        let parts: Vec<String> = string.split(delimiter).map(|s| s.to_string()).collect();
+        let keep = parts.len() as i64 + limit;
+        if keep <= 0 {
+            Vec::new()
+        } else {
+            parts[..keep as usize].to_vec()
+        }
+    }
+}
+
 pub fn explode_with_limit(delimiter: &str, string: &str, limit: i64) -> Vec<String> {
-    let _ = (delimiter, string, limit);
-    todo!()
+    explode_limit_impl(delimiter, string, limit)
 }
 
 pub struct FilesystemIterator;
@@ -1825,8 +1997,20 @@ pub fn file(_filename: &str, _flags: i64) -> Option<Vec<String>> {
     todo!()
 }
 
-pub fn ucwords(_s: &str) -> String {
-    todo!()
+pub fn ucwords(s: &str) -> String {
+    // PHP's default word delimiters: space, tab, CR, LF, FF and VT.
+    let delimiters = [' ', '\t', '\r', '\n', '\x0C', '\x0B'];
+    let mut out = String::with_capacity(s.len());
+    let mut capitalize_next = true;
+    for c in s.chars() {
+        if capitalize_next {
+            out.push(c.to_ascii_uppercase());
+        } else {
+            out.push(c);
+        }
+        capitalize_next = delimiters.contains(&c);
+    }
+    out
 }
 
 pub fn get_current_user() -> String {
@@ -1979,18 +2163,20 @@ pub fn php_uname(mode: &str) -> String {
     }
 }
 
-pub fn uasort<T, F>(_array: &mut Vec<T>, _compare: F)
+pub fn uasort<T, F>(array: &mut Vec<T>, compare: F)
 where
     F: FnMut(&T, &T) -> i64,
 {
-    todo!()
+    let mut compare = compare;
+    array.sort_by(|a, b| compare(a, b).cmp(&0));
 }
 
-pub fn uasort_map<K, V, F>(_array: &mut IndexMap<K, V>, _compare: F)
+pub fn uasort_map<K, V, F>(array: &mut IndexMap<K, V>, compare: F)
 where
     F: FnMut(&V, &V) -> i64,
 {
-    todo!()
+    let mut compare = compare;
+    array.sort_by(|_, v1, _, v2| compare(v1, v2).cmp(&0));
 }
 
 pub fn array_replace_recursive(
@@ -2143,8 +2329,12 @@ pub fn http_build_query(_data: &[(&str, &str)], _sep_str: &str, _sep: &str) -> S
     todo!()
 }
 
-pub fn dirname_levels(_path: &str, _levels: i64) -> String {
-    todo!()
+pub fn dirname_levels(path: &str, levels: i64) -> String {
+    let mut result = path.to_string();
+    for _ in 0..levels {
+        result = dirname(&result);
+    }
+    result
 }
 
 // Byte-based, matching PHP's array form of strtr: at each position the longest
@@ -2181,12 +2371,30 @@ pub fn array_search_mixed(
     haystack: &PhpMixed,
     strict: bool,
 ) -> Option<PhpMixed> {
-    let _ = (needle, haystack, strict);
-    todo!()
+    if !strict {
+        // TODO(phase-c): non-strict array_search needs PHP's loose `==` comparison
+        // semantics. Only the strict path is implemented; loose comparison is
+        // deferred rather than approximated.
+        todo!("non-strict array_search (PHP loose comparison)");
+    }
+    match haystack {
+        PhpMixed::List(items) => items
+            .iter()
+            .position(|value| value == needle)
+            .map(|i| PhpMixed::Int(i as i64)),
+        PhpMixed::Array(map) => map
+            .iter()
+            .find(|(_, value)| *value == needle)
+            .map(|(key, _)| php_key_to_mixed(key)),
+        _ => None,
+    }
 }
 
-pub fn array_search(_needle: &str, _haystack: &IndexMap<String, String>) -> Option<String> {
-    todo!()
+pub fn array_search(needle: &str, haystack: &IndexMap<String, String>) -> Option<String> {
+    haystack
+        .iter()
+        .find(|(_, value)| value.as_str() == needle)
+        .map(|(key, _)| key.clone())
 }
 
 pub fn strcmp(_s1: &str, _s2: &str) -> i64 {
@@ -2280,8 +2488,12 @@ pub fn abs(_value: i64) -> i64 {
     _value.abs()
 }
 
-pub fn ucfirst(_s: &str) -> String {
-    todo!()
+pub fn ucfirst(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str()),
+    }
 }
 
 pub fn strval(value: &PhpMixed) -> String {
@@ -2292,8 +2504,9 @@ pub fn usleep(_microseconds: u64) {
     std::thread::sleep(std::time::Duration::from_micros(_microseconds));
 }
 
-pub fn mb_strlen(_s: &str, _encoding: &str) -> i64 {
-    todo!()
+pub fn mb_strlen(s: &str, _encoding: &str) -> i64 {
+    // `s` is valid UTF-8, so the character count is its number of code points.
+    s.chars().count() as i64
 }
 
 pub fn stream_isatty(stream: PhpResource) -> bool {
@@ -2520,8 +2733,39 @@ pub fn require_php_file(_filename: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn array_flip(_array: &PhpMixed) -> PhpMixed {
-    todo!()
+pub fn array_flip(array: &PhpMixed) -> PhpMixed {
+    let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
+    match array {
+        PhpMixed::List(items) => {
+            for (i, value) in items.iter().enumerate() {
+                match value {
+                    PhpMixed::Int(n) => {
+                        result.insert(n.to_string(), PhpMixed::Int(i as i64));
+                    }
+                    PhpMixed::String(s) => {
+                        result.insert(s.clone(), PhpMixed::Int(i as i64));
+                    }
+                    // Non int/string values cannot be array keys and are skipped.
+                    _ => {}
+                }
+            }
+        }
+        PhpMixed::Array(map) => {
+            for (key, value) in map {
+                match value {
+                    PhpMixed::Int(n) => {
+                        result.insert(n.to_string(), php_key_to_mixed(key));
+                    }
+                    PhpMixed::String(s) => {
+                        result.insert(s.clone(), php_key_to_mixed(key));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => panic!("array_flip(): Argument #1 ($array) must be of type array"),
+    }
+    PhpMixed::Array(result)
 }
 
 pub fn array_flip_strings(_array: &[String]) -> IndexMap<String, PhpMixed> {
@@ -2548,8 +2792,15 @@ pub fn umask() -> u32 {
     todo!()
 }
 
-pub fn basename_with_suffix(_path: &str, _suffix: &str) -> String {
-    todo!()
+pub fn basename_with_suffix(path: &str, suffix: &str) -> String {
+    let base = basename(path);
+    // PHP strips the suffix only when it is a proper trailing part of the name,
+    // never when it equals the whole basename.
+    if base != suffix && base.ends_with(suffix) {
+        base[..base.len() - suffix.len()].to_string()
+    } else {
+        base
+    }
 }
 
 pub fn inet_pton(_host: &str) -> Option<Vec<u8>> {
@@ -2640,8 +2891,12 @@ pub fn r#eval(_code: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn array_is_list(_array: &PhpMixed) -> bool {
-    todo!()
+pub fn array_is_list(array: &PhpMixed) -> bool {
+    match array {
+        PhpMixed::List(_) => true,
+        PhpMixed::Array(map) => map.keys().enumerate().all(|(i, k)| *k == i.to_string()),
+        _ => panic!("array_is_list(): Argument #1 ($array) must be of type array"),
+    }
 }
 
 pub fn array_splice<T>(
@@ -2653,8 +2908,12 @@ pub fn array_splice<T>(
     todo!()
 }
 
-pub fn array_pop_first<T>(_array: &mut Vec<T>) -> Option<T> {
-    todo!()
+pub fn array_pop_first<T>(array: &mut Vec<T>) -> Option<T> {
+    if array.is_empty() {
+        None
+    } else {
+        Some(array.remove(0))
+    }
 }
 
 pub fn reset_first<T: Clone>(_array: &[T]) -> Option<T> {
@@ -2672,16 +2931,36 @@ pub fn array_merge_recursive(_arrays: Vec<PhpMixed>) -> PhpMixed {
     todo!()
 }
 
-pub fn levenshtein(_string1: &str, _string2: &str) -> i64 {
-    todo!()
+pub fn levenshtein(string1: &str, string2: &str) -> i64 {
+    // PHP's levenshtein() is byte-based with unit insertion/deletion/replacement costs.
+    let a = string1.as_bytes();
+    let b = string2.as_bytes();
+    let n = b.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for (i, &ca) in a.iter().enumerate() {
+        curr[0] = i + 1;
+        for (j, &cb) in b.iter().enumerate() {
+            let cost = if ca == cb { 0 } else { 1 };
+            curr[j + 1] = (prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n] as i64
 }
 
 pub fn array_slice<V: Clone>(
-    _array: &IndexMap<String, V>,
-    _offset: i64,
-    _length: Option<i64>,
+    array: &IndexMap<String, V>,
+    offset: i64,
+    length: Option<i64>,
 ) -> IndexMap<String, V> {
-    todo!()
+    let (start, end) = php_slice_bounds(array.len() as i64, offset, length);
+    array
+        .iter()
+        .skip(start)
+        .take(end - start)
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
 }
 
 pub fn asort<V: Ord>(_array: &mut IndexMap<String, V>) {
@@ -3015,11 +3294,12 @@ pub fn strnatcmp(_s1: &str, _s2: &str) -> i64 {
     todo!()
 }
 
-pub fn uksort<V, F>(_array: &mut IndexMap<String, V>, _callback: F)
+pub fn uksort<V, F>(array: &mut IndexMap<String, V>, callback: F)
 where
     F: FnMut(&str, &str) -> i64,
 {
-    todo!()
+    let mut callback = callback;
+    array.sort_by(|k1, _, k2, _| callback(k1, k2).cmp(&0));
 }
 
 pub fn end<V: Clone>(_array: &[V]) -> Option<V> {
@@ -3068,12 +3348,20 @@ pub fn escapeshellarg(_arg: &str) -> String {
     todo!()
 }
 
-pub fn strcspn(_string: &str, _characters: &str) -> usize {
-    todo!()
+pub fn strcspn(string: &str, characters: &str) -> usize {
+    let set = characters.as_bytes();
+    let mut count = 0;
+    for &b in string.as_bytes() {
+        if set.contains(&b) {
+            break;
+        }
+        count += 1;
+    }
+    count
 }
 
-pub fn strstr(_haystack: &str, _needle: &str) -> Option<String> {
-    todo!()
+pub fn strstr(haystack: &str, needle: &str) -> Option<String> {
+    haystack.find(needle).map(|i| haystack[i..].to_string())
 }
 
 pub fn ioncube_loader_iversion() -> i64 {
@@ -3205,11 +3493,11 @@ pub fn instance_of<T>(_value: &PhpMixed) -> bool {
 pub fn to_array(_value: PhpMixed) -> IndexMap<String, PhpMixed> {
     todo!()
 }
-pub fn to_string(_value: &PhpMixed) -> String {
-    todo!()
+pub fn to_string(value: &PhpMixed) -> String {
+    php_to_string(value)
 }
-pub fn to_bool(_value: &PhpMixed) -> bool {
-    todo!()
+pub fn to_bool(value: &PhpMixed) -> bool {
+    php_truthy(value)
 }
 pub fn php_truthy(value: &PhpMixed) -> bool {
     match value {
@@ -3257,11 +3545,19 @@ pub fn mb_strwidth(s: &str, _encoding: Option<&str>) -> i64 {
     // TODO(phase-c): calculate actual width
     s.len() as i64
 }
-pub fn mb_substr(_s: &str, _start: i64, _length: Option<i64>, _encoding: Option<&str>) -> String {
-    todo!()
+pub fn mb_substr(s: &str, start: i64, length: Option<i64>, _encoding: Option<&str>) -> String {
+    // Code-point based, mirroring substr's byte-based offset/length handling.
+    let chars: Vec<char> = s.chars().collect();
+    let (start, end) = php_slice_bounds(chars.len() as i64, start, length);
+    chars[start..end].iter().collect()
 }
-pub fn mb_str_split(_s: &str, _length: i64) -> Vec<String> {
-    todo!()
+pub fn mb_str_split(s: &str, length: i64) -> Vec<String> {
+    let length = length.max(1) as usize;
+    let chars: Vec<char> = s.chars().collect();
+    chars
+        .chunks(length)
+        .map(|chunk| chunk.iter().collect())
+        .collect()
 }
 pub fn mb_convert_variables(_to: &str, _from: &str, _vars: &mut Vec<String>) -> Option<String> {
     // Converts each variable in place from `_from` to `_to`, returning the source encoding (PHP
@@ -3272,11 +3568,13 @@ pub fn mb_convert_variables(_to: &str, _from: &str, _vars: &mut Vec<String>) -> 
     Some(_from.to_string())
 }
 
-pub fn ceil(_v: f64) -> f64 {
-    todo!()
+pub fn ceil(v: f64) -> f64 {
+    v.ceil()
 }
-pub fn intdiv(_a: i64, _b: i64) -> i64 {
-    todo!()
+pub fn intdiv(a: i64, b: i64) -> i64 {
+    // PHP intdiv() throws DivisionByZeroError on a zero divisor and ArithmeticError
+    // for PHP_INT_MIN / -1; Rust's `/` likewise panics in both cases.
+    a / b
 }
 pub fn hexdec(_s: &str) -> i64 {
     todo!()
@@ -3305,8 +3603,8 @@ pub fn str_bitand(_a: &str, _b: &str) -> String {
 pub fn wordwrap(_s: &str, _width: i64, _break_str: &str, _cut: bool) -> String {
     todo!()
 }
-pub fn ctype_digit(_s: &str) -> bool {
-    todo!()
+pub fn ctype_digit(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
 }
 pub fn is_numeric_string(s: &str) -> bool {
     // PHP is_numeric() on a string: optional leading whitespace, an integer or float literal
@@ -3335,8 +3633,8 @@ pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
         _ => 0,
     }
 }
-pub fn explode_limit(_delimiter: &str, _string: &str, _limit: i64) -> Vec<String> {
-    todo!()
+pub fn explode_limit(delimiter: &str, string: &str, limit: i64) -> Vec<String> {
+    explode_limit_impl(delimiter, string, limit)
 }
 pub fn sort_natural_flag_case(_values: &mut Vec<String>) {
     todo!()
@@ -3625,11 +3923,17 @@ pub fn array_splice_mixed(
     todo!()
 }
 
-pub fn str_replace_arrays(_search: &[String], _replace: &[String], _subject: &str) -> String {
-    todo!()
+pub fn str_replace_arrays(search: &[String], replace: &[String], subject: &str) -> String {
+    str_replace_array(search, replace, subject)
 }
-pub fn str_replace_arr(_search: &[&str], _replace: &str, _subject: &str) -> String {
-    todo!()
+pub fn str_replace_arr(search: &[&str], replace: &str, subject: &str) -> String {
+    // PHP str_replace(array, string, subject): every search element is replaced with
+    // the same replacement string, applied in order.
+    let mut result = subject.to_string();
+    for s in search {
+        result = str_replace(s, replace, &result);
+    }
+    result
 }
 
 pub fn php_exception_get_code(_error: &anyhow::Error) -> i32 {
