@@ -10,70 +10,70 @@ fn expect_parse_exception(text: &str, json: &str) {
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_extra_comma() {
     let json = "{\n        \"foo\": \"bar\",\n}";
     expect_parse_exception("Parse error on line 2", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_extra_comma_in_array() {
     let json = "{\n        \"foo\": [\n            \"bar\",\n        ]\n}";
     expect_parse_exception("Parse error on line 3", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_unescaped_backslash() {
     let json = "{\n        \"fo\\o\": \"bar\"\n}";
     expect_parse_exception("Parse error on line 1", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_skips_escaped_backslash() {
     let json = "{\n        \"fo\\\\o\": \"bar\"\n        \"a\": \"b\"\n}";
     expect_parse_exception("Parse error on line 2", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_single_quotes() {
     let json = "{\n        'foo': \"bar\"\n}";
     expect_parse_exception("Parse error on line 1", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_missing_quotes() {
     let json = "{\n        foo: \"bar\"\n}";
     expect_parse_exception("Parse error on line 1", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_array_as_hash() {
     let json = "{\n        \"foo\": [\"bar\": \"baz\"]\n}";
     expect_parse_exception("Parse error on line 2", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_missing_comma() {
     let json = "{\n        \"foo\": \"bar\"\n        \"bar\": \"foo\"\n}";
     expect_parse_exception("Parse error on line 2", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_missing_comma_multiline() {
     let json = "{\n        \"foo\": \"barbar\"\n\n        \"bar\": \"foo\"\n}";
     expect_parse_exception("Parse error on line 2", json);
 }
 
 #[test]
-#[ignore = "JsonFile::parse_json error path reaches json_last_error (todo!()) in the php-shim"]
+#[ignore = "JsonFile::parse_json error path reaches JsonParser::new()/lint() (todo!()); the JSON linter is not yet ported"]
 fn test_parse_error_detect_missing_colon() {
     let json = "{\n        \"foo\": \"bar\",\n        \"bar\" \"foo\"\n}";
     expect_parse_exception("Parse error on line 3", json);

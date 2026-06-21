@@ -1332,7 +1332,7 @@ impl ConfigCommand {
             return Err(RuntimeException {
                 message: format!(
                     "{} is an invalid value{}",
-                    PhpMixed::from(json_encode(&values_mixed)),
+                    PhpMixed::from(json_encode(&values_mixed).ok()),
                     suffix
                 ),
                 code: 0,

@@ -9,12 +9,10 @@ use shirabe_external_packages::json_schema::Validator;
 use shirabe_external_packages::seld::json_lint::JsonParser;
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
-    InvalidArgumentException, JSON_ERROR_CTRL_CHAR, JSON_ERROR_DEPTH, JSON_ERROR_NONE,
-    JSON_ERROR_STATE_MISMATCH, JSON_ERROR_UTF8, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
-    JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, UnexpectedValueException, defined, dirname,
-    file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode,
-    json_encode_ex, json_last_error, mkdir, php_dir, realpath, str_contains, str_ends_with,
-    str_repeat, strlen, strpos, usleep,
+    InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
+    PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
+    file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, php_dir, realpath,
+    str_contains, str_ends_with, str_repeat, strlen, strpos, usleep,
 };
 
 use crate::downloader::TransportException;
@@ -413,18 +411,12 @@ impl JsonFile {
         data: &T,
         options: JsonEncodeOptions,
     ) -> String {
-        let json = json_encode_ex(data, options.to_flags());
-
-        let json = match json {
-            Some(j) => j,
-            None => {
-                // PHP: self::throwEncodeError(json_last_error()), which throws \RuntimeException.
-                // TODO(phase-c): faithfully propagating this requires encode/encode_with_options to
-                // return Result<String>, a signature change rippling across ~53 call sites.
-                Self::throw_encode_error(json_last_error()).unwrap_or_default();
-                String::new()
-            }
-        };
+        let json = json_encode_ex(data, options.to_flags())
+            .map_err(|err| RuntimeException {
+                message: format!("JSON encoding failed: {}", err),
+                code: 0,
+            })
+            .unwrap(); // TODO(phase-c): propagating an Err.
 
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
@@ -449,31 +441,6 @@ impl JsonFile {
         json
     }
 
-    /// Throws an exception according to a given code with a customized message
-    ///
-    /// @param  int               $code return code of json_last_error function
-    /// @throws \RuntimeException
-    /// @return never
-    fn throw_encode_error(code: i64) -> Result<()> {
-        let msg = if code == JSON_ERROR_DEPTH {
-            "Maximum stack depth exceeded"
-        } else if code == JSON_ERROR_STATE_MISMATCH {
-            "Underflow or the modes mismatch"
-        } else if code == JSON_ERROR_CTRL_CHAR {
-            "Unexpected control character found"
-        } else if code == JSON_ERROR_UTF8 {
-            "Malformed UTF-8 characters, possibly incorrectly encoded"
-        } else {
-            "Unknown error"
-        };
-
-        Err(RuntimeException {
-            message: format!("JSON encoding failed: {}", msg),
-            code: 0,
-        }
-        .into())
-    }
-
     /// Parses json string and returns hash.
     ///
     /// @param null|string $json json string
@@ -487,7 +454,11 @@ impl JsonFile {
             Some(j) => j,
         };
         let mut data = json_decode(json, true)?;
-        if matches!(data, PhpMixed::Null) && JSON_ERROR_NONE != json_last_error() {
+        // PHP: `null === $data && JSON_ERROR_NONE !== json_last_error()`, i.e. the decode produced
+        // null because of an error rather than because the input was the literal `null`. json_decode
+        // here swallows the error into PhpMixed::Null, so detect the failure by comparing the source
+        // against `null`, mirroring validateSchema's own `'null' !== $content` check.
+        if matches!(data, PhpMixed::Null) && json != "null" {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
             if let Some(file) = file
                 && str_ends_with(file, ".lock")
@@ -524,16 +495,16 @@ impl JsonFile {
         let mut parser = JsonParser::new();
         let result = parser.lint(json);
         if result.is_none() {
-            if defined("JSON_ERROR_UTF8") && JSON_ERROR_UTF8 == json_last_error() {
-                return Err(UnexpectedValueException {
-                    message: match file {
-                        None => "The input is not UTF-8, could not parse as JSON".to_string(),
-                        Some(f) => format!("\"{}\" is not UTF-8, could not parse as JSON", f),
-                    },
-                    code: 0,
-                }
-                .into());
-            }
+            // TODO(phase-c): Rust's &str is guaranteed as UTF-8, but PHP string is not. Change `json`
+            // to &[u8] and check UTF-8 validity here.
+
+            // if (defined('JSON_ERROR_UTF8') && JSON_ERROR_UTF8 === json_last_error()) {
+            //     if ($file === null) {
+            //         throw new \UnexpectedValueException('The input is not UTF-8, could not parse as JSON');
+            //     } else {
+            //         throw new \UnexpectedValueException('"' . $file . '" is not UTF-8, could not parse as JSON');
+            //     }
+            // }
 
             return Ok(true);
         }

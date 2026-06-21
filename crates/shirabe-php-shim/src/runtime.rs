@@ -61,7 +61,6 @@ pub fn defined(name: &str) -> bool {
             | "CURL_VERSION_LIBZ"
             | "CURL_VERSION_ZSTD"
             | "GLOB_BRACE"
-            | "JSON_ERROR_UTF8"
             | "OPENSSL_VERSION_TEXT"
             | "PHP_BINARY"
             | "SIGINT"

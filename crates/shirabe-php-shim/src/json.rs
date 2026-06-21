@@ -17,29 +17,22 @@ pub const JSON_PRETTY_PRINT: i64 = 128;
 pub const JSON_THROW_ON_ERROR: i64 = 4194304;
 pub const JSON_INVALID_UTF8_IGNORE: i64 = 1048576;
 
-pub const JSON_ERROR_NONE: i64 = 0;
-pub const JSON_ERROR_DEPTH: i64 = 1;
-pub const JSON_ERROR_STATE_MISMATCH: i64 = 2;
-pub const JSON_ERROR_CTRL_CHAR: i64 = 3;
-pub const JSON_ERROR_UTF8: i64 = 5;
-
-pub fn json_last_error() -> i64 {
-    todo!()
-}
-
-pub fn json_encode<T: serde::Serialize + ?Sized>(value: &T) -> Option<String> {
+pub fn json_encode<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<String> {
     // PHP's json_encode() with no flags escapes slashes and non-ASCII characters.
     json_encode_ex(value, 0)
 }
 
-pub fn json_encode_ex<T: serde::Serialize + ?Sized>(value: &T, flags: i64) -> Option<String> {
+pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
+    value: &T,
+    flags: i64,
+) -> anyhow::Result<String> {
     // serde_json's compact output already matches PHP's `json_encode` with both
     // JSON_UNESCAPED_SLASHES and JSON_UNESCAPED_UNICODE set: forward slashes and non-ASCII
     // characters are emitted verbatim. The two flags below re-apply PHP's default escaping when
     // they are absent.
     // TODO(phase-c): other flags (e.g. JSON_PRETTY_PRINT, JSON_HEX_*, JSON_THROW_ON_ERROR) are not
     // handled yet; add them when a call site needs them.
-    let mut s = serde_json::to_string(value).ok()?;
+    let mut s = serde_json::to_string(value)?;
 
     if flags & JSON_UNESCAPED_SLASHES == 0 {
         s = s.replace('/', "\\/");
@@ -60,7 +53,7 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(value: &T, flags: i64) -> Op
         s = out;
     }
 
-    Some(s)
+    Ok(s)
 }
 
 // PHP's two-argument `json_decode`: without JSON_THROW_ON_ERROR it never throws,

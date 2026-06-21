@@ -451,7 +451,8 @@ pub trait BaseIO: IOInterface {
                 Ok(json_encode_ex(
                     &PhpMixed::Array(log_context(context)),
                     JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-                ))
+                )
+                .ok())
             });
             if let Ok(Some(json_str)) = json {
                 message_str += " ";
