@@ -82,10 +82,57 @@ pub fn http_build_query_mixed(
     numeric_prefix: &str,
     arg_separator: &str,
 ) -> String {
-    let _ = (data, numeric_prefix, arg_separator);
-    todo!()
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    for (key, value) in data {
+        // numeric_prefix is prepended only to integer keys at the top level.
+        let key = if key.parse::<i64>().is_ok() {
+            format!("{numeric_prefix}{key}")
+        } else {
+            key.clone()
+        };
+        append_query_pairs(&mut pairs, key, value);
+    }
+    encode_pairs(&pairs, arg_separator)
 }
 
-pub fn http_build_query(_data: &[(&str, &str)], _sep_str: &str, _sep: &str) -> String {
-    todo!()
+pub fn http_build_query(
+    data: &[(&str, &str)],
+    numeric_prefix: &str,
+    arg_separator: &str,
+) -> String {
+    // numeric_prefix only applies to integer keys, which a string-keyed slice never has.
+    let _ = numeric_prefix;
+    encode_pairs(data, arg_separator)
+}
+
+fn encode_pairs<T: serde::Serialize>(pairs: T, arg_separator: &str) -> String {
+    let encoded = serde_urlencoded::to_string(pairs).unwrap();
+    if arg_separator == "&" {
+        encoded
+    } else {
+        // serde_urlencoded percent-encodes any literal '&' in keys/values, so the
+        // only remaining '&' are the separators we are replacing.
+        encoded.replace('&', arg_separator)
+    }
+}
+
+fn append_query_pairs(pairs: &mut Vec<(String, String)>, key: String, value: &PhpMixed) {
+    match value {
+        // Null values are omitted from the query string entirely.
+        PhpMixed::Null => {}
+        PhpMixed::Bool(b) => pairs.push((key, if *b { "1" } else { "0" }.to_string())),
+        PhpMixed::Int(i) => pairs.push((key, i.to_string())),
+        PhpMixed::Float(f) => pairs.push((key, f.to_string())),
+        PhpMixed::String(s) => pairs.push((key, s.clone())),
+        PhpMixed::List(items) => {
+            for (i, item) in items.iter().enumerate() {
+                append_query_pairs(pairs, format!("{key}[{i}]"), item);
+            }
+        }
+        PhpMixed::Array(map) | PhpMixed::Object(map) => {
+            for (k, v) in map {
+                append_query_pairs(pairs, format!("{key}[{k}]"), v);
+            }
+        }
+    }
 }
