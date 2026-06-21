@@ -88,7 +88,6 @@ fn test_audit_with_ignore_severity() {
 }
 
 #[test]
-#[ignore]
 fn test_needs_complete_advisory_load() {
     let cases: Vec<(
         IndexMap<String, Vec<AnySecurityAdvisory>>,

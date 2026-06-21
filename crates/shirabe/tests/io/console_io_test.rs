@@ -81,7 +81,6 @@ fn test_select() {
     todo!()
 }
 
-#[ignore]
 #[test]
 fn test_set_and_get_authentication() {
     let mut console_io = make_console_io();
@@ -97,7 +96,6 @@ fn test_set_and_get_authentication() {
     assert_eq!(expected, console_io.get_authentication("repoName"));
 }
 
-#[ignore]
 #[test]
 fn test_get_authentication_when_did_not_set() {
     let console_io = make_console_io();
@@ -108,7 +106,6 @@ fn test_get_authentication_when_did_not_set() {
     assert_eq!(expected, console_io.get_authentication("repoName"));
 }
 
-#[ignore]
 #[test]
 fn test_has_authentication() {
     let mut console_io = make_console_io();

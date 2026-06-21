@@ -182,35 +182,30 @@ fn test_unicode() {
 }
 
 #[test]
-#[ignore]
 fn test_only_unicode() {
     let data = PhpMixed::String("\\/ƌ".to_string());
     assert_json_format("\"\\\\\\/ƌ\"", &data, Some(unescaped_unicode_only()));
 }
 
 #[test]
-#[ignore]
 fn test_escaped_slashes() {
     let data = PhpMixed::String("\\/foo".to_string());
     assert_json_format("\"\\\\\\/foo\"", &data, Some(JsonEncodeOptions::none()));
 }
 
 #[test]
-#[ignore]
 fn test_escaped_backslashes() {
     let data = PhpMixed::String("a\\b".to_string());
     assert_json_format("\"a\\\\b\"", &data, Some(JsonEncodeOptions::none()));
 }
 
 #[test]
-#[ignore]
 fn test_escaped_unicode() {
     let data = PhpMixed::String("ƌ".to_string());
     assert_json_format("\"\\u018c\"", &data, Some(JsonEncodeOptions::none()));
 }
 
 #[test]
-#[ignore]
 fn test_double_escaped_unicode() {
     let data = PhpMixed::List(vec![
         PhpMixed::String("Zdjęcia".to_string()),
@@ -515,7 +510,6 @@ fn merge_conflict_simple_data() -> PhpMixed {
 }
 
 #[test]
-#[ignore]
 fn test_composer_lock_file_merge_conflict_simple() {
     let data = merge_conflict_simple_data();
     let json =
@@ -527,7 +521,6 @@ fn test_composer_lock_file_merge_conflict_simple() {
 }
 
 #[test]
-#[ignore]
 fn test_composer_lock_file_merge_conflict_simple_crlf() {
     let data = merge_conflict_simple_data();
     let json =
@@ -563,7 +556,6 @@ fn test_composer_lock_file_merge_conflict_complex_crlf() {
 }
 
 #[test]
-#[ignore]
 fn test_composer_lock_file_merge_conflict_extended() {
     let data =
         std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-extended.txt")).unwrap();

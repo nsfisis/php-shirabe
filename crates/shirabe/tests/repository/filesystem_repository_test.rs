@@ -24,7 +24,6 @@ fn create_temp_json_file(contents: &str) -> String {
     path.to_str().unwrap().to_string()
 }
 
-#[ignore]
 #[test]
 fn test_repository_read() {
     let path = create_temp_json_file(
@@ -60,7 +59,6 @@ fn test_corrupted_repository_file() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_unexistent_repository_file() {
     let mut path = std::env::temp_dir();

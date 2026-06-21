@@ -35,7 +35,6 @@ fn test_parse_author_string_with_invalid_email() {
     todo!()
 }
 
-#[ignore]
 #[test]
 fn test_namespace_from_valid_package_name() {
     set_up();
@@ -48,7 +47,6 @@ fn test_namespace_from_valid_package_name() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_namespace_from_invalid_package_name() {
     set_up();
@@ -58,7 +56,6 @@ fn test_namespace_from_invalid_package_name() {
     assert_eq!(None, namespace);
 }
 
-#[ignore]
 #[test]
 fn test_namespace_from_missing_package_name() {
     set_up();

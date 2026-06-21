@@ -36,14 +36,12 @@ fn test_constructor() {
     todo!()
 }
 
-#[ignore]
 #[test]
 fn test_get_packages_empty_by_default() {
     let reporter = reporter();
     assert!(reporter.get_packages().is_empty());
 }
 
-#[ignore]
 #[test]
 fn test_get_packages() {
     let suggested_package = get_suggested_package_array();
@@ -56,7 +54,6 @@ fn test_get_packages() {
     assert_eq!(&vec![suggested_package], reporter.get_packages());
 }
 
-#[ignore]
 #[test]
 fn test_add_package_appends() {
     let suggested_package_a = get_suggested_package_array();

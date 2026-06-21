@@ -3869,7 +3869,6 @@ fn test_remove_config_setting_can_remove_sub_key_in_hash_with_siblings() {
 }
 
 #[test]
-#[ignore]
 fn test_add_main_key() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -4183,7 +4182,6 @@ fn test_remove_main_key_removes_key_where_value_is_null() {
 }
 
 #[test]
-#[ignore]
 fn test_indent_detection() {
     let mut manipulator =
         JsonManipulator::new("{\n\n  \"require\": {\n    \"php\": \"5.*\"\n  }\n}".to_string())

@@ -350,7 +350,6 @@ fn provide_path_couples_as_code()
     ]
 }
 
-#[ignore]
 #[test]
 fn test_find_shortest_path_code() {
     let fs = Filesystem::new(None);
@@ -461,7 +460,6 @@ fn provide_path_couples() -> Vec<(&'static str, &'static str, &'static str, bool
     ]
 }
 
-#[ignore]
 #[test]
 fn test_find_shortest_path() {
     let fs = Filesystem::new(None);
@@ -473,7 +471,6 @@ fn test_find_shortest_path() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_remove_directory_php() {
     let working_dir = tempfile::TempDir::new().unwrap();
@@ -492,7 +489,6 @@ fn test_remove_directory_php() {
     )));
 }
 
-#[ignore]
 #[test]
 fn test_file_size() {
     let unique_tmp = tempfile::TempDir::new().unwrap();
@@ -504,7 +500,6 @@ fn test_file_size() {
     assert!(fs.size(&test_file).unwrap() >= 5);
 }
 
-#[ignore]
 #[test]
 fn test_directory_size() {
     let working_dir = tempfile::TempDir::new().unwrap();
@@ -544,7 +539,6 @@ fn provide_normalized_paths() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
-#[ignore]
 #[test]
 fn test_normalize_path() {
     let fs = Filesystem::new(None);
@@ -553,7 +547,6 @@ fn test_normalize_path() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_unlink_symlinked_directory() {
     let working_dir = tempfile::TempDir::new().unwrap();
@@ -579,7 +572,6 @@ fn test_unlink_symlinked_directory() {
     assert!(!file_exists(&symlinked));
 }
 
-#[ignore]
 #[test]
 fn test_remove_symlinked_directory_with_trailing_slash() {
     let working_dir = tempfile::TempDir::new().unwrap();
@@ -613,7 +605,6 @@ fn test_remove_symlinked_directory_with_trailing_slash() {
     assert!(!file_exists(&symlinked));
 }
 
-#[ignore]
 #[test]
 fn test_junctions() {
     let working_dir = tempfile::TempDir::new().unwrap();
@@ -667,7 +658,6 @@ fn test_junctions() {
     assert!(!is_dir(&junction), "{junction} is not a directory");
 }
 
-#[ignore]
 #[test]
 fn test_override_junctions() {
     if !Platform::is_windows() {
@@ -713,7 +703,6 @@ fn test_override_junctions() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_copy() {
     let working_dir = tempfile::TempDir::new().unwrap();
@@ -769,7 +758,6 @@ fn test_copy() {
     assert!(file_exists(format!("{working_dir}/testfile.file")));
 }
 
-#[ignore]
 #[test]
 fn test_copy_then_remove() {
     let working_dir = tempfile::TempDir::new().unwrap();

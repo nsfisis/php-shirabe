@@ -54,7 +54,6 @@ fn test_execute_captures_stderr() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_timeout() {
     ProcessExecutor::set_timeout(1_i64);
@@ -199,7 +198,6 @@ fn data_escape_arguments() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
-#[ignore]
 #[test]
 fn test_escape_argument() {
     for (argument, unix) in data_escape_arguments() {

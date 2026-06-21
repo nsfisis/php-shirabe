@@ -129,7 +129,6 @@ fn test_self_version() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_type_default() {
     let loader = set_up();
@@ -148,7 +147,6 @@ fn test_type_default() {
     assert_eq!("foo", package.get_type());
 }
 
-#[ignore]
 #[test]
 fn test_normalized_version_optimization() {
     let loader = set_up();
@@ -200,7 +198,6 @@ fn test_parse_dump_false_load_config() {
     assert_eq!(expected_config, dumper.dump(package));
 }
 
-#[ignore]
 #[test]
 fn test_package_with_branch_alias() {
     let loader = set_up();
@@ -287,7 +284,6 @@ fn test_package_with_branch_alias() {
     assert_eq!("4.x-dev", package.get_pretty_version());
 }
 
-#[ignore]
 #[test]
 fn test_package_aliasing_without_branch_alias() {
     let loader = set_up();
@@ -343,7 +339,6 @@ fn test_package_aliasing_without_branch_alias() {
     assert_eq!("2.9999999.9999999.9999999-dev", package.get_version());
 }
 
-#[ignore]
 #[test]
 fn test_abandoned() {
     let loader = set_up();
@@ -362,7 +357,6 @@ fn test_abandoned() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_not_abandoned() {
     let loader = set_up();
@@ -478,7 +472,6 @@ fn test_parse_links_invalid_version() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_none_string_version() {
     let loader = set_up();
@@ -491,7 +484,6 @@ fn test_none_string_version() {
     assert_eq!("1", package.get_pretty_version());
 }
 
-#[ignore]
 #[test]
 fn test_none_string_source_dist_reference() {
     let loader = set_up();
@@ -521,7 +513,6 @@ fn test_none_string_source_dist_reference() {
     assert_eq!(Some("2019".to_string()), package.get_dist_reference());
 }
 
-#[ignore]
 #[test]
 fn test_branch_alias_integer_index() {
     let loader = set_up();
@@ -564,7 +555,6 @@ fn test_package_links_require() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_package_links_require_invalid() {
     let loader = set_up();
@@ -604,7 +594,6 @@ fn test_package_links_replace() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_package_links_replace_invalid() {
     let loader = set_up();
@@ -618,7 +607,6 @@ fn test_package_links_replace_invalid() {
     assert_eq!(0, package.get_replaces().len());
 }
 
-#[ignore]
 #[test]
 fn test_support_string_value() {
     let loader = set_up();
@@ -633,7 +621,6 @@ fn test_support_string_value() {
     assert_eq!(0, package.get_support().len());
 }
 
-#[ignore]
 #[test]
 fn test_invalid_version() {
     let loader = set_up();

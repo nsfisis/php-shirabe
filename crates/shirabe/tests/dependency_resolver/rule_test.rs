@@ -26,7 +26,6 @@ fn generic_rule(literals: Vec<i64>) -> Rule {
     ))
 }
 
-#[ignore]
 #[test]
 fn test_get_hash() {
     let rule = generic_rule(vec![123]);
@@ -108,7 +107,6 @@ fn test_is_assertions() {
 
 // PHP mocks RepositorySet and Request with the constructor disabled; the RULE_PACKAGE_REQUIRES
 // branch with a non-empty requires list never consults them, so real minimal instances suffice.
-#[ignore]
 #[test]
 fn test_pretty_string() {
     let p1 = get_package("foo", "2.1");

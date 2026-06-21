@@ -183,7 +183,6 @@ fn test_add_packagist_repository() {
 // htaccess-protect, var/realpath replacement, oauth, audit, ...) without the env isolation
 // their setUp/tearDown provides, or exercise plugin-config merge details. They are not
 // ported yet.
-#[ignore]
 #[test]
 fn test_preferred_install_as_string() {
     let mut config = Config::new(false, None);
@@ -208,7 +207,6 @@ fn test_preferred_install_as_string() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_merge_preferred_install() {
     let mut config = Config::new(false, None);
@@ -240,7 +238,6 @@ fn test_merge_preferred_install() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_merge_github_oauth() {
     let mut config = Config::new(false, None);
@@ -269,7 +266,6 @@ fn test_merge_github_oauth() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_var_replacement() {
     let mut config = Config::new(false, None);
@@ -301,7 +297,6 @@ fn test_var_replacement() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_realpath_replacement() {
     let mut config = Config::new(false, Some("/foo/bar".to_string()));
@@ -333,7 +328,6 @@ fn test_realpath_replacement() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_stream_wrapper_dirs() {
     let mut config = Config::new(false, Some("/foo/bar".to_string()));
@@ -351,7 +345,6 @@ fn test_stream_wrapper_dirs() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_fetching_relative_paths() {
     let mut config = Config::new(false, Some("/foo/bar".to_string()));
@@ -466,7 +459,6 @@ fn test_allowed_urls_pass() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_prohibited_urls_throw_exception() {
     let urls = vec![
@@ -516,7 +508,6 @@ fn test_disable_tls_can_be_overridden() {
     assert_eq!(PhpMixed::Bool(true), config.get("disable-tls"));
 }
 
-#[ignore]
 #[test]
 fn test_process_timeout() {
     Platform::put_env("COMPOSER_PROCESS_TIMEOUT", "0");
@@ -538,7 +529,6 @@ fn test_htaccess_protect() {
     assert_eq!(PhpMixed::Bool(false), result);
 }
 
-#[ignore]
 #[test]
 fn test_get_source_of_value() {
     Platform::clear_env("COMPOSER_PROCESS_TIMEOUT");
@@ -561,7 +551,6 @@ fn test_get_source_of_value() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_get_source_of_value_env_variables() {
     Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
@@ -572,7 +561,6 @@ fn test_get_source_of_value_env_variables() {
     assert_eq!("COMPOSER_HTACCESS_PROTECT", result.as_str());
 }
 
-#[ignore]
 #[test]
 fn test_audit() {
     let mut config = Config::new(true, None);
@@ -659,7 +647,6 @@ fn test_audit() {
     assert_eq!(Some(&PhpMixed::Bool(false)), result.get("block-abandoned"));
 }
 
-#[ignore]
 #[test]
 fn test_get_defaults_to_an_empty_array() {
     let config = Config::new(true, None);
@@ -681,7 +668,6 @@ fn test_get_defaults_to_an_empty_array() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_merges_plugin_config() {
     let mut config = Config::new(false, None);
@@ -718,7 +704,6 @@ fn test_merges_plugin_config() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_overrides_global_boolean_plugins_config() {
     let mut config = Config::new(false, None);
@@ -744,7 +729,6 @@ fn test_overrides_global_boolean_plugins_config() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_allows_all_plugins_from_local_boolean() {
     let mut config = Config::new(false, None);

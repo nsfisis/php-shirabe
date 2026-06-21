@@ -11,7 +11,6 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 
 #[test]
-#[ignore = "Transaction::new reaches shirabe_php_shim::uasort_map which is still todo!()"]
 fn test_getter() {
     let composer_rc = Rc::new(RefCell::new(PartialOrFullComposer::new_full()));
     let composer = ComposerHandle::from_rc_unchecked(composer_rc);

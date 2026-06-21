@@ -36,7 +36,6 @@ fn test_composer_platform_version() {
 }
 
 #[test]
-#[ignore]
 fn test_valid_platform_packages() {
     let cases: Vec<(&str, bool)> = vec![
         ("php", true),

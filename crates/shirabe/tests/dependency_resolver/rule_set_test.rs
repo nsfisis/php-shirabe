@@ -45,7 +45,6 @@ fn iterator_count(mut iterator: shirabe::dependency_resolver::RuleSetIterator) -
 }
 
 #[test]
-#[ignore = "RuleSet::add computes Rule::get_hash, which reaches hash_raw (todo!()) in the php-shim"]
 fn test_add() {
     let request0 = rule(vec![1]);
     let request1 = rule(vec![2]);
@@ -78,7 +77,6 @@ fn test_add() {
 }
 
 #[test]
-#[ignore = "RuleSet::add computes Rule::get_hash, which reaches hash_raw (todo!()) in the php-shim"]
 fn test_add_ignores_duplicates() {
     let mut rule_set = RuleSet::new();
     rule_set.add(rule(vec![]), RuleSet::TYPE_REQUEST).unwrap();
@@ -100,7 +98,6 @@ fn test_add_when_type_is_not_recognized() {
 }
 
 #[test]
-#[ignore = "RuleSet::add computes Rule::get_hash, which reaches hash_raw (todo!()) in the php-shim"]
 fn test_count() {
     let mut rule_set = RuleSet::new();
     rule_set.add(rule(vec![1]), RuleSet::TYPE_REQUEST).unwrap();
@@ -110,7 +107,6 @@ fn test_count() {
 }
 
 #[test]
-#[ignore = "RuleSet::add computes Rule::get_hash, which reaches hash_raw (todo!()) in the php-shim"]
 fn test_rule_by_id() {
     let mut rule_set = RuleSet::new();
     let rule = rule(vec![]);
@@ -120,7 +116,6 @@ fn test_rule_by_id() {
 }
 
 #[test]
-#[ignore = "RuleSet::add computes Rule::get_hash, which reaches hash_raw (todo!()) in the php-shim"]
 fn test_get_iterator() {
     let mut rule_set = RuleSet::new();
     let rule1 = rule(vec![1]);
@@ -135,7 +130,6 @@ fn test_get_iterator() {
 }
 
 #[test]
-#[ignore = "RuleSet::add computes Rule::get_hash, which reaches hash_raw (todo!()) in the php-shim"]
 fn test_get_iterator_for() {
     let mut rule_set = RuleSet::new();
     let rule1 = rule(vec![1]);
@@ -148,7 +142,6 @@ fn test_get_iterator_for() {
 }
 
 #[test]
-#[ignore = "RuleSet::add computes Rule::get_hash, which reaches hash_raw (todo!()) in the php-shim"]
 fn test_get_iterator_without() {
     let mut rule_set = RuleSet::new();
     let rule1 = rule(vec![1]);
@@ -164,7 +157,6 @@ fn test_get_iterator_without() {
 // "No package found" branch is taken; the RepositorySet/Request collaborators are never
 // actually consulted (PHP mocks them with the constructor disabled).
 #[test]
-#[ignore]
 fn test_pretty_string() {
     let p = get_package("foo", "2.1");
     let mut pool = Pool::new(

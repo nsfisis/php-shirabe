@@ -35,7 +35,6 @@ fn audit_config_from(audit_section: PhpMixed) -> anyhow::Result<AuditConfig> {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_simple_format() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore",
@@ -54,7 +53,6 @@ fn test_simple_format() {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_detailed_format_audit_only() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore",
@@ -76,7 +74,6 @@ fn test_detailed_format_audit_only() {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_detailed_format_block_only() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore",
@@ -136,7 +133,6 @@ fn test_mixed_formats() {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_ignore_severity_simple_array() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore-severity",
@@ -155,7 +151,6 @@ fn test_ignore_severity_simple_array() {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_ignore_severity_detailed_format() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore-severity",
@@ -183,7 +178,6 @@ fn test_ignore_severity_detailed_format() {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_ignore_abandoned_simple_format() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore-abandoned",
@@ -202,7 +196,6 @@ fn test_ignore_abandoned_simple_format() {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_ignore_abandoned_detailed_format() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore-abandoned",
@@ -236,7 +229,6 @@ fn test_ignore_abandoned_detailed_format() {
 }
 
 #[test]
-#[ignore = "Config::merge reaches array_merge, a todo!() in the php-shim"]
 fn test_invalid_apply_value() {
     let result = audit_config_from(arr(vec![(
         "ignore",

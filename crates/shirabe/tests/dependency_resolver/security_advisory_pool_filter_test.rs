@@ -32,7 +32,6 @@ fn test_dont_filter_packages_with_block_insecure_disabled() {
     todo!()
 }
 
-#[ignore]
 #[test]
 fn test_dont_filter_packages_with_abandoned_package() {
     let package_name_ignore_abandoned = "acme/ignore-abandoned";

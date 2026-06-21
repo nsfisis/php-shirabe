@@ -117,7 +117,6 @@ fn test_remote_branches_are_selected() {
     todo!()
 }
 
-#[ignore]
 #[test]
 fn test_get_root_version_from_env() {
     // @dataProvider rootEnvVersionsProvider
