@@ -62,7 +62,8 @@ pub enum PhpMixed {
     String(String),
     List(Vec<PhpMixed>),
     Array(IndexMap<String, PhpMixed>),
-    Object(ArrayObject),
+    // TODO: consolidate Object to Array.
+    Object(IndexMap<String, PhpMixed>),
 }
 
 impl serde::Serialize for PhpMixed {
@@ -91,7 +92,13 @@ impl serde::Serialize for PhpMixed {
                 }
                 map.end()
             }
-            PhpMixed::Object(object) => object.serialize(serializer),
+            PhpMixed::Object(entries) => {
+                let mut map = serializer.serialize_map(Some(entries.len()))?;
+                for (k, v) in entries {
+                    map.serialize_entry(k, v)?;
+                }
+                map.end()
+            }
         }
     }
 }
@@ -112,34 +119,14 @@ impl PartialEq for PhpMixed {
                         .zip(b.iter())
                         .all(|((ka, va), (kb, vb))| ka == kb && va == vb)
             }
-            (PhpMixed::Object(a), PhpMixed::Object(b)) => a == b,
+            (PhpMixed::Object(a), PhpMixed::Object(b)) => {
+                a.len() == b.len()
+                    && a.iter()
+                        .zip(b.iter())
+                        .all(|((ka, va), (kb, vb))| ka == kb && va == vb)
+            }
             _ => false,
         }
-    }
-}
-
-impl PartialEq for ArrayObject {
-    fn eq(&self, other: &Self) -> bool {
-        self.data.len() == other.data.len()
-            && self
-                .data
-                .iter()
-                .zip(other.data.iter())
-                .all(|((ka, va), (kb, vb))| ka == kb && va == vb)
-    }
-}
-
-impl serde::Serialize for ArrayObject {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(Some(self.data.len()))?;
-        for (k, v) in &self.data {
-            map.serialize_entry(k, v)?;
-        }
-        map.end()
     }
 }
 
@@ -200,7 +187,7 @@ impl PhpMixed {
         }
     }
 
-    pub fn as_object(&self) -> Option<&ArrayObject> {
+    pub fn as_object(&self) -> Option<&IndexMap<String, PhpMixed>> {
         match self {
             PhpMixed::Object(o) => Some(o),
             _ => None,
@@ -349,30 +336,6 @@ impl std::fmt::Display for PhpMixed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.pad(&php_to_string(self))
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct ArrayObject {
-    data: IndexMap<String, PhpMixed>,
-}
-
-impl ArrayObject {
-    pub fn new(_array: Option<PhpMixed>) -> Self {
-        todo!()
-    }
-
-    pub fn to_array(&self) -> IndexMap<String, PhpMixed> {
-        self.data.clone()
-    }
-
-    pub fn count(&self) -> usize {
-        self.data.len()
-    }
-}
-
-#[derive(Debug)]
-pub struct StdClass {
-    pub data: IndexMap<String, PhpMixed>,
 }
 
 #[derive(Debug, Clone)]

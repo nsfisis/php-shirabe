@@ -89,7 +89,7 @@ pub trait BaseConfigCommand: BaseCommand {
                 .borrow()
                 .write(PhpMixed::Array({
                     let mut m = IndexMap::new();
-                    m.insert("config".to_string(), PhpMixed::Array(IndexMap::new()));
+                    m.insert("config".to_string(), PhpMixed::Object(IndexMap::new()));
                     m
                 }))?;
             let _ = Silencer::call(|| {

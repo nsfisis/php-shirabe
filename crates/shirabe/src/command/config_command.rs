@@ -10,7 +10,7 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    ArrayObject, InvalidArgumentException, JsonObject, PhpMixed, RuntimeException, array_filter,
+    InvalidArgumentException, JsonObject, PhpMixed, RuntimeException, array_filter,
     array_filter_use_key, array_is_list, array_map, array_merge, array_unique, count,
     escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array, is_array,
     is_bool, is_dir, is_numeric, is_object, is_string, json_encode, key, sort, sprintf,
@@ -188,7 +188,7 @@ impl Command for ConfigCommand {
                 "bearer",
                 "forgejo-token",
             ] {
-                empty_objs.insert(k.to_string(), PhpMixed::Object(ArrayObject::new(None)));
+                empty_objs.insert(k.to_string(), PhpMixed::Object(IndexMap::new()));
             }
             self.auth_config_file
                 .as_ref()
@@ -487,7 +487,7 @@ impl Command for ConfigCommand {
                             })
                             .unwrap_or_default();
                         if type_strings.iter().any(|s| s == "object") {
-                            value = PhpMixed::Object(ArrayObject::new(None));
+                            value = PhpMixed::Object(IndexMap::new());
                         }
                     }
                 }

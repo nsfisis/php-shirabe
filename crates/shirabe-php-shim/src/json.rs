@@ -1,4 +1,3 @@
-use crate::ArrayObject;
 use crate::PhpMixed;
 use indexmap::IndexMap;
 
@@ -58,7 +57,7 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
 
 // PHP's two-argument `json_decode`: without JSON_THROW_ON_ERROR it never throws,
 // returning null on malformed input. With `assoc` false, JSON objects decode to
-// stdClass-equivalent ArrayObject values; with `assoc` true, to associative arrays.
+// stdClass-equivalent `PhpMixed::Object` values; with `assoc` true, to associative arrays.
 pub fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
     match serde_json::from_str::<serde_json::Value>(s) {
         Ok(value) => Ok(json_value_to_php_mixed(value, assoc)),
@@ -91,9 +90,7 @@ fn json_value_to_php_mixed(value: serde_json::Value, assoc: bool) -> PhpMixed {
             if assoc {
                 PhpMixed::Array(data)
             } else {
-                PhpMixed::Object(ArrayObject {
-                    data: data.into_iter().collect(),
-                })
+                PhpMixed::Object(data)
             }
         }
     }

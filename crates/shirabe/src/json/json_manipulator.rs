@@ -4,10 +4,10 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    ArrayObject, InvalidArgumentException, LogicException, PhpMixed, StdClass, addcslashes,
-    array_key_exists, array_keys, array_reverse, count, empty, explode, implode, in_array,
-    is_array, is_int, is_numeric, json_decode, preg_quote, rtrim, str_contains, str_repeat,
-    str_replace, strlen, strnatcmp, strpos, substr, trim, uksort,
+    InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
+    array_reverse, count, empty, explode, implode, in_array, is_array, is_int, is_numeric,
+    json_decode, preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp,
+    strpos, substr, trim, uksort,
 };
 
 use crate::json::JsonFile;
@@ -254,17 +254,17 @@ impl JsonManipulator {
 
         let repositories_value: Option<PhpMixed> = decoded
             .as_object()
-            .and_then(|o| o.to_array().get("repositories").cloned());
+            .and_then(|o| o.get("repositories").cloned());
         let is_std_class = repositories_value
             .as_ref()
-            .map(|v| (v as &dyn std::any::Any).is::<StdClass>())
+            .map(|v| v.as_object().is_some())
             .unwrap_or(false);
 
         if is_std_class {
             // delete from bottom to top, to ensure keys stay the same
             let repos_arr: IndexMap<String, PhpMixed> = repositories_value
                 .as_ref()
-                .and_then(|v| v.as_array().cloned())
+                .and_then(|v| v.as_object().cloned())
                 .unwrap_or_default();
             let entries_to_revert: Vec<String> = array_reverse(&array_keys(&repos_arr), false);
 
@@ -278,7 +278,7 @@ impl JsonManipulator {
 
             // re-add in order
             for (repository_name, repository) in &repos_arr {
-                let is_obj = (repository as &dyn std::any::Any).is::<StdClass>();
+                let is_obj = repository.as_object().is_some();
                 if !is_obj {
                     let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                     m.insert(repository_name.clone(), repository.clone());
@@ -494,15 +494,15 @@ impl JsonManipulator {
         let decoded = json_decode(&self.contents, false)?;
         let repositories_value: Option<PhpMixed> = decoded
             .as_object()
-            .and_then(|o| o.to_array().get("repositories").cloned());
+            .and_then(|o| o.get("repositories").cloned());
         let is_assoc = repositories_value
             .as_ref()
-            .map(|v| (v as &dyn std::any::Any).is::<StdClass>())
+            .map(|v| v.as_object().is_some())
             .unwrap_or(false);
 
         let repos: IndexMap<String, PhpMixed> = repositories_value
             .as_ref()
-            .and_then(|v| v.as_array().cloned())
+            .and_then(|v| v.as_object().cloned())
             .unwrap_or_default();
 
         for (repository_index, repository) in &repos {
@@ -516,7 +516,7 @@ impl JsonManipulator {
 
             let repo_name_owned: Option<String> = repository
                 .as_object()
-                .and_then(|o| o.to_array().get("name").cloned())
+                .and_then(|o| o.get("name").cloned())
                 .and_then(|v| v.as_string().map(|s| s.to_string()));
             if Some(name) == repo_name_owned.as_deref() {
                 if is_assoc {
@@ -996,7 +996,7 @@ impl JsonManipulator {
                         .map(|a| a.is_empty())
                         .unwrap_or(false);
                     if now_empty {
-                        arr.insert(name_owned.clone(), PhpMixed::Object(ArrayObject::new(None)));
+                        arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
                     }
                 }
                 let val = cur_val
@@ -1042,10 +1042,7 @@ impl JsonManipulator {
                             .map(|a| a.is_empty())
                             .unwrap_or(false);
                         if now_empty {
-                            arr.insert(
-                                name_capture.clone(),
-                                PhpMixed::Object(ArrayObject::new(None)),
-                            );
+                            arr.insert(name_capture.clone(), PhpMixed::Object(IndexMap::new()));
                         }
                     }
                     children_clean = formatter.format(&cur_val, 0, true).unwrap_or_default();
@@ -1565,13 +1562,9 @@ impl JsonManipulator {
     pub fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<String> {
         let mut data = data.clone();
         let mut was_object = was_object;
-        if (&data as &dyn std::any::Any).is::<StdClass>()
-            || (&data as &dyn std::any::Any).is::<ArrayObject>()
-        {
+        if let Some(obj) = data.as_object() {
             // PHP: (array) $data — coerce to array
-            if let Some(obj) = data.as_object() {
-                data = PhpMixed::Array(obj.to_array().into_iter().collect());
-            }
+            data = PhpMixed::Array(obj.clone());
             was_object = true;
         }
 
@@ -1639,12 +1632,8 @@ impl ManipulatorFormatter {
     fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<String> {
         let mut data = data.clone();
         let mut was_object = was_object;
-        if (&data as &dyn std::any::Any).is::<StdClass>()
-            || (&data as &dyn std::any::Any).is::<ArrayObject>()
-        {
-            if let Some(obj) = data.as_object() {
-                data = PhpMixed::Array(obj.to_array().into_iter().collect());
-            }
+        if let Some(obj) = data.as_object() {
+            data = PhpMixed::Array(obj.clone());
             was_object = true;
         }
 

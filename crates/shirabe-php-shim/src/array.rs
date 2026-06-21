@@ -568,7 +568,7 @@ pub fn count(value: &PhpMixed) -> usize {
     match value {
         PhpMixed::List(items) => items.len(),
         PhpMixed::Array(entries) => entries.len(),
-        PhpMixed::Object(object) => object.count(),
+        PhpMixed::Object(object) => object.len(),
         // PHP 8 throws a `TypeError` for non-countable arguments.
         PhpMixed::Null
         | PhpMixed::Bool(_)
