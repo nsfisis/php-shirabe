@@ -8,7 +8,7 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array, is_int,
-    ksort, realpath, reset_first, sprintf, strcmp, strtolower, touch2, trim, usort,
+    ksort, realpath, sprintf, strcmp, strtolower, touch2, trim, usort,
 };
 
 use crate::installer::InstallationManager;

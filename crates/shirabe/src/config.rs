@@ -13,8 +13,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
     array_merge, array_reverse, array_search_mixed, array_unique, empty, filter_var_url, implode,
-    in_array, is_array, is_int, is_string, parse_url, php_to_string, reset, rtrim, strtolower,
-    strtoupper, strtr, substr, trigger_error,
+    in_array, is_array, is_int, is_string, parse_url, php_to_string, rtrim, strtolower, strtoupper,
+    strtr, substr, trigger_error,
 };
 use std::cell::RefCell;
 
@@ -866,7 +866,7 @@ impl Config {
                         }
                     }
                 }
-                let first = reset(&protos);
+                let first = protos.first().cloned();
                 if first.as_deref() == Some("http") {
                     return Err(RuntimeException {
                         message: "The http protocol for github is not available anymore, update your config's github-protocols to use \"https\", \"git\" or \"ssh\"".to_string(),

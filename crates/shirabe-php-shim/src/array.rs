@@ -701,18 +701,6 @@ pub fn count(value: &PhpMixed) -> usize {
     }
 }
 
-pub fn reset<T: Clone>(_array: &[T]) -> Option<T> {
-    _array.first().cloned()
-}
-
-pub fn reset_first<T: Clone>(_array: &[T]) -> Option<T> {
-    _array.first().cloned()
-}
-
-pub fn end_arr<V: Clone>(_array: &IndexMap<String, V>) -> Option<V> {
-    _array.values().last().cloned()
-}
-
 pub fn iterator_to_array<I>(iter: I) -> Vec<I::Item>
 where
     I: IntoIterator,

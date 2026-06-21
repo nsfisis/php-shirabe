@@ -15,9 +15,8 @@ use shirabe_php_shim::{
     PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count,
     curl_version, defined, disk_free_space, extension_loaded, file_exists, filter_var_boolean,
     function_exists, get_class, get_class_err, hash, implode, ini_get, ioncube_loader_iversion,
-    ioncube_loader_version, is_array, is_string, ob_get_clean, ob_start, phpinfo, reset, rtrim,
-    sprintf, str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim,
-    version_compare,
+    ioncube_loader_version, is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, sprintf,
+    str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
