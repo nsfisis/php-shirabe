@@ -13,8 +13,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, JsonObject, PhpMixed, RuntimeException, array_filter,
     array_filter_use_key, array_is_list, array_map, array_merge, array_unique, count,
     escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array, is_array,
-    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, key, sort, sprintf,
-    str_replace, str_starts_with, strpos, strtolower, system, touch, var_export,
+    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, sort, sprintf, str_replace,
+    str_starts_with, strpos, strtolower, system, touch, var_export,
 };
 use std::cell::RefCell;
 use std::rc::Rc;

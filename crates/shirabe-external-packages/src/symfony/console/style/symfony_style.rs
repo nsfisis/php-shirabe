@@ -171,9 +171,31 @@ impl SymfonyStyle {
                 todo!()
             }
             // $headers[] = key($value); $row[] = current($value);
-            let _ = shirabe_php_shim::key(value.clone());
-            headers.push(todo!());
-            row.push(shirabe_php_shim::current(value));
+            let (first_key, first_value) = match &value {
+                PhpMixed::Array(entries) => (
+                    entries
+                        .keys()
+                        .next()
+                        .map(|k| PhpMixed::String(k.clone()))
+                        .unwrap_or(PhpMixed::Null),
+                    entries
+                        .values()
+                        .next()
+                        .cloned()
+                        .unwrap_or(PhpMixed::Bool(false)),
+                ),
+                PhpMixed::List(items) => (
+                    if items.is_empty() {
+                        PhpMixed::Null
+                    } else {
+                        PhpMixed::Int(0)
+                    },
+                    items.first().cloned().unwrap_or(PhpMixed::Bool(false)),
+                ),
+                _ => unreachable!("value is an array past the is_array guard"),
+            };
+            headers.push(first_key);
+            row.push(first_value);
         }
 
         self.horizontal_table(headers, vec![PhpMixed::List(row.into_iter().collect())]);

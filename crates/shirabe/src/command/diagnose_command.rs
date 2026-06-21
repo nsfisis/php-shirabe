@@ -15,8 +15,8 @@ use shirabe_php_shim::{
     PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count,
     curl_version, defined, disk_free_space, extension_loaded, file_exists, filter_var_boolean,
     function_exists, get_class, get_class_err, hash, implode, ini_get, ioncube_loader_iversion,
-    ioncube_loader_version, is_array, is_string, key, ob_get_clean, ob_start, phpinfo, reset,
-    rtrim, sprintf, str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim,
+    ioncube_loader_version, is_array, is_string, ob_get_clean, ob_start, phpinfo, reset, rtrim,
+    sprintf, str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim,
     version_compare,
 };
 use std::cell::RefCell;
@@ -690,12 +690,10 @@ impl DiagnoseCommand {
             let path = str_replace(
                 "%hash%",
                 hash_val.as_string().unwrap_or(""),
-                &key(provider_includes
+                &provider_includes
                     .as_array()
-                    .cloned()
-                    .unwrap_or_default()
-                    .into())
-                .unwrap_or_default(),
+                    .and_then(|a| a.keys().next().cloned())
+                    .unwrap_or_default(),
             );
             let response = self.http_downloader.as_ref().unwrap().borrow_mut().get(
                 &format!("{}://repo.packagist.org/{}", protocol, path),

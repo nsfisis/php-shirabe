@@ -12,9 +12,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
-    array_merge, array_reverse, array_search_mixed, array_unique, current, empty, filter_var_url,
-    implode, in_array, is_array, is_int, is_string, key, parse_url, php_to_string, reset, rtrim,
-    strtolower, strtoupper, strtr, substr, trigger_error,
+    array_merge, array_reverse, array_search_mixed, array_unique, empty, filter_var_url, implode,
+    in_array, is_array, is_int, is_string, parse_url, php_to_string, reset, rtrim, strtolower,
+    strtoupper, strtr, substr, trigger_error,
 };
 use std::cell::RefCell;
 
@@ -465,9 +465,17 @@ impl Config {
                 // disable a repository with an anonymous {"name": false} repo
                 if is_array(repository)
                     && repository.as_array().map(|m| m.len()).unwrap_or(0) == 1
-                    && matches!(current(repository.clone()), PhpMixed::Bool(false))
+                    && matches!(
+                        repository.as_array().and_then(|m| m.values().next()),
+                        Some(PhpMixed::Bool(false))
+                    )
                 {
-                    self.disable_repo_by_name(&key(repository.clone()).unwrap_or_default());
+                    let name = repository
+                        .as_array()
+                        .and_then(|m| m.keys().next())
+                        .cloned()
+                        .unwrap_or_default();
+                    self.disable_repo_by_name(&name);
                     continue;
                 }
 

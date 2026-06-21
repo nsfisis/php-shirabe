@@ -701,14 +701,6 @@ pub fn count(value: &PhpMixed) -> usize {
     }
 }
 
-pub fn current(_value: PhpMixed) -> PhpMixed {
-    todo!()
-}
-
-pub fn key(_value: PhpMixed) -> Option<String> {
-    todo!()
-}
-
 pub fn reset<T: Clone>(_array: &[T]) -> Option<T> {
     _array.first().cloned()
 }
@@ -726,8 +718,4 @@ where
     I: IntoIterator,
 {
     iter.into_iter().collect()
-}
-
-pub fn end<V: Clone>(_array: &[V]) -> Option<V> {
-    _array.last().cloned()
 }

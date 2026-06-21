@@ -6,7 +6,7 @@ use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, InvalidArgumentException, LogicException, PhpMixed,
     RuntimeException, UnexpectedValueException, array_pop, basename, chdir, clearstatcache,
-    clearstatcache2, copy, count, dirname, end, error_get_last, explode, fclose, feof, file_exists,
+    clearstatcache2, copy, count, dirname, error_get_last, explode, fclose, feof, file_exists,
     file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread,
     function_exists, fwrite, implode, is_array, is_dir, is_file, is_link, is_readable, lstat,
     mkdir, react_promise_resolve, rename, rmdir, rtrim, sprintf, str_contains, str_repeat,
@@ -739,7 +739,7 @@ impl Filesystem {
         for chunk in explode("/", &path) {
             if ".." == chunk && (strlen(&absolute) > 0 || up) {
                 array_pop(&mut parts);
-                up = !(parts.is_empty() || ".." == end(&parts).unwrap_or_default());
+                up = !(parts.is_empty() || ".." == parts.last().cloned().unwrap_or_default());
             } else if "." != chunk && !chunk.is_empty() {
                 parts.push(chunk.clone());
                 up = ".." != chunk;

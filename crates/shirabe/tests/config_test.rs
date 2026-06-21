@@ -140,7 +140,6 @@ fn data_add_packagist_repository() -> Vec<Case> {
 }
 
 #[test]
-#[ignore = "Config::merge of an anonymous {name: false} disable entry reaches current() (todo!()) in the php-shim"]
 fn test_add_packagist_repository() {
     for case in data_add_packagist_repository() {
         let mut config = Config::new(false, None);

@@ -221,9 +221,10 @@ impl ChoiceQuestion {
                 return Ok(PhpMixed::List(multiselect_choices));
             }
 
-            Ok(shirabe_php_shim::current(PhpMixed::List(
-                multiselect_choices,
-            )))
+            Ok(multiselect_choices
+                .into_iter()
+                .next()
+                .unwrap_or(PhpMixed::Bool(false)))
         })
     }
 }
