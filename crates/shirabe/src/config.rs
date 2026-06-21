@@ -11,10 +11,10 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, FILTER_VALIDATE_URL, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed,
-    RuntimeException, array_key_exists, array_merge, array_reverse, array_search_mixed,
-    array_unique, current, empty, filter_var, implode, in_array, is_array, is_int, is_string, key,
-    parse_url, php_to_string, reset, rtrim, strtolower, strtoupper, strtr, substr, trigger_error,
+    E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
+    array_merge, array_reverse, array_search_mixed, array_unique, current, empty, filter_var_url,
+    implode, in_array, is_array, is_int, is_string, key, parse_url, php_to_string, reset, rtrim,
+    strtolower, strtoupper, strtr, substr, trigger_error,
 };
 use std::cell::RefCell;
 
@@ -1103,7 +1103,7 @@ impl Config {
         repo_options: &IndexMap<String, PhpMixed>,
     ) -> Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs
-        if !filter_var(url, FILTER_VALIDATE_URL) && !Preg::is_match(r"{^https?://}", url) {
+        if !filter_var_url(url) && !Preg::is_match(r"{^https?://}", url) {
             return Ok(());
         }
 

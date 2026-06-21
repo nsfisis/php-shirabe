@@ -10,14 +10,14 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
-    CURL_HTTP_VERSION_2_0, CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD,
-    FILTER_VALIDATE_BOOLEAN, INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER,
-    OPENSSL_VERSION_TEXT, PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID,
-    PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count, curl_version, defined,
-    disk_free_space, extension_loaded, file_exists, filter_var, function_exists, get_class,
-    get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
-    is_array, is_string, key, ob_get_clean, ob_start, phpinfo, reset, rtrim, sprintf, str_contains,
-    str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
+    CURL_HTTP_VERSION_2_0, CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD, INFO_GENERAL,
+    InvalidArgumentException, OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT, PHP_BINARY, PHP_EOL,
+    PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count,
+    curl_version, defined, disk_free_space, extension_loaded, file_exists, filter_var_boolean,
+    function_exists, get_class, get_class_err, hash, implode, ini_get, ioncube_loader_iversion,
+    ioncube_loader_version, is_array, is_string, key, ob_get_clean, ob_start, phpinfo, reset,
+    rtrim, sprintf, str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim,
+    version_compare,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1177,10 +1177,7 @@ impl DiagnoseCommand {
             errors.insert("iconv_mbstring".to_string(), PhpMixed::Bool(true));
         }
 
-        if !filter_var(
-            ini_get("allow_url_fopen").as_deref().unwrap_or(""),
-            FILTER_VALIDATE_BOOLEAN,
-        ) {
+        if !filter_var_boolean(ini_get("allow_url_fopen").as_deref().unwrap_or("")) {
             errors.insert("allow_url_fopen".to_string(), PhpMixed::Bool(true));
         }
 
@@ -1205,10 +1202,7 @@ impl DiagnoseCommand {
 
         if !defined("HHVM_VERSION")
             && !extension_loaded("apcu")
-            && filter_var(
-                ini_get("apc.enable_cli").as_deref().unwrap_or(""),
-                FILTER_VALIDATE_BOOLEAN,
-            )
+            && filter_var_boolean(ini_get("apc.enable_cli").as_deref().unwrap_or(""))
         {
             warnings.insert("apc_cli".to_string(), PhpMixed::Bool(true));
         }
@@ -1243,10 +1237,7 @@ impl DiagnoseCommand {
             }
         }
 
-        if filter_var(
-            ini_get("xdebug.profiler_enabled").as_deref().unwrap_or(""),
-            FILTER_VALIDATE_BOOLEAN,
-        ) {
+        if filter_var_boolean(ini_get("xdebug.profiler_enabled").as_deref().unwrap_or("")) {
             warnings.insert("xdebug_profile".to_string(), PhpMixed::Bool(true));
         } else if XdebugHandler::is_xdebug_active() {
             warnings.insert("xdebug_loaded".to_string(), PhpMixed::Bool(true));
@@ -1265,13 +1256,8 @@ impl DiagnoseCommand {
         }
 
         if extension_loaded("uopz")
-            && !(filter_var(
-                ini_get("uopz.disable").as_deref().unwrap_or(""),
-                FILTER_VALIDATE_BOOLEAN,
-            ) || filter_var(
-                ini_get("uopz.exit").as_deref().unwrap_or(""),
-                FILTER_VALIDATE_BOOLEAN,
-            ))
+            && !(filter_var_boolean(ini_get("uopz.disable").as_deref().unwrap_or(""))
+                || filter_var_boolean(ini_get("uopz.exit").as_deref().unwrap_or("")))
         {
             warnings.insert("uopz".to_string(), PhpMixed::Bool(true));
         }

@@ -3,9 +3,9 @@
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use shirabe_php_shim::{
-    E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException,
-    FILTER_VALIDATE_BOOLEAN, PHP_EOL, PhpMixed, STDERR, debug_backtrace, error_reporting,
-    filter_var, ini_get, is_resource, set_error_handler,
+    E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException, PHP_EOL,
+    PhpMixed, STDERR, debug_backtrace, error_reporting, filter_var_boolean, ini_get, is_resource,
+    set_error_handler,
 };
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -37,7 +37,7 @@ impl ErrorHandler {
         let mut message = message;
 
         let xdebug_scream = ini_get("xdebug.scream").unwrap_or_default();
-        if filter_var(&xdebug_scream, FILTER_VALIDATE_BOOLEAN) {
+        if filter_var_boolean(&xdebug_scream) {
             message += "\n\nWarning: You have xdebug.scream enabled, the warning above may be\na legitimately suppressed error that you were not supposed to see.";
         }
 

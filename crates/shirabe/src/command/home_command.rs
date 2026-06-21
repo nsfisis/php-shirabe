@@ -6,7 +6,7 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use shirabe_php_shim::{FILTER_VALIDATE_URL, filter_var};
+use shirabe_php_shim::filter_var_url;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -73,7 +73,7 @@ impl HomeCommand {
             Some(u) => u,
         };
 
-        if !filter_var(&url, FILTER_VALIDATE_URL) {
+        if !filter_var_url(&url) {
             return false;
         }
 

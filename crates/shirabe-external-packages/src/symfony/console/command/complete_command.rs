@@ -208,9 +208,8 @@ impl Command for CompleteCommand {
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         let _ = (input, output);
-        self.is_debug = shirabe_php_shim::filter_var(
+        self.is_debug = shirabe_php_shim::filter_var_boolean(
             &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG").unwrap_or_default(),
-            shirabe_php_shim::FILTER_VALIDATE_BOOLEAN,
         );
 
         Ok(())

@@ -6,10 +6,10 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, FILTER_VALIDATE_EMAIL, PHP_EOL, PhpMixed, array_intersect_key, array_values,
-    filter_var, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
-    json_encode, parse_url_all, php_to_string, sprintf, str_replace, strcasecmp, strtolower,
-    strtotime, substr, trigger_error, trim, var_export,
+    E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, filter_var_email,
+    get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string, json_encode,
+    parse_url_all, php_to_string, sprintf, str_replace, strcasecmp, strtolower, strtotime, substr,
+    trigger_error, trim, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchNoneConstraint;
@@ -314,7 +314,7 @@ impl ValidatingArrayLoader {
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string());
                 if let Some(email_str) = email
-                    && !filter_var(&email_str, FILTER_VALIDATE_EMAIL)
+                    && !filter_var_email(&email_str)
                 {
                     self.warnings.push(format!(
                         "authors.{}.email : invalid value ({}), must be a valid email address",
@@ -384,7 +384,7 @@ impl ValidatingArrayLoader {
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_string());
             if let Some(email_str) = support_email
-                && !filter_var(&email_str, FILTER_VALIDATE_EMAIL)
+                && !filter_var_email(&email_str)
             {
                 self.warnings.push(format!(
                     "support.email : invalid value ({}), must be a valid email address",

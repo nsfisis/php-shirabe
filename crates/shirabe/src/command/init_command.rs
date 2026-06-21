@@ -12,11 +12,11 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    FILE_IGNORE_NEW_LINES, FILTER_VALIDATE_EMAIL, InvalidArgumentException, PHP_EOL, PhpMixed,
-    array_filter, array_flip, array_flip_strings, array_intersect_key, array_keys, array_map,
-    basename, empty, explode, file, file_exists, file_get_contents, file_put_contents,
-    function_exists, get_current_user, implode, is_dir, is_string, preg_quote, realpath,
-    server_get, sprintf, str_replace, strpos, strtolower, trim, ucwords,
+    FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PhpMixed, array_filter, array_flip,
+    array_flip_strings, array_intersect_key, array_keys, array_map, basename, empty, explode, file,
+    file_exists, file_get_contents, file_put_contents, function_exists, get_current_user, implode,
+    is_dir, is_string, preg_quote, realpath, server_get, sprintf, str_replace, strpos, strtolower,
+    trim, ucwords,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1076,12 +1076,7 @@ impl InitCommand {
     }
 
     pub(crate) fn is_valid_email(&self, email: &str) -> bool {
-        // assume it's valid if we can't validate it
-        if !function_exists("filter_var") {
-            return true;
-        }
-
-        shirabe_php_shim::filter_var(email, FILTER_VALIDATE_EMAIL)
+        shirabe_php_shim::filter_var_email(email)
     }
 
     fn update_dependencies(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {

@@ -4,10 +4,9 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    FILTER_VALIDATE_INT, FILTER_VALIDATE_IP, PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed,
-    RuntimeException, array_key_exists, chr, empty, explode, filter_var, filter_var_with_options,
-    inet_pton, ltrim, parse_url, str_pad, str_repeat, stripos, strlen, strpbrk, strpos, substr,
-    substr_count, unpack,
+    PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists, chr,
+    empty, explode, filter_var_int_with_range, filter_var_ip, inet_pton, ltrim, parse_url, str_pad,
+    str_repeat, stripos, strlen, strpbrk, strpos, substr, substr_count, unpack,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -271,7 +270,7 @@ impl NoProxyPattern {
         }
 
         // See if this is an ip address
-        if !filter_var(&host, FILTER_VALIDATE_IP) {
+        if !filter_var_ip(&host) {
             return Ok(!modified);
         }
 
@@ -483,18 +482,6 @@ impl NoProxyPattern {
 
     /// Wrapper around filter_var FILTER_VALIDATE_INT
     fn validate_int(&self, int: &str, min: i64, max: i64) -> bool {
-        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut inner: IndexMap<String, PhpMixed> = IndexMap::new();
-        inner.insert("min_range".to_string(), PhpMixed::Int(min));
-        inner.insert("max_range".to_string(), PhpMixed::Int(max));
-        options.insert(
-            "options".to_string(),
-            PhpMixed::Array(inner.into_iter().collect()),
-        );
-
-        !matches!(
-            filter_var_with_options(int, FILTER_VALIDATE_INT, &options),
-            PhpMixed::Bool(false)
-        )
+        filter_var_int_with_range(int, min, max)
     }
 }

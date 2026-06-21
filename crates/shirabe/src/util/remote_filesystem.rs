@@ -4,12 +4,12 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed,
-    RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
+    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed, RuntimeException,
+    STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
     array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
-    filter_var, gethostbyname, http_clear_last_response_headers, http_get_last_response_headers,
-    ini_get, json_decode, parse_url, preg_quote, sprintf, strpos, strtolower, strtr, substr, trim,
-    zlib_decode,
+    filter_var_boolean, gethostbyname, http_clear_last_response_headers,
+    http_get_last_response_headers, ini_get, json_decode, parse_url, preg_quote, sprintf, strpos,
+    strtolower, strtr, substr, trim, zlib_decode,
 };
 
 use crate::config::Config;
@@ -410,10 +410,7 @@ impl RemoteFilesystem {
             result = None;
         }
         if !error_message.is_empty()
-            && !filter_var(
-                &ini_get("allow_url_fopen").unwrap_or_default(),
-                FILTER_VALIDATE_BOOLEAN,
-            )
+            && !filter_var_boolean(&ini_get("allow_url_fopen").unwrap_or_default())
         {
             error_message = format!(
                 "allow_url_fopen must be enabled in php.ini ({})",
