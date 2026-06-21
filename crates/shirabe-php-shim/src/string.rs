@@ -31,8 +31,18 @@ pub fn substr_count(haystack: &str, needle: &str) -> i64 {
     haystack.matches(needle).count() as i64
 }
 
-pub fn substr_replace(_string: &str, _replace: &str, _start: usize, _length: usize) -> String {
-    todo!()
+// Byte-based, matching PHP's substr_replace.
+// TODO(phase-d): PHP accepts negative $start/$length (counting from the end); this signature takes
+// usize and therefore cannot express those cases.
+pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) -> String {
+    let bytes = string.as_bytes();
+    let start = start.min(bytes.len());
+    let end = start.saturating_add(length).min(bytes.len());
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len() + replace.len());
+    out.extend_from_slice(&bytes[..start]);
+    out.extend_from_slice(replace.as_bytes());
+    out.extend_from_slice(&bytes[end..]);
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn str_repeat(_s: &str, _count: usize) -> String {
@@ -97,7 +107,12 @@ pub fn str_split(_s: &str, _length: i64) -> Vec<String> {
 }
 
 pub fn str_bitand(_a: &str, _b: &str) -> String {
-    todo!()
+    // PHP's string `&` operator: byte-wise AND, the result truncated to the shorter operand.
+    let a = _a.as_bytes();
+    let b = _b.as_bytes();
+    let n = a.len().min(b.len());
+    let out: Vec<u8> = (0..n).map(|i| a[i] & b[i]).collect();
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn str_replace_arrays(search: &[String], replace: &[String], subject: &str) -> String {
@@ -560,7 +575,21 @@ pub fn mb_convert_variables(_to: &str, _from: &str, _vars: &mut Vec<String>) -> 
 }
 
 pub fn iconv(_in_charset: &str, _out_charset: &str, _string: &str) -> Option<String> {
-    todo!()
+    let from = canonical_encoding(_in_charset);
+    // The output charset may carry a "//TRANSLIT" / "//IGNORE" suffix.
+    let to_base = _out_charset.split("//").next().unwrap_or(_out_charset);
+    let to = canonical_encoding(to_base);
+    // ASCII is a subset of UTF-8, so any conversion among ASCII/UTF-8 that targets UTF-8 is a
+    // byte-level no-op.
+    if to == "UTF-8" && matches!(from.as_str(), "UTF-8" | "ASCII") {
+        return Some(_string.to_string());
+    }
+    if to == "ASCII" && from == "ASCII" {
+        return Some(_string.to_string());
+    }
+    // TODO(phase-d): general iconv conversion needs encoding tables and //TRANSLIT///IGNORE handling
+    // for non-UTF-8 targets, which have not been ported yet.
+    todo!("iconv {} -> {}", from, to)
 }
 
 /// Resolve PHP array_slice/substr-style (offset, length) into a `[start, end)`
@@ -626,11 +655,63 @@ pub fn urlencode(s: &str) -> String {
 }
 
 pub fn base64_encode(_data: &str) -> String {
-    todo!()
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes = _data.as_bytes();
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b1 = chunk.get(1).copied();
+        let b2 = chunk.get(2).copied();
+        let n = (chunk[0] as u32) << 16 | (b1.unwrap_or(0) as u32) << 8 | (b2.unwrap_or(0) as u32);
+        out.push(TABLE[((n >> 18) & 63) as usize] as char);
+        out.push(TABLE[((n >> 12) & 63) as usize] as char);
+        out.push(if b1.is_some() {
+            TABLE[((n >> 6) & 63) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if b2.is_some() {
+            TABLE[(n & 63) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
 }
 
 pub fn base64_decode(_data: &str) -> Option<Vec<u8>> {
-    todo!()
+    // Non-strict mode (PHP's default $strict = false): characters outside the base64 alphabet are
+    // silently skipped, and padding terminates the input.
+    let mut sextets: Vec<u8> = Vec::with_capacity(_data.len());
+    for &b in _data.as_bytes() {
+        let v = match b {
+            b'A'..=b'Z' => b - b'A',
+            b'a'..=b'z' => b - b'a' + 26,
+            b'0'..=b'9' => b - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => break,
+            _ => continue,
+        };
+        sextets.push(v);
+    }
+    let mut out = Vec::with_capacity(sextets.len() * 3 / 4);
+    for chunk in sextets.chunks(4) {
+        if chunk.len() < 2 {
+            break;
+        }
+        let n = (chunk[0] as u32) << 18
+            | (chunk[1] as u32) << 12
+            | (chunk.get(2).copied().unwrap_or(0) as u32) << 6
+            | (chunk.get(3).copied().unwrap_or(0) as u32);
+        out.push((n >> 16) as u8);
+        if chunk.len() >= 3 {
+            out.push((n >> 8) as u8);
+        }
+        if chunk.len() >= 4 {
+            out.push(n as u8);
+        }
+    }
+    Some(out)
 }
 
 pub fn ctype_alnum(_s: &str) -> bool {
@@ -671,27 +752,531 @@ fn hex_digit_value(b: u8) -> Option<u8> {
 }
 
 pub fn pack(_format: &str, _values: &[PhpMixed]) -> Vec<u8> {
-    todo!()
+    let fb = _format.as_bytes();
+    let mut out: Vec<u8> = Vec::new();
+    let mut vi = 0usize;
+    let mut i = 0;
+    while i < fb.len() {
+        let code = fb[i];
+        i += 1;
+        // Repeat count: a number, '*' (consume the rest), or implicitly 1.
+        let mut repeat: usize = 1;
+        let mut star = false;
+        if i < fb.len() && fb[i] == b'*' {
+            star = true;
+            i += 1;
+        } else {
+            let start = i;
+            while i < fb.len() && fb[i].is_ascii_digit() {
+                i += 1;
+            }
+            if i > start {
+                repeat = _format[start..i].parse().unwrap_or(1);
+            }
+        }
+        match code {
+            b'C' | b'c' | b'n' | b'v' | b'N' | b'V' => {
+                let count = if star {
+                    _values.len().saturating_sub(vi)
+                } else {
+                    repeat
+                };
+                for _ in 0..count {
+                    let val = crate::intval(_values.get(vi).unwrap_or(&PhpMixed::Null));
+                    vi += 1;
+                    match code {
+                        b'C' | b'c' => out.push(val as u8),
+                        b'n' => out.extend_from_slice(&(val as u16).to_be_bytes()),
+                        b'v' => out.extend_from_slice(&(val as u16).to_le_bytes()),
+                        b'N' => out.extend_from_slice(&(val as u32).to_be_bytes()),
+                        b'V' => out.extend_from_slice(&(val as u32).to_le_bytes()),
+                        _ => unreachable!(),
+                    }
+                }
+            }
+            b'a' | b'A' => {
+                let s = crate::php_to_string(_values.get(vi).unwrap_or(&PhpMixed::Null));
+                vi += 1;
+                let bytes = s.as_bytes();
+                let len = if star { bytes.len() } else { repeat };
+                let pad = if code == b'A' { b' ' } else { 0 };
+                for j in 0..len {
+                    out.push(bytes.get(j).copied().unwrap_or(pad));
+                }
+            }
+            _ => {
+                // TODO(phase-d): only the C/c/n/v/N/V/a/A pack format codes are ported; the
+                // machine-size and floating-point codes are not.
+                todo!("pack format code {}", code as char)
+            }
+        }
+    }
+    out
 }
 
 pub fn unpack(_format: &str, _data: &[u8]) -> Option<IndexMap<String, PhpMixed>> {
-    todo!()
+    let mut result = IndexMap::new();
+    let mut offset = 0usize;
+    for group in _format.split('/') {
+        if group.is_empty() {
+            continue;
+        }
+        let gb = group.as_bytes();
+        let code = gb[0];
+        let mut j = 1;
+        let mut repeat: usize = 1;
+        let mut star = false;
+        if j < gb.len() && gb[j] == b'*' {
+            star = true;
+            j += 1;
+        } else {
+            let start = j;
+            while j < gb.len() && gb[j].is_ascii_digit() {
+                j += 1;
+            }
+            if j > start {
+                repeat = group[start..j].parse().unwrap_or(1);
+            }
+        }
+        let name = &group[j..];
+        // `i`/`I` are the native int (4 bytes on the LP64 targets in use); `s`/`S` are the native
+        // short (2 bytes).
+        let size = match code {
+            b'C' | b'c' => 1,
+            b'n' | b'v' | b's' | b'S' => 2,
+            b'N' | b'V' | b'i' | b'I' => 4,
+            _ => {
+                // TODO(phase-d): only C/c/n/v/N/V/s/S/i/I unpack format codes are ported; the
+                // machine-size long/quad and floating-point codes are not.
+                todo!("unpack format code {}", code as char)
+            }
+        };
+        let count = if star {
+            _data.len().saturating_sub(offset) / size
+        } else {
+            repeat
+        };
+        for idx in 0..count {
+            if offset + size > _data.len() {
+                break;
+            }
+            let chunk = &_data[offset..offset + size];
+            offset += size;
+            let value: i64 = match code {
+                b'C' => chunk[0] as i64,
+                b'c' => chunk[0] as i8 as i64,
+                b'n' => u16::from_be_bytes([chunk[0], chunk[1]]) as i64,
+                b'v' => u16::from_le_bytes([chunk[0], chunk[1]]) as i64,
+                b's' => i16::from_ne_bytes([chunk[0], chunk[1]]) as i64,
+                b'S' => u16::from_ne_bytes([chunk[0], chunk[1]]) as i64,
+                b'N' => u32::from_be_bytes(chunk.try_into().unwrap()) as i64,
+                b'V' => u32::from_le_bytes(chunk.try_into().unwrap()) as i64,
+                b'i' => i32::from_ne_bytes(chunk.try_into().unwrap()) as i64,
+                b'I' => u32::from_ne_bytes(chunk.try_into().unwrap()) as i64,
+                _ => unreachable!(),
+            };
+            // PHP keys: "name" for a single element; "name1", "name2", ... for repeats; the 1-based
+            // index alone when the name is empty.
+            let key = if star || repeat > 1 {
+                if name.is_empty() {
+                    (idx + 1).to_string()
+                } else {
+                    format!("{}{}", name, idx + 1)
+                }
+            } else if name.is_empty() {
+                "1".to_string()
+            } else {
+                name.to_string()
+            };
+            result.insert(key, PhpMixed::Int(value));
+        }
+    }
+    Some(result)
 }
 
 pub fn sscanf(_subject: &str, _format: &str, _a: &mut i64, _b: &mut i64) -> i64 {
+    // TODO(phase-d): a general sscanf format-string parser is not ported; this specialized two-int
+    // overload has no current callers.
     todo!()
 }
 
 pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
-    todo!()
+    let fb = _format.as_bytes();
+    let mut out = String::new();
+    let mut i = 0;
+    let mut next_arg = 0usize;
+    while i < fb.len() {
+        if fb[i] != b'%' {
+            // Copy the literal run verbatim, preserving any multibyte sequences.
+            let start = i;
+            while i < fb.len() && fb[i] != b'%' {
+                i += 1;
+            }
+            out.push_str(&_format[start..i]);
+            continue;
+        }
+        i += 1;
+        if i >= fb.len() {
+            out.push('%');
+            break;
+        }
+        if fb[i] == b'%' {
+            out.push('%');
+            i += 1;
+            continue;
+        }
+
+        // Optional positional argument: "n$".
+        let mut explicit_arg: Option<usize> = None;
+        {
+            let mut k = i;
+            while k < fb.len() && fb[k].is_ascii_digit() {
+                k += 1;
+            }
+            if k > i && k < fb.len() && fb[k] == b'$' {
+                explicit_arg = _format[i..k].parse::<usize>().ok();
+                i = k + 1;
+            }
+        }
+
+        // Flags.
+        let mut left = false;
+        let mut plus = false;
+        let mut space = false;
+        let mut pad: u8 = b' ';
+        loop {
+            if i >= fb.len() {
+                break;
+            }
+            match fb[i] {
+                b'-' => left = true,
+                b'+' => plus = true,
+                b' ' => space = true,
+                b'0' => pad = b'0',
+                b'\'' => {
+                    i += 1;
+                    if i < fb.len() {
+                        pad = fb[i];
+                    }
+                }
+                _ => break,
+            }
+            i += 1;
+        }
+
+        // Width.
+        let mut width = 0usize;
+        {
+            let start = i;
+            while i < fb.len() && fb[i].is_ascii_digit() {
+                i += 1;
+            }
+            if i > start {
+                width = _format[start..i].parse().unwrap_or(0);
+            }
+        }
+
+        // Precision.
+        let mut precision: Option<usize> = None;
+        if i < fb.len() && fb[i] == b'.' {
+            i += 1;
+            let start = i;
+            while i < fb.len() && fb[i].is_ascii_digit() {
+                i += 1;
+            }
+            precision = Some(_format[start..i].parse().unwrap_or(0));
+        }
+
+        if i >= fb.len() {
+            break;
+        }
+        let spec = fb[i];
+        i += 1;
+
+        let arg = match explicit_arg {
+            Some(n) => _args.get(n.wrapping_sub(1)),
+            None => {
+                let a = _args.get(next_arg);
+                next_arg += 1;
+                a
+            }
+        };
+        let arg = arg.cloned().unwrap_or(PhpMixed::Null);
+
+        let (core, numeric) = match spec {
+            b'd' => (sprintf_signed_int(crate::intval(&arg), plus, space), true),
+            b'u' => ((crate::intval(&arg) as u64).to_string(), true),
+            b'b' => (format!("{:b}", crate::intval(&arg) as u64), true),
+            b'o' => (format!("{:o}", crate::intval(&arg) as u64), true),
+            b'x' => (format!("{:x}", crate::intval(&arg) as u64), true),
+            b'X' => (format!("{:X}", crate::intval(&arg) as u64), true),
+            b'c' => (
+                String::from_utf8_lossy(&[crate::intval(&arg) as u8]).into_owned(),
+                false,
+            ),
+            b'f' | b'F' => (
+                sprintf_float(php_to_float(&arg), precision.unwrap_or(6), plus, space),
+                true,
+            ),
+            b's' => {
+                let mut s = crate::php_to_string(&arg);
+                if let Some(p) = precision.filter(|&p| p < s.len()) {
+                    let mut end = p;
+                    while end > 0 && !s.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    s.truncate(end);
+                }
+                (s, false)
+            }
+            // TODO(phase-d): %e/%E/%g/%G are not ported; their exponent formatting differs from
+            // Rust's default float formatting and an exact PHP match has not been implemented.
+            b'e' | b'E' | b'g' | b'G' => todo!("sprintf conversion %{}", spec as char),
+            _ => todo!("sprintf conversion %{}", spec as char),
+        };
+
+        out.push_str(&sprintf_pad(core, width, left, pad, numeric));
+    }
+    out
 }
 
+fn sprintf_signed_int(n: i64, plus: bool, space: bool) -> String {
+    if n < 0 {
+        n.to_string()
+    } else if plus {
+        format!("+{}", n)
+    } else if space {
+        format!(" {}", n)
+    } else {
+        n.to_string()
+    }
+}
+
+fn sprintf_float(v: f64, precision: usize, plus: bool, space: bool) -> String {
+    let negative = v.is_sign_negative() && !v.is_nan();
+    let magnitude = format!("{:.*}", precision, v.abs());
+    if negative {
+        format!("-{}", magnitude)
+    } else if plus {
+        format!("+{}", magnitude)
+    } else if space {
+        format!(" {}", magnitude)
+    } else {
+        magnitude
+    }
+}
+
+fn sprintf_pad(core: String, width: usize, left: bool, pad: u8, numeric: bool) -> String {
+    let core_len = core.len();
+    if core_len >= width {
+        return core;
+    }
+    let fill = width - core_len;
+    if left {
+        // Left-justify always pads with the pad character; PHP treats a '0' flag as a space here.
+        let p = if pad == b'0' { ' ' } else { pad as char };
+        let mut s = core;
+        for _ in 0..fill {
+            s.push(p);
+        }
+        s
+    } else if pad == b'0' && numeric {
+        // Zero-padding goes after a leading sign.
+        let bytes = core.as_bytes();
+        let sign_len = if matches!(bytes.first(), Some(b'-' | b'+' | b' ')) {
+            1
+        } else {
+            0
+        };
+        let mut s = String::with_capacity(width);
+        s.push_str(&core[..sign_len]);
+        for _ in 0..fill {
+            s.push('0');
+        }
+        s.push_str(&core[sign_len..]);
+        s
+    } else {
+        let mut s = String::with_capacity(width);
+        for _ in 0..fill {
+            s.push(pad as char);
+        }
+        s.push_str(&core);
+        s
+    }
+}
+
+fn php_to_float(v: &PhpMixed) -> f64 {
+    match v {
+        PhpMixed::Int(i) => *i as f64,
+        PhpMixed::Float(f) => *f,
+        PhpMixed::Bool(b) => {
+            if *b {
+                1.0
+            } else {
+                0.0
+            }
+        }
+        PhpMixed::String(s) => {
+            // PHP's (float) cast reads the leading numeric portion of the string.
+            let t = s.trim_start();
+            let bytes = t.as_bytes();
+            let mut end = 0;
+            if end < bytes.len() && (bytes[end] == b'+' || bytes[end] == b'-') {
+                end += 1;
+            }
+            while end < bytes.len() && bytes[end].is_ascii_digit() {
+                end += 1;
+            }
+            if end < bytes.len() && bytes[end] == b'.' {
+                end += 1;
+                while end < bytes.len() && bytes[end].is_ascii_digit() {
+                    end += 1;
+                }
+            }
+            if end < bytes.len() && (bytes[end] == b'e' || bytes[end] == b'E') {
+                let mut e = end + 1;
+                if e < bytes.len() && (bytes[e] == b'+' || bytes[e] == b'-') {
+                    e += 1;
+                }
+                if e < bytes.len() && bytes[e].is_ascii_digit() {
+                    while e < bytes.len() && bytes[e].is_ascii_digit() {
+                        e += 1;
+                    }
+                    end = e;
+                }
+            }
+            t[..end].parse::<f64>().unwrap_or(0.0)
+        }
+        _ => 0.0,
+    }
+}
+
+// Port of PHP's php_strip_tags without the allowed-tags parameter (which this signature omits).
+// State: 0 = text, 1 = inside a tag, 2 = inside an HTML comment, 3 = inside `<? ... ?>` / `<! ...`.
+// TODO(phase-d): this omits allowed-tags handling and the tag-depth counter, so it can diverge from
+// PHP on malformed markup (unterminated comments/quotes, nested `<`).
 pub fn strip_tags(_str: &str) -> String {
-    todo!()
+    let bytes = _str.as_bytes();
+    let n = bytes.len();
+    let mut out: Vec<u8> = Vec::with_capacity(n);
+    let mut state: u8 = 0;
+    // Quote char while inside a quoted attribute value, or 0.
+    let mut in_q: u8 = 0;
+    let mut i = 0;
+    while i < n {
+        let c = bytes[i];
+        match c {
+            b'<' => {
+                if in_q == 0 {
+                    if state == 0 && i + 1 < n && bytes[i + 1].is_ascii_whitespace() {
+                        // PHP keeps "< " (a `<` followed by whitespace) as literal text.
+                        out.push(c);
+                    } else if state == 0 {
+                        state = 1;
+                    }
+                }
+            }
+            b'>' => {
+                if in_q == 0 {
+                    match state {
+                        1 | 3 => state = 0,
+                        2 => {
+                            if i >= 2 && bytes[i - 1] == b'-' && bytes[i - 2] == b'-' {
+                                state = 0;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            b'"' | b'\'' => {
+                if state == 1 {
+                    if in_q == 0 {
+                        in_q = c;
+                    } else if in_q == c && !(i > 0 && bytes[i - 1] == b'\\') {
+                        in_q = 0;
+                    }
+                } else if state == 0 {
+                    out.push(c);
+                }
+            }
+            b'!' => {
+                if state == 1 && i > 0 && bytes[i - 1] == b'<' {
+                    state = 3;
+                } else if state == 0 {
+                    out.push(c);
+                }
+            }
+            b'?' => {
+                if state == 1 && i > 0 && bytes[i - 1] == b'<' {
+                    state = 3;
+                } else if state == 0 {
+                    out.push(c);
+                }
+            }
+            b'-' => {
+                if state == 3 && i >= 2 && bytes[i - 1] == b'-' && bytes[i - 2] == b'!' {
+                    state = 2;
+                } else if state == 0 {
+                    out.push(c);
+                }
+            }
+            _ => {
+                if state == 0 {
+                    out.push(c);
+                }
+            }
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn html_entity_decode(_s: &str) -> String {
-    todo!()
+    // TODO(phase-d): only numeric entities and the most common named entities (the HTML 4.01 markup
+    // set PHP enables by default) are decoded; the full named-entity table is not ported.
+    let chars: Vec<char> = _s.chars().collect();
+    let mut out = String::with_capacity(_s.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '&' {
+            if let Some(rel) = chars[i + 1..].iter().position(|&c| c == ';') {
+                let entity: String = chars[i + 1..i + 1 + rel].iter().collect();
+                if let Some(decoded) = decode_html_entity(&entity) {
+                    out.push_str(&decoded);
+                    i = i + 1 + rel + 1;
+                    continue;
+                }
+            }
+            out.push('&');
+            i += 1;
+        } else {
+            out.push(chars[i]);
+            i += 1;
+        }
+    }
+    out
+}
+
+fn decode_html_entity(entity: &str) -> Option<String> {
+    if let Some(num) = entity.strip_prefix('#') {
+        let code = if let Some(hex) = num.strip_prefix('x').or_else(|| num.strip_prefix('X')) {
+            u32::from_str_radix(hex, 16).ok()?
+        } else {
+            num.parse::<u32>().ok()?
+        };
+        return char::from_u32(code).map(|c| c.to_string());
+    }
+    // PHP's default flags (ENT_QUOTES | ENT_HTML401) do not include the XML-only `apos`.
+    let c = match entity {
+        "amp" => '&',
+        "lt" => '<',
+        "gt" => '>',
+        "quot" => '"',
+        "nbsp" => '\u{00A0}',
+        _ => return None,
+    };
+    Some(c.to_string())
 }
 
 pub fn bin2hex(_data: &[u8]) -> String {
@@ -707,30 +1292,152 @@ pub fn ucfirst(s: &str) -> String {
 }
 
 pub fn chr(_value: u8) -> String {
-    todo!()
+    // TODO(phase-d): PHP chr() yields a single raw byte; for values >= 0x80 that byte is not valid
+    // UTF-8, so storing it in a Rust String forces a lossy substitution.
+    String::from_utf8_lossy(&[_value]).into_owned()
 }
 
+// Port of PHP's addcslashes: every byte that falls in the (range-expanded) charlist is
+// backslash-escaped, with non-printable bytes rendered as the C escape or a three-digit octal.
 pub fn addcslashes(_string: &str, _charlist: &str) -> String {
-    todo!()
+    let mask = php_trim_mask(_charlist.as_bytes());
+    let mut out: Vec<u8> = Vec::with_capacity(_string.len());
+    for &c in _string.as_bytes() {
+        if mask[c as usize] {
+            if !(32..=126).contains(&c) {
+                out.push(b'\\');
+                match c {
+                    b'\n' => out.push(b'n'),
+                    b'\t' => out.push(b't'),
+                    b'\r' => out.push(b'r'),
+                    0x07 => out.push(b'a'),
+                    0x0B => out.push(b'v'),
+                    0x08 => out.push(b'b'),
+                    0x0C => out.push(b'f'),
+                    _ => out.extend_from_slice(format!("{:03o}", c).as_bytes()),
+                }
+            } else {
+                out.push(b'\\');
+                out.push(c);
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn php_strip_whitespace(_path: &str) -> String {
+    // TODO(phase-d): PHP strips comments and redundant whitespace using the PHP tokenizer; no PHP
+    // tokenizer is available in the shim.
     todo!()
 }
 
 pub fn hexdec(_s: &str) -> i64 {
-    todo!()
+    // PHP hexdec() ignores characters outside [0-9A-Fa-f].
+    // TODO(phase-d): PHP promotes the result to float on overflow; this i64 return wraps instead.
+    let mut acc: u64 = 0;
+    for &b in _s.as_bytes() {
+        let d = match b {
+            b'0'..=b'9' => b - b'0',
+            b'a'..=b'f' => b - b'a' + 10,
+            b'A'..=b'F' => b - b'A' + 10,
+            _ => continue,
+        };
+        acc = acc.wrapping_mul(16).wrapping_add(d as u64);
+    }
+    acc as i64
 }
 
 pub fn byte_at(s: &str, i: usize) -> u8 {
     s.as_bytes().get(i).copied().unwrap_or(0)
 }
 
+// Port of PHP's stripcslashes: the inverse of addcslashes, decoding C escape sequences including
+// octal (\ooo) and hex (\xHH).
 pub fn stripcslashes(_s: &str) -> String {
-    todo!()
+    let bytes = _s.as_bytes();
+    let n = bytes.len();
+    let mut out: Vec<u8> = Vec::with_capacity(n);
+    let mut i = 0;
+    while i < n {
+        if bytes[i] == b'\\' && i + 1 < n {
+            i += 1;
+            match bytes[i] {
+                b'n' => {
+                    out.push(b'\n');
+                    i += 1;
+                }
+                b'r' => {
+                    out.push(b'\r');
+                    i += 1;
+                }
+                b'a' => {
+                    out.push(0x07);
+                    i += 1;
+                }
+                b't' => {
+                    out.push(b'\t');
+                    i += 1;
+                }
+                b'v' => {
+                    out.push(0x0B);
+                    i += 1;
+                }
+                b'b' => {
+                    out.push(0x08);
+                    i += 1;
+                }
+                b'f' => {
+                    out.push(0x0C);
+                    i += 1;
+                }
+                b'\\' => {
+                    out.push(b'\\');
+                    i += 1;
+                }
+                b'x' => {
+                    if i + 1 < n && bytes[i + 1].is_ascii_hexdigit() {
+                        let mut val: u8 = 0;
+                        let mut count = 0;
+                        i += 1;
+                        while i < n && count < 2 && bytes[i].is_ascii_hexdigit() {
+                            val = val.wrapping_mul(16) + hex_digit_value(bytes[i]).unwrap();
+                            i += 1;
+                            count += 1;
+                        }
+                        out.push(val);
+                    } else {
+                        out.push(b'x');
+                        i += 1;
+                    }
+                }
+                b'0'..=b'7' => {
+                    let mut val: u8 = 0;
+                    let mut count = 0;
+                    while i < n && count < 3 && (b'0'..=b'7').contains(&bytes[i]) {
+                        val = val.wrapping_mul(8).wrapping_add(bytes[i] - b'0');
+                        i += 1;
+                        count += 1;
+                    }
+                    out.push(val);
+                }
+                other => {
+                    out.push(other);
+                    i += 1;
+                }
+            }
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn wordwrap(_s: &str, _width: i64, _break_str: &str, _cut: bool) -> String {
+    // TODO(phase-d): an exact byte-for-byte port of php_string_wordwrap (with its lastspace/cut
+    // bookkeeping) is intricate; left unported as it has no current callers.
     todo!()
 }
 
@@ -758,9 +1465,58 @@ pub fn number_format(
     _decimal_separator: &str,
     _thousands_separator: &str,
 ) -> String {
-    todo!()
+    let decimals = _decimals.max(0) as usize;
+    let negative = _number < 0.0;
+    let magnitude = _number.abs();
+    // PHP rounds half away from zero; Rust's f64::round() does the same, so round the scaled value
+    // to a whole number before formatting to avoid the round-half-to-even of `{:.*}`.
+    let factor = 10f64.powi(decimals as i32);
+    let scaled = (magnitude * factor).round();
+    let mut digits = format!("{:.0}", scaled);
+    while digits.len() <= decimals {
+        digits.insert(0, '0');
+    }
+    let split = digits.len() - decimals;
+    let int_part = &digits[..split];
+    let frac_part = &digits[split..];
+
+    let mut result = String::new();
+    let int_bytes = int_part.as_bytes();
+    let len = int_bytes.len();
+    for (idx, &b) in int_bytes.iter().enumerate() {
+        if idx > 0 && (len - idx) % 3 == 0 {
+            result.push_str(_thousands_separator);
+        }
+        result.push(b as char);
+    }
+    if decimals > 0 {
+        result.push_str(_decimal_separator);
+        result.push_str(frac_part);
+    }
+    // PHP drops the sign when the rounded value is zero.
+    if negative && result.bytes().any(|b| b.is_ascii_digit() && b != b'0') {
+        result.insert(0, '-');
+    }
+    result
 }
 
 pub fn uniqid(_prefix: &str, _more_entropy: bool) -> String {
-    todo!()
+    // PHP builds the id from the current time: 8 hex digits of seconds followed by 5 hex digits of
+    // microseconds. With $more_entropy a '.' and a random fraction (PHP's "%08.8F") are appended.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let base = format!(
+        "{}{:08x}{:05x}",
+        _prefix,
+        now.as_secs(),
+        now.subsec_micros()
+    );
+    if _more_entropy {
+        // TODO(phase-d): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
+        // not reproducible against PHP (it is non-deterministic in PHP too).
+        format!("{}.{:.8}", base, fastrand::f64() * 10.0)
+    } else {
+        base
+    }
 }
