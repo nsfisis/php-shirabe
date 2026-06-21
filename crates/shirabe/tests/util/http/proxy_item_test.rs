@@ -3,7 +3,6 @@
 use shirabe::util::http::proxy_item::ProxyItem;
 
 #[test]
-#[ignore = "ProxyItem::new reaches a todo!() in the php-shim"]
 fn test_throws_on_malformed_url() {
     for url in data_malformed() {
         assert!(ProxyItem::new(url.to_string(), "http_proxy".to_string()).is_err());
@@ -30,7 +29,7 @@ fn data_malformed() -> Vec<&'static str> {
 }
 
 #[test]
-#[ignore = "ProxyItem::new reaches a todo!() in the php-shim"]
+#[ignore = "URL parsing yields no host for these cases, so proxy formatting fails (parse_url/port discrepancy)"]
 fn test_url_formatting() {
     for (url, expected) in data_formatting() {
         let proxy_item = ProxyItem::new(url.to_string(), "http_proxy".to_string()).unwrap();

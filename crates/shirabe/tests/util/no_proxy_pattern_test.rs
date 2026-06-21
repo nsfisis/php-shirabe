@@ -28,7 +28,6 @@ fn get_url(url: &str) -> String {
 }
 
 #[test]
-#[ignore = "NoProxyPattern::test reaches a todo!() (substr_count) in the php-shim"]
 fn test_host_name() {
     let noproxy = "foobar.com, .barbaz.net";
 
@@ -43,7 +42,7 @@ fn test_host_name() {
 }
 
 #[test]
-#[ignore = "NoProxyPattern::test reaches a todo!() (substr_count) in the php-shim"]
+#[ignore = "NoProxyPattern does not match IPv4-mapped IPv6 addresses against IPv4 rules (port logic gap)"]
 fn test_ip_address() {
     let noproxy = "192.168.1.1, 2001:db8::52:0:1";
 
@@ -56,7 +55,7 @@ fn test_ip_address() {
 }
 
 #[test]
-#[ignore = "NoProxyPattern::test reaches a todo!() (substr_count) in the php-shim"]
+#[ignore = "NoProxyPattern does not match IPv4-mapped IPv6 addresses against IPv4/CIDR rules (port logic gap)"]
 fn test_ip_range() {
     let noproxy = "10.0.0.0/30, 2002:db8:a::45/121";
 
@@ -69,7 +68,6 @@ fn test_ip_range() {
 }
 
 #[test]
-#[ignore = "NoProxyPattern::test reaches a todo!() (substr_count) in the php-shim"]
 fn test_port() {
     let noproxy = "192.168.1.2:81, 192.168.1.3:80, [2001:db8::52:0:2]:443, [2001:db8::52:0:3]:80";
 

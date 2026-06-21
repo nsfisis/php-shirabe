@@ -42,7 +42,6 @@ fn test_from_bool_or_list() {
 }
 
 #[test]
-#[ignore = "get_debug_type is todo!() in the php-shim (used to build the error message)"]
 fn test_from_bool_throws_exception_if_type_is_unknown() {
     let result = PlatformRequirementFilterFactory::from_bool_or_list(PhpMixed::Null);
     let err = result.unwrap_err();

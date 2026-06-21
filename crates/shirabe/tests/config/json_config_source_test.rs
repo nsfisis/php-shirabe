@@ -31,59 +31,57 @@ impl Drop for TearDown {
     }
 }
 
-// JsonConfigSource edits composer.json through JsonManipulator, whose text-rewriting
-// operations reach addcslashes (todo!()) in the php-shim.
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_add_repository() {
     let _tear_down = set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_add_repository_as_list() {
     let _tear_down = set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_add_repository_with_options() {
     let _tear_down = set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_remove_repository() {
     let _tear_down = set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_add_packagist_repository_with_false_value() {
     let _tear_down = set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_remove_packagist() {
     let _tear_down = set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_add_link() {
     let _tear_down = set_up();
     todo!()
 }
 
 #[test]
-#[ignore = "JsonConfigSource uses JsonManipulator, which reaches addcslashes (todo!()) in the php-shim"]
+#[ignore = "test body not yet ported (todo!() stub)"]
 fn test_remove_link() {
     let _tear_down = set_up();
     todo!()

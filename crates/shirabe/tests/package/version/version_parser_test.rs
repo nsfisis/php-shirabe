@@ -57,7 +57,6 @@ fn provide_parse_name_version_pairs_data() -> Vec<(Vec<String>, Vec<IndexMap<Str
 }
 
 #[test]
-#[ignore = "VersionParser::is_upgrade reaches a todo!() in the php-shim"]
 fn test_is_upgrade() {
     for (from, to, expected) in provide_is_upgrade_tests() {
         assert_eq!(expected, VersionParser::is_upgrade(&from, &to).unwrap());

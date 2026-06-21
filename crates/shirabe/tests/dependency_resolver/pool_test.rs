@@ -36,7 +36,6 @@ fn test_pool() {
 }
 
 #[test]
-#[ignore = "what_provides with a constraint reaches a todo!() in the php-shim"]
 fn test_what_provides_package_with_constraint() {
     let first_package = get_package("foo", "1");
     let second_package = get_package("foo", "2");

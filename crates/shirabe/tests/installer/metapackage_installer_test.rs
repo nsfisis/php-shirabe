@@ -44,7 +44,6 @@ fn test_install() {
 }
 
 #[test]
-#[ignore = "MetapackageInstaller::update formats an UpdateOperation, which reaches version_compare (todo!()) in the php-shim"]
 fn test_update() {
     let initial = get_package("test/initial", "1.0.0");
     let target = get_package("test/target", "1.0.1");

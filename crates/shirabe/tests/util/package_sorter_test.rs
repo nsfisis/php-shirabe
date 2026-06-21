@@ -32,7 +32,6 @@ fn names(packages: &[PackageInterfaceHandle]) -> Vec<String> {
 }
 
 #[test]
-#[ignore = "PackageSorter::sort_packages reaches strnatcasecmp, a todo!() in the php-shim"]
 fn test_sorting_does_nothing_with_no_dependencies() {
     let packages = vec![
         create_package("foo/bar1", &[]),
@@ -142,7 +141,7 @@ fn sorting_orders_dependencies_higher_than_package_cases() -> Vec<(
 }
 
 #[test]
-#[ignore = "PackageSorter::sort_packages reaches strnatcasecmp, a todo!() in the php-shim"]
+#[ignore = "constraint parsing reaches a look-around regex unsupported by the regex-crate shim (Preg)"]
 fn test_sorting_orders_dependencies_higher_than_package() {
     for (packages, expected_ordered_list, weights) in
         sorting_orders_dependencies_higher_than_package_cases()
