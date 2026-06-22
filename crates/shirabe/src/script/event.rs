@@ -13,7 +13,13 @@ pub struct Event {
     composer: ComposerWeakHandle,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: bool,
-    originating_event: Option<Box<BaseEvent>>,
+    originating_event: Option<OriginatingEvent>,
+}
+
+#[derive(Debug)]
+pub enum OriginatingEvent {
+    Base(BaseEvent),
+    Script(Box<Event>),
 }
 
 impl Event {
@@ -46,22 +52,25 @@ impl Event {
         self.dev_mode
     }
 
-    pub fn get_originating_event(&self) -> Option<&BaseEvent> {
-        self.originating_event.as_deref()
+    pub fn get_originating_event(&self) -> Option<&OriginatingEvent> {
+        self.originating_event.as_ref()
     }
 
-    pub fn set_originating_event(&mut self, event: BaseEvent) -> &mut Self {
-        self.originating_event = Some(Box::new(self.calculate_originating_event(event)));
+    pub fn set_originating_event(&mut self, event: OriginatingEvent) -> &mut Self {
+        self.originating_event = Some(Self::calculate_originating_event(event));
         self
     }
 
-    fn calculate_originating_event(&self, event: BaseEvent) -> BaseEvent {
-        // if ($event instanceof Event && $event->getOriginatingEvent()) {
-        //     return $this->calculateOriginatingEvent($event->getOriginatingEvent());
-        // }
-        //
-        // return $event;
-        todo!()
+    fn calculate_originating_event(event: OriginatingEvent) -> OriginatingEvent {
+        if let OriginatingEvent::Script(boxed) = event {
+            let mut inner_event = *boxed;
+            if let Some(originating) = inner_event.originating_event.take() {
+                return Self::calculate_originating_event(originating);
+            }
+            return OriginatingEvent::Script(Box::new(inner_event));
+        }
+
+        event
     }
 }
 
@@ -84,5 +93,42 @@ impl EventInterface for Event {
 
     fn stop_propagation(&mut self) {
         self.inner.stop_propagation();
+    }
+}
+
+impl EventInterface for OriginatingEvent {
+    fn get_name(&self) -> &str {
+        match self {
+            OriginatingEvent::Base(e) => e.get_name(),
+            OriginatingEvent::Script(e) => e.get_name(),
+        }
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        match self {
+            OriginatingEvent::Base(e) => e.get_arguments(),
+            OriginatingEvent::Script(e) => e.get_arguments(),
+        }
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        match self {
+            OriginatingEvent::Base(e) => e.get_flags(),
+            OriginatingEvent::Script(e) => e.get_flags(),
+        }
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        match self {
+            OriginatingEvent::Base(e) => e.is_propagation_stopped(),
+            OriginatingEvent::Script(e) => e.is_propagation_stopped(),
+        }
+    }
+
+    fn stop_propagation(&mut self) {
+        match self {
+            OriginatingEvent::Base(e) => e.stop_propagation(),
+            OriginatingEvent::Script(e) => e.stop_propagation(),
+        }
     }
 }
