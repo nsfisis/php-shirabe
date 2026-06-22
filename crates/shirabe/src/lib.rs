@@ -47,8 +47,9 @@ pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
 
 #[cfg(test)]
 mod cli_tests {
+    use serial_test::serial;
     use std::panic::{AssertUnwindSafe, catch_unwind};
-    use std::sync::{Mutex, Once};
+    use std::sync::Once;
 
     const COMMANDS: &[&str] = &[
         "about",
@@ -87,20 +88,15 @@ mod cli_tests {
 
     static QUIET_PANIC: Once = Once::new();
 
-    /// `crate::run` reads/writes process-global env, so concurrent invocations race;
-    /// serialize them since the default test harness runs tests on many threads.
-    static SERIAL: Mutex<()> = Mutex::new(());
-
     /// Runs the CLI with `args`. Returns true on clean exit, false on any panic / error / non-zero
     /// exit.
     fn run(args: &[&str]) -> bool {
         QUIET_PANIC.call_once(|| std::panic::set_hook(Box::new(|_| {})));
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
 
         // Each invocation must look like a fresh process.
         //
-        // SAFETY: all environment access in these tests happens through `crate::run` while holding
-        // `SERIAL`, so no other thread reads or writes the environment concurrently with these calls.
+        // SAFETY: every test reaching this code is marked `#[serial]`, so no other thread reads or
+        // writes the environment concurrently with these calls.
         unsafe {
             std::env::remove_var("COLUMNS");
             std::env::remove_var("LINES");
@@ -115,16 +111,19 @@ mod cli_tests {
     }
 
     #[test]
+    #[serial]
     fn version_flag() {
         assert!(run(&["--version"]));
     }
 
     #[test]
+    #[serial]
     fn help_flag() {
         assert!(run(&["--help"]));
     }
 
     #[test]
+    #[serial]
     fn each_command_help() {
         let failed: Vec<&&str> = COMMANDS.iter().filter(|c| !run(&[c, "--help"])).collect();
         assert!(failed.is_empty(), "`<cmd> --help` failed for: {failed:?}");
@@ -134,14 +133,13 @@ mod cli_tests {
     /// not panic (any exit code, including non-zero or an `Err` return, counts as success).
     fn run_no_panic(args: &[&str]) -> bool {
         QUIET_PANIC.call_once(|| std::panic::set_hook(Box::new(|_| {})));
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
 
         let original = std::env::current_dir().ok();
         let dir = tempfile::tempdir().expect("create temp dir");
         std::env::set_current_dir(dir.path()).expect("chdir to temp dir");
 
-        // SAFETY: all environment access here happens while holding `SERIAL`, so no other thread
-        // touches the environment or working directory concurrently.
+        // SAFETY: every test reaching this code is marked `#[serial]`, so no other thread touches
+        // the environment or working directory concurrently.
         unsafe {
             std::env::remove_var("COLUMNS");
             std::env::remove_var("LINES");
@@ -163,6 +161,7 @@ mod cli_tests {
             $(
                 $(#[$attr])*
                 #[test]
+                #[serial]
                 fn $name() {
                     assert!(run_no_panic(&[$cmd]), "`{}` panicked", $cmd);
                 }
