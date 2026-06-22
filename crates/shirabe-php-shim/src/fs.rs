@@ -512,8 +512,8 @@ pub fn file_put_contents3(_filename: &str, _data: &str, _flags: i64) -> Option<i
     Some(_data.len() as i64)
 }
 
-pub fn file_get_contents(_path: &str) -> Option<String> {
-    std::fs::read(_path)
+pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> Option<String> {
+    std::fs::read(path)
         .ok()
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }

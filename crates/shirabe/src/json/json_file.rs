@@ -11,8 +11,8 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
-    file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, php_dir, realpath,
-    str_contains, str_ends_with, str_repeat, strlen, strpos, usleep,
+    file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, realpath, str_contains,
+    str_ends_with, str_repeat, strlen, strpos, usleep,
 };
 
 use crate::downloader::TransportException;
@@ -87,14 +87,24 @@ impl JsonFile {
 
     pub const INDENT_DEFAULT: &'static str = "    ";
 
-    /// PHP: __DIR__ . '/../../../res/composer-schema.json'
-    pub fn composer_schema_path() -> String {
-        format!("{}/../../../res/composer-schema.json", php_dir())
+    /// build.rs copies the Composer schema files into a res/ directory next to the
+    /// executable; this resolves that path via the running executable's location.
+    ///
+    /// TODO(phase-f): this on-disk layout is hard to distribute. Embed the schema with
+    /// include_str! and extract it to a temporary file at runtime instead.
+    pub fn composer_schema_path() -> std::path::PathBuf {
+        Self::schema_res_path("composer-schema.json")
     }
 
-    /// PHP: __DIR__ . '/../../../res/composer-lock-schema.json'
-    pub fn lock_schema_path() -> String {
-        format!("{}/../../../res/composer-lock-schema.json", php_dir())
+    /// See composer_schema_path.
+    pub fn lock_schema_path() -> std::path::PathBuf {
+        Self::schema_res_path("composer-lock-schema.json")
+    }
+
+    fn schema_res_path(filename: &str) -> std::path::PathBuf {
+        let exe = std::env::current_exe().expect("failed to resolve current executable path");
+        let dir = exe.parent().expect("executable has no parent directory");
+        dir.join("res").join(filename)
     }
 
     /// Initializes json file reader/parser.
@@ -329,8 +339,8 @@ impl JsonFile {
         schema_file: Option<&str>,
     ) -> Result<bool> {
         let mut is_composer_schema_file = false;
-        let mut schema_file: String = match schema_file {
-            Some(f) => f.to_string(),
+        let mut schema_file = match schema_file {
+            Some(f) => f.into(),
             None => {
                 if schema == Self::LOCK_SCHEMA {
                     Self::lock_schema_path()
@@ -340,6 +350,7 @@ impl JsonFile {
                 }
             }
         };
+        let mut schema_file = schema_file.to_string_lossy().into_owned();
 
         // Prepend with file:// only when not using a special schema already (e.g. in the phar)
         if strpos(&schema_file, "://").is_none() {

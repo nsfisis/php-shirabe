@@ -9,8 +9,8 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL,
     UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
-    get_class_err, get_debug_type, in_array, is_array, is_null, is_string, ksort, php_dir,
-    realpath, sort, sort_with_flags, str_repeat, strtr, trim, usort, var_export,
+    get_class_err, get_debug_type, in_array, is_array, is_null, is_string, ksort, realpath, sort,
+    sort_with_flags, str_repeat, strtr, trim, usort, var_export,
 };
 
 use crate::config::is_php_integer_key;
@@ -329,25 +329,19 @@ impl FilesystemRepository {
                 &format!("{}/installed.php", repo_dir),
                 &format!("<?php return {};\n", self.dump_to_php_code(&versions, 0),),
             );
-            let installed_versions_class =
-                file_get_contents(&format!("{}/../InstalledVersions.php", php_dir(),));
+            self.filesystem.borrow_mut().file_put_contents_if_modified(
+                &format!("{}/InstalledVersions.php", repo_dir),
+                include_str!("../../../../composer/src/Composer/InstalledVersions.php"),
+            );
 
-            // this normally should not happen but during upgrades of Composer when it is installed in the project it is a possibility
-            if let Some(class_content) = installed_versions_class {
-                self.filesystem.borrow_mut().file_put_contents_if_modified(
-                    &format!("{}/InstalledVersions.php", repo_dir),
-                    &class_content,
-                );
+            // make sure the in memory state is up to date with on disk
+            InstalledVersions::reload(versions);
 
-                // make sure the in memory state is up to date with on disk
-                InstalledVersions::reload(versions);
-
-                // make sure the selfDir matches the expected data at runtime if the class was loaded from the vendor dir, as it may have been
-                // loaded from the Composer sources, causing packages to appear twice in that case if the installed.php is loaded in addition to the
-                // in memory loaded data from above
-                InstalledVersions::set_self_dir(repo_dir.replace('\\', "/"));
-                InstalledVersions::set_installed_is_local_dir(true);
-            }
+            // make sure the selfDir matches the expected data at runtime if the class was loaded from the vendor dir, as it may have been
+            // loaded from the Composer sources, causing packages to appear twice in that case if the installed.php is loaded in addition to the
+            // in memory loaded data from above
+            InstalledVersions::set_self_dir(repo_dir.replace('\\', "/"));
+            InstalledVersions::set_installed_is_local_dir(true);
         }
 
         Ok(())
