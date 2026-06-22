@@ -100,7 +100,7 @@ fn test_find_packages() {
 }
 
 #[test]
-#[ignore = "AliasPackage::get_unique_name returns the aliased package's name, so has_package misses the alias version"]
+#[ignore]
 fn test_automatically_add_aliased_package_but_not_remove() {
     let mut repo = ArrayRepository::new(vec![]).unwrap();
 

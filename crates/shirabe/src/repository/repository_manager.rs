@@ -162,6 +162,12 @@ impl RepositoryManager {
         &self.repositories
     }
 
+    /// For testing only: exposes the private `repository_classes` map so tests
+    /// can assert on its registered type keys (PHP reads it via ReflectionProperty).
+    pub fn __repository_classes(&self) -> &IndexMap<String, String> {
+        &self.repository_classes
+    }
+
     pub fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle) {
         self.local_repository = Some(repository);
     }

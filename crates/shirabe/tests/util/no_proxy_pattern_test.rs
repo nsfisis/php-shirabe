@@ -42,7 +42,7 @@ fn test_host_name() {
 }
 
 #[test]
-#[ignore = "NoProxyPattern does not match IPv4-mapped IPv6 addresses against IPv4 rules (port logic gap)"]
+#[ignore]
 fn test_ip_address() {
     let noproxy = "192.168.1.1, 2001:db8::52:0:1";
 
@@ -55,7 +55,7 @@ fn test_ip_address() {
 }
 
 #[test]
-#[ignore = "NoProxyPattern does not match IPv4-mapped IPv6 addresses against IPv4/CIDR rules (port logic gap)"]
+#[ignore]
 fn test_ip_range() {
     let noproxy = "10.0.0.0/30, 2002:db8:a::45/121";
 

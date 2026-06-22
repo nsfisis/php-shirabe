@@ -1075,6 +1075,31 @@ impl InitCommand {
         file_put_contents(ignore_file, format!("{}{}\n", contents, vendor).as_bytes());
     }
 
+    /// For testing only: invoke the private `parse_author_string`.
+    pub fn __parse_author_string(&self, author: &str) -> Result<IndexMap<String, Option<String>>> {
+        self.parse_author_string(author)
+    }
+
+    /// For testing only: invoke the crate-private `format_authors`.
+    pub fn __format_authors(&self, author: &str) -> Result<Vec<IndexMap<String, PhpMixed>>> {
+        self.format_authors(author)
+    }
+
+    /// For testing only: invoke the crate-private `get_git_config`.
+    pub fn __get_git_config(&mut self) -> IndexMap<String, String> {
+        self.get_git_config()
+    }
+
+    /// For testing only: invoke the crate-private `has_vendor_ignore`.
+    pub fn __has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
+        self.has_vendor_ignore(ignore_file, vendor)
+    }
+
+    /// For testing only: invoke the crate-private `add_vendor_ignore`.
+    pub fn __add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
+        self.add_vendor_ignore(ignore_file, vendor)
+    }
+
     pub(crate) fn is_valid_email(&self, email: &str) -> bool {
         shirabe_php_shim::filter_var_email(email)
     }

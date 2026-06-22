@@ -3,7 +3,7 @@
 use shirabe::package::archiver::git_exclude_filter::GitExcludeFilter;
 
 #[test]
-#[ignore = "Preg::split panics on the `\\s+` pattern in the regex-crate-based shim"]
+#[ignore]
 fn test_pattern_escape() {
     for (ignore, expected) in provide_patterns() {
         let filter = GitExcludeFilter::new("/".to_string());

@@ -153,7 +153,7 @@ fn provide_filter_require_tests() -> Vec<FilterCase> {
 }
 
 #[test]
-#[ignore = "building packages with links via ArrayLoader parses constraints with a look-around regex the regex crate cannot compile"]
+#[ignore]
 fn test_filter_required_packages() {
     for case in provide_filter_require_tests() {
         let pkgs = build_packages();

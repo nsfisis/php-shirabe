@@ -67,6 +67,17 @@ impl AnyPackage {
         }
     }
 
+    /// For testing only: reach the base `Package` of a real package variant.
+    /// Crate-private; the public `__set_*` test hatches are built on top of it.
+    pub(crate) fn as_package_mut(&mut self) -> Option<&mut Package> {
+        match self {
+            Self::Package(p) => Some(p),
+            Self::CompletePackage(p) => Some(&mut p.inner),
+            Self::RootPackage(p) => Some(&mut p.inner.inner),
+            _ => None,
+        }
+    }
+
     pub fn as_root_package_interface(&self) -> Option<&dyn RootPackageInterface> {
         match self {
             Self::RootPackage(p) => Some(p),
@@ -1118,6 +1129,97 @@ macro_rules! impl_root_package_interface_handle {
         }
     };
 }
+
+macro_rules! impl_real_package_test_setters {
+    ($Handle:ty) => {
+        impl $Handle {
+            /// For testing only: mirrors PHP `Package::setRequires`.
+            pub fn __set_requires(
+                &self,
+                requires: indexmap::IndexMap<String, crate::package::Link>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_requires(requires);
+            }
+
+            /// For testing only: mirrors PHP `Package::setDevRequires`.
+            pub fn __set_dev_requires(
+                &self,
+                dev_requires: indexmap::IndexMap<String, crate::package::Link>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_dev_requires(dev_requires);
+            }
+
+            /// For testing only: mirrors PHP `Package::setConflicts`.
+            pub fn __set_conflicts(
+                &self,
+                conflicts: indexmap::IndexMap<String, crate::package::Link>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_conflicts(conflicts);
+            }
+
+            /// For testing only: mirrors PHP `Package::setProvides`.
+            pub fn __set_provides(
+                &self,
+                provides: indexmap::IndexMap<String, crate::package::Link>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_provides(provides);
+            }
+
+            /// For testing only: mirrors PHP `Package::setReplaces`.
+            pub fn __set_replaces(
+                &self,
+                replaces: indexmap::IndexMap<String, crate::package::Link>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_replaces(replaces);
+            }
+
+            /// For testing only: mirrors PHP `Package::setExtra`.
+            pub fn __set_extra(
+                &self,
+                extra: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_extra(extra);
+            }
+
+            /// For testing only: mirrors PHP `Package::setType`.
+            pub fn __set_type(&self, r#type: String) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_type(r#type);
+            }
+        }
+    };
+}
+
+impl_real_package_test_setters!(PackageHandle);
+impl_real_package_test_setters!(CompletePackageHandle);
+impl_real_package_test_setters!(RootPackageHandle);
 
 macro_rules! impl_handle_common {
     ($Handle:ty) => {

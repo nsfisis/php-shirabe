@@ -7,6 +7,7 @@ use indexmap::IndexMap;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::event_dispatcher::Event as BaseEvent;
+use shirabe::event_dispatcher::EventInterface;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};
@@ -28,7 +29,7 @@ fn create_composer_instance() -> ComposerHandle {
 }
 
 #[test]
-#[ignore = "Event::calculate_originating_event (called by set_originating_event) is todo!()"]
+#[ignore]
 fn test_event_sets_originating_event() {
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
     let composer = create_composer_instance();
@@ -51,7 +52,14 @@ fn test_event_sets_originating_event() {
 
     script_event.set_originating_event(originating_event);
 
-    assert!(script_event.get_originating_event().is_some());
+    // assertSame: the originating event passed in is returned unchanged.
+    assert_eq!(
+        script_event
+            .get_originating_event()
+            .map(EventInterface::get_name),
+        Some("originatingEvent"),
+        "getOriginatingEvent() SHOULD return test event"
+    );
 }
 
 // In PHP, the intermediate originating event is itself a Script\Event, and

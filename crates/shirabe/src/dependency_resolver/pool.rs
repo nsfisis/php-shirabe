@@ -379,6 +379,12 @@ impl Pool {
     pub fn get_unacceptable_fixed_or_locked_packages(&self) -> &Vec<BasePackageHandle> {
         &self.unacceptable_fixed_or_locked_packages
     }
+
+    /// For testing only: mirrors PHP `Pool implements \Countable` (`count($pool)`),
+    /// returning how many packages have been loaded into the pool.
+    pub fn __count(&self) -> i64 {
+        self.packages.len() as i64
+    }
 }
 
 impl fmt::Display for Pool {

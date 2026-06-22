@@ -8,7 +8,7 @@ use shirabe_php_shim::PhpMixed;
 use shirabe_semver::version_parser::VersionParser;
 
 #[test]
-#[ignore = "VersionBumper::bump_requirement uses a look-around regex the regex crate cannot compile"]
+#[ignore]
 fn test_bump_requirement() {
     for (requirement, pretty_version, expected_requirement, branch_alias) in
         provide_bump_requirement_tests()

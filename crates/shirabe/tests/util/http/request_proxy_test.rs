@@ -128,7 +128,7 @@ fn test_get_curl_options() {
 }
 
 #[test]
-#[ignore = "secure proxies require curl_version, which is a todo!() in the php-shim"]
+#[ignore]
 fn test_get_curl_options_with_ssl() {
     let mut cafile_opts: IndexMap<String, PhpMixed> = IndexMap::new();
     cafile_opts.insert(

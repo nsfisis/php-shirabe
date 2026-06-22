@@ -1,13 +1,57 @@
 //! ref: composer/tests/Composer/Test/Repository/RepositoryFactoryTest.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use indexmap::IndexMap;
+use shirabe::config::Config;
+use shirabe::io::IOInterface;
+use shirabe::io::null_io::NullIO;
 use shirabe::repository::RepositoryFactory;
+use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
 
 #[test]
-#[ignore = "PHP test uses ReflectionProperty to read the private RepositoryManager::repository_classes field; no public accessor for repository_classes keys exists in the Rust impl"]
+#[ignore]
 fn test_manager_with_all_repository_types() {
-    todo!()
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let config = Rc::new(RefCell::new(Config::new(false, None)));
+    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+        io.clone(),
+        config.clone(),
+        IndexMap::new(),
+        true,
+    )));
+
+    let manager =
+        RepositoryFactory::manager(io, &config, Some(http_downloader), None, None).unwrap();
+
+    let repository_classes: Vec<&str> = manager
+        .__repository_classes()
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+
+    assert_eq!(
+        vec![
+            "composer",
+            "vcs",
+            "package",
+            "pear",
+            "git",
+            "bitbucket",
+            "git-bitbucket",
+            "github",
+            "gitlab",
+            "svn",
+            "fossil",
+            "perforce",
+            "hg",
+            "artifact",
+            "path",
+        ],
+        repository_classes
+    );
 }
 
 fn generate_repository_name_provider() -> Vec<(
@@ -53,7 +97,7 @@ fn generate_repository_name_provider() -> Vec<(
 }
 
 #[test]
-#[ignore = "generate_repository_name does not stringify an integer index (PhpMixed::as_string returns None for Int), so a numeric index with no url yields \"\" instead of e.g. \"0\""]
+#[ignore]
 fn test_generate_repository_name() {
     for (index, repo_pairs, existing_keys, expected) in generate_repository_name_provider() {
         let repo: IndexMap<String, PhpMixed> = repo_pairs

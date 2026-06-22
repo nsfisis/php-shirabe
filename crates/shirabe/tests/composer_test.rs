@@ -55,7 +55,7 @@ fn test_set_get_package() {
 }
 
 #[test]
-#[ignore = "Locker construction builds an HttpDownloader, which reaches curl_multi_init (todo!()) in the php-shim"]
+#[ignore]
 fn test_set_get_locker() {
     let mut composer = Composer::new();
     let io = null_io();
@@ -74,7 +74,7 @@ fn test_set_get_locker() {
 }
 
 #[test]
-#[ignore = "RepositoryManager construction builds an HttpDownloader, which reaches curl_multi_init (todo!()) in the php-shim"]
+#[ignore]
 fn test_set_get_repository_manager() {
     let mut composer = Composer::new();
     let io = null_io();
@@ -101,7 +101,7 @@ fn test_set_get_download_manager() {
 }
 
 #[test]
-#[ignore = "InstallationManager construction builds a Loop/HttpDownloader, which reaches curl_multi_init (todo!()) in the php-shim"]
+#[ignore]
 fn test_set_get_installation_manager() {
     let mut composer = Composer::new();
     let io = null_io();

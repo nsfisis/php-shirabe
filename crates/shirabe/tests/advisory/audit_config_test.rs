@@ -95,7 +95,7 @@ fn test_detailed_format_block_only() {
 }
 
 #[test]
-#[ignore = "parse_ignore_with_apply does not handle integer keys, so the bare list entry is mis-parsed"]
+#[ignore]
 fn test_mixed_formats() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore",

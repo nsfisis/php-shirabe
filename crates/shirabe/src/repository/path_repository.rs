@@ -113,6 +113,32 @@ impl PathRepository {
         )
     }
 
+    /// For testing only: drives `initialize` (globbing the configured url and loading each
+    /// path package) and returns the packages collected by the inner `ArrayRepository`,
+    /// mirroring the polymorphic `RepositoryInterface::getPackages` dispatch in PHP.
+    pub fn __get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+        self.initialize()?;
+        use crate::repository::RepositoryInterface;
+        self.inner.get_packages()
+    }
+
+    /// For testing only: returns `RepositoryInterface::count` after `initialize`.
+    pub fn __count(&mut self) -> anyhow::Result<usize> {
+        self.initialize()?;
+        use crate::repository::RepositoryInterface;
+        self.inner.count()
+    }
+
+    /// For testing only: returns `RepositoryInterface::has_package` after `initialize`.
+    pub fn __has_package(
+        &mut self,
+        package: crate::package::PackageInterfaceHandle,
+    ) -> anyhow::Result<bool> {
+        self.initialize()?;
+        use crate::repository::RepositoryInterface;
+        Ok(self.inner.has_package(package))
+    }
+
     pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
 

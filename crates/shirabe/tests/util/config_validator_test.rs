@@ -29,7 +29,7 @@ fn validate(file: &str) -> Vec<String> {
 
 /// Test ConfigValidator warns on commit reference
 #[test]
-#[ignore = "ConfigValidator::validate reaches a todo!() in the php-shim"]
+#[ignore]
 fn test_config_validator_commit_ref_warning() {
     let warnings = validate(&fixture("composer_commit-ref.json"));
 
@@ -39,7 +39,7 @@ fn test_config_validator_commit_ref_warning() {
 }
 
 #[test]
-#[ignore = "ConfigValidator::validate reaches a todo!() in the php-shim"]
+#[ignore]
 fn test_config_validator_warns_on_script_description_for_nonexistent_script() {
     let warnings = validate(&fixture("composer_scripts-descriptions.json"));
 
@@ -52,7 +52,7 @@ fn test_config_validator_warns_on_script_description_for_nonexistent_script() {
 }
 
 #[test]
-#[ignore = "ConfigValidator::validate reaches a todo!() in the php-shim"]
+#[ignore]
 fn test_config_validator_warns_on_script_alias_for_nonexistent_script() {
     let warnings = validate(&fixture("composer_scripts-aliases.json"));
 
@@ -62,7 +62,7 @@ fn test_config_validator_warns_on_script_alias_for_nonexistent_script() {
 }
 
 #[test]
-#[ignore = "ConfigValidator::validate reaches a todo!() in the php-shim"]
+#[ignore]
 fn test_config_validator_warns_on_unnecessary_provide_replace() {
     let warnings = validate(&fixture("composer_provide-replace-requirements.json"));
 

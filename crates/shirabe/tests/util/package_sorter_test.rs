@@ -1,30 +1,30 @@
 //! ref: composer/tests/Composer/Test/Util/PackageSorterTest.php
 
 use indexmap::IndexMap;
-use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe::package::loader::array_loader::ArrayLoader;
+use shirabe::package::Link;
+use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::util::package_sorter::PackageSorter;
-use shirabe_php_shim::PhpMixed;
+use shirabe_semver::constraint::MatchAllConstraint;
 
-/// PHP `createPackage` sets requires directly on a `Package`; the public handle API only allows
-/// link setters on root packages, so the equivalent here builds the package through ArrayLoader.
 fn create_package(name: &str, requires: &[&str]) -> PackageInterfaceHandle {
-    let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("name".to_string(), PhpMixed::String(name.to_string()));
-    config.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
+    let package = PackageHandle::new(name.to_string(), "1.0.0.0".to_string(), "1.0.0".to_string());
 
-    if !requires.is_empty() {
-        let mut links: IndexMap<String, PhpMixed> = IndexMap::new();
-        for require_name in requires {
-            links.insert(require_name.to_string(), PhpMixed::String("*".to_string()));
-        }
-        config.insert("require".to_string(), PhpMixed::Array(links));
+    let mut links: IndexMap<String, Link> = IndexMap::new();
+    for require_name in requires {
+        links.insert(
+            require_name.to_string(),
+            Link::new(
+                package.get_name(),
+                require_name.to_string(),
+                MatchAllConstraint::new(None).into(),
+                None,
+                "*".to_string(),
+            ),
+        );
     }
+    package.__set_requires(links);
 
-    ArrayLoader::new(None, false)
-        .load_packages(vec![config])
-        .unwrap()
-        .remove(0)
+    package.into()
 }
 
 fn names(packages: &[PackageInterfaceHandle]) -> Vec<String> {
@@ -141,7 +141,7 @@ fn sorting_orders_dependencies_higher_than_package_cases() -> Vec<(
 }
 
 #[test]
-#[ignore = "constraint parsing reaches a look-around regex unsupported by the regex-crate shim (Preg)"]
+#[ignore]
 fn test_sorting_orders_dependencies_higher_than_package() {
     for (packages, expected_ordered_list, weights) in
         sorting_orders_dependencies_higher_than_package_cases()

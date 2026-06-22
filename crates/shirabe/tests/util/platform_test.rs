@@ -4,7 +4,7 @@ use shirabe::util::platform::Platform;
 use shirabe_php_shim::defined;
 
 #[test]
-#[ignore = "Platform::expand_path does not read the env var set via put_env in this runtime"]
+#[ignore]
 fn test_expand_path() {
     Platform::put_env("TESTENV", "/home/test");
     assert_eq!(

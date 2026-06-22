@@ -303,6 +303,21 @@ impl Svn {
         args
     }
 
+    /// For testing only: invoke the crate-private `get_command`.
+    pub fn __get_command(
+        &mut self,
+        cmd: Vec<String>,
+        url: &str,
+        path: Option<&str>,
+    ) -> Vec<String> {
+        self.get_command(cmd, url, path)
+    }
+
+    /// For testing only: invoke the crate-private `get_credential_args`.
+    pub fn __get_credential_args(&mut self) -> Vec<String> {
+        self.get_credential_args()
+    }
+
     /// Get the password for the svn command. Can be empty.
     ///
     /// @throws \LogicException

@@ -57,7 +57,7 @@ fn provide_openssl_versions() -> Vec<(&'static str, &'static str, bool, Option<&
 }
 
 #[test]
-#[ignore = "compile_php_pattern in the php-shim cannot yet parse Version's PCRE patterns"]
+#[ignore]
 fn test_parse_openssl_versions() {
     for (input, parsed_version, fips_expected, normalized_version) in provide_openssl_versions() {
         let mut is_fips = false;
@@ -76,7 +76,7 @@ fn test_parse_openssl_versions() {
 }
 
 #[test]
-#[ignore = "compile_php_pattern in the php-shim cannot yet parse Version's PCRE patterns"]
+#[ignore]
 fn test_parse_libjpeg_version() {
     let cases = [
         ("9", "9.0"),
@@ -95,7 +95,7 @@ fn test_parse_libjpeg_version() {
 }
 
 #[test]
-#[ignore = "compile_php_pattern in the php-shim cannot yet parse Version's PCRE patterns"]
+#[ignore]
 fn test_parse_zoneinfo_version() {
     let cases = [
         ("2019c", "2019.3"),

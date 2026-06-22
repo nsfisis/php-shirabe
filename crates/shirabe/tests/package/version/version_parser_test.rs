@@ -15,7 +15,7 @@ fn entry(fields: &[(&str, &str)]) -> IndexMap<String, String> {
 }
 
 #[test]
-#[ignore = "parseNameVersionPairs uses a lookbehind/lookahead pattern the regex crate cannot compile"]
+#[ignore]
 fn test_parse_name_version_pairs() {
     for (input, result) in provide_parse_name_version_pairs_data() {
         let version_parser = VersionParser::new();

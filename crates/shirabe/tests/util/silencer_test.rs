@@ -7,7 +7,7 @@ use shirabe_php_shim::{
 
 /// Test succeeds when no warnings are emitted externally, and original level is restored.
 #[test]
-#[ignore = "trigger_error is todo!() in the php-shim"]
+#[ignore]
 fn test_silencer() {
     let before = error_reporting(None);
 

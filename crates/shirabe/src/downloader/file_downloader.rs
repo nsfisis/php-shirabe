@@ -771,6 +771,16 @@ impl FileDownloader {
         String::new()
     }
 
+    /// For testing only: invoke the crate-private `get_file_name`.
+    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &str) -> String {
+        self.get_file_name(package, path)
+    }
+
+    /// For testing only: invoke the crate-private `process_url`.
+    pub fn __process_url(&self, package: PackageInterfaceHandle, url: &str) -> Result<String> {
+        self.process_url(package, url)
+    }
+
     /// Process the download url
     pub(crate) fn process_url(&self, package: PackageInterfaceHandle, url: &str) -> Result<String> {
         if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {

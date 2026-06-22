@@ -64,7 +64,7 @@ fn supports_provider() -> Vec<(bool, &'static str)> {
 }
 
 #[test]
-#[ignore = "GitHubDriver::supports reaches non-strict in_array, which is todo!() in the php-shim"]
+#[ignore]
 fn test_supports() {
     let SetUp { home, config: _ } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());

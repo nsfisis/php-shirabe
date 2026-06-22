@@ -65,6 +65,15 @@ impl ArtifactRepository {
         format!("artifact repo ({})", self.lookup)
     }
 
+    /// For testing only: drives `initialize` (scanning the lookup directory) and returns the
+    /// packages collected by the inner `ArrayRepository`, mirroring the polymorphic
+    /// `RepositoryInterface::getPackages` dispatch in PHP.
+    pub fn __get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+        self.initialize()?;
+        use crate::repository::RepositoryInterface;
+        self.inner.get_packages()
+    }
+
     fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
         let lookup = self.lookup.clone();

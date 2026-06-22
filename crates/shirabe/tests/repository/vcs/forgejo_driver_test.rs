@@ -76,7 +76,7 @@ fn supports_provider() -> Vec<(bool, &'static str)> {
 }
 
 #[test]
-#[ignore = "ForgejoDriver::supports uses a regex with a character class the regex crate cannot compile (unclosed character class)"]
+#[ignore]
 fn test_supports() {
     for (expected, repo_url) in supports_provider() {
         let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));

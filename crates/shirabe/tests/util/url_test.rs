@@ -22,7 +22,7 @@ fn conf(entries: &[(&str, &[&str])]) -> IndexMap<String, PhpMixed> {
 }
 
 #[test]
-#[ignore = "update_dist_reference uses a regex pattern the regex crate cannot compile"]
+#[ignore]
 fn test_update_dist_reference() {
     for (url, expected_url, c, r#ref) in dist_refs_provider() {
         let mut config = Config::new(true, None);
@@ -143,7 +143,7 @@ fn dist_refs_provider() -> Vec<(
 }
 
 #[test]
-#[ignore = "Url::sanitize uses a regex pattern the regex crate cannot compile"]
+#[ignore]
 fn test_sanitize() {
     for (expected, url) in sanitize_provider() {
         assert_eq!(expected, Url::sanitize(url.to_string()));

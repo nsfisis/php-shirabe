@@ -7,7 +7,7 @@ use shirabe_external_packages::symfony::console::formatter::{
 };
 
 #[test]
-#[ignore = "HtmlOutputFormatter::format uses a regex pattern the regex crate cannot compile (backreferences)"]
+#[ignore]
 fn test_formatting() {
     let mut styles: IndexMap<String, Box<dyn OutputFormatterStyleInterface>> = IndexMap::new();
     styles.insert(

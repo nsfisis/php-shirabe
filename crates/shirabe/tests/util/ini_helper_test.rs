@@ -7,10 +7,11 @@ use shirabe_php_shim::{PATH_SEPARATOR, getenv, putenv};
 #[allow(dead_code)]
 fn set_up() -> TearDown {
     // Register our name with XdebugHandler.
-    // TODO: XdebugHandler is the external composer/xdebug-handler package and is not ported.
-    todo!();
+    // The PHP test constructs `new XdebugHandler('composer')` so that
+    // getAllIniFiles() reads the COMPOSER_ORIGINAL_INIS env var. The Rust
+    // XdebugHandler is a unit struct with no name-registration API, so this
+    // step is a no-op here.
     // Save current state
-    #[allow(unreachable_code)]
     let env_original = getenv("COMPOSER_ORIGINAL_INIS");
     TearDown { env_original }
 }
@@ -44,7 +45,7 @@ fn set_env(paths: &[&str]) {
 }
 
 #[test]
-#[ignore = "IniHelper::get_all reaches XdebugHandler::get_all_ini_files, which is todo!()"]
+#[ignore]
 fn test_with_no_ini() {
     let paths = [""];
 
@@ -57,7 +58,7 @@ fn test_with_no_ini() {
 }
 
 #[test]
-#[ignore = "IniHelper::get_all reaches XdebugHandler::get_all_ini_files, which is todo!()"]
+#[ignore]
 fn test_with_loaded_ini_only() {
     let paths = ["loaded.ini"];
 
@@ -66,7 +67,7 @@ fn test_with_loaded_ini_only() {
 }
 
 #[test]
-#[ignore = "IniHelper::get_all reaches XdebugHandler::get_all_ini_files, which is todo!()"]
+#[ignore]
 fn test_with_loaded_ini_and_additional() {
     let paths = ["loaded.ini", "one.ini", "two.ini"];
 
@@ -79,7 +80,7 @@ fn test_with_loaded_ini_and_additional() {
 }
 
 #[test]
-#[ignore = "IniHelper::get_all reaches XdebugHandler::get_all_ini_files, which is todo!()"]
+#[ignore]
 fn test_without_loaded_ini_and_additional() {
     let paths = ["", "one.ini", "two.ini"];
 
