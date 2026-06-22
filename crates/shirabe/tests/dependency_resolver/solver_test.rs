@@ -6,7 +6,9 @@ use std::rc::Rc;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
+use shirabe::dependency_resolver::pool::Pool;
 use shirabe::dependency_resolver::request::Request;
+use shirabe::dependency_resolver::solver_problems_exception::SolverProblemsException;
 use shirabe::io::io_interface::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::Link;
@@ -130,7 +132,7 @@ fn check_solver_result_repo_set(
     let mut solver =
         shirabe::dependency_resolver::solver::Solver::new(policy, Rc::new(RefCell::new(pool)), io);
 
-    let transaction = solver.solve(&request, None).unwrap();
+    let transaction = solver.solve(&request, None).unwrap().unwrap();
 
     // Build readable (unique-name) and identity (ptr) representations of the result and
     // the expectation, mirroring the dual assertEquals in the PHP helper.
@@ -184,25 +186,54 @@ fn check_solver_result_repo_set(
 
 /// ref: SolverTest::createSolver + solve, returning the error for expectException-only tests.
 fn solve_expecting_error(
+    repo_set: RepositorySet,
+    repo: ArrayRepository,
+    repo_locked: LockArrayRepositoryHandle,
+    request: Request,
+) {
+    solve_expecting_problems(repo_set, repo, repo_locked, request);
+}
+
+/// The SolverProblemsException plus the context needed to render its pretty string in assertions.
+struct SolveError {
+    exception: SolverProblemsException,
+    repo_set: RepositorySet,
+    request: Request,
+    pool: Rc<RefCell<Pool>>,
+}
+
+/// ref: SolverTest::createSolver + solve, returning the caught SolverProblemsException.
+fn solve_expecting_problems(
     mut repo_set: RepositorySet,
     repo: ArrayRepository,
     repo_locked: LockArrayRepositoryHandle,
     mut request: Request,
-) {
+) -> SolveError {
     repo_set
         .add_repository(RepositoryInterfaceHandle::new(repo))
         .unwrap();
     repo_set.add_repository(repo_locked.into()).unwrap();
 
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let pool = repo_set
-        .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
-        .unwrap();
+    let pool = Rc::new(RefCell::new(
+        repo_set
+            .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
+            .unwrap(),
+    ));
     let policy: Rc<dyn PolicyInterface> = Rc::new(DefaultPolicy::new(false, false, None));
-    let mut solver =
-        shirabe::dependency_resolver::solver::Solver::new(policy, Rc::new(RefCell::new(pool)), io);
+    let mut solver = shirabe::dependency_resolver::solver::Solver::new(policy, pool.clone(), io);
 
-    assert!(solver.solve(&request, None).is_err());
+    let exception = match solver.solve(&request, None).unwrap() {
+        Ok(_) => panic!("Unsolvable conflict did not result in exception."),
+        Err(e) => e,
+    };
+
+    SolveError {
+        exception,
+        repo_set,
+        request,
+        pool,
+    }
 }
 
 #[ignore]
@@ -246,11 +277,45 @@ fn test_solver_remove_if_not_requested() {
     );
 }
 
-#[ignore = "asserts SolverProblemsException details (getProblems/getCode/getPrettyString) which solve() discards"]
+#[ignore = "get_pretty_string path reaches an unimplemented todo!() (in_array non-strict in php-shim)"]
 #[test]
 fn test_install_non_existing_package_fails() {
-    let _fixtures = set_up();
-    todo!()
+    let fixtures = set_up();
+    fixtures.repo.add_package(get_package("A", "1.0")).unwrap();
+
+    let mut request = fixtures.request;
+    request
+        .require_name("B", Some(get_version_constraint("==", "1")))
+        .unwrap();
+
+    let SolveError {
+        exception,
+        repo_set,
+        request,
+        pool,
+    } = solve_expecting_problems(
+        fixtures.repo_set,
+        fixtures.repo,
+        fixtures.repo_locked,
+        request,
+    );
+
+    let problems = exception.get_problems();
+    assert_eq!(problems.len(), 1);
+    assert_eq!(exception.get_code(), 2);
+    assert_eq!(
+        problems[0]
+            .get_pretty_string(
+                &repo_set,
+                &request,
+                &mut pool.borrow_mut(),
+                false,
+                &IndexMap::new(),
+                &Vec::new(),
+            )
+            .unwrap(),
+        "\n    - Root composer.json requires b, it could not be found in any version, there may be a typo in the package name."
+    );
 }
 
 #[ignore]
@@ -1856,25 +1921,204 @@ fn test_issue265() {
     );
 }
 
-#[ignore = "asserts SolverProblemsException details (getProblems/getPrettyString) which solve() discards"]
+#[ignore = "get_pretty_string path reaches an unimplemented todo!() (in_array non-strict in php-shim)"]
 #[test]
 fn test_conflict_result_empty() {
-    let _fixtures = set_up();
-    todo!()
+    let fixtures = set_up();
+    let package_a = get_package("A", "1.0");
+    fixtures.repo.add_package(package_a.clone()).unwrap();
+    let package_b = get_package("B", "1.0");
+    fixtures.repo.add_package(package_b.clone()).unwrap();
+    package_a
+        .as_complete_package()
+        .unwrap()
+        .__set_conflicts(IndexMap::from([(
+            "b".to_string(),
+            link(
+                "A",
+                "B",
+                get_version_constraint(">=", "1.0"),
+                Link::TYPE_CONFLICT,
+            ),
+        )]));
+
+    let mut request = fixtures.request;
+    request
+        .require_name(
+            "A",
+            Some(MatchAllConstraint::new(Some("*".to_string())).into()),
+        )
+        .unwrap();
+    request
+        .require_name(
+            "B",
+            Some(MatchAllConstraint::new(Some("*".to_string())).into()),
+        )
+        .unwrap();
+
+    let SolveError {
+        exception,
+        repo_set,
+        request,
+        pool,
+    } = solve_expecting_problems(
+        fixtures.repo_set,
+        fixtures.repo,
+        fixtures.repo_locked,
+        request,
+    );
+
+    assert_eq!(exception.get_problems().len(), 1);
+
+    let msg = "\n  Problem 1\n    - Root composer.json requires a * -> satisfiable by A[1.0].\n    - Root composer.json requires b * -> satisfiable by B[1.0].\n    - A 1.0 conflicts with B 1.0.\n";
+    assert_eq!(
+        exception
+            .get_pretty_string(&repo_set, &request, &mut pool.borrow_mut(), false, false)
+            .unwrap(),
+        msg
+    );
 }
 
-#[ignore = "asserts SolverProblemsException details (getProblems/getPrettyString) which solve() discards"]
+#[ignore = "get_pretty_string path reaches an unimplemented todo!() (in_array non-strict in php-shim)"]
 #[test]
 fn test_unsatisfiable_requires() {
-    let _fixtures = set_up();
-    todo!()
+    let fixtures = set_up();
+    let package_a = get_package("A", "1.0");
+    fixtures.repo.add_package(package_a.clone()).unwrap();
+    let package_b = get_package("B", "1.0");
+    fixtures.repo.add_package(package_b.clone()).unwrap();
+
+    package_a
+        .as_complete_package()
+        .unwrap()
+        .__set_requires(IndexMap::from([(
+            "b".to_string(),
+            link(
+                "A",
+                "B",
+                get_version_constraint(">=", "2.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )]));
+
+    let mut request = fixtures.request;
+    request.require_name("A", None).unwrap();
+
+    let SolveError {
+        exception,
+        repo_set,
+        request,
+        pool,
+    } = solve_expecting_problems(
+        fixtures.repo_set,
+        fixtures.repo,
+        fixtures.repo_locked,
+        request,
+    );
+
+    assert_eq!(exception.get_problems().len(), 1);
+
+    let msg = "\n  Problem 1\n    - Root composer.json requires a * -> satisfiable by A[1.0].\n    - A 1.0 requires b >= 2.0 -> found B[1.0] but it does not match the constraint.\n";
+    assert_eq!(
+        exception
+            .get_pretty_string(&repo_set, &request, &mut pool.borrow_mut(), false, false)
+            .unwrap(),
+        msg
+    );
 }
 
-#[ignore = "asserts SolverProblemsException details (getProblems/getPrettyString) which solve() discards"]
+#[ignore = "get_pretty_string path reaches an unimplemented todo!() (Intervals::is_subset_of)"]
 #[test]
 fn test_require_mismatch_exception() {
-    let _fixtures = set_up();
-    todo!()
+    let fixtures = set_up();
+    let package_a = get_package("A", "1.0");
+    fixtures.repo.add_package(package_a.clone()).unwrap();
+    let package_b = get_package("B", "1.0");
+    fixtures.repo.add_package(package_b.clone()).unwrap();
+    fixtures.repo.add_package(get_package("B", "0.9")).unwrap();
+    let package_c = get_package("C", "1.0");
+    fixtures.repo.add_package(package_c.clone()).unwrap();
+    let package_d = get_package("D", "1.0");
+    fixtures.repo.add_package(package_d.clone()).unwrap();
+
+    package_a
+        .as_complete_package()
+        .unwrap()
+        .__set_requires(IndexMap::from([(
+            "b".to_string(),
+            link(
+                "A",
+                "B",
+                get_version_constraint(">=", "1.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )]));
+    package_b
+        .as_complete_package()
+        .unwrap()
+        .__set_requires(IndexMap::from([(
+            "c".to_string(),
+            link(
+                "B",
+                "C",
+                get_version_constraint(">=", "1.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )]));
+    package_c
+        .as_complete_package()
+        .unwrap()
+        .__set_requires(IndexMap::from([(
+            "d".to_string(),
+            link(
+                "C",
+                "D",
+                get_version_constraint(">=", "1.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )]));
+    package_d
+        .as_complete_package()
+        .unwrap()
+        .__set_requires(IndexMap::from([(
+            "b".to_string(),
+            link(
+                "D",
+                "B",
+                get_version_constraint("<", "1.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )]));
+
+    let mut request = fixtures.request;
+    request
+        .require_name(
+            "A",
+            Some(MatchAllConstraint::new(Some("*".to_string())).into()),
+        )
+        .unwrap();
+
+    let SolveError {
+        exception,
+        repo_set,
+        request,
+        pool,
+    } = solve_expecting_problems(
+        fixtures.repo_set,
+        fixtures.repo,
+        fixtures.repo_locked,
+        request,
+    );
+
+    assert_eq!(exception.get_problems().len(), 1);
+
+    let msg = "\n  Problem 1\n    - Root composer.json requires a * -> satisfiable by A[1.0].\n    - A 1.0 requires b >= 1.0 -> satisfiable by B[1.0].\n    - B 1.0 requires c >= 1.0 -> satisfiable by C[1.0].\n    - C 1.0 requires d >= 1.0 -> satisfiable by D[1.0].\n    - D 1.0 requires b < 1.0 -> satisfiable by B[0.9].\n    - You can only install one version of a package, so only one of these can be installed: B[0.9, 1.0].\n";
+    assert_eq!(
+        exception
+            .get_pretty_string(&repo_set, &request, &mut pool.borrow_mut(), false, false)
+            .unwrap(),
+        msg
+    );
 }
 
 #[ignore]
@@ -2296,7 +2540,7 @@ fn test_learn_positive_literal() {
     // check correct setup for assertion later
     assert!(!solver.test_flag_learned_positive_literal);
 
-    let transaction = solver.solve(&request, None).unwrap();
+    let transaction = solver.solve(&request, None).unwrap().unwrap();
 
     let expected = vec![
         ("install".to_string(), package_f1.get_unique_name()),

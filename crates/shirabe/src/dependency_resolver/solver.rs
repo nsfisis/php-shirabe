@@ -230,7 +230,7 @@ impl Solver {
         &mut self,
         request: &Request,
         platform_requirement_filter: Option<Rc<dyn PlatformRequirementFilterInterface>>,
-    ) -> anyhow::Result<LockTransaction> {
+    ) -> anyhow::Result<Result<LockTransaction, SolverProblemsException>> {
         let platform_requirement_filter = platform_requirement_filter
             .unwrap_or_else(|| PlatformRequirementFilterFactory::ignore_nothing());
 
@@ -272,27 +272,25 @@ impl Solver {
         );
 
         if !self.problems.is_empty() {
-            // TODO(phase-c): SolverProblemsException stores `Rc<RefCell<Rule>>` which is not
-            // `Send + Sync`, so it cannot satisfy `anyhow::Error`'s bounds. Returning a
-            // placeholder error preserves control flow until the solver error path is reworked to
-            // a dedicated (non-anyhow) error type or the exception drops its dyn Rule payload.
-            let _ = SolverProblemsException::new(
+            // SolverProblemsException stores `Rc<RefCell<Rule>>` which is not `Send + Sync`, so it
+            // cannot satisfy `anyhow::Error`'s bounds. It is the recoverable exception PHP callers
+            // `catch`, so it rides the inner `Result` while fatal errors stay on the outer one.
+            return Ok(Err(SolverProblemsException::new(
                 std::mem::take(&mut self.problems),
                 std::mem::take(&mut self.learned_pool),
-            );
-            return Err(anyhow::anyhow!("solver problems"));
+            )));
         }
 
         // LockTransaction stores PackageInterfaceHandle maps; widen the request's BasePackageHandle
         // maps into them.
         let present_map = request.get_present_map(false)?.into_iter().collect();
         let unlockable_map = request.get_fixed_packages_map().into_iter().collect();
-        Ok(LockTransaction::new(
+        Ok(Ok(LockTransaction::new(
             &self.pool.borrow(),
             present_map,
             unlockable_map,
             &self.decisions,
-        ))
+        )))
     }
 
     /// Makes a decision and propagates it to all rules.

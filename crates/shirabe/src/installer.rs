@@ -680,7 +680,7 @@ impl Installer {
         match solver
             .as_mut()
             .unwrap()
-            .solve(&request, Some(self.platform_requirement_filter.clone()))
+            .solve(&request, Some(self.platform_requirement_filter.clone()))?
         {
             Ok(t) => {
                 lock_transaction = t;
@@ -688,11 +688,34 @@ impl Installer {
                 solver = None;
             }
             Err(e) => {
-                // TODO(phase-c): SolverProblemsException contains dyn Rule which isn't Send+Sync
-                // so anyhow::Error::downcast_ref can't extract it. Skipping detection until the
-                // solver error path moves off anyhow (see solver.rs).
-                let _ = (&repository_set, &request, &pool);
-                return Err(e);
+                let err =
+                    "Your requirements could not be resolved to an installable set of packages.";
+                let pretty_problem = e.get_pretty_string(
+                    &repository_set,
+                    &request,
+                    &mut pool.borrow_mut(),
+                    self.io.is_verbose(),
+                    false,
+                )?;
+
+                self.io.write_error3(
+                    &format!("<error>{}</error>", err),
+                    true,
+                    io_interface::QUIET,
+                );
+                self.io.write_error(&pretty_problem);
+                if !self.dev_mode {
+                    self.io.write_error3(
+                        "<warning>Running update with --no-dev does not mean require-dev is ignored, it just means the packages will not be installed. If dev requirements are blocking the update you have to resolve those problems.</warning>",
+                        true,
+                        io_interface::QUIET,
+                    );
+                }
+
+                let mut ghe = GithubActionError::new(self.io.clone());
+                ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+
+                return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
             }
         }
         let _ = solver;
@@ -967,16 +990,39 @@ impl Installer {
         match solver
             .as_mut()
             .unwrap()
-            .solve(&request, Some(self.platform_requirement_filter.clone()))
+            .solve(&request, Some(self.platform_requirement_filter.clone()))?
         {
             Ok(t) => {
                 non_dev_lock_transaction = t;
                 solver = None;
             }
             Err(e) => {
-                // TODO(phase-c): SolverProblemsException can't be downcast (dyn Rule not Send+Sync); see solver.rs
-                let _ = (&repository_set, &request, &pool);
-                return Err(e);
+                let err = "Unable to find a compatible set of packages based on your non-dev requirements alone.";
+                let pretty_problem = e.get_pretty_string(
+                    &repository_set,
+                    &request,
+                    &mut pool.borrow_mut(),
+                    self.io.is_verbose(),
+                    true,
+                )?;
+
+                self.io.write_error3(
+                    &format!("<error>{}</error>", err),
+                    true,
+                    io_interface::QUIET,
+                );
+                self.io.write_error(
+                    "Your requirements can be resolved successfully when require-dev packages are present.",
+                );
+                self.io.write_error(
+                    "You may need to move packages from require-dev or some of their dependencies to require.",
+                );
+                self.io.write_error(&pretty_problem);
+
+                let mut ghe = GithubActionError::new(self.io.clone());
+                ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+
+                return Ok(e.get_code());
             }
         }
         let _ = solver;
@@ -1111,7 +1157,7 @@ impl Installer {
             match solver
                 .as_mut()
                 .unwrap()
-                .solve(&request, Some(self.platform_requirement_filter.clone()))
+                .solve(&request, Some(self.platform_requirement_filter.clone()))?
             {
                 Ok(lock_transaction) => {
                     solver = None;
@@ -1128,9 +1174,26 @@ impl Installer {
                     }
                 }
                 Err(e) => {
-                    // TODO(phase-c): SolverProblemsException can't be downcast (dyn Rule not Send+Sync); see solver.rs
-                    let _ = (&repository_set, &request, &pool);
-                    return Err(e);
+                    let err = "Your lock file does not contain a compatible set of packages. Please run composer update.";
+                    let pretty_problem = e.get_pretty_string(
+                        &repository_set,
+                        &request,
+                        &mut pool.borrow_mut(),
+                        self.io.is_verbose(),
+                        false,
+                    )?;
+
+                    self.io.write_error3(
+                        &format!("<error>{}</error>", err),
+                        true,
+                        io_interface::QUIET,
+                    );
+                    self.io.write_error(&pretty_problem);
+
+                    let mut ghe = GithubActionError::new(self.io.clone());
+                    ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+
+                    return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
                 }
             }
             let _ = solver;
