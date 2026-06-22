@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterfaceImmutable;
 use shirabe::io::IOInterfaceMutable;
-use shirabe_external_packages::symfony::console::helper::HelperSet;
+use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
@@ -15,7 +15,7 @@ use shirabe_external_packages::symfony::console::output::output_interface::Outpu
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Builds a ConsoleIO backed by real, side-effect-free Input/Output/HelperSet. PHP uses
+/// Builds a ConsoleIO backed by real, side-effect-free Input/Output/QuestionHelper. PHP uses
 /// PHPUnit mocks here, but for tests that exercise only the authentication map they carry no
 /// expectations, so concrete implementations are an exact substitute.
 fn make_console_io() -> ConsoleIO {
@@ -23,8 +23,7 @@ fn make_console_io() -> ConsoleIO {
         Rc::new(RefCell::new(ArrayInput::new(vec![], None).unwrap()));
     let output: Rc<RefCell<dyn OutputInterface>> =
         Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    let helper_set = HelperSet::default();
-    ConsoleIO::new(input, output, helper_set)
+    ConsoleIO::new(input, output, QuestionHelper::default())
 }
 
 #[ignore = "requires a PHPUnit mock of InputInterface::isInteractive with willReturnOnConsecutiveCalls; no mocking framework"]

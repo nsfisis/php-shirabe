@@ -4,9 +4,6 @@ use crate::io::ConsoleIO;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
-use shirabe_external_packages::symfony::console::helper::HelperInterface;
-use shirabe_external_packages::symfony::console::helper::HelperSet;
-use shirabe_external_packages::symfony::console::helper::HelperSetKey;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
@@ -53,22 +50,11 @@ impl BufferIO {
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
             todo!("wire StreamOutput as the ConsoleIO output (needs PhpResource stream)");
 
-        let question_helper: std::rc::Rc<std::cell::RefCell<dyn HelperInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default()));
-        let mut helpers: indexmap::IndexMap<
-            HelperSetKey,
-            std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>,
-        > = indexmap::IndexMap::new();
-        helpers.insert(HelperSetKey::Int(0), question_helper);
-        let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
-        HelperSet::new(&helper_set, helpers);
-        let helper_set = helper_set.borrow().clone();
-
         let inner = ConsoleIO::new(
             std::rc::Rc::new(std::cell::RefCell::new(input_obj))
                 as std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
             output,
-            helper_set,
+            QuestionHelper::default(),
         );
 
         Ok(Self { inner })

@@ -5,7 +5,6 @@ use crate::io::io_interface;
 use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::console::helper::HelperSet;
 use shirabe_external_packages::symfony::console::helper::ProgressBar;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::helper::Table;
@@ -37,26 +36,25 @@ pub struct ConsoleIO {
 
     pub(crate) input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     pub(crate) output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    pub(crate) helper_set: HelperSet,
+
+    /// `$helperSet` is flattened to `question_helper`. PHP stores a `HelperSet` and calls
+    /// `$this->helperSet->get('question')` on every ask. The Application class, which constructs
+    /// this class, registers a single `QuestionHelper`. So this port holds the `QuestionHelper`
+    /// directly instead of a `HelperSet`.
+    question_helper: RefCell<QuestionHelper>,
+
     pub(crate) last_message: RefCell<String>,
     pub(crate) last_message_err: RefCell<String>,
 
-    /// @var float
     start_time: Option<f64>,
-    /// @var array<IOInterface::*, OutputInterface::VERBOSITY_*>
     verbosity_map: IndexMap<i64, i64>,
 }
 
 impl ConsoleIO {
-    /// Constructor.
-    ///
-    /// @param InputInterface  $input     The input instance
-    /// @param OutputInterface $output    The output instance
-    /// @param HelperSet       $helperSet The helperSet instance
     pub fn new(
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        helper_set: HelperSet,
+        question_helper: QuestionHelper,
     ) -> Self {
         let mut verbosity_map = IndexMap::new();
         verbosity_map.insert(io_interface::QUIET, output_interface::VERBOSITY_QUIET);
@@ -71,7 +69,7 @@ impl ConsoleIO {
             authentications: indexmap![],
             input,
             output,
-            helper_set,
+            question_helper: RefCell::new(question_helper),
             last_message: RefCell::new(String::new()),
             last_message_err: RefCell::new(String::new()),
             start_time: None,
@@ -83,7 +81,6 @@ impl ConsoleIO {
         self.start_time = Some(start_time);
     }
 
-    /// @param string[]|string $messages
     fn do_write(&self, messages: PhpMixed, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
         let mut sf_verbosity = *self.verbosity_map.get(&verbosity).unwrap_or(&0);
         if sf_verbosity > self.output.borrow().get_verbosity() {
@@ -157,7 +154,6 @@ impl ConsoleIO {
         );
     }
 
-    /// @param string[]|string $messages
     fn do_overwrite(
         &self,
         messages: PhpMixed,
@@ -241,7 +237,6 @@ impl ConsoleIO {
     }
 
     pub fn get_progress_bar(&self, max: i64) -> ProgressBar {
-        // PHP ProgressBar::__construct default $minSecondsBetweenRedraws = 1 / 25.
         ProgressBar::new(self.get_error_output(), max, 1.0 / 25.0)
     }
 
@@ -366,24 +361,16 @@ impl ConsoleIO {
         }
     }
 
-    /// Resolves the "question" helper and delegates to `QuestionHelper::ask`.
+    /// Delegates to `QuestionHelper::ask`.
     ///
-    /// PHP: `$this->helperSet->get('question')->ask($this->input, $this->getErrorOutput(), $question)`.
-    /// `HelperSet::get` and `QuestionHelper::ask` both surface PHP exceptions; ConsoleIO does not
-    /// catch them, so an unrecoverable error here is a PHP fatal. The double `Result` is collapsed:
-    /// the outer `anyhow::Result` (fatal) and the inner `MissingInputException` (unhandled, hence
-    /// also fatal in PHP) both abort.
+    /// PHP: `$helper->ask($this->input, $this->getErrorOutput(), $question)`.
+    /// `QuestionHelper::ask` surfaces PHP exceptions; ConsoleIO does not catch them, so an
+    /// unrecoverable error here is a PHP fatal. The double `Result` is collapsed: the outer
+    /// `anyhow::Result` (fatal) and the inner `MissingInputException` (unhandled, hence also fatal
+    /// in PHP) both abort.
     fn ask_question(&self, question: &Question) -> PhpMixed {
-        let helper_rc = self
-            .helper_set
-            .get("question")
-            .expect("the \"question\" helper is always registered");
         let error_output = self.get_error_output();
-        let mut helper = helper_rc.borrow_mut();
-        let question_helper = (*helper)
-            .as_any_mut()
-            .downcast_mut::<QuestionHelper>()
-            .expect("the \"question\" helper is a QuestionHelper");
+        let mut question_helper = self.question_helper.borrow_mut();
         let mut input = self.input.borrow_mut();
         question_helper
             .ask(&mut *input, error_output, question)
@@ -561,16 +548,11 @@ impl IOInterfaceImmutable for ConsoleIO {
         question: String,
         choices: Vec<String>,
         default: PhpMixed,
-        // PHP: int|false attempts
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
     ) -> PhpMixed {
         let choices: PhpMixed = PhpMixed::List(choices.into_iter().map(PhpMixed::String).collect());
-        let _helper = self
-            .helper_set
-            .get("question")
-            .expect("the \"question\" helper is always registered");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")

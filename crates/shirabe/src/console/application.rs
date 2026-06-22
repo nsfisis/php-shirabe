@@ -1973,20 +1973,10 @@ impl ApplicationHandle {
             input.borrow_mut().set_interactive(false);
         }
 
-        let mut helpers: IndexMap<
-            HelperSetKey,
-            std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>,
-        > = IndexMap::new();
-        helpers.insert(
-            HelperSetKey::Int(0),
-            std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default())),
-        );
-        let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
-        HelperSet::new(&helper_set, helpers);
         application.borrow_mut().io = std::rc::Rc::new(std::cell::RefCell::new(ConsoleIO::new(
             input.clone(),
             output.clone(),
-            helper_set.borrow().clone(),
+            QuestionHelper::default(),
         )));
         // Cache the IO so the rest of the flow does not re-borrow the application; command callbacks
         // (e.g. mergeApplicationDefinition) need the application's RefCell free.

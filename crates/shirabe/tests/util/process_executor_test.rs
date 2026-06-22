@@ -11,7 +11,7 @@ use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_external_packages::symfony::console::helper::HelperSet;
+use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
@@ -143,7 +143,7 @@ fn test_console_io_does_not_format_symfony_console_style() {
     let console_io = ConsoleIO::new(
         input,
         output.clone() as Rc<RefCell<dyn OutputInterface>>,
-        HelperSet::default(),
+        QuestionHelper::default(),
     );
     let mut process = ProcessExecutor::new(Some(
         Rc::new(RefCell::new(console_io)) as Rc<RefCell<dyn IOInterface>>
