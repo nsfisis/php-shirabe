@@ -623,28 +623,25 @@ impl Command for InitCommand {
                     }
                 ),
                 // PHP: function ($value) use ($self, $author) { ... $author = $self->parseAuthorString($value); ... }
-                // TODO(phase-c): IOInterface::ask_and_validate takes a `Box<dyn Fn> + 'static`
-                // validator, so it cannot borrow &self to call self.parse_author_string; and
-                // ask_and_validate itself is a deferred QuestionHelper todo!() (see console_io). The
-                // validator body below therefore stays a placeholder. (parse_author_string and
-                // is_valid_email are stateless, so a future fix can make them associated functions and
-                // call them from the closure once the helper interaction is modelled.)
+                // The validator is a `'static` closure and cannot borrow `&self`, but
+                // parse_author_string is stateless (it only delegates to the stateless
+                // is_valid_email), so a fresh InitCommand stands in for `$self` here.
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
-                    let value_str = value.as_string().unwrap_or("").to_string();
-                    if value_str == "n" || value_str == "no" {
+                    let value_str = value.as_string().map(|s| s.to_string());
+                    if value_str.as_deref() == Some("n") || value_str.as_deref() == Some("no") {
                         return Ok(PhpMixed::Null);
                     }
-                    let value_or_default = if value_str.is_empty() {
-                        author_for_validate.clone()
-                    } else {
-                        value_str
+                    // PHP: $value = $value ?: $author
+                    let value = match &value_str {
+                        Some(s) if !s.is_empty() => s.clone(),
+                        _ => author_for_validate.clone(),
                     };
-                    // PHP: $author = $self->parseAuthorString($value); return $author['email'] === null
-                    //   ? $author['name'] : sprintf('%s <%s>', $author['name'], $author['email']);
-                    // TODO(phase-c): see the closure note above — cannot reach parse_author_string from
-                    // this 'static validator yet.
-                    let _ = value_or_default;
-                    Ok(PhpMixed::Null)
+                    let parsed = InitCommand::new().parse_author_string(&value)?;
+                    let name = parsed.get("name").cloned().flatten().unwrap_or_default();
+                    match parsed.get("email").cloned().flatten() {
+                        None => Ok(PhpMixed::String(name)),
+                        Some(email) => Ok(PhpMixed::String(format!("{} <{}>", name, email))),
+                    }
                 }),
                 None,
                 PhpMixed::String(author_default),

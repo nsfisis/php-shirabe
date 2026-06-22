@@ -66,6 +66,13 @@ impl StreamOutput {
         &self.stream
     }
 
+    /// For testing only. Overwrites the private `stream` field, mirroring what
+    /// `Symfony\Component\Console\Tester\TesterTrait::initOutput` does via reflection on the
+    /// `StreamOutput::$stream` property.
+    pub fn __set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+        self.stream = stream;
+    }
+
     /// Returns true if the stream supports colorization.
     ///
     /// Colorization is disabled if not supported by the stream:

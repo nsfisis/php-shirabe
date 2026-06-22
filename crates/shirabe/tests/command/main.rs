@@ -1,3 +1,6 @@
+#[path = "../common/test_case.rs"]
+mod test_case;
+
 mod about_command_test;
 mod archive_command_test;
 mod audit_command_test;

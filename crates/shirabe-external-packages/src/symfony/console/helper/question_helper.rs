@@ -66,12 +66,11 @@ impl QuestionHelper {
             return Ok(Ok(self.get_default_answer(question)));
         }
 
-        // TODO(phase-b): `$input instanceof StreamableInputInterface` cannot be
-        // expressed as a trait-object-to-trait-object downcast, and no concrete
-        // streamable input type is wired up yet. The stream is left unset so the
-        // helper falls back to STDIN. Revisit once StreamableInputInterface has a
-        // concrete implementor and the PhpResource/PhpMixed split is resolved.
-        let _ = &mut self.input_stream;
+        if let Some(streamable) = input.as_streamable()
+            && let Some(stream) = streamable.get_stream()
+        {
+            self.input_stream = Some(stream);
+        }
 
         let result: anyhow::Result<Result<PhpMixed, MissingInputException>> = (|| {
             if question.get_validator().is_none() {
@@ -344,10 +343,7 @@ impl QuestionHelper {
         input_stream: &shirabe_php_shim::PhpResource,
         autocomplete: &dyn Fn(&str) -> Vec<PhpMixed>,
     ) -> String {
-        // TODO(phase-b): Cursor takes Option<PhpMixed>, but the input stream is a
-        // PhpResource and PhpMixed has no resource variant. Defaulting to STDIN
-        // until the PhpResource/PhpMixed stream representation is unified.
-        let cursor = Cursor::new(Rc::clone(&output), None);
+        let cursor = Cursor::new(Rc::clone(&output), Some(input_stream.clone()));
 
         let mut full_choice = String::new();
         let mut ret = String::new();

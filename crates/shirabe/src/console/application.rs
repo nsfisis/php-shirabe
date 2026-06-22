@@ -2585,6 +2585,10 @@ impl ApplicationHandle {
 
         outcome
     }
+
+    pub fn set_catch_exceptions(&self, boolean: bool) {
+        self.0.borrow_mut().set_catch_exceptions(boolean);
+    }
 }
 
 impl ApplicationHandle {

@@ -110,6 +110,13 @@ impl ConsoleOutput {
         shirabe_php_shim::stripos(&shirabe_php_shim::implode(";", &checks), "OS400").is_some()
     }
 
+    /// For testing only. Overwrites the inner `StreamOutput`'s private `stream` field, mirroring
+    /// what `Symfony\Component\Console\Tester\TesterTrait::initOutput` does via reflection on the
+    /// parent `StreamOutput::$stream` property of a `ConsoleOutput`.
+    pub fn __set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+        self.inner.__set_stream(stream);
+    }
+
     fn open_output_stream() -> shirabe_php_shim::PhpResource {
         if !Self::has_stdout_support() {
             return shirabe_php_shim::php_fopen_resource("php://output", "w");

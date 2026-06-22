@@ -4,7 +4,7 @@ use crate::symfony::console::exception::invalid_argument_exception::InvalidArgum
 use crate::symfony::console::exception::runtime_exception::RuntimeException;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, PhpResource};
 
 /// Input is the base class for all concrete Input classes.
 ///
@@ -16,7 +16,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug, Clone)]
 pub struct Input {
     pub(crate) definition: InputDefinition,
-    pub(crate) stream: PhpMixed,
+    pub(crate) stream: Option<PhpResource>,
     pub(crate) options: IndexMap<String, PhpMixed>,
     pub(crate) arguments: IndexMap<String, PhpMixed>,
     pub(crate) interactive: bool,
@@ -26,7 +26,7 @@ impl Input {
     pub fn new(definition: Option<InputDefinition>) -> anyhow::Result<Self> {
         let mut input = Input {
             definition: InputDefinition::new(vec![])?,
-            stream: PhpMixed::Null,
+            stream: None,
             options: IndexMap::new(),
             arguments: IndexMap::new(),
             interactive: true,
@@ -238,14 +238,11 @@ impl Input {
         }
     }
 
-    pub fn set_stream(&mut self, stream: PhpMixed) {
-        self.stream = stream;
+    pub fn set_stream(&mut self, stream: PhpResource) {
+        self.stream = Some(stream);
     }
 
-    pub fn get_stream(&self) -> Option<PhpMixed> {
-        match &self.stream {
-            PhpMixed::Null => None,
-            other => Some(other.clone()),
-        }
+    pub fn get_stream(&self) -> Option<PhpResource> {
+        self.stream.clone()
     }
 }

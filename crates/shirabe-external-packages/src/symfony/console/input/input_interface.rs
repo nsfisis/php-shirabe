@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php
 
 use crate::symfony::console::input::input_definition::InputDefinition;
+use crate::symfony::console::input::streamable_input_interface::StreamableInputInterface;
 use shirabe_php_shim::PhpMixed;
 
 pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
@@ -41,4 +42,10 @@ pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
     fn is_interactive(&self) -> bool;
 
     fn set_interactive(&mut self, interactive: bool);
+
+    /// Models PHP's `$input instanceof StreamableInputInterface` check. Streamable inputs override
+    /// this to return `Some(self)`; everything else falls back to `None`.
+    fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
+        None
+    }
 }
