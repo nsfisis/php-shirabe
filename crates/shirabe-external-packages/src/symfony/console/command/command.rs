@@ -822,9 +822,11 @@ impl Command for CommandData {
             Some(helper_set) => helper_set,
         };
 
-        // TODO(review): HelperSet::get() returns `Rc<RefCell<dyn HelperInterface>>`, but
-        // Command::getHelper() is typed `mixed` (PhpMixed) here and PhpMixed cannot hold a
-        // helper instance. The helper return modelling needs a dedicated type (Phase C).
+        // TODO(plugin): PHP's Command::getHelper($name) looks a helper up by string via
+        // HelperSet::get($name). The HelperSet is now a closed set exposing only typed getters
+        // (get_formatter/get_question/...), so a string-keyed lookup no longer exists. Callers
+        // should use the typed getters on the HelperSet directly; restoring name-based lookup is
+        // deferred until the plugin API (which is the only source of dynamically named helpers).
         let _ = helper_set;
         todo!()
     }

@@ -1,117 +1,76 @@
 //! ref: composer/vendor/symfony/console/Helper/HelperSet.php
 
-use crate::symfony::console::command::command::Command;
-use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::symfony::console::helper::debug_formatter_helper::DebugFormatterHelper;
+use crate::symfony::console::helper::formatter_helper::FormatterHelper;
 use crate::symfony::console::helper::helper_interface::HelperInterface;
-use indexmap::IndexMap;
+use crate::symfony::console::helper::process_helper::ProcessHelper;
+use crate::symfony::console::helper::question_helper::QuestionHelper;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 /// HelperSet represents a set of helpers to be used with a command.
 ///
-/// @implements \IteratorAggregate<string, Helper>
-#[derive(Debug, Default, Clone)]
+/// Symfony lets arbitrary helpers be registered by name, but Composer only ever uses the four
+/// helpers `Application::getDefaultHelperSet()` installs. This port closes the set to exactly those
+/// four, instantiates them in the argument-less constructor, and exposes them through typed getters
+/// instead of Symfony's string-keyed `get()`/`has()`/`set()`.
+///
+/// TODO(plugin): a plugin-defined custom command may register extra helpers dynamically via
+/// `getApplication()->getHelperSet()`. Restoring that path (a `set()` equivalent plus name-based
+/// lookup) is deferred until the plugin API is implemented.
+#[derive(Debug)]
 pub struct HelperSet {
-    helpers: IndexMap<String, Rc<RefCell<dyn HelperInterface>>>,
-    command: Option<Rc<RefCell<dyn Command>>>,
+    formatter_helper: Rc<RefCell<FormatterHelper>>,
+    debug_formatter_helper: Rc<RefCell<DebugFormatterHelper>>,
+    process_helper: Rc<RefCell<ProcessHelper>>,
+    question_helper: Rc<RefCell<QuestionHelper>>,
 }
 
 impl HelperSet {
-    /// @param Helper[] $helpers An array of helper
-    pub fn new(
-        this: &Rc<RefCell<HelperSet>>,
-        helpers: IndexMap<HelperSetKey, Rc<RefCell<dyn HelperInterface>>>,
-    ) {
-        for (alias, helper) in helpers {
-            let alias = match alias {
-                HelperSetKey::Int(_) => None,
-                HelperSetKey::String(alias) => Some(alias),
-            };
-            Self::set(this, helper, alias.as_deref());
-        }
+    /// Builds the fixed set of helpers and wires each one's back-reference to the owning set,
+    /// mirroring the `$helper->setHelperSet($this)` call PHP's `HelperSet::set()` performs.
+    pub fn new() -> Rc<RefCell<HelperSet>> {
+        let formatter_helper = Rc::new(RefCell::new(FormatterHelper::default()));
+        let debug_formatter_helper = Rc::new(RefCell::new(DebugFormatterHelper::default()));
+        let process_helper = Rc::new(RefCell::new(ProcessHelper::default()));
+        let question_helper = Rc::new(RefCell::new(QuestionHelper::default()));
+
+        let this = Rc::new(RefCell::new(HelperSet {
+            formatter_helper: formatter_helper.clone(),
+            debug_formatter_helper: debug_formatter_helper.clone(),
+            process_helper: process_helper.clone(),
+            question_helper: question_helper.clone(),
+        }));
+
+        formatter_helper
+            .borrow_mut()
+            .set_helper_set(Some(this.clone()));
+        debug_formatter_helper
+            .borrow_mut()
+            .set_helper_set(Some(this.clone()));
+        process_helper
+            .borrow_mut()
+            .set_helper_set(Some(this.clone()));
+        question_helper
+            .borrow_mut()
+            .set_helper_set(Some(this.clone()));
+
+        this
     }
 
-    pub fn set(
-        this: &Rc<RefCell<HelperSet>>,
-        helper: Rc<RefCell<dyn HelperInterface>>,
-        alias: Option<&str>,
-    ) {
-        let name = helper.borrow().get_name();
-        this.borrow_mut().helpers.insert(name, helper.clone());
-        if let Some(alias) = alias {
-            this.borrow_mut()
-                .helpers
-                .insert(alias.to_string(), helper.clone());
-        }
-
-        helper.borrow_mut().set_helper_set(Some(this.clone()));
+    pub fn get_formatter(&self) -> Rc<RefCell<FormatterHelper>> {
+        self.formatter_helper.clone()
     }
 
-    /// Returns true if the helper if defined.
-    pub fn has(&self, name: &str) -> bool {
-        self.helpers.contains_key(name)
+    pub fn get_debug_formatter(&self) -> Rc<RefCell<DebugFormatterHelper>> {
+        self.debug_formatter_helper.clone()
     }
 
-    /// Gets a helper value.
-    ///
-    /// @throws InvalidArgumentException if the helper is not defined
-    pub fn get(
-        &self,
-        name: &str,
-    ) -> Result<Rc<RefCell<dyn HelperInterface>>, InvalidArgumentException> {
-        if !self.has(name) {
-            return Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The helper \"{}\" is not defined.",
-                        shirabe_php_shim::PhpMixed::String(name.to_string()),
-                    ),
-                    code: 0,
-                },
-            ));
-        }
-
-        Ok(self.helpers[name].clone())
+    pub fn get_process(&self) -> Rc<RefCell<ProcessHelper>> {
+        self.process_helper.clone()
     }
 
-    /// @deprecated since Symfony 5.4
-    pub fn set_command(&mut self, command: Option<Rc<RefCell<dyn Command>>>) {
-        shirabe_php_shim::trigger_deprecation(
-            "symfony/console",
-            "5.4",
-            "Method \"%s()\" is deprecated.",
-            "HelperSet::setCommand",
-        );
-
-        self.command = command;
+    pub fn get_question(&self) -> Rc<RefCell<QuestionHelper>> {
+        self.question_helper.clone()
     }
-
-    /// Gets the command associated with this helper set.
-    ///
-    /// @deprecated since Symfony 5.4
-    pub fn get_command(&self) -> Option<Rc<RefCell<dyn Command>>> {
-        shirabe_php_shim::trigger_deprecation(
-            "symfony/console",
-            "5.4",
-            "Method \"%s()\" is deprecated.",
-            "HelperSet::getCommand",
-        );
-
-        self.command.clone()
-    }
-
-    /// @return \Traversable<string, Helper>
-    pub fn get_iterator(
-        &self,
-    ) -> impl Iterator<Item = (&String, &Rc<RefCell<dyn HelperInterface>>)> {
-        self.helpers.iter()
-    }
-}
-
-/// PHP array keys are either integers or strings; the HelperSet constructor
-/// distinguishes them via `\is_int($alias)`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum HelperSetKey {
-    Int(i64),
-    String(String),
 }

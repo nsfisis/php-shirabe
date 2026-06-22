@@ -57,12 +57,11 @@ impl ProcessHelper {
         let output: Rc<RefCell<dyn OutputInterface>> =
             todo!("$output instanceof ConsoleOutputInterface redirect to error output");
 
-        let formatter: Rc<RefCell<dyn HelperInterface>> = self
+        let formatter: Rc<RefCell<DebugFormatterHelper>> = self
             .get_helper_set()
             .unwrap()
             .borrow()
-            .get("debug_formatter")
-            .unwrap();
+            .get_debug_formatter();
 
         // Normalize $cmd: a single Process becomes a one-element array.
         let mut cmd = match cmd {
@@ -234,12 +233,11 @@ impl ProcessHelper {
         let output: Rc<RefCell<dyn OutputInterface>> =
             todo!("$output instanceof ConsoleOutputInterface redirect to error output");
 
-        let formatter: Rc<RefCell<dyn HelperInterface>> = self
+        let formatter: Rc<RefCell<DebugFormatterHelper>> = self
             .get_helper_set()
             .unwrap()
             .borrow()
-            .get("debug_formatter")
-            .unwrap();
+            .get_debug_formatter();
 
         let object_hash = shirabe_php_shim::spl_object_hash_process(process);
 
@@ -268,46 +266,30 @@ impl ProcessHelper {
         shirabe_php_shim::str_replace("<", "\\<", str)
     }
 
-    /// PHP fetches `debug_formatter` from the HelperSet as a `HelperInterface` and
-    /// dynamically dispatches `start`/`stop`/`progress`, which are concrete
-    /// `DebugFormatterHelper` methods not present on the interface. Resolving the
-    /// dynamic helper handle back to the concrete `DebugFormatterHelper` is a
-    /// downcast that requires a Phase C decision (e.g. an `as_any` on
-    /// `HelperInterface`); deferred here.
-    fn debug_formatter(
-        _formatter: &Rc<RefCell<dyn HelperInterface>>,
-    ) -> Rc<RefCell<DebugFormatterHelper>> {
-        todo!("downcast HelperInterface handle to DebugFormatterHelper (Phase C)")
-    }
-
     fn formatter_start(
-        formatter: &Rc<RefCell<dyn HelperInterface>>,
+        formatter: &Rc<RefCell<DebugFormatterHelper>>,
         id: &str,
         message: &str,
     ) -> String {
-        Self::debug_formatter(formatter)
-            .borrow_mut()
-            .start(id, message, "RUN")
+        formatter.borrow_mut().start(id, message, "RUN")
     }
 
     fn formatter_stop(
-        formatter: &Rc<RefCell<dyn HelperInterface>>,
+        formatter: &Rc<RefCell<DebugFormatterHelper>>,
         id: &str,
         message: &str,
         successful: bool,
     ) -> String {
-        Self::debug_formatter(formatter)
-            .borrow_mut()
-            .stop(id, message, successful, "RES")
+        formatter.borrow_mut().stop(id, message, successful, "RES")
     }
 
     fn formatter_progress(
-        formatter: &Rc<RefCell<dyn HelperInterface>>,
+        formatter: &Rc<RefCell<DebugFormatterHelper>>,
         id: &str,
         buffer: &str,
         error: bool,
     ) -> String {
-        Self::debug_formatter(formatter)
+        formatter
             .borrow_mut()
             .progress(id, buffer, error, "OUT", "ERR")
     }

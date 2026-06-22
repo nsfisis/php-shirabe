@@ -22,23 +22,18 @@ use shirabe_external_packages::symfony::console::exception::missing_input_except
 use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
 use shirabe_external_packages::symfony::console::exception::runtime_exception::RuntimeException as ConsoleRuntimeException;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::helper::HelperInterface;
 use shirabe_external_packages::symfony::console::helper::HelperSet;
-use shirabe_external_packages::symfony::console::helper::HelperSetKey;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::helper::debug_formatter_helper::DebugFormatterHelper;
 use shirabe_external_packages::symfony::console::helper::formatter_helper::{
     FormatBlockMessages, FormatterHelper,
 };
 use shirabe_external_packages::symfony::console::helper::helper::Helper;
-use shirabe_external_packages::symfony::console::helper::process_helper::ProcessHelper;
 use shirabe_external_packages::symfony::console::input::InputDefinition;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::InputOption;
 use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
-use shirabe_external_packages::symfony::console::input::input_aware_interface::InputAwareInterface;
 use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::{
@@ -1633,33 +1628,10 @@ impl Application {
     }
 
     /// Gets the default helper set with the helpers that should always be available.
+    ///
+    /// The closed set of four helpers is instantiated by `HelperSet::new()` itself.
     pub fn get_default_helper_set(&self) -> std::rc::Rc<std::cell::RefCell<HelperSet>> {
-        let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
-        let helpers: IndexMap<HelperSetKey, std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> = {
-            let mut m: IndexMap<
-                HelperSetKey,
-                std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>,
-            > = IndexMap::new();
-            m.insert(
-                HelperSetKey::Int(0),
-                std::rc::Rc::new(std::cell::RefCell::new(FormatterHelper::default())),
-            );
-            m.insert(
-                HelperSetKey::Int(1),
-                std::rc::Rc::new(std::cell::RefCell::new(DebugFormatterHelper::default())),
-            );
-            m.insert(
-                HelperSetKey::Int(2),
-                std::rc::Rc::new(std::cell::RefCell::new(ProcessHelper::default())),
-            );
-            m.insert(
-                HelperSetKey::Int(3),
-                std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default())),
-            );
-            m
-        };
-        HelperSet::new(&helper_set, helpers);
-        helper_set
+        HelperSet::new()
     }
 
     /// Returns abbreviated suggestions in string format.
@@ -2887,15 +2859,12 @@ impl ApplicationHandle {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
         let application = &self.0;
-        if let Some(helper_set) = command.borrow().get_helper_set() {
-            for (_alias, helper) in helper_set.borrow().get_iterator() {
-                // if ($helper instanceof InputAwareInterface) $helper->setInput($input);
-                // TODO(review): downcasting a HelperInterface to InputAwareInterface is not
-                // expressible without a typed mechanism; needs design.
-                let _ = helper;
-                let _ = std::marker::PhantomData::<dyn InputAwareInterface>;
-            }
-        }
+        // PHP: foreach ($command->getHelperSet() as $helper) { if ($helper instanceof
+        // InputAwareInterface) $helper->setInput($input); }
+        // TODO(plugin): the HelperSet is now a closed set of four helpers, none of which implement
+        // InputAwareInterface, so this loop is a no-op. Plugin-registered InputAware helpers cannot
+        // be reached until dynamic helper registration is restored (see HelperSet).
+        let _ = command.borrow().get_helper_set();
 
         if !application.borrow().signals_to_dispatch_event.is_empty() {
             // $commandSignals = $command instanceof SignalableCommandInterface ? $command->getSubscribedSignals() : []

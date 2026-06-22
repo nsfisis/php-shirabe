@@ -7,7 +7,6 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::helper::FormatBlockMessages;
-use shirabe_external_packages::symfony::console::helper::FormatterHelper;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
@@ -435,17 +434,16 @@ impl Command for InitCommand {
     fn interact(
         &mut self,
         input: Rc<RefCell<dyn InputInterface>>,
-        _output: Rc<RefCell<dyn OutputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
     ) {
         let _ = (|| -> anyhow::Result<()> {
             let io = self.get_io();
             // @var FormatterHelper $formatter — PHP: $this->getHelperSet()->get('formatter')
-            // TODO(phase-c): get_helper_set returns PhpMixed and HelperSet::get is a todo!() stub (per
-            // the "Symfony stays todo!()" policy), so the typed FormatterHelper cannot be retrieved
-            // until the Helper trait + typed HelperSet are modelled.
-            let formatter: FormatterHelper = todo!();
-            let _ = &formatter;
-            let _ = self.get_helper_set();
+            let formatter = self
+                .get_helper_set()
+                .expect("the init command is registered on an application before interact() runs")
+                .borrow()
+                .get_formatter();
 
             // initialize repos if configured
             let repositories: Vec<String> = input
@@ -523,7 +521,7 @@ impl Command for InitCommand {
             io.write_error3(
                 &format!(
                     "\n{}\n",
-                    formatter.format_block(
+                    formatter.borrow().format_block(
                         FormatBlockMessages::String(
                             "Welcome to the Composer config generator".to_string(),
                         ),
@@ -695,6 +693,7 @@ impl Command for InitCommand {
                 }),
                 None,
                 minimum_stability_default
+                    .clone()
                     .map(PhpMixed::String)
                     .unwrap_or(PhpMixed::Null),
             )?;
@@ -796,8 +795,8 @@ impl Command for InitCommand {
             let requirements = if (require.len() as i64) > 0 || io.ask_confirmation(question, true)
             {
                 self.determine_requirements(
-                    input,
-                    _output,
+                    input.clone(),
+                    output.clone(),
                     require,
                     platform_repo.as_ref(),
                     &preferred_stability,
@@ -826,8 +825,8 @@ impl Command for InitCommand {
             let dev_requirements =
                 if (require_dev.len() as i64) > 0 || io.ask_confirmation(question, true) {
                     self.determine_requirements(
-                        input,
-                        _output,
+                        input.clone(),
+                        output.clone(),
                         require_dev,
                         platform_repo.as_ref(),
                         &preferred_stability,

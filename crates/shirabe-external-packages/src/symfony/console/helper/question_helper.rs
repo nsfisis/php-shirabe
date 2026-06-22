@@ -5,6 +5,7 @@ use crate::symfony::console::exception::missing_input_exception::MissingInputExc
 use crate::symfony::console::exception::runtime_exception::RuntimeException;
 use crate::symfony::console::formatter::output_formatter::OutputFormatter;
 use crate::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
+use crate::symfony::console::helper::formatter_helper::FormatBlockMessages;
 use crate::symfony::console::helper::helper::Helper;
 use crate::symfony::console::helper::helper_interface::HelperInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
@@ -316,22 +317,17 @@ impl QuestionHelper {
         output: Rc<RefCell<dyn OutputInterface>>,
         error: &shirabe_php_shim::Exception,
     ) {
-        let message;
-        if let Some(helper_set) = self.get_helper_set() {
-            if helper_set.borrow().has("formatter") {
-                // PHP: `$this->getHelperSet()->get('formatter')->formatBlock(...)`.
-                // HelperSet::get yields `dyn HelperInterface`, which does not have
-                // `AsAny` as a supertrait, so it cannot be downcast to
-                // FormatterHelper. Resolved once HelperInterface gains AsAny (see
-                // report).
-                let _formatter = helper_set.borrow().get("formatter").unwrap();
-                todo!("downcast dyn HelperInterface to FormatterHelper for format_block");
-            } else {
-                message = format!("<error>{}</error>", error.message);
-            }
+        let message = if let Some(helper_set) = self.get_helper_set() {
+            let formatter = helper_set.borrow().get_formatter();
+            let message = formatter.borrow().format_block(
+                FormatBlockMessages::String(error.message.clone()),
+                "error",
+                false,
+            );
+            message
         } else {
-            message = format!("<error>{}</error>", error.message);
-        }
+            format!("<error>{}</error>", error.message)
+        };
 
         output
             .borrow()
