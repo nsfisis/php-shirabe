@@ -210,8 +210,8 @@ pub fn posix_isatty(stream: PhpResource) -> bool {
         PhpResource::Stdin => std::io::stdin().is_terminal(),
         PhpResource::Stdout => std::io::stdout().is_terminal(),
         PhpResource::Stderr => std::io::stderr().is_terminal(),
-        // A regular file is never a tty.
-        PhpResource::File(_) => false,
+        // A regular file or in-memory stream is never a tty.
+        PhpResource::Stream(_) => false,
     }
 }
 

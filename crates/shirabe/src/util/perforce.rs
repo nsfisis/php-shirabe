@@ -6,7 +6,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, chdir, count, date, explode, fclose, feof, fgets,
+    Exception, PHP_EOL, PhpMixed, PhpResource, chdir, count, date, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode, str_replace_array, strcmp, strlen,
     strpos, strrpos, substr, time, trim,
 };
@@ -416,73 +416,73 @@ impl Perforce {
     }
 
     /// @param resource|false $spec
-    pub fn write_client_spec_to_file(&mut self, spec: PhpMixed) {
+    pub fn write_client_spec_to_file(&mut self, spec: &PhpResource) {
         fwrite(
-            spec.clone(),
+            spec,
             &format!("Client: {}{}{}", self.get_client(), PHP_EOL, PHP_EOL),
-            0,
+            None,
         );
         fwrite(
-            spec.clone(),
+            spec,
             &format!(
                 "Update: {}{}{}",
                 date("Y/m/d H:i:s", None),
                 PHP_EOL,
                 PHP_EOL
             ),
-            0,
+            None,
         );
         fwrite(
-            spec.clone(),
+            spec,
             &format!("Access: {}{}", date("Y/m/d H:i:s", None), PHP_EOL),
-            0,
+            None,
         );
         fwrite(
-            spec.clone(),
+            spec,
             &format!(
                 "Owner:  {}{}{}",
                 self.get_user().unwrap_or_default(),
                 PHP_EOL,
                 PHP_EOL
             ),
-            0,
+            None,
         );
-        fwrite(spec.clone(), &format!("Description:{}", PHP_EOL), 0);
+        fwrite(spec, &format!("Description:{}", PHP_EOL), None);
         fwrite(
-            spec.clone(),
+            spec,
             &format!(
                 "  Created by {} from composer.{}{}",
                 self.get_user().unwrap_or_default(),
                 PHP_EOL,
                 PHP_EOL
             ),
-            0,
+            None,
         );
         fwrite(
-            spec.clone(),
+            spec,
             &format!("Root: {}{}{}", self.get_path(), PHP_EOL, PHP_EOL),
-            0,
+            None,
         );
         fwrite(
-            spec.clone(),
+            spec,
             &format!(
                 "Options:  noallwrite noclobber nocompress unlocked modtime rmdir{}{}",
                 PHP_EOL, PHP_EOL
             ),
-            0,
+            None,
         );
         fwrite(
-            spec.clone(),
+            spec,
             &format!("SubmitOptions:  revertunchanged{}{}", PHP_EOL, PHP_EOL),
-            0,
+            None,
         );
         fwrite(
-            spec.clone(),
+            spec,
             &format!("LineEnd:  local{}{}", PHP_EOL, PHP_EOL),
-            0,
+            None,
         );
         if self.is_stream() {
-            fwrite(spec.clone(), &format!("Stream:{}", PHP_EOL), 0);
+            fwrite(spec, &format!("Stream:{}", PHP_EOL), None);
             let stream_clone = self.p4_stream.clone().unwrap_or_default();
             fwrite(
                 spec,
@@ -491,7 +491,7 @@ impl Perforce {
                     self.get_stream_without_label(&stream_clone),
                     PHP_EOL
                 ),
-                0,
+                None,
             );
         } else {
             let stream = self.get_stream();
@@ -499,38 +499,47 @@ impl Perforce {
             fwrite(
                 spec,
                 &format!("View:  {}/...  //{}/... {}", stream, client, PHP_EOL),
-                0,
+                None,
             );
         }
     }
 
     pub fn write_p4_client_spec(&mut self) -> Result<()> {
         let client_spec = self.get_p4_client_spec();
-        let spec = fopen(&client_spec, "w");
+        let spec = match fopen(&client_spec, "w") {
+            Ok(spec) => spec,
+            Err(e) => {
+                return Err(Exception {
+                    message: e.to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+        };
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.write_client_spec_to_file(spec.clone());
+            self.write_client_spec_to_file(&spec);
         }));
         if let Err(e) = result {
-            fclose(spec);
+            fclose(&spec);
             return Err(Exception {
                 message: format!("{:?}", e),
                 code: 0,
             }
             .into());
         }
-        fclose(spec);
+        fclose(&spec);
         Ok(())
     }
 
     /// @param resource $pipe
     /// @param mixed    $name
-    pub(crate) fn read(&self, pipe: PhpMixed, _name: PhpMixed) {
-        if feof(pipe.clone()) {
+    pub(crate) fn read(&self, pipe: &PhpResource, _name: PhpMixed) {
+        if feof(pipe) {
             return;
         }
-        let mut line = fgets(pipe.clone());
+        let mut line = fgets(pipe, None);
         while line.is_some() {
-            line = fgets(pipe.clone());
+            line = fgets(pipe, None);
         }
     }
 

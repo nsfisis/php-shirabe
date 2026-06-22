@@ -291,13 +291,7 @@ impl Platform {
 
     /// @param  ?resource $fd Open file descriptor or null to default to STDOUT
     pub fn is_tty(fd: Option<PhpResource>) -> bool {
-        let fd = match fd {
-            Some(f) => f,
-            None => {
-                // TODO(phase-c): STDOUT is not yet modeled as a `PhpResource` constant.
-                todo!("STDOUT resource constant")
-            }
-        };
+        let fd = fd.unwrap_or(shirabe_php_shim::STDOUT);
 
         // detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690
@@ -323,19 +317,18 @@ impl Platform {
             return true;
         }
 
-        let stat = Silencer::call(|| Ok(fstat(fd)));
+        let stat = Silencer::call(|| Ok(fstat(&fd)));
         let stat = match stat {
             Ok(s) => s,
             Err(_) => return false,
         };
-        if matches!(stat, PhpMixed::Bool(false)) {
-            return false;
-        }
+        let stat = match stat {
+            Some(stat) => stat,
+            None => return false,
+        };
 
         // Check if formatted mode is S_IFCHR
-        if let Some(arr) = stat.as_array()
-            && let Some(mode) = arr.get("mode").and_then(|v| v.as_int())
-        {
+        if let Some(mode) = stat.get("mode").and_then(|v| v.as_int()) {
             return 0o020000 == (mode & 0o170000);
         }
 

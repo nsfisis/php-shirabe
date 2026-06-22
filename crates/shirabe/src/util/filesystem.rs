@@ -417,20 +417,21 @@ impl Filesystem {
                     // if copy fails we attempt to copy it manually as this can help bypass issues with VirtualBox shared folders
                     // see https://github.com/composer/composer/issues/12057
                     if str_contains(&e.message, "Bad address") {
-                        let source_handle = fopen(source, "r");
-                        let target_handle = fopen(&target, "w");
-                        if source_handle.is_null() || target_handle.is_null() {
-                            return Err(e.into());
-                        }
-                        while !feof(source_handle.clone()) {
-                            let chunk =
-                                fread(source_handle.clone(), 1024 * 1024).unwrap_or_default();
-                            if fwrite(target_handle.clone(), &chunk, chunk.len() as i64).is_none() {
+                        let (source_handle, target_handle) =
+                            match (fopen(source, "r"), fopen(&target, "w")) {
+                                (Ok(source_handle), Ok(target_handle)) => {
+                                    (source_handle, target_handle)
+                                }
+                                _ => return Err(e.into()),
+                            };
+                        while !feof(&source_handle) {
+                            let chunk = fread(&source_handle, 1024 * 1024).unwrap_or_default();
+                            if fwrite(&target_handle, &chunk, None).is_none() {
                                 return Err(e.into());
                             }
                         }
-                        fclose(source_handle);
-                        fclose(target_handle);
+                        fclose(&source_handle);
+                        fclose(&target_handle);
 
                         return Ok(true);
                     }
@@ -1041,24 +1042,28 @@ impl Filesystem {
     /// Copy file using stream_copy_to_stream to work around https://bugs.php.net/bug.php?id=6463
     pub fn safe_copy(&self, source: &str, target: &str) -> anyhow::Result<()> {
         if !file_exists(target) || !file_exists(source) || !self.files_are_equal(source, target) {
-            let source_handle = fopen(source, "r");
-            if source_handle.is_null() {
-                return Err(anyhow::anyhow!(
-                    "Could not open \"{}\" for reading.",
-                    source
-                ));
-            }
-            let target_handle = fopen(target, "w+");
-            if target_handle.is_null() {
-                return Err(anyhow::anyhow!(
-                    "Could not open \"{}\" for writing.",
-                    target
-                ));
-            }
+            let source_handle = match fopen(source, "r") {
+                Ok(source_handle) => source_handle,
+                Err(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Could not open \"{}\" for reading.",
+                        source
+                    ));
+                }
+            };
+            let target_handle = match fopen(target, "w+") {
+                Ok(target_handle) => target_handle,
+                Err(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Could not open \"{}\" for writing.",
+                        target
+                    ));
+                }
+            };
 
-            shirabe_php_shim::stream_copy_to_stream(source_handle.clone(), target_handle.clone());
-            fclose(source_handle);
-            fclose(target_handle);
+            shirabe_php_shim::stream_copy_to_stream(&source_handle, &target_handle);
+            fclose(&source_handle);
+            fclose(&target_handle);
 
             touch(target);
             // PHP also passes filemtime/fileatime — skipping detailed timestamp restore here.
@@ -1076,25 +1081,25 @@ impl Filesystem {
         }
 
         // Check if content is different
-        let a_handle = fopen(a, "rb");
-        if a_handle.is_null() {
-            return false;
-        }
-        let b_handle = fopen(b, "rb");
-        if b_handle.is_null() {
-            return false;
-        }
+        let a_handle = match fopen(a, "rb") {
+            Ok(a_handle) => a_handle,
+            Err(_) => return false,
+        };
+        let b_handle = match fopen(b, "rb") {
+            Ok(b_handle) => b_handle,
+            Err(_) => return false,
+        };
 
         let mut result = true;
-        while !feof(a_handle.clone()) {
-            if fread(a_handle.clone(), 8192) != fread(b_handle.clone(), 8192) {
+        while !feof(&a_handle) {
+            if fread(&a_handle, 8192) != fread(&b_handle, 8192) {
                 result = false;
                 break;
             }
         }
 
-        fclose(a_handle);
-        fclose(b_handle);
+        fclose(&a_handle);
+        fclose(&b_handle);
 
         result
     }

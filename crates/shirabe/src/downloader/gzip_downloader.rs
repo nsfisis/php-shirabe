@@ -52,16 +52,16 @@ impl GzipDownloader {
 
     fn extract_using_ext(&self, file: &str, target_filepath: &str) {
         let archive_file = gzopen(file, "rb");
-        let target_file = fopen(target_filepath, "wb");
+        let target_file = fopen(target_filepath, "wb").unwrap();
         loop {
             let string = gzread(archive_file.clone(), 4096);
             if string.is_empty() {
                 break;
             }
-            fwrite(target_file.clone(), &string, Platform::strlen(&string));
+            fwrite(&target_file, &string, Some(Platform::strlen(&string)));
         }
         gzclose(archive_file);
-        fclose(target_file);
+        fclose(&target_file);
     }
 }
 

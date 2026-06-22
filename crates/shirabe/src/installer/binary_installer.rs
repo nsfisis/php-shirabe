@@ -169,9 +169,14 @@ impl BinaryInstaller {
             return "call".to_string();
         }
 
-        let handle = fopen(bin, "r");
-        let line = fgets(handle.clone()).unwrap_or_default();
-        fclose(handle);
+        let line = match fopen(bin, "r") {
+            Ok(handle) => {
+                let line = fgets(&handle, None).unwrap_or_default();
+                fclose(&handle);
+                line
+            }
+            Err(_) => String::new(),
+        };
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
             r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m",

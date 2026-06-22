@@ -12,8 +12,8 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, RuntimeException, fopen, fseek, fwrite, rewind, stream_get_contents,
-    strip_tags,
+    PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, rewind,
+    stream_get_contents, strip_tags,
 };
 
 #[derive(Debug)]
@@ -30,14 +30,16 @@ impl BufferIO {
         let mut input_obj = StringInput::new(&input)?;
         input_obj.set_interactive(false);
 
-        let stream = fopen("php://memory", "rw");
-        if matches!(stream, PhpMixed::Bool(false)) {
-            return Err(RuntimeException {
-                message: "Unable to open memory output stream".to_string(),
-                code: 0,
+        let stream = match fopen("php://memory", "rw") {
+            Ok(stream) => stream,
+            Err(_) => {
+                return Err(RuntimeException {
+                    message: "Unable to open memory output stream".to_string(),
+                    code: 0,
+                }
+                .into());
             }
-            .into());
-        }
+        };
 
         let _decorated = formatter.as_ref().is_some_and(|f| f.is_decorated());
         // TODO(phase-c): wire StreamOutput as the output. StreamOutput::new requires a
@@ -75,11 +77,11 @@ impl BufferIO {
     pub fn get_output(&self) -> String {
         // TODO(phase-c): OutputInterface::get_stream returns PhpResource, while
         // fseek/stream_get_contents take PhpMixed. The PhpResource stream model is not yet defined.
-        let stream: PhpMixed =
-            todo!("PhpResource -> PhpMixed conversion for OutputInterface::get_stream");
-        fseek(stream.clone(), 0);
+        let stream: PhpResource =
+            todo!("retrieve the StreamOutput's PhpResource from OutputInterface::get_stream");
+        fseek(&stream, 0, SEEK_SET);
 
-        let output = stream_get_contents(stream).unwrap_or_default();
+        let output = stream_get_contents(&stream).unwrap_or_default();
 
         Preg::replace_callback(
             r"{(?<=^|\n|\x08)(.+?)(\x08+)}",
@@ -119,21 +121,23 @@ impl BufferIO {
         todo!("BufferIO::set_user_inputs: needs an as_streamable accessor on InputInterface")
     }
 
-    fn create_stream(&self, inputs: Vec<String>) -> Result<PhpMixed> {
-        let stream = fopen("php://memory", "r+");
-        if matches!(stream, PhpMixed::Bool(false)) {
-            return Err(RuntimeException {
-                message: "Unable to open memory output stream".to_string(),
-                code: 0,
+    fn create_stream(&self, inputs: Vec<String>) -> Result<PhpResource> {
+        let stream = match fopen("php://memory", "r+") {
+            Ok(stream) => stream,
+            Err(_) => {
+                return Err(RuntimeException {
+                    message: "Unable to open memory output stream".to_string(),
+                    code: 0,
+                }
+                .into());
             }
-            .into());
-        }
+        };
 
         for input in inputs {
-            fwrite(stream.clone(), &format!("{}{}", input, PHP_EOL), -1);
+            fwrite(&stream, &format!("{}{}", input, PHP_EOL), None);
         }
 
-        rewind(stream.clone());
+        rewind(&stream);
 
         Ok(stream)
     }

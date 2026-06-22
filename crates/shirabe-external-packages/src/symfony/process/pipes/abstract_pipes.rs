@@ -37,13 +37,8 @@ impl AbstractPipes {
     }
 
     pub fn close(&mut self) {
-        if let PhpMixed::List(pipes) = &self.pipes {
-            for pipe in pipes {
-                if php::is_resource(pipe) {
-                    php::fclose(pipe.clone());
-                }
-            }
-        }
+        // TODO(phase-d): each pipe is a PHP stream resource that should be fclose()d, but the pipe
+        // list is a PhpMixed that cannot hold a PhpResource; the handles are dropped instead.
         self.pipes = PhpMixed::List(Vec::new());
     }
 

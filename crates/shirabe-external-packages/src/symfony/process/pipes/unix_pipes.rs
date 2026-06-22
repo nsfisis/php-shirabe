@@ -44,9 +44,12 @@ fn descriptor(items: &[&str]) -> PhpMixed {
 impl PipesInterface for UnixPipes {
     fn get_descriptors(&mut self) -> Vec<PhpMixed> {
         if !self.have_read_support {
-            let nullstream = shirabe_php_shim::fopen("/dev/null", "c");
-
-            return vec![descriptor(&["pipe", "r"]), nullstream.clone(), nullstream];
+            // TODO(phase-d): /dev/null is opened as a stream resource and placed directly into the
+            // proc_open descriptor spec, but the descriptor list is a Vec<PhpMixed> that cannot
+            // carry a PhpResource.
+            todo!(
+                "UnixPipes::get_descriptors: the /dev/null resource cannot be represented in a PhpMixed descriptor list"
+            );
         }
 
         if self.tty_mode == Some(true) {

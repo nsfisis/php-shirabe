@@ -345,5 +345,54 @@ pub enum PhpResource {
     Stdin,
     Stdout,
     Stderr,
-    File(std::rc::Rc<std::cell::RefCell<std::fs::File>>),
+    Stream(std::rc::Rc<std::cell::RefCell<StreamState>>),
+}
+
+/// Combined capability of every seekable byte stream backing. Both `std::fs::File`
+/// and `std::io::Cursor<Vec<u8>>` satisfy it, so a stream can be driven uniformly.
+pub trait ReadWriteSeek: std::io::Read + std::io::Write + std::io::Seek {}
+impl<T: std::io::Read + std::io::Write + std::io::Seek> ReadWriteSeek for T {}
+
+#[derive(Debug)]
+pub enum StreamBacking {
+    /// A real file on disk (also `/dev/null`); the OS tracks the position.
+    File(std::fs::File),
+    /// `php://memory` and `php://temp` — an in-memory growable buffer.
+    /// TODO(phase-d): `php://temp/maxmemory:N` spills to a temp file past N bytes;
+    /// the threshold is ignored here and everything stays in memory.
+    Memory(std::io::Cursor<Vec<u8>>),
+}
+
+impl StreamBacking {
+    pub(crate) fn as_rws(&mut self) -> &mut dyn ReadWriteSeek {
+        match self {
+            StreamBacking::File(f) => f,
+            StreamBacking::Memory(c) => c,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct StreamState {
+    pub(crate) backing: StreamBacking,
+    /// Whether the mode opened the stream for reading.
+    pub(crate) readable: bool,
+    /// Whether the mode opened the stream for writing.
+    pub(crate) writable: bool,
+    /// Set once a read attempt sees end-of-stream, mirroring PHP's `feof()` which
+    /// only reports true after a read has hit the end; cleared by a seek.
+    pub(crate) eof: bool,
+    pub(crate) closed: bool,
+}
+
+impl StreamState {
+    pub(crate) fn new(backing: StreamBacking, readable: bool, writable: bool) -> PhpResource {
+        PhpResource::Stream(std::rc::Rc::new(std::cell::RefCell::new(StreamState {
+            backing,
+            readable,
+            writable,
+            eof: false,
+            closed: false,
+        })))
+    }
 }

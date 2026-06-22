@@ -8,25 +8,15 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct Cursor {
     output: Rc<RefCell<dyn OutputInterface>>,
-    input: shirabe_php_shim::PhpMixed,
+    input: shirabe_php_shim::PhpResource,
 }
 
 impl Cursor {
     pub fn new(
         output: Rc<RefCell<dyn OutputInterface>>,
-        input: Option<shirabe_php_shim::PhpMixed>,
+        input: Option<shirabe_php_shim::PhpResource>,
     ) -> Self {
-        let input = input.unwrap_or_else(|| {
-            if shirabe_php_shim::defined("STDIN") {
-                // PHP uses the `STDIN` resource constant here, but the shim models it as
-                // `PhpResource` while this field is `PhpMixed` (which has no resource
-                // variant). Fall back to opening `php://input` so the value stays a
-                // PhpMixed stream handle.
-                shirabe_php_shim::fopen("php://input", "r+")
-            } else {
-                shirabe_php_shim::fopen("php://input", "r+")
-            }
-        });
+        let input = input.unwrap_or(shirabe_php_shim::STDIN);
 
         Self { output, input }
     }
@@ -228,10 +218,10 @@ impl Cursor {
         let stty_mode = shirabe_php_shim::shell_exec("stty -g");
         shirabe_php_shim::shell_exec("stty -icanon -echo");
 
-        shirabe_php_shim::fwrite(self.input.clone(), "\x1b[6n", 0);
+        shirabe_php_shim::fwrite(&self.input, "\x1b[6n", None);
 
         let code = shirabe_php_shim::trim(
-            shirabe_php_shim::fread(self.input.clone(), 1024)
+            shirabe_php_shim::fread(&self.input, 1024)
                 .as_deref()
                 .unwrap_or(""),
             None,

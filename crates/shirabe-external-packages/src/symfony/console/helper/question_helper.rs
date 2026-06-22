@@ -383,7 +383,7 @@ impl QuestionHelper {
         );
 
         // Read a keypress
-        while !feof_resource(input_stream) {
+        while !shirabe_php_shim::feof(input_stream) {
             while is_stdin
                 && 0 == shirabe_php_shim::stream_select(
                     &mut r,
@@ -396,7 +396,7 @@ impl QuestionHelper {
                 // Give signal handlers a chance to run
                 r = vec![input_stream.clone()];
             }
-            let mut c = fread_resource(input_stream, 1);
+            let mut c = shirabe_php_shim::fread(input_stream, 1);
 
             // as opposed to fgets(), fread() returns an empty string when the stream content is empty, not false.
             if c.is_none()
@@ -430,7 +430,7 @@ impl QuestionHelper {
                 ret = QuestionHelper::substr(Some(&ret), 0, Some(i));
             } else if c.as_deref() == Some("\u{1b}") {
                 // Did we read an escape sequence?
-                let escape = fread_resource(input_stream, 2).unwrap_or_default();
+                let escape = shirabe_php_shim::fread(input_stream, 2).unwrap_or_default();
                 let cc = format!("{}{}", c.clone().unwrap_or_default(), escape);
                 c = Some(cc.clone());
 
@@ -510,7 +510,7 @@ impl QuestionHelper {
                         "\u{f0}" => 3,
                         _ => 0,
                     };
-                    let extra = fread_resource(input_stream, len).unwrap_or_default();
+                    let extra = shirabe_php_shim::fread(input_stream, len).unwrap_or_default();
                     c = Some(format!("{}{}", cur, extra));
                 }
 
@@ -649,7 +649,7 @@ impl QuestionHelper {
             })));
         }
 
-        let value = fgets_resource(input_stream, Some(4096));
+        let value = shirabe_php_shim::fgets(input_stream, Some(4096));
 
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
             shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
@@ -764,7 +764,7 @@ impl QuestionHelper {
     ) -> PhpMixed {
         if !question.is_multiline() {
             let cp = self.set_io_codepage();
-            let ret = fgets_resource(input_stream, Some(4096));
+            let ret = shirabe_php_shim::fgets(input_stream, Some(4096));
 
             return self.reset_io_codepage(
                 cp,
@@ -856,16 +856,16 @@ impl QuestionHelper {
 
         let uri = uri?;
 
-        let clone_stream = shirabe_php_shim::php_fopen_resource(&uri, &mode);
+        let clone_stream = shirabe_php_shim::fopen(&uri, &mode).ok()?;
 
         // For seekable and writable streams, add all the same data to the
         // cloned stream and then seek to the same offset.
         if matches!(seekable, PhpMixed::Bool(true)) && !["r", "rb", "rt"].contains(&mode.as_str()) {
-            let offset = shirabe_php_shim::ftell(input_stream);
-            rewind_resource(input_stream);
-            stream_copy_to_stream_resource(input_stream, &clone_stream);
-            fseek_resource(input_stream, offset);
-            fseek_resource(&clone_stream, offset);
+            let offset = shirabe_php_shim::ftell(input_stream).unwrap_or(0);
+            shirabe_php_shim::rewind(input_stream);
+            shirabe_php_shim::stream_copy_to_stream(input_stream, &clone_stream);
+            shirabe_php_shim::fseek(input_stream, offset, shirabe_php_shim::SEEK_SET);
+            shirabe_php_shim::fseek(&clone_stream, offset, shirabe_php_shim::SEEK_SET);
         }
 
         Some(clone_stream)
@@ -882,42 +882,10 @@ fn question_as_choice_question(question: &Question) -> Option<&ChoiceQuestion> {
     question.as_any().downcast_ref::<ChoiceQuestion>()
 }
 
-// PHP operates on raw stream resources, but the shim models `feof`/`fread`/
-// `fgets`/`fseek`/`rewind`/`stream_copy_to_stream` over `PhpMixed`, which has no
-// resource variant. These thin resource-typed wrappers stand in until the shim
-// grows `*_resource` counterparts (see report). Each defers to the real
-// implementation once it exists.
 // PHP `__FILE__` magic constant. The shim's `file()` is PHP's file() function,
 // not the magic constant, and there is no `__FILE__` shim yet (see report).
 fn magic_file() -> String {
     todo!("magic_file: shim needs a __FILE__ magic-constant equivalent")
-}
-
-fn feof_resource(_stream: &shirabe_php_shim::PhpResource) -> bool {
-    todo!("feof_resource: shim needs a PhpResource-based feof")
-}
-
-fn fread_resource(_stream: &shirabe_php_shim::PhpResource, _length: i64) -> Option<String> {
-    todo!("fread_resource: shim needs a PhpResource-based fread")
-}
-
-fn fgets_resource(_stream: &shirabe_php_shim::PhpResource, _length: Option<i64>) -> Option<String> {
-    todo!("fgets_resource: shim needs a PhpResource-based fgets")
-}
-
-fn fseek_resource(_stream: &shirabe_php_shim::PhpResource, _offset: i64) -> i64 {
-    todo!("fseek_resource: shim needs a PhpResource-based fseek")
-}
-
-fn rewind_resource(_stream: &shirabe_php_shim::PhpResource) -> bool {
-    todo!("rewind_resource: shim needs a PhpResource-based rewind")
-}
-
-fn stream_copy_to_stream_resource(
-    _source: &shirabe_php_shim::PhpResource,
-    _dest: &shirabe_php_shim::PhpResource,
-) -> Option<i64> {
-    todo!("stream_copy_to_stream_resource: shim needs a PhpResource-based stream_copy_to_stream")
 }
 
 impl HelperInterface for QuestionHelper {

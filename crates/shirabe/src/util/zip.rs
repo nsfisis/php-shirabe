@@ -34,8 +34,8 @@ impl Zip {
         let configuration_file_name = zip.get_name_index(found_file_index);
         let stream = zip.get_stream(&configuration_file_name);
 
-        if stream.is_some() {
-            content = stream_get_contents(stream.unwrap());
+        if let Some(stream) = &stream {
+            content = stream_get_contents(stream);
         }
 
         zip.close();

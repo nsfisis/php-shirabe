@@ -1,5 +1,7 @@
 use crate::PhpMixed;
 use crate::PhpResource;
+use crate::StreamBacking;
+use crate::StreamState;
 use crate::UnexpectedValueException;
 use indexmap::IndexMap;
 
@@ -8,6 +10,8 @@ pub const PHP_EOL: &str = "\n";
 pub const FILE_APPEND: i64 = 8;
 
 pub const STDIN: PhpResource = PhpResource::Stdin;
+pub const STDOUT: PhpResource = PhpResource::Stdout;
+pub const STDERR: PhpResource = PhpResource::Stderr;
 
 pub const PATHINFO_FILENAME: i64 = 64;
 pub const PATHINFO_EXTENSION: i64 = 4;
@@ -234,63 +238,361 @@ pub fn directory_iterator(_path: &str) -> Vec<DirectoryIteratorEntry> {
     todo!()
 }
 
-// TODO(phase-d): the fopen-family stream API is keyed on PhpMixed, but PhpMixed has no stream/
-// resource variant, so an opened stream cannot be represented or threaded through fread/fwrite/etc.
-// Wiring a stream representation into PhpMixed is Phase C type-design work.
-pub fn fopen(_file: &str, _mode: &str) -> PhpMixed {
-    todo!()
+/// PHP `fopen()`. Returns a stream resource, or an error mirroring PHP's `false`-on-failure
+/// (the I/O error carries the reason so callers that surface the warning text can use it).
+pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
+    match file {
+        "php://output" | "php://stdout" => return Ok(PhpResource::Stdout),
+        "php://stderr" => return Ok(PhpResource::Stderr),
+        "php://stdin" | "php://input" => return Ok(PhpResource::Stdin),
+        _ => {}
+    }
+    // Strip the binary/text flags PHP accepts as part of the mode.
+    let base_mode: String = mode.chars().filter(|c| *c != 'b' && *c != 't').collect();
+    let (readable, writable) = match base_mode.as_str() {
+        "r" => (true, false),
+        "w" | "a" | "x" | "c" => (false, true),
+        _ => (true, true), // r+, w+, a+, x+, c+, rw, ...
+    };
+    // php://memory and php://temp are in-memory streams.
+    if file == "php://memory" || file.starts_with("php://temp") {
+        return Ok(StreamState::new(
+            StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
+            readable,
+            writable,
+        ));
+    }
+    let mut options = std::fs::OpenOptions::new();
+    match base_mode.as_str() {
+        "r" => options.read(true),
+        "r+" => options.read(true).write(true),
+        "w" => options.write(true).create(true).truncate(true),
+        "w+" => options.read(true).write(true).create(true).truncate(true),
+        "a" => options.append(true).create(true),
+        "a+" => options.read(true).append(true).create(true),
+        "x" => options.write(true).create_new(true),
+        "x+" => options.read(true).write(true).create_new(true),
+        // "c"/"c+": open or create without truncating, position at start.
+        "c" => options.write(true).create(true),
+        "c+" => options.read(true).write(true).create(true),
+        _ => options.read(true),
+    };
+    let file = options.open(file)?;
+    Ok(StreamState::new(
+        StreamBacking::File(file),
+        readable,
+        writable,
+    ))
 }
 
-pub fn fwrite(_file: PhpMixed, _data: &str, _length: i64) -> Option<i64> {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
+/// PHP `fwrite()`. `length` caps the number of bytes written (`None` = whole string).
+/// Returns the byte count written, or `None` for PHP's `false`-on-failure.
+pub fn fwrite(stream: &PhpResource, data: &str, length: Option<i64>) -> Option<i64> {
+    use std::io::Write;
+    let bytes = data.as_bytes();
+    let bytes = match length {
+        Some(l) if l >= 0 => &bytes[..(l as usize).min(bytes.len())],
+        _ => bytes,
+    };
+    match stream {
+        PhpResource::Stdin => None,
+        PhpResource::Stdout => std::io::stdout()
+            .write_all(bytes)
+            .ok()
+            .map(|_| bytes.len() as i64),
+        PhpResource::Stderr => std::io::stderr()
+            .write_all(bytes)
+            .ok()
+            .map(|_| bytes.len() as i64),
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed || !state.writable {
+                return None;
+            }
+            let n = state.backing.as_rws().write(bytes).ok()?;
+            Some(n as i64)
+        }
+    }
 }
 
-pub fn fread(_handle: PhpMixed, _length: i64) -> Option<String> {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
+/// PHP `fread()`. Reads up to `length` bytes.
+/// TODO(phase-e): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
+/// binary reads (filesAreEqual / binary copy).
+pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
+    use std::io::Read;
+    let cap = length.max(0) as usize;
+    match stream {
+        PhpResource::Stdin => {
+            let mut buf = vec![0u8; cap];
+            let n = std::io::stdin().read(&mut buf).ok()?;
+            buf.truncate(n);
+            Some(String::from_utf8_lossy(&buf).into_owned())
+        }
+        PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed || !state.readable {
+                return None;
+            }
+            let mut buf = vec![0u8; cap];
+            let n = state.backing.as_rws().read(&mut buf).ok()?;
+            if cap > 0 && n == 0 {
+                state.eof = true;
+            }
+            buf.truncate(n);
+            Some(String::from_utf8_lossy(&buf).into_owned())
+        }
+    }
 }
 
-pub fn feof(_stream: PhpMixed) -> bool {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
+/// PHP `feof()`: true only after a read has hit end-of-stream.
+pub fn feof(stream: &PhpResource) -> bool {
+    match stream {
+        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => false,
+        PhpResource::Stream(state) => state.borrow().eof,
+    }
 }
 
-pub fn fclose(_file: PhpMixed) {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
+/// PHP `fclose()`. Marks the stream closed; the backing is released when the last clone drops.
+pub fn fclose(stream: &PhpResource) -> bool {
+    match stream {
+        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => true,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed {
+                return false;
+            }
+            use std::io::Write;
+            let _ = state.backing.as_rws().flush();
+            state.closed = true;
+            true
+        }
+    }
 }
 
-pub fn fgets(_handle: PhpMixed) -> Option<String> {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
+/// PHP `fgets()`. Reads one line, including the trailing newline, capped at `length-1` bytes
+/// when given (matching PHP's `length` parameter).
+/// TODO(phase-e): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
+/// binary reads.
+pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
+    let limit = match length {
+        Some(l) if l > 0 => Some((l - 1) as usize),
+        _ => None,
+    };
+    match stream {
+        PhpResource::Stdin => {
+            let stdin = std::io::stdin();
+            let line = fgets_read_line(&mut stdin.lock(), limit).ok()?;
+            if line.is_empty() {
+                return None;
+            }
+            Some(String::from_utf8_lossy(&line).into_owned())
+        }
+        PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed || !state.readable {
+                return None;
+            }
+            let line = fgets_read_line(state.backing.as_rws(), limit).ok()?;
+            if line.is_empty() {
+                state.eof = true;
+                return None;
+            }
+            Some(String::from_utf8_lossy(&line).into_owned())
+        }
+    }
 }
 
-pub fn fgetc(_resource: &PhpResource) -> Option<String> {
-    // TODO(phase-d): PhpResource models stdio/file write sinks (see fwrite_resource) but not
-    // buffered reads with a tracked position; fgetc needs a readable, seekable stream wrapper.
-    todo!()
+// Reads one byte at a time up to and including the next newline, stopping early at `limit` bytes.
+fn fgets_read_line<R: std::io::Read + ?Sized>(
+    r: &mut R,
+    limit: Option<usize>,
+) -> std::io::Result<Vec<u8>> {
+    let mut line = Vec::new();
+    let mut byte = [0u8; 1];
+    loop {
+        if let Some(max) = limit {
+            if line.len() >= max {
+                break;
+            }
+        }
+        let n = r.read(&mut byte)?;
+        if n == 0 {
+            break;
+        }
+        line.push(byte[0]);
+        if byte[0] == b'\n' {
+            break;
+        }
+    }
+    Ok(line)
 }
 
-pub fn ftell(_resource: &PhpResource) -> i64 {
-    // TODO(phase-d): PhpResource does not track a stream position; see fgetc.
-    todo!()
+/// PHP `fgetc()`: reads a single byte, or `None` at end-of-stream.
+/// TODO(phase-e): byte-string semantics — should return Vec<u8>.
+pub fn fgetc(stream: &PhpResource) -> Option<String> {
+    use std::io::Read;
+    let mut byte = [0u8; 1];
+    match stream {
+        PhpResource::Stdin => {
+            let n = std::io::stdin().read(&mut byte).ok()?;
+            if n == 0 {
+                return None;
+            }
+            Some(String::from_utf8_lossy(&byte).into_owned())
+        }
+        PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed || !state.readable {
+                return None;
+            }
+            let n = state.backing.as_rws().read(&mut byte).ok()?;
+            if n == 0 {
+                state.eof = true;
+                return None;
+            }
+            Some(String::from_utf8_lossy(&byte).into_owned())
+        }
+    }
 }
 
-pub fn fseek(_stream: PhpMixed, _offset: i64) -> i64 {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
+/// PHP `ftell()`: the current position, or `None` for `false`-on-failure.
+pub fn ftell(stream: &PhpResource) -> Option<i64> {
+    use std::io::Seek;
+    match stream {
+        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed {
+                return None;
+            }
+            state
+                .backing
+                .as_rws()
+                .stream_position()
+                .ok()
+                .map(|p| p as i64)
+        }
+    }
 }
 
-pub fn rewind(_stream: PhpMixed) -> bool {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
+/// PHP `fseek()`. Returns 0 on success, -1 on failure.
+pub fn fseek(stream: &PhpResource, offset: i64, whence: i64) -> i64 {
+    use std::io::Seek;
+    let from = match whence {
+        SEEK_CUR => std::io::SeekFrom::Current(offset),
+        SEEK_END => std::io::SeekFrom::End(offset),
+        _ => std::io::SeekFrom::Start(offset.max(0) as u64),
+    };
+    match stream {
+        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => -1,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed {
+                return -1;
+            }
+            match state.backing.as_rws().seek(from) {
+                Ok(_) => {
+                    state.eof = false;
+                    0
+                }
+                Err(_) => -1,
+            }
+        }
+    }
 }
 
-pub fn fstat(_stream: PhpResource) -> PhpMixed {
-    // TODO(phase-d): PhpResource::File holds a File, but the stdio variants have no fd to stat; a
-    // faithful fstat needs a uniform stream handle.
-    todo!()
+/// PHP `rewind()`: seek to the start.
+pub fn rewind(stream: &PhpResource) -> bool {
+    fseek(stream, 0, SEEK_SET) == 0
+}
+
+/// PHP `fstat()`: the stat array of an open stream, or `None` for `false`-on-failure.
+pub fn fstat(stream: &PhpResource) -> Option<IndexMap<String, PhpMixed>> {
+    match stream {
+        // TODO(phase-d): the stdio streams expose no fd to stat without a syscall crate; report
+        // failure rather than fabricate fields.
+        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed {
+                return None;
+            }
+            let (size, file_meta) = match &mut state.backing {
+                StreamBacking::File(f) => {
+                    let m = f.metadata().ok()?;
+                    (m.len(), Some(m))
+                }
+                StreamBacking::Memory(c) => (c.get_ref().len() as u64, None),
+            };
+            Some(build_stat_map(size, file_meta.as_ref()))
+        }
+    }
+}
+
+// Builds the 13-field PHP stat array (indexed 0..12 and by name). For in-memory streams only
+// `size` is meaningful; the rest are reported as 0, matching PHP fstat on php://temp.
+fn build_stat_map(size: u64, file_meta: Option<&std::fs::Metadata>) -> IndexMap<String, PhpMixed> {
+    use std::os::unix::fs::MetadataExt;
+    let fields: [(&str, i64); 13] = match file_meta {
+        Some(m) => [
+            ("dev", m.dev() as i64),
+            ("ino", m.ino() as i64),
+            ("mode", m.mode() as i64),
+            ("nlink", m.nlink() as i64),
+            ("uid", m.uid() as i64),
+            ("gid", m.gid() as i64),
+            ("rdev", m.rdev() as i64),
+            ("size", m.size() as i64),
+            ("atime", m.atime()),
+            ("mtime", m.mtime()),
+            ("ctime", m.ctime()),
+            ("blksize", m.blksize() as i64),
+            ("blocks", m.blocks() as i64),
+        ],
+        None => [
+            ("dev", 0),
+            ("ino", 0),
+            ("mode", 0),
+            ("nlink", 0),
+            ("uid", 0),
+            ("gid", 0),
+            ("rdev", 0),
+            ("size", size as i64),
+            ("atime", 0),
+            ("mtime", 0),
+            ("ctime", 0),
+            ("blksize", 0),
+            ("blocks", 0),
+        ],
+    };
+    let mut map = IndexMap::new();
+    for (i, (_, v)) in fields.iter().enumerate() {
+        map.insert(i.to_string(), PhpMixed::Int(*v));
+    }
+    for (name, v) in &fields {
+        map.insert(name.to_string(), PhpMixed::Int(*v));
+    }
+    map
+}
+
+/// PHP `fflush()`.
+pub fn fflush(stream: &PhpResource) -> bool {
+    use std::io::Write;
+    match stream {
+        PhpResource::Stdin => true,
+        PhpResource::Stdout => std::io::stdout().flush().is_ok(),
+        PhpResource::Stderr => std::io::stderr().flush().is_ok(),
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed {
+                return false;
+            }
+            state.backing.as_rws().flush().is_ok()
+        }
+    }
 }
 
 pub fn lstat(_filename: &str) -> Option<IndexMap<String, PhpMixed>> {
@@ -322,18 +624,6 @@ pub fn lstat(_filename: &str) -> Option<IndexMap<String, PhpMixed>> {
     Some(map)
 }
 
-/// PHP `ftell()` over a PhpMixed stream resource. (`ftell` itself is already defined for the
-/// `PhpResource`-typed stream API used elsewhere.)
-pub fn ftell_stream(_stream: &PhpMixed) -> i64 {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
-}
-
-pub fn fseek3(_stream: PhpMixed, _offset: i64, _whence: i64) -> i64 {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists.
-    todo!()
-}
-
 pub fn touch(_path: &str) -> bool {
     // TODO(phase-d): for an existing file PHP also bumps its mtime/atime to now; std exposes no
     // portable utime, so only the create-if-absent case is handled here.
@@ -346,36 +636,11 @@ pub fn touch(_path: &str) -> bool {
 }
 
 pub fn fflush_resource(resource: &PhpResource) {
-    use std::io::Write;
-    match resource {
-        PhpResource::Stdin => {}
-        PhpResource::Stdout => {
-            let _ = std::io::stdout().flush();
-        }
-        PhpResource::Stderr => {
-            let _ = std::io::stderr().flush();
-        }
-        PhpResource::File(file) => {
-            let _ = file.borrow_mut().flush();
-        }
-    }
+    fflush(resource);
 }
 
 pub fn fwrite_resource(resource: &PhpResource, data: &str) {
-    use std::io::Write;
-    let bytes = data.as_bytes();
-    match resource {
-        PhpResource::Stdin => {}
-        PhpResource::Stdout => {
-            let _ = std::io::stdout().write_all(bytes);
-        }
-        PhpResource::Stderr => {
-            let _ = std::io::stderr().write_all(bytes);
-        }
-        PhpResource::File(file) => {
-            let _ = file.borrow_mut().write_all(bytes);
-        }
-    }
+    fwrite(resource, data, None);
 }
 
 pub fn touch2(_path: &str, _mtime: i64) -> bool {
@@ -621,9 +886,26 @@ pub fn copy(_source: &str, _dest: &str) -> bool {
     std::fs::copy(_source, _dest).is_ok()
 }
 
-pub fn ftruncate(_stream: &PhpMixed, _size: i64) -> bool {
-    // TODO(phase-d): see fopen; no PhpMixed stream representation exists to truncate.
-    todo!()
+pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
+    match stream {
+        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => false,
+        PhpResource::Stream(state) => {
+            let mut state = state.borrow_mut();
+            if state.closed || !state.writable {
+                return false;
+            }
+            let size = size.max(0) as u64;
+            match &mut state.backing {
+                StreamBacking::File(f) => f.set_len(size).is_ok(),
+                StreamBacking::Memory(c) => {
+                    // Grow or shrink the buffer; PHP ftruncate leaves the position unchanged.
+                    let buf = c.get_mut();
+                    buf.resize(size as usize, 0);
+                    true
+                }
+            }
+        }
+    }
 }
 
 pub fn symlink(_target: &str, _link: &str) -> bool {
@@ -657,10 +939,20 @@ pub fn tempnam(_dir: &str, _prefix: &str) -> Option<String> {
     None
 }
 
-pub fn opendir(_path: &str) -> Option<PhpMixed> {
-    // TODO(phase-d): opendir returns a directory-handle resource consumed by readdir/closedir, but
-    // PhpMixed has no resource variant to carry it (see fopen).
-    todo!()
+// A directory-handle resource. This is a distinct resource kind from the byte streams modeled by
+// PhpResource; readdir/closedir have no callers yet, so it only records the opened path.
+// TODO(phase-d): give it real readdir/closedir behavior (cursor over the entries) when needed.
+#[derive(Debug)]
+pub struct PhpDirHandle {
+    pub path: std::path::PathBuf,
+}
+
+pub fn opendir(path: &str) -> Option<PhpDirHandle> {
+    // opendir succeeds iff the path is a readable directory.
+    std::fs::read_dir(path).ok()?;
+    Some(PhpDirHandle {
+        path: std::path::PathBuf::from(path),
+    })
 }
 
 pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
@@ -984,4 +1276,50 @@ fn glob_split_top_commas(inner: &str) -> Vec<String> {
     }
     parts.push(inner[start..].to_string());
     parts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn memory_stream_round_trips() {
+        let stream = fopen("php://temp", "w+").unwrap();
+
+        assert_eq!(fwrite(&stream, "hello\n", None), Some(6));
+        assert_eq!(fwrite(&stream, "world", None), Some(5));
+        assert_eq!(ftell(&stream), Some(11));
+
+        // Truncation past the end leaves the position untouched and reports the new size.
+        assert!(rewind(&stream));
+        assert_eq!(ftell(&stream), Some(0));
+        assert!(!feof(&stream));
+
+        // fgets reads up to and including the newline.
+        assert_eq!(fgets(&stream, None).as_deref(), Some("hello\n"));
+        // fread reads the requested number of bytes.
+        assert_eq!(fread(&stream, 3).as_deref(), Some("wor"));
+        assert_eq!(fgetc(&stream).as_deref(), Some("l"));
+        assert_eq!(fread(&stream, 10).as_deref(), Some("d"));
+        // A read past the end sets eof.
+        assert_eq!(fread(&stream, 10).as_deref(), Some(""));
+        assert!(feof(&stream));
+
+        // fstat reports the buffer size.
+        let stat = fstat(&stream).unwrap();
+        assert_eq!(stat.get("size"), Some(&PhpMixed::Int(11)));
+
+        // seek + truncate.
+        assert_eq!(fseek(&stream, 5, SEEK_SET), 0);
+        assert!(!feof(&stream)); // seek clears eof
+        assert!(ftruncate(&stream, 5));
+        assert_eq!(fstat(&stream).unwrap().get("size"), Some(&PhpMixed::Int(5)));
+
+        assert!(fclose(&stream));
+    }
+
+    #[test]
+    fn fopen_missing_file_is_err() {
+        assert!(fopen("/nonexistent/shirabe/test/path", "r").is_err());
+    }
 }

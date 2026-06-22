@@ -3,7 +3,7 @@
 use std::sync::OnceLock;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{self as php, PhpMixed};
+use shirabe_php_shim::{self as php, PhpMixed, PhpResource};
 
 use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::process::exception::logic_exception::LogicException;
@@ -48,8 +48,8 @@ pub struct Process {
     fallback_status: IndexMap<String, PhpMixed>,
     process_information: Option<IndexMap<String, PhpMixed>>,
     output_disabled: bool,
-    stdout: PhpMixed,
-    stderr: PhpMixed,
+    stdout: Option<PhpResource>,
+    stderr: Option<PhpResource>,
     process: PhpMixed,
     status: String,
     incremental_output_offset: i64,
@@ -199,8 +199,8 @@ impl Process {
             fallback_status: IndexMap::new(),
             process_information: None,
             output_disabled: false,
-            stdout: PhpMixed::Null,
-            stderr: PhpMixed::Null,
+            stdout: None,
+            stderr: None,
             process: PhpMixed::Null,
             status: Self::STATUS_READY.to_string(),
             incremental_output_offset: 0,
@@ -407,12 +407,12 @@ impl Process {
         self.status = Self::STATUS_STARTED.to_string();
 
         if descriptors.len() > 3 {
-            let pipe3 = php_pipe(self.process_pipes.as_ref().unwrap().pipes(), 3);
-            let pid = php::fgets(pipe3)
-                .and_then(|s| s.trim().parse::<i64>().ok())
-                .unwrap_or(0);
-            self.fallback_status
-                .insert("pid".to_string(), PhpMixed::Int(pid));
+            let _pipe3 = php_pipe(self.process_pipes.as_ref().unwrap().pipes(), 3);
+            // TODO(phase-d): the pid is read with fgets() from pipe 3, a PHP stream resource. The
+            // pipe list is a PhpMixed and cannot hold a PhpResource, so this cannot be expressed.
+            todo!(
+                "Process::start: reading the pid from pipe 3 needs a PhpResource the PhpMixed pipe list cannot carry"
+            );
         }
 
         if self.tty {
@@ -610,16 +610,19 @@ impl Process {
     pub fn get_output(&mut self) -> anyhow::Result<String> {
         self.read_pipes_for_output("getOutput", false)?;
 
-        Ok(php::stream_get_contents3(self.stdout.clone(), -1, 0).unwrap_or_default())
+        Ok(php::stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0).unwrap_or_default())
     }
 
     /// Returns the output incrementally.
     pub fn get_incremental_output(&mut self) -> anyhow::Result<String> {
         self.read_pipes_for_output("getIncrementalOutput", false)?;
 
-        let latest =
-            php::stream_get_contents3(self.stdout.clone(), -1, self.incremental_output_offset);
-        self.incremental_output_offset = php::ftell_stream(&self.stdout);
+        let latest = php::stream_get_contents3(
+            self.stdout.as_ref().unwrap(),
+            -1,
+            self.incremental_output_offset,
+        );
+        self.incremental_output_offset = php::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
 
         Ok(latest.unwrap_or_default())
     }
@@ -637,15 +640,15 @@ impl Process {
 
         let mut yields = Vec::new();
         while self.callback.is_some()
-            || (yield_out && !php::feof(self.stdout.clone()))
-            || (yield_err && !php::feof(self.stderr.clone()))
+            || (yield_out && !php::feof(self.stdout.as_ref().unwrap()))
+            || (yield_err && !php::feof(self.stderr.as_ref().unwrap()))
         {
             let mut got_out = false;
             let mut got_err = false;
 
             if yield_out {
                 let out = php::stream_get_contents3(
-                    self.stdout.clone(),
+                    self.stdout.as_ref().unwrap(),
                     -1,
                     self.incremental_output_offset,
                 )
@@ -656,7 +659,8 @@ impl Process {
                     if clear_output {
                         self.clear_output();
                     } else {
-                        self.incremental_output_offset = php::ftell_stream(&self.stdout);
+                        self.incremental_output_offset =
+                            php::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
                     }
 
                     yields.push((Self::OUT.to_string(), out));
@@ -665,7 +669,7 @@ impl Process {
 
             if yield_err {
                 let err = php::stream_get_contents3(
-                    self.stderr.clone(),
+                    self.stderr.as_ref().unwrap(),
                     -1,
                     self.incremental_error_output_offset,
                 )
@@ -676,7 +680,8 @@ impl Process {
                     if clear_output {
                         self.clear_error_output();
                     } else {
-                        self.incremental_error_output_offset = php::ftell_stream(&self.stderr);
+                        self.incremental_error_output_offset =
+                            php::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
                     }
 
                     yields.push((Self::ERR.to_string(), err));
@@ -696,8 +701,8 @@ impl Process {
 
     /// Clears the process output.
     pub fn clear_output(&mut self) -> &mut Self {
-        php::ftruncate(&self.stdout, 0);
-        php::fseek(self.stdout.clone(), 0);
+        php::ftruncate(self.stdout.as_ref().unwrap(), 0);
+        php::fseek(self.stdout.as_ref().unwrap(), 0, php::SEEK_SET);
         self.incremental_output_offset = 0;
 
         self
@@ -707,7 +712,7 @@ impl Process {
     pub fn get_error_output(&mut self) -> anyhow::Result<String> {
         self.read_pipes_for_output("getErrorOutput", false)?;
 
-        Ok(php::stream_get_contents3(self.stderr.clone(), -1, 0).unwrap_or_default())
+        Ok(php::stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0).unwrap_or_default())
     }
 
     /// Returns the errorOutput incrementally.
@@ -715,19 +720,20 @@ impl Process {
         self.read_pipes_for_output("getIncrementalErrorOutput", false)?;
 
         let latest = php::stream_get_contents3(
-            self.stderr.clone(),
+            self.stderr.as_ref().unwrap(),
             -1,
             self.incremental_error_output_offset,
         );
-        self.incremental_error_output_offset = php::ftell_stream(&self.stderr);
+        self.incremental_error_output_offset =
+            php::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
 
         Ok(latest.unwrap_or_default())
     }
 
     /// Clears the process error output.
     pub fn clear_error_output(&mut self) -> &mut Self {
-        php::ftruncate(&self.stderr, 0);
-        php::fseek(self.stderr.clone(), 0);
+        php::ftruncate(self.stderr.as_ref().unwrap(), 0);
+        php::fseek(self.stderr.as_ref().unwrap(), 0, php::SEEK_SET);
         self.incremental_error_output_offset = 0;
 
         self
@@ -882,18 +888,20 @@ impl Process {
     pub fn add_output(&mut self, line: &str) {
         self.last_output_time = Some(php::microtime());
 
-        php::fseek3(self.stdout.clone(), 0, php::SEEK_END);
-        php::fwrite(self.stdout.clone(), line, line.len() as i64);
-        php::fseek(self.stdout.clone(), self.incremental_output_offset);
+        let stdout = self.stdout.as_ref().unwrap();
+        php::fseek(stdout, 0, php::SEEK_END);
+        php::fwrite(stdout, line, Some(line.len() as i64));
+        php::fseek(stdout, self.incremental_output_offset, php::SEEK_SET);
     }
 
     /// Adds a line to the STDERR stream.
     pub fn add_error_output(&mut self, line: &str) {
         self.last_output_time = Some(php::microtime());
 
-        php::fseek3(self.stderr.clone(), 0, php::SEEK_END);
-        php::fwrite(self.stderr.clone(), line, line.len() as i64);
-        php::fseek(self.stderr.clone(), self.incremental_error_output_offset);
+        let stderr = self.stderr.as_ref().unwrap();
+        php::fseek(stderr, 0, php::SEEK_END);
+        php::fwrite(stderr, line, Some(line.len() as i64));
+        php::fseek(stderr, self.incremental_error_output_offset, php::SEEK_SET);
     }
 
     /// Gets the last output time in seconds.
@@ -1398,8 +1406,11 @@ impl Process {
         self.exitcode = None;
         self.fallback_status = IndexMap::new();
         self.process_information = None;
-        self.stdout = php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+");
-        self.stderr = php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+");
+        // php://temp is an in-memory stream; fopen never fails for it.
+        self.stdout =
+            Some(php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
+        self.stderr =
+            Some(php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
         self.process = PhpMixed::Null;
         self.latest_signal = None;
         self.status = Self::STATUS_READY.to_string();
@@ -1458,7 +1469,11 @@ impl Process {
                     None,
                     None,
                 );
-                ok = php::php_truthy(&opened) && php::fgets(php_pipe(&pipes, 2)).is_none();
+                let _pipe2 = php_pipe(&pipes, 2);
+                // TODO(phase-d): the original also requires `fgets($pipes[2]) === false`, reading
+                // from a PHP stream resource the PhpMixed pipe list cannot hold; that read is
+                // dropped here.
+                ok = php::php_truthy(&opened);
             }
             if !ok {
                 if throw_exception {

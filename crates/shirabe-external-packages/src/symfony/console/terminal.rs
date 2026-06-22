@@ -219,7 +219,7 @@ impl Terminal {
             ]),
         ];
 
-        let cp = if shirabe_php_shim::function_exists("sapi_windows_cp_set") {
+        let _cp = if shirabe_php_shim::function_exists("sapi_windows_cp_set") {
             shirabe_php_shim::sapi_windows_cp_get(None)
         } else {
             0
@@ -233,16 +233,13 @@ impl Terminal {
         }
 
         // $pipes[1] and $pipes[2] from proc_open's output array.
-        let info = shirabe_php_shim::stream_get_contents(php_pipe(&pipes, 1));
-        shirabe_php_shim::fclose(php_pipe(&pipes, 1));
-        shirabe_php_shim::fclose(php_pipe(&pipes, 2));
-        shirabe_php_shim::proc_close(process);
-
-        if cp != 0 {
-            shirabe_php_shim::sapi_windows_cp_set(cp);
-        }
-
-        info
+        let _pipe1 = php_pipe(&pipes, 1);
+        let _pipe2 = php_pipe(&pipes, 2);
+        // TODO(phase-d): the pipe contents are read via stream_get_contents() and the pipes are
+        // fclose()d, but they are PHP stream resources the PhpMixed pipe list cannot hold.
+        todo!(
+            "Terminal: reading proc_open pipes needs PhpResource handles the PhpMixed pipe list cannot carry"
+        );
     }
 }
 

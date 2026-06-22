@@ -49,7 +49,7 @@ impl ZipArchive {
         todo!()
     }
 
-    pub fn get_stream(&self, _name: &str) -> Option<PhpMixed> {
+    pub fn get_stream(&self, _name: &str) -> Option<crate::PhpResource> {
         todo!()
     }
 
