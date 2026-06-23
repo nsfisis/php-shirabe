@@ -49,6 +49,10 @@ impl ZipArchive {
         todo!()
     }
 
+    pub fn get_from_name(&self, _name: &str) -> Option<String> {
+        todo!()
+    }
+
     pub fn get_stream(&self, _name: &str) -> Option<crate::PhpResource> {
         todo!()
     }

@@ -79,11 +79,16 @@ fn test_dump_abandoned_replacement() {
     );
 }
 
-// PHP drives ~25 heterogeneous setters dynamically (set{ucfirst(method)}) across strings,
-// arrays, a DateTime and Link maps, then checks the corresponding dumped key. Reproducing
-// that dynamic dispatch faithfully would require per-case wiring for every property type.
+// PHP drives 26 heterogeneous setters dynamically (set{ucfirst(method)}) across strings,
+// arrays, a DateTime and Link maps, then checks the corresponding dumped key. Three of the
+// data sets cannot be expressed faithfully because the ported production types were narrowed
+// from PHP's loose `array`: the `authors` set passes plain strings (Rust set_authors wants
+// Vec<IndexMap<String,String>>), `scripts` passes a bare string value (set_scripts wants
+// IndexMap<String,Vec<String>>), and `funding` passes a single map (set_funding wants
+// Vec<IndexMap<String,PhpMixed>>); the dumper additionally re-wraps each of these. Porting the
+// remaining 23 would drop those three cases, so testKeys stays unported (all-or-nothing).
 #[test]
-#[ignore = "RootPackageHandle lacks set_type/set_release_date/set_binaries/set_php_ext setters required by the data provider's type/time/bin/php-ext cases"]
+#[ignore = "authors/scripts/funding data sets pass loosely-typed PHP arrays the narrowed Rust set_authors/set_scripts/set_funding types cannot represent, and the dumper re-wraps them; faithful all-or-nothing port blocked without loosening those production types"]
 fn test_keys() {
     todo!()
 }

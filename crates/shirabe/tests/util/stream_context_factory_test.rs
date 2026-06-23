@@ -7,7 +7,33 @@ use indexmap::IndexMap;
 use shirabe::util::http::proxy_manager::ProxyManager;
 use shirabe::util::platform::Platform;
 use shirabe::util::stream_context_factory::StreamContextFactory;
-use shirabe_php_shim::{PhpMixed, implode, stripos};
+use shirabe_php_shim::{
+    PhpMixed, base64_encode, extension_loaded, implode, stream_context_get_options, stripos,
+};
+
+fn s(value: &str) -> PhpMixed {
+    PhpMixed::String(value.to_string())
+}
+
+fn arr(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {
+    PhpMixed::Array(
+        entries
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect(),
+    )
+}
+
+fn list(items: Vec<PhpMixed>) -> PhpMixed {
+    PhpMixed::List(items)
+}
+
+fn map(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
+    entries
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect()
+}
 
 fn set_up() {
     Platform::clear_env("HTTP_PROXY");
@@ -37,8 +63,11 @@ impl Drop for TearDown {
     }
 }
 
+// PHP's dataGetContext second data set passes a `notification` closure in both the default and
+// expected params; PhpMixed has no closure variant, so that data set (and thus the all-or-nothing
+// testGetContext) cannot be expressed.
 #[test]
-#[ignore = "stream_context_get_options/stream_context_get_params shim functions do not exist; cannot read back created context to assert"]
+#[ignore = "dataGetContext passes a notification closure in params; PhpMixed cannot represent a PHP closure, so the data set is unportable"]
 fn test_get_context() {
     let _tear_down = TearDown;
     set_up();
@@ -46,67 +75,299 @@ fn test_get_context() {
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_http_proxy() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+    Platform::put_env(
+        "http_proxy",
+        "http://username:p%40ssword@proxyserver.net:3128/",
+    );
+    Platform::put_env("HTTP_PROXY", "http://proxyserver/");
+
+    let default_options = map(vec![(
+        "http",
+        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+    )]);
+    let context =
+        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap();
+    let options = stream_context_get_options(&context);
+
+    let expected = map(vec![(
+        "http",
+        arr(vec![
+            ("proxy", s("tcp://proxyserver.net:3128")),
+            ("request_fulluri", PhpMixed::Bool(true)),
+            ("method", s("GET")),
+            (
+                "header",
+                list(vec![
+                    s("User-Agent: foo"),
+                    s(&format!(
+                        "Proxy-Authorization: Basic {}",
+                        base64_encode("username:p@ssword")
+                    )),
+                ]),
+            ),
+            ("max_redirects", PhpMixed::Int(20)),
+            ("follow_location", PhpMixed::Int(1)),
+        ]),
+    )]);
+    assert_eq!(expected, options);
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_http_proxy_with_no_proxy() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+    Platform::put_env(
+        "http_proxy",
+        "http://username:password@proxyserver.net:3128/",
+    );
+    Platform::put_env("no_proxy", "foo,example.org");
+
+    let default_options = map(vec![(
+        "http",
+        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+    )]);
+    let context =
+        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap();
+    let options = stream_context_get_options(&context);
+
+    let expected = map(vec![(
+        "http",
+        arr(vec![
+            ("method", s("GET")),
+            ("max_redirects", PhpMixed::Int(20)),
+            ("follow_location", PhpMixed::Int(1)),
+            ("header", list(vec![s("User-Agent: foo")])),
+        ]),
+    )]);
+    assert_eq!(expected, options);
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_http_proxy_with_no_proxy_wildcard() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+    Platform::put_env(
+        "http_proxy",
+        "http://username:password@proxyserver.net:3128/",
+    );
+    Platform::put_env("no_proxy", "*");
+
+    let default_options = map(vec![(
+        "http",
+        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+    )]);
+    let context =
+        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap();
+    let options = stream_context_get_options(&context);
+
+    let expected = map(vec![(
+        "http",
+        arr(vec![
+            ("method", s("GET")),
+            ("max_redirects", PhpMixed::Int(20)),
+            ("follow_location", PhpMixed::Int(1)),
+            ("header", list(vec![s("User-Agent: foo")])),
+        ]),
+    )]);
+    assert_eq!(expected, options);
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_options_are_preserved() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+    Platform::put_env(
+        "http_proxy",
+        "http://username:password@proxyserver.net:3128/",
+    );
+
+    let default_options = map(vec![(
+        "http",
+        arr(vec![
+            ("method", s("GET")),
+            ("header", list(vec![s("User-Agent: foo"), s("X-Foo: bar")])),
+            ("request_fulluri", PhpMixed::Bool(false)),
+        ]),
+    )]);
+    let context =
+        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap();
+    let options = stream_context_get_options(&context);
+
+    let expected = map(vec![(
+        "http",
+        arr(vec![
+            ("proxy", s("tcp://proxyserver.net:3128")),
+            ("request_fulluri", PhpMixed::Bool(false)),
+            ("method", s("GET")),
+            (
+                "header",
+                list(vec![
+                    s("User-Agent: foo"),
+                    s("X-Foo: bar"),
+                    s(&format!(
+                        "Proxy-Authorization: Basic {}",
+                        base64_encode("username:password")
+                    )),
+                ]),
+            ),
+            ("max_redirects", PhpMixed::Int(20)),
+            ("follow_location", PhpMixed::Int(1)),
+        ]),
+    )]);
+    assert_eq!(expected, options);
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_http_proxy_without_port() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+    Platform::put_env("https_proxy", "http://username:password@proxyserver.net");
+
+    let default_options = map(vec![(
+        "http",
+        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+    )]);
+    let context =
+        StreamContextFactory::get_context("https://example.org", default_options, IndexMap::new())
+            .unwrap();
+    let options = stream_context_get_options(&context);
+
+    let expected = map(vec![(
+        "http",
+        arr(vec![
+            ("proxy", s("tcp://proxyserver.net:80")),
+            ("method", s("GET")),
+            (
+                "header",
+                list(vec![
+                    s("User-Agent: foo"),
+                    s(&format!(
+                        "Proxy-Authorization: Basic {}",
+                        base64_encode("username:password")
+                    )),
+                ]),
+            ),
+            ("max_redirects", PhpMixed::Int(20)),
+            ("follow_location", PhpMixed::Int(1)),
+        ]),
+    )]);
+    assert_eq!(expected, options);
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_https_proxy_override() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+    if !extension_loaded("openssl") {
+        // markTestSkipped('Requires openssl')
+        return;
+    }
+
+    Platform::put_env("http_proxy", "http://username:password@proxyserver.net");
+    Platform::put_env("https_proxy", "https://woopproxy.net");
+
+    // Pointless test replaced by ProxyHelperTest.php
+    // expectException('Composer\Downloader\TransportException')
+    let result = StreamContextFactory::get_context(
+        "https://example.org",
+        map(vec![(
+            "http",
+            arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+        )]),
+        IndexMap::new(),
+    );
+    assert!(result.is_err());
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_ssl_proxy() {
     let _tear_down = TearDown;
-    set_up();
-    todo!()
+    for (expected, proxy) in [
+        ("ssl://proxyserver:443", "https://proxyserver/"),
+        ("ssl://proxyserver:8443", "https://proxyserver:8443"),
+    ] {
+        set_up();
+        Platform::put_env("http_proxy", proxy);
+
+        if extension_loaded("openssl") {
+            let context = StreamContextFactory::get_context(
+                "http://example.org",
+                map(vec![("http", arr(vec![("header", s("User-Agent: foo"))]))]),
+                IndexMap::new(),
+            )
+            .unwrap();
+            let options = stream_context_get_options(&context);
+
+            let expected_options = map(vec![(
+                "http",
+                arr(vec![
+                    ("proxy", s(expected)),
+                    ("request_fulluri", PhpMixed::Bool(true)),
+                    ("max_redirects", PhpMixed::Int(20)),
+                    ("follow_location", PhpMixed::Int(1)),
+                    ("header", list(vec![s("User-Agent: foo")])),
+                ]),
+            )]);
+            assert_eq!(expected_options, options);
+        } else {
+            match StreamContextFactory::get_context(
+                "http://example.org",
+                IndexMap::new(),
+                IndexMap::new(),
+            ) {
+                // The catch in PHP asserts the exception is a TransportException; the return type
+                // here already guarantees that.
+                Ok(_) => panic!(),
+                Err(_) => {}
+            }
+        }
+    }
 }
 
 #[test]
-#[ignore = "stream_context_get_options shim function does not exist; cannot read back created context to assert"]
+#[ignore]
 fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+    let options = map(vec![(
+        "http",
+        arr(vec![(
+            "header",
+            s(
+                "User-agent: foo\r\nX-Foo: bar\r\nContent-Type: application/json\r\nAuthorization: Basic aW52YWxpZA==",
+            ),
+        )]),
+    )]);
+    let expected_header = vec![
+        s("User-agent: foo"),
+        s("X-Foo: bar"),
+        s("Authorization: Basic aW52YWxpZA=="),
+        s("Content-Type: application/json"),
+    ];
+    let context =
+        StreamContextFactory::get_context("http://example.org", options, IndexMap::new()).unwrap();
+    let ctxoptions = stream_context_get_options(&context);
+    let ctx_header = ctxoptions
+        .get("http")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.get("header"))
+        .and_then(|v| v.as_list())
+        .unwrap();
+    assert_eq!(expected_header.last().unwrap(), ctx_header.last().unwrap());
 }
 
 #[test]

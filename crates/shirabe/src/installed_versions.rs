@@ -352,6 +352,20 @@ impl InstalledVersions {
     /// Returns the raw data of all installed.php which are currently loaded for custom implementations
     ///
     /// @return array[]
+    /// Returns the first dataset loaded, which may not be what you expect. Use get_all_raw_data
+    /// instead, which returns all datasets for all autoloaders present in the process.
+    pub fn get_raw_data() -> IndexMap<String, PhpMixed> {
+        // PHP emits an E_USER_DEPRECATED notice here; there is no Rust equivalent.
+        let mut installed = INSTALLED.lock().unwrap();
+        if installed.is_none() {
+            // PHP only includes __DIR__/installed.php when loaded from its dumped location; the
+            // shim is always the source location (PHP's `else` branch), so the data is empty.
+            *installed = Some(IndexMap::new());
+        }
+
+        installed.clone().unwrap()
+    }
+
     pub fn get_all_raw_data() -> Vec<IndexMap<String, PhpMixed>> {
         Self::get_installed()
     }

@@ -38,11 +38,32 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[ignore = "ProxyManager::get_instance returns a shared &'static Mutex, so instance identity (=== / after reset) cannot be expressed through the public API"]
+#[serial_test::serial]
 fn test_instantiation() {
     let _tear_down = TearDown;
     set_up();
-    todo!()
+
+    // PHP compares object identity (===); the value-based Rust singleton exposes a per-instance
+    // generation id instead, which changes only when a new ProxyManager is constructed.
+    let original_instance = {
+        let mutex = ProxyManager::get_instance();
+        let guard = mutex.lock().unwrap();
+        guard.as_ref().unwrap().__generation()
+    };
+    let same_instance = {
+        let mutex = ProxyManager::get_instance();
+        let guard = mutex.lock().unwrap();
+        guard.as_ref().unwrap().__generation()
+    };
+    assert_eq!(original_instance, same_instance);
+
+    ProxyManager::reset();
+    let new_instance = {
+        let mutex = ProxyManager::get_instance();
+        let guard = mutex.lock().unwrap();
+        guard.as_ref().unwrap().__generation()
+    };
+    assert_ne!(same_instance, new_instance);
 }
 
 #[test]

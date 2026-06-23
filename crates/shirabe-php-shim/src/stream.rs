@@ -67,6 +67,14 @@ pub fn stream_context_create(
     todo!()
 }
 
+pub fn stream_context_get_options(_stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
+    todo!()
+}
+
+pub fn stream_context_get_params(_stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
+    todo!()
+}
+
 pub fn stream_isatty(stream: PhpResource) -> bool {
     stream_isatty_resource(&stream)
 }
@@ -124,8 +132,76 @@ pub fn stream_isatty_resource(resource: &PhpResource) -> bool {
     }
 }
 
-pub fn stream_get_meta_data(_resource: &PhpResource) -> IndexMap<String, PhpMixed> {
-    todo!()
+pub fn stream_get_meta_data(resource: &PhpResource) -> IndexMap<String, PhpMixed> {
+    // (timed_out, blocked, eof, wrapper_type, stream_type, mode, seekable, uri)
+    let (eof, wrapper_type, stream_type, mode, seekable, uri) = match resource {
+        PhpResource::Stdin => (false, "PHP", "STDIO", "r".to_string(), false, "php://stdin"),
+        PhpResource::Stdout => (
+            false,
+            "PHP",
+            "STDIO",
+            "w".to_string(),
+            false,
+            "php://stdout",
+        ),
+        PhpResource::Stderr => (
+            false,
+            "PHP",
+            "STDIO",
+            "w".to_string(),
+            false,
+            "php://stderr",
+        ),
+        PhpResource::Stream(state) => {
+            let state = state.borrow();
+            let (wrapper_type, stream_type) = match &state.backing {
+                StreamBacking::Memory(_) => {
+                    if state.uri.starts_with("php://temp") {
+                        ("PHP", "TEMP")
+                    } else {
+                        ("PHP", "MEMORY")
+                    }
+                }
+                StreamBacking::File(_) => ("plainfile", "STDIO"),
+            };
+            return build_meta_data(
+                state.eof,
+                wrapper_type,
+                stream_type,
+                state.mode.clone(),
+                true,
+                &state.uri,
+            );
+        }
+    };
+    build_meta_data(eof, wrapper_type, stream_type, mode, seekable, uri)
+}
+
+fn build_meta_data(
+    eof: bool,
+    wrapper_type: &str,
+    stream_type: &str,
+    mode: String,
+    seekable: bool,
+    uri: &str,
+) -> IndexMap<String, PhpMixed> {
+    let mut map = IndexMap::new();
+    map.insert("timed_out".to_string(), PhpMixed::Bool(false));
+    map.insert("blocked".to_string(), PhpMixed::Bool(true));
+    map.insert("eof".to_string(), PhpMixed::Bool(eof));
+    map.insert(
+        "wrapper_type".to_string(),
+        PhpMixed::String(wrapper_type.to_string()),
+    );
+    map.insert(
+        "stream_type".to_string(),
+        PhpMixed::String(stream_type.to_string()),
+    );
+    map.insert("mode".to_string(), PhpMixed::String(mode));
+    map.insert("unread_bytes".to_string(), PhpMixed::Int(0));
+    map.insert("seekable".to_string(), PhpMixed::Bool(seekable));
+    map.insert("uri".to_string(), PhpMixed::String(uri.to_string()));
+    map
 }
 
 pub fn stream_set_blocking(_resource: &PhpResource, _enable: bool) -> bool {

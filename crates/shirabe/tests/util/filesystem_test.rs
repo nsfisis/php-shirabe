@@ -9,50 +9,9 @@ use shirabe_php_shim::{
     dirname, file_exists, file_put_contents, is_dir, is_file, mkdir, symlink, touch,
 };
 
-#[allow(dead_code)]
-struct SetUp {
-    fs: Filesystem,
-    working_dir: String,
-    test_file: String,
-}
-
-#[allow(dead_code)]
-fn set_up() -> SetUp {
-    let fs = Filesystem::new(None);
-    // getUniqueTmpDirectory is base TestCase infrastructure that is not ported.
-    let working_dir: String = todo!();
-    #[allow(unreachable_code)]
-    let unique_tmp: String = todo!();
-    #[allow(unreachable_code)]
-    let test_file: String = format!("{unique_tmp}/composer_test_file");
-    #[allow(unreachable_code)]
-    SetUp {
-        fs,
-        working_dir,
-        test_file,
-    }
-}
-
-#[allow(dead_code)]
-fn tear_down(set_up: &mut SetUp) {
-    if is_dir(&set_up.working_dir) {
-        let _ = set_up.fs.remove_directory(&set_up.working_dir);
-    }
-    if is_file(&set_up.test_file) {
-        let _ = set_up.fs.remove_directory(dirname(&set_up.test_file));
-    }
-}
-
-#[allow(dead_code)]
-struct TearDown {
-    set_up: SetUp,
-}
-
-impl Drop for TearDown {
-    fn drop(&mut self) {
-        tear_down(&mut self.set_up);
-    }
-}
+// PHP's setUp/tearDown build workingDir/testFile under TestCase::getUniqueTmpDirectory; the
+// on-disk tests below instead create their own tempfile::TempDir inline, so no shared fixture
+// helper is needed.
 
 /// providePathCouplesAsCode: (a, b, directory, expected, static, prefer_relative)
 fn provide_path_couples_as_code()

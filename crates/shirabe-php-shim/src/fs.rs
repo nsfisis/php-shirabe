@@ -260,8 +260,11 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
             StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
             readable,
             writable,
+            mode.to_string(),
+            file.to_string(),
         ));
     }
+    let uri = file.to_string();
     let mut options = std::fs::OpenOptions::new();
     match base_mode.as_str() {
         "r" => options.read(true),
@@ -282,6 +285,8 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
         StreamBacking::File(file),
         readable,
         writable,
+        mode.to_string(),
+        uri,
     ))
 }
 

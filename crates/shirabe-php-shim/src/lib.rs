@@ -383,16 +383,28 @@ pub struct StreamState {
     /// only reports true after a read has hit the end; cleared by a seek.
     pub(crate) eof: bool,
     pub(crate) closed: bool,
+    /// The mode string passed to `fopen`, reported back by `stream_get_meta_data`.
+    pub(crate) mode: String,
+    /// The path/URI the stream was opened from, reported back by `stream_get_meta_data`.
+    pub(crate) uri: String,
 }
 
 impl StreamState {
-    pub(crate) fn new(backing: StreamBacking, readable: bool, writable: bool) -> PhpResource {
+    pub(crate) fn new(
+        backing: StreamBacking,
+        readable: bool,
+        writable: bool,
+        mode: String,
+        uri: String,
+    ) -> PhpResource {
         PhpResource::Stream(std::rc::Rc::new(std::cell::RefCell::new(StreamState {
             backing,
             readable,
             writable,
             eof: false,
             closed: false,
+            mode,
+            uri,
         })))
     }
 }

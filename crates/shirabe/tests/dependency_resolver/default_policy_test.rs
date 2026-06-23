@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
+use shirabe::package::Link;
 use shirabe::package::handle::{CompleteAliasPackageHandle, CompletePackageHandle};
 use shirabe::repository::array_repository::ArrayRepository;
 use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
@@ -556,28 +557,217 @@ fn test_select_local_repos_first() {
     assert_eq!(expected, selected);
 }
 
-#[ignore = "set_provides/set_replaces only exist on RootPackage handles; CompletePackage from get_package has no set_provides"]
+/// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
+/// `(string) $constraint`.
+fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
+    let pretty = constraint.get_pretty_string();
+    Link::new(
+        source.to_string(),
+        target.to_string(),
+        constraint,
+        Some(r#type.to_string()),
+        pretty,
+    )
+}
+
+fn as_complete(
+    package: &shirabe::package::handle::PackageInterfaceHandle,
+) -> CompletePackageHandle {
+    CompletePackageHandle::from_rc_unchecked(package.as_rc().clone())
+}
+
+fn constraint(operator: &str, version: &str) -> AnyConstraint {
+    SimpleConstraint::new(operator.to_string(), version.to_string(), None).into()
+}
+
+#[ignore]
 #[test]
 fn test_select_all_providers() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a = get_package("A", "1.0");
+    fixtures.repo.add_package(package_a.clone()).unwrap();
+    let package_b = get_package("B", "2.0");
+    fixtures.repo.add_package(package_b.clone()).unwrap();
+
+    let mut provides_a: IndexMap<String, Link> = IndexMap::new();
+    provides_a.insert(
+        "x".to_string(),
+        link("A", "X", constraint("==", "1.0"), Link::TYPE_PROVIDE),
+    );
+    as_complete(&package_a).__set_provides(provides_a);
+    let mut provides_b: IndexMap<String, Link> = IndexMap::new();
+    provides_b.insert(
+        "x".to_string(),
+        link("B", "X", constraint("==", "1.0"), Link::TYPE_PROVIDE),
+    );
+    as_complete(&package_b).__set_provides(provides_b);
+
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_packages(
+            vec!["A".to_string(), "B".to_string()],
+            Some(fixtures.repo_locked.clone()),
+        )
+        .unwrap();
+
+    let literals = vec![package_a.get_id(), package_b.get_id()];
+    let expected = literals.clone();
+
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
-#[ignore = "set_provides/set_replaces only exist on RootPackage handles; CompletePackage from get_package has no set_replaces"]
+#[ignore]
 #[test]
 fn test_prefer_non_replacing_from_same_repo() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    let package_a = get_package("A", "1.0");
+    fixtures.repo.add_package(package_a.clone()).unwrap();
+    let package_b = get_package("B", "2.0");
+    fixtures.repo.add_package(package_b.clone()).unwrap();
+
+    let mut replaces_b: IndexMap<String, Link> = IndexMap::new();
+    replaces_b.insert(
+        "a".to_string(),
+        link("B", "A", constraint("==", "1.0"), Link::TYPE_REPLACE),
+    );
+    as_complete(&package_b).__set_replaces(replaces_b);
+
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_packages(
+            vec!["A".to_string(), "B".to_string()],
+            Some(fixtures.repo_locked.clone()),
+        )
+        .unwrap();
+
+    let literals = vec![package_a.get_id(), package_b.get_id()];
+    let expected = literals.clone();
+
+    let selected = fixtures
+        .policy
+        .select_preferred_packages(&pool, literals, None);
+
+    assert_eq!(expected, selected);
 }
 
-#[ignore = "set_replaces only exists on RootPackage handles; CompletePackage from get_package has no set_replaces"]
+#[ignore]
 #[test]
 fn test_prefer_replacing_package_from_same_vendor() {
     let _tear_down = TearDown;
-    let _fixtures = set_up();
-    todo!()
+    let mut fixtures = set_up();
+
+    // test with default order
+    let package_b = get_package("vendor-b/replacer", "1.0");
+    fixtures.repo.add_package(package_b.clone()).unwrap();
+    let package_a = get_package("vendor-a/replacer", "1.0");
+    fixtures.repo.add_package(package_a.clone()).unwrap();
+
+    let mut replaces_a: IndexMap<String, Link> = IndexMap::new();
+    replaces_a.insert(
+        "vendor-a/package".to_string(),
+        link(
+            "vendor-a/replacer",
+            "vendor-a/package",
+            constraint("==", "1.0"),
+            Link::TYPE_REPLACE,
+        ),
+    );
+    as_complete(&package_a).__set_replaces(replaces_a);
+    let mut replaces_b: IndexMap<String, Link> = IndexMap::new();
+    replaces_b.insert(
+        "vendor-a/package".to_string(),
+        link(
+            "vendor-b/replacer",
+            "vendor-a/package",
+            constraint("==", "1.0"),
+            Link::TYPE_REPLACE,
+        ),
+    );
+    as_complete(&package_b).__set_replaces(replaces_b);
+
+    fixtures
+        .repository_set
+        .add_repository(RepositoryInterfaceHandle::new(fixtures.repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_packages(
+            vec![
+                "vendor-a/replacer".to_string(),
+                "vendor-b/replacer".to_string(),
+            ],
+            Some(fixtures.repo_locked.clone()),
+        )
+        .unwrap();
+
+    let literals = vec![package_a.get_id(), package_b.get_id()];
+    let expected = literals.clone();
+
+    let selected = fixtures.policy.select_preferred_packages(
+        &pool,
+        literals,
+        Some("vendor-a/package".to_string()),
+    );
+    assert_eq!(expected, selected);
+
+    // test with reversed order in repo
+    let repo = ArrayRepository::new(vec![]).unwrap();
+    let package_a = CompletePackageHandle::dup(&as_complete(&package_a));
+    repo.add_package(package_a.clone().into()).unwrap();
+    let package_b = CompletePackageHandle::dup(&as_complete(&package_b));
+    repo.add_package(package_b.clone().into()).unwrap();
+
+    let mut repository_set = RepositorySet::new(
+        "dev",
+        IndexMap::new(),
+        vec![],
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+    );
+    repository_set
+        .add_repository(RepositoryInterfaceHandle::new(repo))
+        .unwrap();
+
+    let pool = fixtures
+        .repository_set
+        .create_pool_for_packages(
+            vec![
+                "vendor-a/replacer".to_string(),
+                "vendor-b/replacer".to_string(),
+            ],
+            Some(fixtures.repo_locked.clone()),
+        )
+        .unwrap();
+
+    let literals = vec![package_a.get_id(), package_b.get_id()];
+    let expected = literals.clone();
+
+    let selected = fixtures.policy.select_preferred_packages(
+        &pool,
+        literals,
+        Some("vendor-a/package".to_string()),
+    );
+    assert_eq!(expected, selected);
 }
 
 #[ignore]

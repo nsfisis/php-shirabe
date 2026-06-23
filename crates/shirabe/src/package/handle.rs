@@ -1213,6 +1213,15 @@ macro_rules! impl_real_package_test_setters {
                     .expect("real package handle invariant")
                     .set_type(r#type);
             }
+
+            /// For testing only: mirrors PHP `Package::setSourceType`.
+            pub fn __set_source_type(&self, r#type: Option<String>) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_source_type(r#type);
+            }
         }
     };
 }

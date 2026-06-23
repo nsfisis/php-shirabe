@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/Http/ProxyManager.php
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use crate::downloader::TransportException;
@@ -9,12 +10,17 @@ use crate::util::http::RequestProxy;
 
 static INSTANCE: OnceLock<Mutex<Option<ProxyManager>>> = OnceLock::new();
 
+// Distinguishes ProxyManager instances so tests can mirror PHP `===` identity of the singleton,
+// which the Rust value-based singleton does not otherwise expose.
+static NEXT_GENERATION: AtomicU64 = AtomicU64::new(0);
+
 #[derive(Debug)]
 pub struct ProxyManager {
     error: Option<String>,
     http_proxy: Option<ProxyItem>,
     https_proxy: Option<ProxyItem>,
     no_proxy_handler: std::cell::RefCell<Option<NoProxyPattern>>,
+    generation: u64,
 }
 
 impl ProxyManager {
@@ -24,6 +30,7 @@ impl ProxyManager {
             http_proxy: None,
             https_proxy: None,
             no_proxy_handler: std::cell::RefCell::new(None),
+            generation: NEXT_GENERATION.fetch_add(1, Ordering::Relaxed),
         };
         if let Err(e) = instance.get_proxy_data() {
             instance.error = Some(e.to_string());
@@ -39,6 +46,12 @@ impl ProxyManager {
         if let Some(mutex) = INSTANCE.get() {
             *mutex.lock().unwrap() = Some(ProxyManager::new());
         }
+    }
+
+    /// For testing only: a unique id per constructed instance, used to mirror PHP `===` identity
+    /// comparison of the ProxyManager singleton across `get_instance`/`reset`.
+    pub fn __generation(&self) -> u64 {
+        self.generation
     }
 
     pub fn has_proxy(&self) -> bool {

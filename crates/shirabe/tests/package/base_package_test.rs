@@ -1,7 +1,10 @@
 //! ref: composer/tests/Composer/Test/Package/BasePackageTest.php
 
+use shirabe::package::DisplayMode;
 use shirabe::package::base_package::package_names_to_regexp;
+use shirabe::package::handle::PackageHandle;
 use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle};
+use shirabe_semver::version_parser::VersionParser;
 
 use crate::test_case::get_package;
 
@@ -31,14 +34,40 @@ fn test_set_another_repository() {
     assert!(package.set_repository(repository2.clone()).is_err());
 }
 
-// In PHP this mocks isDev()/getSourceType()/getPrettyVersion()/getSourceReference()
-// on an abstract BasePackage to drive getFullPrettyVersion(). Reproducing those exact
-// getter values requires mocking; a real package cannot carry the pretty version
-// "PrettyVersion" together with isDev() == true.
-#[ignore = "requires mocking isDev/getSourceType/getPrettyVersion/getSourceReference on an abstract BasePackage; no mock infrastructure exists and a real package cannot carry prettyVersion \"PrettyVersion\" with isDev() == true"]
+// PHP mocks isDev()/getSourceType()/getPrettyVersion()/getSourceReference() on an abstract
+// BasePackage. A real Package reproduces the same observable getters: a "dev-master" version makes
+// isDev() true, while the pretty version is an independent constructor argument.
 #[test]
 fn test_format_version_for_dev_package() {
-    todo!()
+    let cases: Vec<(&str, bool, &str)> = vec![
+        ("v2.1.0-RC2", true, "PrettyVersion v2.1.0-RC2"),
+        (
+            "bbf527a27356414bfa9bf520f018c5cb7af67c77",
+            true,
+            "PrettyVersion bbf527a",
+        ),
+        ("v1.0.0", false, "PrettyVersion v1.0.0"),
+        (
+            "bbf527a27356414bfa9bf520f018c5cb7af67c77",
+            false,
+            "PrettyVersion bbf527a27356414bfa9bf520f018c5cb7af67c77",
+        ),
+    ];
+
+    for (source_reference, truncate, expected) in cases {
+        let package = PackageHandle::new(
+            "dummy/pkg".to_string(),
+            VersionParser.normalize("dev-master", None).unwrap(),
+            "PrettyVersion".to_string(),
+        );
+        package.__set_source_type(Some("git".to_string()));
+        package.set_source_reference(Some(source_reference.to_string()));
+
+        assert_eq!(
+            expected,
+            package.get_full_pretty_version(truncate, DisplayMode::SourceRefIfDev)
+        );
+    }
 }
 
 #[test]

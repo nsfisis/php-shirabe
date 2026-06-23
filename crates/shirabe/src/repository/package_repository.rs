@@ -2,12 +2,18 @@
 
 use crate::advisory::SecurityAdvisory;
 use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
+use crate::package::BasePackageHandle;
+use crate::package::PackageInterfaceHandle;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::package::version::VersionParser;
 use crate::repository::ArrayRepository;
 use crate::repository::InvalidRepositoryException;
-use crate::repository::{AdvisoryProviderInterface, SecurityAdvisoryResult};
+use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::repository::{
+    AdvisoryProviderInterface, FindPackageConstraint, LoadPackagesResult, ProviderInfo,
+    RepositoryInterface, SearchResult, SecurityAdvisoryResult,
+};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, var_export};
@@ -77,6 +83,85 @@ impl PackageRepository {
     pub fn get_repo_name(&self) -> String {
         use crate::repository::RepositoryInterface;
         Preg::replace(r"^array ", "package ", &self.inner.get_repo_name())
+    }
+}
+
+impl RepositoryInterface for PackageRepository {
+    // The structural methods are inherited from ArrayRepository in PHP, where they trigger the
+    // overridden initialize() that loads packages from config. Wiring that virtual dispatch is a
+    // Phase C concern; the advisory paths below are what is exercised so far.
+    fn count(&self) -> anyhow::Result<usize> {
+        todo!()
+    }
+
+    fn has_package(&self, _package: PackageInterfaceHandle) -> bool {
+        todo!()
+    }
+
+    fn find_package(
+        &mut self,
+        _name: &str,
+        _constraint: FindPackageConstraint,
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
+        todo!()
+    }
+
+    fn find_packages(
+        &mut self,
+        _name: &str,
+        _constraint: Option<FindPackageConstraint>,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        todo!()
+    }
+
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        todo!()
+    }
+
+    fn load_packages(
+        &mut self,
+        _package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
+        _acceptable_stabilities: IndexMap<String, i64>,
+        _stability_flags: IndexMap<String, i64>,
+        _already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+    ) -> anyhow::Result<LoadPackagesResult> {
+        todo!()
+    }
+
+    fn search(
+        &mut self,
+        _query: String,
+        _mode: i64,
+        _type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        todo!()
+    }
+
+    fn get_providers(
+        &mut self,
+        _package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        todo!()
+    }
+
+    fn get_repo_name(&self) -> String {
+        PackageRepository::get_repo_name(self)
+    }
+
+    fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
+        Some(self)
+    }
+
+    fn as_advisory_provider_mut(&mut self) -> Option<&mut dyn AdvisoryProviderInterface> {
+        Some(self)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }
 

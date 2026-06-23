@@ -8,11 +8,14 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
 use shirabe_php_shim::{PhpMixed, extension_loaded};
 
-fn set_up() {
+/// Returns true when the test should be skipped because the zip extension is
+/// unavailable, mirroring PHP's markTestSkipped in setUp.
+fn set_up() -> bool {
     if !extension_loaded("zip") {
         // markTestSkipped('You need the zip extension to run this test.')
-        todo!()
+        return true;
     }
+    false
 }
 
 fn artifacts_dir() -> String {
@@ -34,7 +37,9 @@ fn create_repo(url: &str) -> ArtifactRepository {
 #[test]
 #[ignore]
 fn test_extracts_configs_from_zip_archives() {
-    set_up();
+    if set_up() {
+        return;
+    }
 
     let mut expected_packages = vec![
         "vendor0/package0-0.0.1".to_string(),
@@ -82,7 +87,9 @@ fn test_extracts_configs_from_zip_archives() {
 #[test]
 #[ignore]
 fn test_absolute_repo_url_creates_absolute_url_packages() {
-    set_up();
+    if set_up() {
+        return;
+    }
 
     let absolute_path = artifacts_dir();
     let mut repo = create_repo(&absolute_path);
@@ -101,7 +108,9 @@ fn test_absolute_repo_url_creates_absolute_url_packages() {
 #[test]
 #[ignore]
 fn test_relative_repo_url_creates_relative_url_packages() {
-    set_up();
+    if set_up() {
+        return;
+    }
 
     let relative_path = "tests/Composer/Test/Repository/Fixtures/artifacts";
     let mut repo = create_repo(relative_path);

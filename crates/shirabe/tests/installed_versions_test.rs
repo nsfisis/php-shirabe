@@ -342,11 +342,12 @@ fn test_get_root_package() {
     assert_eq!(expected, InstalledVersions::get_root_package());
 }
 
-#[ignore = "InstalledVersions::get_raw_data not ported (only get_all_raw_data exists)"]
+#[ignore]
 #[test]
 fn test_get_raw_data() {
-    let _root = set_up();
-    todo!()
+    let (_root, dir) = set_up();
+
+    assert_eq!(fixture(&dir), InstalledVersions::get_raw_data());
 }
 
 #[ignore]

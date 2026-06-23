@@ -29,31 +29,31 @@ impl Drop for TearDown {
 // the filename-derivation helpers over packages; the archiving and fixture setup are not
 // ported.
 #[test]
-#[ignore = "setupPackage requires CompletePackage::setSourceType, not exposed on the package handle API; also needs Factory-built ArchiveManager (set_up) which is unported"]
+#[ignore = "needs the Factory/FactoryMock-built ArchiveManager (createDownloadManager/createHttpDownloader/FactoryMock::createConfig) in set_up, which is unported"]
 fn test_unknown_format() {
     todo!()
 }
 
 #[test]
-#[ignore = "needs setupGitRepo + PharData tar archiving and Factory-built ArchiveManager (set_up), and setupPackage's setSourceType which is not exposed on the package handle API"]
+#[ignore = "needs setupGitRepo + PharData tar archiving and the Factory/FactoryMock-built ArchiveManager (set_up), which is unported"]
 fn test_archive_tar() {
     todo!()
 }
 
 #[test]
-#[ignore = "needs setupGitRepo + PharData tar archiving and Factory-built ArchiveManager (set_up), and setupPackage's setSourceType which is not exposed on the package handle API"]
+#[ignore = "needs setupGitRepo + PharData tar archiving and the Factory/FactoryMock-built ArchiveManager (set_up), which is unported"]
 fn test_archive_custom_file_name() {
     todo!()
 }
 
 #[test]
-#[ignore = "setupPackage requires CompletePackage::setSourceType, not exposed on the package handle API; also needs Factory-built ArchiveManager (set_up) which is unported"]
+#[ignore = "needs the Factory/FactoryMock-built ArchiveManager (createDownloadManager/createHttpDownloader/FactoryMock::createConfig) in set_up, which is unported"]
 fn test_get_package_filename_parts() {
     todo!()
 }
 
 #[test]
-#[ignore = "setupPackage requires CompletePackage::setSourceType, not exposed on the package handle API; also needs Factory-built ArchiveManager (set_up) which is unported"]
+#[ignore = "needs the Factory/FactoryMock-built ArchiveManager (createDownloadManager/createHttpDownloader/FactoryMock::createConfig) in set_up, which is unported"]
 fn test_get_package_filename() {
     todo!()
 }

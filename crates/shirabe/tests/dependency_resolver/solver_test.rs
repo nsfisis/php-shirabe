@@ -277,7 +277,7 @@ fn test_solver_remove_if_not_requested() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented todo!() (in_array non-strict in php-shim)"]
+#[ignore = "get_pretty_string path reaches an unimplemented stub (in_array non-strict in php-shim)"]
 #[test]
 fn test_install_non_existing_package_fails() {
     let fixtures = set_up();
@@ -1921,7 +1921,7 @@ fn test_issue265() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented todo!() (in_array non-strict in php-shim)"]
+#[ignore = "get_pretty_string path reaches an unimplemented stub (in_array non-strict in php-shim)"]
 #[test]
 fn test_conflict_result_empty() {
     let fixtures = set_up();
@@ -1979,7 +1979,7 @@ fn test_conflict_result_empty() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented todo!() (in_array non-strict in php-shim)"]
+#[ignore = "get_pretty_string path reaches an unimplemented stub (in_array non-strict in php-shim)"]
 #[test]
 fn test_unsatisfiable_requires() {
     let fixtures = set_up();
@@ -2027,7 +2027,7 @@ fn test_unsatisfiable_requires() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented todo!() (Intervals::is_subset_of)"]
+#[ignore = "get_pretty_string path reaches an unimplemented stub (Intervals::is_subset_of)"]
 #[test]
 fn test_require_mismatch_exception() {
     let fixtures = set_up();
