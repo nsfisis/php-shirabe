@@ -35,9 +35,7 @@ impl StreamOutput {
     ) -> anyhow::Result<Result<Self, InvalidArgumentException>> {
         let verbosity = verbosity.unwrap_or(VERBOSITY_NORMAL);
 
-        if !shirabe_php_shim::is_resource_value(&stream)
-            || "stream" != shirabe_php_shim::get_resource_type(&stream)
-        {
+        if shirabe_php_shim::get_resource_type(&stream) != "stream" {
             return Ok(Err(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
                     message: "The StreamOutput class needs a stream as its first argument."

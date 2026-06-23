@@ -17,11 +17,9 @@ impl AbstractPipes {
     pub fn new(input: PhpMixed) -> Self {
         let mut input_buffer = String::new();
         let stored_input;
-        // TODO(plugin): `$input instanceof \Iterator` is not modeled. `is_resource` on a PhpMixed is
-        // always false, so the resource branch never stores input here.
-        if php::is_resource(&input) {
-            stored_input = input;
-        } else if let PhpMixed::String(s) = &input {
+        // TODO(plugin): `$input instanceof \Iterator` is not modeled. The PHP `is_resource($input)`
+        // branch never applies: a PhpMixed is never a resource, so input is never stored as-is here.
+        if let PhpMixed::String(s) = &input {
             input_buffer = s.clone();
             stored_input = PhpMixed::Null;
         } else {

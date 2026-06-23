@@ -12,9 +12,6 @@ impl ProcessUtils {
     /// Validates and normalizes a Process input.
     pub fn validate_input(caller: &str, input: PhpMixed) -> anyhow::Result<PhpMixed> {
         if !input.is_null() {
-            if php::is_resource(&input) {
-                return Ok(input);
-            }
             if php::is_string(&input) {
                 return Ok(input);
             }

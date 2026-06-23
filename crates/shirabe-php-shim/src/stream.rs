@@ -240,10 +240,6 @@ pub fn stream_get_contents3(stream: &PhpResource, max_length: i64, offset: i64) 
     stream_read_remaining(stream, max)
 }
 
-pub fn is_resource_value(_resource: &PhpResource) -> bool {
-    true
-}
-
 pub fn get_resource_type(resource: &PhpResource) -> String {
     match resource {
         PhpResource::Process(_) => "process".to_string(),

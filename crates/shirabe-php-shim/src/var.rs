@@ -137,11 +137,6 @@ pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> b
     todo!()
 }
 
-pub fn is_resource(_value: &PhpMixed) -> bool {
-    // PhpMixed has no resource variant, so a PhpMixed is never a resource.
-    false
-}
-
 pub fn is_array(_value: &PhpMixed) -> bool {
     matches!(_value, PhpMixed::List(_) | PhpMixed::Array(_))
 }

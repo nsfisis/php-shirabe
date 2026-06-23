@@ -19,9 +19,9 @@ use shirabe_php_shim::{
     curl_init, curl_multi_add_handle, curl_multi_exec, curl_multi_info_read, curl_multi_init,
     curl_multi_select, curl_multi_setopt, curl_setopt, curl_setopt_array, curl_share_init,
     curl_share_setopt, curl_strerror, curl_version, defined, explode, fclose, fopen,
-    function_exists, implode, in_array, ini_get, is_resource, json_decode, parse_url, preg_quote,
-    rename, rewind, rtrim, sprintf, str_contains, stream_get_contents,
-    stream_get_contents_with_max, stripos, strpos, substr, unlink_silent, usleep, var_export,
+    function_exists, implode, in_array, ini_get, json_decode, parse_url, preg_quote, rename,
+    rewind, rtrim, sprintf, str_contains, stream_get_contents, stream_get_contents_with_max,
+    stripos, strpos, substr, unlink_silent, usleep, var_export,
 };
 
 use crate::config::Config;

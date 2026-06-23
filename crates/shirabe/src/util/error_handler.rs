@@ -4,8 +4,8 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use shirabe_php_shim::{
     E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException, PHP_EOL,
-    PhpMixed, STDERR, debug_backtrace, error_reporting, filter_var_boolean, ini_get,
-    is_resource_value, set_error_handler,
+    PhpMixed, STDERR, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
+    set_error_handler,
 };
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -126,15 +126,7 @@ impl ErrorHandler {
         }
 
         if output_even_without_io {
-            if is_resource_value(&STDERR) {
-                shirabe_php_shim::fwrite(
-                    &STDERR,
-                    &format!("Warning: {}{}", message, PHP_EOL),
-                    None,
-                );
-            } else {
-                print!("Warning: {}{}", message, PHP_EOL);
-            }
+            fwrite(&STDERR, &format!("Warning: {}{}", message, PHP_EOL), None);
         }
     }
 }
