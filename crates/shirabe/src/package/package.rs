@@ -6,7 +6,6 @@ use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::composer::util::ComposerMirror;
 use shirabe_php_shim::{E_USER_DEPRECATED, LogicException, PhpMixed, strpos, trigger_error};
 
 use crate::package::BasePackage;
@@ -16,6 +15,7 @@ use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::util::ComposerMirror;
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]
@@ -484,12 +484,7 @@ impl Package {
                         Some(self.pretty_version.as_str()),
                     )
                 } else if url_type == "source" && r#type == Some("git") {
-                    ComposerMirror::process_git_url(
-                        &mirror.url,
-                        &self.name,
-                        &url,
-                        r#type.unwrap_or(""),
-                    )
+                    ComposerMirror::process_git_url(&mirror.url, &self.name, &url, r#type)
                 } else if url_type == "source" && r#type == Some("hg") {
                     ComposerMirror::process_hg_url(
                         &mirror.url,
