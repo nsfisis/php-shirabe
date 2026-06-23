@@ -4,6 +4,7 @@ use crate::symfony::console::exception::invalid_argument_exception::InvalidArgum
 use crate::symfony::console::input::argv_input::ArgvInput;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_interface::InputInterface;
+use crate::symfony::console::input::streamable_input_interface::StreamableInputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{CaptureKey, PhpMixed};
 
@@ -209,5 +210,23 @@ impl InputInterface for StringInput {
 
     fn set_interactive(&mut self, interactive: bool) {
         self.inner.set_interactive(interactive)
+    }
+
+    fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
+        Some(self)
+    }
+
+    fn as_streamable_mut(&mut self) -> Option<&mut dyn StreamableInputInterface> {
+        Some(self)
+    }
+}
+
+impl StreamableInputInterface for StringInput {
+    fn set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+        self.inner.set_stream(stream)
+    }
+
+    fn get_stream(&self) -> Option<shirabe_php_shim::PhpResource> {
+        self.inner.get_stream()
     }
 }

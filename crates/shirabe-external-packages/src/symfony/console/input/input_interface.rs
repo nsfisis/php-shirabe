@@ -48,4 +48,9 @@ pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
         None
     }
+
+    /// Mutable counterpart of `as_streamable`, needed to call `set_stream`/`set_interactive`.
+    fn as_streamable_mut(&mut self) -> Option<&mut dyn StreamableInputInterface> {
+        None
+    }
 }

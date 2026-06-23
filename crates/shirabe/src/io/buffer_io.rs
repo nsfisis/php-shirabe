@@ -8,9 +8,10 @@ use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::output::StreamOutput;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, rewind,
-    stream_get_contents, strip_tags,
+    AsAny, PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite,
+    rewind, stream_get_contents, strip_tags,
 };
 
 #[derive(Debug)]
@@ -22,7 +23,7 @@ impl BufferIO {
     pub fn new(
         input: String,
         verbosity: i64,
-        formatter: Option<Box<dyn OutputFormatterInterface>>,
+        formatter: Option<std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>>,
     ) -> Result<Self> {
         let mut input_obj = StringInput::new(&input)?;
         input_obj.set_interactive(false);
@@ -38,17 +39,12 @@ impl BufferIO {
             }
         };
 
-        let _decorated = formatter.as_ref().is_some_and(|f| f.is_decorated());
-        // TODO(phase-c): wire StreamOutput as the output. StreamOutput::new requires a
-        // PhpResource, but `fopen` here yields a PhpMixed; PhpMixed has no resource variant,
-        // so the stream cannot be passed through yet (same PhpResource/PhpMixed gap noted in
-        // QuestionHelper). The constructed StreamOutput is therefore not wired as the output.
-        // formatter, stream and verbosity feed the pending StreamOutput::new wiring below.
-        let _ = formatter;
-        let _ = stream;
-        let _ = verbosity;
+        let decorated = formatter
+            .as_ref()
+            .is_some_and(|f| f.borrow().is_decorated());
+        let output = StreamOutput::new(stream, Some(verbosity), Some(decorated), formatter)??;
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
-            todo!("wire StreamOutput as the ConsoleIO output (needs PhpResource stream)");
+            std::rc::Rc::new(std::cell::RefCell::new(output));
 
         let inner = ConsoleIO::new(
             std::rc::Rc::new(std::cell::RefCell::new(input_obj))
@@ -61,13 +57,15 @@ impl BufferIO {
     }
 
     pub fn get_output(&self) -> String {
-        // TODO(phase-c): OutputInterface::get_stream returns PhpResource, while
-        // fseek/stream_get_contents take PhpMixed. The PhpResource stream model is not yet defined.
-        let stream: PhpResource =
-            todo!("retrieve the StreamOutput's PhpResource from OutputInterface::get_stream");
-        fseek(&stream, 0, SEEK_SET);
+        let output = self.inner.output.borrow();
+        let stream_output = (*output)
+            .as_any()
+            .downcast_ref::<StreamOutput>()
+            .expect("BufferIO output is always a StreamOutput");
+        let stream = stream_output.get_stream();
+        fseek(stream, 0, SEEK_SET);
 
-        let output = stream_get_contents(&stream).unwrap_or_default();
+        let output = stream_get_contents(stream).unwrap_or_default();
 
         Preg::replace_callback(
             r"{(?<=^|\n|\x08)(.+?)(\x08+)}",
@@ -97,14 +95,21 @@ impl BufferIO {
     }
 
     pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> Result<()> {
-        // PHP: `if (!$this->input instanceof StreamableInputInterface) { throw ... }`
-        //      `$this->input->setStream($this->createStream($inputs)); $this->input->setInteractive(true);`
-        //
-        // TODO(phase-c): unblocked by the console tree merge (StreamableInputInterface and
-        // InputInterface now share one tree). Wiring the downcast still needs an as_streamable
-        // accessor on InputInterface to reach ConsoleIO's input.
-        let _ = inputs;
-        todo!("BufferIO::set_user_inputs: needs an as_streamable accessor on InputInterface")
+        let stream = self.create_stream(inputs)?;
+
+        let mut input = self.inner.input.borrow_mut();
+        let Some(streamable) = input.as_streamable_mut() else {
+            return Err(RuntimeException {
+                message: "Setting the user inputs requires at least the version 3.2 of the symfony/console component.".to_string(),
+                code: 0,
+            }
+            .into());
+        };
+
+        streamable.set_stream(stream);
+        streamable.set_interactive(true);
+
+        Ok(())
     }
 
     fn create_stream(&self, inputs: Vec<String>) -> Result<PhpResource> {

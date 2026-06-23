@@ -6,7 +6,6 @@ use shirabe_external_packages::symfony::console::output::output_interface::VERBO
 use shirabe_php_shim::PhpMixed;
 
 #[test]
-#[ignore]
 fn test_set_user_inputs() {
     let mut buffer_io = BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap();
 

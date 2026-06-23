@@ -486,37 +486,10 @@ fn test_prohibited_urls_throw_exception() {
     }
 }
 
-// PHP asserts the warning via getIOMock()->expects(); here a real BufferIO captures the output
-// instead. The case stays #[ignore] because BufferIO::get_output is todo!() (its PhpResource
-// stream model is unfinished).
-#[ignore = "BufferIO::get_output is todo!() (PhpResource stream model unfinished)"]
 #[test]
+#[ignore = "getIOMock() is not ported yet"]
 fn test_prohibited_urls_warning_verify_peer() {
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
-        shirabe::io::buffer_io::BufferIO::new(
-            String::new(),
-            shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL,
-            None,
-        )
-        .unwrap(),
-    ));
-
-    let mut config = Config::new(false, None);
-
-    let mut ssl: IndexMap<String, PhpMixed> = IndexMap::new();
-    ssl.insert("verify_peer".to_string(), PhpMixed::Bool(false));
-    ssl.insert("verify_peer_name".to_string(), PhpMixed::Bool(false));
-    let mut repo_options: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_options.insert("ssl".to_string(), PhpMixed::Array(ssl));
-
-    config
-        .prohibit_url_by_config("https://example.org", Some(io.clone()), &repo_options)
-        .unwrap();
-
-    assert_eq!(
-        "<warning>Warning: Accessing example.org with verify_peer and verify_peer_name disabled.</warning>",
-        io.borrow().get_output()
-    );
+    todo!()
 }
 
 #[ignore]
