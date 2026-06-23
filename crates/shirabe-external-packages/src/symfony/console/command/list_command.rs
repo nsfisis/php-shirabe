@@ -46,7 +46,7 @@ impl Default for ListCommand {
 
 impl ListCommand {
     pub fn new() -> Self {
-        let mut command = ListCommand {
+        let command = ListCommand {
             inner: CommandData::new(None),
         };
         command
@@ -85,7 +85,7 @@ impl ListCommand {
 }
 
 impl Command for ListCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.inner.set_name("list")?;
         self.inner.set_definition(SetDefinitionArg::Array(vec![
             DefinitionItem::InputArgument(InputArgument::new(
@@ -139,7 +139,7 @@ impl Command for ListCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {

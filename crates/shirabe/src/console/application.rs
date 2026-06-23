@@ -1263,7 +1263,7 @@ impl Application {
             // PHP: sprintf('<info>%s</info>', OutputFormatter::escape(sprintf($synopsis, $this->getName())))
             // A command synopsis carries no printf conversion specifier, so the inner sprintf is an
             // identity over the synopsis and the application-name argument is never substituted.
-            let synopsis = running_command.borrow_mut().get_synopsis(false);
+            let synopsis = running_command.borrow().get_synopsis(false);
             output.borrow().writeln(
                 &[format!(
                     "<info>{}</info>",
@@ -1868,12 +1868,12 @@ impl ApplicationHandle {
         command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
     ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
         let application = &self.0;
-        command.borrow_mut().set_application(Some(
+        command.borrow().set_application(Some(
             application.clone() as std::rc::Rc<std::cell::RefCell<dyn BaseApplication>>
         ));
 
         if !command.borrow().is_enabled() {
-            command.borrow_mut().set_application(None);
+            command.borrow().set_application(None);
 
             return Ok(None);
         }
@@ -2903,7 +2903,7 @@ impl ApplicationHandle {
         }
 
         command
-            .borrow_mut()
+            .borrow()
             .run(input.clone(), output.clone())
             .map(|c| c as i32)
     }

@@ -40,7 +40,7 @@ impl Default for ValidateCommand {
 
 impl ValidateCommand {
     pub fn new() -> Self {
-        let mut command = ValidateCommand {
+        let command = ValidateCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -51,7 +51,7 @@ impl ValidateCommand {
 }
 
 impl Command for ValidateCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("validate")?;
         self.set_description("Validates a composer.json and composer.lock");
         self.set_definition(&[
@@ -139,7 +139,7 @@ impl Command for ValidateCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -310,7 +310,7 @@ impl Command for ValidateCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -321,10 +321,10 @@ impl Command for ValidateCommand {
 }
 
 impl BaseCommand for ValidateCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

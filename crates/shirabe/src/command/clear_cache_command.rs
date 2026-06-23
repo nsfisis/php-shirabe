@@ -31,7 +31,7 @@ impl Default for ClearCacheCommand {
 
 impl ClearCacheCommand {
     pub fn new() -> Self {
-        let mut command = ClearCacheCommand {
+        let command = ClearCacheCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -42,7 +42,7 @@ impl ClearCacheCommand {
 }
 
 impl Command for ClearCacheCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("clear-cache")?;
         self.set_aliases(vec!["clearcache".to_string(), "cc".to_string()])?;
         self.set_description("Clears composer's internal package cache");
@@ -64,7 +64,7 @@ impl Command for ClearCacheCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -182,7 +182,7 @@ impl Command for ClearCacheCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -193,10 +193,10 @@ impl Command for ClearCacheCommand {
 }
 
 impl BaseCommand for ClearCacheCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

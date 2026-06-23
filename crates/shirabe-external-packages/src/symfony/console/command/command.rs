@@ -12,7 +12,7 @@ use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
+use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
 
 /// The base-class state of the PHP `Command` class.
@@ -22,22 +22,28 @@ use std::rc::Rc;
 /// which holds the base-class fields and provides their canonical behavior via
 /// `impl Command for CommandData`. Subclasses embed a `CommandData` (directly, or
 /// transitively through `BaseCommandData`) and forward the state methods to it.
+///
+/// The mutable fields use interior mutability (`Cell`/`RefCell`) so that the `Command`
+/// trait methods take `&self`, mirroring PHP's reference semantics: calling a method on a
+/// command does not lock the object, so a command can be re-entered (e.g. the help command
+/// describing itself) without the borrow conflicts a `&mut self` design would cause.
 pub struct CommandData {
-    application: Option<Rc<RefCell<dyn Application>>>,
-    name: Option<String>,
-    process_title: Option<String>,
-    aliases: Vec<String>,
-    definition: Option<InputDefinition>,
-    hidden: bool,
-    help: String,
-    description: String,
-    full_definition: Option<InputDefinition>,
-    ignore_validation_errors: bool,
+    application: RefCell<Option<Rc<RefCell<dyn Application>>>>,
+    name: RefCell<Option<String>>,
+    process_title: RefCell<Option<String>>,
+    aliases: RefCell<Vec<String>>,
+    definition: RefCell<Option<InputDefinition>>,
+    hidden: Cell<bool>,
+    help: RefCell<String>,
+    description: RefCell<String>,
+    full_definition: RefCell<Option<InputDefinition>>,
+    ignore_validation_errors: Cell<bool>,
     // A callable(InputInterface, OutputInterface) -> i64.
-    code: Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
-    synopsis: IndexMap<String, String>,
-    usages: Vec<String>,
-    helper_set: Option<Rc<RefCell<HelperSet>>>,
+    code:
+        RefCell<Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>>,
+    synopsis: RefCell<IndexMap<String, String>>,
+    usages: RefCell<Vec<String>>,
+    helper_set: RefCell<Option<Rc<RefCell<HelperSet>>>>,
 }
 
 impl CommandData {
@@ -74,23 +80,23 @@ impl CommandData {
     /// command's `new()` calls `configure()` after embedding the data, mirroring the
     /// virtual dispatch of `$this->configure()` from the parent constructor.
     pub fn new(name: Option<String>) -> Self {
-        let mut this = CommandData {
-            application: None,
-            name: None,
-            process_title: None,
-            aliases: Vec::new(),
-            definition: Some(
+        let this = CommandData {
+            application: RefCell::new(None),
+            name: RefCell::new(None),
+            process_title: RefCell::new(None),
+            aliases: RefCell::new(Vec::new()),
+            definition: RefCell::new(Some(
                 InputDefinition::new(Vec::new()).expect("an empty InputDefinition cannot fail"),
-            ),
-            hidden: false,
-            help: String::new(),
-            description: String::new(),
-            full_definition: None,
-            ignore_validation_errors: false,
-            code: None,
-            synopsis: IndexMap::new(),
-            usages: Vec::new(),
-            helper_set: None,
+            )),
+            hidden: Cell::new(false),
+            help: RefCell::new(String::new()),
+            description: RefCell::new(String::new()),
+            full_definition: RefCell::new(None),
+            ignore_validation_errors: Cell::new(false),
+            code: RefCell::new(None),
+            synopsis: RefCell::new(IndexMap::new()),
+            usages: RefCell::new(Vec::new()),
+            helper_set: RefCell::new(None),
         };
 
         // PHP's __construct also derives the name from getDefaultName() when null and
@@ -98,7 +104,7 @@ impl CommandData {
         // (get_default_name/get_default_description are todo!()), and concrete commands
         // always set their name in configure(), so only an explicit name is honored here.
         if let Some(name) = name {
-            this.name = Some(name);
+            *this.name.borrow_mut() = Some(name);
         }
 
         this
@@ -107,7 +113,7 @@ impl CommandData {
     /// Applies a `$defaultName`-style name (PHP `Command::__construct` when `$name` is null and a
     /// `static $defaultName` exists). The string is `|`-separated; a leading empty segment marks the
     /// command hidden, the next segment is the name, and the rest are aliases.
-    pub fn apply_default_name(&mut self, default_name: &str) -> anyhow::Result<()> {
+    pub fn apply_default_name(&self, default_name: &str) -> anyhow::Result<()> {
         let mut aliases: Vec<String> = default_name.split('|').map(|s| s.to_string()).collect();
         let mut name = aliases.remove(0);
         if name.is_empty() {
@@ -144,17 +150,22 @@ impl CommandData {
 
     /// Sets an array of argument and option instances (the Symfony-typed entry point;
     /// `BaseCommand::set_definition` adapts the Composer-typed arguments to this).
-    pub fn set_definition(&mut self, definition: SetDefinitionArg) -> &mut Self {
+    pub fn set_definition(&self, definition: SetDefinitionArg) -> &Self {
         match definition {
             SetDefinitionArg::Definition(definition) => {
-                self.definition = Some(definition);
+                *self.definition.borrow_mut() = Some(definition);
             }
             SetDefinitionArg::Array(definition) => {
-                let _ = self.definition.as_mut().unwrap().set_definition(definition);
+                let _ = self
+                    .definition
+                    .borrow_mut()
+                    .as_mut()
+                    .unwrap()
+                    .set_definition(definition);
             }
         }
 
-        self.full_definition = None;
+        *self.full_definition.borrow_mut() = None;
 
         self
     }
@@ -163,13 +174,14 @@ impl CommandData {
     ///
     /// Throws InvalidArgumentException when argument mode is not valid.
     pub fn add_argument(
-        &mut self,
+        &self,
         name: &str,
         mode: Option<i64>,
         description: &str,
         default: PhpMixed,
-    ) -> anyhow::Result<&mut Self> {
+    ) -> anyhow::Result<&Self> {
         self.definition
+            .borrow_mut()
             .as_mut()
             .unwrap()
             .add_argument(InputArgument::new(
@@ -178,7 +190,7 @@ impl CommandData {
                 description.to_string(),
                 default.clone(),
             )?)?;
-        if let Some(full_definition) = self.full_definition.as_mut() {
+        if let Some(full_definition) = self.full_definition.borrow_mut().as_mut() {
             full_definition.add_argument(InputArgument::new(
                 name.to_string(),
                 mode,
@@ -194,14 +206,15 @@ impl CommandData {
     ///
     /// Throws InvalidArgumentException if option mode is invalid or incompatible.
     pub fn add_option(
-        &mut self,
+        &self,
         name: &str,
         shortcut: PhpMixed,
         mode: Option<i64>,
         description: &str,
         default: PhpMixed,
-    ) -> anyhow::Result<&mut Self> {
+    ) -> anyhow::Result<&Self> {
         self.definition
+            .borrow_mut()
             .as_mut()
             .unwrap()
             .add_option(InputOption::new(
@@ -211,7 +224,7 @@ impl CommandData {
                 description.to_string(),
                 default.clone(),
             )?)?;
-        if let Some(full_definition) = self.full_definition.as_mut() {
+        if let Some(full_definition) = self.full_definition.borrow_mut().as_mut() {
             full_definition.add_option(InputOption::new(
                 name,
                 shortcut,
@@ -239,21 +252,22 @@ pub enum SetDefinitionArg {
 /// Each `Command`/`BaseCommand` implementer spells out the methods it delegates, one
 /// `delegate_to_inner!` per method, alongside the few methods it overrides by hand.
 /// The first argument names the field to forward to; the second is the method's
-/// signature. Fluent setters returning `&mut Self` (optionally wrapped in
-/// `anyhow::Result`) are handled specially so the returned reference is re-rooted at
-/// the outer `self` rather than the inner field.
+/// signature. Every method takes `&self` (the command state is interior-mutable);
+/// fluent setters returning `&Self` (optionally wrapped in `anyhow::Result`) are handled
+/// specially so the returned reference is re-rooted at the outer `self` rather than the
+/// inner field.
 #[macro_export]
 macro_rules! delegate_to_inner {
-    // fluent fallible: -> anyhow::Result<&mut Self>
-    ($field:ident, fn $name:ident(&mut self $(, $arg:ident : $ty:ty )* $(,)?) -> anyhow::Result<&mut Self>) => {
-        fn $name(&mut self $(, $arg: $ty)*) -> anyhow::Result<&mut Self> {
+    // fluent fallible: -> anyhow::Result<&Self>
+    ($field:ident, fn $name:ident(&self $(, $arg:ident : $ty:ty )* $(,)?) -> anyhow::Result<&Self>) => {
+        fn $name(&self $(, $arg: $ty)*) -> anyhow::Result<&Self> {
             self.$field.$name($($arg),*)?;
             Ok(self)
         }
     };
-    // fluent infallible: -> &mut Self
-    ($field:ident, fn $name:ident(&mut self $(, $arg:ident : $ty:ty )* $(,)?) -> &mut Self) => {
-        fn $name(&mut self $(, $arg: $ty)*) -> &mut Self {
+    // fluent infallible: -> &Self
+    ($field:ident, fn $name:ident(&self $(, $arg:ident : $ty:ty )* $(,)?) -> &Self) => {
+        fn $name(&self $(, $arg: $ty)*) -> &Self {
             self.$field.$name($($arg),*);
             self
         }
@@ -270,18 +284,6 @@ macro_rules! delegate_to_inner {
             self.$field.$name($($arg),*)
         }
     };
-    // &mut self with a return type
-    ($field:ident, fn $name:ident(&mut self $(, $arg:ident : $ty:ty )* $(,)?) -> $ret:ty) => {
-        fn $name(&mut self $(, $arg: $ty)*) -> $ret {
-            self.$field.$name($($arg),*)
-        }
-    };
-    // &mut self without a return type
-    ($field:ident, fn $name:ident(&mut self $(, $arg:ident : $ty:ty )* $(,)?)) => {
-        fn $name(&mut self $(, $arg: $ty)*) {
-            self.$field.$name($($arg),*)
-        }
-    };
 }
 
 /// Forwards every `Command` state method (the setters/getters whose canonical impl lives on
@@ -293,33 +295,33 @@ macro_rules! delegate_to_inner {
 macro_rules! delegate_command_trait_impls_to_inner {
     ($field:ident) => {
         $crate::delegate_to_inner!($field, fn is_enabled(&self) -> bool);
-        $crate::delegate_to_inner!($field, fn set_application(&mut self, application: Option<std::rc::Rc<std::cell::RefCell<dyn $crate::symfony::console::application::Application>>>));
+        $crate::delegate_to_inner!($field, fn set_application(&self, application: Option<std::rc::Rc<std::cell::RefCell<dyn $crate::symfony::console::application::Application>>>));
         $crate::delegate_to_inner!($field, fn get_application(&self) -> Option<std::rc::Rc<std::cell::RefCell<dyn $crate::symfony::console::application::Application>>>);
-        $crate::delegate_to_inner!($field, fn set_helper_set(&mut self, helper_set: std::rc::Rc<std::cell::RefCell<$crate::symfony::console::helper::helper_set::HelperSet>>));
+        $crate::delegate_to_inner!($field, fn set_helper_set(&self, helper_set: std::rc::Rc<std::cell::RefCell<$crate::symfony::console::helper::helper_set::HelperSet>>));
         $crate::delegate_to_inner!($field, fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<$crate::symfony::console::helper::helper_set::HelperSet>>>);
-        $crate::delegate_to_inner!($field, fn merge_application_definition(&mut self, merge_args: bool));
-        $crate::delegate_to_inner!($field, fn get_definition(&self) -> &$crate::symfony::console::input::input_definition::InputDefinition);
-        $crate::delegate_to_inner!($field, fn get_native_definition(&self) -> &$crate::symfony::console::input::input_definition::InputDefinition);
-        $crate::delegate_to_inner!($field, fn set_name(&mut self, name: &str) -> anyhow::Result<()>);
+        $crate::delegate_to_inner!($field, fn merge_application_definition(&self, merge_args: bool));
+        $crate::delegate_to_inner!($field, fn get_definition(&self) -> std::cell::Ref<'_, $crate::symfony::console::input::input_definition::InputDefinition>);
+        $crate::delegate_to_inner!($field, fn get_native_definition(&self) -> std::cell::Ref<'_, $crate::symfony::console::input::input_definition::InputDefinition>);
+        $crate::delegate_to_inner!($field, fn set_name(&self, name: &str) -> anyhow::Result<()>);
         $crate::delegate_to_inner!($field, fn get_name(&self) -> Option<String>);
-        $crate::delegate_to_inner!($field, fn set_process_title(&mut self, title: &str));
+        $crate::delegate_to_inner!($field, fn set_process_title(&self, title: &str));
         $crate::delegate_to_inner!($field, fn get_process_title(&self) -> Option<String>);
-        $crate::delegate_to_inner!($field, fn set_hidden(&mut self, hidden: bool));
+        $crate::delegate_to_inner!($field, fn set_hidden(&self, hidden: bool));
         $crate::delegate_to_inner!($field, fn is_hidden(&self) -> bool);
-        $crate::delegate_to_inner!($field, fn set_description(&mut self, description: &str));
+        $crate::delegate_to_inner!($field, fn set_description(&self, description: &str));
         $crate::delegate_to_inner!($field, fn get_description(&self) -> String);
-        $crate::delegate_to_inner!($field, fn set_help(&mut self, help: &str));
+        $crate::delegate_to_inner!($field, fn set_help(&self, help: &str));
         $crate::delegate_to_inner!($field, fn get_help(&self) -> String);
         $crate::delegate_to_inner!($field, fn get_processed_help(&self) -> String);
-        $crate::delegate_to_inner!($field, fn set_aliases(&mut self, aliases: Vec<String>) -> anyhow::Result<()>);
+        $crate::delegate_to_inner!($field, fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()>);
         $crate::delegate_to_inner!($field, fn get_aliases(&self) -> Vec<String>);
-        $crate::delegate_to_inner!($field, fn get_synopsis(&mut self, short: bool) -> String);
-        $crate::delegate_to_inner!($field, fn add_usage(&mut self, usage: &str));
+        $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> String);
+        $crate::delegate_to_inner!($field, fn add_usage(&self, usage: &str));
         $crate::delegate_to_inner!($field, fn get_usages(&self) -> Vec<String>);
         $crate::delegate_to_inner!($field, fn get_helper(&self, name: &str) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, $crate::symfony::console::exception::logic_exception::LogicException>>);
-        $crate::delegate_to_inner!($field, fn set_code(&mut self, code: Box<dyn Fn(&mut dyn $crate::symfony::console::input::InputInterface, &mut dyn $crate::symfony::console::output::OutputInterface) -> shirabe_php_shim::PhpMixed>));
-        $crate::delegate_to_inner!($field, fn get_code(&self) -> Option<&Box<dyn Fn(&mut dyn $crate::symfony::console::input::InputInterface, &mut dyn $crate::symfony::console::output::OutputInterface) -> shirabe_php_shim::PhpMixed>>);
-        $crate::delegate_to_inner!($field, fn ignore_validation_errors(&mut self));
+        $crate::delegate_to_inner!($field, fn set_code(&self, code: Box<dyn Fn(&mut dyn $crate::symfony::console::input::InputInterface, &mut dyn $crate::symfony::console::output::OutputInterface) -> shirabe_php_shim::PhpMixed>));
+        $crate::delegate_to_inner!($field, fn get_code(&self) -> std::cell::Ref<'_, Option<Box<dyn Fn(&mut dyn $crate::symfony::console::input::InputInterface, &mut dyn $crate::symfony::console::output::OutputInterface) -> shirabe_php_shim::PhpMixed>>>);
+        $crate::delegate_to_inner!($field, fn ignore_validation_errors(&self));
         $crate::delegate_to_inner!($field, fn get_ignore_validation_errors(&self) -> bool);
     };
 }
@@ -329,8 +331,8 @@ macro_rules! delegate_command_trait_impls_to_inner {
 ///
 /// The canonical behavior lives in `impl Command for CommandData`; subclasses forward
 /// the state methods there and override the behavior hooks (`configure`/`execute`/...).
-/// Object-safe so `dyn Command` works; the fluent `where Self: Sized` setters are only
-/// called from `configure()` on a concrete command, never through `dyn Command`.
+/// Object-safe so `dyn Command` works. All methods take `&self`; the command's mutable
+/// state is interior-mutable (see [`CommandData`]).
 pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     fn clone_box(&self) -> Box<dyn Command> {
         todo!()
@@ -339,7 +341,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     // --- behavior hooks (PHP-overridable; defaults match the PHP `Command` class) ---
 
     /// Configures the current command.
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -348,7 +350,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// Concrete commands override this; reaching the default means a command class
     /// forgot to implement it (PHP throws LogicException — a programming error here).
     fn execute(
-        &mut self,
+        &self,
         _input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -357,7 +359,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     /// Interacts with the user before the InputDefinition is validated.
     fn interact(
-        &mut self,
+        &self,
         _input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) {
@@ -365,7 +367,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     /// Initializes the command after the input has been bound and before it is validated.
     fn initialize(
-        &mut self,
+        &self,
         _input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -390,7 +392,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// not be overridden (except by proxy commands like `GlobalCommand`) nor delegated,
     /// or that late binding breaks.
     fn run(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -402,7 +404,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// matching PHP's `parent::run($input, $output)`. It must not be overridden, or the late
     /// binding of `initialize`/`interact`/`execute` to the concrete command breaks.
     fn base_run(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -410,7 +412,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
         self.merge_application_definition(true);
 
         // bind the input against the command specific arguments/options
-        match input.borrow_mut().bind(self.get_definition()) {
+        match input.borrow_mut().bind(&*self.get_definition()) {
             Ok(()) => {}
             Err(e) => {
                 if !self.get_ignore_validation_errors() {
@@ -463,7 +465,9 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
         input.borrow_mut().validate()?;
 
         let status_code: PhpMixed;
-        if let Some(code) = self.get_code() {
+        if self.get_code().is_some() {
+            let code = self.get_code();
+            let code = code.as_ref().unwrap();
             status_code = code(&mut *input.borrow_mut(), &mut *output.borrow_mut());
         } else {
             let executed = self.execute(input.clone(), output.clone())?;
@@ -480,49 +484,49 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     fn is_enabled(&self) -> bool;
 
-    fn set_application(&mut self, application: Option<Rc<RefCell<dyn Application>>>);
+    fn set_application(&self, application: Option<Rc<RefCell<dyn Application>>>);
 
     fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>>;
 
-    fn set_helper_set(&mut self, helper_set: Rc<RefCell<HelperSet>>);
+    fn set_helper_set(&self, helper_set: Rc<RefCell<HelperSet>>);
 
     fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>>;
 
-    fn merge_application_definition(&mut self, merge_args: bool);
+    fn merge_application_definition(&self, merge_args: bool);
 
-    fn get_definition(&self) -> &InputDefinition;
+    fn get_definition(&self) -> Ref<'_, InputDefinition>;
 
-    fn get_native_definition(&self) -> &InputDefinition;
+    fn get_native_definition(&self) -> Ref<'_, InputDefinition>;
 
-    fn set_name(&mut self, name: &str) -> anyhow::Result<()>;
+    fn set_name(&self, name: &str) -> anyhow::Result<()>;
 
     fn get_name(&self) -> Option<String>;
 
-    fn set_process_title(&mut self, title: &str);
+    fn set_process_title(&self, title: &str);
 
     fn get_process_title(&self) -> Option<String>;
 
-    fn set_hidden(&mut self, hidden: bool);
+    fn set_hidden(&self, hidden: bool);
 
     fn is_hidden(&self) -> bool;
 
-    fn set_description(&mut self, description: &str);
+    fn set_description(&self, description: &str);
 
     fn get_description(&self) -> String;
 
-    fn set_help(&mut self, help: &str);
+    fn set_help(&self, help: &str);
 
     fn get_help(&self) -> String;
 
     fn get_processed_help(&self) -> String;
 
-    fn set_aliases(&mut self, aliases: Vec<String>) -> anyhow::Result<()>;
+    fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()>;
 
     fn get_aliases(&self) -> Vec<String>;
 
-    fn get_synopsis(&mut self, short: bool) -> String;
+    fn get_synopsis(&self, short: bool) -> String;
 
-    fn add_usage(&mut self, usage: &str);
+    fn add_usage(&self, usage: &str);
 
     fn get_usages(&self) -> Vec<String>;
 
@@ -534,15 +538,15 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     >;
 
     fn set_code(
-        &mut self,
+        &self,
         code: Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>,
     );
 
     fn get_code(
         &self,
-    ) -> Option<&Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>;
+    ) -> Ref<'_, Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>>;
 
-    fn ignore_validation_errors(&mut self);
+    fn ignore_validation_errors(&self);
 
     fn get_ignore_validation_errors(&self) -> bool;
 }
@@ -552,32 +556,32 @@ impl Command for CommandData {
         true
     }
 
-    fn set_application(&mut self, application: Option<Rc<RefCell<dyn Application>>>) {
-        self.application = application.clone();
+    fn set_application(&self, application: Option<Rc<RefCell<dyn Application>>>) {
+        *self.application.borrow_mut() = application.clone();
         if let Some(application) = application {
             self.set_helper_set(application.borrow_mut().get_helper_set());
         } else {
-            self.helper_set = None;
+            *self.helper_set.borrow_mut() = None;
         }
 
-        self.full_definition = None;
+        *self.full_definition.borrow_mut() = None;
     }
 
     fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>> {
-        self.application.clone()
+        self.application.borrow().clone()
     }
 
-    fn set_helper_set(&mut self, helper_set: Rc<RefCell<HelperSet>>) {
-        self.helper_set = Some(helper_set);
+    fn set_helper_set(&self, helper_set: Rc<RefCell<HelperSet>>) {
+        *self.helper_set.borrow_mut() = Some(helper_set);
     }
 
     fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
-        self.helper_set.clone()
+        self.helper_set.borrow().clone()
     }
 
     /// Merges the application definition with the command definition.
-    fn merge_application_definition(&mut self, merge_args: bool) {
-        let application = match &self.application {
+    fn merge_application_definition(&self, merge_args: bool) {
+        let application = match &*self.application.borrow() {
             None => return,
             Some(application) => application.clone(),
         };
@@ -591,6 +595,7 @@ impl Command for CommandData {
 
         let own_options: Vec<InputOption> = self
             .definition
+            .borrow()
             .as_ref()
             .unwrap()
             .get_options()
@@ -624,6 +629,7 @@ impl Command for CommandData {
 
             let own_arguments: Vec<InputArgument> = self
                 .definition
+                .borrow()
                 .as_ref()
                 .unwrap()
                 .get_arguments()
@@ -636,6 +642,7 @@ impl Command for CommandData {
         } else {
             let own_arguments: Vec<InputArgument> = self
                 .definition
+                .borrow()
                 .as_ref()
                 .unwrap()
                 .get_arguments()
@@ -647,18 +654,22 @@ impl Command for CommandData {
                 .expect("the command's own arguments are already valid");
         }
 
-        self.full_definition = Some(full_definition);
+        *self.full_definition.borrow_mut() = Some(full_definition);
     }
 
-    fn get_definition(&self) -> &InputDefinition {
-        match &self.full_definition {
-            Some(full_definition) => full_definition,
-            None => self.get_native_definition(),
+    fn get_definition(&self) -> Ref<'_, InputDefinition> {
+        if self.full_definition.borrow().is_some() {
+            Ref::map(self.full_definition.borrow(), |full_definition| {
+                full_definition.as_ref().unwrap()
+            })
+        } else {
+            self.get_native_definition()
         }
     }
 
-    fn get_native_definition(&self) -> &InputDefinition {
-        match &self.definition {
+    fn get_native_definition(&self) -> Ref<'_, InputDefinition> {
+        Ref::map(self.definition.borrow(), |definition| match definition {
+            Some(definition) => definition,
             None => {
                 // PHP throws LogicException; `definition` is set in `new()`, so None is a
                 // programming error (forgot to call the parent constructor).
@@ -666,59 +677,58 @@ impl Command for CommandData {
                     "Command class is not correctly initialized. You probably forgot to call the parent constructor."
                 );
             }
-            Some(definition) => definition,
-        }
+        })
     }
 
-    fn set_name(&mut self, name: &str) -> anyhow::Result<()> {
+    fn set_name(&self, name: &str) -> anyhow::Result<()> {
         if let Err(e) = self.validate_name(name)? {
             return Err(e.into());
         }
 
-        self.name = Some(name.to_string());
+        *self.name.borrow_mut() = Some(name.to_string());
 
         Ok(())
     }
 
     fn get_name(&self) -> Option<String> {
-        self.name.clone()
+        self.name.borrow().clone()
     }
 
-    fn set_process_title(&mut self, title: &str) {
-        self.process_title = Some(title.to_string());
+    fn set_process_title(&self, title: &str) {
+        *self.process_title.borrow_mut() = Some(title.to_string());
     }
 
     fn get_process_title(&self) -> Option<String> {
-        self.process_title.clone()
+        self.process_title.borrow().clone()
     }
 
-    fn set_hidden(&mut self, hidden: bool) {
-        self.hidden = hidden;
+    fn set_hidden(&self, hidden: bool) {
+        self.hidden.set(hidden);
     }
 
     fn is_hidden(&self) -> bool {
-        self.hidden
+        self.hidden.get()
     }
 
-    fn set_description(&mut self, description: &str) {
-        self.description = description.to_string();
+    fn set_description(&self, description: &str) {
+        *self.description.borrow_mut() = description.to_string();
     }
 
     fn get_description(&self) -> String {
-        self.description.clone()
+        self.description.borrow().clone()
     }
 
-    fn set_help(&mut self, help: &str) {
-        self.help = help.to_string();
+    fn set_help(&self, help: &str) {
+        *self.help.borrow_mut() = help.to_string();
     }
 
     fn get_help(&self) -> String {
-        self.help.clone()
+        self.help.borrow().clone()
     }
 
     fn get_processed_help(&self) -> String {
-        let name = self.name.clone();
-        let is_single_command = match &self.application {
+        let name = self.name.borrow().clone();
+        let is_single_command = match &*self.application.borrow() {
             Some(application) => application.borrow().is_single_command(),
             None => false,
         };
@@ -747,7 +757,7 @@ impl Command for CommandData {
         shirabe_php_shim::str_replace_array(&placeholders, &replacements, &subject)
     }
 
-    fn set_aliases(&mut self, aliases: Vec<String>) -> anyhow::Result<()> {
+    fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()> {
         let mut list = Vec::new();
 
         for alias in &aliases {
@@ -759,44 +769,48 @@ impl Command for CommandData {
 
         // PHP: `\is_array($aliases) ? $aliases : $list`. Here `aliases` is always an
         // array (Vec), so the result is `aliases`; `list` mirrors the validation loop.
-        self.aliases = aliases;
+        *self.aliases.borrow_mut() = aliases;
 
         Ok(())
     }
 
     fn get_aliases(&self) -> Vec<String> {
-        self.aliases.clone()
+        self.aliases.borrow().clone()
     }
 
-    fn get_synopsis(&mut self, short: bool) -> String {
+    fn get_synopsis(&self, short: bool) -> String {
         let key = if short { "short" } else { "long" }.to_string();
 
-        if !self.synopsis.contains_key(&key) {
+        if !self.synopsis.borrow().contains_key(&key) {
             let value = format!(
                 "{} {}",
-                self.name.clone().unwrap_or_default(),
-                self.definition.as_ref().unwrap().get_synopsis(short)
+                self.name.borrow().clone().unwrap_or_default(),
+                self.definition
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .get_synopsis(short)
             )
             .trim()
             .to_string();
-            self.synopsis.insert(key.clone(), value);
+            self.synopsis.borrow_mut().insert(key.clone(), value);
         }
 
-        self.synopsis[&key].clone()
+        self.synopsis.borrow()[&key].clone()
     }
 
-    fn add_usage(&mut self, usage: &str) {
+    fn add_usage(&self, usage: &str) {
         let mut usage = usage.to_string();
-        let name = self.name.clone().unwrap_or_default();
+        let name = self.name.borrow().clone().unwrap_or_default();
         if !usage.starts_with(&name) {
             usage = format!("{} {}", name, usage);
         }
 
-        self.usages.push(usage);
+        self.usages.borrow_mut().push(usage);
     }
 
     fn get_usages(&self) -> Vec<String> {
-        self.usages.clone()
+        self.usages.borrow().clone()
     }
 
     fn get_helper(
@@ -805,7 +819,8 @@ impl Command for CommandData {
     ) -> anyhow::Result<
         Result<PhpMixed, crate::symfony::console::exception::logic_exception::LogicException>,
     > {
-        let helper_set = match &self.helper_set {
+        let helper_set_ref = self.helper_set.borrow();
+        let helper_set = match &*helper_set_ref {
             None => {
                 return Ok(Err(
                     crate::symfony::console::exception::logic_exception::LogicException(
@@ -832,37 +847,38 @@ impl Command for CommandData {
     }
 
     fn set_code(
-        &mut self,
+        &self,
         code: Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>,
     ) {
         // TODO: PHP rebinds an unbound Closure's $this to the command instance via
         // ReflectionFunction/Closure::bind. Rust closures have no `$this` rebinding;
         // the closure is stored as-is.
-        self.code = Some(code);
+        *self.code.borrow_mut() = Some(code);
     }
 
     fn get_code(
         &self,
-    ) -> Option<&Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>> {
-        self.code.as_ref()
+    ) -> Ref<'_, Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>>
+    {
+        self.code.borrow()
     }
 
-    fn ignore_validation_errors(&mut self) {
-        self.ignore_validation_errors = true;
+    fn ignore_validation_errors(&self) {
+        self.ignore_validation_errors.set(true);
     }
 
     fn get_ignore_validation_errors(&self) -> bool {
-        self.ignore_validation_errors
+        self.ignore_validation_errors.get()
     }
 }
 
 impl std::fmt::Debug for CommandData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CommandData")
-            .field("name", &self.name)
-            .field("aliases", &self.aliases)
-            .field("hidden", &self.hidden)
-            .field("description", &self.description)
+            .field("name", &self.name.borrow())
+            .field("aliases", &self.aliases.borrow())
+            .field("hidden", &self.hidden.get())
+            .field("description", &self.description.borrow())
             .finish_non_exhaustive()
     }
 }

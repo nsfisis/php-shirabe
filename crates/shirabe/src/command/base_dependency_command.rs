@@ -37,11 +37,11 @@ pub trait BaseDependencyCommand: BaseCommand {
     const OPTION_RECURSIVE: &'static str = OPTION_RECURSIVE;
     const OPTION_TREE: &'static str = OPTION_TREE;
 
-    fn colors(&self) -> &[String];
-    fn colors_mut(&mut self) -> &mut Vec<String>;
+    fn colors(&self) -> std::cell::Ref<'_, Vec<String>>;
+    fn set_colors(&self, colors: Vec<String>);
 
     fn do_execute(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         inverted: bool,
@@ -383,15 +383,15 @@ pub trait BaseDependencyCommand: BaseCommand {
         self.render_table(table_as_mixed, output);
     }
 
-    fn init_styles(&mut self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
-        *self.colors_mut() = vec![
+    fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
+        self.set_colors(vec![
             "green".to_string(),
             "yellow".to_string(),
             "cyan".to_string(),
             "magenta".to_string(),
             "blue".to_string(),
-        ];
-        for color in self.colors() {
+        ]);
+        for color in self.colors().iter() {
             let style = OutputFormatterStyle::new(Some(color), None, vec![]);
             output
                 .borrow()
@@ -401,14 +401,15 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
     }
 
-    fn print_tree(&mut self, results: &[DependentsEntry], prefix: &str, level: i64) {
+    fn print_tree(&self, results: &[DependentsEntry], prefix: &str, level: i64) {
         let count = results.len() as i64;
         let mut idx: i64 = 0;
-        let colors_len = self.colors().len() as i64;
+        let colors = self.colors();
+        let colors_len = colors.len() as i64;
         for result in results {
             let DependentsEntry(package, link, children) = result;
-            let color = &self.colors()[(level % colors_len) as usize];
-            let prev_color = &self.colors()[((level - 1) % colors_len) as usize];
+            let color = &colors[(level % colors_len) as usize];
+            let prev_color = &colors[((level - 1) % colors_len) as usize];
             idx += 1;
             let is_last = idx == count;
             let version_text =
@@ -464,7 +465,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
     }
 
-    fn write_tree_line(&mut self, line: &str) {
+    fn write_tree_line(&self, line: &str) {
         let io = self.get_io();
         let line = if !io.is_decorated() {
             line.replace('└', "`-")

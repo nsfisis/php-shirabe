@@ -64,9 +64,9 @@ const _INPUT_OPTION_REF: i64 = InputOption::VALUE_NONE;
 pub struct ShowCommand {
     base_command_data: BaseCommandData,
 
-    pub(crate) version_parser: VersionParser,
-    pub(crate) colors: Vec<String>,
-    repository_set: Option<std::rc::Rc<std::cell::RefCell<RepositorySet>>>,
+    pub(crate) version_parser: std::cell::RefCell<VersionParser>,
+    pub(crate) colors: std::cell::RefCell<Vec<String>>,
+    repository_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
 
 impl Default for ShowCommand {
@@ -77,11 +77,11 @@ impl Default for ShowCommand {
 
 impl ShowCommand {
     pub fn new() -> Self {
-        let mut command = ShowCommand {
+        let command = ShowCommand {
             base_command_data: BaseCommandData::new(None),
-            version_parser: VersionParser::new(),
-            colors: Vec::new(),
-            repository_set: None,
+            version_parser: std::cell::RefCell::new(VersionParser::new()),
+            colors: std::cell::RefCell::new(Vec::new()),
+            repository_set: std::cell::RefCell::new(None),
         };
         command
             .configure()
@@ -91,7 +91,7 @@ impl ShowCommand {
 }
 
 impl Command for ShowCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("show")?;
         self.set_aliases(vec!["info".to_string()])?;
         self.set_description("Shows information about packages");
@@ -107,11 +107,11 @@ impl Command for ShowCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        self.version_parser = VersionParser::new();
+        *self.version_parser.borrow_mut() = VersionParser::new();
         if input.borrow().get_option("tree")?.as_bool() == Some(true) {
             self.init_styles(output.clone());
         }
@@ -1341,7 +1341,7 @@ impl Command for ShowCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -1352,10 +1352,10 @@ impl Command for ShowCommand {
 }
 
 impl BaseCommand for ShowCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
@@ -1366,7 +1366,7 @@ impl ShowCommand {
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn print_packages(
-        &mut self,
+        &self,
         packages: &[IndexMap<String, PhpMixed>],
         indent: &str,
         write_version: bool,
@@ -1519,7 +1519,7 @@ impl ShowCommand {
         }
     }
 
-    pub(crate) fn get_root_requires(&mut self) -> Vec<String> {
+    pub(crate) fn get_root_requires(&self) -> Vec<String> {
         let composer_rc = self.try_composer(None, None);
         let composer_rc = match composer_rc {
             None => return vec![],
@@ -1556,7 +1556,7 @@ impl ShowCommand {
 
     /// finds a package by name and version if provided
     pub(crate) fn get_package(
-        &mut self,
+        &self,
         installed_repo: &dyn RepositoryInterface,
         repos: &RepositoryInterfaceHandle,
         name: &str,
@@ -1567,7 +1567,7 @@ impl ShowCommand {
     )> {
         let name = strtolower(name);
         let constraint: Option<AnyConstraint> = match &version {
-            PhpMixed::String(s) => Some(self.version_parser.parse_constraints(s)?),
+            PhpMixed::String(s) => Some(self.version_parser.borrow().parse_constraints(s)?),
             PhpMixed::Null => None,
             _ => None, // already a ConstraintInterface
         };
@@ -1636,7 +1636,7 @@ impl ShowCommand {
 
     /// Prints package info.
     pub(crate) fn print_package_info(
-        &mut self,
+        &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &mut dyn RepositoryInterface,
@@ -1666,7 +1666,7 @@ impl ShowCommand {
 
     /// Prints package metadata.
     pub(crate) fn print_meta(
-        &mut self,
+        &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &mut dyn RepositoryInterface,
@@ -1829,7 +1829,7 @@ impl ShowCommand {
 
     /// Prints all available versions of this package and highlights the installed one if any.
     pub(crate) fn print_versions(
-        &mut self,
+        &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &mut dyn RepositoryInterface,
@@ -1864,7 +1864,7 @@ impl ShowCommand {
 
     /// print link objects
     pub(crate) fn print_links(
-        &mut self,
+        &self,
         package: CompletePackageInterfaceHandle,
         link_type: &str,
         title: Option<&str>,
@@ -1886,7 +1886,7 @@ impl ShowCommand {
     }
 
     /// Prints the licenses of a package with metadata
-    pub(crate) fn print_licenses(&mut self, package: CompletePackageInterfaceHandle) {
+    pub(crate) fn print_licenses(&self, package: CompletePackageInterfaceHandle) {
         let spdx_licenses = SpdxLicenses::new();
 
         let licenses = package.get_license();
@@ -1926,7 +1926,7 @@ impl ShowCommand {
 
     /// Prints package info in JSON format.
     pub(crate) fn print_package_info_as_json(
-        &mut self,
+        &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &dyn RepositoryInterface,
@@ -2261,11 +2261,8 @@ impl ShowCommand {
     }
 
     /// Init styles for tree
-    pub(crate) fn init_styles(
-        &mut self,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
-        self.colors = vec![
+    pub(crate) fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
+        *self.colors.borrow_mut() = vec![
             "green".to_string(),
             "yellow".to_string(),
             "cyan".to_string(),
@@ -2273,7 +2270,7 @@ impl ShowCommand {
             "blue".to_string(),
         ];
 
-        for color in self.colors.iter() {
+        for color in self.colors.borrow().iter() {
             let style = OutputFormatterStyle::new(Some(color.as_str()), None, vec![]);
             output
                 .borrow()
@@ -2284,7 +2281,7 @@ impl ShowCommand {
     }
 
     /// Display the tree
-    pub(crate) fn display_package_tree(&mut self, array_tree: Vec<IndexMap<String, PhpMixed>>) {
+    pub(crate) fn display_package_tree(&self, array_tree: Vec<IndexMap<String, PhpMixed>>) {
         for package in array_tree.iter() {
             let name = package
                 .get("name")
@@ -2326,7 +2323,7 @@ impl ShowCommand {
                         tree_bar = "└".to_string();
                     }
                     let level: usize = 1;
-                    let color = self.colors.get(level).cloned().unwrap_or_default();
+                    let color = self.colors.borrow().get(level).cloned().unwrap_or_default();
                     let info = format!(
                         "{}──<{}>{}</{}> {}",
                         tree_bar,
@@ -2364,7 +2361,7 @@ impl ShowCommand {
 
     /// Generate the package tree
     pub(crate) fn generate_package_tree(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         installed_repo: &dyn RepositoryInterface,
         remote_repos: &RepositoryInterfaceHandle,
@@ -2440,7 +2437,7 @@ impl ShowCommand {
 
     /// Display a package tree
     pub(crate) fn display_tree(
-        &mut self,
+        &self,
         package: &PhpMixed,
         packages_in_tree: &[PhpMixed],
         previous_tree_bar: &str,
@@ -2464,8 +2461,13 @@ impl ShowCommand {
             if i == total {
                 tree_bar = format!("{}  └", previous_tree_bar);
             }
-            let color_ident = level % self.colors.len();
-            let color = self.colors.get(color_ident).cloned().unwrap_or_default();
+            let color_ident = level % self.colors.borrow().len();
+            let color = self
+                .colors
+                .borrow()
+                .get(color_ident)
+                .cloned()
+                .unwrap_or_default();
 
             let require = match require_mixed.as_array() {
                 Some(a) => a,
@@ -2508,7 +2510,7 @@ impl ShowCommand {
 
     /// Display a package tree
     pub(crate) fn add_tree(
-        &mut self,
+        &self,
         name: &str,
         link: &Link,
         installed_repo: &dyn RepositoryInterface,
@@ -2606,7 +2608,7 @@ impl ShowCommand {
         Ok("update-possible".to_string())
     }
 
-    fn write_tree_line(&mut self, line: &str) {
+    fn write_tree_line(&self, line: &str) {
         let io = self.get_io();
         let mut line = line.to_string();
         if !io.is_decorated() {
@@ -2623,7 +2625,7 @@ impl ShowCommand {
     /// Given a package, this finds the latest package matching it
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn find_latest_package(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         composer: &PartialComposerHandle,
         platform_repo: &PlatformRepositoryHandle,
@@ -2753,11 +2755,11 @@ impl ShowCommand {
     }
 
     fn get_repository_set(
-        &mut self,
+        &self,
         composer: &PartialComposerHandle,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
         let composer = crate::command::composer_full(composer);
-        if self.repository_set.is_none() {
+        if self.repository_set.borrow().is_none() {
             let mut rs = RepositorySet::new(
                 &composer.get_package().get_minimum_stability(),
                 composer.get_package().get_stability_flags().clone(),
@@ -2773,10 +2775,10 @@ impl ShowCommand {
                     .get_repositories()
                     .to_vec(),
             )))?;
-            self.repository_set = Some(std::rc::Rc::new(std::cell::RefCell::new(rs)));
+            *self.repository_set.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(rs)));
         }
 
-        Ok(self.repository_set.as_ref().unwrap().clone())
+        Ok(self.repository_set.borrow().as_ref().unwrap().clone())
     }
 
     fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> String {

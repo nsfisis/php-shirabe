@@ -42,7 +42,7 @@ impl XmlDescriptor {
         dom
     }
 
-    pub fn get_command_document(&self, command: &mut dyn Command, short: bool) -> DOMDocument {
+    pub fn get_command_document(&self, command: &dyn Command, short: bool) -> DOMDocument {
         let dom = DOMDocument::new("1.0", "UTF-8");
         let command_xml = dom.append_child(dom.create_element("command"));
 
@@ -125,8 +125,8 @@ impl XmlDescriptor {
             .values()
             .map(|c| c.borrow().clone_box())
             .collect();
-        for mut command in command_list {
-            let command_xml = self.get_command_document(command.as_mut(), short);
+        for command in command_list {
+            let command_xml = self.get_command_document(command.as_ref(), short);
             self.append_document(&commands_xml, &command_xml.as_node());
         }
 
@@ -186,7 +186,7 @@ impl XmlDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let short = matches!(options.get("short"), Some(PhpMixed::Bool(true)));
@@ -399,7 +399,7 @@ impl Descriptor for XmlDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         XmlDescriptor::describe_command(self, command, options)

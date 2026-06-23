@@ -48,7 +48,7 @@ impl BumpCommand {
     const ERROR_LOCK_OUTDATED: i64 = 2;
 
     pub fn new() -> Self {
-        let mut command = BumpCommand {
+        let command = BumpCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -58,7 +58,7 @@ impl BumpCommand {
     }
 
     pub fn do_bump(
-        &mut self,
+        &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_only: bool,
         no_dev_only: bool,
@@ -340,7 +340,7 @@ impl BumpCommand {
 }
 
 impl Command for BumpCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_root_requirement() for `packages` argument
         self.set_name("bump")?;
         self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions");
@@ -396,7 +396,7 @@ impl Command for BumpCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -438,7 +438,7 @@ impl Command for BumpCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -449,10 +449,10 @@ impl Command for BumpCommand {
 }
 
 impl BaseCommand for BumpCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

@@ -56,7 +56,7 @@ impl JsonDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let short = matches!(options.get("short"), Some(PhpMixed::Bool(true)));
@@ -83,9 +83,9 @@ impl JsonDescriptor {
             .values()
             .map(|c| c.borrow().clone_box())
             .collect();
-        for mut command in command_list {
+        for command in command_list {
             commands.push(PhpMixed::Array(
-                self.get_command_data(command.as_mut(), short)?
+                self.get_command_data(command.as_ref(), short)?
                     .into_iter()
                     .collect(),
             ));
@@ -292,7 +292,7 @@ impl JsonDescriptor {
 
     fn get_command_data(
         &self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         short: bool,
     ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -333,7 +333,7 @@ impl JsonDescriptor {
             data.insert(
                 "definition".to_string(),
                 PhpMixed::Array(
-                    self.get_input_definition_data(command.get_definition())?
+                    self.get_input_definition_data(&command.get_definition())?
                         .into_iter()
                         .collect(),
                 ),
@@ -392,7 +392,7 @@ impl Descriptor for JsonDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         JsonDescriptor::describe_command(self, command, options)

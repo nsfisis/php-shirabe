@@ -22,7 +22,7 @@ use crate::symfony::console::output::output_interface::OutputInterface;
 pub struct CompleteCommand {
     inner: CommandData,
     completion_outputs: IndexMap<String, PhpMixed>,
-    is_debug: bool,
+    is_debug: std::cell::Cell<bool>,
 }
 
 impl Deref for CompleteCommand {
@@ -59,10 +59,10 @@ impl CompleteCommand {
                 )
             });
 
-        let mut this = Self {
+        let this = Self {
             inner: CommandData::new(None),
             completion_outputs,
-            is_debug: false,
+            is_debug: std::cell::Cell::new(false),
         };
         // PHP: static $defaultName = '|_complete' / $defaultDescription, applied by the parent
         // constructor before configure().
@@ -121,7 +121,7 @@ impl CompleteCommand {
     }
 
     fn log_many(&self, messages: Vec<String>) {
-        if !self.is_debug {
+        if !self.is_debug.get() {
             return;
         }
 
@@ -159,7 +159,7 @@ fn instantiate_completion_output(_class: &PhpMixed) -> Box<dyn CompletionOutputI
 }
 
 impl Command for CompleteCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         let shells = self
             .completion_outputs
             .keys()
@@ -200,20 +200,20 @@ impl Command for CompleteCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         let _ = (input, output);
-        self.is_debug = shirabe_php_shim::filter_var_boolean(
+        self.is_debug.set(shirabe_php_shim::filter_var_boolean(
             &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG").unwrap_or_default(),
-        );
+        ));
 
         Ok(())
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -307,8 +307,8 @@ impl Command for CompleteCommand {
                     );
                 }
                 Some(command) => {
-                    command.borrow_mut().merge_application_definition(false);
-                    completion_input.bind(command.borrow().get_definition())?;
+                    command.borrow().merge_application_definition(false);
+                    completion_input.bind(&*command.borrow().get_definition())?;
 
                     if CompletionInput::TYPE_OPTION_NAME == completion_input.get_completion_type() {
                         self.log(&format!(

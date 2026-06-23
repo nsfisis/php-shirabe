@@ -41,7 +41,7 @@ impl Default for SearchCommand {
 
 impl SearchCommand {
     pub fn new() -> Self {
-        let mut command = SearchCommand {
+        let command = SearchCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -52,7 +52,7 @@ impl SearchCommand {
 }
 
 impl Command for SearchCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("search")?;
         self.set_description("Searches for packages");
         self.set_definition(&[
@@ -110,7 +110,7 @@ impl Command for SearchCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -277,7 +277,7 @@ impl Command for SearchCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -288,10 +288,10 @@ impl Command for SearchCommand {
 }
 
 impl BaseCommand for SearchCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

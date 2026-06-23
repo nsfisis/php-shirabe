@@ -35,7 +35,7 @@ impl Default for SelfUpdateCommand {
 
 impl SelfUpdateCommand {
     pub fn new() -> Self {
-        let mut command = SelfUpdateCommand {
+        let command = SelfUpdateCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -46,7 +46,7 @@ impl SelfUpdateCommand {
 }
 
 impl Command for SelfUpdateCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("self-update")?;
         self.set_aliases(vec!["selfupdate".to_string()])?;
         self.set_description("Updates composer.phar to the latest version");
@@ -79,7 +79,7 @@ impl Command for SelfUpdateCommand {
     /// differs fundamentally from the PHP phar-based one, and no release has
     /// been published yet. The command is therefore disabled.
     fn execute(
-        &mut self,
+        &self,
         _input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -94,7 +94,7 @@ impl Command for SelfUpdateCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -105,10 +105,10 @@ impl Command for SelfUpdateCommand {
 }
 
 impl BaseCommand for SelfUpdateCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

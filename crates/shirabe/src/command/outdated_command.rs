@@ -34,7 +34,7 @@ impl Default for OutdatedCommand {
 
 impl OutdatedCommand {
     pub fn new() -> Self {
-        let mut command = OutdatedCommand {
+        let command = OutdatedCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -45,7 +45,7 @@ impl OutdatedCommand {
 }
 
 impl Command for OutdatedCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_installed_package(false, false) for `package` argument and `--ignore` option
         self.set_name("outdated")?;
         self.set_description("Shows a list of installed packages that have updates available, including their latest version");
@@ -80,7 +80,7 @@ impl Command for OutdatedCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -231,7 +231,7 @@ impl Command for OutdatedCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -242,10 +242,10 @@ impl Command for OutdatedCommand {
 }
 
 impl BaseCommand for OutdatedCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     fn is_proxy_command(&self) -> bool {

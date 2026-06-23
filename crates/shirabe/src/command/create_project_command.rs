@@ -59,7 +59,7 @@ pub struct CreateProjectCommand {
 
     /// @var SuggestedPackagesReporter
     pub(crate) suggested_packages_reporter:
-        Option<std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>>,
+        std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>>>,
 }
 
 impl Default for CreateProjectCommand {
@@ -70,9 +70,9 @@ impl Default for CreateProjectCommand {
 
 impl CreateProjectCommand {
     pub fn new() -> Self {
-        let mut command = CreateProjectCommand {
+        let command = CreateProjectCommand {
             base_command_data: BaseCommandData::new(None),
-            suggested_packages_reporter: None,
+            suggested_packages_reporter: std::cell::RefCell::new(None),
         };
         command
             .configure()
@@ -82,7 +82,7 @@ impl CreateProjectCommand {
 }
 
 impl Command for CreateProjectCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_prefer_install / suggest_available_package
         self.set_name("create-project")?;
         self.set_description("Creates new project from a package into given directory");
@@ -134,7 +134,7 @@ impl Command for CreateProjectCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -260,7 +260,7 @@ impl Command for CreateProjectCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -271,10 +271,10 @@ impl Command for CreateProjectCommand {
 }
 
 impl BaseCommand for CreateProjectCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
@@ -286,7 +286,7 @@ impl CreateProjectCommand {
     /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
     pub fn install_project(
-        &mut self,
+        &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -330,9 +330,9 @@ impl CreateProjectCommand {
         io.borrow_mut()
             .load_configuration(&mut config.borrow_mut())?;
 
-        self.suggested_packages_reporter = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            SuggestedPackagesReporter::new(io.clone()),
-        )));
+        *self.suggested_packages_reporter.borrow_mut() = Some(std::rc::Rc::new(
+            std::cell::RefCell::new(SuggestedPackagesReporter::new(io.clone())),
+        ));
 
         let installed_from_vcs = if let Some(package_name) = package_name.as_ref() {
             self.install_root_package(
@@ -469,7 +469,11 @@ impl CreateProjectCommand {
                 .set_dev_mode(install_dev_packages)
                 .set_platform_requirement_filter(platform_requirement_filter.clone())
                 .set_suggested_packages_reporter(
-                    self.suggested_packages_reporter.as_ref().unwrap().clone(),
+                    self.suggested_packages_reporter
+                        .borrow()
+                        .as_ref()
+                        .unwrap()
+                        .clone(),
                 )
                 .set_optimize_autoloader(
                     config
@@ -1014,6 +1018,7 @@ impl CreateProjectCommand {
 
         // collect suggestions
         self.suggested_packages_reporter
+            .borrow()
             .as_ref()
             .unwrap()
             .borrow_mut()

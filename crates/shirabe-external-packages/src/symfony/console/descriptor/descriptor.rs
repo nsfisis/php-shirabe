@@ -39,7 +39,7 @@ pub trait Descriptor: DescriptorInterface {
                 self.describe_input_definition(&definition, options)?;
             }
             DescribableObject::Command(command) => {
-                self.describe_command(&mut *command.borrow_mut(), options)?;
+                self.describe_command(&*command.borrow(), options)?;
             }
             DescribableObject::Application(application) => {
                 self.describe_application(application, options)?;
@@ -86,7 +86,7 @@ pub trait Descriptor: DescriptorInterface {
     /// Describes a Command instance.
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()>;
 

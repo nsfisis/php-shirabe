@@ -42,7 +42,7 @@ impl Default for AuditCommand {
 
 impl AuditCommand {
     pub fn new() -> Self {
-        let mut command = AuditCommand {
+        let command = AuditCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -53,7 +53,7 @@ impl AuditCommand {
 }
 
 impl Command for AuditCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("audit")?;
         self.set_description("Checks for security vulnerability advisories for installed packages");
         self.set_definition(&[
@@ -122,7 +122,7 @@ impl Command for AuditCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -226,7 +226,7 @@ impl Command for AuditCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -237,10 +237,10 @@ impl Command for AuditCommand {
 }
 
 impl BaseCommand for AuditCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

@@ -13,16 +13,14 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, chmod, touch};
 
 pub trait BaseConfigCommand: BaseCommand {
-    fn config(&self) -> Option<&std::rc::Rc<std::cell::RefCell<Config>>>;
-    fn config_mut(&mut self) -> &mut Option<std::rc::Rc<std::cell::RefCell<Config>>>;
-    fn config_file(&self) -> Option<&std::rc::Rc<std::cell::RefCell<JsonFile>>>;
-    fn set_config_file(&mut self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>);
-    fn config_source(&self) -> Option<&JsonConfigSource>;
-    fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource>;
-    fn set_config_source(&mut self, source: Option<JsonConfigSource>);
+    fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>>;
+    fn set_config(&self, config: Option<std::rc::Rc<std::cell::RefCell<Config>>>);
+    fn config_file(&self) -> Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>;
+    fn set_config_file(&self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>);
+    fn set_config_source(&self, source: Option<JsonConfigSource>);
 
     fn initialize(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -40,10 +38,10 @@ pub trait BaseConfigCommand: BaseCommand {
         }
 
         let io = self.get_io();
-        *self.config_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
+        self.set_config(Some(std::rc::Rc::new(std::cell::RefCell::new(
             Factory::create_config(Some(io.clone()), None)?,
-        )));
-        let config_rc = self.config().unwrap().clone();
+        ))));
+        let config_rc = self.config().unwrap();
 
         // When using --global flag, set baseDir to home directory for correct absolute path resolution
         if input

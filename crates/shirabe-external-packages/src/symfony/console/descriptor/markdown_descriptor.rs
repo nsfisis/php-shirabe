@@ -147,7 +147,7 @@ impl MarkdownDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         if matches!(options.get("short"), Some(PhpMixed::Bool(true))) {
@@ -285,10 +285,10 @@ impl MarkdownDescriptor {
             .values()
             .map(|c| c.borrow().clone_box())
             .collect();
-        for mut command in command_list {
+        for command in command_list {
             self.write("\n\n", true);
             // describeCommand returns null; the guarded write never runs.
-            self.describe_command(command.as_mut(), options.clone())?;
+            self.describe_command(command.as_ref(), options.clone())?;
         }
         Ok(())
     }
@@ -372,7 +372,7 @@ impl Descriptor for MarkdownDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe_command(self, command, options)

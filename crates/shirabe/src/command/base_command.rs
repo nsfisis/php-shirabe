@@ -46,23 +46,24 @@ pub const INVALID: i64 = 2;
 #[derive(Debug)]
 pub struct BaseCommandData {
     inner: CommandData,
-    pub(crate) composer: Option<PartialComposerHandle>,
-    pub(crate) io: Option<Rc<RefCell<dyn IOInterface>>>,
+    pub(crate) composer: RefCell<Option<PartialComposerHandle>>,
+    pub(crate) io: RefCell<Option<Rc<RefCell<dyn IOInterface>>>>,
 }
 
 impl BaseCommandData {
     pub fn new(name: Option<String>) -> Self {
         BaseCommandData {
             inner: CommandData::new(name),
-            composer: None,
-            io: None,
+            composer: RefCell::new(None),
+            io: RefCell::new(None),
         }
     }
 
-    /// Mutable access to the embedded Symfony command state, used by the Composer-typed definition
-    /// builders to forward to `CommandData`'s Symfony-typed entry points.
-    pub(crate) fn command_data_mut(&mut self) -> &mut CommandData {
-        &mut self.inner
+    /// Access to the embedded Symfony command state, used by the Composer-typed definition
+    /// builders to forward to `CommandData`'s Symfony-typed entry points. `CommandData` is
+    /// interior-mutable, so a shared reference is enough.
+    pub(crate) fn command_data(&self) -> &CommandData {
+        &self.inner
     }
 }
 
@@ -70,13 +71,14 @@ impl BaseCommandData {
 /// `Command` trait. The Symfony state methods are inherited from the [`Command`] supertrait;
 /// only the Composer-specific behavior and the Composer-typed definition builders live here.
 pub trait BaseCommand: Command {
-    /// Mutable access to the embedded Symfony command state. Each command returns
-    /// `self.base_command_data.command_data_mut()`; this lets the Composer-typed definition
-    /// builders below forward to `CommandData`'s Symfony-typed entry points.
-    fn command_data_mut(&mut self) -> &mut CommandData;
+    /// Access to the embedded Symfony command state. Each command returns
+    /// `self.base_command_data.command_data()`; this lets the Composer-typed definition
+    /// builders below forward to `CommandData`'s Symfony-typed entry points. `CommandData` is
+    /// interior-mutable, so a shared reference is enough.
+    fn command_data(&self) -> &CommandData;
 
     /// Sets the definition from Composer-typed argument/option instances.
-    fn set_definition(&mut self, definition: &[InputDefinitionItem]) -> &mut Self
+    fn set_definition(&self, definition: &[InputDefinitionItem]) -> &Self
     where
         Self: Sized,
     {
@@ -84,42 +86,42 @@ pub trait BaseCommand: Command {
             .iter()
             .map(|item| item.to_definition_item())
             .collect();
-        self.command_data_mut()
+        self.command_data()
             .set_definition(SetDefinitionArg::Array(items));
         self
     }
 
     fn add_argument(
-        &mut self,
+        &self,
         name: &str,
         mode: Option<i64>,
         description: &str,
         default: PhpMixed,
-    ) -> &mut Self
+    ) -> &Self
     where
         Self: Sized,
     {
-        self.command_data_mut()
+        self.command_data()
             .add_argument(name, mode, description, default)
             .expect("command argument definitions in configure() are statically valid");
         self
     }
 
     fn add_option(
-        &mut self,
+        &self,
         name: &str,
         shortcut: Option<&str>,
         mode: Option<i64>,
         description: &str,
         default: PhpMixed,
-    ) -> &mut Self
+    ) -> &Self
     where
         Self: Sized,
     {
         let shortcut = shortcut
             .map(|s| PhpMixed::from(s.to_string()))
             .unwrap_or(PhpMixed::Null);
-        self.command_data_mut()
+        self.command_data()
             .add_option(name, shortcut, mode, description, default)
             .expect("command option definitions in configure() are statically valid");
         self
@@ -137,26 +139,26 @@ pub trait BaseCommand: Command {
 
     /// Retrieves the default Composer\Composer instance or throws
     fn require_composer(
-        &mut self,
+        &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Result<PartialComposerHandle>;
 
     /// Retrieves the default Composer\Composer instance or null
     fn try_composer(
-        &mut self,
+        &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Option<PartialComposerHandle>;
 
-    fn set_composer(&mut self, composer: PartialComposerHandle);
+    fn set_composer(&self, composer: PartialComposerHandle);
 
     /// Removes the cached composer instance
-    fn reset_composer(&mut self) -> Result<()>;
+    fn reset_composer(&self) -> Result<()>;
 
-    fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>>;
+    fn get_io(&self) -> Rc<RefCell<dyn IOInterface>>;
 
-    fn set_io(&mut self, io: Rc<RefCell<dyn IOInterface>>);
+    fn set_io(&self, io: Rc<RefCell<dyn IOInterface>>);
 
     /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
     fn create_composer_instance(
@@ -223,12 +225,12 @@ pub trait BaseCommand: Command {
 #[macro_export]
 macro_rules! delegate_base_command_trait_impls_to_inner {
     ($field:ident) => {
-        shirabe_external_packages::delegate_to_inner!($field, fn require_composer(&mut self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
-        shirabe_external_packages::delegate_to_inner!($field, fn try_composer(&mut self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> Option<$crate::composer::PartialComposerHandle>);
-        shirabe_external_packages::delegate_to_inner!($field, fn set_composer(&mut self, composer: $crate::composer::PartialComposerHandle));
-        shirabe_external_packages::delegate_to_inner!($field, fn reset_composer(&mut self) -> anyhow::Result<()>);
-        shirabe_external_packages::delegate_to_inner!($field, fn get_io(&mut self) -> std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>);
-        shirabe_external_packages::delegate_to_inner!($field, fn set_io(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>));
+        shirabe_external_packages::delegate_to_inner!($field, fn require_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
+        shirabe_external_packages::delegate_to_inner!($field, fn try_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> Option<$crate::composer::PartialComposerHandle>);
+        shirabe_external_packages::delegate_to_inner!($field, fn set_composer(&self, composer: $crate::composer::PartialComposerHandle));
+        shirabe_external_packages::delegate_to_inner!($field, fn reset_composer(&self) -> anyhow::Result<()>);
+        shirabe_external_packages::delegate_to_inner!($field, fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>);
+        shirabe_external_packages::delegate_to_inner!($field, fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>));
         shirabe_external_packages::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
         shirabe_external_packages::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
         shirabe_external_packages::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
@@ -246,16 +248,16 @@ impl Command for BaseCommandData {
 }
 
 impl BaseCommand for BaseCommandData {
-    fn command_data_mut(&mut self) -> &mut CommandData {
-        &mut self.inner
+    fn command_data(&self) -> &CommandData {
+        &self.inner
     }
 
     fn require_composer(
-        &mut self,
+        &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Result<PartialComposerHandle> {
-        if self.composer.is_none() {
+        if self.composer.borrow().is_none() {
             let application = self.get_application();
             let Some(application) = application else {
                 return Err(RuntimeException {
@@ -273,21 +275,22 @@ impl BaseCommand for BaseCommandData {
                     .expect("a Composer command's application is a shirabe Application");
                 app.get_composer(true, disable_plugins, disable_scripts)?
             };
-            self.composer = composer;
+            *self.composer.borrow_mut() = composer;
         }
 
         Ok(self
             .composer
+            .borrow()
             .clone()
             .expect("requireComposer always yields a Composer or errors"))
     }
 
     fn try_composer(
-        &mut self,
+        &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Option<PartialComposerHandle> {
-        if self.composer.is_none()
+        if self.composer.borrow().is_none()
             && let Some(application) = self.get_application()
         {
             let result = {
@@ -300,19 +303,19 @@ impl BaseCommand for BaseCommandData {
                 app.get_composer(false, disable_plugins, disable_scripts)
             };
             if let Ok(composer) = result {
-                self.composer = composer;
+                *self.composer.borrow_mut() = composer;
             }
         }
 
-        self.composer.clone()
+        self.composer.borrow().clone()
     }
 
-    fn set_composer(&mut self, composer: PartialComposerHandle) {
-        self.composer = Some(composer);
+    fn set_composer(&self, composer: PartialComposerHandle) {
+        *self.composer.borrow_mut() = Some(composer);
     }
 
-    fn reset_composer(&mut self) -> Result<()> {
-        self.composer = None;
+    fn reset_composer(&self) -> Result<()> {
+        *self.composer.borrow_mut() = None;
         if let Some(application) = self.get_application() {
             let mut app_ref = application.borrow_mut();
             let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
@@ -325,8 +328,8 @@ impl BaseCommand for BaseCommandData {
         Ok(())
     }
 
-    fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>> {
-        if self.io.is_none() {
+    fn get_io(&self) -> Rc<RefCell<dyn IOInterface>> {
+        if self.io.borrow().is_none() {
             match self.get_application() {
                 Some(application) => {
                     let io = {
@@ -338,19 +341,19 @@ impl BaseCommand for BaseCommandData {
                             .expect("a Composer command's application is a shirabe Application");
                         app.get_io()
                     };
-                    self.io = Some(io);
+                    *self.io.borrow_mut() = Some(io);
                 }
                 None => {
-                    self.io = Some(Rc::new(RefCell::new(NullIO::new())));
+                    *self.io.borrow_mut() = Some(Rc::new(RefCell::new(NullIO::new())));
                 }
             }
         }
 
-        self.io.clone().unwrap()
+        self.io.borrow().clone().unwrap()
     }
 
-    fn set_io(&mut self, io: Rc<RefCell<dyn IOInterface>>) {
-        self.io = Some(io);
+    fn set_io(&self, io: Rc<RefCell<dyn IOInterface>>) {
+        *self.io.borrow_mut() = Some(io);
     }
 
     fn create_composer_instance(
@@ -695,7 +698,7 @@ impl BaseCommand for BaseCommandData {
 /// `Command::initialize` forwards here so the leaf's `is_self_update_command()` override (and
 /// future overrides) bind correctly.
 pub fn base_command_initialize(
-    cmd: &mut dyn BaseCommand,
+    cmd: &dyn BaseCommand,
     input: Rc<RefCell<dyn InputInterface>>,
     _output: Rc<RefCell<dyn OutputInterface>>,
 ) -> Result<()> {

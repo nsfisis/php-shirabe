@@ -24,7 +24,7 @@ use crate::io::IOInterface;
 pub struct ProhibitsCommand {
     base_command_data: BaseCommandData,
 
-    colors: Vec<String>,
+    colors: std::cell::RefCell<Vec<String>>,
 }
 
 impl Default for ProhibitsCommand {
@@ -35,9 +35,9 @@ impl Default for ProhibitsCommand {
 
 impl ProhibitsCommand {
     pub fn new() -> Self {
-        let mut command = ProhibitsCommand {
+        let command = ProhibitsCommand {
             base_command_data: BaseCommandData::new(None),
-            colors: Vec::new(),
+            colors: std::cell::RefCell::new(Vec::new()),
         };
         command
             .configure()
@@ -47,17 +47,17 @@ impl ProhibitsCommand {
 }
 
 impl BaseDependencyCommand for ProhibitsCommand {
-    fn colors(&self) -> &[String] {
-        &self.colors
+    fn colors(&self) -> std::cell::Ref<'_, Vec<String>> {
+        self.colors.borrow()
     }
 
-    fn colors_mut(&mut self) -> &mut Vec<String> {
-        &mut self.colors
+    fn set_colors(&self, colors: Vec<String>) {
+        *self.colors.borrow_mut() = colors;
     }
 }
 
 impl Command for ProhibitsCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_available_package() for `package` argument
         self.set_name("prohibits")?;
         self.set_aliases(vec!["why-not".to_string()])?;
@@ -116,7 +116,7 @@ impl Command for ProhibitsCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -124,7 +124,7 @@ impl Command for ProhibitsCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -135,10 +135,10 @@ impl Command for ProhibitsCommand {
 }
 
 impl BaseCommand for ProhibitsCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

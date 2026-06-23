@@ -31,9 +31,9 @@ use crate::json::JsonFile;
 pub struct RepositoryCommand {
     base_command_data: BaseCommandData,
 
-    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-    config_file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
-    config_source: Option<JsonConfigSource>,
+    config: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<Config>>>>,
+    config_file: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
+    config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 }
 
 impl Default for RepositoryCommand {
@@ -44,11 +44,11 @@ impl Default for RepositoryCommand {
 
 impl RepositoryCommand {
     pub fn new() -> Self {
-        let mut command = RepositoryCommand {
+        let command = RepositoryCommand {
             base_command_data: BaseCommandData::new(None),
-            config: None,
-            config_file: None,
-            config_source: None,
+            config: std::cell::RefCell::new(None),
+            config_file: std::cell::RefCell::new(None),
+            config_source: std::cell::RefCell::new(None),
         };
         command
             .configure()
@@ -56,7 +56,7 @@ impl RepositoryCommand {
         command
     }
 
-    fn list_repositories(&mut self, mut repos: IndexMap<String, PhpMixed>) {
+    fn list_repositories(&self, mut repos: IndexMap<String, PhpMixed>) {
         let io = self.get_io();
 
         let mut packagist_present = false;
@@ -132,7 +132,7 @@ impl RepositoryCommand {
 }
 
 impl Command for RepositoryCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_repo_names() / suggest_type_for_add()
         self.set_name("repository")?;
         self.set_aliases(vec!["repo".to_string()])?;
@@ -237,7 +237,7 @@ impl Command for RepositoryCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -264,24 +264,18 @@ impl Command for RepositoryCommand {
             .as_string()
             .map(|s| s.to_string());
 
-        let config_data = self.config_file.as_ref().unwrap().borrow_mut().read()?;
-        let config_file_path = self
-            .config_file
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .get_path()
-            .to_string();
+        let config_file = self.config_file.borrow().as_ref().unwrap().clone();
+        let config_data = config_file.borrow_mut().read()?;
+        let config_file_path = config_file.borrow().get_path().to_string();
         let config_data_map: IndexMap<String, PhpMixed> = match config_data {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
-        self.config
-            .as_mut()
-            .unwrap()
+        let config = self.config.borrow().as_ref().unwrap().clone();
+        config
             .borrow_mut()
             .merge(&config_data_map, &config_file_path);
-        let repos = self.config.as_ref().unwrap().borrow().get_repositories();
+        let repos = config.borrow().get_repositories();
 
         match action.as_str() {
             "list" | "ls" | "show" => {
@@ -344,12 +338,16 @@ impl Command for RepositoryCommand {
                     }
                     let reference_name = before.as_deref().or(after.as_deref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
-                    self.config_source.as_mut().unwrap().insert_repository(
-                        name.as_deref().unwrap(),
-                        repo_config.clone(),
-                        reference_name,
-                        offset,
-                    )?;
+                    self.config_source
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .insert_repository(
+                            name.as_deref().unwrap(),
+                            repo_config.clone(),
+                            reference_name,
+                            offset,
+                        )?;
                     return Ok(0);
                 }
 
@@ -358,11 +356,11 @@ impl Command for RepositoryCommand {
                     .get_option("append")?
                     .as_bool()
                     .unwrap_or(false);
-                self.config_source.as_mut().unwrap().add_repository(
-                    name.as_deref().unwrap(),
-                    repo_config.clone(),
-                    append,
-                )?;
+                self.config_source
+                    .borrow_mut()
+                    .as_mut()
+                    .unwrap()
+                    .add_repository(name.as_deref().unwrap(), repo_config.clone(), append)?;
                 Ok(0)
             }
             "remove" | "rm" | "delete" => {
@@ -374,15 +372,16 @@ impl Command for RepositoryCommand {
                 }
                 let name_str = name.as_deref().unwrap();
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_repository(name_str)?;
                 if ["packagist", "packagist.org"].contains(&name_str) {
-                    self.config_source.as_mut().unwrap().add_repository(
-                        "packagist.org",
-                        PhpMixed::Null,
-                        false,
-                    )?;
+                    self.config_source
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .add_repository("packagist.org", PhpMixed::Null, false)?;
                 }
                 Ok(0)
             }
@@ -394,6 +393,7 @@ impl Command for RepositoryCommand {
                     }));
                 }
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .set_repository_url(name.as_deref().unwrap(), arg1.as_deref().unwrap());
@@ -455,11 +455,11 @@ impl Command for RepositoryCommand {
                         .get_option("append")?
                         .as_bool()
                         .unwrap_or(false);
-                    self.config_source.as_mut().unwrap().add_repository(
-                        "packagist.org",
-                        PhpMixed::Bool(false),
-                        append,
-                    );
+                    self.config_source
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .add_repository("packagist.org", PhpMixed::Bool(false), append);
                     return Ok(0);
                 }
                 Err(anyhow::anyhow!(RuntimeException {
@@ -477,6 +477,7 @@ impl Command for RepositoryCommand {
                 let name_str = name.as_deref().unwrap();
                 if ["packagist", "packagist.org"].contains(&name_str) {
                     self.config_source
+                        .borrow_mut()
                         .as_mut()
                         .unwrap()
                         .remove_repository("packagist.org");
@@ -499,7 +500,7 @@ impl Command for RepositoryCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -512,41 +513,33 @@ impl Command for RepositoryCommand {
 }
 
 impl BaseCommand for RepositoryCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseConfigCommand for RepositoryCommand {
-    fn config(&self) -> Option<&std::rc::Rc<std::cell::RefCell<Config>>> {
-        self.config.as_ref()
+    fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>> {
+        self.config.borrow().clone()
     }
 
-    fn config_mut(&mut self) -> &mut Option<std::rc::Rc<std::cell::RefCell<Config>>> {
-        &mut self.config
+    fn set_config(&self, config: Option<std::rc::Rc<std::cell::RefCell<Config>>>) {
+        *self.config.borrow_mut() = config;
     }
 
-    fn config_file(&self) -> Option<&std::rc::Rc<std::cell::RefCell<JsonFile>>> {
-        self.config_file.as_ref()
+    fn config_file(&self) -> Option<std::rc::Rc<std::cell::RefCell<JsonFile>>> {
+        self.config_file.borrow().clone()
     }
 
-    fn config_source(&self) -> Option<&JsonConfigSource> {
-        self.config_source.as_ref()
+    fn set_config_file(&self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>) {
+        *self.config_file.borrow_mut() = file;
     }
 
-    fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource> {
-        self.config_source.as_mut()
-    }
-
-    fn set_config_file(&mut self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>) {
-        self.config_file = file;
-    }
-
-    fn set_config_source(&mut self, source: Option<JsonConfigSource>) {
-        self.config_source = source;
+    fn set_config_source(&self, source: Option<JsonConfigSource>) {
+        *self.config_source.borrow_mut() = source;
     }
 }

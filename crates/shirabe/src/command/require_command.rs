@@ -55,18 +55,19 @@ use crate::util::Silencer;
 pub struct RequireCommand {
     base_command_data: BaseCommandData,
 
-    newly_created: bool,
-    first_require: bool,
-    json: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
-    file: String,
-    composer_backup: String,
+    newly_created: std::cell::Cell<bool>,
+    first_require: std::cell::Cell<bool>,
+    json: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
+    file: std::cell::RefCell<String>,
+    composer_backup: std::cell::RefCell<String>,
     /// file name
-    lock: String,
+    lock: std::cell::RefCell<String>,
     /// contents before modification if the lock file exists
-    lock_backup: Option<String>,
-    dependency_resolution_completed: bool,
-    repos: Option<crate::repository::RepositoryInterfaceHandle>,
-    repository_sets: IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>,
+    lock_backup: std::cell::RefCell<Option<String>>,
+    dependency_resolution_completed: std::cell::Cell<bool>,
+    repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
+    repository_sets:
+        std::cell::RefCell<IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
 
 impl Default for RequireCommand {
@@ -77,18 +78,18 @@ impl Default for RequireCommand {
 
 impl RequireCommand {
     pub fn new() -> Self {
-        let mut command = RequireCommand {
+        let command = RequireCommand {
             base_command_data: BaseCommandData::new(None),
-            newly_created: false,
-            first_require: false,
-            json: None,
-            file: String::new(),
-            composer_backup: String::new(),
-            lock: String::new(),
-            lock_backup: None,
-            dependency_resolution_completed: false,
-            repos: None,
-            repository_sets: IndexMap::new(),
+            newly_created: std::cell::Cell::new(false),
+            first_require: std::cell::Cell::new(false),
+            json: std::cell::RefCell::new(None),
+            file: std::cell::RefCell::new(String::new()),
+            composer_backup: std::cell::RefCell::new(String::new()),
+            lock: std::cell::RefCell::new(String::new()),
+            lock_backup: std::cell::RefCell::new(None),
+            dependency_resolution_completed: std::cell::Cell::new(false),
+            repos: std::cell::RefCell::new(None),
+            repository_sets: std::cell::RefCell::new(IndexMap::new()),
         };
         command
             .configure()
@@ -98,19 +99,22 @@ impl RequireCommand {
 }
 
 impl PackageDiscoveryTrait for RequireCommand {
-    fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle> {
-        &mut self.repos
+    fn get_repos_mut(
+        &self,
+    ) -> std::cell::RefMut<'_, Option<crate::repository::RepositoryInterfaceHandle>> {
+        self.repos.borrow_mut()
     }
 
     fn get_repository_sets_mut(
-        &mut self,
-    ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
-        &mut self.repository_sets
+        &self,
+    ) -> std::cell::RefMut<'_, IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>
+    {
+        self.repository_sets.borrow_mut()
     }
 }
 
 impl Command for RequireCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_available_package_incl_platform / suggest_prefer_install
         self.set_name("require")?;
         self.set_aliases(vec!["r".to_string()])?;
@@ -163,11 +167,11 @@ impl Command for RequireCommand {
 
     /// @throws \Seld\JsonLint\ParsingException
     fn execute(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
-        self.file = Factory::get_composer_file()?;
+        *self.file.borrow_mut() = Factory::get_composer_file()?;
 
         if input
             .borrow()
@@ -178,34 +182,38 @@ impl Command for RequireCommand {
             self.get_io().write_error3("<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>", true, io_interface::NORMAL);
         }
 
-        self.newly_created = !file_exists(&self.file);
-        let write_failed = self.newly_created && file_put_contents(&self.file, b"{\n}\n").is_none();
+        let file = self.file.borrow().clone();
+        self.newly_created.set(!file_exists(&file));
+        let write_failed =
+            self.newly_created.get() && file_put_contents(&file, b"{\n}\n").is_none();
         if write_failed {
-            let msg = format!("<error>{} could not be created.</error>", self.file);
+            let msg = format!("<error>{} could not be created.</error>", file);
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
             return Ok(1);
         }
-        if !Filesystem::is_readable(&self.file) {
-            let msg = format!("<error>{} is not readable.</error>", self.file);
+        if !Filesystem::is_readable(&file) {
+            let msg = format!("<error>{} is not readable.</error>", file);
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
             return Ok(1);
         }
-        if filesize(&self.file) == Some(0) {
-            file_put_contents(&self.file, b"{\n}\n");
+        if filesize(&file) == Some(0) {
+            file_put_contents(&file, b"{\n}\n");
         }
 
-        self.json = Some(std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-            self.file.clone(),
+        *self.json.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
+            file.clone(),
             None,
             None,
         )?)));
-        self.lock = Factory::get_lock_file(&self.file);
-        self.composer_backup =
-            file_get_contents(self.json.as_ref().unwrap().borrow().get_path()).unwrap_or_default();
-        self.lock_backup = if file_exists(&self.lock) {
-            file_get_contents(&self.lock)
+        *self.lock.borrow_mut() = Factory::get_lock_file(&file);
+        let json = self.json.borrow().as_ref().unwrap().clone();
+        *self.composer_backup.borrow_mut() =
+            file_get_contents(json.borrow().get_path()).unwrap_or_default();
+        let lock = self.lock.borrow().clone();
+        *self.lock_backup.borrow_mut() = if file_exists(&lock) {
+            file_get_contents(&lock)
         } else {
             None
         };
@@ -232,9 +240,9 @@ impl Command for RequireCommand {
 
         // check for writability by writing to the file as is_writable can not be trusted on network-mounts
         // see https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
-        let file_path = self.file.clone();
-        let backup_contents = self.composer_backup.clone();
-        if !is_writable(&self.file)
+        let file_path = file.clone();
+        let backup_contents = self.composer_backup.borrow().clone();
+        if !is_writable(&file)
             && Silencer::call(|| {
                 shirabe_php_shim::file_put_contents(&file_path, backup_contents.as_bytes());
                 Ok::<bool, anyhow::Error>(false)
@@ -242,14 +250,14 @@ impl Command for RequireCommand {
             .ok()
                 == Some(false)
         {
-            let msg = format!("<error>{} is not writable.</error>", self.file);
+            let msg = format!("<error>{} is not writable.</error>", file);
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
             return Ok(1);
         }
 
         if input.borrow().get_option("fixed")?.as_bool() == Some(true) {
-            let config = self.json.as_ref().unwrap().borrow_mut().read()?;
+            let config = json.borrow_mut().read()?;
 
             let package_type = if empty(&config.get("type").cloned().unwrap_or(PhpMixed::Null)) {
                 "library".to_string()
@@ -335,13 +343,13 @@ impl Command for RequireCommand {
         let requirements = match requirements_result {
             Ok(r) => r,
             Err(e) => {
-                if self.newly_created {
+                if self.newly_created.get() {
                     self.revert_composer_file();
 
                     return Err(RuntimeException {
                         message: format!(
                             "No composer.json present in the current directory ({}), this may be the cause of the following exception.",
-                            self.file
+                            self.file.borrow()
                         ),
                         code: 0,
                     }
@@ -534,9 +542,9 @@ impl Command for RequireCommand {
                 .as_bool()
                 .unwrap_or(false);
 
-        self.first_require = self.newly_created;
-        if !self.first_require {
-            let composer_definition = self.json.as_ref().unwrap().borrow_mut().read()?;
+        self.first_require.set(self.newly_created.get());
+        if !self.first_require.get() {
+            let composer_definition = json.borrow_mut().read()?;
             let require_count = composer_definition
                 .get("require")
                 .and_then(|v| v.as_array())
@@ -548,7 +556,7 @@ impl Command for RequireCommand {
                 .map(|m| m.len() as i64)
                 .unwrap_or(0);
             if require_count == 0 && require_dev_count == 0 {
-                self.first_require = true;
+                self.first_require.set(true);
             }
         }
 
@@ -558,14 +566,13 @@ impl Command for RequireCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let json = self.json.as_ref().unwrap().clone();
             self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
         }
 
         let updated_msg = format!(
             "<info>{} has been {}</info>",
-            self.file,
-            if self.newly_created {
+            file,
+            if self.newly_created.get() {
                 "created"
             } else {
                 "updated"
@@ -624,7 +631,7 @@ impl Command for RequireCommand {
                 Ok(final_result)
             }
             Err(e) => {
-                if !self.dependency_resolution_completed {
+                if !self.dependency_resolution_completed.get() {
                     self.revert_composer_file();
                 }
                 Err(e)
@@ -632,9 +639,9 @@ impl Command for RequireCommand {
         };
 
         // finally
-        if dry_run && self.newly_created {
+        if dry_run && self.newly_created.get() {
             // @unlink($this->json->getPath());
-            unlink(self.json.as_ref().unwrap().borrow().get_path());
+            unlink(json.borrow().get_path());
         }
         signal_handler.unregister();
 
@@ -642,14 +649,14 @@ impl Command for RequireCommand {
     }
 
     fn interact(
-        &mut self,
+        &self,
         _input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -660,10 +667,10 @@ impl Command for RequireCommand {
 }
 
 impl BaseCommand for RequireCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
@@ -673,7 +680,7 @@ impl RequireCommand {
     /// @param array<string, string> $newRequirements
     /// @return string[]
     fn get_inconsistent_require_keys(
-        &mut self,
+        &self,
         new_requirements: &IndexMap<String, String>,
         require_key: &str,
     ) -> Vec<String> {
@@ -692,14 +699,9 @@ impl RequireCommand {
     }
 
     /// @return array<string, string>
-    fn get_packages_by_require_key(&mut self) -> IndexMap<String, String> {
-        let composer_definition = self
-            .json
-            .as_ref()
-            .unwrap()
-            .borrow_mut()
-            .read()
-            .unwrap_or_default();
+    fn get_packages_by_require_key(&self) -> IndexMap<String, String> {
+        let json = self.json.borrow().as_ref().unwrap().clone();
+        let composer_definition = json.borrow_mut().read().unwrap_or_default();
         let mut require: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut require_dev: IndexMap<String, PhpMixed> = IndexMap::new();
 
@@ -755,7 +757,7 @@ impl RequireCommand {
     /// @param 'require'|'require-dev' $removeKey
     /// @throws \Exception
     fn do_update(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -768,7 +770,7 @@ impl RequireCommand {
         let composer_handle = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer_handle);
 
-        self.dependency_resolution_completed = false;
+        self.dependency_resolution_completed.set(false);
         // PHP: $composer->getEventDispatcher()->addListener(InstallerEvents::PRE_OPERATIONS_EXEC,
         //   function () use (&$dependencyResolutionCompleted) { $dependencyResolutionCompleted = true; }, 10000);
         // TODO(phase-c): the event dispatcher's Callable::Closure is a placeholder variant that
@@ -1018,7 +1020,7 @@ impl RequireCommand {
 
         // if no lock is present, or the file is brand new, we do not do a
         // partial update as this is not supported by the Installer
-        if !self.first_require && composer.get_locker().borrow_mut().is_locked() {
+        if !self.first_require.get() && composer.get_locker().borrow_mut().is_locked() {
             install.set_update_allow_list(
                 array_keys(requirements)
                     .into_iter()
@@ -1060,7 +1062,7 @@ impl RequireCommand {
 
     /// @param list<string> $requirementsToUpdate
     fn update_requirements_after_resolution(
-        &mut self,
+        &self,
         requirements_to_update: &[String],
         require_key: &str,
         remove_key: &str,
@@ -1156,7 +1158,7 @@ impl RequireCommand {
         }
 
         if !dry_run {
-            let json = self.json.as_ref().unwrap().clone();
+            let json = self.json.borrow().as_ref().unwrap().clone();
             self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
             if locker_is_locked
                 && composer
@@ -1184,7 +1186,7 @@ impl RequireCommand {
 
     /// @param array<string, string> $new
     fn update_file(
-        &mut self,
+        &self,
         json: &std::rc::Rc<std::cell::RefCell<JsonFile>>,
         new: &IndexMap<String, String>,
         require_key: &str,
@@ -1266,34 +1268,37 @@ impl RequireCommand {
         true
     }
 
-    fn revert_composer_file(&mut self) {
-        if self.newly_created {
+    fn revert_composer_file(&self) {
+        let json = self.json.borrow().as_ref().unwrap().clone();
+        let lock = self.lock.borrow().clone();
+        if self.newly_created.get() {
             let msg = format!(
                 "\n<error>Installation failed, deleting {}.</error>",
-                self.file
+                self.file.borrow()
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
-            unlink(self.json.as_ref().unwrap().borrow().get_path());
-            if file_exists(&self.lock) {
-                unlink(&self.lock);
+            unlink(json.borrow().get_path());
+            if file_exists(&lock) {
+                unlink(&lock);
             }
         } else {
-            let extra = if self.lock_backup.is_some() {
-                format!(" and {} to their ", self.lock)
+            let extra = if self.lock_backup.borrow().is_some() {
+                format!(" and {} to their ", lock)
             } else {
                 " to its ".to_string()
             };
             let msg = format!(
                 "\n<error>Installation failed, reverting {}{}original content.</error>",
-                self.file, extra
+                self.file.borrow(),
+                extra
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
             file_put_contents(
-                self.json.as_ref().unwrap().borrow().get_path(),
-                self.composer_backup.as_bytes(),
+                json.borrow().get_path(),
+                self.composer_backup.borrow().as_bytes(),
             );
-            if let Some(ref lock_backup) = self.lock_backup {
-                file_put_contents(&self.lock, lock_backup.as_bytes());
+            if let Some(ref lock_backup) = *self.lock_backup.borrow() {
+                file_put_contents(&lock, lock_backup.as_bytes());
             }
         }
     }

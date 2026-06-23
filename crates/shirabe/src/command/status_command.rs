@@ -44,7 +44,7 @@ impl StatusCommand {
     const EXIT_CODE_VERSION_CHANGES: i64 = 4;
 
     pub fn new() -> Self {
-        let mut command = StatusCommand {
+        let command = StatusCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -54,7 +54,7 @@ impl StatusCommand {
     }
 
     fn do_execute(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
@@ -323,7 +323,7 @@ impl StatusCommand {
 }
 
 impl Command for StatusCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("status")?;
         self.set_description("Shows a list of locally modified packages");
         self.set_definition(&[InputOption::new(
@@ -342,7 +342,7 @@ impl Command for StatusCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -388,7 +388,7 @@ impl Command for StatusCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -399,10 +399,10 @@ impl Command for StatusCommand {
 }
 
 impl BaseCommand for StatusCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

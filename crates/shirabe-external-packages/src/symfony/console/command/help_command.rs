@@ -22,7 +22,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct HelpCommand {
     inner: CommandData,
-    command: Option<Rc<RefCell<dyn Command>>>,
+    command: RefCell<Option<Rc<RefCell<dyn Command>>>>,
 }
 
 impl Deref for HelpCommand {
@@ -47,9 +47,9 @@ impl Default for HelpCommand {
 
 impl HelpCommand {
     pub fn new() -> Self {
-        let mut command = HelpCommand {
+        let command = HelpCommand {
             inner: CommandData::new(None),
-            command: None,
+            command: RefCell::new(None),
         };
         command
             .configure()
@@ -57,8 +57,8 @@ impl HelpCommand {
         command
     }
 
-    pub fn set_command(&mut self, command: Rc<RefCell<dyn Command>>) {
-        self.command = Some(command);
+    pub fn set_command(&self, command: Rc<RefCell<dyn Command>>) {
+        *self.command.borrow_mut() = Some(command);
     }
 
     pub fn complete_impl(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
@@ -91,7 +91,7 @@ impl HelpCommand {
 }
 
 impl Command for HelpCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.inner.ignore_validation_errors();
 
         self.inner.set_name("help")?;
@@ -134,24 +134,25 @@ impl Command for HelpCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        if self.command.is_none() {
+        if self.command.borrow().is_none() {
             let application = self.get_application().unwrap();
             let command_name = input.borrow().get_argument("command_name")?.to_string();
-            self.command = Some(application.borrow_mut().find(&command_name)?);
+            let found = application.borrow_mut().find(&command_name)?;
+            *self.command.borrow_mut() = Some(found);
         }
 
         let mut helper = DescriptorHelper::new();
-        let object = DescribableObject::Command(self.command.clone().unwrap());
+        let object = DescribableObject::Command(self.command.borrow().clone().unwrap());
         let mut options = indexmap::IndexMap::new();
         options.insert("format".to_string(), input.borrow().get_option("format")?);
         options.insert("raw_text".to_string(), input.borrow().get_option("raw")?);
         helper.describe2(output.clone(), object, options)?;
 
-        self.command = None;
+        *self.command.borrow_mut() = None;
 
         Ok(0)
     }

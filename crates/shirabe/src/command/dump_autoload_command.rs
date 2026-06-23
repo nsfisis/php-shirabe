@@ -35,7 +35,7 @@ impl Default for DumpAutoloadCommand {
 
 impl DumpAutoloadCommand {
     pub fn new() -> Self {
-        let mut command = DumpAutoloadCommand {
+        let command = DumpAutoloadCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -46,7 +46,7 @@ impl DumpAutoloadCommand {
 }
 
 impl Command for DumpAutoloadCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("dump-autoload")?;
         self.set_aliases(vec!["dumpautoload".to_string()])?;
         self.set_description("Dumps the autoloader");
@@ -71,7 +71,7 @@ impl Command for DumpAutoloadCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -320,7 +320,7 @@ impl Command for DumpAutoloadCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -331,10 +331,10 @@ impl Command for DumpAutoloadCommand {
 }
 
 impl BaseCommand for DumpAutoloadCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

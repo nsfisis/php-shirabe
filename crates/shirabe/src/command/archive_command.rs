@@ -50,7 +50,7 @@ impl ArchiveCommand {
     const FORMATS: &'static [&'static str] = &["tar", "tar.gz", "tar.bz2", "zip"];
 
     pub fn new() -> Self {
-        let mut command = ArchiveCommand {
+        let command = ArchiveCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -61,7 +61,7 @@ impl ArchiveCommand {
 }
 
 impl Command for ArchiveCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_available_package(99) for `package` argument
         self.set_name("archive")?;
         self.set_description("Creates an archive of this composer package");
@@ -84,7 +84,7 @@ impl Command for ArchiveCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -186,7 +186,7 @@ impl Command for ArchiveCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -197,10 +197,10 @@ impl Command for ArchiveCommand {
 }
 
 impl BaseCommand for ArchiveCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
@@ -209,7 +209,7 @@ impl BaseCommand for ArchiveCommand {
 impl ArchiveCommand {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn archive(
-        &mut self,
+        &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: Option<String>,
@@ -289,7 +289,7 @@ impl ArchiveCommand {
     }
 
     pub fn select_package(
-        &mut self,
+        &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         package_name: &str,
         version: Option<&str>,

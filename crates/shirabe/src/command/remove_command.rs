@@ -47,7 +47,7 @@ impl Default for RemoveCommand {
 
 impl RemoveCommand {
     pub fn new() -> Self {
-        let mut command = RemoveCommand {
+        let command = RemoveCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -58,7 +58,7 @@ impl RemoveCommand {
 }
 
 impl Command for RemoveCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_root_requirement() for `packages` argument
         self.set_name("remove")?;
         self.set_aliases(vec!["rm".to_string(), "uninstall".to_string()])?;
@@ -184,7 +184,7 @@ impl Command for RemoveCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -722,7 +722,7 @@ impl Command for RemoveCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -733,10 +733,10 @@ impl Command for RemoveCommand {
 }
 
 impl BaseCommand for RemoveCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

@@ -220,7 +220,7 @@ impl TextDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         command.merge_application_definition(false);
@@ -593,7 +593,7 @@ impl Descriptor for TextDescriptor {
 
     fn describe_command(
         &mut self,
-        command: &mut dyn Command,
+        command: &dyn Command,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         TextDescriptor::describe_command(self, command, options)

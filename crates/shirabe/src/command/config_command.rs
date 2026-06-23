@@ -44,12 +44,13 @@ use shirabe_semver::VersionParser;
 pub struct ConfigCommand {
     base_command_data: BaseCommandData,
 
-    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-    config_file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
-    config_source: Option<JsonConfigSource>,
+    config: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<Config>>>>,
+    config_file: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
+    config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 
-    pub(crate) auth_config_file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
-    pub(crate) auth_config_source: Option<JsonConfigSource>,
+    pub(crate) auth_config_file:
+        std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
+    pub(crate) auth_config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 }
 
 impl ConfigCommand {
@@ -78,13 +79,13 @@ impl Default for ConfigCommand {
 
 impl ConfigCommand {
     pub fn new() -> Self {
-        let mut command = ConfigCommand {
+        let command = ConfigCommand {
             base_command_data: BaseCommandData::new(None),
-            config: None,
-            config_file: None,
-            config_source: None,
-            auth_config_file: None,
-            auth_config_source: None,
+            config: std::cell::RefCell::new(None),
+            config_file: std::cell::RefCell::new(None),
+            config_source: std::cell::RefCell::new(None),
+            auth_config_file: std::cell::RefCell::new(None),
+            auth_config_source: std::cell::RefCell::new(None),
         };
         command
             .configure()
@@ -94,7 +95,7 @@ impl ConfigCommand {
 }
 
 impl Command for ConfigCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_setting_keys() for `setting-key` argument
         self.set_name("config")?;
         self.set_description("Sets config options");
@@ -152,7 +153,7 @@ impl Command for ConfigCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -162,22 +163,24 @@ impl Command for ConfigCommand {
             output,
         )?;
 
-        let auth_config_file =
-            self.get_auth_config_file(input.clone(), &self.config.as_ref().unwrap().borrow())?;
+        let config = self.config.borrow().as_ref().unwrap().clone();
+        let auth_config_file = self.get_auth_config_file(input.clone(), &config.borrow())?;
 
         let auth_config_file_jf = std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
             auth_config_file,
             None,
             Some(self.get_io().clone()),
         )?));
-        self.auth_config_file = Some(auth_config_file_jf.clone());
-        self.auth_config_source = Some(JsonConfigSource::new(auth_config_file_jf, true));
+        *self.auth_config_file.borrow_mut() = Some(auth_config_file_jf.clone());
+        *self.auth_config_source.borrow_mut() =
+            Some(JsonConfigSource::new(auth_config_file_jf, true));
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
+        let auth_config_file = self.auth_config_file.borrow().as_ref().unwrap().clone();
         if input.borrow().get_option("global")?.as_bool() == Some(true)
-            && !self.auth_config_file.as_ref().unwrap().borrow().exists()
+            && !auth_config_file.borrow().exists()
         {
-            touch(self.auth_config_file.as_ref().unwrap().borrow().get_path());
+            touch(auth_config_file.borrow().get_path());
             let mut empty_objs: IndexMap<String, PhpMixed> = IndexMap::new();
             for k in &[
                 "bitbucket-oauth",
@@ -190,18 +193,10 @@ impl Command for ConfigCommand {
             ] {
                 empty_objs.insert(k.to_string(), PhpMixed::Object(IndexMap::new()));
             }
-            self.auth_config_file
-                .as_ref()
-                .unwrap()
+            auth_config_file
                 .borrow()
                 .write(PhpMixed::Array(empty_objs))?;
-            let path_clone = self
-                .auth_config_file
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .get_path()
-                .to_string();
+            let path_clone = auth_config_file.borrow().get_path().to_string();
             Silencer::call(|| {
                 shirabe_php_shim::chmod(&path_clone, 0o600);
                 Ok(())
@@ -211,7 +206,7 @@ impl Command for ConfigCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -238,6 +233,7 @@ impl Command for ConfigCommand {
 
             let file = if input.borrow().get_option("auth")?.as_bool() == Some(true) {
                 self.auth_config_file
+                    .borrow()
                     .as_ref()
                     .unwrap()
                     .borrow()
@@ -245,6 +241,7 @@ impl Command for ConfigCommand {
                     .to_string()
             } else {
                 self.config_file
+                    .borrow()
                     .as_ref()
                     .unwrap()
                     .borrow()
@@ -268,35 +265,30 @@ impl Command for ConfigCommand {
             return Ok(0);
         }
 
+        let config = self.config.borrow().as_ref().unwrap().clone();
+        let config_file = self.config_file.borrow().as_ref().unwrap().clone();
+        let auth_config_file = self.auth_config_file.borrow().as_ref().unwrap().clone();
         if input.borrow().get_option("global")?.as_bool() != Some(true) {
-            let config_read = self.config_file.as_ref().unwrap().borrow_mut().read()?;
+            let config_read = config_file.borrow_mut().read()?;
             let config_map = match config_read {
                 PhpMixed::Array(m) => m,
                 _ => IndexMap::new(),
             };
-            self.config.as_mut().unwrap().borrow_mut().merge(
-                &config_map,
-                self.config_file.as_ref().unwrap().borrow().get_path(),
-            );
-            let auth_data: PhpMixed = if self.auth_config_file.as_ref().unwrap().borrow().exists() {
-                self.auth_config_file
-                    .as_ref()
-                    .unwrap()
-                    .borrow_mut()
-                    .read()?
+            let config_file_path = config_file.borrow().get_path().to_string();
+            config.borrow_mut().merge(&config_map, &config_file_path);
+            let auth_data: PhpMixed = if auth_config_file.borrow().exists() {
+                auth_config_file.borrow_mut().read()?
             } else {
                 PhpMixed::Array(IndexMap::new())
             };
             let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
             wrap.insert("config".to_string(), auth_data);
-            self.config.as_mut().unwrap().borrow_mut().merge(
-                &wrap,
-                self.auth_config_file.as_ref().unwrap().borrow().get_path(),
-            );
+            let auth_config_file_path = auth_config_file.borrow().get_path().to_string();
+            config.borrow_mut().merge(&wrap, &auth_config_file_path);
         }
 
         {
-            let config_rc = self.config.as_ref().unwrap().clone();
+            let config_rc = config.clone();
             self.get_io()
                 .borrow_mut()
                 .load_configuration(&mut config_rc.borrow_mut())?;
@@ -304,8 +296,8 @@ impl Command for ConfigCommand {
 
         // List the configuration of the file settings
         if input.borrow().get_option("list")?.as_bool() == Some(true) {
-            let all_map = self.config.as_ref().unwrap().borrow_mut().all(0)?;
-            let raw_map = self.config.as_ref().unwrap().borrow().raw();
+            let all_map = config.borrow_mut().all(0)?;
+            let raw_map = config.borrow().raw();
             let to_mixed = |m: IndexMap<String, PhpMixed>| -> PhpMixed {
                 PhpMixed::Array(m.into_iter().collect())
             };
@@ -362,14 +354,9 @@ impl Command for ConfigCommand {
             properties_defaults.insert("license".to_string(), PhpMixed::List(vec![]));
             properties_defaults.insert("suggest".to_string(), PhpMixed::List(vec![]));
             properties_defaults.insert("extra".to_string(), PhpMixed::List(vec![]));
-            let raw_data = self.config_file.as_ref().unwrap().borrow_mut().read()?;
-            let mut data = self.config.as_ref().unwrap().borrow_mut().all(0)?;
-            let mut source = self
-                .config
-                .as_ref()
-                .unwrap()
-                .borrow_mut()
-                .get_source_of_value(&setting_key);
+            let raw_data = config_file.borrow_mut().read()?;
+            let mut data = config.borrow_mut().all(0)?;
+            let mut source = config.borrow_mut().get_source_of_value(&setting_key);
 
             let mut value: PhpMixed;
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
@@ -444,7 +431,7 @@ impl Command for ConfigCommand {
                 .map(|c| c.contains_key(&setting_key))
                 .unwrap_or(false)
             {
-                value = self.config.as_ref().unwrap().borrow_mut().get_with_flags(
+                value = config.borrow_mut().get_with_flags(
                     &setting_key,
                     if input.borrow().get_option("absolute")?.as_bool() == Some(true) {
                         0
@@ -503,13 +490,7 @@ impl Command for ConfigCommand {
                     .get(&setting_key)
                     .unwrap()
                     .clone();
-                source = self
-                    .config_file
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .get_path()
-                    .to_string();
+                source = config_file.borrow().get_path().to_string();
             } else if let Some(v) = properties_defaults.get(&setting_key) {
                 value = v.clone();
                 source = "defaults".to_string();
@@ -574,6 +555,7 @@ impl Command for ConfigCommand {
         // allow unsetting audit config entirely
         if input.borrow().get_option("unset")?.as_bool() == Some(true) && setting_key == "audit" {
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .remove_config_setting(&setting_key);
@@ -586,10 +568,7 @@ impl Command for ConfigCommand {
                 || multi_config_values.contains_key(&setting_key))
         {
             if setting_key == "disable-tls"
-                && self
-                    .config
-                    .as_ref()
-                    .unwrap()
+                && config
                     .borrow()
                     .get("disable-tls")
                     .as_bool()
@@ -601,6 +580,7 @@ impl Command for ConfigCommand {
             }
 
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .remove_config_setting(&setting_key);
@@ -626,6 +606,7 @@ impl Command for ConfigCommand {
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&setting_key);
@@ -649,6 +630,7 @@ impl Command for ConfigCommand {
             }
 
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .add_config_setting(&setting_key, PhpMixed::String(values[0].clone()));
@@ -665,6 +647,7 @@ impl Command for ConfigCommand {
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&setting_key);
@@ -683,6 +666,7 @@ impl Command for ConfigCommand {
             let normalized_value = boolean_normalizer(&PhpMixed::String(values[0].clone()));
 
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .add_config_setting(&setting_key, normalized_value);
@@ -709,6 +693,7 @@ impl Command for ConfigCommand {
             && (unique_props.contains_key(&setting_key) || multi_props.contains_key(&setting_key))
         {
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .remove_property(&setting_key);
@@ -735,6 +720,7 @@ impl Command for ConfigCommand {
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_repository(&matches[1]);
@@ -746,11 +732,15 @@ impl Command for ConfigCommand {
                 let mut repo: IndexMap<String, PhpMixed> = IndexMap::new();
                 repo.insert("type".to_string(), PhpMixed::String(values[0].clone()));
                 repo.insert("url".to_string(), PhpMixed::String(values[1].clone()));
-                self.config_source.as_mut().unwrap().add_repository(
-                    &matches[1],
-                    PhpMixed::Array(repo),
-                    input.borrow().get_option("append")?.as_bool() == Some(true),
-                );
+                self.config_source
+                    .borrow_mut()
+                    .as_mut()
+                    .unwrap()
+                    .add_repository(
+                        &matches[1],
+                        PhpMixed::Array(repo),
+                        input.borrow().get_option("append")?.as_bool() == Some(true),
+                    );
 
                 return Ok(0);
             }
@@ -762,21 +752,29 @@ impl Command for ConfigCommand {
                         .as_bool()
                         .unwrap_or(false)
                     {
-                        self.config_source.as_mut().unwrap().add_repository(
-                            &matches[1],
-                            PhpMixed::Bool(false),
-                            input.borrow().get_option("append")?.as_bool() == Some(true),
-                        );
+                        self.config_source
+                            .borrow_mut()
+                            .as_mut()
+                            .unwrap()
+                            .add_repository(
+                                &matches[1],
+                                PhpMixed::Bool(false),
+                                input.borrow().get_option("append")?.as_bool() == Some(true),
+                            );
 
                         return Ok(0);
                     }
                 } else {
                     let value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
-                    self.config_source.as_mut().unwrap().add_repository(
-                        &matches[1],
-                        value,
-                        input.borrow().get_option("append")?.as_bool() == Some(true),
-                    );
+                    self.config_source
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .add_repository(
+                            &matches[1],
+                            value,
+                            input.borrow().get_option("append")?.as_bool() == Some(true),
+                        );
 
                     return Ok(0);
                 }
@@ -794,6 +792,7 @@ impl Command for ConfigCommand {
         if Preg::is_match3("/^extra\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_property(&setting_key);
@@ -805,8 +804,7 @@ impl Command for ConfigCommand {
             if input.borrow().get_option("json")?.as_bool() == Some(true) {
                 value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                 if input.borrow().get_option("merge")?.as_bool() == Some(true) {
-                    let current_value_outer =
-                        self.config_file.as_ref().unwrap().borrow_mut().read()?;
+                    let current_value_outer = config_file.borrow_mut().read()?;
                     let bits = explode(".", &setting_key);
                     let mut current_value: PhpMixed = current_value_outer;
                     for bit in &bits {
@@ -841,6 +839,7 @@ impl Command for ConfigCommand {
                 }
             }
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .add_property(&setting_key, value);
@@ -853,6 +852,7 @@ impl Command for ConfigCommand {
         if Preg::is_match3("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_property(&setting_key);
@@ -861,6 +861,7 @@ impl Command for ConfigCommand {
             }
 
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .add_property(&setting_key, PhpMixed::String(implode(" ", &values)));
@@ -876,6 +877,7 @@ impl Command for ConfigCommand {
         ) && input.borrow().get_option("unset")?.as_bool() == Some(true)
         {
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .remove_property(&setting_key);
@@ -888,6 +890,7 @@ impl Command for ConfigCommand {
         if Preg::is_match3("/^platform\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&setting_key);
@@ -901,6 +904,7 @@ impl Command for ConfigCommand {
                 PhpMixed::String(values[0].clone())
             };
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .add_config_setting(&setting_key, value);
@@ -912,6 +916,7 @@ impl Command for ConfigCommand {
         if setting_key == "platform" && input.borrow().get_option("unset")?.as_bool() == Some(true)
         {
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .remove_config_setting(&setting_key);
@@ -931,6 +936,7 @@ impl Command for ConfigCommand {
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&setting_key);
@@ -952,7 +958,7 @@ impl Command for ConfigCommand {
             }
 
             if input.borrow().get_option("merge")?.as_bool() == Some(true) {
-                let current_config = self.config_file.as_ref().unwrap().borrow_mut().read()?;
+                let current_config = config_file.borrow_mut().read()?;
                 let key_suffix = str_replace("audit.", "", &setting_key);
                 let current_value = current_config
                     .as_array()
@@ -994,6 +1000,7 @@ impl Command for ConfigCommand {
             }
 
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .add_config_setting(&setting_key, value);
@@ -1010,10 +1017,12 @@ impl Command for ConfigCommand {
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.auth_config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
@@ -1034,6 +1043,7 @@ impl Command for ConfigCommand {
                     .into());
                 }
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
@@ -1047,11 +1057,13 @@ impl Command for ConfigCommand {
                     PhpMixed::String(values[1].clone()),
                 );
                 self.auth_config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches[1] == "gitlab-token" && 2 == values.len() {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
@@ -1059,6 +1071,7 @@ impl Command for ConfigCommand {
                 obj.insert("username".to_string(), PhpMixed::String(values[0].clone()));
                 obj.insert("token".to_string(), PhpMixed::String(values[1].clone()));
                 self.auth_config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
@@ -1081,10 +1094,12 @@ impl Command for ConfigCommand {
                     .into());
                 }
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
                 self.auth_config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::String(values[0].clone()));
@@ -1100,6 +1115,7 @@ impl Command for ConfigCommand {
                     .into());
                 }
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
@@ -1107,6 +1123,7 @@ impl Command for ConfigCommand {
                 obj.insert("username".to_string(), PhpMixed::String(values[0].clone()));
                 obj.insert("password".to_string(), PhpMixed::String(values[1].clone()));
                 self.auth_config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
@@ -1149,10 +1166,12 @@ impl Command for ConfigCommand {
                 }
 
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
                 self.auth_config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::List(formatted_headers));
@@ -1168,6 +1187,7 @@ impl Command for ConfigCommand {
                     .into());
                 }
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_config_setting(&key);
@@ -1175,6 +1195,7 @@ impl Command for ConfigCommand {
                 obj.insert("username".to_string(), PhpMixed::String(values[0].clone()));
                 obj.insert("token".to_string(), PhpMixed::String(values[1].clone()));
                 self.auth_config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
@@ -1188,6 +1209,7 @@ impl Command for ConfigCommand {
         if Preg::is_match3("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_property(&setting_key);
@@ -1201,6 +1223,7 @@ impl Command for ConfigCommand {
                 PhpMixed::String(values[0].clone())
             };
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .add_property(&setting_key, value);
@@ -1211,6 +1234,7 @@ impl Command for ConfigCommand {
         // handle unsetting other top level properties
         if input.borrow().get_option("unset")?.as_bool() == Some(true) {
             self.config_source
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .remove_property(&setting_key);
@@ -1232,10 +1256,10 @@ impl Command for ConfigCommand {
 }
 
 impl BaseCommand for ConfigCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
@@ -1243,7 +1267,7 @@ impl BaseCommand for ConfigCommand {
 
 impl ConfigCommand {
     pub(crate) fn handle_single_value(
-        &mut self,
+        &self,
         key: &str,
         callbacks: &(ValidatorFn, NormalizerFn),
         values: &[String],
@@ -1276,11 +1300,9 @@ impl ConfigCommand {
         let normalized_value = normalizer(&PhpMixed::String(values[0].clone()));
 
         if key == "disable-tls" {
+            let config = self.config.borrow().as_ref().unwrap().clone();
             if !normalized_value.as_bool().unwrap_or(false)
-                && self
-                    .config
-                    .as_ref()
-                    .unwrap()
+                && config
                     .borrow()
                     .get("disable-tls")
                     .as_bool()
@@ -1290,10 +1312,7 @@ impl ConfigCommand {
                     "<info>You are now running Composer with SSL/TLS protection enabled.</info>",
                 );
             } else if normalized_value.as_bool().unwrap_or(false)
-                && !self
-                    .config
-                    .as_ref()
-                    .unwrap()
+                && !config
                     .borrow()
                     .get("disable-tls")
                     .as_bool()
@@ -1303,7 +1322,8 @@ impl ConfigCommand {
             }
         }
 
-        let config_source = self.config_source.as_mut().unwrap();
+        let mut config_source = self.config_source.borrow_mut();
+        let config_source = config_source.as_mut().unwrap();
         match method {
             "addConfigSetting" => config_source.add_config_setting(key, normalized_value)?,
             "addProperty" => config_source.add_property(key, normalized_value)?,
@@ -1313,7 +1333,7 @@ impl ConfigCommand {
     }
 
     pub(crate) fn handle_multi_value(
-        &mut self,
+        &self,
         key: &str,
         callbacks: &(ValidatorFn, NormalizerFn),
         values: &[String],
@@ -1340,7 +1360,8 @@ impl ConfigCommand {
             .into());
         }
 
-        let config_source = self.config_source.as_mut().unwrap();
+        let mut config_source = self.config_source.borrow_mut();
+        let config_source = config_source.as_mut().unwrap();
         match method {
             "addConfigSetting" => {
                 config_source.add_config_setting(key, normalizer(&values_mixed))?
@@ -1353,7 +1374,7 @@ impl ConfigCommand {
 
     /// Display the contents of the file in a pretty formatted way
     pub(crate) fn list_configuration(
-        &mut self,
+        &self,
         contents: PhpMixed,
         raw_contents: PhpMixed,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -1424,6 +1445,7 @@ impl ConfigCommand {
                 format!(
                     " ({})",
                     self.config
+                        .borrow()
                         .as_ref()
                         .unwrap()
                         .borrow_mut()
@@ -2166,31 +2188,23 @@ fn key_first_key(value: &PhpMixed) -> Option<String> {
 }
 
 impl BaseConfigCommand for ConfigCommand {
-    fn config(&self) -> Option<&std::rc::Rc<std::cell::RefCell<Config>>> {
-        self.config.as_ref()
+    fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>> {
+        self.config.borrow().clone()
     }
 
-    fn config_mut(&mut self) -> &mut Option<std::rc::Rc<std::cell::RefCell<Config>>> {
-        &mut self.config
+    fn set_config(&self, config: Option<std::rc::Rc<std::cell::RefCell<Config>>>) {
+        *self.config.borrow_mut() = config;
     }
 
-    fn config_file(&self) -> Option<&std::rc::Rc<std::cell::RefCell<JsonFile>>> {
-        self.config_file.as_ref()
+    fn config_file(&self) -> Option<std::rc::Rc<std::cell::RefCell<JsonFile>>> {
+        self.config_file.borrow().clone()
     }
 
-    fn set_config_file(&mut self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>) {
-        self.config_file = file;
+    fn set_config_file(&self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>) {
+        *self.config_file.borrow_mut() = file;
     }
 
-    fn config_source(&self) -> Option<&JsonConfigSource> {
-        self.config_source.as_ref()
-    }
-
-    fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource> {
-        self.config_source.as_mut()
-    }
-
-    fn set_config_source(&mut self, source: Option<JsonConfigSource>) {
-        self.config_source = source;
+    fn set_config_source(&self, source: Option<JsonConfigSource>) {
+        *self.config_source.borrow_mut() = source;
     }
 }

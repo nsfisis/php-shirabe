@@ -63,9 +63,11 @@ use crate::util::http::RequestProxy;
 pub struct DiagnoseCommand {
     base_command_data: BaseCommandData,
 
-    pub(crate) http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-    pub(crate) process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
-    pub(crate) exit_code: i64,
+    pub(crate) http_downloader:
+        std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>>,
+    pub(crate) process:
+        std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>>,
+    pub(crate) exit_code: std::cell::Cell<i64>,
 }
 
 impl Default for DiagnoseCommand {
@@ -76,11 +78,11 @@ impl Default for DiagnoseCommand {
 
 impl DiagnoseCommand {
     pub fn new() -> Self {
-        let mut command = DiagnoseCommand {
+        let command = DiagnoseCommand {
             base_command_data: BaseCommandData::new(None),
-            http_downloader: None,
-            process: None,
-            exit_code: 0,
+            http_downloader: std::cell::RefCell::new(None),
+            process: std::cell::RefCell::new(None),
+            exit_code: std::cell::Cell::new(0),
         };
         command
             .configure()
@@ -90,7 +92,7 @@ impl DiagnoseCommand {
 }
 
 impl Command for DiagnoseCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("diagnose")?;
         self.set_description("Diagnoses the system to identify common errors");
         self.set_help(
@@ -102,7 +104,7 @@ impl Command for DiagnoseCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -125,7 +127,7 @@ impl Command for DiagnoseCommand {
             c.get_event_dispatcher()
                 .borrow_mut()
                 .dispatch(Some(command_event.get_name()), None);
-            self.process = Some(
+            *self.process.borrow_mut() = Some(
                 c.get_loop()
                     .borrow()
                     .get_process_executor()
@@ -139,7 +141,7 @@ impl Command for DiagnoseCommand {
         } else {
             config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
 
-            self.process = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            *self.process.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
                 ProcessExecutor::new(Some(io.clone())),
             )));
         }
@@ -157,7 +159,7 @@ impl Command for DiagnoseCommand {
             &IndexMap::new(),
         );
 
-        self.http_downloader = Some(std::rc::Rc::new(std::cell::RefCell::new(
+        *self.http_downloader.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
             Factory::create_http_downloader(io.clone(), &config, indexmap::IndexMap::new())?,
         )));
 
@@ -321,7 +323,7 @@ impl Command for DiagnoseCommand {
                     repo_arr_unboxed,
                     self.get_io().clone(),
                     &config.borrow(),
-                    self.http_downloader.clone().unwrap(),
+                    self.http_downloader.borrow().clone().unwrap(),
                     None,
                 )
                 .unwrap();
@@ -443,11 +445,11 @@ impl Command for DiagnoseCommand {
         let r = self.check_disk_space(&config.borrow());
         self.output_result(r);
 
-        Ok(self.exit_code)
+        Ok(self.exit_code.get())
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -458,17 +460,17 @@ impl Command for DiagnoseCommand {
 }
 
 impl BaseCommand for DiagnoseCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl DiagnoseCommand {
-    fn check_composer_schema(&mut self) -> anyhow::Result<PhpMixed> {
+    fn check_composer_schema(&self) -> anyhow::Result<PhpMixed> {
         let validator = ConfigValidator::new(self.get_io().clone());
         let (errors, _, warnings) = validator.validate(&Factory::get_composer_file()?, 0, 0);
 
@@ -511,26 +513,33 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_git(&mut self) -> String {
+    fn check_git(&self) -> String {
         if !function_exists("proc_open") {
             return "<comment>proc_open is not available, git cannot be used</comment>".to_string();
         }
 
         let mut output = String::new();
-        let _ = self.process.as_mut().unwrap().borrow_mut().execute(
-            vec![
-                "git".to_string(),
-                "config".to_string(),
-                "color.ui".to_string(),
-            ],
-            &mut output,
-            (),
-        );
+        let _ = self
+            .process
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .execute(
+                vec![
+                    "git".to_string(),
+                    "config".to_string(),
+                    "color.ui".to_string(),
+                ],
+                &mut output,
+                (),
+            );
         if strtolower(&trim(&output, Some(" \t\n\r\0\u{0B}"))) == "always" {
             return "<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>".to_string();
         }
 
-        let git_version = Git::get_version(self.process.as_ref().unwrap());
+        let process = self.process.borrow();
+        let git_version = Git::get_version(process.as_ref().unwrap());
         let git_version = match git_version {
             Some(v) => v,
             None => return "<comment>No git process found</>".to_string(),
@@ -546,7 +555,7 @@ impl DiagnoseCommand {
         format!("<info>OK</> <comment>git version {}</>", git_version)
     }
 
-    fn check_http(&mut self, proto: &str, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_http(&self, proto: &str, config: &Config) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -558,10 +567,16 @@ impl DiagnoseCommand {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
-        match self.http_downloader.as_ref().unwrap().borrow_mut().get(
-            &format!("{}://repo.packagist.org/packages.json", proto),
-            IndexMap::new(),
-        ) {
+        match self
+            .http_downloader
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .get(
+                &format!("{}://repo.packagist.org/packages.json", proto),
+                IndexMap::new(),
+            ) {
             Ok(_) => {}
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
@@ -594,7 +609,7 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_composer_repo(&mut self, url: &str, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_composer_repo(&self, url: &str, config: &Config) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -608,6 +623,7 @@ impl DiagnoseCommand {
 
         match self
             .http_downloader
+            .borrow()
             .as_ref()
             .unwrap()
             .borrow_mut()
@@ -645,11 +661,7 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_http_proxy(
-        &mut self,
-        proxy: &RequestProxy,
-        protocol: &str,
-    ) -> anyhow::Result<PhpMixed> {
+    fn check_http_proxy(&self, proxy: &RequestProxy, protocol: &str) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -666,6 +678,7 @@ impl DiagnoseCommand {
 
         let json = self
             .http_downloader
+            .borrow()
             .as_ref()
             .unwrap()
             .borrow_mut()
@@ -694,10 +707,16 @@ impl DiagnoseCommand {
                     .and_then(|a| a.keys().next().cloned())
                     .unwrap_or_default(),
             );
-            let response = self.http_downloader.as_ref().unwrap().borrow_mut().get(
-                &format!("{}://repo.packagist.org/{}", protocol, path),
-                IndexMap::new(),
-            )?;
+            let response = self
+                .http_downloader
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .borrow_mut()
+                .get(
+                    &format!("{}://repo.packagist.org/{}", protocol, path),
+                    IndexMap::new(),
+                )?;
             let provider = response.get_body().unwrap_or_default().to_string();
 
             if hash("sha256", &provider) != hash_val.as_string().unwrap_or("") {
@@ -714,7 +733,7 @@ impl DiagnoseCommand {
         )))
     }
 
-    fn check_github_oauth(&mut self, domain: &str, token: &str) -> anyhow::Result<PhpMixed> {
+    fn check_github_oauth(&self, domain: &str, token: &str) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -736,6 +755,7 @@ impl DiagnoseCommand {
 
         match self
             .http_downloader
+            .borrow()
             .as_ref()
             .unwrap()
             .borrow_mut()
@@ -773,11 +793,7 @@ impl DiagnoseCommand {
         }
     }
 
-    fn get_github_rate_limit(
-        &mut self,
-        domain: &str,
-        token: Option<&str>,
-    ) -> anyhow::Result<PhpMixed> {
+    fn get_github_rate_limit(&self, domain: &str, token: Option<&str>) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -800,6 +816,7 @@ impl DiagnoseCommand {
         opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
         let data = self
             .http_downloader
+            .borrow()
             .as_ref()
             .unwrap()
             .borrow_mut()
@@ -841,7 +858,7 @@ impl DiagnoseCommand {
         PhpMixed::Bool(true)
     }
 
-    fn check_pub_keys(&mut self, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_pub_keys(&self, config: &Config) -> anyhow::Result<PhpMixed> {
         let home = config.get("home").as_string().unwrap_or("").to_string();
         let mut errors: Vec<PhpMixed> = vec![];
         let io = self.get_io();
@@ -888,7 +905,7 @@ impl DiagnoseCommand {
     }
 
     fn check_version(
-        &mut self,
+        &self,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
@@ -896,8 +913,10 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let mut versions_util =
-            Versions::new(config.clone(), self.http_downloader.clone().unwrap());
+        let mut versions_util = Versions::new(
+            config.clone(),
+            self.http_downloader.borrow().clone().unwrap(),
+        );
         let latest = match versions_util.get_latest(None) {
             Ok(Ok(l)) => l,
             Ok(Err(e)) => {
@@ -932,7 +951,7 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_composer_audit(&mut self, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_composer_audit(&self, config: &Config) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -981,7 +1000,7 @@ impl DiagnoseCommand {
                 repo_config,
                 std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
                 config,
-                self.http_downloader.clone().unwrap(),
+                self.http_downloader.borrow().clone().unwrap(),
                 None,
             )?);
         repo_set.add_repository(composer_repo_as_repo)?;
@@ -1086,8 +1105,8 @@ impl DiagnoseCommand {
         "<error>missing, using php streams fallback, which reduces performance</error>".to_string()
     }
 
-    fn output_result(&mut self, result: PhpMixed) {
-        let prev_exit_code = self.exit_code;
+    fn output_result(&self, result: PhpMixed) {
+        let prev_exit_code = self.exit_code.get();
         let io = self.get_io();
         if result.as_bool() == Some(true) {
             io.write("<info>OK</info>");
@@ -1138,13 +1157,13 @@ impl DiagnoseCommand {
         }
         // Apply exit code updates after io borrow ends
         if had_error {
-            self.exit_code = prev_exit_code.max(2);
+            self.exit_code.set(prev_exit_code.max(2));
         } else if had_warning {
-            self.exit_code = prev_exit_code.max(1);
+            self.exit_code.set(prev_exit_code.max(1));
         }
     }
 
-    fn check_platform(&mut self) -> anyhow::Result<PhpMixed> {
+    fn check_platform(&self) -> anyhow::Result<PhpMixed> {
         let mut output = String::new();
         let mut display_ini_message = false;
 

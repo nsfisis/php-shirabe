@@ -45,7 +45,7 @@ impl DumpCompletionCommand {
     pub const DEFAULT_DESCRIPTION: &'static str = "Dump the shell completion script";
 
     pub fn new() -> Self {
-        let mut command = DumpCompletionCommand {
+        let command = DumpCompletionCommand {
             inner: CommandData::new(None),
         };
         // PHP: static $defaultName = 'completion' / $defaultDescription, applied by the parent
@@ -111,7 +111,7 @@ impl DumpCompletionCommand {
 }
 
 impl Command for DumpCompletionCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         let full_command = shirabe_php_shim::server_php_self();
         let command_name = shirabe_php_shim::basename(&full_command);
         // @realpath($fullCommand) ?: $fullCommand
@@ -166,7 +166,7 @@ impl Command for DumpCompletionCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {

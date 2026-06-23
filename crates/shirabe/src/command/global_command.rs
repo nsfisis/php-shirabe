@@ -43,7 +43,7 @@ impl Default for GlobalCommand {
 
 impl GlobalCommand {
     pub fn new() -> Self {
-        let mut command = GlobalCommand {
+        let command = GlobalCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -78,7 +78,7 @@ impl GlobalCommand {
     }
 
     fn prepare_subcommand_input(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         quiet: bool,
     ) -> Result<StringInput> {
@@ -127,7 +127,7 @@ impl GlobalCommand {
 }
 
 impl Command for GlobalCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("global")?;
         self.set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)");
         self.set_definition(&[
@@ -164,7 +164,7 @@ impl Command for GlobalCommand {
     }
 
     fn run(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -191,7 +191,7 @@ impl Command for GlobalCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -202,10 +202,10 @@ impl Command for GlobalCommand {
 }
 
 impl BaseCommand for GlobalCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

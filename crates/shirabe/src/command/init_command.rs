@@ -47,22 +47,27 @@ pub struct InitCommand {
     base_command_data: BaseCommandData,
 
     /// @var array<string, string>
-    git_config: Option<IndexMap<String, String>>,
-    repos: Option<crate::repository::RepositoryInterfaceHandle>,
-    repository_sets:
+    git_config: std::cell::RefCell<Option<IndexMap<String, String>>>,
+    repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
+    repository_sets: std::cell::RefCell<
         IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
+    >,
 }
 
 impl PackageDiscoveryTrait for InitCommand {
-    fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle> {
-        &mut self.repos
+    fn get_repos_mut(
+        &self,
+    ) -> std::cell::RefMut<'_, Option<crate::repository::RepositoryInterfaceHandle>> {
+        self.repos.borrow_mut()
     }
 
     fn get_repository_sets_mut(
-        &mut self,
-    ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>
-    {
-        &mut self.repository_sets
+        &self,
+    ) -> std::cell::RefMut<
+        '_,
+        IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
+    > {
+        self.repository_sets.borrow_mut()
     }
 }
 
@@ -74,11 +79,11 @@ impl Default for InitCommand {
 
 impl InitCommand {
     pub fn new() -> Self {
-        let mut command = InitCommand {
+        let command = InitCommand {
             base_command_data: BaseCommandData::new(None),
-            git_config: None,
-            repos: None,
-            repository_sets: IndexMap::new(),
+            git_config: std::cell::RefCell::new(None),
+            repos: std::cell::RefCell::new(None),
+            repository_sets: std::cell::RefCell::new(IndexMap::new()),
         };
         command
             .configure()
@@ -88,7 +93,7 @@ impl InitCommand {
 }
 
 impl Command for InitCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_available_package_incl_platform() for `require` / `require-dev`
         self.set_name("init")?;
         self.set_description("Creates a basic composer.json file in current directory");
@@ -118,7 +123,7 @@ impl Command for InitCommand {
 
     /// @throws \Seld\JsonLint\ParsingException
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -404,7 +409,7 @@ impl Command for InitCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -432,7 +437,7 @@ impl Command for InitCommand {
     }
 
     fn interact(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) {
@@ -905,10 +910,10 @@ impl Command for InitCommand {
 }
 
 impl BaseCommand for InitCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
@@ -994,9 +999,9 @@ impl InitCommand {
     }
 
     /// @return array<string, string>
-    pub(crate) fn get_git_config(&mut self) -> IndexMap<String, String> {
-        if self.git_config.is_some() {
-            return self.git_config.clone().unwrap_or_default();
+    pub(crate) fn get_git_config(&self) -> IndexMap<String, String> {
+        if self.git_config.borrow().is_some() {
+            return self.git_config.borrow().clone().unwrap_or_default();
         }
 
         let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
@@ -1008,7 +1013,7 @@ impl InitCommand {
             (),
         ) == 0
         {
-            self.git_config = Some(IndexMap::new());
+            *self.git_config.borrow_mut() = Some(IndexMap::new());
             let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
             if Preg::is_match_all3(r"{^([^=]+)=(.*)$}m", &output, Some(&mut m)) {
                 let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
@@ -1016,16 +1021,17 @@ impl InitCommand {
                     m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 for (key, value) in keys.iter().zip(values.iter()) {
                     self.git_config
+                        .borrow_mut()
                         .as_mut()
                         .unwrap()
                         .insert(key.clone(), value.clone());
                 }
             }
 
-            return self.git_config.clone().unwrap_or_default();
+            return self.git_config.borrow().clone().unwrap_or_default();
         }
 
-        self.git_config = Some(IndexMap::new());
+        *self.git_config.borrow_mut() = Some(IndexMap::new());
         IndexMap::new()
     }
 
@@ -1082,7 +1088,7 @@ impl InitCommand {
     }
 
     /// For testing only: invoke the crate-private `get_git_config`.
-    pub fn __get_git_config(&mut self) -> IndexMap<String, String> {
+    pub fn __get_git_config(&self) -> IndexMap<String, String> {
         self.get_git_config()
     }
 
@@ -1153,7 +1159,7 @@ impl InitCommand {
         Preg::replace(r"{([_.-]){2,}}u", "$1", &name)
     }
 
-    fn get_default_package_name(&mut self) -> String {
+    fn get_default_package_name(&self) -> String {
         let git = self.get_git_config();
         let cwd = realpath(".").unwrap_or_default();
         let name = basename(&cwd);
@@ -1193,7 +1199,7 @@ impl InitCommand {
         format!("{}/{}", vendor, name)
     }
 
-    fn get_default_author(&mut self) -> Option<String> {
+    fn get_default_author(&self) -> Option<String> {
         let git = self.get_git_config();
 
         let mut author_name: Option<String> = None;

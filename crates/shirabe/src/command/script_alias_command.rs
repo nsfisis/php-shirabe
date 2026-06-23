@@ -54,7 +54,7 @@ impl ScriptAliasCommand {
         // the command's name/definition/application state and ignoreValidationErrors() flips a flag
         // on it. Composer's BaseCommand carries no such Symfony Command state yet (the Symfony
         // Command base is an intentional todo!() stub), so there is nothing to initialize here.
-        let mut command = Self {
+        let command = Self {
             base_command_data: BaseCommandData::new(None),
             script,
             description,
@@ -68,7 +68,7 @@ impl ScriptAliasCommand {
 }
 
 impl Command for ScriptAliasCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         let name = self.script.clone();
         self.set_name(&name)?;
         let description = self.description.clone();
@@ -111,7 +111,7 @@ impl Command for ScriptAliasCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -167,7 +167,7 @@ impl Command for ScriptAliasCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -178,10 +178,10 @@ impl Command for ScriptAliasCommand {
 }
 
 impl BaseCommand for ScriptAliasCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

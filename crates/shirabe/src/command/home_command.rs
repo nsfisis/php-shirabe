@@ -43,7 +43,7 @@ impl Default for HomeCommand {
 
 impl HomeCommand {
     pub fn new() -> Self {
-        let mut command = HomeCommand {
+        let command = HomeCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -53,7 +53,7 @@ impl HomeCommand {
     }
 
     fn handle_package(
-        &mut self,
+        &self,
         package: CompletePackageInterfaceHandle,
         show_homepage: bool,
         show_only: bool,
@@ -86,7 +86,7 @@ impl HomeCommand {
         true
     }
 
-    fn open_browser(&mut self, url: &str) {
+    fn open_browser(&self, url: &str) {
         let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
         if Platform::is_windows() {
             let _ = process.execute(
@@ -116,7 +116,7 @@ impl HomeCommand {
         }
     }
 
-    fn initialize_repos(&mut self) -> Result<Vec<crate::repository::RepositoryInterfaceHandle>> {
+    fn initialize_repos(&self) -> Result<Vec<crate::repository::RepositoryInterfaceHandle>> {
         let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {
@@ -142,7 +142,7 @@ impl HomeCommand {
 }
 
 impl Command for HomeCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_installed_package() for `packages` argument
         self.set_name("browse")?;
         self.set_aliases(vec!["home".to_string()])?;
@@ -186,7 +186,7 @@ impl Command for HomeCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -264,7 +264,7 @@ impl Command for HomeCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -275,10 +275,10 @@ impl Command for HomeCommand {
 }
 
 impl BaseCommand for HomeCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

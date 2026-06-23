@@ -49,7 +49,7 @@ impl Default for LicensesCommand {
 
 impl LicensesCommand {
     pub fn new() -> Self {
-        let mut command = LicensesCommand {
+        let command = LicensesCommand {
             base_command_data: BaseCommandData::new(None),
         };
         command
@@ -60,7 +60,7 @@ impl LicensesCommand {
 }
 
 impl Command for LicensesCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("licenses")?;
         self.set_description("Shows information about licenses of dependencies");
         self.set_definition(&[
@@ -103,7 +103,7 @@ impl Command for LicensesCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -341,7 +341,7 @@ impl Command for LicensesCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -352,10 +352,10 @@ impl Command for LicensesCommand {
 }
 
 impl BaseCommand for LicensesCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

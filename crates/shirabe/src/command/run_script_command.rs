@@ -41,7 +41,7 @@ impl Default for RunScriptCommand {
 
 impl RunScriptCommand {
     pub fn new() -> Self {
-        let mut command = RunScriptCommand {
+        let command = RunScriptCommand {
             base_command_data: BaseCommandData::new(None),
             script_events: vec![
                 ScriptEvents::PRE_INSTALL_CMD,
@@ -64,7 +64,7 @@ impl RunScriptCommand {
         command
     }
 
-    fn list_scripts(&mut self, output: Rc<RefCell<dyn OutputInterface>>) -> Result<i64> {
+    fn list_scripts(&self, output: Rc<RefCell<dyn OutputInterface>>) -> Result<i64> {
         let scripts = self.get_scripts()?;
         if scripts.is_empty() {
             return Ok(0);
@@ -87,7 +87,7 @@ impl RunScriptCommand {
         Ok(0)
     }
 
-    fn get_scripts(&mut self) -> Result<Vec<(String, String)>> {
+    fn get_scripts(&self) -> Result<Vec<(String, String)>> {
         let composer = self.require_composer(None, None)?;
         let scripts = crate::command::composer_full(&composer)
             .get_package()
@@ -116,7 +116,7 @@ impl RunScriptCommand {
 }
 
 impl Command for RunScriptCommand {
-    fn configure(&mut self) -> anyhow::Result<()> {
+    fn configure(&self) -> anyhow::Result<()> {
         self.set_name("run-script")?;
         self.set_aliases(vec!["run".to_string()])?;
         self.set_description("Runs the scripts defined in composer.json");
@@ -184,7 +184,7 @@ impl Command for RunScriptCommand {
     }
 
     fn interact(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) {
@@ -226,7 +226,7 @@ impl Command for RunScriptCommand {
     }
 
     fn execute(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -326,7 +326,7 @@ impl Command for RunScriptCommand {
     }
 
     fn initialize(
-        &mut self,
+        &self,
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
@@ -337,10 +337,10 @@ impl Command for RunScriptCommand {
 }
 
 impl BaseCommand for RunScriptCommand {
-    fn command_data_mut(
-        &mut self,
-    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data_mut()
+    fn command_data(
+        &self,
+    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data()
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

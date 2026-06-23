@@ -37,12 +37,14 @@ use crate::util::Filesystem;
 pub trait PackageDiscoveryTrait: BaseCommand {
     // PHP: private $repos; private $repositorySets;
     // TODO(phase-b): trait fields require an associated state struct in Rust; expose via accessors
-    fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle>;
+    fn get_repos_mut(
+        &self,
+    ) -> std::cell::RefMut<'_, Option<crate::repository::RepositoryInterfaceHandle>>;
     fn get_repository_sets_mut(
-        &mut self,
-    ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>;
+        &self,
+    ) -> std::cell::RefMut<'_, IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>;
 
-    fn get_repos(&mut self) -> crate::repository::RepositoryInterfaceHandle {
+    fn get_repos(&self) -> crate::repository::RepositoryInterfaceHandle {
         if self.get_repos_mut().is_none() {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
             let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
@@ -67,7 +69,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
     /// @param key-of<BasePackage::STABILITIES>|null $minimumStability
     fn get_repository_set(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         minimum_stability: Option<&str>,
     ) -> std::rc::Rc<std::cell::RefCell<RepositorySet>> {
@@ -134,7 +136,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn determine_requirements(
-        &mut self,
+        &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         mut requires: Vec<String>,
@@ -463,7 +465,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
     /// @throws \InvalidArgumentException
     /// @return array{string, string}     name version
     fn find_best_version_and_name_for_package(
-        &mut self,
+        &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         name: &str,
@@ -759,7 +761,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
     }
 
     /// @return array<string>
-    fn find_similar(&mut self, package: &str) -> Result<Vec<String>> {
+    fn find_similar(&self, package: &str) -> Result<Vec<String>> {
         let results: Vec<SearchResult> = match (|| -> Result<Vec<SearchResult>> {
             if self.get_repos_mut().is_none() {
                 return Err(LogicException {
