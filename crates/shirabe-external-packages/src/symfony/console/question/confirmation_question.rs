@@ -1,6 +1,8 @@
 //! ref: composer/vendor/symfony/console/Question/ConfirmationQuestion.php
 
+use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::question::Question;
+use crate::symfony::console::question::QuestionInterface;
 use shirabe_php_shim::PhpMixed;
 
 /// Represents a yes/no question.
@@ -55,5 +57,57 @@ impl ConfirmationQuestion {
             let answer_is_empty_string = matches!(&answer, PhpMixed::String(s) if s.is_empty());
             PhpMixed::Bool(answer_is_empty_string || answer_is_true)
         })
+    }
+}
+
+impl QuestionInterface for ConfirmationQuestion {
+    fn get_question(&self) -> &str {
+        self.inner.get_question()
+    }
+
+    fn get_default(&self) -> PhpMixed {
+        self.inner.get_default()
+    }
+
+    fn is_multiline(&self) -> bool {
+        self.inner.is_multiline()
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.inner.is_hidden()
+    }
+
+    fn is_hidden_fallback(&self) -> bool {
+        self.inner.is_hidden_fallback()
+    }
+
+    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+        self.inner.get_autocompleter_values()
+    }
+
+    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)> {
+        self.inner.get_autocompleter_callback()
+    }
+
+    fn get_validator(
+        &self,
+    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)> {
+        self.inner.get_validator()
+    }
+
+    fn get_max_attempts(&self) -> Option<i64> {
+        self.inner.get_max_attempts()
+    }
+
+    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)> {
+        self.inner.get_normalizer()
+    }
+
+    fn is_trimmable(&self) -> bool {
+        self.inner.is_trimmable()
+    }
+
+    fn as_confirmation(&self) -> Option<&ConfirmationQuestion> {
+        Some(self)
     }
 }

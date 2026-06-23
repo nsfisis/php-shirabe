@@ -2,7 +2,52 @@
 
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::logic_exception::LogicException;
+use crate::symfony::console::question::choice_question::ChoiceQuestion;
+use crate::symfony::console::question::confirmation_question::ConfirmationQuestion;
 use shirabe_php_shim::PhpMixed;
+
+/// Polymorphic boundary for the Symfony Console Question hierarchy.
+///
+/// PHP has no `QuestionInterface`; `Question` is a concrete class extended by
+/// `ChoiceQuestion`/`ConfirmationQuestion`. Modelling those subclasses as
+/// `inner: Question` composition loses subtype identity, so consumers that take
+/// a `Question` and run `instanceof` checks are expressed here as a trait whose
+/// `as_choice`/`as_confirmation` downcasts stand in for `instanceof`.
+pub trait QuestionInterface: std::fmt::Debug {
+    fn get_question(&self) -> &str;
+
+    fn get_default(&self) -> PhpMixed;
+
+    fn is_multiline(&self) -> bool;
+
+    fn is_hidden(&self) -> bool;
+
+    fn is_hidden_fallback(&self) -> bool;
+
+    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>>;
+
+    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)>;
+
+    fn get_validator(
+        &self,
+    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)>;
+
+    fn get_max_attempts(&self) -> Option<i64>;
+
+    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)>;
+
+    fn is_trimmable(&self) -> bool;
+
+    /// Models `$question instanceof ChoiceQuestion`.
+    fn as_choice(&self) -> Option<&ChoiceQuestion> {
+        None
+    }
+
+    /// Models `$question instanceof ConfirmationQuestion`.
+    fn as_confirmation(&self) -> Option<&ConfirmationQuestion> {
+        None
+    }
+}
 
 /// Represents a Question.
 pub struct Question {
@@ -273,5 +318,53 @@ impl Question {
         self.trimmable = trimmable;
 
         self
+    }
+}
+
+impl QuestionInterface for Question {
+    fn get_question(&self) -> &str {
+        self.get_question()
+    }
+
+    fn get_default(&self) -> PhpMixed {
+        self.get_default()
+    }
+
+    fn is_multiline(&self) -> bool {
+        self.is_multiline()
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.is_hidden()
+    }
+
+    fn is_hidden_fallback(&self) -> bool {
+        self.is_hidden_fallback()
+    }
+
+    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+        self.get_autocompleter_values()
+    }
+
+    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)> {
+        self.get_autocompleter_callback()
+    }
+
+    fn get_validator(
+        &self,
+    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)> {
+        self.get_validator()
+    }
+
+    fn get_max_attempts(&self) -> Option<i64> {
+        self.get_max_attempts()
+    }
+
+    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)> {
+        self.get_normalizer()
+    }
+
+    fn is_trimmable(&self) -> bool {
+        self.is_trimmable()
     }
 }

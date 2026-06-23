@@ -3,8 +3,10 @@
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::console::question::Question;
+use shirabe_external_packages::symfony::console::question::QuestionInterface;
 use shirabe_php_shim::{PhpMixed, empty, is_bool};
 
+#[derive(Debug)]
 pub struct StrictConfirmationQuestion {
     inner: Question,
     true_answer_regex: String,
@@ -78,5 +80,56 @@ impl StrictConfirmationQuestion {
             }
             Ok(answer)
         })
+    }
+}
+
+// PHP: `class StrictConfirmationQuestion extends Question` (not ConfirmationQuestion),
+// so it is not an instanceof ChoiceQuestion/ConfirmationQuestion and keeps the default
+// downcasts returning None.
+impl QuestionInterface for StrictConfirmationQuestion {
+    fn get_question(&self) -> &str {
+        self.inner.get_question()
+    }
+
+    fn get_default(&self) -> PhpMixed {
+        self.inner.get_default()
+    }
+
+    fn is_multiline(&self) -> bool {
+        self.inner.is_multiline()
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.inner.is_hidden()
+    }
+
+    fn is_hidden_fallback(&self) -> bool {
+        self.inner.is_hidden_fallback()
+    }
+
+    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+        self.inner.get_autocompleter_values()
+    }
+
+    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)> {
+        self.inner.get_autocompleter_callback()
+    }
+
+    fn get_validator(
+        &self,
+    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)> {
+        self.inner.get_validator()
+    }
+
+    fn get_max_attempts(&self) -> Option<i64> {
+        self.inner.get_max_attempts()
+    }
+
+    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)> {
+        self.inner.get_normalizer()
+    }
+
+    fn is_trimmable(&self) -> bool {
+        self.inner.is_trimmable()
     }
 }

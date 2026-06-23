@@ -18,6 +18,7 @@ use crate::symfony::console::output::output_interface::OUTPUT_NORMAL;
 use crate::symfony::console::question::ChoiceQuestion;
 use crate::symfony::console::question::ConfirmationQuestion;
 use crate::symfony::console::question::Question;
+use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::style::output_style::OutputStyle;
 use crate::symfony::console::style::style_interface::StyleInterface;
 use crate::symfony::console::terminal::Terminal;
@@ -211,7 +212,7 @@ impl SymfonyStyle {
         todo!()
     }
 
-    pub fn ask_question(&mut self, question: Question) -> PhpMixed {
+    pub fn ask_question(&mut self, question: &impl QuestionInterface) -> PhpMixed {
         if self.input.borrow().is_interactive() {
             self.auto_prepend_block();
         }
@@ -227,7 +228,7 @@ impl SymfonyStyle {
             self.question_helper
                 .as_mut()
                 .unwrap()
-                .ask(&mut *input, self.output.clone(), &question)
+                .ask(&mut *input, self.output.clone(), question)
         };
         // PHP `askQuestion` returns the answer directly; exceptions propagate. Phase B
         // collapses the double `Result` by panicking on either error.
@@ -669,7 +670,7 @@ impl StyleInterface for SymfonyStyle {
         );
         question.set_validator(Self::adapt_validator(validator));
 
-        self.ask_question(question)
+        self.ask_question(&question)
     }
 
     /// {@inheritdoc}
@@ -683,23 +684,18 @@ impl StyleInterface for SymfonyStyle {
         question.set_hidden(true);
         question.set_validator(Self::adapt_validator(validator));
 
-        self.ask_question(question)
+        self.ask_question(&question)
     }
 
     /// {@inheritdoc}
     fn confirm(&mut self, question: &str, default: bool) -> bool {
-        // PHP: return $this->askQuestion(new ConfirmationQuestion($question, $default));
-        // ConfirmationQuestion extends Question, but the ported type embeds a private
-        // `inner: Question` and cannot be passed to `ask_question(Question)`. The
-        // Question class hierarchy needs a trait/enum to dispatch polymorphically.
-        let _confirmation_question =
-            ConfirmationQuestion::new(question.to_string(), default, "/^y/i".to_string());
-        let answer = self.ask_question(todo!());
-        // PHP returns the bool answer from ConfirmationQuestion.
-        match answer {
-            PhpMixed::Bool(b) => b,
-            _ => todo!(),
-        }
+        let answer = self.ask_question(&ConfirmationQuestion::new(
+            question.to_string(),
+            default,
+            "/^y/i".to_string(),
+        ));
+
+        shirabe_php_shim::boolval(&answer)
     }
 
     /// {@inheritdoc}
@@ -713,21 +709,24 @@ impl StyleInterface for SymfonyStyle {
             let values =
                 shirabe_php_shim::array_flip(&PhpMixed::List(choices.iter().cloned().collect()));
             // $default = $values[$default] ?? $default;
-            let _ = values;
-            Some(default)
+            let resolved = match &values {
+                PhpMixed::Array(map) => map.get(&default.to_string()).cloned(),
+                _ => None,
+            };
+            Some(resolved.unwrap_or(default))
         } else {
             None
         };
 
         // PHP: return $this->askQuestion(new ChoiceQuestion($question, $choices, $default));
-        // ChoiceQuestion extends Question; see `confirm` for the polymorphism note.
         let choices_map: indexmap::IndexMap<String, PhpMixed> = choices
             .into_iter()
             .enumerate()
             .map(|(i, c)| (i.to_string(), c))
             .collect();
-        let _choice_question = ChoiceQuestion::new(question.to_string(), choices_map, default);
-        self.ask_question(todo!())
+        let choice_question = ChoiceQuestion::new(question.to_string(), choices_map, default)
+            .expect("choice() always provides at least one choice");
+        self.ask_question(&choice_question)
     }
 
     /// {@inheritdoc}

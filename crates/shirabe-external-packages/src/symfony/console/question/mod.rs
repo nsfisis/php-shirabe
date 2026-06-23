@@ -1,6 +1,6 @@
-pub mod choice_question;
-pub mod confirmation_question;
-pub mod question;
+mod choice_question;
+mod confirmation_question;
+mod question;
 
 pub use choice_question::*;
 pub use confirmation_question::*;

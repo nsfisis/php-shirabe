@@ -16,6 +16,7 @@ use shirabe_external_packages::symfony::console::output::output_interface::{
 };
 use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
 use shirabe_external_packages::symfony::console::question::Question;
+use shirabe_external_packages::symfony::console::question::QuestionInterface;
 use shirabe_php_shim::{
     AsAny, PhpMixed, array_search, function_exists, implode, in_array, is_array, is_string,
     mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat, strip_tags, strlen,
@@ -368,7 +369,7 @@ impl ConsoleIO {
     /// unrecoverable error here is a PHP fatal. The double `Result` is collapsed: the outer
     /// `anyhow::Result` (fatal) and the inner `MissingInputException` (unhandled, hence also fatal
     /// in PHP) both abort.
-    fn ask_question(&self, question: &Question) -> PhpMixed {
+    fn ask_question(&self, question: &impl QuestionInterface) -> PhpMixed {
         let error_output = self.get_error_output();
         let mut question_helper = self.question_helper.borrow_mut();
         let mut input = self.input.borrow_mut();
@@ -479,7 +480,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             "/^no?$/i".to_string(),
         );
 
-        let result = self.ask_question(question.inner());
+        let result = self.ask_question(&question);
         result.as_bool().unwrap_or(false)
     }
 
@@ -579,24 +580,18 @@ impl IOInterfaceImmutable for ConsoleIO {
             ChoiceQuestion::new(sanitized_question, sanitized_choices, sanitized_default)
                 .expect("select() always provides at least one choice");
         // PHP: IOInterface requires false, and Question requires null or int
-        let _max_attempts = match attempts {
+        let max_attempts = match attempts {
             PhpMixed::Bool(false) => None,
             PhpMixed::Int(i) => Some(i),
             _ => None,
         };
-        // TODO(phase-c): PHP calls $question->setMaxAttempts($attempts), inherited from Question.
-        // ChoiceQuestion (shirabe-external-packages) keeps its inner Question private and exposes
-        // no setMaxAttempts passthrough, so the attempts cannot be propagated here yet. See report.
+        question
+            .set_max_attempts(max_attempts)
+            .expect("select() max attempts must be a positive value");
         question.set_error_message(error_message);
         question.set_multiselect(multiselect);
 
-        // TODO(phase-c): QuestionHelper::ask takes a concrete `&Question`, but PHP passes a
-        // ChoiceQuestion whose getValidator/getDefault/autocompleter overrides drive the answer
-        // handling via polymorphism. Passing the inner Question would silently drop that behaviour.
-        // Faithful support needs the Symfony Question hierarchy modelled as a trait (or ask taking a
-        // trait object) so ChoiceQuestion's overrides dispatch — unlike StrictConfirmationQuestion,
-        // whose behaviour lives entirely on its inner Question (see ask_confirmation above).
-        let result: PhpMixed = todo!("call QuestionHelper::ask with a polymorphic ChoiceQuestion");
+        let result: PhpMixed = self.ask_question(&question);
 
         // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
         let choice_keys: Vec<String> = match &choices {

@@ -15,8 +15,8 @@ use crate::symfony::console::output::console_output_interface::ConsoleOutputInte
 use crate::symfony::console::output::console_section_output::ConsoleSectionOutput;
 use crate::symfony::console::output::output_interface;
 use crate::symfony::console::output::output_interface::OutputInterface;
-use crate::symfony::console::question::choice_question::ChoiceQuestion;
-use crate::symfony::console::question::question::Question;
+use crate::symfony::console::question::ChoiceQuestion;
+use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::terminal::Terminal;
 use crate::symfony::string::s;
 use shirabe_php_shim::AsAny;
@@ -48,7 +48,7 @@ impl QuestionHelper {
         &mut self,
         input: &mut dyn InputInterface,
         output: Rc<RefCell<dyn OutputInterface>>,
-        question: &Question,
+        question: &impl QuestionInterface,
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
         let mut output = output;
         let error_output = {
@@ -115,7 +115,7 @@ impl QuestionHelper {
     fn do_ask(
         &self,
         output: Rc<RefCell<dyn OutputInterface>>,
-        question: &Question,
+        question: &impl QuestionInterface,
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
         self.write_prompt(Rc::clone(&output), question);
 
@@ -220,7 +220,7 @@ impl QuestionHelper {
     }
 
     /// @return mixed
-    fn get_default_answer(&self, question: &Question) -> PhpMixed {
+    fn get_default_answer(&self, question: &impl QuestionInterface) -> PhpMixed {
         let default = question.get_default();
 
         if matches!(default, PhpMixed::Null) {
@@ -230,7 +230,7 @@ impl QuestionHelper {
         if let Some(validator) = question.get_validator() {
             // call_user_func($question->getValidator(), $default)
             return validator(Some(default)).unwrap();
-        } else if let Some(choice_question) = question_as_choice_question(question) {
+        } else if let Some(choice_question) = question.as_choice() {
             let choices = choice_question.get_choices();
 
             if !choice_question.is_multiselect() {
@@ -262,11 +262,11 @@ impl QuestionHelper {
     pub(crate) fn write_prompt(
         &self,
         output: Rc<RefCell<dyn OutputInterface>>,
-        question: &Question,
+        question: &impl QuestionInterface,
     ) {
         let mut message = question.get_question().to_string();
 
-        if let Some(choice_question) = question_as_choice_question(question) {
+        if let Some(choice_question) = question.as_choice() {
             let mut lines = vec![question.get_question().to_string()];
             lines.extend(self.format_choice_question_choices(choice_question, "info"));
             output
@@ -339,7 +339,7 @@ impl QuestionHelper {
     fn autocomplete(
         &self,
         output: Rc<RefCell<dyn OutputInterface>>,
-        question: &Question,
+        question: &impl QuestionInterface,
         input_stream: &shirabe_php_shim::PhpResource,
         autocomplete: &dyn Fn(&str) -> Vec<PhpMixed>,
     ) -> String {
@@ -518,7 +518,7 @@ impl QuestionHelper {
 
                 let mut temp_ret = ret.clone();
 
-                if let Some(choice_question) = question_as_choice_question(question)
+                if let Some(choice_question) = question.as_choice()
                     && choice_question.is_multiselect()
                 {
                     temp_ret = self.most_recently_entered_value(&full_choice);
@@ -680,7 +680,7 @@ impl QuestionHelper {
         &self,
         interviewer: &dyn Fn() -> anyhow::Result<Result<PhpMixed, MissingInputException>>,
         output: Rc<RefCell<dyn OutputInterface>>,
-        question: &Question,
+        question: &impl QuestionInterface,
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
         let mut error: Option<shirabe_php_shim::Exception> = None;
         let mut attempts = question.get_max_attempts();
@@ -752,7 +752,7 @@ impl QuestionHelper {
     fn read_input(
         &self,
         input_stream: &shirabe_php_shim::PhpResource,
-        question: &Question,
+        question: &impl QuestionInterface,
     ) -> PhpMixed {
         if !question.is_multiline() {
             let cp = self.set_io_codepage();
@@ -867,11 +867,6 @@ impl QuestionHelper {
     fn substr(string: Option<&str>, from: i64, length: Option<i64>) -> String {
         Helper::substr(string.unwrap_or(""), from, length)
     }
-}
-
-/// Downcasts a Question to a ChoiceQuestion if applicable.
-fn question_as_choice_question(question: &Question) -> Option<&ChoiceQuestion> {
-    question.as_any().downcast_ref::<ChoiceQuestion>()
 }
 
 // PHP `__FILE__` magic constant. The shim's `file()` is PHP's file() function,

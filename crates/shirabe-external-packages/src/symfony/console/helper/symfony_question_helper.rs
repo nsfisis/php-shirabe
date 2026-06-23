@@ -4,9 +4,7 @@ use crate::symfony::console::formatter::output_formatter::OutputFormatter;
 use crate::symfony::console::helper::question_helper::QuestionHelper;
 use crate::symfony::console::output::output_interface;
 use crate::symfony::console::output::output_interface::OutputInterface;
-use crate::symfony::console::question::choice_question::ChoiceQuestion;
-use crate::symfony::console::question::confirmation_question::ConfirmationQuestion;
-use crate::symfony::console::question::question::Question;
+use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_php_shim::AsAny;
 use shirabe_php_shim::PhpMixed;
@@ -28,7 +26,7 @@ impl SymfonyQuestionHelper {
     pub(crate) fn write_prompt(
         &self,
         output: Rc<RefCell<dyn OutputInterface>>,
-        question: &Question,
+        question: &impl QuestionInterface,
     ) {
         let mut text = OutputFormatter::escape_trailing_backslash(question.get_question());
         let default = question.get_default();
@@ -43,11 +41,7 @@ impl SymfonyQuestionHelper {
         // switch (true)
         if matches!(default, PhpMixed::Null) {
             text = format!(" <info>{}</info>:", PhpMixed::String(text));
-        } else if question
-            .as_any()
-            .downcast_ref::<ConfirmationQuestion>()
-            .is_some()
-        {
+        } else if question.as_confirmation().is_some() {
             text = format!(
                 " <info>{} (yes/no)</info> [<comment>{}</comment>]:",
                 PhpMixed::String(text),
@@ -60,11 +54,7 @@ impl SymfonyQuestionHelper {
                     .to_string(),
                 ),
             );
-        } else if let Some(choice_question) = question
-            .as_any()
-            .downcast_ref::<ChoiceQuestion>()
-            .filter(|q| q.is_multiselect())
-        {
+        } else if let Some(choice_question) = question.as_choice().filter(|q| q.is_multiselect()) {
             let choices = choice_question.get_choices();
             let default_parts = shirabe_php_shim::explode(",", &default.to_string());
 
@@ -83,7 +73,7 @@ impl SymfonyQuestionHelper {
                 PhpMixed::String(text),
                 PhpMixed::String(OutputFormatter::escape(&resolved.join(", ")).unwrap()),
             );
-        } else if let Some(choice_question) = question.as_any().downcast_ref::<ChoiceQuestion>() {
+        } else if let Some(choice_question) = question.as_choice() {
             let choices = choice_question.get_choices();
             text = format!(
                 " <info>{}</info> [<comment>{}</comment>]:",
@@ -113,7 +103,7 @@ impl SymfonyQuestionHelper {
 
         let mut prompt = " > ".to_string();
 
-        if let Some(choice_question) = question.as_any().downcast_ref::<ChoiceQuestion>() {
+        if let Some(choice_question) = question.as_choice() {
             output.borrow().writeln(
                 &self
                     .inner

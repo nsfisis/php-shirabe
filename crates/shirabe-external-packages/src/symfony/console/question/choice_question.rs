@@ -3,6 +3,7 @@
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::logic_exception::LogicException;
 use crate::symfony::console::question::Question;
+use crate::symfony::console::question::QuestionInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -81,6 +82,16 @@ impl ChoiceQuestion {
         self.prompt = prompt;
 
         self
+    }
+
+    /// Inherited from Question. Sets the maximum number of attempts.
+    pub fn set_max_attempts(
+        &mut self,
+        attempts: Option<i64>,
+    ) -> Result<&mut Self, InvalidArgumentException> {
+        self.inner.set_max_attempts(attempts)?;
+
+        Ok(self)
     }
 
     /// Sets the error message for invalid values.
@@ -226,6 +237,58 @@ impl ChoiceQuestion {
                 .next()
                 .unwrap_or(PhpMixed::Bool(false)))
         })
+    }
+}
+
+impl QuestionInterface for ChoiceQuestion {
+    fn get_question(&self) -> &str {
+        self.inner.get_question()
+    }
+
+    fn get_default(&self) -> PhpMixed {
+        self.inner.get_default()
+    }
+
+    fn is_multiline(&self) -> bool {
+        self.inner.is_multiline()
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.inner.is_hidden()
+    }
+
+    fn is_hidden_fallback(&self) -> bool {
+        self.inner.is_hidden_fallback()
+    }
+
+    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+        self.inner.get_autocompleter_values()
+    }
+
+    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)> {
+        self.inner.get_autocompleter_callback()
+    }
+
+    fn get_validator(
+        &self,
+    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)> {
+        self.inner.get_validator()
+    }
+
+    fn get_max_attempts(&self) -> Option<i64> {
+        self.inner.get_max_attempts()
+    }
+
+    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)> {
+        self.inner.get_normalizer()
+    }
+
+    fn is_trimmable(&self) -> bool {
+        self.inner.is_trimmable()
+    }
+
+    fn as_choice(&self) -> Option<&ChoiceQuestion> {
+        Some(self)
     }
 }
 
