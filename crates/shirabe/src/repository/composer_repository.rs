@@ -9,7 +9,7 @@ use shirabe_php_shim::{
     parse_url_all, realpath, strtolower, strtr, urlencode, var_export,
 };
 
-use shirabe_semver::compiling_matcher::CompilingMatcher;
+use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::SimpleConstraint;

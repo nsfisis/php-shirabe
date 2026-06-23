@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use shirabe::package::ArrayDumper;
 use shirabe::package::handle::{CompletePackageHandle, RootPackageHandle};
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 fn set_up() -> ArrayDumper {
     ArrayDumper::new()

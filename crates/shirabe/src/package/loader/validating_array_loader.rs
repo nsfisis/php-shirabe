@@ -10,10 +10,10 @@ use shirabe_php_shim::{
     parse_url_all, php_to_string, sprintf, str_replace, strcasecmp, strtolower, strtotime, substr,
     trigger_error, trim, var_export,
 };
+use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchNoneConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-use shirabe_semver::intervals::Intervals;
 use shirabe_spdx_licenses::SpdxLicenses;
 
 use crate::package::loader::InvalidPackageException;

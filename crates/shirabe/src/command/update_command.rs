@@ -13,8 +13,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
     array_keys, array_merge_map, array_search_in_vec, count, empty, in_array, sprintf, strtolower,
 };
+use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
-use shirabe_semver::intervals::Intervals;
 use std::cell::RefCell;
 use std::rc::Rc;
 

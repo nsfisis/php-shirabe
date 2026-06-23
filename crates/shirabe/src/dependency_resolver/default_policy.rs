@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 
 use indexmap::IndexMap;
-use shirabe_semver::compiling_matcher::CompilingMatcher;
+use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 

@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Platform/VersionTest.php
 
 use shirabe::platform::version::Version;
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 fn provide_openssl_versions() -> Vec<(&'static str, &'static str, bool, Option<&'static str>)> {
     vec![

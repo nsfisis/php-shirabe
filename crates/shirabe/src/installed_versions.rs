@@ -8,7 +8,7 @@ use shirabe_php_shim::{
     OutOfBoundsException, PhpMixed, array_flip, array_keys, array_merge, call_user_func_array,
     implode, is_file, method_exists, php_dir, require_php_file, strtr_array, substr,
 };
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 use crate::autoload::ClassLoader;
 

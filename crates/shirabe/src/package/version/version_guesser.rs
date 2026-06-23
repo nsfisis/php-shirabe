@@ -9,7 +9,7 @@ use shirabe_php_shim::{
     function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,
     strnatcasecmp, strpos, substr, trim, usort,
 };
-use shirabe_semver::version_parser::VersionParser as SemverVersionParser;
+use shirabe_semver::VersionParser as SemverVersionParser;
 
 use crate::config::Config;
 use crate::io::IOInterface;

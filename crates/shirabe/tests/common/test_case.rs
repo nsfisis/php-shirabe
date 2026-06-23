@@ -17,8 +17,8 @@ use shirabe_external_packages::symfony::console::output::console_output_interfac
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
 use shirabe_php_shim::{PhpMixed, PhpResource};
+use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-use shirabe_semver::version_parser::VersionParser;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;

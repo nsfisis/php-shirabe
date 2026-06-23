@@ -3,7 +3,6 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::composer::semver::Semver;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
@@ -14,6 +13,7 @@ use shirabe_php_shim::{
     array_search, date, date_format_to_strftime, extension_loaded, in_array, realpath, strtolower,
     version_compare,
 };
+use shirabe_semver::Semver;
 use shirabe_spdx_licenses::SpdxLicenses;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1062,7 +1062,7 @@ impl Command for ShowCommand {
                                     latest_version_str.trim_start_matches('v').to_string();
                             }
                             let update_status =
-                                Self::get_update_status(latest.clone(), package.clone());
+                                Self::get_update_status(latest.clone(), package.clone())?;
                             latest_length = latest_length.max(latest_version_str.len());
                             package_view_data
                                 .insert("latest".to_string(), PhpMixed::String(latest_version_str));
@@ -1544,9 +1544,14 @@ impl ShowCommand {
         &self,
         latest_package: PackageInterfaceHandle,
         package: PackageInterfaceHandle,
-    ) -> String {
-        Self::update_status_to_version_style(&Self::get_update_status(latest_package, package))
-            .to_string()
+    ) -> anyhow::Result<String> {
+        Ok(
+            Self::update_status_to_version_style(&Self::get_update_status(
+                latest_package,
+                package,
+            )?)
+            .to_string(),
+        )
     }
 
     /// finds a package by name and version if provided
@@ -1691,7 +1696,7 @@ impl ShowCommand {
             ));
         }
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
-            let style = self.get_version_style(latest.clone(), package.clone().into());
+            let style = self.get_version_style(latest.clone(), package.clone().into())?;
             let released_time = match latest.get_release_date() {
                 None => String::new(),
                 Some(rd) => {
@@ -1830,7 +1835,7 @@ impl ShowCommand {
         installed_repo: &mut dyn RepositoryInterface,
     ) -> anyhow::Result<()> {
         let mut versions_keys: Vec<String> = versions.keys().cloned().collect();
-        versions_keys = Semver::rsort(versions_keys);
+        versions_keys = Semver::rsort(versions_keys)?;
 
         // highlight installed version
         let installed_packages = installed_repo.find_packages(&package.get_name(), None)?;
@@ -2579,11 +2584,11 @@ impl ShowCommand {
     fn get_update_status(
         latest_package: PackageInterfaceHandle,
         package: PackageInterfaceHandle,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         if latest_package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
             == package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
         {
-            return "up-to-date".to_string();
+            return Ok("up-to-date".to_string());
         }
 
         let mut constraint = package.get_version().to_string();
@@ -2591,14 +2596,14 @@ impl ShowCommand {
             constraint = format!("^{}", constraint);
         }
         if !latest_package.get_version().is_empty()
-            && Semver::satisfies(&latest_package.get_version(), &constraint)
+            && Semver::satisfies(latest_package.get_version(), constraint)?
         {
             // it needs an immediate semver-compliant upgrade
-            return "semver-safe-update".to_string();
+            return Ok("semver-safe-update".to_string());
         }
 
         // it needs an upgrade but has potential BC breaks so is not urgent
-        "update-possible".to_string()
+        Ok("update-possible".to_string())
     }
 
     fn write_tree_line(&mut self, line: &str) {

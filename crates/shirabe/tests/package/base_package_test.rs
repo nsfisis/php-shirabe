@@ -4,7 +4,7 @@ use shirabe::package::DisplayMode;
 use shirabe::package::base_package::package_names_to_regexp;
 use shirabe::package::handle::PackageHandle;
 use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle};
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 use crate::test_case::get_package;
 

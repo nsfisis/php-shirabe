@@ -2,7 +2,7 @@
 
 use shirabe::package::package::Package;
 use shirabe::package::package_interface::PackageInterface;
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 /// Memory package naming, versioning, and marshalling semantics provider
 /// demonstrates several versioning schemes

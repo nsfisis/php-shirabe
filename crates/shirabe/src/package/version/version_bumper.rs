@@ -8,8 +8,8 @@ use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::intervals::Intervals;
 
 #[derive(Debug)]
 pub struct VersionBumper;

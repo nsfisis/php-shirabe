@@ -4,9 +4,9 @@ use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_semver::Semver;
+use shirabe_semver::VersionParser as SemverVersionParser;
 use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::semver::Semver;
-use shirabe_semver::version_parser::VersionParser as SemverVersionParser;
 
 use crate::repository::PlatformRepository;
 

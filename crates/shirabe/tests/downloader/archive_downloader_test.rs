@@ -17,7 +17,7 @@ use shirabe::io::null_io::NullIO;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {

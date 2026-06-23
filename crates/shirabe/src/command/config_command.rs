@@ -38,7 +38,7 @@ use crate::package::base_package::{self, BasePackage};
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 #[derive(Debug)]
 pub struct ConfigCommand {

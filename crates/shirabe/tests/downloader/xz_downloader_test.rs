@@ -16,7 +16,7 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)

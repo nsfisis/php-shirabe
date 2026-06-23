@@ -758,7 +758,7 @@ impl Installer {
             return Ok(exit_code);
         }
 
-        shirabe_semver::compiling_matcher::CompilingMatcher::clear();
+        shirabe_semver::CompilingMatcher::clear();
 
         // write lock
         let platform_reqs = self.extract_platform_requirements(&self.package.get_requires());

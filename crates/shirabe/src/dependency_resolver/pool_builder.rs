@@ -4,12 +4,12 @@ use crate::io::io_interface;
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::composer::semver::CompilingMatcher;
-use shirabe_external_packages::composer::semver::Intervals;
 use shirabe_php_shim::{
     LogicException, PhpMixed, array_flip, array_flip_strings, array_map, array_merge, array_search,
     array_search_mixed, count, in_array, microtime, number_format, round, sprintf, strpos,
 };
+use shirabe_semver::CompilingMatcher;
+use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -281,10 +281,10 @@ impl PoolBuilder {
 
                     let mut found = false;
                     for (_idx, package_or_alias) in &package_and_aliases {
-                        if CompilingMatcher::matches(
+                        if CompilingMatcher::r#match(
                             &constraint,
                             SimpleConstraint::OP_EQ,
-                            &package_or_alias.get_version(),
+                            package_or_alias.get_version(),
                         ) {
                             found = true;
                         }
@@ -400,13 +400,14 @@ impl PoolBuilder {
 
                 // extend the constraint to be loaded
                 constraint = Intervals::compact_constraint(
-                    MultiConstraint::create(
+                    &MultiConstraint::create(
                         vec![existing.clone(), constraint.clone()],
                         false,
                         None,
                     )
                     .unwrap_or_else(|_| MatchAllConstraint::new(None).into()),
-                );
+                )
+                .unwrap();
             }
 
             self.packages_to_load.insert(name.to_string(), constraint);
@@ -428,13 +429,14 @@ impl PoolBuilder {
         self.packages_to_load.insert(
             name.to_string(),
             Intervals::compact_constraint(
-                MultiConstraint::create(
+                &MultiConstraint::create(
                     vec![self.loaded_packages.get(name).unwrap().clone(), constraint],
                     false,
                     None,
                 )
                 .unwrap_or_else(|_| MatchAllConstraint::new(None).into()),
-            ),
+            )
+            .unwrap(),
         );
         self.loaded_packages.shift_remove(name);
     }

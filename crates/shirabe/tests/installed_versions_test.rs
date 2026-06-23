@@ -9,7 +9,7 @@
 use indexmap::IndexMap;
 use shirabe::installed_versions::InstalledVersions;
 use shirabe_php_shim::{PhpMixed, realpath};
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 fn arr(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {

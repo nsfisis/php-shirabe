@@ -5,7 +5,7 @@ use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::package::package::Package;
 use shirabe::package::version::version_bumper::VersionBumper;
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::version_parser::VersionParser;
+use shirabe_semver::VersionParser;
 
 #[test]
 #[ignore]

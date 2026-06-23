@@ -4,11 +4,11 @@ use std::rc::Rc;
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, implode, ksort};
-use shirabe_semver::compiling_matcher::CompilingMatcher;
+use shirabe_semver::CompilingMatcher;
+use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-use shirabe_semver::intervals::Intervals;
 
 use crate::dependency_resolver::PolicyInterface;
 use crate::dependency_resolver::Pool;
