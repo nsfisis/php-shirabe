@@ -208,49 +208,48 @@ impl Terminal {
             return None;
         }
 
-        let descriptorspec: Vec<PhpMixed> = vec![
-            PhpMixed::List(vec![
-                PhpMixed::String("pipe".to_string()),
-                PhpMixed::String("w".to_string()),
-            ]),
-            PhpMixed::List(vec![
-                PhpMixed::String("pipe".to_string()),
-                PhpMixed::String("w".to_string()),
-            ]),
+        // Sparse PHP descriptorspec `[1 => ['pipe', 'w'], 2 => ['pipe', 'w']]`: fd 0 is inherited.
+        let descriptorspec = [
+            shirabe_php_shim::Descriptor::Inherit,
+            shirabe_php_shim::Descriptor::Pipe("w".to_string()),
+            shirabe_php_shim::Descriptor::Pipe("w".to_string()),
         ];
 
-        let _cp = if shirabe_php_shim::function_exists("sapi_windows_cp_set") {
+        let cp = if shirabe_php_shim::function_exists("sapi_windows_cp_set") {
             shirabe_php_shim::sapi_windows_cp_get(None)
         } else {
             0
         };
 
-        let mut pipes = PhpMixed::Null;
-        let process =
-            shirabe_php_shim::proc_open(command, &descriptorspec, &mut pipes, None, None, None);
-        if !shirabe_php_shim::php_truthy(&process) {
-            return None;
+        let mut pipes: indexmap::IndexMap<i64, shirabe_php_shim::PhpResource> =
+            indexmap::IndexMap::new();
+        let process = match shirabe_php_shim::proc_open(
+            command,
+            &descriptorspec,
+            &mut pipes,
+            None,
+            None,
+            None,
+        ) {
+            Ok(process) => process,
+            Err(_) => return None,
+        };
+
+        let info = pipes
+            .get(&1)
+            .and_then(shirabe_php_shim::stream_get_contents);
+        if let Some(pipe) = pipes.get(&1) {
+            shirabe_php_shim::fclose(pipe);
+        }
+        if let Some(pipe) = pipes.get(&2) {
+            shirabe_php_shim::fclose(pipe);
+        }
+        shirabe_php_shim::proc_close(&process);
+
+        if cp != 0 {
+            shirabe_php_shim::sapi_windows_cp_set(cp);
         }
 
-        // $pipes[1] and $pipes[2] from proc_open's output array.
-        let _pipe1 = php_pipe(&pipes, 1);
-        let _pipe2 = php_pipe(&pipes, 2);
-        // TODO(phase-d): the pipe contents are read via stream_get_contents() and the pipes are
-        // fclose()d, but they are PHP stream resources the PhpMixed pipe list cannot hold.
-        todo!(
-            "Terminal: reading proc_open pipes needs PhpResource handles the PhpMixed pipe list cannot carry"
-        );
-    }
-}
-
-/// Indexes into the `$pipes` array populated by proc_open.
-fn php_pipe(pipes: &PhpMixed, index: i64) -> PhpMixed {
-    match pipes {
-        PhpMixed::List(list) => list.get(index as usize).cloned().unwrap_or(PhpMixed::Null),
-        PhpMixed::Array(array) => array
-            .get(&index.to_string())
-            .map(|v| v.clone())
-            .unwrap_or(PhpMixed::Null),
-        _ => PhpMixed::Null,
+        info
     }
 }

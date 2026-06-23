@@ -3,7 +3,7 @@
 use std::sync::OnceLock;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{self as php, PhpMixed, PhpResource};
+use shirabe_php_shim::{self as php, Descriptor, PhpMixed, PhpResource};
 
 use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::process::exception::logic_exception::LogicException;
@@ -50,7 +50,7 @@ pub struct Process {
     output_disabled: bool,
     stdout: Option<PhpResource>,
     stderr: Option<PhpResource>,
-    process: PhpMixed,
+    process: Option<PhpResource>,
     status: String,
     incremental_output_offset: i64,
     incremental_error_output_offset: i64,
@@ -74,24 +74,12 @@ impl std::fmt::Debug for Process {
     }
 }
 
-fn descriptor(items: &[&str]) -> PhpMixed {
-    PhpMixed::List(
-        items
-            .iter()
-            .map(|s| PhpMixed::String(s.to_string()))
-            .collect(),
-    )
-}
-
-/// Index into the `$pipes` array (a PhpMixed list/array) populated by proc_open.
-fn php_pipe(pipes: &PhpMixed, index: i64) -> PhpMixed {
-    match pipes {
-        PhpMixed::List(list) => list.get(index as usize).cloned().unwrap_or(PhpMixed::Null),
-        PhpMixed::Array(array) => array
-            .get(&index.to_string())
-            .cloned()
-            .unwrap_or(PhpMixed::Null),
-        _ => PhpMixed::Null,
+fn descriptor(items: &[&str]) -> Descriptor {
+    match items {
+        ["pipe", mode] => Descriptor::Pipe(mode.to_string()),
+        ["file", path, mode] => Descriptor::File(path.to_string(), mode.to_string()),
+        ["pty"] => Descriptor::Pty,
+        _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }
 
@@ -201,7 +189,7 @@ impl Process {
             output_disabled: false,
             stdout: None,
             stderr: None,
-            process: PhpMixed::Null,
+            process: None,
             status: Self::STATUS_READY.to_string(),
             incremental_output_offset: 0,
             incremental_error_output_offset: 0,
@@ -397,9 +385,9 @@ impl Process {
                 Some(&options),
             )
         };
-        self.process = process;
+        self.process = process.ok();
 
-        if !php::php_truthy(&self.process) {
+        if self.process.is_none() {
             return Err(
                 RuntimeException::new("Unable to launch a new process.".to_string()).into(),
             );
@@ -407,12 +395,19 @@ impl Process {
         self.status = Self::STATUS_STARTED.to_string();
 
         if descriptors.len() > 3 {
-            let _pipe3 = php_pipe(self.process_pipes.as_ref().unwrap().pipes(), 3);
-            // TODO(phase-d): the pid is read with fgets() from pipe 3, a PHP stream resource. The
-            // pipe list is a PhpMixed and cannot hold a PhpResource, so this cannot be expressed.
-            todo!(
-                "Process::start: reading the pid from pipe 3 needs a PhpResource the PhpMixed pipe list cannot carry"
-            );
+            let pipe3 = self
+                .process_pipes
+                .as_ref()
+                .unwrap()
+                .pipes()
+                .get(&3)
+                .cloned();
+            let pid = pipe3
+                .and_then(|p| php::fgets(&p, None))
+                .map(|s| s.trim().parse::<i64>().unwrap_or(0))
+                .unwrap_or(0);
+            self.fallback_status
+                .insert("pid".to_string(), PhpMixed::Int(pid));
         }
 
         if self.tty {
@@ -1121,8 +1116,8 @@ impl Process {
         static IS_TTY_SUPPORTED: OnceLock<bool> = OnceLock::new();
 
         *IS_TTY_SUPPORTED.get_or_init(|| {
-            let mut pipes = PhpMixed::Null;
-            php::php_truthy(&php::proc_open(
+            let mut pipes = IndexMap::new();
+            php::proc_open(
                 "echo 1 >/dev/null",
                 &[
                     descriptor(&["file", "/dev/tty", "r"]),
@@ -1133,7 +1128,8 @@ impl Process {
                 None,
                 None,
                 None,
-            ))
+            )
+            .is_ok()
         })
     }
 
@@ -1146,8 +1142,8 @@ impl Process {
                 return false;
             }
 
-            let mut pipes = PhpMixed::Null;
-            php::php_truthy(&php::proc_open(
+            let mut pipes = IndexMap::new();
+            php::proc_open(
                 "echo 1 >/dev/null",
                 &[
                     descriptor(&["pty"]),
@@ -1158,12 +1154,13 @@ impl Process {
                 None,
                 None,
                 None,
-            ))
+            )
+            .is_ok()
         })
     }
 
     /// Creates the descriptors needed by the proc_open.
-    fn get_descriptors(&mut self) -> Vec<PhpMixed> {
+    fn get_descriptors(&mut self) -> Vec<Descriptor> {
         // TODO(plugin): $this->input instanceof \Iterator -> rewind() is not modeled.
         if php::DIRECTORY_SEPARATOR == "\\" {
             self.process_pipes = Some(Box::new(WindowsPipes::new(
@@ -1220,7 +1217,7 @@ impl Process {
             return;
         }
 
-        self.process_information = Some(php::proc_get_status(&self.process));
+        self.process_information = Some(php::proc_get_status(self.process.as_ref().unwrap()));
         let running = self
             .process_information
             .as_ref()
@@ -1358,9 +1355,9 @@ impl Process {
         if let Some(p) = self.process_pipes.as_mut() {
             p.close();
         }
-        if php::php_truthy(&self.process) {
-            php::proc_close(self.process.clone());
-            self.process = PhpMixed::Null;
+        if self.process.is_some() {
+            php::proc_close(self.process.as_ref().unwrap());
+            self.process = None;
         }
         self.exitcode = self
             .process_information
@@ -1411,7 +1408,7 @@ impl Process {
             Some(php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
         self.stderr =
             Some(php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
-        self.process = PhpMixed::Null;
+        self.process = None;
         self.latest_signal = None;
         self.status = Self::STATUS_READY.to_string();
         self.incremental_output_offset = 0;
@@ -1456,24 +1453,27 @@ impl Process {
         } else {
             let ok;
             if !self.is_sigchild_enabled() {
-                ok = php::proc_terminate(&self.process, signal);
+                ok = php::proc_terminate(self.process.as_ref().unwrap(), signal);
             } else if php::function_exists("posix_kill") {
                 ok = php::posix_kill(pid, signal);
             } else {
-                let mut pipes = PhpMixed::Null;
+                let mut pipes = IndexMap::new();
                 let opened = php::proc_open(
                     &format!("kill -{} {}", signal, pid),
-                    &[PhpMixed::Null, PhpMixed::Null, descriptor(&["pipe", "w"])],
+                    &[
+                        Descriptor::Inherit,
+                        Descriptor::Inherit,
+                        descriptor(&["pipe", "w"]),
+                    ],
                     &mut pipes,
                     None,
                     None,
                     None,
                 );
-                let _pipe2 = php_pipe(&pipes, 2);
-                // TODO(phase-d): the original also requires `fgets($pipes[2]) === false`, reading
-                // from a PHP stream resource the PhpMixed pipe list cannot hold; that read is
-                // dropped here.
-                ok = php::php_truthy(&opened);
+                ok = match opened {
+                    Ok(_) => pipes.get(&2).and_then(|p| php::fgets(p, None)).is_none(),
+                    Err(_) => false,
+                };
             }
             if !ok {
                 if throw_exception {

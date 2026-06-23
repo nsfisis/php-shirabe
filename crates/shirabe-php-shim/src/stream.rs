@@ -43,7 +43,7 @@ fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Optio
             }
             Some(String::from_utf8_lossy(&buf).into_owned())
         }
-        PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed || !state.readable {
@@ -92,7 +92,7 @@ pub fn stream_copy_to_stream(source: &PhpResource, dest: &PhpResource) -> Option
         PhpResource::Stdin => {
             std::io::stdin().read_to_end(&mut buf).ok()?;
         }
-        PhpResource::Stdout | PhpResource::Stderr => return None,
+        PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => return None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed || !state.readable {
@@ -102,7 +102,7 @@ pub fn stream_copy_to_stream(source: &PhpResource, dest: &PhpResource) -> Option
         }
     }
     match dest {
-        PhpResource::Stdin => None,
+        PhpResource::Stdin | PhpResource::Process(_) => None,
         PhpResource::Stdout => std::io::stdout()
             .write_all(&buf)
             .ok()
@@ -128,13 +128,14 @@ pub fn stream_isatty_resource(resource: &PhpResource) -> bool {
         PhpResource::Stdin => std::io::stdin().is_terminal(),
         PhpResource::Stdout => std::io::stdout().is_terminal(),
         PhpResource::Stderr => std::io::stderr().is_terminal(),
-        PhpResource::Stream(_) => false,
+        PhpResource::Stream(_) | PhpResource::Process(_) => false,
     }
 }
 
 pub fn stream_get_meta_data(resource: &PhpResource) -> IndexMap<String, PhpMixed> {
     // (timed_out, blocked, eof, wrapper_type, stream_type, mode, seekable, uri)
     let (eof, wrapper_type, stream_type, mode, seekable, uri) = match resource {
+        PhpResource::Process(_) => (false, "PHP", "STDIO", String::new(), false, ""),
         PhpResource::Stdin => (false, "PHP", "STDIO", "r".to_string(), false, "php://stdin"),
         PhpResource::Stdout => (
             false,
@@ -163,6 +164,7 @@ pub fn stream_get_meta_data(resource: &PhpResource) -> IndexMap<String, PhpMixed
                     }
                 }
                 StreamBacking::File(_) => ("plainfile", "STDIO"),
+                StreamBacking::Pipe(_) => ("PHP", "STDIO"),
             };
             return build_meta_data(
                 state.eof,
@@ -205,17 +207,23 @@ fn build_meta_data(
 }
 
 pub fn stream_set_blocking(_resource: &PhpResource, _enable: bool) -> bool {
-    todo!()
+    // TODO(phase-d): toggling O_NONBLOCK requires fcntl(2); a syscall crate is intentionally not
+    // introduced here.
+    todo!("stream_set_blocking requires fcntl(2) (syscall crate not available)")
 }
 
+/// PHP `stream_select`. Returns the number of changed streams, or `None` for the PHP `false`
+/// returned when the underlying `select` is interrupted/fails.
 pub fn stream_select(
     _read: &mut Vec<PhpResource>,
     _write: &mut Vec<PhpResource>,
     _except: &mut Vec<PhpResource>,
     _seconds: i64,
     _microseconds: Option<i64>,
-) -> i64 {
-    todo!()
+) -> Option<i64> {
+    // TODO(phase-d): multiplexing readiness requires select(2)/poll(2); a syscall crate is
+    // intentionally not introduced here.
+    todo!("stream_select requires select(2)/poll(2) (syscall crate not available)")
 }
 
 /// PHP `stream_get_contents($stream, $maxlength, $offset)`. A non-negative `offset` seeks there
@@ -236,8 +244,11 @@ pub fn is_resource_value(_resource: &PhpResource) -> bool {
     true
 }
 
-pub fn get_resource_type(_resource: &PhpResource) -> String {
-    "stream".to_string()
+pub fn get_resource_type(resource: &PhpResource) -> String {
+    match resource {
+        PhpResource::Process(_) => "process".to_string(),
+        _ => "stream".to_string(),
+    }
 }
 
 /// Convenience wrapper over `fopen` for callers that open never-failing `php://` stdio streams and

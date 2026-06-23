@@ -1,11 +1,11 @@
 //! ref: composer/vendor/symfony/process/Pipes/AbstractPipes.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{self as php, PhpMixed};
+use shirabe_php_shim::{self as php, PhpMixed, PhpResource};
 
 #[derive(Debug)]
 pub struct AbstractPipes {
-    pub pipes: PhpMixed,
+    pub pipes: IndexMap<i64, PhpResource>,
 
     input_buffer: String,
     input: PhpMixed,
@@ -17,6 +17,8 @@ impl AbstractPipes {
     pub fn new(input: PhpMixed) -> Self {
         let mut input_buffer = String::new();
         let stored_input;
+        // TODO(plugin): `$input instanceof \Iterator` is not modeled. `is_resource` on a PhpMixed is
+        // always false, so the resource branch never stores input here.
         if php::is_resource(&input) {
             stored_input = input;
         } else if let PhpMixed::String(s) = &input {
@@ -28,7 +30,7 @@ impl AbstractPipes {
         }
 
         Self {
-            pipes: PhpMixed::List(Vec::new()),
+            pipes: IndexMap::new(),
             input_buffer,
             input: stored_input,
             blocked: true,
@@ -37,9 +39,10 @@ impl AbstractPipes {
     }
 
     pub fn close(&mut self) {
-        // TODO(phase-d): each pipe is a PHP stream resource that should be fclose()d, but the pipe
-        // list is a PhpMixed that cannot hold a PhpResource; the handles are dropped instead.
-        self.pipes = PhpMixed::List(Vec::new());
+        for (_, pipe) in &self.pipes {
+            php::fclose(pipe);
+        }
+        self.pipes = IndexMap::new();
     }
 
     /// Returns true if a system call has been interrupted.
@@ -54,14 +57,52 @@ impl AbstractPipes {
 
     /// Unblocks streams.
     pub(crate) fn unblock(&mut self) {
-        let _ = &self.input_buffer;
-        let _ = &self.blocked;
-        todo!()
+        if !self.blocked {
+            return;
+        }
+
+        for (_, pipe) in &self.pipes {
+            php::stream_set_blocking(pipe, false);
+        }
+        // The `is_resource($this->input)` branch does not apply: `input` is never a resource in this
+        // port (is_resource on a PhpMixed is always false).
+
+        self.blocked = false;
     }
 
     /// Writes input to stdin.
-    pub(crate) fn write(&mut self) -> Option<IndexMap<i64, PhpMixed>> {
-        todo!()
+    pub(crate) fn write(&mut self) -> Option<Vec<PhpResource>> {
+        let stdin = self.pipes.get(&0)?.clone();
+
+        // TODO(plugin): the `$input instanceof \Iterator` branch is not modeled. `input` is never a
+        // resource here, so the fread($input)/stream_set_blocking($input) paths do not apply and
+        // only the input buffer is written to stdin.
+
+        let mut r: Vec<PhpResource> = Vec::new();
+        let mut e: Vec<PhpResource> = Vec::new();
+        let mut w: Vec<PhpResource> = vec![stdin.clone()];
+
+        // let's have a look if something changed in streams
+        if php::stream_select(&mut r, &mut w, &mut e, 0, Some(0)).is_none() {
+            return None;
+        }
+
+        if !self.input_buffer.is_empty() {
+            let written = php::fwrite(&stdin, &self.input_buffer, None).unwrap_or(0) as usize;
+            self.input_buffer = self.input_buffer.get(written..).unwrap_or("").to_string();
+            if !self.input_buffer.is_empty() {
+                return Some(vec![stdin]);
+            }
+        }
+
+        // no input to read on resource, buffer is empty
+        if self.input_buffer.is_empty() && !php::php_truthy(&self.input) {
+            self.input = PhpMixed::Null;
+            php::fclose(&stdin);
+            self.pipes.shift_remove(&0);
+        }
+
+        None
     }
 
     pub fn handle_error(&mut self, _type: i64, msg: String) {

@@ -346,6 +346,7 @@ pub enum PhpResource {
     Stdout,
     Stderr,
     Stream(std::rc::Rc<std::cell::RefCell<StreamState>>),
+    Process(std::rc::Rc<std::cell::RefCell<process::ProcessState>>),
 }
 
 /// Combined capability of every seekable byte stream backing. Both `std::fs::File`
@@ -361,6 +362,8 @@ pub enum StreamBacking {
     /// TODO(phase-d): `php://temp/maxmemory:N` spills to a temp file past N bytes;
     /// the threshold is ignored here and everything stays in memory.
     Memory(std::io::Cursor<Vec<u8>>),
+    /// A child process pipe created by `proc_open`. Half-duplex and not seekable.
+    Pipe(ChildPipe),
 }
 
 impl StreamBacking {
@@ -368,7 +371,52 @@ impl StreamBacking {
         match self {
             StreamBacking::File(f) => f,
             StreamBacking::Memory(c) => c,
+            StreamBacking::Pipe(p) => p,
         }
+    }
+}
+
+/// One end of a child process pipe. Each variant supports only the direction PHP
+/// allows for it; the unsupported operations return `ErrorKind::Unsupported` so the
+/// `ReadWriteSeek` contract is satisfied without pretending pipes are seekable.
+#[derive(Debug)]
+pub enum ChildPipe {
+    In(std::process::ChildStdin),
+    Out(std::process::ChildStdout),
+    Err(std::process::ChildStderr),
+}
+
+impl std::io::Read for ChildPipe {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            ChildPipe::Out(o) => o.read(buf),
+            ChildPipe::Err(e) => e.read(buf),
+            ChildPipe::In(_) => Err(std::io::Error::from(std::io::ErrorKind::Unsupported)),
+        }
+    }
+}
+
+impl std::io::Write for ChildPipe {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            ChildPipe::In(i) => i.write(buf),
+            ChildPipe::Out(_) | ChildPipe::Err(_) => {
+                Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+            }
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            ChildPipe::In(i) => i.flush(),
+            ChildPipe::Out(_) | ChildPipe::Err(_) => Ok(()),
+        }
+    }
+}
+
+impl std::io::Seek for ChildPipe {
+    fn seek(&mut self, _pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
     }
 }
 

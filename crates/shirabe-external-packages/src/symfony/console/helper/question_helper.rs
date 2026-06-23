@@ -377,13 +377,14 @@ impl QuestionHelper {
         // Read a keypress
         while !shirabe_php_shim::feof(input_stream) {
             while is_stdin
-                && 0 == shirabe_php_shim::stream_select(
-                    &mut r,
-                    &mut w.clone(),
-                    &mut w.clone(),
-                    0,
-                    Some(100),
-                )
+                && Some(0)
+                    == shirabe_php_shim::stream_select(
+                        &mut r,
+                        &mut w.clone(),
+                        &mut w.clone(),
+                        0,
+                        Some(100),
+                    )
             {
                 // Give signal handlers a chance to run
                 r = vec![input_stream.clone()];

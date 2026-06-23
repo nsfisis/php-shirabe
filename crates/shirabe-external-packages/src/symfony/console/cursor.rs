@@ -181,31 +181,20 @@ impl Cursor {
 
         let is_tty_supported = if shirabe_php_shim::function_exists("proc_open") {
             *IS_TTY_SUPPORTED.get_or_init(|| {
-                let mut pipes = shirabe_php_shim::PhpMixed::Null;
-                shirabe_php_shim::php_truthy(&shirabe_php_shim::proc_open(
+                let mut pipes = indexmap::IndexMap::new();
+                shirabe_php_shim::proc_open(
                     "echo 1 >/dev/null",
-                    &vec![
-                        shirabe_php_shim::PhpMixed::List(vec![
-                            shirabe_php_shim::PhpMixed::String("file".to_string()),
-                            shirabe_php_shim::PhpMixed::String("/dev/tty".to_string()),
-                            shirabe_php_shim::PhpMixed::String("r".to_string()),
-                        ]),
-                        shirabe_php_shim::PhpMixed::List(vec![
-                            shirabe_php_shim::PhpMixed::String("file".to_string()),
-                            shirabe_php_shim::PhpMixed::String("/dev/tty".to_string()),
-                            shirabe_php_shim::PhpMixed::String("w".to_string()),
-                        ]),
-                        shirabe_php_shim::PhpMixed::List(vec![
-                            shirabe_php_shim::PhpMixed::String("file".to_string()),
-                            shirabe_php_shim::PhpMixed::String("/dev/tty".to_string()),
-                            shirabe_php_shim::PhpMixed::String("w".to_string()),
-                        ]),
+                    &[
+                        shirabe_php_shim::Descriptor::File("/dev/tty".to_string(), "r".to_string()),
+                        shirabe_php_shim::Descriptor::File("/dev/tty".to_string(), "w".to_string()),
+                        shirabe_php_shim::Descriptor::File("/dev/tty".to_string(), "w".to_string()),
                     ],
                     &mut pipes,
                     None,
                     None,
                     None,
-                ))
+                )
+                .is_ok()
             })
         } else {
             false

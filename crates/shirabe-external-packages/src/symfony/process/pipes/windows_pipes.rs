@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/process/Pipes/WindowsPipes.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
 
 use crate::symfony::process::pipes::abstract_pipes::AbstractPipes;
 use crate::symfony::process::pipes::pipes_interface::PipesInterface;
@@ -11,8 +11,8 @@ use crate::symfony::process::pipes::pipes_interface::PipesInterface;
 pub struct WindowsPipes {
     inner: AbstractPipes,
     files: IndexMap<i64, String>,
-    file_handles: IndexMap<i64, PhpMixed>,
-    lock_handles: IndexMap<i64, PhpMixed>,
+    file_handles: IndexMap<i64, PhpResource>,
+    lock_handles: IndexMap<i64, PhpResource>,
     read_bytes: IndexMap<i64, i64>,
     have_read_support: bool,
 }
@@ -25,7 +25,7 @@ impl WindowsPipes {
 }
 
 impl PipesInterface for WindowsPipes {
-    fn get_descriptors(&mut self) -> Vec<PhpMixed> {
+    fn get_descriptors(&mut self) -> Vec<Descriptor> {
         let _ = (
             &self.files,
             &self.file_handles,
@@ -48,7 +48,7 @@ impl PipesInterface for WindowsPipes {
     }
 
     fn are_open(&self) -> bool {
-        shirabe_php_shim::php_truthy(&self.inner.pipes) && !self.file_handles.is_empty()
+        !self.inner.pipes.is_empty() && !self.file_handles.is_empty()
     }
 
     fn close(&mut self) {
@@ -56,11 +56,11 @@ impl PipesInterface for WindowsPipes {
         todo!()
     }
 
-    fn pipes(&self) -> &PhpMixed {
+    fn pipes(&self) -> &IndexMap<i64, PhpResource> {
         &self.inner.pipes
     }
 
-    fn pipes_mut(&mut self) -> &mut PhpMixed {
+    fn pipes_mut(&mut self) -> &mut IndexMap<i64, PhpResource> {
         &mut self.inner.pipes
     }
 }

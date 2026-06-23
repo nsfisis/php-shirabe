@@ -1,4 +1,4 @@
-use crate::{PhpMixed, PhpResource};
+use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState};
 use indexmap::IndexMap;
 
 pub const SIGINT: i64 = 2;
@@ -130,33 +130,215 @@ pub fn escapeshellarg(arg: &str) -> String {
     out
 }
 
-// TODO(phase-c): reports proc_open as unavailable (returns false), so callers fall back to
-// their defaults. A real implementation requires holding the child process and its pipes; defer
-// it to the broader process-subsystem work (ProcessExecutor).
-pub fn proc_open(
-    _command: &str,
-    _descriptorspec: &[PhpMixed],
-    _pipes: &mut PhpMixed,
-    _cwd: Option<&str>,
-    _env: Option<&[String]>,
-    _options: Option<&IndexMap<String, PhpMixed>>,
-) -> PhpMixed {
-    PhpMixed::Bool(false)
+/// State held behind a `PhpResource::Process` handle returned by `proc_open`.
+#[derive(Debug)]
+pub struct ProcessState {
+    /// The spawned child. Taken by `proc_close`/`wait`; once taken the handle is closed.
+    child: Option<std::process::Child>,
+    /// The command line passed to `proc_open`, reported back by `proc_get_status`.
+    command: String,
 }
 
-pub fn proc_close(_process: PhpMixed) -> i64 {
+/// One entry of the `descriptorspec` array passed to `proc_open`. Unlike PHP's array this is a
+/// native type so it can carry a live `PhpResource` (e.g. a `/dev/null` stream).
+#[derive(Debug)]
+pub enum Descriptor {
+    /// `['pipe', mode]` — `mode` is `"r"`/`"w"` from the child's point of view.
+    Pipe(String),
+    /// `['file', path, mode]`.
+    File(String, String),
+    /// `['pty']`.
+    Pty,
+    /// An already-opened stream resource used directly as the descriptor.
+    Resource(PhpResource),
+    /// A descriptor index left unspecified by a sparse PHP descriptorspec; the child inherits the
+    /// corresponding parent fd.
+    Inherit,
+}
+
+/// Extracts a `try_clone`d `std::fs::File` from a file-backed stream resource so it can be handed
+/// to `Stdio::from` as a `proc_open` descriptor.
+fn resource_to_file(resource: &PhpResource) -> std::io::Result<std::fs::File> {
+    match resource {
+        PhpResource::Stream(state) => {
+            let state = state.borrow();
+            match &state.backing {
+                StreamBacking::File(f) => f.try_clone(),
+                _ => Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "proc_open descriptor resource is not a file-backed stream",
+                )),
+            }
+        }
+        _ => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "proc_open descriptor is not a stream resource",
+        )),
+    }
+}
+
+/// PHP `proc_open`. Returns the process resource on success; the PHP `false` return is modeled as
+/// `Err`. The `pipes` out-parameter is filled with the parent-side pipe streams keyed by fd index.
+pub fn proc_open(
+    command: &str,
+    descriptorspec: &[Descriptor],
+    pipes: &mut IndexMap<i64, PhpResource>,
+    cwd: Option<&str>,
+    env: Option<&[String]>,
+    options: Option<&IndexMap<String, PhpMixed>>,
+) -> std::io::Result<PhpResource> {
+    // Windows-oriented options (bypass_shell, create_process_group, ...) have no effect here.
+    let _ = options;
+
+    let mut cmd = std::process::Command::new("/bin/sh");
+    cmd.arg("-c").arg(command);
+
+    if let Some(cwd) = cwd {
+        cmd.current_dir(cwd);
+    }
+
+    if let Some(env) = env {
+        // A provided environment replaces the inherited one, matching proc_open.
+        cmd.env_clear();
+        for pair in env {
+            match pair.split_once('=') {
+                Some((k, v)) => cmd.env(k, v),
+                None => cmd.env(pair, ""),
+            };
+        }
+    }
+
+    // Remember which fds requested a pipe so their ends can be taken after spawn.
+    let mut pipe_modes: Vec<(i64, String)> = Vec::new();
+    for (index, descriptor) in descriptorspec.iter().enumerate() {
+        let fd = index as i64;
+        let stdio = match descriptor {
+            Descriptor::Pipe(mode) => {
+                pipe_modes.push((fd, mode.clone()));
+                std::process::Stdio::piped()
+            }
+            Descriptor::File(path, mode) => {
+                std::process::Stdio::from(resource_to_file(&crate::fs::fopen(path, mode)?)?)
+            }
+            Descriptor::Resource(resource) => {
+                std::process::Stdio::from(resource_to_file(resource)?)
+            }
+            Descriptor::Inherit => std::process::Stdio::inherit(),
+            Descriptor::Pty => {
+                // TODO(phase-d): pty descriptors need a pseudo-terminal (openpty/ioctl); a syscall
+                // crate is intentionally not introduced here.
+                todo!("proc_open: pty descriptors require a pseudo-terminal (syscall)")
+            }
+        };
+        match fd {
+            0 => cmd.stdin(stdio),
+            1 => cmd.stdout(stdio),
+            2 => cmd.stderr(stdio),
+            _ => {
+                // TODO(phase-d): inheriting fds >= 3 (e.g. the --enable-sigchild pipe 3) requires
+                // dup2/pre_exec; a syscall crate is intentionally not introduced here.
+                todo!("proc_open: descriptors with fd >= 3 require fd inheritance (syscall)")
+            }
+        };
+    }
+
+    let mut child = cmd.spawn()?;
+
+    for (fd, mode) in pipe_modes {
+        // fd 0 is the child's stdin: the parent-side handle is writable. fds 1/2 are stdout/stderr:
+        // the parent reads them.
+        let (pipe, readable, writable) = match fd {
+            0 => (ChildPipe::In(child.stdin.take().unwrap()), false, true),
+            1 => (ChildPipe::Out(child.stdout.take().unwrap()), true, false),
+            2 => (ChildPipe::Err(child.stderr.take().unwrap()), true, false),
+            _ => unreachable!(),
+        };
+        let resource = StreamState::new(
+            StreamBacking::Pipe(pipe),
+            readable,
+            writable,
+            mode,
+            format!("pipe:fd{}", fd),
+        );
+        pipes.insert(fd, resource);
+    }
+
+    Ok(PhpResource::Process(std::rc::Rc::new(
+        std::cell::RefCell::new(ProcessState {
+            child: Some(child),
+            command: command.to_string(),
+        }),
+    )))
+}
+
+/// PHP `proc_close`. Waits for the process to terminate and returns its exit code (-1 on failure).
+/// Pipes are expected to have been closed by the caller beforehand.
+pub fn proc_close(process: &PhpResource) -> i64 {
+    if let PhpResource::Process(state) = process {
+        let mut state = state.borrow_mut();
+        if let Some(mut child) = state.child.take() {
+            return match child.wait() {
+                Ok(status) => status.code().map(|c| c as i64).unwrap_or(-1),
+                Err(_) => -1,
+            };
+        }
+    }
     -1
 }
 
-pub fn proc_get_status(_process: &PhpMixed) -> IndexMap<String, PhpMixed> {
-    // TODO(phase-d): depends on proc_open returning a real process handle, which is itself deferred
-    // (see proc_open above). Without a live child there is no status to report.
-    todo!()
+/// PHP `proc_get_status`. Reports the live status of the process behind the resource.
+pub fn proc_get_status(process: &PhpResource) -> IndexMap<String, PhpMixed> {
+    use std::os::unix::process::ExitStatusExt;
+
+    let mut status = IndexMap::new();
+    let PhpResource::Process(state) = process else {
+        return status;
+    };
+    let mut state = state.borrow_mut();
+
+    let pid = state.child.as_ref().map(|c| c.id() as i64).unwrap_or(-1);
+    let mut running = false;
+    let mut signaled = false;
+    let mut exitcode = -1i64;
+    let mut termsig = 0i64;
+
+    if let Some(child) = state.child.as_mut() {
+        match child.try_wait() {
+            Ok(None) => running = true,
+            Ok(Some(exit)) => {
+                if let Some(code) = exit.code() {
+                    exitcode = code as i64;
+                }
+                if let Some(sig) = exit.signal() {
+                    signaled = true;
+                    termsig = sig as i64;
+                }
+            }
+            Err(_) => {}
+        }
+    }
+
+    status.insert(
+        "command".to_string(),
+        PhpMixed::String(state.command.clone()),
+    );
+    status.insert("pid".to_string(), PhpMixed::Int(pid));
+    status.insert("running".to_string(), PhpMixed::Bool(running));
+    status.insert("signaled".to_string(), PhpMixed::Bool(signaled));
+    status.insert("stopped".to_string(), PhpMixed::Bool(false));
+    status.insert("exitcode".to_string(), PhpMixed::Int(exitcode));
+    status.insert("termsig".to_string(), PhpMixed::Int(termsig));
+    status.insert("stopsig".to_string(), PhpMixed::Int(0));
+    status
 }
 
-pub fn proc_terminate(_process: &PhpMixed, _signal: i64) -> bool {
-    // TODO(phase-d): depends on proc_open returning a real process handle (see proc_open above).
-    todo!()
+pub fn proc_terminate(process: &PhpResource, signal: i64) -> bool {
+    let _ = (process, signal);
+    // TODO(phase-d): sending an arbitrary signal requires kill(2); std's Child::kill only sends
+    // SIGKILL and a syscall crate is intentionally not introduced here.
+    todo!(
+        "proc_terminate: arbitrary signal delivery requires kill(2) (syscall crate not available)"
+    )
 }
 
 pub fn getmypid() -> i64 {
@@ -210,8 +392,8 @@ pub fn posix_isatty(stream: PhpResource) -> bool {
         PhpResource::Stdin => std::io::stdin().is_terminal(),
         PhpResource::Stdout => std::io::stdout().is_terminal(),
         PhpResource::Stderr => std::io::stderr().is_terminal(),
-        // A regular file or in-memory stream is never a tty.
-        PhpResource::Stream(_) => false,
+        // A regular file, in-memory stream or process handle is never a tty.
+        PhpResource::Stream(_) | PhpResource::Process(_) => false,
     }
 }
 
@@ -224,4 +406,107 @@ pub fn get_current_user() -> String {
     // TODO(phase-d): PHP returns the owner name of the running script file, which needs stat(2) plus
     // getpwuid(3); neither is reachable without a libc/syscall crate.
     todo!()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fs::{fclose, fwrite};
+    use crate::stream::stream_get_contents;
+
+    #[test]
+    fn proc_open_reads_stdout_and_reports_status() {
+        let mut pipes = IndexMap::new();
+        let process = proc_open(
+            "echo hi",
+            &[
+                Descriptor::Inherit,
+                Descriptor::Pipe("w".to_string()),
+                Descriptor::Inherit,
+            ],
+            &mut pipes,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        let stdout = pipes.get(&1).unwrap();
+        assert_eq!(stream_get_contents(stdout).unwrap(), "hi\n");
+
+        // Reading to EOF means the child has finished; the status converges to "not running".
+        let status = loop {
+            let status = proc_get_status(&process);
+            if !crate::php_truthy(status.get("running").unwrap()) {
+                break status;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+        assert_eq!(status.get("command").unwrap().as_string(), Some("echo hi"));
+        assert!(status.get("pid").unwrap().as_int().unwrap() > 0);
+        assert_eq!(status.get("exitcode").unwrap().as_int(), Some(0));
+        assert_eq!(status.get("signaled").unwrap().as_bool(), Some(false));
+
+        for (_, pipe) in &pipes {
+            fclose(pipe);
+        }
+        assert_eq!(proc_close(&process), 0);
+    }
+
+    #[test]
+    fn proc_open_writes_stdin_pipe() {
+        let mut pipes = IndexMap::new();
+        let process = proc_open(
+            "cat",
+            &[
+                Descriptor::Pipe("r".to_string()),
+                Descriptor::Pipe("w".to_string()),
+                Descriptor::Inherit,
+            ],
+            &mut pipes,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        fwrite(pipes.get(&0).unwrap(), "ping\n", None);
+        fclose(pipes.get(&0).unwrap());
+        // Dropping the last handle closes the fd so `cat` sees end-of-input.
+        pipes.shift_remove(&0);
+
+        assert_eq!(
+            stream_get_contents(pipes.get(&1).unwrap()).unwrap(),
+            "ping\n"
+        );
+
+        assert_eq!(proc_close(&process), 0);
+    }
+
+    #[test]
+    fn proc_open_redirects_stdout_to_file() {
+        let path =
+            std::env::temp_dir().join(format!("shirabe_proc_open_{}.txt", std::process::id()));
+        let path_str = path.to_str().unwrap();
+
+        let mut pipes = IndexMap::new();
+        let process = proc_open(
+            "echo filetest",
+            &[
+                Descriptor::Inherit,
+                Descriptor::File(path_str.to_string(), "w".to_string()),
+                Descriptor::Inherit,
+            ],
+            &mut pipes,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(pipes.is_empty());
+        assert_eq!(proc_close(&process), 0);
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "filetest\n");
+        std::fs::remove_file(&path).ok();
+    }
 }

@@ -300,7 +300,7 @@ pub fn fwrite(stream: &PhpResource, data: &str, length: Option<i64>) -> Option<i
         _ => bytes,
     };
     match stream {
-        PhpResource::Stdin => None,
+        PhpResource::Stdin | PhpResource::Process(_) => None,
         PhpResource::Stdout => std::io::stdout()
             .write_all(bytes)
             .ok()
@@ -333,7 +333,7 @@ pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
             buf.truncate(n);
             Some(String::from_utf8_lossy(&buf).into_owned())
         }
-        PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed || !state.readable {
@@ -353,7 +353,10 @@ pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
 /// PHP `feof()`: true only after a read has hit end-of-stream.
 pub fn feof(stream: &PhpResource) -> bool {
     match stream {
-        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => false,
+        PhpResource::Stdin
+        | PhpResource::Stdout
+        | PhpResource::Stderr
+        | PhpResource::Process(_) => false,
         PhpResource::Stream(state) => state.borrow().eof,
     }
 }
@@ -362,6 +365,7 @@ pub fn feof(stream: &PhpResource) -> bool {
 pub fn fclose(stream: &PhpResource) -> bool {
     match stream {
         PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => true,
+        PhpResource::Process(_) => false,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed {
@@ -393,7 +397,7 @@ pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
             }
             Some(String::from_utf8_lossy(&line).into_owned())
         }
-        PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed || !state.readable {
@@ -447,7 +451,7 @@ pub fn fgetc(stream: &PhpResource) -> Option<String> {
             }
             Some(String::from_utf8_lossy(&byte).into_owned())
         }
-        PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed || !state.readable {
@@ -467,7 +471,10 @@ pub fn fgetc(stream: &PhpResource) -> Option<String> {
 pub fn ftell(stream: &PhpResource) -> Option<i64> {
     use std::io::Seek;
     match stream {
-        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stdin
+        | PhpResource::Stdout
+        | PhpResource::Stderr
+        | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed {
@@ -492,7 +499,10 @@ pub fn fseek(stream: &PhpResource, offset: i64, whence: i64) -> i64 {
         _ => std::io::SeekFrom::Start(offset.max(0) as u64),
     };
     match stream {
-        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => -1,
+        PhpResource::Stdin
+        | PhpResource::Stdout
+        | PhpResource::Stderr
+        | PhpResource::Process(_) => -1,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed {
@@ -519,7 +529,10 @@ pub fn fstat(stream: &PhpResource) -> Option<IndexMap<String, PhpMixed>> {
     match stream {
         // TODO(phase-d): the stdio streams expose no fd to stat without a syscall crate; report
         // failure rather than fabricate fields.
-        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => None,
+        PhpResource::Stdin
+        | PhpResource::Stdout
+        | PhpResource::Stderr
+        | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed {
@@ -531,6 +544,7 @@ pub fn fstat(stream: &PhpResource) -> Option<IndexMap<String, PhpMixed>> {
                     (m.len(), Some(m))
                 }
                 StreamBacking::Memory(c) => (c.get_ref().len() as u64, None),
+                StreamBacking::Pipe(_) => return None,
             };
             Some(build_stat_map(size, file_meta.as_ref()))
         }
@@ -590,6 +604,7 @@ pub fn fflush(stream: &PhpResource) -> bool {
         PhpResource::Stdin => true,
         PhpResource::Stdout => std::io::stdout().flush().is_ok(),
         PhpResource::Stderr => std::io::stderr().flush().is_ok(),
+        PhpResource::Process(_) => false,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed {
@@ -893,7 +908,10 @@ pub fn copy(_source: &str, _dest: &str) -> bool {
 
 pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
     match stream {
-        PhpResource::Stdin | PhpResource::Stdout | PhpResource::Stderr => false,
+        PhpResource::Stdin
+        | PhpResource::Stdout
+        | PhpResource::Stderr
+        | PhpResource::Process(_) => false,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed || !state.writable {
@@ -908,6 +926,7 @@ pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
                     buf.resize(size as usize, 0);
                     true
                 }
+                StreamBacking::Pipe(_) => false,
             }
         }
     }
