@@ -120,13 +120,9 @@ impl XmlDescriptor {
             commands_xml.set_attribute("namespace", namespace);
         }
 
-        let command_list: Vec<_> = description
-            .get_commands()
-            .values()
-            .map(|c| c.borrow().clone_box())
-            .collect();
-        for command in command_list {
-            let command_xml = self.get_command_document(command.as_ref(), short);
+        for command in description.get_commands().values() {
+            let command = command.borrow();
+            let command_xml = self.get_command_document(&*command, short);
             self.append_document(&commands_xml, &command_xml.as_node());
         }
 

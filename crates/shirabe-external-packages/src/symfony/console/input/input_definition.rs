@@ -46,6 +46,26 @@ impl InputDefinition {
         Ok(input_definition)
     }
 
+    /// Builds an option-only definition that shares the given options by
+    /// reference, mirroring `new InputDefinition($definition->getOptions())`.
+    /// `InputOption` is not `Clone` and lives behind `Rc`, so the options are
+    /// reused rather than reconstructed by value.
+    pub fn from_options(options: Vec<Rc<InputOption>>) -> anyhow::Result<Self> {
+        let mut input_definition = InputDefinition {
+            arguments: IndexMap::new(),
+            required_count: 0,
+            last_array_argument: None,
+            last_optional_argument: None,
+            options: IndexMap::new(),
+            negations: IndexMap::new(),
+            shortcuts: IndexMap::new(),
+        };
+        for option in options {
+            input_definition.add_option_rc(option)?;
+        }
+        Ok(input_definition)
+    }
+
     /// Sets the definition of the input.
     pub fn set_definition(&mut self, definition: Vec<DefinitionItem>) -> anyhow::Result<()> {
         let mut arguments = vec![];
@@ -230,8 +250,12 @@ impl InputDefinition {
     }
 
     pub fn add_option(&mut self, option: InputOption) -> anyhow::Result<()> {
-        let option = Rc::new(option);
+        self.add_option_rc(Rc::new(option))
+    }
 
+    /// Adds an option that is already shared behind `Rc`, mirroring PHP passing
+    /// `InputOption` objects by reference.
+    pub fn add_option_rc(&mut self, option: Rc<InputOption>) -> anyhow::Result<()> {
         if let Some(existing) = self.options.get(option.get_name())
             && !option.equals(existing)
         {

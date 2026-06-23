@@ -280,15 +280,11 @@ impl MarkdownDescriptor {
             );
         }
 
-        let command_list: Vec<_> = description
-            .get_commands()
-            .values()
-            .map(|c| c.borrow().clone_box())
-            .collect();
-        for command in command_list {
+        for command in description.get_commands().values() {
+            let command = command.borrow();
             self.write("\n\n", true);
             // describeCommand returns null; the guarded write never runs.
-            self.describe_command(command.as_ref(), options.clone())?;
+            self.describe_command(&*command, options.clone())?;
         }
         Ok(())
     }

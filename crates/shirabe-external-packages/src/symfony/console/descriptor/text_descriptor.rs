@@ -308,11 +308,14 @@ impl TextDescriptor {
             self.write_text("<comment>Usage:</comment>\n", &options);
             self.write_text("  command [options] [arguments]\n\n", &options);
 
-            // PHP: new InputDefinition($application->getDefinition()->getOptions()).
-            // `InputOption` is not Clone and lives behind `Rc`, so the option-only
-            // definition cannot be reconstructed by value yet.
-            let definition: InputDefinition =
-                todo!("new InputDefinition($application->getDefinition()->getOptions())");
+            let app_definition = application.borrow_mut().get_definition();
+            let options_only: Vec<std::rc::Rc<InputOption>> = app_definition
+                .borrow()
+                .get_options()
+                .values()
+                .cloned()
+                .collect();
+            let definition = InputDefinition::from_options(options_only)?;
             self.describe_input_definition(&definition, options.clone())?;
 
             self.write_text("\n", &IndexMap::new());

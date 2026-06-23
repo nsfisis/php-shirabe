@@ -334,12 +334,6 @@ macro_rules! delegate_command_trait_impls_to_inner {
 /// Object-safe so `dyn Command` works. All methods take `&self`; the command's mutable
 /// state is interior-mutable (see [`CommandData`]).
 pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
-    fn clone_box(&self) -> Box<dyn Command> {
-        todo!()
-    }
-
-    // --- behavior hooks (PHP-overridable; defaults match the PHP `Command` class) ---
-
     /// Configures the current command.
     fn configure(&self) -> anyhow::Result<()> {
         Ok(())
