@@ -55,9 +55,9 @@ impl DebugFormatterHelper {
 
         format!(
             "{}<bg=blue;fg=white> {} </> <fg=blue>{}</>\n",
-            shirabe_php_shim::PhpMixed::String(self.get_border(id)),
-            shirabe_php_shim::PhpMixed::String(prefix.to_string()),
-            shirabe_php_shim::PhpMixed::String(message.to_string()),
+            self.get_border(id),
+            prefix.to_string(),
+            message.to_string(),
         )
     }
 
@@ -80,8 +80,8 @@ impl DebugFormatterHelper {
             if !self.started[id].err {
                 message.push_str(&format!(
                     "{}<bg=red;fg=white> {} </> ",
-                    shirabe_php_shim::PhpMixed::String(self.get_border(id)),
-                    shirabe_php_shim::PhpMixed::String(error_prefix.to_string()),
+                    self.get_border(id),
+                    error_prefix.to_string(),
                 ));
                 self.started.get_mut(id).unwrap().err = true;
             }
@@ -90,8 +90,8 @@ impl DebugFormatterHelper {
                 "\n",
                 &format!(
                     "\n{}<bg=red;fg=white> {} </> ",
-                    shirabe_php_shim::PhpMixed::String(self.get_border(id)),
-                    shirabe_php_shim::PhpMixed::String(error_prefix.to_string()),
+                    self.get_border(id),
+                    error_prefix.to_string(),
                 ),
                 buffer,
             ));
@@ -103,8 +103,8 @@ impl DebugFormatterHelper {
             if !self.started[id].out {
                 message.push_str(&format!(
                     "{}<bg=green;fg=white> {} </> ",
-                    shirabe_php_shim::PhpMixed::String(self.get_border(id)),
-                    shirabe_php_shim::PhpMixed::String(prefix.to_string()),
+                    self.get_border(id),
+                    prefix.to_string(),
                 ));
                 self.started.get_mut(id).unwrap().out = true;
             }
@@ -113,8 +113,8 @@ impl DebugFormatterHelper {
                 "\n",
                 &format!(
                     "\n{}<bg=green;fg=white> {} </> ",
-                    shirabe_php_shim::PhpMixed::String(self.get_border(id)),
-                    shirabe_php_shim::PhpMixed::String(prefix.to_string()),
+                    self.get_border(id),
+                    prefix.to_string(),
                 ),
                 buffer,
             ));
@@ -134,19 +134,19 @@ impl DebugFormatterHelper {
         if successful {
             return format!(
                 "{}{}<bg=green;fg=white> {} </> <fg=green>{}</>\n",
-                shirabe_php_shim::PhpMixed::String(trailing_eol.to_string()),
-                shirabe_php_shim::PhpMixed::String(self.get_border(id)),
-                shirabe_php_shim::PhpMixed::String(prefix.to_string()),
-                shirabe_php_shim::PhpMixed::String(message.to_string()),
+                trailing_eol.to_string(),
+                self.get_border(id),
+                prefix.to_string(),
+                message.to_string(),
             );
         }
 
         let message = format!(
             "{}{}<bg=red;fg=white> {} </> <fg=red>{}</>\n",
-            shirabe_php_shim::PhpMixed::String(trailing_eol.to_string()),
-            shirabe_php_shim::PhpMixed::String(self.get_border(id)),
-            shirabe_php_shim::PhpMixed::String(prefix.to_string()),
-            shirabe_php_shim::PhpMixed::String(message.to_string()),
+            trailing_eol.to_string(),
+            self.get_border(id),
+            prefix.to_string(),
+            message.to_string(),
         );
 
         if let Some(session) = self.started.get_mut(id) {
@@ -160,9 +160,7 @@ impl DebugFormatterHelper {
     fn get_border(&self, id: &str) -> String {
         format!(
             "<bg={}> </>",
-            shirabe_php_shim::PhpMixed::String(
-                COLORS[self.started[id].border as usize].to_string(),
-            ),
+            COLORS[self.started[id].border as usize].to_string(),
         )
     }
 }

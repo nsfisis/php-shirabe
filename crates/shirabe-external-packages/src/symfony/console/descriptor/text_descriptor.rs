@@ -62,18 +62,18 @@ impl TextDescriptor {
         self.write_text(
             &format!(
                 "  <info>{}</info>  {}{}{}",
-                PhpMixed::String(argument.get_name().to_string()),
-                PhpMixed::String(shirabe_php_shim::str_repeat(" ", spacing_width as usize)),
+                argument.get_name().to_string(),
+                shirabe_php_shim::str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                PhpMixed::String(Preg::replace(
+                Preg::replace(
                     "/\\s*[\\r\\n]\\s*/",
                     &format!(
                         "\n{}",
                         shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
                     ),
                     argument.get_description(),
-                )),
-                PhpMixed::String(default),
+                ),
+                default,
             ),
             &options,
         );
@@ -114,24 +114,14 @@ impl TextDescriptor {
         let synopsis = format!(
             "{}{}",
             if option.get_shortcut().is_some() {
-                format!(
-                    "-{}, ",
-                    PhpMixed::String(option.get_shortcut().unwrap().to_string()),
-                )
+                format!("-{}, ", option.get_shortcut().unwrap().to_string())
             } else {
                 "    ".to_string()
             },
             if option.is_negatable() {
-                format!(
-                    "--{0}|--no-{0}",
-                    PhpMixed::String(option.get_name().to_string()),
-                )
+                format!("--{0}|--no-{0}", option.get_name().to_string())
             } else {
-                format!(
-                    "--{0}{1}",
-                    PhpMixed::String(option.get_name().to_string()),
-                    PhpMixed::String(value.clone()),
-                )
+                format!("--{0}{1}", option.get_name().to_string(), value.clone())
             }
         );
 
@@ -140,23 +130,23 @@ impl TextDescriptor {
         self.write_text(
             &format!(
                 "  <info>{}</info>  {}{}{}{}",
-                PhpMixed::String(synopsis),
-                PhpMixed::String(shirabe_php_shim::str_repeat(" ", spacing_width as usize)),
+                synopsis,
+                shirabe_php_shim::str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                PhpMixed::String(Preg::replace(
+                Preg::replace(
                     "/\\s*[\\r\\n]\\s*/",
                     &format!(
                         "\n{}",
                         shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
                     ),
                     option.get_description(),
-                )),
-                PhpMixed::String(default),
-                PhpMixed::String(if option.is_array() {
+                ),
+                default,
+                if option.is_array() {
                     "<comment> (multiple values allowed)</comment>".to_string()
                 } else {
                     String::new()
-                }),
+                },
             ),
             &options,
         );
@@ -291,8 +281,8 @@ impl TextDescriptor {
                 self.write_text(
                     &format!(
                         "{:<w$} {}",
-                        PhpMixed::String(command.get_name().unwrap_or_default()),
-                        PhpMixed::String(command.get_description()),
+                        command.get_name().unwrap_or_default(),
+                        command.get_description(),
                         w = width as usize,
                     ),
                     &options,
@@ -360,7 +350,7 @@ impl TextDescriptor {
                 self.write_text(
                     &format!(
                         "<comment>Available commands for the \"{}\" namespace:</comment>",
-                        PhpMixed::String(described_namespace.clone()),
+                        described_namespace.clone(),
                     ),
                     &options,
                 );
@@ -411,16 +401,9 @@ impl TextDescriptor {
                     self.write_text(
                         &format!(
                             "  <info>{}</info>{}{}",
-                            PhpMixed::String(name.clone()),
-                            PhpMixed::String(shirabe_php_shim::str_repeat(
-                                " ",
-                                spacing_width as usize,
-                            )),
-                            PhpMixed::String(format!(
-                                "{}{}",
-                                command_aliases,
-                                command.get_description()
-                            )),
+                            name.clone(),
+                            shirabe_php_shim::str_repeat(" ", spacing_width as usize),
+                            format!("{}{}", command_aliases, command.get_description()),
                         ),
                         &options,
                     );

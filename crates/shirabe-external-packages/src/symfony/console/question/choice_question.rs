@@ -172,7 +172,7 @@ impl ChoiceQuestion {
                         shirabe_php_shim::InvalidArgumentException {
                             message: format!(
                                 "The provided answer is ambiguous. Value should be one of \"{}\".",
-                                PhpMixed::String(shirabe_php_shim::implode("\" or \"", &results,)),
+                                shirabe_php_shim::implode("\" or \"", &results),
                             ),
                             code: 0,
                         },

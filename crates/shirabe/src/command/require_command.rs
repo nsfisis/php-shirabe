@@ -463,7 +463,7 @@ impl Command for RequireCommand {
             if strtolower(package) == composer.get_package().get_name() {
                 let msg = format!(
                     "<error>Root package '{}' cannot require itself in its composer.json</error>",
-                    PhpMixed::String(package.clone()),
+                    package.clone(),
                 );
                 self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
@@ -481,17 +481,15 @@ impl Command for RequireCommand {
             for package in &inconsistent_require_keys {
                 let warn_msg = format!(
                     "{} is currently present in the {} key and you ran the command {} the --dev flag, which will move it to the {} key.",
-                    PhpMixed::String(package.clone()),
-                    PhpMixed::String(remove_key.to_string()),
-                    PhpMixed::String(
-                        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
-                            "with"
-                        } else {
-                            "without"
-                        }
-                        .to_string(),
-                    ),
-                    PhpMixed::String(require_key.to_string()),
+                    package.clone(),
+                    remove_key.to_string(),
+                    if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
+                        "with"
+                    } else {
+                        "without"
+                    }
+                    .to_string(),
+                    require_key.to_string(),
                 );
                 self.get_io().warning(&warn_msg, &[]);
             }
@@ -499,26 +497,22 @@ impl Command for RequireCommand {
             if self.get_io().is_interactive() {
                 let q1 = format!(
                     "<info>Do you want to move {}?</info> [<comment>no</comment>]? ",
-                    PhpMixed::String(
-                        if (inconsistent_require_keys.len() as i64) > 1 {
-                            "these requirements"
-                        } else {
-                            "this requirement"
-                        }
-                        .to_string(),
-                    ),
+                    if (inconsistent_require_keys.len() as i64) > 1 {
+                        "these requirements"
+                    } else {
+                        "this requirement"
+                    }
+                    .to_string(),
                 );
                 if !self.get_io().ask_confirmation(q1, false) {
                     let q2 = format!(
                         "<info>Do you want to re-run the command {} --dev?</info> [<comment>yes</comment>]? ",
-                        PhpMixed::String(
-                            if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
-                                "without"
-                            } else {
-                                "with"
-                            }
-                            .to_string(),
-                        ),
+                        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
+                            "without"
+                        } else {
+                            "with"
+                        }
+                        .to_string(),
                     );
                     if !self.get_io().ask_confirmation(q2, true) {
                         return Ok(0);
@@ -1122,8 +1116,8 @@ impl RequireCommand {
             self.get_io().write_error3(
                 &format!(
                     "Using version <info>{}</info> for <info>{}</info>",
-                    PhpMixed::String(requirements.get(package_name).cloned().unwrap_or_default(),),
-                    PhpMixed::String(package_name.clone()),
+                    requirements.get(package_name).cloned().unwrap_or_default(),
+                    package_name.clone(),
                 ),
                 true,
                 io_interface::NORMAL,

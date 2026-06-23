@@ -106,14 +106,7 @@ impl ConsoleIO {
             };
             let mapped: Vec<String> = arr
                 .into_iter()
-                .map(|message| {
-                    format!(
-                        "[{:.1}MiB/{:.2}s] {}",
-                        memory_usage,
-                        time_spent,
-                        PhpMixed::String(message),
-                    )
-                })
+                .map(|message| format!("[{:.1}MiB/{:.2}s] {}", memory_usage, time_spent, message))
                 .collect();
             PhpMixed::List(mapped.into_iter().map(PhpMixed::String).collect())
         } else {

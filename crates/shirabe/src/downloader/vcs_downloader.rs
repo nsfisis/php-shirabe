@@ -161,7 +161,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!("Failed: [{}] {}", get_class_err(&e), e,),
+                            &format!("Failed: [{}] {}", get_class_err(&e), e),
                             true,
                             io_interface::NORMAL,
                         );
@@ -265,7 +265,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!("Failed: [{}] {}", get_class_err(&e), e,),
+                            &format!("Failed: [{}] {}", get_class_err(&e), e),
                             true,
                             io_interface::NORMAL,
                         );
@@ -334,7 +334,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!("Failed: [{}] {}", get_class_err(&e), e,),
+                            &format!("Failed: [{}] {}", get_class_err(&e), e),
                             true,
                             io_interface::NORMAL,
                         );

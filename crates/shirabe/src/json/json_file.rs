@@ -385,7 +385,7 @@ impl JsonFile {
             let mut m = indexmap::IndexMap::new();
             m.insert(
                 "$ref".to_string(),
-                PhpMixed::String(format!("{}#/properties/config", schema_file,)),
+                PhpMixed::String(format!("{}#/properties/config", schema_file)),
             );
             m.insert(
                 "$schema".to_string(),

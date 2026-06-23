@@ -343,8 +343,8 @@ impl EventDispatcher {
                     self.io.write_error3(
                         &format!(
                             "> {}: {}",
-                            PhpMixed::String(formatted_event_name_with_args.clone()),
-                            PhpMixed::String(format!("{}->{}", prefix, method_name)),
+                            formatted_event_name_with_args.clone(),
+                            format!("{}->{}", prefix, method_name),
                         ),
                         true,
                         crate::io::VERBOSE,
@@ -358,8 +358,8 @@ impl EventDispatcher {
                         self.io.write_error3(
                             &format!(
                                 "> {}: {}",
-                                PhpMixed::String(formatted_event_name_with_args.clone()),
-                                PhpMixed::String(callable_str.clone()),
+                                formatted_event_name_with_args.clone(),
+                                callable_str.clone(),
                             ),
                             true,
                             crate::io::VERBOSE,
@@ -416,8 +416,8 @@ impl EventDispatcher {
                             if exit_code != 0 {
                                 self.io.write_error3(&format!(
                                     "<error>Script {} handling the {} event returned with error code {}</error>",
-                                    PhpMixed::String(callable_str.clone()),
-                                    PhpMixed::String(event.get_name().to_string()),
+                                    callable_str.clone(),
+                                    event.get_name().to_string(),
                                     exit_code
                                 ), true, crate::io::QUIET);
 
@@ -442,7 +442,7 @@ impl EventDispatcher {
                             {
                                 self.io.write_error3(&format!(
                                     "<warning>You made a reference to a non-existent script {}</warning>",
-                                    PhpMixed::String(callable_str.clone()),
+                                    callable_str.clone(),
                                 ), true, crate::io::QUIET);
                             }
 
@@ -469,8 +469,8 @@ impl EventDispatcher {
                                         self.io.write_error3(
                                             &format!(
                                                 "<error>Script {} was called via {}</error>",
-                                                PhpMixed::String(callable_str.clone()),
-                                                PhpMixed::String(event.get_name().to_string()),
+                                                callable_str.clone(),
+                                                event.get_name().to_string(),
                                             ),
                                             true,
                                             crate::io::QUIET,
@@ -513,8 +513,8 @@ impl EventDispatcher {
                                 self.io.write_error3(
                                     &format!(
                                         "<error>Script {} handling the {} event terminated with an exception</error>",
-                                        PhpMixed::String(callable_str.clone()),
-                                        PhpMixed::String(event.get_name().to_string()),
+                                        callable_str.clone(),
+                                        event.get_name().to_string(),
                                     ),
                                     true,
                                     crate::io::QUIET,
@@ -613,17 +613,13 @@ impl EventDispatcher {
 
                         if self.io.is_verbose() {
                             self.io.write_error3(
-                                &format!(
-                                    "> {}: {}",
-                                    PhpMixed::String(event.get_name().to_string()),
-                                    PhpMixed::String(exec.clone()),
-                                ),
+                                &format!("> {}: {}", event.get_name().to_string(), exec.clone()),
                                 true,
                                 crate::io::NORMAL,
                             );
                         } else if self.event_needs_to_output(event) {
                             self.io.write_error3(
-                                &format!("> {}", PhpMixed::String(exec.clone())),
+                                &format!("> {}", exec.clone()),
                                 true,
                                 crate::io::NORMAL,
                             );
@@ -741,8 +737,8 @@ impl EventDispatcher {
                         if exit_code != 0 {
                             self.io.write_error3(&format!(
                                 "<error>Script {} handling the {} event returned with error code {}</error>",
-                                PhpMixed::String(callable_str.clone()),
-                                PhpMixed::String(event.get_name().to_string()),
+                                callable_str.clone(),
+                                event.get_name().to_string(),
                                 exit_code
                             ), true, crate::io::QUIET);
 
@@ -843,20 +839,16 @@ impl EventDispatcher {
             self.io.write_error3(
                 &format!(
                     "> {}: {}::{}",
-                    PhpMixed::String(event.get_name().to_string()),
-                    PhpMixed::String(class_name.to_string()),
-                    PhpMixed::String(method_name.to_string()),
+                    event.get_name().to_string(),
+                    class_name.to_string(),
+                    method_name.to_string(),
                 ),
                 true,
                 crate::io::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
             self.io.write_error3(
-                &format!(
-                    "> {}::{}",
-                    PhpMixed::String(class_name.to_string()),
-                    PhpMixed::String(method_name.to_string()),
-                ),
+                &format!("> {}::{}", class_name.to_string(), method_name.to_string()),
                 true,
                 crate::io::NORMAL,
             );

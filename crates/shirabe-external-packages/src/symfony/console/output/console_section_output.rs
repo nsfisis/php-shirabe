@@ -129,13 +129,8 @@ impl ConsoleSectionOutput {
 
         if number_of_lines_to_clear > 0 {
             // move cursor up n lines
-            self.inner.do_write(
-                &format!(
-                    "\x1b[{}A",
-                    shirabe_php_shim::PhpMixed::Int(number_of_lines_to_clear),
-                ),
-                false,
-            );
+            self.inner
+                .do_write(&format!("\x1b[{}A", number_of_lines_to_clear), false);
             // erase to end of screen
             self.inner.do_write("\x1b[0J", false);
         }

@@ -90,11 +90,11 @@ impl Command for ExecCommand {
             InputArgument::new("binary",
             Some(InputArgument::OPTIONAL),
             "The binary to run, e.g. phpunit",
-            None,).unwrap().into(),
+            None).unwrap().into(),
             InputArgument::new("args",
             Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
             "Arguments to pass to the binary. Use <info>--</info> to separate from composer arguments",
-            None,).unwrap().into(),
+            None).unwrap().into(),
         ]);
         self.set_help(
             "Executes a vendored binary/script.\n\n\

@@ -262,8 +262,8 @@ impl MarkdownDescriptor {
                     .map(|command_name| {
                         Ok(format!(
                             "* [`{}`](#{})",
-                            PhpMixed::String(command_name.clone()),
-                            PhpMixed::String(shirabe_php_shim::str_replace(
+                            command_name.clone(),
+                            shirabe_php_shim::str_replace(
                                 ":",
                                 "",
                                 &description
@@ -271,7 +271,7 @@ impl MarkdownDescriptor {
                                     .borrow()
                                     .get_name()
                                     .unwrap_or_default(),
-                            )),
+                            ),
                         ))
                     })
                     .collect::<anyhow::Result<Vec<String>>>()?
@@ -292,11 +292,7 @@ impl MarkdownDescriptor {
     fn get_application_title(&self, application: &dyn Application) -> String {
         if "UNKNOWN" != application.get_name() {
             if "UNKNOWN" != application.get_version() {
-                return format!(
-                    "{} {}",
-                    PhpMixed::String(application.get_name()),
-                    PhpMixed::String(application.get_version()),
-                );
+                return format!("{} {}", application.get_name(), application.get_version());
             }
 
             return application.get_name();

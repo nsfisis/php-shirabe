@@ -188,10 +188,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         io.write_error3(
                             &format!(
                                 "Using version <info>{}</info> for <info>{}</info>",
-                                PhpMixed::String(version),
-                                PhpMixed::String(
-                                    requirement.get("name").cloned().unwrap_or_default(),
-                                ),
+                                version,
+                                requirement.get("name").cloned().unwrap_or_default(),
                             ),
                             true,
                             io_interface::NORMAL,
@@ -295,23 +293,20 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         if let Some(ai) = &found_package.abandoned {
                             let replacement = match ai {
                                 crate::repository::AbandonedInfo::Replacement(r) => {
-                                    format!("Use {} instead", PhpMixed::String(r.clone()))
+                                    format!("Use {} instead", r.clone())
                                 }
                                 crate::repository::AbandonedInfo::Abandoned => {
                                     "No replacement was suggested".to_string()
                                 }
                             };
-                            abandoned = format!(
-                                "<warning>Abandoned. {}.</warning>",
-                                PhpMixed::String(replacement),
-                            );
+                            abandoned = format!("<warning>Abandoned. {}.</warning>", replacement);
                         }
 
                         choices.push(format!(
                             " <info>{:>5}</info> {} {}",
-                            PhpMixed::String(format!("[{}]", position)),
-                            PhpMixed::String(found_package.name.clone()),
-                            PhpMixed::String(abandoned),
+                            format!("[{}]", position),
+                            found_package.name.clone(),
+                            abandoned,
                         ));
                     }
 
@@ -319,8 +314,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     io.write_error3(
                         &format!(
                             "Found <info>{}</info> packages matching <info>{}</info>",
-                            PhpMixed::Int(matches.len() as i64),
-                            PhpMixed::String(package.clone()),
+                            matches.len() as i64,
+                            package.clone(),
                         ),
                         true,
                         io_interface::NORMAL,
@@ -432,8 +427,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             io.write_error3(
                                 &format!(
                                     "Using version <info>{}</info> for <info>{}</info>",
-                                    PhpMixed::String(c.clone()),
-                                    PhpMixed::String(package.clone()),
+                                    c.clone(),
+                                    package.clone(),
                                 ),
                                 true,
                                 io_interface::NORMAL,
@@ -563,7 +558,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "Package {} has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
-                            PhpMixed::String(name.to_string()),
+                            name.to_string(),
                             self.get_platform_exception_details(
                                 candidate.clone(),
                                 platform_repo,
@@ -617,8 +612,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 return Err(InvalidArgumentException {
                     message: format!(
                         "Could not find a version of package {} matching your minimum-stability ({}). Require it with an explicit version constraint allowing its desired stability.",
-                        PhpMixed::String(name.to_string()),
-                        PhpMixed::String(effective_minimum_stability.clone()),
+                        name.to_string(),
+                        effective_minimum_stability.clone(),
                     ),
                     code: 0,
                 }
@@ -659,12 +654,12 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "Could not find package {} in any version matching your PHP version, PHP extensions and Composer version{}{}",
-                            PhpMixed::String(name.to_string()),
+                            name.to_string(),
                             self.get_platform_exception_details(
                                 candidate.clone(),
                                 platform_repo,
                             )?,
-                            PhpMixed::String(additional),
+                            additional,
                         ),
                         code: 0,
                     }
@@ -688,7 +683,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "Could not find package {}. It was however found via repository search, which indicates a consistency issue with the repository.",
-                            PhpMixed::String(name.to_string()),
+                            name.to_string(),
                         ),
                         code: 0,
                     }
@@ -725,13 +720,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 return Err(InvalidArgumentException {
                     message: format!(
                         "Could not find package {}.\n\nDid you mean {}?\n    {}",
-                        PhpMixed::String(name.to_string()),
+                        name.to_string(),
                         if similar.len() > 1 {
                             "one of these"
                         } else {
                             "this"
                         },
-                        PhpMixed::String(implode("\n    ", &similar)),
+                        implode("\n    ", &similar),
                     ),
                     code: 0,
                 }
@@ -741,8 +736,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             return Err(InvalidArgumentException {
                 message: format!(
                     "Could not find a matching version of package {}. Check the package spelling, your version constraint and that the package is available in a stability which matches your minimum-stability ({}).",
-                    PhpMixed::String(name.to_string()),
-                    PhpMixed::String(effective_minimum_stability),
+                    name.to_string(),
+                    effective_minimum_stability,
                 ),
                 code: 0,
             }

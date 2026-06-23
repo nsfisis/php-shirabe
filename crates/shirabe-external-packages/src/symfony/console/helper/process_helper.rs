@@ -174,10 +174,7 @@ impl ProcessHelper {
             && let Some(error) = error
         {
             output.borrow().writeln(
-                &[format!(
-                    "<error>{}</error>",
-                    shirabe_php_shim::PhpMixed::String(self.escape_string(error),),
-                )],
+                &[format!("<error>{}</error>", self.escape_string(error))],
                 output_interface::OUTPUT_NORMAL,
             );
         }

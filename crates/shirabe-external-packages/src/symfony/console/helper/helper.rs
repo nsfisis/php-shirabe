@@ -111,18 +111,18 @@ impl Helper {
 
     pub fn format_memory(memory: i64) -> String {
         if memory >= 1024 * 1024 * 1024 {
-            return format!("{:.1} GiB", memory as f64 / 1024.0 / 1024.0 / 1024.0,);
+            return format!("{:.1} GiB", memory as f64 / 1024.0 / 1024.0 / 1024.0);
         }
 
         if memory >= 1024 * 1024 {
-            return format!("{:.1} MiB", memory as f64 / 1024.0 / 1024.0,);
+            return format!("{:.1} MiB", memory as f64 / 1024.0 / 1024.0);
         }
 
         if memory >= 1024 {
-            return format!("{} KiB", shirabe_php_shim::PhpMixed::Int(memory / 1024),);
+            return format!("{} KiB", memory / 1024);
         }
 
-        format!("{} B", shirabe_php_shim::PhpMixed::Int(memory))
+        format!("{} B", memory)
     }
 
     /// @deprecated since Symfony 5.3

@@ -112,8 +112,8 @@ impl DownloadManager {
             return Err(InvalidArgumentException {
                 message: format!(
                     "Unknown downloader type: {}. Available types: {}.",
-                    PhpMixed::String(r#type),
-                    PhpMixed::String(implode(", ", &array_keys(&self.downloaders))),
+                    r#type,
+                    implode(", ", &array_keys(&self.downloaders)),
                 ),
                 code: 0,
             }
@@ -159,10 +159,10 @@ impl DownloadManager {
             return Err(LogicException {
                 message: format!(
                     "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
-                    PhpMixed::String(shirabe_php_shim::get_class_obj(&*downloader.borrow())),
-                    PhpMixed::String(downloader_installation_source),
-                    PhpMixed::String(installation_source.clone().unwrap_or_default()),
-                    PhpMixed::String(package.to_string()),
+                    shirabe_php_shim::get_class_obj(&*downloader.borrow()),
+                    downloader_installation_source,
+                    installation_source.clone().unwrap_or_default(),
+                    package.to_string(),
                 ),
                 code: 0,
             }

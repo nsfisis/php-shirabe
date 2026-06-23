@@ -452,7 +452,7 @@ impl InstalledVersions {
                     installed.push(cached);
                 } else if is_file(&format!("{}/composer/installed.php", vendor_dir)) {
                     let required =
-                        require_php_file(&format!("{}/composer/installed.php", vendor_dir,));
+                        require_php_file(&format!("{}/composer/installed.php", vendor_dir));
                     let required_map: IndexMap<String, PhpMixed> =
                         required.as_array().cloned().unwrap_or_default();
                     INSTALLED_BY_VENDOR

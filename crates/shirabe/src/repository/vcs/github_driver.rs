@@ -82,7 +82,7 @@ impl GitHubDriver {
             return Err(InvalidArgumentException {
                 message: format!(
                     "The GitHub repository URL {} is invalid.",
-                    PhpMixed::String(self.inner.url.clone()),
+                    self.inner.url.clone(),
                 ),
                 code: 0,
             }
@@ -364,10 +364,10 @@ impl GitHubDriver {
                             "source".to_string(),
                             PhpMixed::String(format!(
                                 "https://{}/{}/{}/tree/{}",
-                                PhpMixed::String(self.inner.origin_url.clone()),
-                                PhpMixed::String(self.owner.clone()),
-                                PhpMixed::String(self.repository.clone()),
-                                PhpMixed::String(label_str),
+                                self.inner.origin_url.clone(),
+                                self.owner.clone(),
+                                self.repository.clone(),
+                                label_str,
                             )),
                         );
                     }
@@ -388,9 +388,9 @@ impl GitHubDriver {
                         "issues".to_string(),
                         PhpMixed::String(format!(
                             "https://{}/{}/{}/issues",
-                            PhpMixed::String(self.inner.origin_url.clone()),
-                            PhpMixed::String(self.owner.clone()),
-                            PhpMixed::String(self.repository.clone()),
+                            self.inner.origin_url.clone(),
+                            self.owner.clone(),
+                            self.repository.clone(),
                         )),
                     );
                 }

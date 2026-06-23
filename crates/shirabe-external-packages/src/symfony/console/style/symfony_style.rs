@@ -353,7 +353,7 @@ impl SymfonyStyle {
         let mut r#type = r#type.map(|t| t.to_string());
         let mut line_indentation = String::new();
         if let Some(t) = &r#type {
-            let formatted = format!("[{}] ", PhpMixed::String(t.clone()));
+            let formatted = format!("[{}] ", t.clone());
             indent_length = shirabe_php_shim::strlen(&formatted);
             line_indentation = shirabe_php_shim::str_repeat(" ", indent_length as usize);
             r#type = Some(formatted);
@@ -424,11 +424,7 @@ impl SymfonyStyle {
             ));
 
             if let Some(style) = style {
-                *line = format!(
-                    "<{}>{}</>",
-                    PhpMixed::String(style.to_string()),
-                    PhpMixed::String(line.clone()),
-                );
+                *line = format!("<{}>{}</>", style.to_string(), line.clone());
             }
         }
 
@@ -521,17 +517,17 @@ impl StyleInterface for SymfonyStyle {
             PhpMixed::List(vec![
                 PhpMixed::String(format!(
                     "<comment>{}</>",
-                    PhpMixed::String(OutputFormatter::escape_trailing_backslash(message),),
+                    OutputFormatter::escape_trailing_backslash(message),
                 )),
                 PhpMixed::String(format!(
                     "<comment>{}</>",
-                    PhpMixed::String(shirabe_php_shim::str_repeat(
+                    shirabe_php_shim::str_repeat(
                         "=",
                         Helper::width(&Helper::remove_decoration(
                             &mut *self.get_formatter().borrow_mut(),
                             message,
                         )) as usize,
-                    )),
+                    ),
                 )),
             ]),
             OUTPUT_NORMAL,
@@ -546,17 +542,17 @@ impl StyleInterface for SymfonyStyle {
             PhpMixed::List(vec![
                 PhpMixed::String(format!(
                     "<comment>{}</>",
-                    PhpMixed::String(OutputFormatter::escape_trailing_backslash(message),),
+                    OutputFormatter::escape_trailing_backslash(message),
                 )),
                 PhpMixed::String(format!(
                     "<comment>{}</>",
-                    PhpMixed::String(shirabe_php_shim::str_repeat(
+                    shirabe_php_shim::str_repeat(
                         "-",
                         Helper::width(&Helper::remove_decoration(
                             &mut *self.get_formatter().borrow_mut(),
                             message,
                         )) as usize,
-                    )),
+                    ),
                 )),
             ]),
             OUTPUT_NORMAL,

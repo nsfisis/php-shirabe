@@ -730,7 +730,7 @@ impl Locker {
                 return Err(LogicException {
                     message: format!(
                         "Package \"{}\" has no version or name and can not be locked",
-                        PhpMixed::String(package.to_string()),
+                        package.to_string(),
                     ),
                     code: 0,
                 }
@@ -955,14 +955,12 @@ impl Locker {
                                         description = format!(
                                             "{} as {} by {}",
                                             verb,
-                                            PhpMixed::String(
-                                                provider_link.get_pretty_constraint().to_string(),
-                                            ),
-                                            PhpMixed::String(format!(
+                                            provider_link.get_pretty_constraint().to_string(),
+                                            format!(
                                                 "{} {}",
                                                 provider.get_pretty_name(),
                                                 provider.get_pretty_version()
-                                            )),
+                                            ),
                                         );
                                         break 'outer;
                                     }

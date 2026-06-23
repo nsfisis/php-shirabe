@@ -95,7 +95,7 @@ impl GitBitbucketDriver {
             return Err(InvalidArgumentException {
                 message: format!(
                     "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
-                    PhpMixed::String(self.inner.url.clone()),
+                    self.inner.url.clone(),
                 ),
                 code: 0,
             }
@@ -154,9 +154,9 @@ impl GitBitbucketDriver {
     fn get_repo_data(&mut self) -> Result<bool> {
         let resource = format!(
             "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
-            PhpMixed::String(self.owner.clone()),
-            PhpMixed::String(self.repository.clone()),
-            PhpMixed::String(http_build_query_mixed(
+            self.owner.clone(),
+            self.repository.clone(),
+            http_build_query_mixed(
                 &{
                     let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                     m.insert(
@@ -167,7 +167,7 @@ impl GitBitbucketDriver {
                 },
                 "",
                 "&",
-            )),
+            ),
         );
 
         let repo_data = self
@@ -349,9 +349,9 @@ impl GitBitbucketDriver {
                                 "source".to_string(),
                                 PhpMixed::String(format!(
                                     "https://{}/{}/{}/src",
-                                    PhpMixed::String(self.inner.origin_url.clone()),
-                                    PhpMixed::String(self.owner.clone()),
-                                    PhpMixed::String(self.repository.clone()),
+                                    self.inner.origin_url.clone(),
+                                    self.owner.clone(),
+                                    self.repository.clone(),
                                 )),
                             );
                         }
@@ -360,11 +360,11 @@ impl GitBitbucketDriver {
                             "source".to_string(),
                             PhpMixed::String(format!(
                                 "https://{}/{}/{}/src/{}/?at={}",
-                                PhpMixed::String(self.inner.origin_url.clone()),
-                                PhpMixed::String(self.owner.clone()),
-                                PhpMixed::String(self.repository.clone()),
-                                PhpMixed::String(hash.unwrap()),
-                                PhpMixed::String(label.clone()),
+                                self.inner.origin_url.clone(),
+                                self.owner.clone(),
+                                self.repository.clone(),
+                                hash.unwrap(),
+                                label.clone(),
                             )),
                         );
                     }
@@ -385,9 +385,9 @@ impl GitBitbucketDriver {
                             "issues".to_string(),
                             PhpMixed::String(format!(
                                 "https://{}/{}/{}/issues",
-                                PhpMixed::String(self.inner.origin_url.clone()),
-                                PhpMixed::String(self.owner.clone()),
-                                PhpMixed::String(self.repository.clone()),
+                                self.inner.origin_url.clone(),
+                                self.owner.clone(),
+                                self.repository.clone(),
                             )),
                         );
                     }
@@ -429,10 +429,10 @@ impl GitBitbucketDriver {
 
         let resource = format!(
             "https://api.bitbucket.org/2.0/repositories/{}/{}/src/{}/{}",
-            PhpMixed::String(self.owner.clone()),
-            PhpMixed::String(self.repository.clone()),
-            PhpMixed::String(identifier),
-            PhpMixed::String(file.to_string()),
+            self.owner.clone(),
+            self.repository.clone(),
+            identifier,
+            file.to_string(),
         );
 
         Ok(self
@@ -457,9 +457,9 @@ impl GitBitbucketDriver {
 
         let resource = format!(
             "https://api.bitbucket.org/2.0/repositories/{}/{}/commit/{}?fields=date",
-            PhpMixed::String(self.owner.clone()),
-            PhpMixed::String(self.repository.clone()),
-            PhpMixed::String(identifier),
+            self.owner.clone(),
+            self.repository.clone(),
+            identifier,
         );
         let commit = self
             .fetch_with_oauth_credentials(&resource, false)?
@@ -498,9 +498,9 @@ impl GitBitbucketDriver {
 
         let url = format!(
             "https://bitbucket.org/{}/{}/get/{}.zip",
-            PhpMixed::String(self.owner.clone()),
-            PhpMixed::String(self.repository.clone()),
-            PhpMixed::String(identifier.to_string()),
+            self.owner.clone(),
+            self.repository.clone(),
+            identifier.to_string(),
         );
 
         let mut m: IndexMap<String, String> = IndexMap::new();
@@ -521,8 +521,8 @@ impl GitBitbucketDriver {
             let mut tags: IndexMap<String, String> = IndexMap::new();
             let mut resource = format!(
                 "{}?{}",
-                PhpMixed::String(self.tags_url.clone()),
-                PhpMixed::String(http_build_query_mixed(
+                self.tags_url.clone(),
+                http_build_query_mixed(
                     &{
                         let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                         m.insert("pagelen".to_string(), PhpMixed::Int(100));
@@ -538,7 +538,7 @@ impl GitBitbucketDriver {
                     },
                     "",
                     "&",
-                )),
+                ),
             );
             let mut has_next = true;
             while has_next {
@@ -600,8 +600,8 @@ impl GitBitbucketDriver {
             let mut branches: IndexMap<String, String> = IndexMap::new();
             let mut resource = format!(
                 "{}?{}",
-                PhpMixed::String(self.branches_url.clone()),
-                PhpMixed::String(http_build_query_mixed(
+                self.branches_url.clone(),
+                http_build_query_mixed(
                     &{
                         let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                         m.insert("pagelen".to_string(), PhpMixed::Int(100));
@@ -619,7 +619,7 @@ impl GitBitbucketDriver {
                     },
                     "",
                     "&",
-                )),
+                ),
             );
             let mut has_next = true;
             while has_next {

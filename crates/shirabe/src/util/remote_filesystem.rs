@@ -951,8 +951,8 @@ impl RemoteFilesystem {
             self.io.write_error3(
                 &format!(
                     "Following redirect ({}) {}",
-                    PhpMixed::Int(self.redirects),
-                    PhpMixed::String(Url::sanitize(target_url.clone())),
+                    self.redirects,
+                    Url::sanitize(target_url.clone()),
                 ),
                 true,
                 crate::io::DEBUG,

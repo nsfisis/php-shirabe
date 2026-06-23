@@ -418,7 +418,7 @@ impl AuthHelper {
             }
 
             self.io.write_error3(
-                &format!("    Authentication required (<info>{}</info>):", origin,),
+                &format!("    Authentication required (<info>{}</info>):", origin),
                 true,
                 io_interface::NORMAL,
             );

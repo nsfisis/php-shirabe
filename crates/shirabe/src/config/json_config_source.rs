@@ -37,7 +37,7 @@ impl JsonConfigSource {
                 return Err(RuntimeException {
                     message: format!(
                         "The file \"{}\" is not writable.",
-                        PhpMixed::String(self.file.borrow().get_path().to_string()),
+                        self.file.borrow().get_path().to_string(),
                     ),
                     code: 0,
                 }
@@ -48,7 +48,7 @@ impl JsonConfigSource {
                 return Err(RuntimeException {
                     message: format!(
                         "The file \"{}\" is not readable.",
-                        PhpMixed::String(self.file.borrow().get_path().to_string()),
+                        self.file.borrow().get_path().to_string(),
                     ),
                     code: 0,
                 }
@@ -401,7 +401,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                     return Err(RuntimeException {
                         message: format!(
                             "The referenced repository \"{}\" does not exist.",
-                            PhpMixed::String(reference_name.to_string()),
+                            reference_name.to_string(),
                         ),
                         code: 0,
                     }

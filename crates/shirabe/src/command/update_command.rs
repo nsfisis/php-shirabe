@@ -707,9 +707,7 @@ impl UpdateCommand {
         if io.ask_confirmation(
             format!(
                 "Would you like to continue and update the above package{} [<comment>yes</comment>]? ",
-                PhpMixed::String(
-                    if 1 == packages.len() { "" } else { "s" }.to_string(),
-                ),
+                if 1 == packages.len() { "" } else { "s" }.to_string(),
             ),
             true,
         ) {

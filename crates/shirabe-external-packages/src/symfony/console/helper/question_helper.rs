@@ -302,7 +302,7 @@ impl QuestionHelper {
 
             messages.push(format!(
                 "  [<{tag}>{}{padding}</{tag}>] {}",
-                PhpMixed::String(key.clone()),
+                key.clone(),
                 value.clone(),
             ));
         }

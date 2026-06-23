@@ -154,7 +154,7 @@ impl ArgvInput {
                     }
                 };
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: format!("The \"-{}\" option does not exist.", PhpMixed::String(bad),),
+                    message: format!("The \"-{}\" option does not exist.", bad),
                     code: 0,
                 })
                 .into());
@@ -254,12 +254,12 @@ impl ArgvInput {
                         format!(
                             "Too many arguments to \"{}\" command, expected arguments \"{}\".",
                             symfony_command_name.clone(),
-                            PhpMixed::String(shirabe_php_shim::implode("\" \"", &names)),
+                            shirabe_php_shim::implode("\" \"", &names),
                         )
                     }
                     _ => format!(
                         "Too many arguments, expected arguments \"{}\".",
-                        PhpMixed::String(shirabe_php_shim::implode("\" \"", &names)),
+                        shirabe_php_shim::implode("\" \"", &names),
                     ),
                 }
             } else if symfony_command_name
@@ -270,13 +270,10 @@ impl ArgvInput {
                 format!(
                     "No arguments expected for \"{}\" command, got \"{}\".",
                     symfony_command_name.clone().unwrap(),
-                    PhpMixed::String(token.to_string()),
+                    token.to_string(),
                 )
             } else {
-                format!(
-                    "No arguments expected, got \"{}\".",
-                    PhpMixed::String(token.to_string()),
-                )
+                format!("No arguments expected, got \"{}\".", token.to_string())
             };
 
             return Err(
@@ -291,10 +288,7 @@ impl ArgvInput {
     fn add_short_option(&mut self, shortcut: &str, value: PhpMixed) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: format!(
-                    "The \"-{}\" option does not exist.",
-                    PhpMixed::String(shortcut.to_string()),
-                ),
+                message: format!("The \"-{}\" option does not exist.", shortcut.to_string()),
                 code: 0,
             })
             .into());
@@ -314,10 +308,7 @@ impl ArgvInput {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: format!(
-                        "The \"--{}\" option does not exist.",
-                        PhpMixed::String(name.to_string()),
-                    ),
+                    message: format!("The \"--{}\" option does not exist.", name.to_string()),
                     code: 0,
                 })
                 .into());
@@ -328,7 +319,7 @@ impl ArgvInput {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
                     message: format!(
                         "The \"--{}\" option does not accept a value.",
-                        PhpMixed::String(name.to_string()),
+                        name.to_string(),
                     ),
                     code: 0,
                 })
@@ -347,7 +338,7 @@ impl ArgvInput {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
                 message: format!(
                     "The \"--{}\" option does not accept a value.",
-                    PhpMixed::String(name.to_string()),
+                    name.to_string(),
                 ),
                 code: 0,
             })
@@ -373,10 +364,7 @@ impl ArgvInput {
         if matches!(value, PhpMixed::Null) {
             if option.is_value_required() {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: format!(
-                        "The \"--{}\" option requires a value.",
-                        PhpMixed::String(name.to_string()),
-                    ),
+                    message: format!("The \"--{}\" option requires a value.", name.to_string()),
                     code: 0,
                 })
                 .into());

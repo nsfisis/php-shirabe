@@ -28,8 +28,7 @@ impl ClassMapGenerator {
             .iter()
             .map(|w| preg_quote(w, None))
             .collect();
-        let stream_wrappers_regex =
-            format!("{{^(?:{})://}}", PhpMixed::String(implode("|", &wrappers)));
+        let stream_wrappers_regex = format!("{{^(?:{})://}}", implode("|", &wrappers));
 
         ClassMapGenerator {
             extensions,

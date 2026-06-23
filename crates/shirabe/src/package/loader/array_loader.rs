@@ -385,14 +385,13 @@ impl ArrayLoader {
                 return Err(UnexpectedValueException {
                     message: format!(
                         "Package {}'s source key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ...}},\n{} given.",
-                        PhpMixed::String(
+
                             config
                                 .get("name")
                                 .and_then(|v| v.as_string())
                                 .unwrap_or("")
                                 .to_string(),
-                        ),
-                        PhpMixed::String(json_encode(&source).unwrap_or_default()),
+                        json_encode(&source).unwrap_or_default(),
                     ),
                     code: 0,
                 }
@@ -428,14 +427,13 @@ impl ArrayLoader {
                 return Err(UnexpectedValueException {
                     message: format!(
                         "Package {}'s dist key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...}},\n{} given.",
-                        PhpMixed::String(
+
                             config
                                 .get("name")
                                 .and_then(|v| v.as_string())
                                 .unwrap_or("")
                                 .to_string(),
-                        ),
-                        PhpMixed::String(json_encode(&dist).unwrap_or_default()),
+                        json_encode(&dist).unwrap_or_default(),
                     ),
                     code: 0,
                 }

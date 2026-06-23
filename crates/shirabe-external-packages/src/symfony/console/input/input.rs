@@ -83,7 +83,7 @@ impl Input {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
                 message: format!(
                     "Not enough arguments (missing: \"{}\").",
-                    PhpMixed::String(shirabe_php_shim::implode(", ", &missing_arguments,)),
+                    shirabe_php_shim::implode(", ", &missing_arguments),
                 ),
                 code: 0,
             })
@@ -115,10 +115,7 @@ impl Input {
         {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The \"{}\" argument does not exist.",
-                        PhpMixed::String(name.to_string()),
-                    ),
+                    message: format!("The \"{}\" argument does not exist.", name.to_string()),
                     code: 0,
                 })
                 .into(),
@@ -142,10 +139,7 @@ impl Input {
         {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The \"{}\" argument does not exist.",
-                        PhpMixed::String(name.to_string()),
-                    ),
+                    message: format!("The \"{}\" argument does not exist.", name.to_string()),
                     code: 0,
                 })
                 .into(),
@@ -182,10 +176,7 @@ impl Input {
         if !self.definition.has_option(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The \"{}\" option does not exist.",
-                        PhpMixed::String(name.to_string()),
-                    ),
+                    message: format!("The \"{}\" option does not exist.", name.to_string()),
                     code: 0,
                 })
                 .into(),
@@ -209,10 +200,7 @@ impl Input {
         } else if !self.definition.has_option(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The \"{}\" option does not exist.",
-                        PhpMixed::String(name.to_string()),
-                    ),
+                    message: format!("The \"{}\" option does not exist.", name.to_string()),
                     code: 0,
                 })
                 .into(),

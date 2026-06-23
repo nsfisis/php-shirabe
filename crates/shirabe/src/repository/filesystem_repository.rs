@@ -327,7 +327,7 @@ impl FilesystemRepository {
 
             self.filesystem.borrow_mut().file_put_contents_if_modified(
                 &format!("{}/installed.php", repo_dir),
-                &format!("<?php return {};\n", self.dump_to_php_code(&versions, 0),),
+                &format!("<?php return {};\n", self.dump_to_php_code(&versions, 0)),
             );
             self.filesystem.borrow_mut().file_put_contents_if_modified(
                 &format!("{}/InstalledVersions.php", repo_dir),
@@ -422,7 +422,7 @@ impl FilesystemRepository {
             } else if key == "install_path" && is_string(value) {
                 let s = value.as_string().unwrap_or("").to_string();
                 if self.filesystem.borrow_mut().is_absolute_path(&s) {
-                    lines.push_str(&format!("{},\n", var_export(&PhpMixed::String(s), true),));
+                    lines.push_str(&format!("{},\n", var_export(&PhpMixed::String(s), true)));
                 } else {
                     lines.push_str(&format!(
                         "__DIR__ . {},\n",

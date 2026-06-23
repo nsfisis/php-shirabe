@@ -549,7 +549,7 @@ impl Application {
         if !composer::BRANCH_ALIAS_VERSION.is_empty()
             && composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
         {
-            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION,);
+            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION);
         }
 
         format!(
@@ -796,10 +796,7 @@ impl Application {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
         if !self.has(name) {
             return Err(CommandNotFoundException::new(
-                format!(
-                    "The command \"{}\" does not exist.",
-                    PhpMixed::from(name.to_string()),
-                ),
+                format!("The command \"{}\" does not exist.", name.to_string()),
                 Vec::new(),
                 0,
             )
@@ -811,7 +808,7 @@ impl Application {
             return Err(CommandNotFoundException::new(
                 format!(
                     "The \"{}\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\".",
-                    PhpMixed::from(name.to_string()),
+                    name.to_string(),
                 ),
                 Vec::new(),
                 0,
@@ -914,7 +911,7 @@ impl Application {
         if namespaces.is_empty() {
             let mut message = format!(
                 "There are no commands defined in the \"{}\" namespace.",
-                PhpMixed::from(namespace.to_string()),
+                namespace.to_string(),
             );
 
             let alternatives = self.find_alternatives(namespace, &all_namespaces);
@@ -941,8 +938,8 @@ impl Application {
             return Err(NamespaceNotFoundException(CommandNotFoundException::new(
                 format!(
                     "The namespace \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                    PhpMixed::from(namespace.to_string()),
-                    PhpMixed::from(self.get_abbreviation_suggestions(&namespaces)),
+                    namespace.to_string(),
+                    self.get_abbreviation_suggestions(&namespaces),
                 ),
                 namespaces.clone(),
                 0,
@@ -1143,8 +1140,8 @@ impl Application {
                     return Err(CommandNotFoundException::new(
                         format!(
                             "SymfonyCommand \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                            PhpMixed::from(name.to_string()),
-                            PhpMixed::from(suggestions),
+                            name.to_string(),
+                            suggestions,
                         ),
                         commands.clone(),
                         0,
@@ -1159,10 +1156,7 @@ impl Application {
 
         if command.borrow().is_hidden() {
             return Err(CommandNotFoundException::new(
-                format!(
-                    "The command \"{}\" does not exist.",
-                    PhpMixed::from(name.to_string()),
-                ),
+                format!("The command \"{}\" does not exist.", name.to_string()),
                 Vec::new(),
                 0,
             )
@@ -1885,7 +1879,7 @@ impl ApplicationHandle {
             return Err(ConsoleLogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "The command defined in \"{}\" cannot have an empty name.",
-                    PhpMixed::from(shirabe_php_shim::get_debug_type_obj(&command)),
+                    shirabe_php_shim::get_debug_type_obj(&command),
                 ),
                 code: 0,
             })
@@ -2804,7 +2798,7 @@ impl ApplicationHandle {
                 let formatted_block = FormatterHelper::default().format_block(
                     FormatBlockMessages::String(format!(
                         "Command \"{}\" is not defined.",
-                        PhpMixed::from(name.clone()),
+                        name.clone(),
                     )),
                     "error",
                     true,
@@ -2813,10 +2807,7 @@ impl ApplicationHandle {
                     .borrow()
                     .writeln(&[formatted_block], output_interface::OUTPUT_NORMAL);
                 if !style.confirm(
-                    &format!(
-                        "Do you want to run \"{}\" instead? ",
-                        PhpMixed::from(alternative.clone()),
-                    ),
+                    &format!("Do you want to run \"{}\" instead? ", alternative.clone()),
                     false,
                 ) {
                     return Ok(1);

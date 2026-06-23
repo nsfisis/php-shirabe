@@ -1278,9 +1278,9 @@ impl PlatformRepository {
                             .unwrap_or(0);
                         let version_built = format!(
                             "{}.{}.{}",
-                            PhpMixed::Int((lib_rd_kafka_version_int & 0x7F000000) >> 24),
-                            PhpMixed::Int((lib_rd_kafka_version_int & 0x00FF0000) >> 16),
-                            PhpMixed::Int((lib_rd_kafka_version_int & 0x0000FF00) >> 8),
+                            (lib_rd_kafka_version_int & 0x7F000000) >> 24,
+                            (lib_rd_kafka_version_int & 0x00FF0000) >> 16,
+                            (lib_rd_kafka_version_int & 0x0000FF00) >> 8,
                         );
                         self.add_library(
                             &mut libraries,

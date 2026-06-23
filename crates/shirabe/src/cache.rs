@@ -125,7 +125,7 @@ impl Cache {
             self.io
                 .write_error(&format!("Writing {}{} into cache", self.root, file));
 
-            let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)),);
+            let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)));
             let dest = format!("{}{}", self.root, file);
             let attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 file_put_contents(&temp_file_name, contents.as_bytes()).is_some()

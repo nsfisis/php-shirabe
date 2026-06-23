@@ -56,7 +56,7 @@ impl TableCellStyle {
                 shirabe_php_shim::InvalidArgumentException {
                     message: format!(
                         "The TableCellStyle does not support the following options: '{}'.",
-                        shirabe_php_shim::PhpMixed::String(diff.join("', '")),
+                        diff.join("', '"),
                     ),
                     code: 0,
                 },
@@ -73,7 +73,7 @@ impl TableCellStyle {
                     shirabe_php_shim::InvalidArgumentException {
                         message: format!(
                             "Wrong align value. Value must be following: '{}'.",
-                            shirabe_php_shim::PhpMixed::String(align_map_keys().join("', '"),),
+                            align_map_keys().join("', '"),
                         ),
                         code: 0,
                     },

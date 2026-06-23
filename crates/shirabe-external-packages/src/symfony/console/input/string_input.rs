@@ -125,7 +125,7 @@ impl StringInput {
                     InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
                         message: format!(
                             "Unable to parse input near \"... {} ...\".",
-                            PhpMixed::String(shirabe_php_shim::substr(input, cursor, Some(10),)),
+                            shirabe_php_shim::substr(input, cursor, Some(10)),
                         ),
                         code: 0,
                     })

@@ -32,27 +32,22 @@ impl SymfonyQuestionHelper {
         let default = question.get_default();
 
         if question.is_multiline() {
-            text += &format!(
-                " (press {} to continue)",
-                PhpMixed::String(self.get_eof_shortcut()),
-            );
+            text += &format!(" (press {} to continue)", self.get_eof_shortcut());
         }
 
         // switch (true)
         if matches!(default, PhpMixed::Null) {
-            text = format!(" <info>{}</info>:", PhpMixed::String(text));
+            text = format!(" <info>{}</info>:", text);
         } else if question.as_confirmation().is_some() {
             text = format!(
                 " <info>{} (yes/no)</info> [<comment>{}</comment>]:",
-                PhpMixed::String(text),
-                PhpMixed::String(
-                    if shirabe_php_shim::boolval(&default) {
-                        "yes"
-                    } else {
-                        "no"
-                    }
-                    .to_string(),
-                ),
+                text,
+                if shirabe_php_shim::boolval(&default) {
+                    "yes"
+                } else {
+                    "no"
+                }
+                .to_string(),
             );
         } else if let Some(choice_question) = question.as_choice().filter(|q| q.is_multiselect()) {
             let choices = choice_question.get_choices();
@@ -70,30 +65,28 @@ impl SymfonyQuestionHelper {
 
             text = format!(
                 " <info>{}</info> [<comment>{}</comment>]:",
-                PhpMixed::String(text),
-                PhpMixed::String(OutputFormatter::escape(&resolved.join(", ")).unwrap()),
+                text,
+                OutputFormatter::escape(&resolved.join(", ")).unwrap(),
             );
         } else if let Some(choice_question) = question.as_choice() {
             let choices = choice_question.get_choices();
             text = format!(
                 " <info>{}</info> [<comment>{}</comment>]:",
-                PhpMixed::String(text),
-                PhpMixed::String(
-                    OutputFormatter::escape(
-                        &choices
-                            .get(&default.to_string())
-                            .cloned()
-                            .unwrap_or(default.clone())
-                            .to_string(),
-                    )
-                    .unwrap(),
-                ),
+                text,
+                OutputFormatter::escape(
+                    &choices
+                        .get(&default.to_string())
+                        .cloned()
+                        .unwrap_or(default.clone())
+                        .to_string(),
+                )
+                .unwrap(),
             );
         } else {
             text = format!(
                 " <info>{}</info> [<comment>{}</comment>]:",
-                PhpMixed::String(text),
-                PhpMixed::String(OutputFormatter::escape(&default.to_string()).unwrap()),
+                text,
+                OutputFormatter::escape(&default.to_string()).unwrap(),
             );
         }
 

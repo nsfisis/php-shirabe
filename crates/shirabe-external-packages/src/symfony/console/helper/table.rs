@@ -121,7 +121,7 @@ impl Table {
 
         Ok(Err(InvalidArgumentException(
             shirabe_php_shim::InvalidArgumentException {
-                message: format!("Style \"{}\" is not defined.", PhpMixed::from(name),),
+                message: format!("Style \"{}\" is not defined.", name),
                 code: 0,
             },
         )))
@@ -272,8 +272,8 @@ impl Table {
             return Ok(Err(RuntimeException(shirabe_php_shim::RuntimeException {
                 message: format!(
                     "Output should be an instance of \"{}\" when calling \"{}\".",
-                    PhpMixed::from("Symfony\\Component\\Console\\Output\\ConsoleSectionOutput"),
-                    PhpMixed::from("Symfony\\Component\\Console\\Helper\\Table::appendRow"),
+                    "Symfony\\Component\\Console\\Output\\ConsoleSectionOutput",
+                    "Symfony\\Component\\Console\\Helper\\Table::appendRow",
                 ),
                 code: 0,
             })));
@@ -1234,7 +1234,7 @@ impl Table {
 
         Ok(Err(InvalidArgumentException(
             shirabe_php_shim::InvalidArgumentException {
-                message: format!("Style \"{}\" is not defined.", PhpMixed::from(name_str),),
+                message: format!("Style \"{}\" is not defined.", name_str),
                 code: 0,
             },
         )))

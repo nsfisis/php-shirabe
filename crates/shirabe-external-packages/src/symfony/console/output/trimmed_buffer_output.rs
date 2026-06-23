@@ -25,11 +25,9 @@ impl TrimmedBufferOutput {
                 shirabe_php_shim::InvalidArgumentException {
                     message: format!(
                         "\"{}()\" expects a strictly positive maxLength. Got {}.",
-                        shirabe_php_shim::PhpMixed::String(
-                            "Symfony\\Component\\Console\\Output\\TrimmedBufferOutput::__construct"
-                                .to_string(),
-                        ),
-                        shirabe_php_shim::PhpMixed::Int(max_length),
+                        "Symfony\\Component\\Console\\Output\\TrimmedBufferOutput::__construct"
+                            .to_string(),
+                        max_length,
                     ),
                     code: 0,
                 },

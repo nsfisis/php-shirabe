@@ -114,7 +114,7 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "An argument with name \"{}\" already exists.",
-                    PhpMixed::String(argument.get_name().to_string()),
+                    argument.get_name().to_string(),
                 ),
                 code: 0,
             })
@@ -125,8 +125,8 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "Cannot add a required argument \"{}\" after an array argument \"{}\".",
-                    PhpMixed::String(argument.get_name().to_string()),
-                    PhpMixed::String(last_array_argument.get_name().to_string()),
+                    argument.get_name().to_string(),
+                    last_array_argument.get_name().to_string(),
                 ),
                 code: 0,
             })
@@ -139,8 +139,8 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "Cannot add a required argument \"{}\" after an optional one \"{}\".",
-                    PhpMixed::String(argument.get_name().to_string()),
-                    PhpMixed::String(last_optional_argument.get_name().to_string()),
+                    argument.get_name().to_string(),
+                    last_optional_argument.get_name().to_string(),
                 ),
                 code: 0,
             })
@@ -168,7 +168,7 @@ impl InputDefinition {
         if !self.has_argument(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"{}\" argument does not exist.", name.clone(),),
+                    message: format!("The \"{}\" argument does not exist.", name.clone()),
                     code: 0,
                 })
                 .into(),
@@ -262,7 +262,7 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "An option named \"{}\" already exists.",
-                    PhpMixed::String(option.get_name().to_string()),
+                    option.get_name().to_string(),
                 ),
                 code: 0,
             })
@@ -272,7 +272,7 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "An option named \"{}\" already exists.",
-                    PhpMixed::String(option.get_name().to_string()),
+                    option.get_name().to_string(),
                 ),
                 code: 0,
             })
@@ -287,7 +287,7 @@ impl InputDefinition {
                     return Err(LogicException(shirabe_php_shim::LogicException {
                         message: format!(
                             "An option with shortcut \"{}\" already exists.",
-                            PhpMixed::String(shortcut.clone()),
+                            shortcut.clone(),
                         ),
                         code: 0,
                     })
@@ -311,7 +311,7 @@ impl InputDefinition {
                 return Err(LogicException(shirabe_php_shim::LogicException {
                     message: format!(
                         "An option named \"{}\" already exists.",
-                        PhpMixed::String(negated_name.clone()),
+                        negated_name.clone(),
                     ),
                     code: 0,
                 })
@@ -329,10 +329,7 @@ impl InputDefinition {
         if !self.has_option(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The \"--{}\" option does not exist.",
-                        PhpMixed::String(name.to_string()),
-                    ),
+                    message: format!("The \"--{}\" option does not exist.", name.to_string()),
                     code: 0,
                 })
                 .into(),
@@ -384,10 +381,7 @@ impl InputDefinition {
         match self.shortcuts.get(shortcut) {
             None => Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The \"-{}\" option does not exist.",
-                        PhpMixed::String(shortcut.to_string()),
-                    ),
+                    message: format!("The \"-{}\" option does not exist.", shortcut.to_string()),
                     code: 0,
                 })
                 .into(),
@@ -401,10 +395,7 @@ impl InputDefinition {
         match self.negations.get(negation) {
             None => Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The \"--{}\" option does not exist.",
-                        PhpMixed::String(negation.to_string()),
-                    ),
+                    message: format!("The \"--{}\" option does not exist.", negation.to_string()),
                     code: 0,
                 })
                 .into(),
@@ -425,37 +416,37 @@ impl InputDefinition {
                 if option.accept_value() {
                     value = format!(
                         " {}{}{}",
-                        PhpMixed::String(if option.is_value_optional() {
+                        if option.is_value_optional() {
                             "[".to_string()
                         } else {
                             String::new()
-                        }),
-                        PhpMixed::String(shirabe_php_shim::strtoupper(option.get_name())),
-                        PhpMixed::String(if option.is_value_optional() {
+                        },
+                        shirabe_php_shim::strtoupper(option.get_name()),
+                        if option.is_value_optional() {
                             "]".to_string()
                         } else {
                             String::new()
-                        }),
+                        },
                     );
                 }
 
                 let shortcut = match option.get_shortcut() {
                     Some(shortcut) => {
-                        format!("-{}|", PhpMixed::String(shortcut.to_string()))
+                        format!("-{}|", shortcut.to_string())
                     }
                     None => String::new(),
                 };
                 let negation = if option.is_negatable() {
-                    format!("|--no-{}", PhpMixed::String(option.get_name().to_string()),)
+                    format!("|--no-{}", option.get_name().to_string())
                 } else {
                     String::new()
                 };
                 elements.push(format!(
                     "[{}--{}{}{}]",
-                    PhpMixed::String(shortcut),
-                    PhpMixed::String(option.get_name().to_string()),
-                    PhpMixed::String(value),
-                    PhpMixed::String(negation),
+                    shortcut,
+                    option.get_name().to_string(),
+                    value,
+                    negation,
                 ));
             }
         }

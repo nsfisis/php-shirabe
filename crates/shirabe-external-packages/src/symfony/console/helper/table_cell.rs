@@ -40,7 +40,7 @@ impl TableCell {
                 shirabe_php_shim::InvalidArgumentException {
                     message: format!(
                         "The TableCell does not support the following options: '{}'.",
-                        shirabe_php_shim::PhpMixed::String(diff.join("', '")),
+                        diff.join("', '"),
                     ),
                     code: 0,
                 },

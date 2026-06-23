@@ -888,7 +888,7 @@ impl Command for InitCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
-                            PhpMixed::String(value_or_default.clone()),
+                            value_or_default.clone(),
                         ),
                         code: 0,
                     }
@@ -1049,10 +1049,7 @@ impl InitCommand {
             return false;
         }
 
-        let pattern = format!(
-            "{{^/?{}(/\\*?)?$}}",
-            PhpMixed::String(preg_quote(vendor, None)),
-        );
+        let pattern = format!("{{^/?{}(/\\*?)?$}}", preg_quote(vendor, None));
 
         let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
         for line in &lines {
@@ -1229,11 +1226,7 @@ impl InitCommand {
         }
 
         if let (Some(name), Some(email)) = (author_name, author_email) {
-            return Some(format!(
-                "{} <{}>",
-                PhpMixed::String(name),
-                PhpMixed::String(email),
-            ));
+            return Some(format!("{} <{}>", name, email));
         }
 
         None

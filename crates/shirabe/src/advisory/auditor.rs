@@ -537,12 +537,12 @@ impl Auditor {
     ) -> Result<()> {
         io.write_error(&format!(
             "<error>Found {} abandoned package{}:</error>",
-            PhpMixed::Int(packages.len() as i64),
-            PhpMixed::String(if packages.len() > 1 {
+            packages.len() as i64,
+            if packages.len() > 1 {
                 "s".to_string()
             } else {
                 String::new()
-            }),
+            },
         ));
 
         if format == Self::FORMAT_PLAIN {
@@ -554,8 +554,8 @@ impl Auditor {
                 };
                 io.write_error(&format!(
                     "{} is abandoned. {}.",
-                    PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
-                    PhpMixed::String(replacement),
+                    self.get_package_name_with_link(pkg.clone().into()),
+                    replacement,
                 ));
             }
 

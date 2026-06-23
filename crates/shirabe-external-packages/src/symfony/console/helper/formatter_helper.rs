@@ -18,10 +18,10 @@ impl FormatterHelper {
     pub fn format_section(&self, section: &str, message: &str, style: &str) -> String {
         format!(
             "<{}>[{}]</{}> {}",
-            shirabe_php_shim::PhpMixed::String(style.to_string()),
-            shirabe_php_shim::PhpMixed::String(section.to_string()),
-            shirabe_php_shim::PhpMixed::String(style.to_string()),
-            shirabe_php_shim::PhpMixed::String(message.to_string()),
+            style.to_string(),
+            section.to_string(),
+            style.to_string(),
+            message.to_string(),
         )
     }
 
@@ -68,9 +68,9 @@ impl FormatterHelper {
         while i < messages.len() {
             messages[i] = format!(
                 "<{}>{}</{}>",
-                shirabe_php_shim::PhpMixed::String(style.to_string()),
-                shirabe_php_shim::PhpMixed::String(messages[i].clone()),
-                shirabe_php_shim::PhpMixed::String(style.to_string()),
+                style.to_string(),
+                messages[i].clone(),
+                style.to_string(),
             );
             i += 1;
         }

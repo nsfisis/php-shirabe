@@ -88,7 +88,7 @@ impl GitLabDriver {
             return Err(InvalidArgumentException {
                 message: format!(
                     "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
-                    PhpMixed::String(self.inner.url.clone()),
+                    self.inner.url.clone(),
                 ),
                 code: 0,
             }
@@ -357,11 +357,7 @@ impl GitLabDriver {
                     }) {
                         support.insert(
                             "source".to_string(),
-                            PhpMixed::String(format!(
-                                "{}/-/tree/{}",
-                                PhpMixed::String(web_url),
-                                PhpMixed::String(label_str),
-                            )),
+                            PhpMixed::String(format!("{}/-/tree/{}", web_url, label_str)),
                         );
                     }
                 }
@@ -388,7 +384,7 @@ impl GitLabDriver {
                     }) {
                         support.insert(
                             "issues".to_string(),
-                            PhpMixed::String(format!("{}/-/issues", PhpMixed::String(web_url),)),
+                            PhpMixed::String(format!("{}/-/issues", PhpMixed::String(web_url))),
                         );
                     }
                 }

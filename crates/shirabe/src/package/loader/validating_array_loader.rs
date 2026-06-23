@@ -196,7 +196,7 @@ impl ValidatingArrayLoader {
                     if !is_string(&license) {
                         self.warnings.push(format!(
                             "License {} should be a string.",
-                            PhpMixed::String(json_encode(&license).unwrap_or_default()),
+                            json_encode(&license).unwrap_or_default(),
                         ));
                         licenses.shift_remove(index);
                     }
@@ -219,18 +219,15 @@ impl ValidatingArrayLoader {
                             {
                                 self.warnings.push(format!(
                                     "License {} must not contain extra spaces, make sure to trim it.",
-                                    PhpMixed::String(
                                         json_encode(&PhpMixed::String(license_str.clone()))
                                             .unwrap_or_default(),
-                                    ),
                                 ));
                             } else {
                                 self.warnings.push(format!(
                                     "License {} is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{}If the software is closed-source, you may use \"proprietary\" as license.",
-                                    PhpMixed::String(
+
                                         json_encode(&PhpMixed::String(license_str.clone()))
                                             .unwrap_or_default(),
-                                    ),
                                     PHP_EOL
                                 ));
                             }
@@ -248,7 +245,7 @@ impl ValidatingArrayLoader {
             } else {
                 self.warnings.push(format!(
                     "License must be a string or array of strings, got {}.",
-                    PhpMixed::String(json_encode(&license_val).unwrap_or_default(),),
+                    json_encode(&license_val).unwrap_or_default(),
                 ));
                 self.config.shift_remove("license");
             }

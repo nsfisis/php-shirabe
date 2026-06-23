@@ -266,7 +266,7 @@ impl RootPackageLoader {
         for (req_name, req_version) in requires {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
-                r"(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)",
+                r"(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *)",
                 req_version,
                 Some(&mut m),
             ) {

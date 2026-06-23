@@ -155,7 +155,7 @@ impl Color {
             if shirabe_php_shim::strlen(&color) != 6 {
                 return Err(InvalidArgumentException(
                     shirabe_php_shim::InvalidArgumentException {
-                        message: format!("Invalid \"{}\" color.", color.clone(),),
+                        message: format!("Invalid \"{}\" color.", color.clone()),
                         code: 0,
                     },
                 ));

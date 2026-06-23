@@ -1548,15 +1548,13 @@ impl CurlDownloader {
             self.io.write_error3(
                 &format!(
                     "Following redirect ({}) {}",
-                    PhpMixed::Int(
-                        job.get("attributes")
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get("redirects"))
-                            .and_then(|b| b.as_int())
-                            .unwrap_or(0)
-                            + 1,
-                    ),
-                    PhpMixed::String(Url::sanitize(target_url.clone())),
+                    job.get("attributes")
+                        .and_then(|v| v.as_array())
+                        .and_then(|a| a.get("redirects"))
+                        .and_then(|b| b.as_int())
+                        .unwrap_or(0)
+                        + 1,
+                    Url::sanitize(target_url.clone()),
                 ),
                 true,
                 crate::io::DEBUG,
