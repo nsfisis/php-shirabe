@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Repository/ComposerRepository.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::metadata_minifier::MetadataMinifier;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
     UnexpectedValueException, extension_loaded, hash, http_build_query, in_array, json_decode,

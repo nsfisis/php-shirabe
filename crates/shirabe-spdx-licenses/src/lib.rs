@@ -1,3 +1,3 @@
-pub mod spdx_licenses;
+mod spdx_licenses;
 
 pub use spdx_licenses::*;

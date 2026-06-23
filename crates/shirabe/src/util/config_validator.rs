@@ -8,10 +8,10 @@ use crate::package::loader::InvalidPackageException;
 use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_external_packages::seld::json_lint::DuplicateKeyException;
 use shirabe_external_packages::seld::json_lint::JsonParser;
 use shirabe_php_shim::PhpMixed;
+use shirabe_spdx_licenses::SpdxLicenses;
 
 #[derive(Debug)]
 pub struct ConfigValidator {

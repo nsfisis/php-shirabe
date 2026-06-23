@@ -6,8 +6,10 @@ edition.workspace = true
 [dependencies]
 shirabe-class-map-generator.workspace = true
 shirabe-external-packages.workspace = true
+shirabe-metadata-minifier.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-semver.workspace = true
+shirabe-spdx-licenses.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 base64.workspace = true

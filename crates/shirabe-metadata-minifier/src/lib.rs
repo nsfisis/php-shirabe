@@ -1,3 +1,3 @@
-pub mod metadata_minifier;
+mod metadata_minifier;
 
 pub use metadata_minifier::*;

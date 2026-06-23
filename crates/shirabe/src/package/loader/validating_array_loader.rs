@@ -4,7 +4,6 @@ use chrono::TimeZone;
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, filter_var_email,
     get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string, json_encode,
@@ -15,6 +14,7 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchNoneConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_semver::intervals::Intervals;
+use shirabe_spdx_licenses::SpdxLicenses;
 
 use crate::package::loader::InvalidPackageException;
 use crate::package::loader::LoaderInterface;

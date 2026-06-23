@@ -4,7 +4,6 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::helper::FormatBlockMessages;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
@@ -17,6 +16,7 @@ use shirabe_php_shim::{
     is_dir, is_string, preg_quote, realpath, server_get, sprintf, str_replace, strpos, strtolower,
     trim, ucwords,
 };
+use shirabe_spdx_licenses::SpdxLicenses;
 use std::cell::RefCell;
 use std::rc::Rc;
 

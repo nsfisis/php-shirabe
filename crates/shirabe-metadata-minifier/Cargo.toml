@@ -1,0 +1,11 @@
+[package]
+name = "shirabe-metadata-minifier"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shirabe-php-shim.workspace = true
+indexmap.workspace = true
+
+[lints]
+workspace = true

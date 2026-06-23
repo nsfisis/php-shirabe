@@ -1659,8 +1659,10 @@ dependencies = [
  "sha1",
  "shirabe-class-map-generator",
  "shirabe-external-packages",
+ "shirabe-metadata-minifier",
  "shirabe-php-shim",
  "shirabe-semver",
+ "shirabe-spdx-licenses",
  "tempfile",
  "tokio",
  "url",
@@ -1689,6 +1691,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "shirabe-metadata-minifier"
+version = "0.0.1"
+dependencies = [
+ "indexmap",
+ "shirabe-php-shim",
+]
+
+[[package]]
 name = "shirabe-php-shim"
 version = "0.0.1"
 dependencies = [
@@ -1714,6 +1724,13 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "indexmap",
+ "shirabe-php-shim",
+]
+
+[[package]]
+name = "shirabe-spdx-licenses"
+version = "0.0.1"
+dependencies = [
  "shirabe-php-shim",
 ]
 

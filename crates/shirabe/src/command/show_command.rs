@@ -4,7 +4,6 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::semver::Semver;
-use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
@@ -15,6 +14,7 @@ use shirabe_php_shim::{
     array_search, date, date_format_to_strftime, extension_loaded, in_array, realpath, strtolower,
     version_compare,
 };
+use shirabe_spdx_licenses::SpdxLicenses;
 use std::cell::RefCell;
 use std::rc::Rc;
 

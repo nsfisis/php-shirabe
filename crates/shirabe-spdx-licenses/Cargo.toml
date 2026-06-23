@@ -1,0 +1,10 @@
+[package]
+name = "shirabe-spdx-licenses"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shirabe-php-shim.workspace = true
+
+[lints]
+workspace = true
