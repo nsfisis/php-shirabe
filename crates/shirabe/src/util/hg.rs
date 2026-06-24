@@ -50,7 +50,7 @@ impl Hg {
         if self
             .process
             .borrow_mut()
-            .execute_args(&command, &mut ignored_output, cwd.clone())
+            .execute_args(&command, &mut ignored_output, cwd.as_deref())
             == 0
         {
             return Ok(());
@@ -109,7 +109,7 @@ impl Hg {
             if self
                 .process
                 .borrow_mut()
-                .execute_args(&command, &mut ignored_output, cwd)
+                .execute_args(&command, &mut ignored_output, cwd.as_deref())
                 == 0
             {
                 return Ok(());
@@ -150,7 +150,7 @@ impl Hg {
                 if process.borrow_mut().execute_args(
                     &["hg".to_string(), "--version".to_string()],
                     &mut output,
-                    (),
+                    None,
                 ) == 0
                     && let Some(matches) = Preg::is_match_with_indexed_captures(
                         r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/",

@@ -92,22 +92,22 @@ impl HomeCommand {
             let _ = process.execute(
                 PhpMixed::from(vec!["start", "\"web\"", "explorer", url]),
                 (),
-                (),
+                None,
             );
             return;
         }
 
         let linux = process
-            .execute(PhpMixed::from(vec!["which", "xdg-open"]), (), ())
+            .execute(PhpMixed::from(vec!["which", "xdg-open"]), (), None)
             .unwrap_or(1);
         let osx = process
-            .execute(PhpMixed::from(vec!["which", "open"]), (), ())
+            .execute(PhpMixed::from(vec!["which", "open"]), (), None)
             .unwrap_or(1);
 
         if linux == 0 {
-            let _ = process.execute(PhpMixed::from(vec!["xdg-open", url]), (), ());
+            let _ = process.execute(PhpMixed::from(vec!["xdg-open", url]), (), None);
         } else if osx == 0 {
-            let _ = process.execute(PhpMixed::from(vec!["open", url]), (), ());
+            let _ = process.execute(PhpMixed::from(vec!["open", url]), (), None);
         } else {
             self.get_io().write_error(&format!(
                 "No suitable browser opening command found, open yourself: {}",

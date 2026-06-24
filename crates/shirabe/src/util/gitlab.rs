@@ -75,7 +75,7 @@ impl GitLab {
                 "gitlab.accesstoken".to_string(),
             ],
             &mut output,
-            (),
+            None,
         ) == 0
         {
             self.io.borrow_mut().set_authentication(
@@ -96,7 +96,7 @@ impl GitLab {
                 "gitlab.deploytoken.user".to_string(),
             ],
             &mut token_user,
-            (),
+            None,
         ) == 0
             && self.process.borrow_mut().execute_args(
                 &[
@@ -105,7 +105,7 @@ impl GitLab {
                     "gitlab.deploytoken.token".to_string(),
                 ],
                 &mut token_password,
-                (),
+                None,
             ) == 0
         {
             self.io.borrow_mut().set_authentication(

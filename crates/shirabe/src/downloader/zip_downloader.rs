@@ -132,7 +132,7 @@ impl ZipDownloader {
             .inner
             .process
             .borrow_mut()
-            .execute_async(&command, ())
+            .execute_async(&command, None)
             .await;
         match process_result {
             Ok(mut process) => {

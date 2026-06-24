@@ -121,7 +121,7 @@ impl Filesystem {
             .execute(
                 PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
                 Some(&mut output),
-                (),
+                None,
             )
             .map(|n| n == 0)
             .unwrap_or(false);
@@ -161,7 +161,7 @@ impl Filesystem {
             .get_process()
             .execute_async(
                 PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
-                (),
+                None,
             )
             .await?;
 
@@ -499,7 +499,7 @@ impl Filesystem {
                     "/Y".to_string(),
                 ],
                 &mut output,
-                (),
+                None,
             );
 
             // clear stat cache because external processes aren't tracked by the php stat cache
@@ -517,7 +517,7 @@ impl Filesystem {
             let result = self.get_process().execute_args(
                 &["mv".to_string(), source.to_string(), target.to_string()],
                 &mut output,
-                (),
+                None,
             );
 
             // clear stat cache because external processes aren't tracked by the php stat cache
@@ -951,7 +951,7 @@ impl Filesystem {
             Platform::realpath(target),
         ];
         let mut output = String::new();
-        if self.get_process().execute_args(&cmd, &mut output, ()) != 0 {
+        if self.get_process().execute_args(&cmd, &mut output, None) != 0 {
             return Err(IOException::new(
                 format!(
                     "Failed to create junction to \"{}\" at \"{}\".",

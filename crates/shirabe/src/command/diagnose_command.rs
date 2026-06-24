@@ -532,7 +532,7 @@ impl DiagnoseCommand {
                     "color.ui".to_string(),
                 ],
                 &mut output,
-                (),
+                None,
             );
         if strtolower(&trim(&output, Some(" \t\n\r\0\u{0B}"))) == "always" {
             return "<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>".to_string();

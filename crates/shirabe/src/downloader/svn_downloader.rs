@@ -69,7 +69,7 @@ impl SvnDownloader {
         if self.inner.process.borrow_mut().execute_args(
             ["svn", "revert", "-R", "."].map(|s| s.to_string()).as_ref(),
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         ) != 0
         {
             return Err(RuntimeException {
@@ -378,11 +378,12 @@ impl VcsDownloader for SvnDownloader {
                 path.to_string(),
             ];
             let mut output = String::new();
-            if self.inner.process.borrow_mut().execute_args(
-                &command,
-                &mut output,
-                Some(path.to_string()),
-            ) != 0
+            if self
+                .inner
+                .process
+                .borrow_mut()
+                .execute_args(&command, &mut output, Some(path))
+                != 0
             {
                 return Err(RuntimeException {
                     message: format!(
@@ -466,7 +467,7 @@ impl ChangeReportInterface for SvnDownloader {
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         );
 
         Ok(if Preg::is_match("{^ *[^X ] +}m", &output) {

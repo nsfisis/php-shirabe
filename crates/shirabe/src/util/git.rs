@@ -184,7 +184,7 @@ impl Git {
                 } else {
                     cwd_string.clone()
                 };
-                status = this_process.execute_args(&cmd, &mut local_output, exec_cwd);
+                status = this_process.execute_args(&cmd, &mut local_output, exec_cwd.as_deref());
                 if collect_outputs {
                     outputs.push(local_output);
                 }
@@ -217,7 +217,7 @@ impl Git {
             self.process.borrow_mut().execute_args(
                 &["git".to_string(), "remote".to_string(), "-v".to_string()],
                 &mut output,
-                cwd.map(|s| s.to_string()),
+                cwd,
             );
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
@@ -807,7 +807,7 @@ impl Git {
                     "--git-dir".to_string(),
                 ],
                 &mut output,
-                Some(dir.to_string()),
+                Some(dir),
             ) == 0
             && trim(&output, None) == "."
         {
@@ -919,7 +919,7 @@ impl Git {
                 if self.process.borrow_mut().execute_args(
                     &["git".to_string(), "branch".to_string()],
                     &mut output,
-                    Some(dir.to_string()),
+                    Some(dir),
                 ) == 0
                 {
                     branches = Some(output);
@@ -928,7 +928,7 @@ impl Git {
                 if self.process.borrow_mut().execute_args(
                     &["git".to_string(), "tag".to_string()],
                     &mut output,
-                    Some(dir.to_string()),
+                    Some(dir),
                 ) == 0
                 {
                     tags = Some(output);
@@ -1048,7 +1048,7 @@ impl Git {
                     "--git-dir".to_string(),
                 ],
                 &mut output,
-                Some(dir.to_string()),
+                Some(dir),
             ) == 0
             && trim(&output, None) == "."
         {
@@ -1062,7 +1062,7 @@ impl Git {
                     format!("{}^{{commit}}", r#ref),
                 ],
                 &mut ignored_output,
-                Some(dir.to_string()),
+                Some(dir),
             );
             if exit_code == 0 {
                 return Ok(true);
@@ -1123,7 +1123,7 @@ impl Git {
                         "origin".to_string(),
                     ],
                     &mut output,
-                    Some(dir.to_string()),
+                    Some(dir),
                 );
                 output_mixed = PhpMixed::String(output);
             } else {

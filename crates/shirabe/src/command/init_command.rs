@@ -1010,7 +1010,7 @@ impl InitCommand {
         if process.execute_args(
             &["git".to_string(), "config".to_string(), "-l".to_string()],
             &mut output,
-            (),
+            None,
         ) == 0
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());

@@ -93,13 +93,13 @@ impl HgDriver {
                 && self.inner.process.borrow_mut().execute_args(
                     ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                     &mut String::new(),
-                    Some(self.repo_dir.clone()),
+                    Some(&self.repo_dir),
                 ) == 0
             {
                 if self.inner.process.borrow_mut().execute_args(
                     ["hg", "pull"].map(|s| s.to_string()).as_ref(),
                     &mut String::new(),
-                    Some(self.repo_dir.clone()),
+                    Some(&self.repo_dir),
                 ) != 0
                 {
                     self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()), true, crate::io::NORMAL);
@@ -138,7 +138,7 @@ impl HgDriver {
                     .map(|s| s.to_string())
                     .as_ref(),
                 &mut output,
-                Some(self.repo_dir.clone()),
+                Some(&self.repo_dir),
             );
             let lines = self.inner.process.borrow().split_lines(&output);
             self.root_identifier = lines.into_iter().next();
@@ -184,11 +184,10 @@ impl HgDriver {
             file.to_string(),
         ];
         let mut content = String::new();
-        self.inner.process.borrow_mut().execute_args(
-            &resource,
-            &mut content,
-            Some(self.repo_dir.clone()),
-        );
+        self.inner
+            .process
+            .borrow_mut()
+            .execute_args(&resource, &mut content, Some(&self.repo_dir));
 
         if content.trim().is_empty() {
             return Ok(None);
@@ -225,7 +224,7 @@ impl HgDriver {
             .map(|s| s.to_string())
             .as_ref(),
             &mut output,
-            Some(self.repo_dir.clone()),
+            Some(&self.repo_dir),
         );
 
         let date: DateTime<Utc> = shirabe_php_shim::date_create(output.trim())?;
@@ -239,7 +238,7 @@ impl HgDriver {
             self.inner.process.borrow_mut().execute_args(
                 ["hg", "tags"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(self.repo_dir.clone()),
+                Some(&self.repo_dir),
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
@@ -269,7 +268,7 @@ impl HgDriver {
             self.inner.process.borrow_mut().execute_args(
                 ["hg", "branches"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(self.repo_dir.clone()),
+                Some(&self.repo_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
@@ -290,7 +289,7 @@ impl HgDriver {
             self.inner.process.borrow_mut().execute_args(
                 ["hg", "bookmarks"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(self.repo_dir.clone()),
+                Some(&self.repo_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
@@ -339,7 +338,7 @@ impl HgDriver {
             if process.execute_args(
                 ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(url),
+                Some(&url),
             ) == 0
             {
                 return Ok(true);
@@ -357,7 +356,7 @@ impl HgDriver {
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut ignored,
-            (),
+            None,
         );
 
         Ok(exit == 0)

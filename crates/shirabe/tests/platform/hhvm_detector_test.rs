@@ -58,7 +58,7 @@ fn test_hhvm_version_when_executing_in_php() {
         ProcessExecutor::escape(&hhvm)
     );
     let exit_code = process
-        .execute(cmd.as_str(), Some(&mut version), ())
+        .execute(cmd.as_str(), Some(&mut version), None)
         .unwrap();
     assert_eq!(0, exit_code);
 

@@ -167,7 +167,7 @@ impl Perforce {
         };
         self.process
             .borrow_mut()
-            .execute_args(&cmd_vec, &mut self.command_result, ())
+            .execute_args(&cmd_vec, &mut self.command_result, None)
     }
 
     pub fn get_client(&mut self) -> String {

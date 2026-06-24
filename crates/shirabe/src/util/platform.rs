@@ -381,7 +381,7 @@ impl Platform {
                 let mut process = ProcessExecutor::new(None);
                 let mut output = String::new();
                 let result: Result<()> = (|| {
-                    if process.execute_args(&["lsmod".to_string()], &mut output, ()) == 0
+                    if process.execute_args(&["lsmod".to_string()], &mut output, None) == 0
                         && shirabe_php_shim::str_contains(&output, "vboxguest")
                     {
                         *cached = Some(true);

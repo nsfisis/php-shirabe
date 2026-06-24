@@ -782,10 +782,10 @@ impl EventDispatcher {
 
     fn execute_tty(&self, exec: &str) -> anyhow::Result<i64> {
         if self.io.is_interactive() {
-            return self.process.borrow_mut().execute_tty(exec, ());
+            return self.process.borrow_mut().execute_tty(exec, None);
         }
 
-        self.process.borrow_mut().execute(exec, (), ())
+        self.process.borrow_mut().execute(exec, (), None)
     }
 
     fn get_php_exec_command(&self) -> anyhow::Result<String> {

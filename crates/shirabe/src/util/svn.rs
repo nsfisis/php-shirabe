@@ -165,11 +165,10 @@ impl Svn {
         // TODO(phase-c): pass the filtering handler above to process.execute once the callback
         // model lands; for now a plain buffer is used and the output filtering is skipped.
         let mut handler_output = String::new();
-        let status = self.process.borrow_mut().execute_args(
-            &command,
-            &mut handler_output,
-            cwd.map(String::from),
-        );
+        let status = self
+            .process
+            .borrow_mut()
+            .execute_args(&command, &mut handler_output, cwd);
         if 0 == status {
             return Ok(output);
         }
@@ -455,7 +454,7 @@ impl Svn {
             if 0 == self.process.borrow_mut().execute_args(
                 &["svn".to_string(), "--version".to_string()],
                 &mut output,
-                (),
+                None,
             ) {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::is_match3(r"{(\d+(?:\.\d+)+)}", &output, Some(&mut matches)) {

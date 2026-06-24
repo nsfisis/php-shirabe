@@ -25,7 +25,7 @@ use shirabe_php_shim::{PHP_EOL, trim};
 fn test_execute_captures_output() {
     let mut process = ProcessExecutor::new(None);
     let mut output = String::new();
-    process.execute("echo foo", &mut output, ()).unwrap();
+    process.execute("echo foo", &mut output, None).unwrap();
     assert_eq!(format!("foo{}", PHP_EOL), output);
 }
 
@@ -46,7 +46,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
 fn test_execute_captures_stderr() {
     let mut process = ProcessExecutor::new(None);
     let mut output = String::new();
-    process.execute("cat foo", &mut output, ()).unwrap();
+    process.execute("cat foo", &mut output, None).unwrap();
     assert!(
         process
             .get_error_output()
@@ -99,7 +99,7 @@ fn test_hide_passwords() {
         let mut process =
             ProcessExecutor::new(Some(buffer.clone() as Rc<RefCell<dyn IOInterface>>));
         let mut output = String::new();
-        process.execute(command, &mut output, ()).unwrap();
+        process.execute(command, &mut output, None).unwrap();
         assert_eq!(
             format!("Executing command (CWD): {}", expected_command_output),
             trim(&buffer.borrow().get_output(), None)
@@ -116,7 +116,7 @@ fn test_doesnt_hide_ports() {
     let mut process = ProcessExecutor::new(Some(buffer.clone() as Rc<RefCell<dyn IOInterface>>));
     let mut output = String::new();
     process
-        .execute("echo https://localhost:1234/", &mut output, ())
+        .execute("echo https://localhost:1234/", &mut output, None)
         .unwrap();
     assert_eq!(
         "Executing command (CWD): echo https://localhost:1234/",
@@ -153,7 +153,7 @@ fn test_console_io_does_not_format_symfony_console_style() {
         .execute(
             r#"php -ddisplay_errors=0 -derror_reporting=0 -r "echo '<error>foo</error>'.PHP_EOL;""#,
             (),
-            (),
+            None,
         )
         .unwrap();
     assert_eq!(

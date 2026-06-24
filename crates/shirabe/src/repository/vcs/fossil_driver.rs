@@ -103,7 +103,7 @@ impl FossilDriver {
         if self.inner.process.borrow_mut().execute_args(
             ["fossil", "version"].map(|s| s.to_string()).as_ref(),
             &mut ignored_output,
-            (),
+            None,
         ) != 0
         {
             return Err(RuntimeException {
@@ -143,13 +143,13 @@ impl FossilDriver {
             && self.inner.process.borrow_mut().execute_args(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
-                Some(self.checkout_dir.clone()),
+                Some(&self.checkout_dir),
             ) == 0
         {
             if self.inner.process.borrow_mut().execute_args(
                 ["fossil", "pull"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
-                Some(self.checkout_dir.clone()),
+                Some(&self.checkout_dir),
             ) != 0
             {
                 self.inner.io.write_error3(&format!(
@@ -170,7 +170,7 @@ impl FossilDriver {
                     .map(|s| s.to_string())
                     .as_ref(),
                 &mut output,
-                (),
+                None,
             ) != 0
             {
                 let output = self.inner.process.borrow().get_error_output().to_string();
@@ -189,7 +189,7 @@ impl FossilDriver {
                     .map(|s| s.to_string())
                     .as_ref(),
                 &mut output,
-                Some(self.checkout_dir.clone()),
+                Some(&self.checkout_dir),
             ) != 0
             {
                 let output = self.inner.process.borrow().get_error_output().to_string();
@@ -248,7 +248,7 @@ impl FossilDriver {
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut content,
-            Some(self.checkout_dir.clone()),
+            Some(&self.checkout_dir),
         );
 
         if content.trim().is_empty() {
@@ -268,7 +268,7 @@ impl FossilDriver {
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut output,
-            Some(self.checkout_dir.clone()),
+            Some(&self.checkout_dir),
         );
         let parts: Vec<&str> = output.trim().splitn(3, ' ').collect();
         let date = parts.get(1).copied().unwrap_or("");
@@ -284,7 +284,7 @@ impl FossilDriver {
             self.inner.process.borrow_mut().execute_args(
                 ["fossil", "tag", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(self.checkout_dir.clone()),
+                Some(&self.checkout_dir),
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 tags.insert(tag.clone(), tag);
@@ -301,7 +301,7 @@ impl FossilDriver {
             self.inner.process.borrow_mut().execute_args(
                 ["fossil", "branch", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(self.checkout_dir.clone()),
+                Some(&self.checkout_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 let branch = Preg::replace(r"/^\*/", "", branch.trim());
@@ -342,7 +342,7 @@ impl FossilDriver {
             if process.execute_args(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(url),
+                Some(&url),
             ) == 0
             {
                 return Ok(true);

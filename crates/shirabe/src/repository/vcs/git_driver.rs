@@ -208,7 +208,7 @@ impl GitDriver {
                     "--no-color".to_string(),
                 ],
                 &mut output,
-                Some(self.repo_dir.clone()),
+                Some(&self.repo_dir),
             );
             let branches = self.inner.process.borrow().split_lines(&output);
             if !branches.contains(&"* master".to_string()) {
@@ -269,7 +269,7 @@ impl GitDriver {
                 format!("{}:{}", identifier, file),
             ],
             &mut content,
-            Some(self.repo_dir.clone()),
+            Some(&self.repo_dir),
         );
 
         if content.trim().is_empty() {
@@ -303,11 +303,10 @@ impl GitDriver {
             ],
         );
         let mut output = String::new();
-        self.inner.process.borrow_mut().execute_args(
-            &command,
-            &mut output,
-            Some(self.repo_dir.clone()),
-        );
+        self.inner
+            .process
+            .borrow_mut()
+            .execute_args(&command, &mut output, Some(&self.repo_dir));
 
         let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process);
         let timestamp: i64 = timestamp_str.trim().parse().unwrap_or(0);
@@ -329,7 +328,7 @@ impl GitDriver {
                     "--dereference".to_string(),
                 ],
                 &mut output,
-                Some(self.repo_dir.clone()),
+                Some(&self.repo_dir),
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
@@ -368,7 +367,7 @@ impl GitDriver {
                     "-v".to_string(),
                 ],
                 &mut output,
-                Some(self.repo_dir.clone()),
+                Some(&self.repo_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() && !Preg::is_match(r"{^ *[^/]+/HEAD }", &branch) {
@@ -419,7 +418,7 @@ impl GitDriver {
             if process.borrow_mut().execute_args(
                 &["git".to_string(), "tag".to_string()],
                 &mut output,
-                Some(url.clone()),
+                Some(&url),
             ) == 0
             {
                 return Ok(true);

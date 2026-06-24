@@ -193,7 +193,7 @@ impl VersionGuesser {
                 "-v".to_string(),
             ],
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         ) {
             let mut branches: Vec<String> = vec![];
             let mut is_feature_branch = false;
@@ -306,7 +306,7 @@ impl VersionGuesser {
             if 0 == self.process.borrow_mut().execute_args(
                 &command,
                 &mut command_output,
-                Some(path.to_string()),
+                Some(path),
             ) {
                 let parsed = trim(
                     &GitUtil::parse_rev_list_output(&command_output, &self.process),
@@ -341,7 +341,7 @@ impl VersionGuesser {
                 "--tags".to_string(),
             ],
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         ) {
             match self.version_parser.normalize(&trim(&output, None), None) {
                 Ok(version) => return Ok(Some((version, trim(&output, None)))),
@@ -365,7 +365,7 @@ impl VersionGuesser {
         if 0 == self.process.borrow_mut().execute_args(
             &["hg".to_string(), "branch".to_string()],
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         ) {
             let branch = trim(&output, None);
             let version = self.version_parser.normalize_branch(&branch)?;
@@ -533,9 +533,11 @@ impl VersionGuesser {
                         },
                         &scm_cmdline,
                     );
-                    let mut process = tokio::runtime::Runtime::new()
-                        .unwrap()
-                        .block_on(self.process.borrow_mut().execute_async(&cmd_line, path))?;
+                    let mut process = tokio::runtime::Runtime::new().unwrap().block_on(
+                        self.process
+                            .borrow_mut()
+                            .execute_async(&cmd_line, Some(path)),
+                    )?;
                     if !process.is_successful() {
                         continue;
                     }
@@ -611,7 +613,7 @@ impl VersionGuesser {
                 "list".to_string(),
             ],
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         ) {
             let branch = trim(&output, None);
             version = Some(self.version_parser.normalize_branch(&branch)?);
@@ -623,7 +625,7 @@ impl VersionGuesser {
         if 0 == self.process.borrow_mut().execute_args(
             &["fossil".to_string(), "tag".to_string(), "list".to_string()],
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         ) {
             match self.version_parser.normalize(&trim(&output, None), None) {
                 Ok(v) => {
@@ -658,7 +660,7 @@ impl VersionGuesser {
         if 0 == self.process.borrow_mut().execute_args(
             &["svn".to_string(), "info".to_string(), "--xml".to_string()],
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         ) {
             let trunk_path = package_config
                 .get("trunk-path")

@@ -93,7 +93,7 @@ impl ArchiveDownloader for RarDownloader {
                         .collect(),
                 ),
                 Some(&mut process_output),
-                (),
+                None,
             )? == 0
             {
                 return Ok(None);

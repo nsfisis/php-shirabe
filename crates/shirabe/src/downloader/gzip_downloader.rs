@@ -120,7 +120,7 @@ impl ArchiveDownloader for GzipDownloader {
                         .collect(),
                 ),
                 Some(&mut process_output),
-                (),
+                None,
             )? == 0
             {
                 return Ok(None);

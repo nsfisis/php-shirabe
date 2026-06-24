@@ -110,31 +110,22 @@ impl ProcessExecutor {
     ///                          if a callable is passed it will be used as output handler
     /// @param  null|string $cwd     the working directory
     /// @return int     statuscode
-    pub fn execute<'o, C, O, W>(&mut self, command: C, output: O, cwd: W) -> Result<i64>
+    pub fn execute<'o, C, O>(&mut self, command: C, output: O, cwd: Option<&str>) -> Result<i64>
     where
         C: IntoExecCommand,
         O: IntoExecOutput<'o>,
-        W: IntoExecCwd,
     {
         let command = command.into_exec_command();
         let mut output = output.into_exec_output();
-        let cwd_storage;
-        let cwd_ref: Option<&str> = match cwd.into_exec_cwd() {
-            Some(s) => {
-                cwd_storage = s;
-                Some(cwd_storage.as_str())
-            }
-            None => None,
-        };
         // PHP: func_num_args() > 1
         let has_output_arg = output.has_output();
         let rc = if has_output_arg {
             let mut buf = PhpMixed::Null;
-            let result = self.do_execute(command, cwd_ref, false, Some(&mut buf))?;
+            let result = self.do_execute(command, cwd, false, Some(&mut buf))?;
             output.write_back(buf);
             result
         } else {
-            self.do_execute(command, cwd_ref, false, None)?
+            self.do_execute(command, cwd, false, None)?
         };
         Ok(rc)
     }
@@ -142,10 +133,12 @@ impl ProcessExecutor {
     /// Convenience wrapper used by phase-A code that calls
     /// `process.execute(&[String], &mut String, Option<&str>) == 0`.
     /// Forwards to `execute`, returning the status code (0 on Err for compatibility).
-    pub fn execute_args<W>(&mut self, command: &[String], output: &mut String, cwd: W) -> i64
-    where
-        W: IntoExecCwd,
-    {
+    pub fn execute_args(
+        &mut self,
+        command: &[String],
+        output: &mut String,
+        cwd: Option<&str>,
+    ) -> i64 {
         let cmd = PhpMixed::List(
             command
                 .iter()
@@ -153,39 +146,22 @@ impl ProcessExecutor {
                 .collect(),
         );
         let mut buf = PhpMixed::String(String::new());
-        let cwd_storage;
-        let cwd_ref: Option<&str> = match cwd.into_exec_cwd() {
-            Some(s) => {
-                cwd_storage = s;
-                Some(cwd_storage.as_str())
-            }
-            None => None,
-        };
-        let rc = self.execute(cmd, Some(&mut buf), cwd_ref).unwrap_or(1);
+        let rc = self.execute(cmd, Some(&mut buf), cwd).unwrap_or(1);
         *output = buf.as_string().unwrap_or("").to_string();
         rc
     }
 
     /// runs a process on the commandline in TTY mode
-    pub fn execute_tty<C, W>(&mut self, command: C, cwd: W) -> Result<i64>
+    pub fn execute_tty<C>(&mut self, command: C, cwd: Option<&str>) -> Result<i64>
     where
         C: IntoExecCommand,
-        W: IntoExecCwd,
     {
         let command = command.into_exec_command();
-        let cwd_storage;
-        let cwd_ref: Option<&str> = match cwd.into_exec_cwd() {
-            Some(s) => {
-                cwd_storage = s;
-                Some(cwd_storage.as_str())
-            }
-            None => None,
-        };
         if Platform::is_tty(None) {
-            return self.do_execute(command, cwd_ref, true, None);
+            return self.do_execute(command, cwd, true, None);
         }
 
-        self.do_execute(command, cwd_ref, false, None)
+        self.do_execute(command, cwd, false, None)
     }
 
     /// @param  string|non-empty-list<string> $command
@@ -377,13 +353,11 @@ impl ProcessExecutor {
     }
 
     /// starts a process on the commandline in async mode
-    pub async fn execute_async<C, W>(&mut self, command: C, cwd: W) -> Result<Process>
+    pub async fn execute_async<C>(&mut self, command: C, cwd: Option<&str>) -> Result<Process>
     where
         C: IntoExecCommand,
-        W: IntoExecCwd,
     {
         let command = command.into_exec_command();
-        let cwd_opt = cwd.into_exec_cwd();
         if !self.allow_async {
             return Err(LogicException {
                 message: "You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string(),
@@ -398,7 +372,7 @@ impl ProcessExecutor {
             id,
             status: Self::STATUS_QUEUED,
             command,
-            cwd: cwd_opt,
+            cwd: cwd.map(ToOwned::to_owned),
             process: None,
             exception: None,
         };
@@ -984,53 +958,6 @@ impl<'a> IntoExecOutput<'a> for &'a mut String {
     type Sink = StringOutput<'a>;
     fn into_exec_output(self) -> StringOutput<'a> {
         StringOutput(self)
-    }
-}
-
-/// Phase B helper trait: convert various cwd argument forms into `Option<String>`.
-pub trait IntoExecCwd {
-    fn into_exec_cwd(self) -> Option<String>;
-}
-
-impl IntoExecCwd for () {
-    fn into_exec_cwd(self) -> Option<String> {
-        None
-    }
-}
-
-impl IntoExecCwd for Option<&str> {
-    fn into_exec_cwd(self) -> Option<String> {
-        self.map(|s| s.to_string())
-    }
-}
-
-impl IntoExecCwd for Option<String> {
-    fn into_exec_cwd(self) -> Option<String> {
-        self
-    }
-}
-
-impl IntoExecCwd for Option<&String> {
-    fn into_exec_cwd(self) -> Option<String> {
-        self.cloned()
-    }
-}
-
-impl IntoExecCwd for &str {
-    fn into_exec_cwd(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
-
-impl IntoExecCwd for String {
-    fn into_exec_cwd(self) -> Option<String> {
-        Some(self)
-    }
-}
-
-impl IntoExecCwd for &String {
-    fn into_exec_cwd(self) -> Option<String> {
-        Some(self.clone())
     }
 }
 

@@ -114,7 +114,7 @@ impl VcsDownloader for HgDownloader {
         if self.inner.process.borrow_mut().execute_args(
             &command,
             &mut ignored_output,
-            shirabe_php_shim::realpath(path),
+            shirabe_php_shim::realpath(path).as_deref(),
         ) != 0
         {
             return Err(RuntimeException {
@@ -201,7 +201,7 @@ impl VcsDownloader for HgDownloader {
         if self.inner.process.borrow_mut().execute_args(
             &command,
             &mut output,
-            shirabe_php_shim::realpath(path),
+            shirabe_php_shim::realpath(path).as_deref(),
         ) != 0
         {
             return Err(RuntimeException {
@@ -237,7 +237,7 @@ impl ChangeReportInterface for HgDownloader {
         self.inner.process.borrow_mut().execute_args(
             &["hg".to_string(), "st".to_string()],
             &mut output,
-            shirabe_php_shim::realpath(path),
+            shirabe_php_shim::realpath(path).as_deref(),
         );
 
         let output = output.trim().to_string();

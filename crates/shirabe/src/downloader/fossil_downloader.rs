@@ -43,7 +43,7 @@ impl FossilDownloader {
             .inner
             .process
             .borrow_mut()
-            .execute(&command, output, cwd)?
+            .execute(&command, output, cwd.as_deref())?
             != 0
         {
             return Err(RuntimeException {
@@ -271,7 +271,7 @@ impl ChangeReportInterface for FossilDownloader {
         self.inner.process.borrow_mut().execute_args(
             &["fossil".to_string(), "changes".to_string()],
             &mut output,
-            shirabe_php_shim::realpath(path),
+            shirabe_php_shim::realpath(path).as_deref(),
         );
 
         let output = output.trim().to_string();

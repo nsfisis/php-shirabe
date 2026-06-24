@@ -71,7 +71,7 @@ impl GitHub {
                 "github.accesstoken".to_string(),
             ],
             &mut output,
-            (),
+            None,
         ) == 0
         {
             self.io.borrow_mut().set_authentication(
@@ -106,7 +106,7 @@ impl GitHub {
             if self
                 .process
                 .borrow_mut()
-                .execute_args(&["hostname".to_string()], &mut output, ())
+                .execute_args(&["hostname".to_string()], &mut output, None)
                 == 0
             {
                 note += &format!(" on {}", output.trim());

@@ -495,7 +495,7 @@ impl SvnDriver {
                 url.clone(),
             ],
             &mut ignored_output,
-            (),
+            None,
         );
 
         if exit == 0 {

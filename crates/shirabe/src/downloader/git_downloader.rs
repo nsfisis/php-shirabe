@@ -83,7 +83,7 @@ impl GitDownloader {
             .inner
             .process
             .borrow_mut()
-            .execute_args(&command, &mut output, Some(path.clone()))
+            .execute_args(&command, &mut output, Some(&path))
             != 0
         {
             return Err(RuntimeException {
@@ -179,7 +179,7 @@ impl GitDownloader {
                     if self.inner.process.borrow_mut().execute_args(
                         &command,
                         &mut output,
-                        Some(path.clone()),
+                        Some(&path),
                     ) != 0
                     {
                         return Err(RuntimeException {
@@ -210,7 +210,7 @@ impl GitDownloader {
                 self.inner.process.borrow_mut().execute_args(
                     &["git".to_string(), "fetch".to_string(), "--all".to_string()],
                     &mut output,
-                    Some(path.clone()),
+                    Some(&path),
                 );
 
                 // update list of refs after fetching
@@ -221,11 +221,12 @@ impl GitDownloader {
                     "-d".to_string(),
                 ];
                 let mut output = String::new();
-                if self.inner.process.borrow_mut().execute_args(
-                    &command,
-                    &mut output,
-                    Some(path.clone()),
-                ) != 0
+                if self
+                    .inner
+                    .process
+                    .borrow_mut()
+                    .execute_args(&command, &mut output, Some(&path))
+                    != 0
                 {
                     return Err(RuntimeException {
                         message: format!(
@@ -289,7 +290,7 @@ impl GitDownloader {
             if self.inner.process.borrow_mut().execute_args(
                 &["git".to_string(), "branch".to_string(), "-r".to_string()],
                 &mut output,
-                Some(path.to_string()),
+                Some(path),
             ) == 0
             {
                 branches = Some(output);
@@ -322,18 +323,19 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok1 = self.inner.process.borrow_mut().execute_args(
-                &command1,
-                &mut output,
-                Some(path.to_string()),
-            ) == 0;
+            let ok1 =
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute_args(&command1, &mut output, Some(path))
+                    == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner.process.borrow_mut().execute_args(
-                    &command2,
-                    &mut output,
-                    Some(path.to_string()),
-                ) == 0
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute_args(&command2, &mut output, Some(path))
+                    == 0
             } else {
                 false
             };
@@ -381,17 +383,18 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok_command = self.inner.process.borrow_mut().execute_args(
-                &command,
-                &mut output,
-                Some(path.to_string()),
-            ) == 0;
+            let ok_command =
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute_args(&command, &mut output, Some(path))
+                    == 0;
             let ok_fallback = if !ok_command {
                 let mut output = String::new();
                 self.inner.process.borrow_mut().execute_args(
                     &fallback_command,
                     &mut output,
-                    Some(path.to_string()),
+                    Some(path),
                 ) == 0
             } else {
                 false
@@ -401,7 +404,7 @@ impl GitDownloader {
                 self.inner.process.borrow_mut().execute_args(
                     &reset_command,
                     &mut output,
-                    Some(path.to_string()),
+                    Some(path),
                 ) == 0
             } else {
                 false
@@ -423,18 +426,19 @@ impl GitDownloader {
         ];
         {
             let mut output = String::new();
-            let ok1 = self.inner.process.borrow_mut().execute_args(
-                &command1,
-                &mut output,
-                Some(path.to_string()),
-            ) == 0;
+            let ok1 =
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute_args(&command1, &mut output, Some(path))
+                    == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner.process.borrow_mut().execute_args(
-                    &command2,
-                    &mut output,
-                    Some(path.to_string()),
-                ) == 0
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute_args(&command2, &mut output, Some(path))
+                    == 0
             } else {
                 false
             };
@@ -492,7 +496,7 @@ impl GitDownloader {
                 url.to_string(),
             ],
             &mut output,
-            Some(path.to_string()),
+            Some(path),
         );
         self.set_push_url(path, url);
     }
@@ -535,11 +539,10 @@ impl GitDownloader {
                 push_url,
             ];
             let mut ignored_output = String::new();
-            self.inner.process.borrow_mut().execute_args(
-                &cmd,
-                &mut ignored_output,
-                Some(path.to_string()),
-            );
+            self.inner
+                .process
+                .borrow_mut()
+                .execute_args(&cmd, &mut ignored_output, Some(path));
         }
     }
 
@@ -551,7 +554,7 @@ impl GitDownloader {
         if self.inner.process.borrow_mut().execute_args(
             &["git".to_string(), "clean".to_string(), "-df".to_string()],
             &mut output,
-            Some(path.clone()),
+            Some(&path),
         ) != 0
         {
             return Err(RuntimeException {
@@ -564,7 +567,7 @@ impl GitDownloader {
         if self.inner.process.borrow_mut().execute_args(
             &["git".to_string(), "reset".to_string(), "--hard".to_string()],
             &mut output,
-            Some(path.clone()),
+            Some(&path),
         ) != 0
         {
             return Err(RuntimeException {
@@ -591,7 +594,7 @@ impl GitDownloader {
                 "--include-untracked".to_string(),
             ],
             &mut output,
-            Some(path.clone()),
+            Some(&path),
         ) != 0
         {
             return Err(RuntimeException {
@@ -613,7 +616,7 @@ impl GitDownloader {
         if self.inner.process.borrow_mut().execute_args(
             &["git".to_string(), "diff".to_string(), "HEAD".to_string()],
             &mut output,
-            Some(path.clone()),
+            Some(&path),
         ) != 0
         {
             return Err(RuntimeException {
@@ -711,11 +714,12 @@ impl ChangeReportInterface for GitDownloader {
             "--untracked-files=no".to_string(),
         ];
         let mut output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
-            &command,
-            &mut output,
-            Some(path.to_string()),
-        ) != 0
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute_args(&command, &mut output, Some(path))
+            != 0
         {
             return Err(RuntimeException {
                 message: format!(
@@ -1061,7 +1065,7 @@ impl VcsDownloader for GitDownloader {
                 format!("{}^{{commit}}", r#ref),
             ],
             &mut output,
-            Some(path.clone()),
+            Some(&path),
         ) != 0
         {
             let commands = vec![
@@ -1116,7 +1120,7 @@ impl VcsDownloader for GitDownloader {
         if self.inner.process.borrow_mut().execute_args(
             &["git".to_string(), "remote".to_string(), "-v".to_string()],
             &mut output,
-            Some(path.clone()),
+            Some(&path),
         ) == 0
         {
             let mut origin_match: IndexMap<CaptureKey, String> = IndexMap::new();
@@ -1334,7 +1338,7 @@ impl VcsDownloader for GitDownloader {
             if self.inner.process.borrow_mut().execute_args(
                 &["git".to_string(), "stash".to_string(), "pop".to_string()],
                 &mut output,
-                Some(path.clone()),
+                Some(&path),
             ) != 0
             {
                 return Err(RuntimeException {
@@ -1371,7 +1375,7 @@ impl VcsDownloader for GitDownloader {
             .inner
             .process
             .borrow_mut()
-            .execute_args(&command, &mut output, Some(path.clone()))
+            .execute_args(&command, &mut output, Some(&path))
             != 0
         {
             return Err(RuntimeException {

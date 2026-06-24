@@ -255,7 +255,7 @@ impl PathRepository {
                 let code2 = self
                     .process
                     .borrow_mut()
-                    .execute(cmd, Some(&mut ref2), ())
+                    .execute(cmd, Some(&mut ref2), None)
                     .unwrap_or(1);
                 if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
                     package.insert(

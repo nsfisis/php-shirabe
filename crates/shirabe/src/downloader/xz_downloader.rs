@@ -80,7 +80,7 @@ impl ArchiveDownloader for XzDownloader {
                     .collect(),
             ),
             Some(&mut ignored_output),
-            (),
+            None,
         )? == 0
         {
             return Ok(None);
