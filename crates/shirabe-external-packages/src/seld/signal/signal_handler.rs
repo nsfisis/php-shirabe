@@ -3,24 +3,23 @@
 #[derive(Debug)]
 pub struct SignalHandler;
 
+// TODO(phase-d): disable signal handler at all for now.
 impl SignalHandler {
     pub const SIGINT: &'static str = "SIGINT";
     pub const SIGTERM: &'static str = "SIGTERM";
     pub const SIGHUP: &'static str = "SIGHUP";
 
     pub fn create(_signals: Vec<String>, _callback: Box<dyn Fn(String, &SignalHandler)>) -> Self {
-        todo!()
+        Self
     }
 
-    pub fn unregister(&self) {
-        todo!()
-    }
+    pub fn unregister(&self) {}
 
     pub fn exit_with_last_signal(&self) {
-        todo!()
+        std::process::exit(0);
     }
 
     pub fn is_triggered(&self) -> bool {
-        todo!()
+        false
     }
 }
