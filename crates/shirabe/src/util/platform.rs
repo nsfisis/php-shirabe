@@ -5,11 +5,11 @@ use std::sync::Mutex;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, PhpResource, RuntimeException, defined, env_contains_key, env_get, env_set,
-    env_unset, file_exists, file_get_contents, fstat, function_exists, getcwd, getenv, in_array,
-    ini_get, is_array, is_readable, mb_strlen, php_os_family, posix_geteuid, posix_getpwuid,
-    posix_getuid, posix_isatty, putenv, realpath, server_contains_key, server_get, server_set,
-    server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
+    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
+    file_get_contents, fstat, function_exists, getcwd, getenv, in_array, ini_get, is_array,
+    is_readable, mb_strlen, php_os_family, posix_geteuid, posix_getpwuid, posix_getuid,
+    posix_isatty, putenv, putenv_clear, realpath, stream_isatty, stripos, strlen, strtoupper,
+    substr, usleep,
 };
 
 use crate::util::ProcessExecutor;
@@ -66,28 +66,28 @@ impl Platform {
     ///
     /// @return string|false
     pub fn get_env(name: &str) -> Option<String> {
-        if server_contains_key(name) {
-            return Some(server_get(name).unwrap_or_default());
+        if let Some(value) = PHP_SERVER.lock().unwrap().get(name) {
+            return Some(value.to_string_lossy().into_owned());
         }
-        if env_contains_key(name) {
-            return Some(env_get(name).unwrap_or_default());
+        if let Some(value) = PHP_ENV.lock().unwrap().get(name) {
+            return Some(value.to_string_lossy().into_owned());
         }
 
-        getenv(name)
+        getenv(name).map(|value| value.to_string_lossy().into_owned())
     }
 
     /// putenv() equivalent but updates the runtime global variables too
     pub fn put_env(name: &str, value: &str) {
-        putenv(&format!("{}={}", name, value));
-        server_set(name, value.to_string());
-        env_set(name, value.to_string());
+        unsafe { putenv(name, value) };
+        PHP_SERVER.lock().unwrap().put(name.into(), value.into());
+        PHP_ENV.lock().unwrap().put(name.into(), value.into());
     }
 
     /// putenv('X') equivalent but updates the runtime global variables too
     pub fn clear_env(name: &str) {
-        putenv(name);
-        server_unset(name);
-        env_unset(name);
+        unsafe { putenv_clear(name) };
+        PHP_SERVER.lock().unwrap().clear(name);
+        PHP_ENV.lock().unwrap().clear(name);
     }
 
     /// Parses tildes and environment variables in paths.

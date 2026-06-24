@@ -277,7 +277,8 @@ impl SymfonyStyle {
         let mut progress_bar = self.inner.create_progress_bar(max);
 
         if std::path::MAIN_SEPARATOR != '\\'
-            || shirabe_php_shim::getenv("TERM_PROGRAM").as_deref() == Some("Hyper")
+            || shirabe_php_shim::getenv("TERM_PROGRAM").as_deref()
+                == Some(std::ffi::OsStr::new("Hyper"))
         {
             progress_bar.set_empty_bar_character("░"); // light shade character ░
             progress_bar.set_progress_character("");

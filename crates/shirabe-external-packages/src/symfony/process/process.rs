@@ -1670,13 +1670,20 @@ impl Process {
     }
 
     fn get_default_env(&self) -> IndexMap<String, PhpMixed> {
-        let env = php::getenv_all();
-        let server = php::php_server();
+        let env: IndexMap<String, String> = php::getenv_all()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    v.to_string_lossy().into_owned(),
+                )
+            })
+            .collect();
+        let server = php::PHP_SERVER.lock().unwrap();
 
         // non-Windows: array_intersect_key($env, $_SERVER) ?: $env
         let mut intersect: IndexMap<String, PhpMixed> = IndexMap::new();
         for (k, v) in &env {
-            if server.contains_key(k) {
+            if server.get(k).is_some() {
                 intersect.insert(k.clone(), PhpMixed::String(v.clone()));
             }
         }
@@ -1689,7 +1696,17 @@ impl Process {
         };
 
         // $_ENV + env_map
-        let mut result = php::php_env();
+        let mut result: IndexMap<String, PhpMixed> = php::PHP_ENV
+            .lock()
+            .unwrap()
+            .get_all()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    PhpMixed::String(v.to_string_lossy().into_owned()),
+                )
+            })
+            .collect();
         for (k, v) in env_map {
             result.entry(k).or_insert(v);
         }

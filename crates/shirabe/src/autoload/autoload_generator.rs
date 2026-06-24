@@ -148,7 +148,12 @@ impl AutoloadGenerator {
 
         if self.run_scripts {
             // set COMPOSER_DEV_MODE in case not set yet so it is available in the dump-autoload event listeners
-            if shirabe_php_shim::server_get("COMPOSER_DEV_MODE").is_none() {
+            if shirabe_php_shim::PHP_SERVER
+                .lock()
+                .unwrap()
+                .get("COMPOSER_DEV_MODE")
+                .is_none()
+            {
                 Platform::put_env(
                     "COMPOSER_DEV_MODE",
                     if self.dev_mode.unwrap_or(false) {

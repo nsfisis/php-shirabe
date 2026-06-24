@@ -103,7 +103,10 @@ impl ConsoleOutput {
             } else {
                 String::new()
             },
-            shirabe_php_shim::getenv("OSTYPE").unwrap_or_default(),
+            shirabe_php_shim::getenv("OSTYPE")
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
             shirabe_php_shim::PHP_OS.to_string(),
         ];
 

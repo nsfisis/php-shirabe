@@ -77,13 +77,17 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
         if self.handles_href_gracefully.is_none() {
             self.handles_href_gracefully = Some(
                 shirabe_php_shim::getenv("TERMINAL_EMULATOR").as_deref()
-                    != Some("JetBrains-JediTerm")
+                    != Some(std::ffi::OsStr::new("JetBrains-JediTerm"))
                     && (shirabe_php_shim::getenv("KONSOLE_VERSION").is_none_or(|v| v.is_empty())
                         || shirabe_php_shim::getenv("KONSOLE_VERSION")
-                            .map(|v| v.parse::<i64>().unwrap_or(0))
+                            .map(|v| v.to_string_lossy().parse::<i64>().unwrap_or(0))
                             .unwrap_or(0)
                             > 201100)
-                    && !shirabe_php_shim::server_contains_key("IDEA_INITIAL_DIRECTORY"),
+                    && shirabe_php_shim::PHP_SERVER
+                        .lock()
+                        .unwrap()
+                        .get("IDEA_INITIAL_DIRECTORY")
+                        .is_none(),
             );
         }
 

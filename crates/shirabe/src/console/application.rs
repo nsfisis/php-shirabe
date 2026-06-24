@@ -1402,7 +1402,10 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        let mut shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY").unwrap_or_default();
+        let shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY")
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
         let shell_verbosity_int: i64 = shell_verbosity.parse().unwrap_or(0);
         let mut shell_verbosity: i64 = shell_verbosity_int;
         match shell_verbosity_int {
@@ -1500,10 +1503,16 @@ impl Application {
         }
 
         if shirabe_php_shim::function_exists("putenv") {
-            shirabe_php_shim::putenv(&format!("SHELL_VERBOSITY={}", shell_verbosity));
+            unsafe { shirabe_php_shim::putenv("SHELL_VERBOSITY", shell_verbosity.to_string()) };
         }
-        shirabe_php_shim::env_set("SHELL_VERBOSITY", shell_verbosity.to_string());
-        shirabe_php_shim::server_set("SHELL_VERBOSITY", shell_verbosity.to_string());
+        shirabe_php_shim::PHP_ENV
+            .lock()
+            .unwrap()
+            .put("SHELL_VERBOSITY".into(), shell_verbosity.to_string().into());
+        shirabe_php_shim::PHP_SERVER
+            .lock()
+            .unwrap()
+            .put("SHELL_VERBOSITY".into(), shell_verbosity.to_string().into());
 
         let _ = &mut shell_verbosity;
 
@@ -2285,7 +2294,12 @@ impl ApplicationHandle {
             {
                 io.write_error(&format!(
                     "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
-                    shirabe_php_shim::server_get("PHP_SELF").unwrap_or_default(),
+                    shirabe_php_shim::PHP_SERVER
+                        .lock()
+                        .unwrap()
+                        .get("PHP_SELF")
+                        .unwrap_or_default()
+                        .to_string_lossy(),
                 ));
             }
 
@@ -2598,8 +2612,8 @@ impl ApplicationHandle {
                 let app = application.borrow();
                 (app.terminal.get_height(), app.terminal.get_width())
             };
-            shirabe_php_shim::putenv(&format!("LINES={}", height));
-            shirabe_php_shim::putenv(&format!("COLUMNS={}", width));
+            unsafe { shirabe_php_shim::putenv("LINES", height.to_string()) };
+            unsafe { shirabe_php_shim::putenv("COLUMNS", width.to_string()) };
         }
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = match input {

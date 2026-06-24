@@ -73,7 +73,14 @@ impl DumpCompletionCommand {
     }
 
     fn guess_shell() -> String {
-        shirabe_php_shim::basename(&shirabe_php_shim::server_shell().unwrap_or_default())
+        shirabe_php_shim::basename(
+            &shirabe_php_shim::PHP_SERVER
+                .lock()
+                .unwrap()
+                .get("SHELL")
+                .unwrap_or_default()
+                .to_string_lossy(),
+        )
     }
 
     fn tail_debug_log(&self, command_name: &str, _output: &dyn OutputInterface) {
@@ -112,7 +119,13 @@ impl DumpCompletionCommand {
 
 impl Command for DumpCompletionCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        let full_command = shirabe_php_shim::server_php_self();
+        let full_command = shirabe_php_shim::PHP_SERVER
+            .lock()
+            .unwrap()
+            .php_self()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
         let command_name = shirabe_php_shim::basename(&full_command);
         // @realpath($fullCommand) ?: $fullCommand
         let full_command = match shirabe_php_shim::realpath(&full_command) {
@@ -170,7 +183,15 @@ impl Command for DumpCompletionCommand {
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let command_name = shirabe_php_shim::basename(&shirabe_php_shim::server_argv()[0]);
+        let command_name = shirabe_php_shim::basename(
+            &shirabe_php_shim::PHP_SERVER
+                .lock()
+                .unwrap()
+                .argv()
+                .next()
+                .unwrap_or_default()
+                .to_string_lossy(),
+        );
 
         if input.borrow().get_option("debug")?.to_bool() {
             self.tail_debug_log(&command_name, &*output.borrow());

@@ -196,7 +196,9 @@ impl Color {
         let b = color & 255;
 
         // see https://github.com/termstandard/colors/ for more information about true color support
-        if shirabe_php_shim::getenv("COLORTERM").as_deref() != Some("truecolor") {
+        if shirabe_php_shim::getenv("COLORTERM").as_deref()
+            != Some(std::ffi::OsStr::new("truecolor"))
+        {
             return Self::degrade_hex_color_to_ansi(r, g, b).to_string();
         }
 

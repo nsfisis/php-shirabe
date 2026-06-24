@@ -1,100 +1,90 @@
-use crate::PhpMixed;
-use indexmap::IndexMap;
+//! Porting rules for PHP environment variables: see `docs/dev/env-vars-porting.md`.
 
-pub fn getenv(_name: &str) -> Option<String> {
-    std::env::var(_name).ok()
+pub fn getenv_all() -> std::env::VarsOs {
+    std::env::vars_os()
 }
 
-// TODO(phase-c): only the simple `^(\w+)(=(.+))?$` form is supported.
-pub fn putenv(setting: &str) -> bool {
-    let is_word =
-        |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
-    // A setting without `=` deletes the variable, mirroring PHP's putenv('NAME').
-    match setting.split_once('=') {
-        Some((name, value)) => {
-            if !is_word(name) {
-                panic!("putenv: unsupported setting format: {setting:?}");
-            }
-            unsafe {
-                std::env::set_var(name, value);
-            }
-        }
-        None => {
-            if !is_word(setting) {
-                panic!("putenv: unsupported setting format: {setting:?}");
-            }
-            unsafe {
-                std::env::remove_var(setting);
-            }
-        }
+pub fn getenv<K: AsRef<std::ffi::OsStr>>(key: K) -> Option<std::ffi::OsString> {
+    std::env::var_os(key)
+}
+
+pub unsafe fn putenv<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
+    // TODO: validate key and value format to avoid panic?
+    unsafe { std::env::set_var(key, value) }
+}
+
+pub unsafe fn putenv_clear<K: AsRef<std::ffi::OsStr>>(key: K) {
+    // TODO: validate key and value format to avoid panic?
+    unsafe { std::env::remove_var(key) }
+}
+
+pub struct Superglobal {
+    vars: indexmap::IndexMap<std::ffi::OsString, std::ffi::OsString>,
+}
+
+pub struct SuperglobalServer(Superglobal);
+
+impl Superglobal {
+    fn from_env_vars() -> Self {
+        let vars = std::env::vars_os().collect();
+        Self { vars }
     }
-    true
-}
 
-/// PHP superglobal $_SERVER access. In the CLI SAPI $_SERVER is populated from
-/// the environment, which is the only source modeled here.
-pub fn server_get(name: &str) -> Option<String> {
-    // TODO: is var_os() better?
-    std::env::var(name).ok()
-}
-
-// TODO(php-runtime): modify the real PHP's $_SERVER.
-pub fn server_set(_name: &str, _value: String) {}
-
-// TODO(php-runtime): modify the real PHP's $_SERVER.
-pub fn server_unset(_name: &str) {}
-
-pub fn server_contains_key(name: &str) -> bool {
-    std::env::var_os(name).is_some()
-}
-
-/// PHP superglobal $_ENV access.
-pub fn env_get(name: &str) -> Option<String> {
-    // TODO: is var_os() better?
-    std::env::var(name).ok()
-}
-
-// TODO(php-runtime): modify the real PHP's $_ENV.
-pub fn env_set(_name: &str, _value: String) {}
-
-// TODO(php-runtime): modify the real PHP's $_ENV.
-pub fn env_unset(_name: &str) {}
-
-pub fn env_contains_key(name: &str) -> bool {
-    std::env::var_os(name).is_some()
-}
-
-/// PHP `getenv()` with no argument: all environment variables.
-pub fn getenv_all() -> IndexMap<String, String> {
-    todo!()
-}
-
-/// PHP superglobal `$_ENV`.
-pub fn php_env() -> IndexMap<String, PhpMixed> {
-    todo!()
-}
-
-/// PHP superglobal `$_SERVER`.
-pub fn php_server() -> IndexMap<String, PhpMixed> {
-    todo!()
-}
-
-pub fn server(key: &str) -> String {
-    if key == "PHP_SELF" {
-        return server_php_self();
+    pub fn get_all(&self) -> impl Iterator<Item = (std::ffi::OsString, std::ffi::OsString)> + '_ {
+        self.vars.iter().map(|(k, v)| (k.clone(), v.clone()))
     }
-    server_get(key).unwrap_or_default()
+
+    pub fn get<K: AsRef<std::ffi::OsStr>>(&self, key: K) -> Option<std::ffi::OsString> {
+        self.vars.get(key.as_ref()).cloned()
+    }
+
+    pub fn put(&mut self, key: std::ffi::OsString, value: std::ffi::OsString) {
+        self.vars.insert(key, value);
+    }
+
+    pub fn clear<K: AsRef<std::ffi::OsStr>>(&mut self, key: K) {
+        self.vars.shift_remove(key.as_ref());
+    }
 }
 
-pub fn server_argv() -> Vec<String> {
-    std::env::args().collect()
+impl SuperglobalServer {
+    fn from_env_vars() -> Self {
+        Self(Superglobal::from_env_vars())
+    }
+
+    pub fn get_all(&self) -> impl Iterator<Item = (std::ffi::OsString, std::ffi::OsString)> + '_ {
+        self.0.get_all()
+    }
+
+    pub fn get<K: AsRef<std::ffi::OsStr>>(&self, key: K) -> Option<std::ffi::OsString> {
+        self.0.get(key)
+    }
+
+    pub fn put(&mut self, key: std::ffi::OsString, value: std::ffi::OsString) {
+        self.0.put(key, value)
+    }
+
+    pub fn clear<K: AsRef<std::ffi::OsStr>>(&mut self, key: K) {
+        self.0.clear(key)
+    }
+
+    pub fn argv(&self) -> std::env::ArgsOs {
+        std::env::args_os()
+    }
+
+    pub fn php_self(&self) -> Option<std::ffi::OsString> {
+        self.argv().next()
+    }
 }
 
-pub fn server_php_self() -> String {
-    // CLI SAPI: $_SERVER['PHP_SELF'] is the path of the executed script, i.e. argv[0].
-    std::env::args().next().unwrap_or_default()
-}
+/// PHP superglobal $_SERVER. $_SERVER is a snapshot at startup. Modifying it does not affect the
+/// real environment variables, while putenv() does.
+/// TODO(php-runtime): modify the real PHP's $_SERVER.
+pub static PHP_SERVER: std::sync::LazyLock<std::sync::Mutex<SuperglobalServer>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(SuperglobalServer::from_env_vars()));
 
-pub fn server_shell() -> Option<String> {
-    todo!()
-}
+/// PHP superglobal $_ENV. $_ENV is a snapshot at startup. Modifying it does not affect the real
+/// environment variables, while putenv() does.
+/// TODO(php-runtime): modify the real PHP's $_ENV.
+pub static PHP_ENV: std::sync::LazyLock<std::sync::Mutex<Superglobal>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(Superglobal::from_env_vars()));

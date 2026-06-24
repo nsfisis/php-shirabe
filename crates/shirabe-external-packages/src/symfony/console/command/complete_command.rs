@@ -125,7 +125,15 @@ impl CompleteCommand {
             return;
         }
 
-        let command_name = shirabe_php_shim::basename(&shirabe_php_shim::server_argv()[0]);
+        let command_name = shirabe_php_shim::basename(
+            &shirabe_php_shim::PHP_SERVER
+                .lock()
+                .unwrap()
+                .argv()
+                .next()
+                .unwrap_or_default()
+                .to_string_lossy(),
+        );
         shirabe_php_shim::file_put_contents3(
             &format!(
                 "{}/sf_{}.log",
@@ -206,7 +214,9 @@ impl Command for CompleteCommand {
     ) -> anyhow::Result<()> {
         let _ = (input, output);
         self.is_debug.set(shirabe_php_shim::filter_var_boolean(
-            &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG").unwrap_or_default(),
+            &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG")
+                .unwrap_or_default()
+                .to_string_lossy(),
         ));
 
         Ok(())
@@ -268,7 +278,16 @@ impl Command for CompleteCommand {
                 "<info>Input:</> <comment>(\"|\" indicates the cursor position)</>".to_string(),
                 format!("  {}", completion_input.to_string()),
                 "<info>Command:</>".to_string(),
-                format!("  {}", shirabe_php_shim::server_argv().join(" ")),
+                format!(
+                    "  {}",
+                    shirabe_php_shim::PHP_SERVER
+                        .lock()
+                        .unwrap()
+                        .argv()
+                        .map(|a| a.to_string_lossy().into_owned())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                ),
                 "<info>Messages:</>".to_string(),
             ]);
 

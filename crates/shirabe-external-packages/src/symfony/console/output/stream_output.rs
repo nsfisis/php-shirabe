@@ -91,7 +91,9 @@ impl StreamOutput {
         if !shirabe_php_shim::stream_isatty_resource(stream)
             && !["MINGW32", "MINGW64"].contains(
                 &shirabe_php_shim::strtoupper(
-                    &shirabe_php_shim::getenv("MSYSTEM").unwrap_or_default(),
+                    &shirabe_php_shim::getenv("MSYSTEM")
+                        .unwrap_or_default()
+                        .to_string_lossy(),
                 )
                 .as_str(),
             )
@@ -105,15 +107,19 @@ impl StreamOutput {
             return true;
         }
 
-        if Some("Hyper".to_string()) == shirabe_php_shim::getenv("TERM_PROGRAM")
+        if shirabe_php_shim::getenv("TERM_PROGRAM").as_deref()
+            == Some(std::ffi::OsStr::new("Hyper"))
             || shirabe_php_shim::getenv("COLORTERM").is_some()
             || shirabe_php_shim::getenv("ANSICON").is_some()
-            || Some("ON".to_string()) == shirabe_php_shim::getenv("ConEmuANSI")
+            || shirabe_php_shim::getenv("ConEmuANSI").as_deref() == Some(std::ffi::OsStr::new("ON"))
         {
             return true;
         }
 
-        let term = shirabe_php_shim::getenv("TERM").unwrap_or_default();
+        let term = shirabe_php_shim::getenv("TERM")
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
         if "dumb" == term {
             return false;
         }
@@ -130,7 +136,10 @@ impl StreamOutput {
 
 /// PHP: `(($_SERVER['NO_COLOR'] ?? getenv('NO_COLOR'))[0] ?? '')`.
 fn no_color_first_char() -> String {
-    let value = shirabe_php_shim::getenv("NO_COLOR").unwrap_or_default();
+    let value = shirabe_php_shim::getenv("NO_COLOR")
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     value
         .chars()
         .next()

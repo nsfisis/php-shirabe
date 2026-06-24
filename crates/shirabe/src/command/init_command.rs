@@ -10,11 +10,11 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PhpMixed, array_filter, array_flip,
-    array_flip_strings, array_intersect_key, array_keys, array_map, basename, empty, explode, file,
-    file_exists, file_get_contents, file_put_contents, function_exists, get_current_user, implode,
-    is_dir, is_string, preg_quote, realpath, server_get, sprintf, str_replace, strpos, strtolower,
-    trim, ucwords,
+    FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed, array_filter,
+    array_flip, array_flip_strings, array_intersect_key, array_keys, array_map, basename, empty,
+    explode, file, file_exists, file_get_contents, file_put_contents, function_exists,
+    get_current_user, implode, is_dir, is_string, preg_quote, realpath, sprintf, str_replace,
+    strpos, strtolower, trim, ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use std::cell::RefCell;
@@ -723,7 +723,11 @@ impl Command for InitCommand {
                 .as_string()
                 .map(|s| s.to_string());
             if license.is_none() {
-                let default_license = server_get("COMPOSER_DEFAULT_LICENSE");
+                let default_license = PHP_SERVER
+                    .lock()
+                    .unwrap()
+                    .get("COMPOSER_DEFAULT_LICENSE")
+                    .map(|value| value.to_string_lossy().into_owned());
                 if !empty(
                     &default_license
                         .clone()
@@ -1163,7 +1167,21 @@ impl InitCommand {
         let name = self.sanitize_package_name_component(&name);
 
         let mut vendor = name.clone();
-        let composer_default_vendor = server_get("COMPOSER_DEFAULT_VENDOR");
+        let composer_default_vendor = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_VENDOR")
+            .map(|value| value.to_string_lossy().into_owned());
+        let server_username = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("USERNAME")
+            .map(|value| value.to_string_lossy().into_owned());
+        let server_user = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("USER")
+            .map(|value| value.to_string_lossy().into_owned());
         if !empty(
             &composer_default_vendor
                 .clone()
@@ -1174,19 +1192,19 @@ impl InitCommand {
         } else if git.contains_key("github.user") {
             vendor = git.get("github.user").cloned().unwrap_or_default();
         } else if !empty(
-            &server_get("USERNAME")
+            &server_username
                 .clone()
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
         ) {
-            vendor = server_get("USERNAME").unwrap_or_default();
+            vendor = server_username.unwrap_or_default();
         } else if !empty(
-            &server_get("USER")
+            &server_user
                 .clone()
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
         ) {
-            vendor = server_get("USER").unwrap_or_default();
+            vendor = server_user.unwrap_or_default();
         } else if !get_current_user().is_empty() {
             vendor = get_current_user();
         }
@@ -1200,7 +1218,11 @@ impl InitCommand {
         let git = self.get_git_config();
 
         let mut author_name: Option<String> = None;
-        let composer_default_author = server_get("COMPOSER_DEFAULT_AUTHOR");
+        let composer_default_author = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_AUTHOR")
+            .map(|value| value.to_string_lossy().into_owned());
         if !empty(
             &composer_default_author
                 .clone()
@@ -1213,7 +1235,11 @@ impl InitCommand {
         }
 
         let mut author_email: Option<String> = None;
-        let composer_default_email = server_get("COMPOSER_DEFAULT_EMAIL");
+        let composer_default_email = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_EMAIL")
+            .map(|value| value.to_string_lossy().into_owned());
         if !empty(
             &composer_default_email
                 .clone()

@@ -4,12 +4,13 @@ use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
-use shirabe_php_shim::{PhpMixed, server_set, server_unset};
+use shirabe_php_shim::{PHP_SERVER, PhpMixed};
 use tempfile::TempDir;
 
 fn set_up() {
-    server_set("COMPOSER_DEFAULT_AUTHOR", "John Smith".to_string());
-    server_set("COMPOSER_DEFAULT_EMAIL", "john@example.com".to_string());
+    let mut server = PHP_SERVER.lock().unwrap();
+    server.put("COMPOSER_DEFAULT_AUTHOR".into(), "John Smith".into());
+    server.put("COMPOSER_DEFAULT_EMAIL".into(), "john@example.com".into());
 }
 
 /// const DEFAULT_AUTHORS in PHP.
@@ -497,12 +498,15 @@ fn test_run_guess_name_from_dir_sanitizes_dir() {
     std::fs::create_dir(dir_name).unwrap();
     std::env::set_current_dir(dir_name).unwrap();
 
-    server_set("COMPOSER_DEFAULT_VENDOR", ".vendorName".to_string());
+    PHP_SERVER
+        .lock()
+        .unwrap()
+        .put("COMPOSER_DEFAULT_VENDOR".into(), ".vendorName".into());
 
     let mut app_tester = get_application_tester();
     let result = app_tester.run(non_interactive_input(vec![]), RunOptions::default());
 
-    server_unset("COMPOSER_DEFAULT_VENDOR");
+    PHP_SERVER.lock().unwrap().clear("COMPOSER_DEFAULT_VENDOR");
     result.unwrap();
 
     assert_eq!(0, app_tester.get_status_code());

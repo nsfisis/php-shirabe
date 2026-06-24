@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/ConfigTest.php
 
 use indexmap::IndexMap;
+use serial_test::serial;
 use shirabe::advisory::Auditor;
 use shirabe::config::Config;
 use shirabe::util::Platform;
@@ -509,6 +510,7 @@ fn test_disable_tls_can_be_overridden() {
 }
 
 #[test]
+#[serial]
 fn test_process_timeout() {
     Platform::put_env("COMPOSER_PROCESS_TIMEOUT", "0");
     let config = Config::new(true, None);
@@ -520,6 +522,7 @@ fn test_process_timeout() {
 
 #[ignore]
 #[test]
+#[serial]
 fn test_htaccess_protect() {
     Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
     let config = Config::new(true, None);
@@ -530,6 +533,7 @@ fn test_htaccess_protect() {
 }
 
 #[test]
+#[serial]
 fn test_get_source_of_value() {
     Platform::clear_env("COMPOSER_PROCESS_TIMEOUT");
 
@@ -552,6 +556,7 @@ fn test_get_source_of_value() {
 }
 
 #[test]
+#[serial]
 fn test_get_source_of_value_env_variables() {
     Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
     let mut config = Config::new(true, None);
@@ -562,6 +567,7 @@ fn test_get_source_of_value_env_variables() {
 }
 
 #[test]
+#[serial]
 fn test_audit() {
     let mut config = Config::new(true, None);
     let result = config.get("audit");

@@ -731,7 +731,13 @@ impl Command for CommandData {
             "%command.name%".to_string(),
             "%command.full_name%".to_string(),
         ];
-        let php_self = shirabe_php_shim::server("PHP_SELF");
+        let php_self = shirabe_php_shim::PHP_SERVER
+            .lock()
+            .unwrap()
+            .php_self()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
         let replacements = [
             name.clone().unwrap_or_default(),
             if is_single_command {

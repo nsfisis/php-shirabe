@@ -28,7 +28,8 @@ impl Terminal {
         let width = shirabe_php_shim::getenv("COLUMNS");
         if let Some(width) = width {
             return shirabe_php_shim::intval(&PhpMixed::String(shirabe_php_shim::trim(
-                &width, None,
+                &width.to_string_lossy(),
+                None,
             )));
         }
 
@@ -44,7 +45,8 @@ impl Terminal {
         let height = shirabe_php_shim::getenv("LINES");
         if let Some(height) = height {
             return shirabe_php_shim::intval(&PhpMixed::String(shirabe_php_shim::trim(
-                &height, None,
+                &height.to_string_lossy(),
+                None,
             )));
         }
 
@@ -85,7 +87,7 @@ impl Terminal {
             if let Some(ansicon) = &ansicon
                 && shirabe_php_shim::preg_match(
                     "/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/",
-                    &shirabe_php_shim::trim(ansicon, None),
+                    &shirabe_php_shim::trim(&ansicon.to_string_lossy(), None),
                     &mut matches,
                 )
             {

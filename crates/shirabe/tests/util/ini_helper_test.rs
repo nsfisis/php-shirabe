@@ -12,7 +12,8 @@ fn set_up() -> TearDown {
     // XdebugHandler is a unit struct with no name-registration API, so this
     // step is a no-op here.
     // Save current state
-    let env_original = getenv("COMPOSER_ORIGINAL_INIS");
+    let env_original =
+        getenv("COMPOSER_ORIGINAL_INIS").map(|value| value.to_string_lossy().into_owned());
     TearDown { env_original }
 }
 
@@ -20,7 +21,7 @@ fn set_up() -> TearDown {
 fn tear_down(env_original: &Option<String>) {
     // Restore original state
     if let Some(env_original) = env_original {
-        putenv(&format!("COMPOSER_ORIGINAL_INIS={env_original}"));
+        unsafe { putenv("COMPOSER_ORIGINAL_INIS", env_original) };
     } else {
         Platform::clear_env("COMPOSER_ORIGINAL_INIS");
     }
@@ -38,10 +39,7 @@ impl Drop for TearDown {
 }
 
 fn set_env(paths: &[&str]) {
-    putenv(&format!(
-        "COMPOSER_ORIGINAL_INIS={}",
-        paths.join(PATH_SEPARATOR)
-    ));
+    unsafe { putenv("COMPOSER_ORIGINAL_INIS", paths.join(PATH_SEPARATOR)) };
 }
 
 #[test]
