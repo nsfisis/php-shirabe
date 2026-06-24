@@ -29,9 +29,19 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     // JSON_UNESCAPED_SLASHES and JSON_UNESCAPED_UNICODE set: forward slashes and non-ASCII
     // characters are emitted verbatim. The two flags below re-apply PHP's default escaping when
     // they are absent.
-    // TODO(phase-c): other flags (e.g. JSON_PRETTY_PRINT, JSON_HEX_*, JSON_THROW_ON_ERROR) are not
-    // handled yet; add them when a call site needs them.
-    let mut s = serde_json::to_string(value)?;
+    // TODO(phase-c): other flags (e.g. JSON_HEX_*, JSON_THROW_ON_ERROR) are not handled yet; add
+    // them when a call site needs them.
+    let mut s = if flags & JSON_PRETTY_PRINT != 0 {
+        // PHP's JSON_PRETTY_PRINT uses a 4-space indent.
+        use serde::Serialize;
+        let mut buf = Vec::new();
+        let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+        let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+        value.serialize(&mut ser)?;
+        String::from_utf8(buf)?
+    } else {
+        serde_json::to_string(value)?
+    };
 
     if flags & JSON_UNESCAPED_SLASHES == 0 {
         s = s.replace('/', "\\/");
