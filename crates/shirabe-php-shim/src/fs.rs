@@ -798,6 +798,12 @@ pub fn file_put_contents3(_filename: &str, _data: &str, _flags: i64) -> Option<i
 }
 
 pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> Option<String> {
+    let path = path.as_ref();
+    // PHP supports the file:// stream wrapper; strip it to read the local file.
+    let path = path
+        .to_str()
+        .and_then(|s| s.strip_prefix("file://"))
+        .map_or(path, std::path::Path::new);
     std::fs::read(path)
         .ok()
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())

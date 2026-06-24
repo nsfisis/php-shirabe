@@ -5,7 +5,6 @@ use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::json_schema::Validator;
 use shirabe_external_packages::seld::json_lint::JsonParser;
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
@@ -371,7 +370,7 @@ impl JsonFile {
 
         if schema == Self::STRICT_SCHEMA && is_composer_schema_file {
             schema_data = json_decode(&file_get_contents(&schema_file).unwrap_or_default(), false)?;
-            if let PhpMixed::Array(map) = &mut schema_data {
+            if let PhpMixed::Object(map) = &mut schema_data {
                 map.insert("additionalProperties".to_string(), PhpMixed::Bool(false));
                 map.insert(
                     "required".to_string(),
@@ -394,16 +393,31 @@ impl JsonFile {
             schema_data = PhpMixed::Array(m);
         }
 
-        let mut validator = Validator::new();
         // convert assoc arrays to objects
-        let data_converted = json_decode(&json_encode_ex(data, 0).unwrap_or_default(), false)?;
-        validator.check(&data_converted, &schema_data)?;
+        let schema_value = serde_json::to_value(&schema_data)?;
+        let data_value = serde_json::to_value(data)?;
+        let validator = jsonschema::options()
+            .with_retriever(FileRetriever)
+            .build(&schema_value)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
-        if !validator.is_valid() {
-            // TODO(phase-c): Validator::get_errors currently returns Vec<String>; original PHP
-            // exposes [{property, message}, ...]. Until the validator shim is enriched, surface raw
-            // error strings without prop/message splitting.
-            let errors: Vec<String> = validator.get_errors();
+        let errors: Vec<String> = validator
+            .iter_errors(&data_value)
+            .map(|error| {
+                let property = error
+                    .instance_path()
+                    .as_str()
+                    .trim_start_matches('/')
+                    .replace('/', ".");
+                if property.is_empty() {
+                    error.to_string()
+                } else {
+                    format!("{} : {}", property, error)
+                }
+            })
+            .collect();
+
+        if !errors.is_empty() {
             return Err(JsonValidationException::new(
                 format!("\"{}\" does not match the expected JSON schema", source),
                 errors,
@@ -548,5 +562,23 @@ impl JsonFile {
         }
 
         Self::INDENT_DEFAULT.to_string()
+    }
+}
+
+#[derive(Debug)]
+struct FileRetriever;
+
+impl jsonschema::Retrieve for FileRetriever {
+    fn retrieve(
+        &self,
+        uri: &jsonschema::Uri<String>,
+    ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+        match uri.scheme().as_str() {
+            "file" => {
+                let file = std::fs::File::open(uri.path().as_str())?;
+                Ok(serde_json::from_reader(file)?)
+            }
+            scheme => Err(format!("Unknown scheme {scheme}").into()),
+        }
     }
 }

@@ -15,6 +15,7 @@ async-trait.workspace = true
 base64.workspace = true
 chrono.workspace = true
 indexmap.workspace = true
+jsonschema.workspace = true
 md5.workspace = true
 regex.workspace = true
 serde.workspace = true

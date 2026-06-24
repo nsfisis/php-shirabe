@@ -37,20 +37,9 @@ fn fixture_path(name: &str) -> std::path::PathBuf {
         .join(name)
 }
 
-/// ref: TestCase::createTempFile (PHP tempnam())
-fn create_temp_file() -> String {
-    let mut path = std::env::temp_dir();
-    let unique = format!(
-        "shirabe_jsonfiletest_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    );
-    path.push(unique);
-    std::fs::write(&path, b"").unwrap();
-    path.to_str().unwrap().to_string()
+/// ref: TestCase::createTempFile.
+fn create_temp_file() -> tempfile::NamedTempFile {
+    tempfile::NamedTempFile::new().expect("failed to create a temporary file")
 }
 
 #[test]
@@ -124,7 +113,6 @@ fn test_parse_error_detect_missing_colon() {
 }
 
 #[test]
-#[ignore]
 fn test_simple_json_string() {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert(
@@ -136,7 +124,6 @@ fn test_simple_json_string() {
 }
 
 #[test]
-#[ignore]
 fn test_trailing_backslash() {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert(
@@ -148,7 +135,6 @@ fn test_trailing_backslash() {
 }
 
 #[test]
-#[ignore]
 fn test_format_empty_array() {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert("test".to_string(), PhpMixed::List(vec![]));
@@ -158,7 +144,6 @@ fn test_format_empty_array() {
 }
 
 #[test]
-#[ignore]
 fn test_escape() {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert(
@@ -170,7 +155,6 @@ fn test_escape() {
 }
 
 #[test]
-#[ignore]
 fn test_unicode() {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert(
@@ -245,7 +229,6 @@ fn test_preserve_indentation_after_read() {
 }
 
 #[test]
-#[ignore]
 fn test_overwrites_indentation_by_default() {
     let src = fixture_path("tabs.json");
     let dst = fixture_path("tabs2.json");
@@ -265,7 +248,6 @@ fn test_overwrites_indentation_by_default() {
 }
 
 #[test]
-#[ignore]
 fn test_schema_validation() {
     let path = fixture_path("composer.json");
     let json = JsonFile::new(path.to_str().unwrap().to_string(), None, None).unwrap();
@@ -274,13 +256,15 @@ fn test_schema_validation() {
 }
 
 #[test]
-#[ignore]
 fn test_schema_validation_error() {
-    let file = create_temp_file();
+    // WORDING NOTE: upstream asserts justinrainbow's "name : NULL value found, but a string is
+    // required". The jsonschema crate reports the same violation with different wording.
+    let file_tmp = create_temp_file();
+    let file = file_tmp.path().to_str().unwrap().to_string();
     std::fs::write(&file, b"{ \"name\": null }").unwrap();
     let json = JsonFile::new(file.clone(), None, None).unwrap();
     let expected_message = format!("\"{}\" does not match the expected JSON schema", file);
-    let expected_error = "name : NULL value found, but a string is required".to_string();
+    let expected_error = "name : null is not of type \"string\"".to_string();
 
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
@@ -295,14 +279,15 @@ fn test_schema_validation_error() {
     let e = err.downcast_ref::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert!(e.get_errors().contains(&expected_error));
-
-    std::fs::remove_file(&file).unwrap();
 }
 
 #[test]
-#[ignore]
 fn test_schema_validation_lax_additional_properties() {
-    let file = create_temp_file();
+    // WORDING NOTE: upstream asserts justinrainbow's "The property foo is not defined and the
+    // definition does not allow additional properties". The jsonschema crate reports the same
+    // additionalProperties violation with different wording.
+    let file_tmp = create_temp_file();
+    let file = file_tmp.path().to_str().unwrap().to_string();
     std::fs::write(
         &file,
         b"{ \"name\": \"vendor/package\", \"description\": \"generic description\", \"foo\": \"bar\" }",
@@ -319,21 +304,21 @@ fn test_schema_validation_lax_additional_properties() {
         e.get_message()
     );
     assert_eq!(
-        &vec![
-            "The property foo is not defined and the definition does not allow additional properties"
-                .to_string()
-        ],
+        &vec!["Additional properties are not allowed ('foo' was unexpected)".to_string()],
         e.get_errors()
     );
 
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
-    std::fs::remove_file(&file).unwrap();
 }
 
 #[test]
-#[ignore]
 fn test_schema_validation_lax_required() {
-    let file = create_temp_file();
+    // WORDING NOTE: upstream asserts justinrainbow's property-prefixed strings such as
+    // "name : The property name is required". The jsonschema crate reports the same required
+    // violations as "\"name\" is a required property" (no property prefix; the property name is
+    // embedded in the message).
+    let file_tmp = create_temp_file();
+    let file = file_tmp.path().to_str().unwrap().to_string();
     let json = JsonFile::new(file.clone(), None, None).unwrap();
 
     let expected_message = format!("\"{}\" does not match the expected JSON schema", file);
@@ -345,8 +330,8 @@ fn test_schema_validation_lax_required() {
     let e = err.downcast_ref::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
-    assert!(errors.contains(&"name : The property name is required".to_string()));
-    assert!(errors.contains(&"description : The property description is required".to_string()));
+    assert!(errors.contains(&"\"name\" is a required property".to_string()));
+    assert!(errors.contains(&"\"description\" is a required property".to_string()));
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 
     std::fs::write(&file, b"{ \"name\": \"vendor/package\" }").unwrap();
@@ -356,7 +341,7 @@ fn test_schema_validation_lax_required() {
     let e = err.downcast_ref::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert_eq!(
-        &vec!["description : The property description is required".to_string()],
+        &vec!["\"description\" is a required property".to_string()],
         e.get_errors()
     );
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
@@ -368,7 +353,7 @@ fn test_schema_validation_lax_required() {
     let e = err.downcast_ref::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert_eq!(
-        &vec!["name : The property name is required".to_string()],
+        &vec!["\"name\" is a required property".to_string()],
         e.get_errors()
     );
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
@@ -380,8 +365,8 @@ fn test_schema_validation_lax_required() {
     let e = err.downcast_ref::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
-    assert!(errors.contains(&"name : The property name is required".to_string()));
-    assert!(errors.contains(&"description : The property description is required".to_string()));
+    assert!(errors.contains(&"\"name\" is a required property".to_string()));
+    assert!(errors.contains(&"\"description\" is a required property".to_string()));
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 
     std::fs::write(&file, b"{ \"type\": \"project\" }").unwrap();
@@ -391,8 +376,8 @@ fn test_schema_validation_lax_required() {
     let e = err.downcast_ref::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
-    assert!(errors.contains(&"name : The property name is required".to_string()));
-    assert!(errors.contains(&"description : The property description is required".to_string()));
+    assert!(errors.contains(&"\"name\" is a required property".to_string()));
+    assert!(errors.contains(&"\"description\" is a required property".to_string()));
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 
     std::fs::write(
@@ -402,21 +387,20 @@ fn test_schema_validation_lax_required() {
     .unwrap();
     json.validate_schema(JsonFile::STRICT_SCHEMA, None).unwrap();
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
-
-    std::fs::remove_file(&file).unwrap();
 }
 
 #[test]
-#[ignore]
 fn test_custom_schema_validation_lax() {
-    let file = create_temp_file();
+    let file_tmp = create_temp_file();
+    let file = file_tmp.path().to_str().unwrap().to_string();
     std::fs::write(
         &file,
         b"{ \"custom\": \"property\", \"another custom\": \"property\" }",
     )
     .unwrap();
 
-    let schema = create_temp_file();
+    let schema_tmp = create_temp_file();
+    let schema = schema_tmp.path().to_str().unwrap().to_string();
     std::fs::write(
         &schema,
         b"{ \"properties\": { \"custom\": { \"type\": \"string\" }}}",
@@ -427,18 +411,16 @@ fn test_custom_schema_validation_lax() {
 
     json.validate_schema(JsonFile::LAX_SCHEMA, Some(&schema))
         .unwrap();
-
-    std::fs::remove_file(&file).unwrap();
-    std::fs::remove_file(&schema).unwrap();
 }
 
 #[test]
-#[ignore]
 fn test_custom_schema_validation_strict() {
-    let file = create_temp_file();
+    let file_tmp = create_temp_file();
+    let file = file_tmp.path().to_str().unwrap().to_string();
     std::fs::write(&file, b"{ \"custom\": \"property\" }").unwrap();
 
-    let schema = create_temp_file();
+    let schema_tmp = create_temp_file();
+    let schema = schema_tmp.path().to_str().unwrap().to_string();
     std::fs::write(
         &schema,
         b"{ \"properties\": { \"custom\": { \"type\": \"string\" }}}",
@@ -449,17 +431,16 @@ fn test_custom_schema_validation_strict() {
 
     json.validate_schema(JsonFile::STRICT_SCHEMA, Some(&schema))
         .unwrap();
-
-    std::fs::remove_file(&file).unwrap();
-    std::fs::remove_file(&schema).unwrap();
 }
 
 #[test]
-#[ignore]
 fn test_auth_schema_validation_with_custom_data_source() {
+    // WORDING NOTE: upstream asserts justinrainbow's "github-oauth : String value found, but an
+    // object is required". The jsonschema crate reports the same type violation with different
+    // wording.
     let json = shirabe_php_shim::json_decode("{\"github-oauth\": \"foo\"}", false).unwrap();
     let expected_message = "\"COMPOSER_AUTH\" does not match the expected JSON schema".to_string();
-    let expected_error = "github-oauth : String value found, but an object is required".to_string();
+    let expected_error = "github-oauth : \"foo\" is not of type \"object\"".to_string();
 
     let err = JsonFile::validate_json_schema("COMPOSER_AUTH", &json, JsonFile::AUTH_SCHEMA, None)
         .unwrap_err();
