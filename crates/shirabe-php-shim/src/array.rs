@@ -591,13 +591,72 @@ pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
         _ => return false,
     };
 
-    if !strict {
-        // TODO(phase-c): non-strict in_array needs PHP's loose `==` comparison semantics. Only the
-        // strict path is implemented; loose comparison is deferred rather than approximated.
-        todo!("non-strict in_array (PHP loose comparison)");
+    if strict {
+        values.iter().any(|value| **value == needle)
+    } else {
+        values.iter().any(|value| loose_eq(value, &needle))
     }
+}
 
-    values.iter().any(|value| **value == needle)
+/// PHP numeric-string-aware conversion to a number, used by loose comparison.
+fn loose_to_number(s: &str) -> Option<f64> {
+    if crate::var::is_numeric_string(s) {
+        s.trim().parse::<f64>().ok()
+    } else {
+        None
+    }
+}
+
+fn loose_num_to_string(value: &PhpMixed) -> String {
+    match value {
+        PhpMixed::Int(i) => i.to_string(),
+        PhpMixed::Float(f) => f.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn loose_num_value(value: &PhpMixed) -> f64 {
+    match value {
+        PhpMixed::Int(i) => *i as f64,
+        PhpMixed::Float(f) => *f,
+        _ => 0.0,
+    }
+}
+
+/// PHP `==` loose comparison.
+pub fn loose_eq(a: &PhpMixed, b: &PhpMixed) -> bool {
+    use PhpMixed::*;
+    match (a, b) {
+        (Null, Null) => true,
+        // null compares loosely against the "empty"/false-y value of the other type.
+        (Null, other) | (other, Null) => !crate::var::to_bool(other),
+        // If either operand is a bool, both are converted to bool.
+        (Bool(x), other) => *x == crate::var::to_bool(other),
+        (other, Bool(y)) => crate::var::to_bool(other) == *y,
+        (Int(x), Int(y)) => x == y,
+        (Int(_) | Float(_), Int(_) | Float(_)) => loose_num_value(a) == loose_num_value(b),
+        (String(x), String(y)) => match (loose_to_number(x), loose_to_number(y)) {
+            (Some(nx), Some(ny)) => nx == ny,
+            _ => x == y,
+        },
+        (Int(_) | Float(_), String(s)) => match loose_to_number(s) {
+            Some(ns) => loose_num_value(a) == ns,
+            None => loose_num_to_string(a) == *s,
+        },
+        (String(s), Int(_) | Float(_)) => match loose_to_number(s) {
+            Some(ns) => loose_num_value(b) == ns,
+            None => *s == loose_num_to_string(b),
+        },
+        (List(x), List(y)) => {
+            x.len() == y.len() && x.iter().zip(y.iter()).all(|(p, q)| loose_eq(p, q))
+        }
+        (Array(x), Array(y)) | (Object(x), Object(y)) => {
+            x.len() == y.len()
+                && x.iter()
+                    .all(|(k, v)| y.get(k).map(|w| loose_eq(v, w)).unwrap_or(false))
+        }
+        _ => false,
+    }
 }
 
 pub fn krsort<V>(array: &mut IndexMap<i64, V>) {
