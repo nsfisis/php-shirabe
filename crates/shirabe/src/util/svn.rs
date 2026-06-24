@@ -139,36 +139,32 @@ impl Svn {
         // Regenerate the command at each try, to use the newly user-provided credentials
         let command = self.get_command(svn_command.clone(), url, path);
 
-        let mut output: Option<String> = None;
-        // PHP: $handler = function ($type, $buffer) use (&$output, $io, $verbose) { ... };
-        //      $status = $this->process->execute($command, $handler, $cwd);
-        // TODO(phase-c): ProcessExecutor::execute does not yet accept a streaming output callback
-        // (its Symfony Process backing stays todo!()), so this handler — which filters by stream
-        // type, drops "Redirecting to URL" lines, accumulates into `output`, and echoes when
-        // verbose — cannot be passed through. The plain-buffer execute_args call below loses that
-        // filtering; resolving needs the process callback model (cf. process_executor.rs).
-        let _io = &self.io;
-        let _handler = |r#type: &str, buffer: &str| -> Option<()> {
-            if r#type != "out" {
-                return None;
-            }
-            if strpos(buffer, "Redirecting to URL ") == Some(0) {
-                return None;
-            }
-            // PHP: $output .= $buffer;
-            output.get_or_insert_with(String::new).push_str(buffer);
-            if verbose {
-                // self.io.write_error(PhpMixed::String(buffer.to_string()), false, io_interface::NORMAL);
-            }
-            None
-        };
-        // TODO(phase-c): pass the filtering handler above to process.execute once the callback
-        // model lands; for now a plain buffer is used and the output filtering is skipped.
-        let mut handler_output = String::new();
+        let output: std::rc::Rc<std::cell::RefCell<Option<String>>> =
+            std::rc::Rc::new(std::cell::RefCell::new(None));
+        let io = self.io.clone();
+        let output_for_handler = output.clone();
+        let handler: Box<dyn FnMut(&str, &str) -> bool> =
+            Box::new(move |r#type: &str, buffer: &str| {
+                if r#type != "out" {
+                    return false;
+                }
+                if strpos(buffer, "Redirecting to URL ") == Some(0) {
+                    return false;
+                }
+                output_for_handler
+                    .borrow_mut()
+                    .get_or_insert_with(String::new)
+                    .push_str(buffer);
+                if verbose {
+                    io.borrow().write_error2(buffer, false);
+                }
+                false
+            });
         let status = self
             .process
             .borrow_mut()
-            .execute_args(&command, &mut handler_output, cwd);
+            .execute(command.as_slice(), handler, cwd)?;
+        let output = output.borrow().clone();
         if 0 == status {
             return Ok(output);
         }

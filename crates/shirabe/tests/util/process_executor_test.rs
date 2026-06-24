@@ -152,7 +152,7 @@ fn test_console_io_does_not_format_symfony_console_style() {
     process
         .execute(
             r#"php -ddisplay_errors=0 -derror_reporting=0 -r "echo '<error>foo</error>'.PHP_EOL;""#,
-            (),
+            ProcessExecutor::FORWARD_OUTPUT,
             None,
         )
         .unwrap();

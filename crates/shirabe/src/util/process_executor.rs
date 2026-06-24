@@ -13,9 +13,9 @@ use shirabe_external_packages::symfony::process::exception::ProcessSignaledExcep
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, array_intersect, array_map, call_user_func,
-    defined, escapeshellarg, explode, implode, in_array, is_array, is_callable, is_dir, is_numeric,
-    is_string, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
-    substr_replace, trim, usleep,
+    defined, escapeshellarg, explode, implode, in_array, is_array, is_dir, is_numeric, is_string,
+    rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace,
+    trim, usleep,
 };
 
 use crate::io::IOInterface;
@@ -69,7 +69,14 @@ impl std::fmt::Debug for Job {
     }
 }
 
+/// Output target marking the "no `$output` argument" case of `ProcessExecutor::execute`, where the
+/// child's output is forwarded to STDOUT/STDERR (or the IO) instead of captured. Use the
+/// [`ProcessExecutor::FORWARD_OUTPUT`] constant rather than constructing this directly.
+pub struct ProcessForwardOutput;
+
 impl ProcessExecutor {
+    pub const FORWARD_OUTPUT: ProcessForwardOutput = ProcessForwardOutput;
+
     const STATUS_QUEUED: i64 = 1;
     const STATUS_STARTED: i64 = 2;
     const STATUS_COMPLETED: i64 = 3;
@@ -104,30 +111,13 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline
-    ///
-    /// @param  string|non-empty-list<string> $command the command to execute
-    /// @param  mixed   $output  the output will be written into this var if passed by ref
-    ///                          if a callable is passed it will be used as output handler
-    /// @param  null|string $cwd     the working directory
-    /// @return int     statuscode
     pub fn execute<'o, C, O>(&mut self, command: C, output: O, cwd: Option<&str>) -> Result<i64>
     where
         C: IntoExecCommand,
         O: IntoExecOutput<'o>,
     {
         let command = command.into_exec_command();
-        let mut output = output.into_exec_output();
-        // PHP: func_num_args() > 1
-        let has_output_arg = output.has_output();
-        let rc = if has_output_arg {
-            let mut buf = PhpMixed::Null;
-            let result = self.do_execute(command, cwd, false, Some(&mut buf))?;
-            output.write_back(buf);
-            result
-        } else {
-            self.do_execute(command, cwd, false, None)?
-        };
-        Ok(rc)
+        self.do_execute(command, cwd, false, output)
     }
 
     /// Convenience wrapper used by phase-A code that calls
@@ -146,7 +136,7 @@ impl ProcessExecutor {
                 .collect(),
         );
         let mut buf = PhpMixed::String(String::new());
-        let rc = self.execute(cmd, Some(&mut buf), cwd).unwrap_or(1);
+        let rc = self.execute(cmd, &mut buf, cwd).unwrap_or(1);
         *output = buf.as_string().unwrap_or("").to_string();
         rc
     }
@@ -158,22 +148,23 @@ impl ProcessExecutor {
     {
         let command = command.into_exec_command();
         if Platform::is_tty(None) {
-            return self.do_execute(command, cwd, true, None);
+            return self.do_execute(command, cwd, true, Self::FORWARD_OUTPUT);
         }
 
-        self.do_execute(command, cwd, false, None)
+        self.do_execute(command, cwd, false, Self::FORWARD_OUTPUT)
     }
 
-    /// @param  string|non-empty-list<string> $command
-    /// @param  array<string, string>|null $env
-    fn run_process(
+    fn run_process<'o, O>(
         &mut self,
         command: PhpMixed,
         cwd: Option<&str>,
         env: Option<IndexMap<String, String>>,
         tty: bool,
-        mut output: Option<&mut PhpMixed>,
-    ) -> Result<Option<i64>> {
+        mut output: O,
+    ) -> Result<Option<i64>>
+    where
+        O: IntoExecOutput<'o>,
+    {
         // On Windows, we don't rely on the OS to find the executable if possible to avoid lookups
         // in the current directory which could be untrusted. Instead we use the ExecutableFinder.
 
@@ -235,21 +226,6 @@ impl ProcessExecutor {
             // ignore TTY enabling errors
         }
 
-        // PHP: $callback = is_callable($output) ? $output : fn($type, $buffer) => $this->outputHandler($type, $buffer);
-        let output_is_callable = output.as_deref().map(is_callable).unwrap_or(false);
-        let _callback: Box<dyn Fn(&str, &str)> = if output_is_callable {
-            // TODO(phase-c): the user-supplied $output is a PhpMixed callable that cannot be
-            // invoked without a typed callable model (Rc<dyn Fn>); deferred with the callable model.
-            Box::new(|_t: &str, _b: &str| {})
-        } else {
-            // TODO(phase-c): the fallback must call self.output_handler(type, buffer) (which is
-            // &mut self and writes to io / updates last_message), but this is a 'static
-            // `Box<dyn Fn>` that cannot borrow &mut self. Wiring it needs the handler state shared
-            // (Rc<RefCell<...>>). The callback is also not yet passed to process.run, whose Symfony
-            // Process backing stays todo!().
-            Box::new(|_t: &str, _b: &str| {})
-        };
-
         let io_for_signal = self.io.clone();
         let signal_handler = SignalHandler::create(
             vec![
@@ -268,17 +244,22 @@ impl ProcessExecutor {
         );
 
         let result: Result<()> = (|| -> Result<()> {
-            process.run(
-                /* callback */ Some(Box::new(|_t: &str, _b: &str| false)),
-                IndexMap::new(),
-            )?;
-
-            let output_is_callable_inner = output.as_deref().map(is_callable).unwrap_or(false);
-            if self.capture_output
-                && !output_is_callable_inner
-                && let Some(out) = output.as_mut()
-            {
-                **out = PhpMixed::String(process.get_output()?);
+            match output.to_callback() {
+                Ok(callback) => {
+                    process.run(Some(callback), IndexMap::new())?;
+                }
+                Err(mut output) => {
+                    let capture_output = self.capture_output;
+                    let mut io = self.io.clone();
+                    let mut callback = move |r#type: &str, buffer: &str| {
+                        Self::output_handler(capture_output, &mut io, r#type, buffer);
+                        false
+                    };
+                    process.run(Some(Box::new(callback)), IndexMap::new())?;
+                    if self.capture_output {
+                        output.write_back(process.get_output()?);
+                    }
+                }
             }
 
             self.error_output = process.get_error_output()?;
@@ -306,18 +287,19 @@ impl ProcessExecutor {
         Ok(process.get_exit_code())
     }
 
-    /// @param  string|non-empty-list<string> $command
-    /// @param  mixed   $output
-    fn do_execute(
+    fn do_execute<'o, O>(
         &mut self,
         command: PhpMixed,
         cwd: Option<&str>,
         tty: bool,
-        mut output: Option<&mut PhpMixed>,
-    ) -> Result<i64> {
+        output: O,
+    ) -> Result<i64>
+    where
+        O: IntoExecOutput<'o>,
+    {
         self.output_command_run(&command, cwd, false);
 
-        self.capture_output = output.is_some();
+        self.capture_output = output.capture_output();
         self.error_output = String::new();
 
         let mut env: Option<IndexMap<String, String>> = None;
@@ -338,7 +320,7 @@ impl ProcessExecutor {
                     cwd,
                     Some(git_env.clone()),
                     tty,
-                    Some(&mut config_value),
+                    &mut config_value,
                 )?;
                 let trimmed = trim(config_value.as_string().unwrap_or(""), None);
                 if trimmed == "explicit" {
@@ -400,25 +382,28 @@ impl ProcessExecutor {
         }
     }
 
-    fn output_handler(&mut self, r#type: &str, buffer: &str) {
-        if self.capture_output {
+    fn output_handler(
+        capture_output: bool,
+        io: &mut Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        r#type: &str,
+        buffer: &str,
+    ) {
+        if capture_output {
             return;
         }
 
-        if self.io.is_none() {
+        if io.is_none() {
             print!("{}", buffer);
 
             return;
         }
 
         if Process::ERR == r#type {
-            self.io
-                .as_mut()
+            io.as_mut()
                 .unwrap()
                 .write_error_raw3(buffer, false, io_interface::NORMAL);
         } else {
-            self.io
-                .as_mut()
+            io.as_mut()
                 .unwrap()
                 .write_raw3(buffer, false, io_interface::NORMAL);
         }
@@ -892,73 +877,113 @@ impl IntoExecCommand for &[String] {
     }
 }
 
-/// Phase B helper trait: write captured output back to the caller's buffer.
-pub trait IntoExecOutput<'a> {
-    type Sink: ExecOutputSink + 'a;
-    fn into_exec_output(self) -> Self::Sink;
+/// Models the `mixed &$output` parameter of `ProcessExecutor::execute` (cf.
+/// `composer/src/Composer/Util/ProcessExecutor.php`). In PHP the behaviour is selected by
+/// `func_num_args()` and `is_callable($output)`; here each behaviour is a distinct implementing type:
+///
+/// | PHP call site | meaning | implementor | `capture_output` |
+/// |---|---|---|---|
+/// | `execute($cmd)` | forward child output to STDOUT/STDERR (or the IO) | [`ProcessForwardOutput`] | `false` |
+/// | `execute($cmd, $out)` | assign captured output back to `$out` | `&mut String` / `&mut PhpMixed` | `true` |
+/// | `execute($cmd, $out)` where `$out` is unused | capture (suppress output) but discard it | `()` | `true` |
+/// | `execute($cmd, $cb)` | drive the child through the callback | `Box<dyn FnMut(&str, &str) -> bool>` | `false` |
+///
+/// `capture_output` maps to PHP's `$this->captureOutput` (`func_num_args() > 3` in `doExecute`): when
+/// `true`, `outputHandler` swallows the child output instead of echoing it, and the full output is
+/// read back via `Process::getOutput()` afterwards.
+pub trait IntoExecOutput<'a>: Sized {
+    /// Whether the child's output is captured rather than forwarded to the terminal/IO.
+    ///
+    /// Mirrors `$this->captureOutput`: `true` makes `output_handler` swallow the stream so the buffer
+    /// can be retrieved via `Process::get_output` (and handed to [`write_back`](Self::write_back)),
+    /// `false` lets it pass through to STDOUT/STDERR or the IO.
+    fn capture_output(&self) -> bool;
+
+    /// Splits the output target into the two PHP cases handled by `is_callable($output)`:
+    /// `Ok(callback)` for a user-supplied output handler (passed straight to `Process::run`),
+    /// `Err(self)` for the capture/forward cases (a default handler is used and `self` is returned
+    /// so the captured output can still be written back).
+    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self>;
+
+    /// Assigns the captured output back to the by-reference target, mirroring PHP's
+    /// `$output = $process->getOutput()`. Only meaningful when [`capture_output`](Self::capture_output)
+    /// is `true`; a no-op for the forwarding and discarding variants.
+    fn write_back(&mut self, value: String);
 }
 
-pub trait ExecOutputSink {
-    fn has_output(&self) -> bool;
-    fn write_back(&mut self, value: PhpMixed);
-}
-
-pub struct NoOutput;
-impl ExecOutputSink for NoOutput {
-    fn has_output(&self) -> bool {
-        false
-    }
-    fn write_back(&mut self, _value: PhpMixed) {}
-}
-
-pub struct PhpMixedOutput<'a>(Option<&'a mut PhpMixed>);
-impl<'a> ExecOutputSink for PhpMixedOutput<'a> {
-    fn has_output(&self) -> bool {
-        self.0.is_some()
-    }
-    fn write_back(&mut self, value: PhpMixed) {
-        if let Some(out) = self.0.as_deref_mut() {
-            *out = value;
-        }
-    }
-}
-
-pub struct StringOutput<'a>(&'a mut String);
-impl<'a> ExecOutputSink for StringOutput<'a> {
-    fn has_output(&self) -> bool {
+/// `execute($cmd, $out)` where the caller never reads `$out` (e.g. `HomeCommand::openBrowser`):
+/// output is captured (so the terminal stays quiet) but thrown away.
+impl<'a> IntoExecOutput<'a> for () {
+    fn capture_output(&self) -> bool {
         true
     }
-    fn write_back(&mut self, value: PhpMixed) {
-        *self.0 = value.as_string().unwrap_or("").to_string();
+
+    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+        Err(self)
     }
+
+    fn write_back(&mut self, _value: String) {}
 }
 
-impl<'a> IntoExecOutput<'a> for () {
-    type Sink = NoOutput;
-    fn into_exec_output(self) -> NoOutput {
-        NoOutput
+/// `execute($cmd)` with no output argument: the child's output is forwarded to STDOUT/STDERR
+/// (or the IO). Obtained via [`ProcessExecutor::FORWARD_OUTPUT`].
+impl<'a> IntoExecOutput<'a> for ProcessForwardOutput {
+    fn capture_output(&self) -> bool {
+        false
     }
+
+    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+        Err(self)
+    }
+
+    fn write_back(&mut self, _value: String) {}
 }
 
-impl<'a> IntoExecOutput<'a> for Option<&'a mut PhpMixed> {
-    type Sink = PhpMixedOutput<'a>;
-    fn into_exec_output(self) -> PhpMixedOutput<'a> {
-        PhpMixedOutput(self)
-    }
-}
-
+/// `execute($cmd, $out)` where `$out` holds a `mixed`/string value: output is captured and assigned
+/// back as a [`PhpMixed::String`].
 impl<'a> IntoExecOutput<'a> for &'a mut PhpMixed {
-    type Sink = PhpMixedOutput<'a>;
-    fn into_exec_output(self) -> PhpMixedOutput<'a> {
-        PhpMixedOutput(Some(self))
+    fn capture_output(&self) -> bool {
+        true
+    }
+
+    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+        Err(self)
+    }
+
+    fn write_back(&mut self, value: String) {
+        **self = PhpMixed::String(value);
     }
 }
 
+/// `execute($cmd, $out)` where `$out` is consumed as a string: output is captured and assigned back
+/// directly.
 impl<'a> IntoExecOutput<'a> for &'a mut String {
-    type Sink = StringOutput<'a>;
-    fn into_exec_output(self) -> StringOutput<'a> {
-        StringOutput(self)
+    fn capture_output(&self) -> bool {
+        true
     }
+
+    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+        Err(self)
+    }
+
+    fn write_back(&mut self, value: String) {
+        **self = value;
+    }
+}
+
+/// `execute($cmd, $cb)` where `$cb` is callable: the callback is passed straight to `Process::run`
+/// as the output handler, so the caller drives the child's output itself (e.g. `Svn`'s streaming
+/// handler). The `bool` return mirrors Symfony's ignored callback return value.
+impl<'a> IntoExecOutput<'a> for Box<dyn FnMut(&str, &str) -> bool> {
+    fn capture_output(&self) -> bool {
+        false
+    }
+
+    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+        Ok(self)
+    }
+
+    fn write_back(&mut self, _value: String) {}
 }
 
 /// Phase B helper: accept either `i64` or `PhpMixed` for `set_timeout`.

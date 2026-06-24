@@ -120,7 +120,7 @@ impl Filesystem {
             .get_process()
             .execute(
                 PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
-                Some(&mut output),
+                &mut output,
                 None,
             )
             .map(|n| n == 0)

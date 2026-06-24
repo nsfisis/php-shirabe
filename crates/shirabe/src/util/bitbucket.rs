@@ -82,7 +82,7 @@ impl Bitbucket {
             .borrow_mut()
             .execute(
                 PhpMixed::from(vec!["git", "config", "bitbucket.accesstoken"]),
-                Some(&mut output),
+                &mut output,
                 None,
             )
             .unwrap_or(1)

@@ -833,7 +833,7 @@ impl Locker {
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
                         PhpMixed::List(command.into_iter().map(PhpMixed::String).collect()),
-                        Some(&mut output),
+                        &mut output,
                         path.as_deref(),
                     )? {
                         let output_str = trim(
@@ -860,7 +860,7 @@ impl Locker {
                             PhpMixed::String("-r".to_string()),
                             PhpMixed::String(source_ref.clone()),
                         ]),
-                        Some(&mut output),
+                        &mut output,
                         path.as_deref(),
                     )? {
                         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();

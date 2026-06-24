@@ -119,7 +119,7 @@ impl ArchiveDownloader for GzipDownloader {
                         .map(|s| PhpMixed::String(s.clone()))
                         .collect(),
                 ),
-                Some(&mut process_output),
+                &mut process_output,
                 None,
             )? == 0
             {

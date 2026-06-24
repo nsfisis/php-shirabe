@@ -92,7 +92,7 @@ impl ArchiveDownloader for RarDownloader {
                         .map(|s| PhpMixed::String(s.clone()))
                         .collect(),
                 ),
-                Some(&mut process_output),
+                &mut process_output,
                 None,
             )? == 0
             {

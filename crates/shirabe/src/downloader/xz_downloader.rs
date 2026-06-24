@@ -79,7 +79,7 @@ impl ArchiveDownloader for XzDownloader {
                     .map(|s| PhpMixed::String(s.to_string()))
                     .collect(),
             ),
-            Some(&mut ignored_output),
+            &mut ignored_output,
             None,
         )? == 0
         {

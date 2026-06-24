@@ -785,7 +785,9 @@ impl EventDispatcher {
             return self.process.borrow_mut().execute_tty(exec, None);
         }
 
-        self.process.borrow_mut().execute(exec, (), None)
+        self.process
+            .borrow_mut()
+            .execute(exec, ProcessExecutor::FORWARD_OUTPUT, None)
     }
 
     fn get_php_exec_command(&self) -> anyhow::Result<String> {

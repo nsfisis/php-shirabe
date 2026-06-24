@@ -69,7 +69,7 @@ impl HhvmDetector {
                 );
                 let exit_code = executor
                     .borrow_mut()
-                    .execute(cmd, Some(&mut version_output), None)
+                    .execute(cmd, &mut version_output, None)
                     .unwrap_or(1);
                 if exit_code == 0 {
                     *cache = Some(version_output.as_string().map(|s| s.to_string()));
