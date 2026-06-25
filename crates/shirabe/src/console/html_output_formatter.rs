@@ -57,8 +57,11 @@ impl HtmlOutputFormatter {
         };
 
         let clear_escape_codes = "(?:39|49|0|22|24|25|27|28)";
+        // Regex pattern compatibility:
+        // The PHP pattern writes the ESC byte as the octal escape `\033`; the `regex` crate reads
+        // `\0` as a backreference, so spell ESC as `\x1b` instead.
         let pattern = format!(
-            "{{\\033\\[([0-9;]+)m(.*?)\\033\\[(?:{};)*?{}m}}s",
+            "{{\\x1b\\[([0-9;]+)m(.*?)\\x1b\\[(?:{};)*?{}m}}s",
             clear_escape_codes, clear_escape_codes
         );
 
