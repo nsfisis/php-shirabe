@@ -1,4 +1,5 @@
 pub mod json_file;
+pub(crate) mod json_grammar;
 pub mod json_manipulator;
 pub mod json_validation_exception;
 
