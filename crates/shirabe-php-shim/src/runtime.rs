@@ -244,8 +244,11 @@ pub fn error_reporting(level: Option<i64>) -> i64 {
 }
 
 pub fn spl_autoload_functions() -> Vec<PhpMixed> {
-    // TODO(phase-d): see spl_autoload_register; no autoload registry exists.
-    todo!()
+    // In compiled Rust there is no runtime class-autoload registry, so no autoload functions are
+    // ever registered. Callers (e.g. EventDispatcher::do_dispatch, which diffs the registry before
+    // and after running listeners to re-order plugin-prepended autoloaders) therefore always
+    // observe an empty list. See spl_autoload_register/unregister, which remain unimplemented.
+    Vec::new()
 }
 
 pub fn version_compare(_v1: &str, _v2: &str, _op: &str) -> bool {

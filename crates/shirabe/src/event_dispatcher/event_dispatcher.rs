@@ -70,6 +70,19 @@ pub struct EventDispatcher {
     skip_scripts: Vec<String>,
     previous_hash: Option<String>,
     previous_listeners: IndexMap<String, bool>,
+    /// For testing only. Mirrors PHPUnit's `getMockBuilder(EventDispatcher)->onlyMethods(['getListeners'])`:
+    /// when set, `get_listeners` returns this closure's result verbatim instead of resolving
+    /// registered listeners and package scripts.
+    get_listeners_override: Option<GetListenersOverride>,
+}
+
+/// For testing only. Holds a closure standing in for an overridden `getListeners` method.
+pub struct GetListenersOverride(pub Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>>);
+
+impl std::fmt::Debug for GetListenersOverride {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("GetListenersOverride(..)")
+    }
 }
 
 impl EventDispatcher {
@@ -101,7 +114,18 @@ impl EventDispatcher {
             skip_scripts,
             previous_hash: None,
             previous_listeners: IndexMap::new(),
+            get_listeners_override: None,
         }
+    }
+
+    /// For testing only. Installs a closure that overrides `get_listeners`, mirroring
+    /// PHPUnit's `onlyMethods(['getListeners'])->will($this->returnValue(...))` /
+    /// `->will($this->returnCallback(...))`.
+    pub fn __set_get_listeners_override(
+        &mut self,
+        callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>>,
+    ) {
+        self.get_listeners_override = Some(GetListenersOverride(callback));
     }
 
     /// Set whether script handlers are active or not
@@ -923,6 +947,12 @@ impl EventDispatcher {
 
     /// Retrieves all listeners for a given event
     fn get_listeners(&mut self, event: &dyn EventInterface) -> Vec<Callable> {
+        // For testing only: a test may override this method, mirroring PHPUnit's
+        // `onlyMethods(['getListeners'])`.
+        if let Some(override_cb) = &self.get_listeners_override {
+            return override_cb.0(event);
+        }
+
         let script_listeners: Vec<Callable> = if self.run_scripts {
             self.get_script_listeners(event)
         } else {

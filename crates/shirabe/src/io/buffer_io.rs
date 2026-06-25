@@ -67,31 +67,49 @@ impl BufferIO {
 
         let output = stream_get_contents(stream).unwrap_or_default();
 
-        Preg::replace_callback(
-            r"{(?<=^|\n|\x08)(.+?)(\x08+)}",
-            |matches: &indexmap::IndexMap<
-                shirabe_external_packages::composer::pcre::CaptureKey,
-                String,
-            >|
-             -> String {
-                let empty = String::new();
-                let g1 = matches
-                    .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
-                    .unwrap_or(&empty);
-                let g2 = matches
-                    .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(2))
-                    .unwrap_or(&empty);
-                let pre = strip_tags(g1);
+        // Regex pattern compatibility:
+        // PHP uses `{(?<=^|\n|\x08)(.+?)(\x08+)}` to collapse backspace-overwritten spans (e.g.
+        // progress bars). The `regex` crate has no look-behind, so the `(?<=^|\n|\x08)` anchor is
+        // turned into a consuming optional leading group `(^|\n|\x08)` that is re-emitted in the
+        // replacement. Because PCRE's look-behind is zero-width, a `\x08` ending one match can also
+        // anchor the following match; consuming-and-restoring would break that chaining in a single
+        // pass, so the replacement is applied to a fixpoint (each pass strictly shrinks the string).
+        let mut output = output;
+        loop {
+            let next = Preg::replace_callback(
+                r"{(^|\n|\x08)(.+?)(\x08+)}",
+                |matches: &indexmap::IndexMap<
+                    shirabe_external_packages::composer::pcre::CaptureKey,
+                    String,
+                >|
+                 -> String {
+                    let empty = String::new();
+                    let g1 = matches
+                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
+                        .unwrap_or(&empty);
+                    let g2 = matches
+                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(2))
+                        .unwrap_or(&empty);
+                    let g3 = matches
+                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(3))
+                        .unwrap_or(&empty);
+                    let pre = strip_tags(g2);
 
-                if pre.len() == g2.len() {
-                    return String::new();
-                }
+                    if pre.len() == g3.len() {
+                        return g1.clone();
+                    }
 
-                // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
-                format!("{}\n", g1.trim_end())
-            },
-            &output,
-        )
+                    // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
+                    format!("{}{}\n", g1, g2.trim_end())
+                },
+                &output,
+            );
+            if next == output {
+                break;
+            }
+            output = next;
+        }
+        output
     }
 
     pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> Result<()> {

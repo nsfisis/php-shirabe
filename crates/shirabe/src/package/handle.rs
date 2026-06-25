@@ -1222,10 +1222,20 @@ macro_rules! impl_real_package_test_setters {
                     .expect("real package handle invariant")
                     .set_source_type(r#type);
             }
+
+            /// For testing only: mirrors PHP `Package::setDistSha1Checksum`.
+            pub fn __set_dist_sha1_checksum(&self, sha1checksum: Option<String>) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_dist_sha1_checksum(sha1checksum);
+            }
         }
     };
 }
 
+impl_real_package_test_setters!(PackageInterfaceHandle);
 impl_real_package_test_setters!(PackageHandle);
 impl_real_package_test_setters!(CompletePackageHandle);
 impl_real_package_test_setters!(RootPackageHandle);

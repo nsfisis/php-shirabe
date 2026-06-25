@@ -414,6 +414,13 @@ impl ComposerRepository {
             }.into());
         }
 
+        // PHP relies on ArrayRepository::getPackages() invoking the virtual initialize(),
+        // which ComposerRepository overrides. Embedded inheritance does not dispatch back to
+        // the wrapper, so initialize the wrapper explicitly before delegating.
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
+
         self.inner.get_packages()
     }
 
@@ -1461,12 +1468,13 @@ impl ComposerRepository {
 
         let mut result: IndexMap<String, BasePackageHandle> = IndexMap::new();
         let mut versions_to_load: IndexMap<String, IndexMap<String, PhpMixed>> = IndexMap::new();
-        let packages_inner = packages
-            .get("packages")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        for (_pkg_key, versions_mixed) in packages_inner.iter() {
+        // $packages['packages'] can be either array<string, mixed> or list<mixed>
+        let packages_inner: Vec<PhpMixed> = match packages.get("packages") {
+            Some(PhpMixed::Array(a)) => a.values().cloned().collect(),
+            Some(PhpMixed::List(l)) => l.clone(),
+            _ => Vec::new(),
+        };
+        for versions_mixed in packages_inner.iter() {
             // $versions can be either array<string, array> or list<array>
             let iter_versions: Vec<PhpMixed> = match versions_mixed {
                 PhpMixed::Array(a) => a.values().map(|v| v.clone()).collect(),
@@ -1631,6 +1639,42 @@ impl ComposerRepository {
             .as_ref()
             .and_then(std::rc::Weak::upgrade)
             .map(RepositoryInterfaceHandle::from_rc)
+    }
+
+    /// For testing only. Exposes the private `whatProvides` method, mirroring the
+    /// `ReflectionMethod` invocation in `ComposerRepositoryTest::testWhatProvides`.
+    pub fn __what_provides(
+        &mut self,
+        name: &str,
+    ) -> anyhow::Result<IndexMap<String, BasePackageHandle>> {
+        self.what_provides(name, None, None, IndexMap::new())
+    }
+
+    /// For testing only. Exposes the private `canonicalizeUrl` method, mirroring the
+    /// `ReflectionMethod` invocation in `ComposerRepositoryTest::testCanonicalizeUrl`.
+    pub fn __canonicalize_url(&self, url: &str) -> anyhow::Result<String> {
+        self.canonicalize_url(url)
+    }
+
+    /// For testing only. Sets the private `url` property, mirroring the
+    /// `ReflectionProperty` write in `ComposerRepositoryTest::testCanonicalizeUrl`.
+    pub fn __set_url(&mut self, url: impl Into<String>) {
+        self.url = url.into();
+    }
+
+    /// For testing only. Sets the private `providerListing` property, mirroring the
+    /// `ReflectionProperty` write in `ComposerRepositoryTest::testWhatProvides`.
+    pub fn __set_provider_listing(
+        &mut self,
+        provider_listing: IndexMap<String, ProviderListingEntry>,
+    ) {
+        self.provider_listing = Some(provider_listing);
+    }
+
+    /// For testing only. Sets the private `providersUrl` property, mirroring the
+    /// `ReflectionProperty` write in `ComposerRepositoryTest::testWhatProvides`.
+    pub fn __set_providers_url(&mut self, providers_url: impl Into<String>) {
+        self.providers_url = Some(providers_url.into());
     }
 
     /// @param packageNames array of package name => ConstraintInterface|null - if a constraint is provided, only packages matching it will be loaded
@@ -2474,11 +2518,13 @@ impl ComposerRepository {
         if let Some(pkgs) = data.get("packages").and_then(|v| v.as_array()).cloned() {
             for (package, versions_mixed) in pkgs.iter() {
                 let package_name = strtolower(package);
-                let versions = match versions_mixed.as_array() {
-                    Some(a) => a.clone(),
-                    None => continue,
+                // $versions can be either array<string, array> or list<array>
+                let versions: Vec<PhpMixed> = match versions_mixed {
+                    PhpMixed::Array(a) => a.values().cloned().collect(),
+                    PhpMixed::List(l) => l.clone(),
+                    _ => continue,
                 };
-                for (_version, metadata_mixed) in versions.iter() {
+                for metadata_mixed in versions.iter() {
                     let metadata = match metadata_mixed.as_array() {
                         Some(a) => a.clone(),
                         None => continue,
