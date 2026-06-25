@@ -14,6 +14,7 @@ use crate::symfony::console::helper::table_style::TableStyle;
 use crate::symfony::console::output::console_section_output::ConsoleSectionOutput;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
+use shirabe_php_shim::AsAny;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1248,7 +1249,9 @@ impl Table {
 
     fn formatter_is_wrappable(_output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
         // PHP: $this->output->getFormatter() instanceof WrappableOutputFormatterInterface
-        // TODO(phase-b): trait-to-trait instanceof check requires concrete formatter knowledge.
+        // TODO(phase-c/d): instanceof on `dyn OutputFormatterInterface` needs an AsAny supertrait
+        // on OutputFormatterInterface to downcast to the concrete wrappable formatter; adding it
+        // would touch output_formatter_interface.rs, which is out of scope for this file.
         let _ = std::any::type_name::<dyn WrappableOutputFormatterInterface>();
         todo!()
     }
@@ -1260,9 +1263,13 @@ impl Table {
         Helper::remove_decoration(&mut *formatter, string)
     }
 
-    fn output_is_console_section(_output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
+    fn output_is_console_section(output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
         // PHP: $this->output instanceof ConsoleSectionOutput
-        todo!()
+        let borrowed = output.borrow();
+        (*borrowed)
+            .as_any()
+            .downcast_ref::<ConsoleSectionOutput>()
+            .is_some()
     }
 
     fn is_divider(_row: &PhpMixed, _divider: &TableSeparator) -> bool {

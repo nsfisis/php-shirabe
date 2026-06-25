@@ -6,11 +6,12 @@ pub use byte_string::*;
 pub use code_point_string::*;
 pub use unicode_string::*;
 
-/// Mirror of Symfony's `u()` / `b()` helper functions.
-pub fn b(_string: &str) -> ByteString {
-    todo!()
+/// Mirror of Symfony's `b()` helper function.
+pub fn b(string: &str) -> ByteString {
+    ByteString::new(string)
 }
 
-pub fn s(_string: &str) -> UnicodeString {
-    todo!()
+/// Mirror of Symfony's `u()` helper function.
+pub fn s(string: &str) -> UnicodeString {
+    UnicodeString::new(string)
 }

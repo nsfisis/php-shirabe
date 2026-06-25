@@ -13,6 +13,8 @@ pub fn stream_get_contents(stream: &PhpResource) -> Option<String> {
 }
 
 pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
+    // TODO(phase-d): resolution searches the `include_path` ini setting, which the shim does not
+    // model; checking only the current directory would silently miss configured include paths.
     let _ = filename;
     todo!()
 }
@@ -60,19 +62,49 @@ fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Optio
     }
 }
 
+// A stream context is modeled as an object holding the two arrays PHP keeps for it: the per-wrapper
+// `options` and the `params`. This is a self-contained value, so it round-trips through the
+// accessors below without any registry.
 pub fn stream_context_create(
-    _options: &IndexMap<String, PhpMixed>,
-    _params: Option<&IndexMap<String, PhpMixed>>,
+    options: &IndexMap<String, PhpMixed>,
+    params: Option<&IndexMap<String, PhpMixed>>,
 ) -> PhpMixed {
-    todo!()
+    let mut context = IndexMap::new();
+    context.insert("options".to_string(), PhpMixed::Array(options.clone()));
+    context.insert(
+        "params".to_string(),
+        PhpMixed::Array(params.cloned().unwrap_or_default()),
+    );
+    PhpMixed::Object(context)
 }
 
-pub fn stream_context_get_options(_stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
-    todo!()
+pub fn stream_context_get_options(stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
+    match stream_or_context {
+        PhpMixed::Object(context) | PhpMixed::Array(context) => context
+            .get("options")
+            .and_then(PhpMixed::as_array)
+            .cloned()
+            .unwrap_or_default(),
+        _ => IndexMap::new(),
+    }
 }
 
-pub fn stream_context_get_params(_stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
-    todo!()
+pub fn stream_context_get_params(stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
+    let (options, params) = match stream_or_context {
+        PhpMixed::Object(context) | PhpMixed::Array(context) => (
+            context.get("options").cloned().unwrap_or_default(),
+            context
+                .get("params")
+                .and_then(PhpMixed::as_array)
+                .cloned()
+                .unwrap_or_default(),
+        ),
+        _ => (PhpMixed::default(), IndexMap::new()),
+    };
+    // PHP exposes the wrapper options under an "options" key alongside the params.
+    let mut result = params;
+    result.insert("options".to_string(), options);
+    result
 }
 
 pub fn stream_isatty(stream: PhpResource) -> bool {
@@ -80,6 +112,8 @@ pub fn stream_isatty(stream: PhpResource) -> bool {
 }
 
 pub fn stream_get_wrappers() -> Vec<String> {
+    // TODO(phase-d): the registered wrapper set depends on compiled-in extensions and runtime
+    // `stream_wrapper_register` calls; neither is modeled, so a fixed list would be inaccurate.
     todo!()
 }
 

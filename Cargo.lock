@@ -1995,6 +1995,8 @@ dependencies = [
 name = "shirabe-spdx-licenses"
 version = "0.0.1"
 dependencies = [
+ "indexmap",
+ "serde_json",
  "shirabe-php-shim",
 ]
 

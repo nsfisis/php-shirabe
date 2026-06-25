@@ -1,6 +1,10 @@
 static DEFAULT_TIMEZONE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 pub fn date_create<Tz: chrono::TimeZone>(s: &str) -> chrono::ParseResult<chrono::DateTime<Tz>> {
+    // TODO(phase-d): PHP `date_create` accepts the full strtotime() grammar (RFC2822, ISO8601,
+    // VCS-specific and relative formats), which requires a dedicated date parser not available
+    // here. The generic `Tz` also has no constructor from a parsed `FixedOffset`/`Utc` value.
+    let _ = s;
     todo!()
 }
 
@@ -22,6 +26,8 @@ pub fn date_format_to_strftime(format: &str) -> &'static str {
 }
 
 pub fn strtotime(_time: &str) -> Option<i64> {
+    // TODO(phase-d): requires the full strtotime() grammar (absolute, relative and compound
+    // expressions); a partial parser would silently mis-handle unsupported inputs.
     todo!()
 }
 
@@ -53,6 +59,17 @@ pub fn date_default_timezone_set(tz: &str) -> bool {
     true
 }
 
-pub fn date(_format: &str, _timestamp: Option<i64>) -> String {
-    todo!()
+pub fn date(format: &str, timestamp: Option<i64>) -> String {
+    let timestamp = timestamp.unwrap_or_else(time);
+    // PHP `date()` renders in the default timezone. Without a timezone database only "UTC" can be
+    // resolved; any named zone is rejected loudly rather than silently rendered in the wrong zone.
+    let tz = date_default_timezone_get();
+    if tz != "UTC" {
+        panic!(
+            "date() with non-UTC default timezone {tz:?} is not supported (no timezone database)"
+        );
+    }
+    let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
+        .expect("date() timestamp out of range");
+    dt.format(date_format_to_strftime(format)).to_string()
 }
