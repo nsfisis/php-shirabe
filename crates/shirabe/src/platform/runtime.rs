@@ -3,22 +3,31 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, html_entity_decode, implode, strip_tags, trim};
+use shirabe_php_shim::{
+    PhpMixed, class_exists, constant, defined, function_exists, get_loaded_extensions,
+    html_entity_decode, implode, instantiate_class, ltrim, phpversion, strip_tags, trim,
+};
 
 #[derive(Debug)]
 pub struct Runtime;
 
 impl Runtime {
     pub fn has_constant(&self, constant_name: &str, class: Option<&str>) -> bool {
-        todo!()
+        defined(&ltrim(
+            &format!("{}::{}", class.unwrap_or(""), constant_name),
+            Some(":"),
+        ))
     }
 
     pub fn get_constant(&self, constant_name: &str, class: Option<&str>) -> PhpMixed {
-        todo!()
+        constant(&ltrim(
+            &format!("{}::{}", class.unwrap_or(""), constant_name),
+            Some(":"),
+        ))
     }
 
     pub fn has_function(&self, f: &str) -> bool {
-        todo!()
+        function_exists(f)
     }
 
     pub fn invoke(
@@ -26,26 +35,33 @@ impl Runtime {
         callable: Box<dyn Fn(Vec<PhpMixed>) -> PhpMixed>,
         arguments: Vec<PhpMixed>,
     ) -> PhpMixed {
-        todo!()
+        callable(arguments)
     }
 
     pub fn has_class(&self, class: &str) -> bool {
-        todo!()
+        class_exists(class)
     }
 
     pub fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> Result<PhpMixed> {
-        todo!()
+        if arguments.is_empty() {
+            Ok(instantiate_class(class, vec![]))
+        } else {
+            Ok(instantiate_class(class, arguments))
+        }
     }
 
     pub fn get_extensions(&self) -> Vec<String> {
-        todo!()
+        get_loaded_extensions()
     }
 
     pub fn get_extension_version(&self, extension: &str) -> String {
-        todo!()
+        let version = phpversion(extension);
+        version.unwrap_or_else(|| "0".to_string())
     }
 
     pub fn get_extension_info(&self, extension: &str) -> Result<String> {
+        // Depends on \ReflectionExtension::info() and output buffering; no shim equivalent exists.
+        let _ = extension;
         todo!()
     }
 
