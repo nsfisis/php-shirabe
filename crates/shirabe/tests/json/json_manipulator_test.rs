@@ -3248,7 +3248,6 @@ fn test_add_repository_can_override_deep_repos() {
 }
 
 #[test]
-#[ignore]
 fn test_insert_repository_before_and_after_by_name() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3359,7 +3358,6 @@ fn test_remove_repository_removes_from_assoc_but_does_not_converts_from_assoc_to
 }
 
 #[test]
-#[ignore]
 fn test_remove_repository_removes_from_list() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3394,7 +3392,6 @@ fn test_remove_repository_removes_from_list() {
 }
 
 #[test]
-#[ignore]
 fn test_add_repository_converts_from_assoc_to_list() {
     let mut manipulator = JsonManipulator::new(
         r#"{
