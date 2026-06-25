@@ -349,6 +349,32 @@ pub enum PhpResource {
     Process(std::rc::Rc<std::cell::RefCell<process::ProcessState>>),
 }
 
+impl PhpResource {
+    /// Returns the underlying OS file descriptor backing this resource, when it has one.
+    /// Used by `stream_set_blocking`/`stream_select` to drive `fcntl(2)`/`select(2)`. In-memory
+    /// streams (`php://memory`/`php://temp`) and process handles have no fd and return `None`.
+    pub(crate) fn raw_fd(&self) -> Option<std::os::unix::io::RawFd> {
+        use std::os::unix::io::AsRawFd;
+        match self {
+            PhpResource::Stdin => Some(std::io::stdin().as_raw_fd()),
+            PhpResource::Stdout => Some(std::io::stdout().as_raw_fd()),
+            PhpResource::Stderr => Some(std::io::stderr().as_raw_fd()),
+            PhpResource::Process(_) => None,
+            PhpResource::Stream(state) => {
+                let state = state.borrow();
+                if state.closed {
+                    return None;
+                }
+                match &state.backing {
+                    StreamBacking::File(f) => Some(f.as_raw_fd()),
+                    StreamBacking::Pipe(p) => Some(p.as_raw_fd()),
+                    StreamBacking::Memory(_) => None,
+                }
+            }
+        }
+    }
+}
+
 /// Combined capability of every seekable byte stream backing. Both `std::fs::File`
 /// and `std::io::Cursor<Vec<u8>>` satisfy it, so a stream can be driven uniformly.
 pub trait ReadWriteSeek: std::io::Read + std::io::Write + std::io::Seek {}
@@ -417,6 +443,16 @@ impl std::io::Write for ChildPipe {
 impl std::io::Seek for ChildPipe {
     fn seek(&mut self, _pos: std::io::SeekFrom) -> std::io::Result<u64> {
         Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+    }
+}
+
+impl std::os::unix::io::AsRawFd for ChildPipe {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        match self {
+            ChildPipe::In(i) => i.as_raw_fd(),
+            ChildPipe::Out(o) => o.as_raw_fd(),
+            ChildPipe::Err(e) => e.as_raw_fd(),
+        }
     }
 }
 

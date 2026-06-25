@@ -343,7 +343,13 @@ pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
                 return None;
             }
             let mut buf = vec![0u8; cap];
-            let n = state.backing.as_rws().read(&mut buf).ok()?;
+            let n = match state.backing.as_rws().read(&mut buf) {
+                Ok(n) => n,
+                // A non-blocking stream with no data ready is not an error in PHP: fread() returns
+                // the empty string and feof() stays false. std surfaces this as WouldBlock.
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => return Some(String::new()),
+                Err(_) => return None,
+            };
             if cap > 0 && n == 0 {
                 state.eof = true;
             }

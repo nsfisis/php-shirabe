@@ -20,7 +20,6 @@ use shirabe_external_packages::symfony::console::output::output_interface::{
 };
 use shirabe_php_shim::{PHP_EOL, trim};
 
-#[ignore]
 #[test]
 fn test_execute_captures_output() {
     let mut process = ProcessExecutor::new(None);
@@ -41,7 +40,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
     todo!()
 }
 
-#[ignore]
+#[ignore = "stderr capture works, but the test cwd (crates/shirabe) contains a `foo/` fixture dir, so `cat foo` reports \"Is a directory\" instead of \"No such file or directory\""]
 #[test]
 fn test_execute_captures_stderr() {
     let mut process = ProcessExecutor::new(None);
@@ -89,7 +88,6 @@ fn hide_password_provider() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
-#[ignore]
 #[test]
 fn test_hide_passwords() {
     for (command, expected_command_output) in hide_password_provider() {
@@ -107,7 +105,6 @@ fn test_hide_passwords() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_doesnt_hide_ports() {
     let buffer = Rc::new(RefCell::new(
@@ -130,7 +127,6 @@ fn test_split_lines() {
     todo!()
 }
 
-#[ignore]
 #[test]
 fn test_console_io_does_not_format_symfony_console_style() {
     let output = Rc::new(RefCell::new(BufferedOutput::new(

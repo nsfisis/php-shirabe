@@ -259,24 +259,139 @@ fn build_meta_data(
     map
 }
 
-pub fn stream_set_blocking(_resource: &PhpResource, _enable: bool) -> bool {
-    // TODO(phase-d): toggling O_NONBLOCK requires fcntl(2); a syscall crate is intentionally not
-    // introduced here.
-    todo!("stream_set_blocking requires fcntl(2) (syscall crate not available)")
+// libc is already linked into every binary, so these can be declared directly without an extra
+// crate (mirrors the `getuid`/`geteuid` declarations in process.rs).
+const F_GETFL: i32 = 3;
+const F_SETFL: i32 = 4;
+const O_NONBLOCK: i32 = 0o4000;
+const FD_SETSIZE: usize = 1024;
+
+unsafe extern "C" {
+    fn fcntl(fd: i32, cmd: i32, ...) -> i32;
+    fn select(
+        nfds: i32,
+        readfds: *mut FdSet,
+        writefds: *mut FdSet,
+        exceptfds: *mut FdSet,
+        timeout: *mut TimeVal,
+    ) -> i32;
+}
+
+#[repr(C)]
+struct TimeVal {
+    tv_sec: i64,
+    tv_usec: i64,
+}
+
+// `fd_set` is a bitmap of `FD_SETSIZE` bits laid out as an array of `long` words.
+#[repr(C)]
+struct FdSet {
+    fds_bits: [i64; FD_SETSIZE / (8 * std::mem::size_of::<i64>())],
+}
+
+impl FdSet {
+    fn zero() -> Self {
+        FdSet {
+            fds_bits: [0; FD_SETSIZE / (8 * std::mem::size_of::<i64>())],
+        }
+    }
+
+    fn set(&mut self, fd: i32) {
+        let bits = 8 * std::mem::size_of::<i64>();
+        self.fds_bits[fd as usize / bits] |= 1i64 << (fd as usize % bits);
+    }
+
+    fn is_set(&self, fd: i32) -> bool {
+        let bits = 8 * std::mem::size_of::<i64>();
+        (self.fds_bits[fd as usize / bits] & (1i64 << (fd as usize % bits))) != 0
+    }
+}
+
+/// PHP `stream_set_blocking()`: toggle `O_NONBLOCK` on the resource's underlying fd via `fcntl(2)`.
+/// Returns `false` (PHP failure) when the resource has no fd or the syscall fails.
+pub fn stream_set_blocking(resource: &PhpResource, enable: bool) -> bool {
+    let Some(fd) = resource.raw_fd() else {
+        return false;
+    };
+    let flags = unsafe { fcntl(fd, F_GETFL) };
+    if flags < 0 {
+        return false;
+    }
+    // `enable` means blocking, i.e. clear O_NONBLOCK.
+    let new_flags = if enable {
+        flags & !O_NONBLOCK
+    } else {
+        flags | O_NONBLOCK
+    };
+    unsafe { fcntl(fd, F_SETFL, new_flags) >= 0 }
 }
 
 /// PHP `stream_select`. Returns the number of changed streams, or `None` for the PHP `false`
-/// returned when the underlying `select` is interrupted/fails.
+/// returned when the underlying `select` is interrupted/fails. On success the `read`/`write`/
+/// `except` vectors are narrowed to only the resources that became ready, matching PHP's
+/// in-place rewrite of the passed arrays.
 pub fn stream_select(
-    _read: &mut Vec<PhpResource>,
-    _write: &mut Vec<PhpResource>,
-    _except: &mut Vec<PhpResource>,
-    _seconds: i64,
-    _microseconds: Option<i64>,
+    read: &mut Vec<PhpResource>,
+    write: &mut Vec<PhpResource>,
+    except: &mut Vec<PhpResource>,
+    seconds: i64,
+    microseconds: Option<i64>,
 ) -> Option<i64> {
-    // TODO(phase-d): multiplexing readiness requires select(2)/poll(2); a syscall crate is
-    // intentionally not introduced here.
-    todo!("stream_select requires select(2)/poll(2) (syscall crate not available)")
+    let mut readfds = FdSet::zero();
+    let mut writefds = FdSet::zero();
+    let mut exceptfds = FdSet::zero();
+    let mut nfds = 0i32;
+
+    // Resources without an fd (in-memory streams, process handles) cannot be waited on; PHP would
+    // emit a warning for them. We skip them here, leaving them out of the ready set.
+    let mut prepare = |set: &mut FdSet, resources: &[PhpResource]| {
+        for resource in resources {
+            if let Some(fd) = resource.raw_fd() {
+                if (fd as usize) < FD_SETSIZE {
+                    set.set(fd);
+                    if fd + 1 > nfds {
+                        nfds = fd + 1;
+                    }
+                }
+            }
+        }
+    };
+    prepare(&mut readfds, read);
+    prepare(&mut writefds, write);
+    prepare(&mut exceptfds, except);
+
+    let mut timeout = TimeVal {
+        tv_sec: seconds,
+        tv_usec: microseconds.unwrap_or(0),
+    };
+
+    let ret = unsafe {
+        select(
+            nfds,
+            &mut readfds,
+            &mut writefds,
+            &mut exceptfds,
+            &mut timeout,
+        )
+    };
+
+    if ret < 0 {
+        // select(2) failed (e.g. EINTR). PHP returns false.
+        return None;
+    }
+
+    // Narrow each array in place to the resources whose fd is still set in the result bitmap.
+    let narrow = |set: &FdSet, resources: &mut Vec<PhpResource>| {
+        resources.retain(|resource| match resource.raw_fd() {
+            Some(fd) if (fd as usize) < FD_SETSIZE => set.is_set(fd),
+            _ => false,
+        });
+    };
+    narrow(&readfds, read);
+    narrow(&writefds, write);
+    narrow(&exceptfds, except);
+
+    Some(ret as i64)
 }
 
 /// PHP `stream_get_contents($stream, $maxlength, $offset)`. A non-negative `offset` seeks there

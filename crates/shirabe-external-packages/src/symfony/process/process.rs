@@ -222,7 +222,11 @@ impl Process {
         this.cwd = cwd;
 
         // on Windows, if the cwd changed via chdir(), proc_open defaults to the dir where PHP was started
-        if this.cwd.is_none() && php::DIRECTORY_SEPARATOR == "\\" {
+        // PHP: null === $this->cwd && (\defined('ZEND_THREAD_SAFE') || '\\' === \DIRECTORY_SEPARATOR)
+        // `\defined('ZEND_THREAD_SAFE')` is unconditionally true in modern PHP (the constant always
+        // exists; its value merely reflects the NTS/ZTS build), so the disjunction is always true and
+        // the cwd is defaulted to getcwd() whenever it was null.
+        if this.cwd.is_none() {
             this.cwd = php::getcwd();
         }
         if let Some(env) = env {
