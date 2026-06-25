@@ -200,11 +200,11 @@ impl Command for LicensesCommand {
                 io.write("");
 
                 let mut table = Table::new(output);
-                table.set_style(shirabe_php_shim::PhpMixed::from("compact"))??;
+                table.set_style("compact".into())??;
                 table.set_headers(vec![
-                    PhpMixed::String("Name".to_string()),
-                    PhpMixed::String("Version".to_string()),
-                    PhpMixed::String("Licenses".to_string()),
+                    "Name".into(),
+                    "Version".into(),
+                    "Licenses".into(),
                 ]);
                 for package in &packages {
                     let link = PackageInfo::get_view_source_or_homepage_url(package.clone());
@@ -234,7 +234,7 @@ impl Command for LicensesCommand {
                             crate::package::DisplayMode::SourceRefIfDev,
                         )),
                         PhpMixed::String(licenses_str),
-                    ]));
+                    ]).into());
                 }
                 table.render();
             }

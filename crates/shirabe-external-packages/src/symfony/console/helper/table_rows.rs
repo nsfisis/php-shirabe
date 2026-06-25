@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Helper/TableRows.php
 
-use shirabe_php_shim::PhpMixed;
+use crate::symfony::console::helper::table::Row;
 
 /// @internal
 ///
@@ -9,26 +9,26 @@ use shirabe_php_shim::PhpMixed;
 /// groups eagerly (see `Table::build_table_rows`) and store them here.
 #[derive(Debug)]
 pub struct TableRows {
-    row_groups: Vec<Vec<PhpMixed>>,
+    row_groups: Vec<Vec<Row>>,
 }
 
 impl TableRows {
-    pub fn from_row_groups(row_groups: Vec<Vec<PhpMixed>>) -> Self {
+    pub fn from_row_groups(row_groups: Vec<Vec<Row>>) -> Self {
         Self { row_groups }
     }
 
-    pub fn get_iterator(&self) -> std::slice::Iter<'_, Vec<PhpMixed>> {
+    pub fn get_iterator(&self) -> std::slice::Iter<'_, Vec<Row>> {
         self.row_groups.iter()
     }
 
-    pub fn into_row_groups(self) -> Vec<Vec<PhpMixed>> {
+    pub fn into_row_groups(self) -> Vec<Vec<Row>> {
         self.row_groups
     }
 }
 
 impl<'a> IntoIterator for &'a TableRows {
-    type Item = &'a Vec<PhpMixed>;
-    type IntoIter = std::slice::Iter<'a, Vec<PhpMixed>>;
+    type Item = &'a Vec<Row>;
+    type IntoIter = std::slice::Iter<'a, Vec<Row>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.row_groups.iter()
@@ -36,8 +36,8 @@ impl<'a> IntoIterator for &'a TableRows {
 }
 
 impl IntoIterator for TableRows {
-    type Item = Vec<PhpMixed>;
-    type IntoIter = std::vec::IntoIter<Vec<PhpMixed>>;
+    type Item = Vec<Row>;
+    type IntoIter = std::vec::IntoIter<Vec<Row>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.row_groups.into_iter()

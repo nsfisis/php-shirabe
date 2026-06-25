@@ -470,7 +470,7 @@ impl Auditor {
                 table.add_row(ConsoleIO::sanitize(
                     PhpMixed::List(row.into_iter().map(PhpMixed::String).collect()),
                     false,
-                ))??;
+                ).into());
                 table
                     .set_column_width(1, 80)
                     .set_column_max_width(1, 80)
@@ -595,7 +595,7 @@ impl Auditor {
                     PhpMixed::String(replacement),
                 ]),
                 false,
-            ));
+            ).into());
         }
 
         table.render();

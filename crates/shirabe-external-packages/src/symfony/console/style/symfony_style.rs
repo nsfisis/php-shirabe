@@ -8,6 +8,7 @@ use crate::symfony::console::helper::Helper;
 use crate::symfony::console::helper::ProgressBar;
 use crate::symfony::console::helper::SymfonyQuestionHelper;
 use crate::symfony::console::helper::Table;
+use crate::symfony::console::helper::table::{Cell, Row};
 use crate::symfony::console::helper::TableCell;
 use crate::symfony::console::helper::TableSeparator;
 use crate::symfony::console::input::InputInterface;
@@ -130,8 +131,8 @@ impl SymfonyStyle {
     pub fn horizontal_table(&mut self, headers: Vec<PhpMixed>, rows: Vec<PhpMixed>) {
         self.create_table()
             .set_horizontal(true)
-            .set_headers(headers)
-            .set_rows(rows)
+            .set_headers(headers.into_iter().map(Cell::from).collect())
+            .set_rows(rows.into_iter().map(Row::from).collect())
             .render();
 
         self.new_line(1);
@@ -272,7 +273,7 @@ impl SymfonyStyle {
         // PHP passes the cloned `TableStyle` instance directly; `set_style` here takes a
         // `PhpMixed` name/style. Phase B leaves the polymorphic style passing as a TODO.
         let _ = &style;
-        let _ = table.set_style(PhpMixed::String("symfony-style-guide".to_string()));
+        let _ = table.set_style("symfony-style-guide".into());
         table
     }
 
@@ -663,8 +664,8 @@ impl StyleInterface for SymfonyStyle {
     /// {@inheritdoc}
     fn table(&mut self, headers: Vec<PhpMixed>, rows: Vec<PhpMixed>) {
         self.create_table()
-            .set_headers(headers)
-            .set_rows(rows)
+            .set_headers(headers.into_iter().map(Cell::from).collect())
+            .set_rows(rows.into_iter().map(Row::from).collect())
             .render();
 
         self.new_line(1);

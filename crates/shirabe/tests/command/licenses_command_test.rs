@@ -79,9 +79,6 @@ fn assert_lines(display: &str, expected: &[Vec<&str>]) {
 
 #[test]
 #[serial]
-#[ignore = "renders the text-format Table, which reaches shirabe_php_shim::instance_of \
-            (var.rs:191 todo!()); PhpMixed::Object carries no runtime class tag, so the Symfony \
-            Table helper cannot distinguish TableSeparator/TableCell rows yet"]
 fn test_basic_run() {
     let _tear_down = set_up();
 
@@ -111,8 +108,6 @@ fn test_basic_run() {
 
 #[test]
 #[serial]
-#[ignore = "renders the text-format Table, which reaches shirabe_php_shim::instance_of \
-            (var.rs:191 todo!()); see test_basic_run"]
 fn test_no_dev() {
     let _tear_down = set_up();
 
@@ -246,8 +241,6 @@ fn test_format_unknown() {
 
 #[test]
 #[serial]
-#[ignore = "renders the text-format Table, which reaches shirabe_php_shim::instance_of \
-            (var.rs:191 todo!()); see test_basic_run"]
 fn test_locked() {
     let _tear_down = set_up();
 
@@ -280,8 +273,6 @@ fn test_locked() {
 
 #[test]
 #[serial]
-#[ignore = "renders the text-format Table, which reaches shirabe_php_shim::instance_of \
-            (var.rs:191 todo!()); see test_basic_run"]
 fn test_locked_no_dev() {
     let _tear_down = set_up();
 

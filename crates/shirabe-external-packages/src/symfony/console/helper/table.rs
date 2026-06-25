@@ -19,6 +19,215 @@ use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// A single cell within a table row.
+///
+/// PHP types a cell as `TableCell|string|int|null` (scalars are stringified). Because
+/// `TableSeparator extends TableCell`, a separator can in principle appear as a cell, so it has its
+/// own variant; `is_table_cell` reports `true` for it, mirroring `instanceof TableCell`.
+#[derive(Debug, Clone)]
+pub enum Cell {
+    Null,
+    Value(String),
+    Cell(TableCell),
+    Separator(TableSeparator),
+}
+
+impl Cell {
+    /// PHP `$cell instanceof TableCell` (true for `TableSeparator`, which extends `TableCell`).
+    fn is_table_cell(&self) -> bool {
+        matches!(self, Cell::Cell(_) | Cell::Separator(_))
+    }
+
+    /// PHP `$cell instanceof TableSeparator`.
+    fn is_table_separator(&self) -> bool {
+        matches!(self, Cell::Separator(_))
+    }
+
+    fn colspan(&self) -> i64 {
+        match self {
+            Cell::Cell(c) => c.get_colspan(),
+            Cell::Separator(s) => s.get_colspan(),
+            _ => 1,
+        }
+    }
+
+    fn rowspan(&self) -> i64 {
+        match self {
+            Cell::Cell(c) => c.get_rowspan(),
+            Cell::Separator(s) => s.get_rowspan(),
+            _ => 1,
+        }
+    }
+
+    fn style(&self) -> Option<Rc<TableCellStyle>> {
+        match self {
+            Cell::Cell(c) => c.get_style(),
+            Cell::Separator(s) => s.get_style(),
+            _ => None,
+        }
+    }
+
+    /// PHP `(string) $cell`.
+    fn to_php_string(&self) -> String {
+        match self {
+            Cell::Null | Cell::Separator(_) => String::new(),
+            Cell::Value(s) => s.clone(),
+            Cell::Cell(c) => c.to_string(),
+        }
+    }
+
+    /// PHP truthiness / `!empty($cell)` for a cell value: only "" and "0" (and null) are falsy;
+    /// any object is truthy.
+    fn is_truthy(&self) -> bool {
+        match self {
+            Cell::Null => false,
+            Cell::Value(s) => !s.is_empty() && s != "0",
+            Cell::Cell(_) | Cell::Separator(_) => true,
+        }
+    }
+
+    fn is_null(&self) -> bool {
+        matches!(self, Cell::Null)
+    }
+}
+
+impl From<String> for Cell {
+    fn from(value: String) -> Self {
+        Cell::Value(value)
+    }
+}
+
+impl From<&str> for Cell {
+    fn from(value: &str) -> Self {
+        Cell::Value(value.to_string())
+    }
+}
+
+impl From<TableCell> for Cell {
+    fn from(value: TableCell) -> Self {
+        Cell::Cell(value)
+    }
+}
+
+/// Bridges PHP-typed cell values built elsewhere in the codebase (where rows are still assembled as
+/// `PhpMixed`) onto the typed cell. A cell is a scalar or null; collections stringify as PHP would.
+impl From<PhpMixed> for Cell {
+    fn from(value: PhpMixed) -> Self {
+        match value {
+            PhpMixed::Null => Cell::Null,
+            other => Cell::Value(shirabe_php_shim::to_string(&other)),
+        }
+    }
+}
+
+/// A table row.
+///
+/// PHP types a row as `array<int, Cell>|TableSeparator`. The header/body boundary that PHP creates
+/// as a fresh `TableSeparator` and recognizes by object identity (`$divider === $row`) is modeled
+/// here by its own [`Row::HeaderDivider`] variant rather than by reference identity: it counts as a
+/// separator for layout (`is_table_separator`), but unlike a user-supplied [`Row::Separator`] it
+/// renders no separator line — it only flips the header/first-row state during rendering.
+#[derive(Debug, Clone)]
+pub enum Row {
+    HeaderDivider,
+    Separator(TableSeparator),
+    Cells(Vec<Cell>),
+}
+
+impl Row {
+    /// PHP `$row instanceof TableSeparator` (also true for the internal header/body divider).
+    fn is_table_separator(&self) -> bool {
+        matches!(self, Row::HeaderDivider | Row::Separator(_))
+    }
+
+    /// PHP `$divider === $row`: identifies the internal header/body boundary marker.
+    fn is_divider(&self) -> bool {
+        matches!(self, Row::HeaderDivider)
+    }
+
+    /// The row's cells, or an empty list for a separator (PHP `foreach` over a separator object,
+    /// which exposes no public properties, yields nothing).
+    fn cells(&self) -> Vec<Cell> {
+        match self {
+            Row::Cells(cells) => cells.clone(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// PHP `!$row`: an empty cell array is falsy; a separator is an object and thus truthy.
+    fn is_truthy(&self) -> bool {
+        match self {
+            Row::Cells(cells) => !cells.is_empty(),
+            _ => true,
+        }
+    }
+
+    /// PHP `isset($row[$i])`: `false` for a missing or null cell.
+    fn get_cell_isset(&self, index: i64) -> Option<Cell> {
+        match self {
+            Row::Cells(cells) => match cells.get(index as usize) {
+                Some(Cell::Null) | None => None,
+                Some(cell) => Some(cell.clone()),
+            },
+            _ => None,
+        }
+    }
+}
+
+impl From<Vec<Cell>> for Row {
+    fn from(cells: Vec<Cell>) -> Self {
+        Row::Cells(cells)
+    }
+}
+
+/// Bridges PHP-typed rows built elsewhere (still assembled as `PhpMixed`) onto the typed row.
+impl From<PhpMixed> for Row {
+    fn from(value: PhpMixed) -> Self {
+        match value {
+            PhpMixed::List(items) => Row::Cells(items.into_iter().map(Cell::from).collect()),
+            PhpMixed::Array(map) => Row::Cells(map.into_values().map(Cell::from).collect()),
+            PhpMixed::Null => Row::Cells(Vec::new()),
+            other => Row::Cells(vec![Cell::from(other)]),
+        }
+    }
+}
+
+/// A table or column style argument. PHP types it as `string|TableStyle`: either the name of a
+/// registered style or a `TableStyle` instance.
+#[derive(Debug, Clone)]
+pub enum StyleName {
+    Name(String),
+    Style(TableStyle),
+}
+
+impl From<&str> for StyleName {
+    fn from(name: &str) -> Self {
+        StyleName::Name(name.to_string())
+    }
+}
+
+impl From<String> for StyleName {
+    fn from(name: String) -> Self {
+        StyleName::Name(name)
+    }
+}
+
+impl From<TableStyle> for StyleName {
+    fn from(style: TableStyle) -> Self {
+        StyleName::Style(style)
+    }
+}
+
+/// PHP `$row[$index] = $value`: assigns at the integer key, growing the (dense) row with null
+/// cells to reach `index` when necessary.
+fn set_cell(row: &mut Vec<Cell>, index: i64, value: Cell) {
+    let index = index as usize;
+    while row.len() <= index {
+        row.push(Cell::Null);
+    }
+    row[index] = value;
+}
+
 /// Provides helpers to display a table.
 #[derive(Debug)]
 pub struct Table {
@@ -26,10 +235,10 @@ pub struct Table {
     footer_title: Option<String>,
 
     /// Table headers.
-    headers: Vec<PhpMixed>,
+    headers: Vec<Row>,
 
     /// Table rows.
-    rows: Vec<PhpMixed>,
+    rows: Vec<Row>,
     horizontal: bool,
 
     /// Column widths cache.
@@ -91,7 +300,7 @@ impl Table {
             rendered: false,
         };
 
-        this.set_style(PhpMixed::from("default"));
+        this.set_style(StyleName::from("default"));
 
         this
     }
@@ -115,9 +324,8 @@ impl Table {
             *styles_guard = Some(Self::init_styles());
         }
 
-        if let Some(_style) = styles_guard.as_ref().unwrap().get(&name) {
-            // TODO(phase-b): TableStyle is not Clone; sharing semantics need resolving.
-            todo!()
+        if let Some(style) = styles_guard.as_ref().unwrap().get(&name) {
+            return Ok(Ok(style.clone()));
         }
 
         Ok(Err(InvalidArgumentException(
@@ -133,7 +341,7 @@ impl Table {
     /// `$name` is the style name or a TableStyle instance.
     pub fn set_style(
         &mut self,
-        name: PhpMixed,
+        name: StyleName,
     ) -> anyhow::Result<Result<&mut Self, InvalidArgumentException>> {
         match self.resolve_style(name)? {
             Ok(style) => {
@@ -155,7 +363,7 @@ impl Table {
     pub fn set_column_style(
         &mut self,
         column_index: i64,
-        name: PhpMixed,
+        name: StyleName,
     ) -> anyhow::Result<Result<&mut Self, InvalidArgumentException>> {
         match self.resolve_style(name)? {
             Ok(style) => {
@@ -212,26 +420,25 @@ impl Table {
         self
     }
 
-    pub fn set_headers(&mut self, headers: Vec<PhpMixed>) -> &mut Self {
-        // PHP: $headers = array_values($headers). A row is already modeled as a positional Vec,
-        // so reindexing is the identity here.
-        let mut headers = headers;
-        if !headers.is_empty() && !shirabe_php_shim::is_array(&headers[0]) {
-            headers = vec![Self::from_row_vec(headers)];
-        }
-
-        self.headers = headers;
+    pub fn set_headers(&mut self, headers: Vec<Cell>) -> &mut Self {
+        // PHP wraps a flat list of cells into a single header row. (Multi-row headers, which PHP
+        // also accepts, are not used in this codebase and are not modeled by the typed API.)
+        self.headers = if headers.is_empty() {
+            Vec::new()
+        } else {
+            vec![Row::Cells(headers)]
+        };
 
         self
     }
 
-    pub fn set_rows(&mut self, rows: Vec<PhpMixed>) -> &mut Self {
+    pub fn set_rows(&mut self, rows: Vec<Row>) -> &mut Self {
         self.rows = Vec::new();
 
         self.add_rows(rows)
     }
 
-    pub fn add_rows(&mut self, rows: Vec<PhpMixed>) -> &mut Self {
+    pub fn add_rows(&mut self, rows: Vec<Row>) -> &mut Self {
         for row in rows {
             self.add_row(row);
         }
@@ -239,35 +446,18 @@ impl Table {
         self
     }
 
-    pub fn add_row(
-        &mut self,
-        row: PhpMixed,
-    ) -> anyhow::Result<Result<&mut Self, InvalidArgumentException>> {
-        if shirabe_php_shim::instance_of::<TableSeparator>(&row) {
-            self.rows.push(row);
+    pub fn add_row(&mut self, row: Row) -> &mut Self {
+        // PHP `array_values($row)` reindexing is the identity on a positional cell vector, and the
+        // "row must be an array or a TableSeparator" check is now guaranteed by the type.
+        self.rows.push(row);
 
-            return Ok(Ok(self));
-        }
-
-        if !shirabe_php_shim::is_array(&row) {
-            return Ok(Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: "A row must be an array or a TableSeparator instance.".to_string(),
-                    code: 0,
-                },
-            )));
-        }
-
-        // PHP: $this->rows[] = array_values($row). The row is modeled as a positional Vec.
-        self.rows.push(Self::from_row_vec(Self::to_row_vec(row)));
-
-        Ok(Ok(self))
+        self
     }
 
     /// Adds a row to the table, and re-renders the table.
     pub fn append_row(
         &mut self,
-        row: PhpMixed,
+        row: Row,
     ) -> anyhow::Result<Result<&mut Self, RuntimeException>> {
         if !Self::output_is_console_section(&self.output) {
             return Ok(Err(RuntimeException(shirabe_php_shim::RuntimeException {
@@ -288,15 +478,17 @@ impl Table {
             todo!()
         }
 
-        self.add_row(row)?.ok();
+        self.add_row(row);
         self.render();
 
         Ok(Ok(self))
     }
 
-    pub fn set_row(&mut self, column: i64, row: Vec<PhpMixed>) -> &mut Self {
-        // PHP indexes $this->rows by arbitrary key; here we follow the integer-keyed case.
+    pub fn set_row(&mut self, column: i64, row: Vec<Cell>) -> &mut Self {
+        // PHP indexes $this->rows by arbitrary key; sparse assignment over a positional Vec is not
+        // modeled and has no callers.
         let _ = (column, row);
+        // TODO(phase-d): sparse `$this->rows[$column] = $row` over a positional row vector.
         todo!()
     }
 
@@ -320,49 +512,43 @@ impl Table {
 
     /// Renders table to output.
     pub fn render(&mut self) {
-        let divider = TableSeparator::new();
-        let rows: Vec<PhpMixed>;
+        let rows: Vec<Row>;
         if self.horizontal {
-            let mut horizontal_rows: IndexMap<i64, Vec<PhpMixed>> = IndexMap::new();
+            let mut horizontal_rows: IndexMap<i64, Vec<Cell>> = IndexMap::new();
             let header0 = self
                 .headers
                 .first()
-                .map(|h| Self::to_row_vec(h.clone()))
+                .map(|h| h.cells())
                 .unwrap_or_default();
             for (i, header) in header0.into_iter().enumerate() {
                 let i = i as i64;
                 horizontal_rows.insert(i, vec![header]);
                 for row in &self.rows {
-                    if shirabe_php_shim::instance_of::<TableSeparator>(row) {
+                    if row.is_table_separator() {
                         continue;
                     }
-                    if let Some(cell) = Self::row_get(row, i) {
+                    if let Some(cell) = row.get_cell_isset(i) {
                         let entry = horizontal_rows.get_mut(&i).unwrap();
                         entry.push(cell);
                     } else {
                         let first = horizontal_rows.get(&i).unwrap().first().cloned();
                         let is_title_noop = match first {
-                            Some(ref c) if shirabe_php_shim::instance_of::<TableCell>(c) => {
-                                Self::cell_colspan(c) >= 2
-                            }
+                            Some(ref c) if c.is_table_cell() => c.colspan() >= 2,
                             _ => false,
                         };
                         if is_title_noop {
                             // Noop, there is a "title"
                         } else {
                             let entry = horizontal_rows.get_mut(&i).unwrap();
-                            entry.push(PhpMixed::from(()));
+                            entry.push(Cell::Null);
                         }
                     }
                 }
             }
-            rows = horizontal_rows
-                .into_values()
-                .map(Self::from_row_vec)
-                .collect();
+            rows = horizontal_rows.into_values().map(Row::Cells).collect();
         } else {
             let mut merged = self.headers.clone();
-            merged.push(Self::table_separator_to_mixed(divider.clone()));
+            merged.push(Row::HeaderDivider);
             merged.extend(self.rows.clone());
             rows = merged;
         }
@@ -381,20 +567,20 @@ impl Table {
             let mut is_header_separator_rendered = false;
 
             for row in row_group {
-                if Self::is_divider(row, &divider) {
+                if row.is_divider() {
                     is_header = false;
                     is_first_row = true;
 
                     continue;
                 }
 
-                if shirabe_php_shim::instance_of::<TableSeparator>(row) {
+                if row.is_table_separator() {
                     self.render_row_separator(SEPARATOR_MID, None, None);
 
                     continue;
                 }
 
-                if !shirabe_php_shim::to_bool(row) {
+                if !row.is_truthy() {
                     continue;
                 }
 
@@ -444,13 +630,13 @@ impl Table {
 
                 if self.horizontal {
                     self.render_row(
-                        Self::to_row_vec(row.clone()),
+                        row.cells(),
                         self.style.get_cell_row_format(),
                         Some(self.style.get_cell_header_format()),
                     );
                 } else {
                     self.render_row(
-                        Self::to_row_vec(row.clone()),
+                        row.cells(),
                         if is_header {
                             self.style.get_cell_header_format()
                         } else {
@@ -603,7 +789,7 @@ impl Table {
     /// Renders table row.
     fn render_row(
         &self,
-        row: Vec<PhpMixed>,
+        row: Vec<Cell>,
         cell_format: String,
         first_cell_format: Option<String>,
     ) {
@@ -634,19 +820,22 @@ impl Table {
     }
 
     /// Renders table cell with padding.
-    fn render_cell(&self, row: &[PhpMixed], column: i64, cell_format: String) -> String {
-        let cell = Self::row_get_index(row, column).unwrap_or_else(|| PhpMixed::from(""));
+    fn render_cell(&self, row: &[Cell], column: i64, cell_format: String) -> String {
+        let cell = row
+            .get(column as usize)
+            .cloned()
+            .unwrap_or(Cell::Value(String::new()));
         let mut width = self.effective_column_widths[&column];
-        if shirabe_php_shim::instance_of::<TableCell>(&cell) && Self::cell_colspan(&cell) > 1 {
+        if cell.is_table_cell() && cell.colspan() > 1 {
             // add the width of the following columns(numbers of colspan).
-            for next_column in (column + 1)..=(column + Self::cell_colspan(&cell) - 1) {
+            for next_column in (column + 1)..=(column + cell.colspan() - 1) {
                 width +=
                     self.get_column_separator_width() + self.effective_column_widths[&next_column];
             }
         }
 
         // str_pad won't work properly with multi-byte strings, we need to fix the padding
-        let cell_str = shirabe_php_shim::to_string(&cell);
+        let cell_str = cell.to_php_string();
         if let Some(encoding) = shirabe_php_shim::mb_detect_encoding(&cell_str, None, true) {
             width += shirabe_php_shim::strlen(&cell_str)
                 - shirabe_php_shim::mb_strwidth(&cell_str, Some(&encoding));
@@ -654,7 +843,7 @@ impl Table {
 
         let style = self.get_column_style(column);
 
-        if shirabe_php_shim::instance_of::<TableSeparator>(&cell) {
+        if cell.is_table_separator() {
             return shirabe_php_shim::sprintf(
                 &style.get_border_format(),
                 &[PhpMixed::from(shirabe_php_shim::str_repeat(
@@ -672,15 +861,13 @@ impl Table {
 
         let mut cell_format = cell_format;
         let mut pad_type = style.get_pad_type();
-        if shirabe_php_shim::instance_of::<TableCell>(&cell)
-            && Self::cell_style_is_table_cell_style(&cell)
-        {
+        if cell.is_table_cell() && cell.style().is_some() {
             let is_not_styled_by_tag = !Preg::is_match(
                 "/^<(\\w+|(\\w+=[\\w,]+;?)*)>.+<\\/(\\w+|(\\w+=\\w+;?)*)?>$/",
                 &cell_str,
             );
             if is_not_styled_by_tag {
-                let cell_style = Self::cell_get_style(&cell).unwrap();
+                let cell_style = cell.style().unwrap();
                 match cell_style.get_cell_format() {
                     Some(fmt) => cell_format = fmt,
                     None => {
@@ -704,7 +891,7 @@ impl Table {
                 }
             }
 
-            pad_type = Self::cell_get_style(&cell).unwrap().get_pad_by_align();
+            pad_type = cell.style().unwrap().get_pad_by_align();
         }
 
         shirabe_php_shim::sprintf(
@@ -719,48 +906,48 @@ impl Table {
     }
 
     /// Calculate number of columns for this table.
-    fn calculate_number_of_columns(&mut self, rows: &[PhpMixed]) {
+    fn calculate_number_of_columns(&mut self, rows: &[Row]) {
         let mut columns = vec![0i64];
         for row in rows {
-            if shirabe_php_shim::instance_of::<TableSeparator>(row) {
+            if row.is_table_separator() {
                 continue;
             }
 
-            columns.push(self.get_number_of_columns(&Self::to_row_vec(row.clone())));
+            columns.push(self.get_number_of_columns(&row.cells()));
         }
 
         self.number_of_columns = Some(*columns.iter().max().unwrap());
     }
 
-    fn build_table_rows(&mut self, rows: Vec<PhpMixed>) -> TableRows {
+    fn build_table_rows(&mut self, rows: Vec<Row>) -> TableRows {
         let mut rows = rows;
-        let mut unmerged_rows: IndexMap<i64, IndexMap<i64, Vec<PhpMixed>>> = IndexMap::new();
+        let mut unmerged_rows: IndexMap<i64, IndexMap<i64, Vec<Cell>>> = IndexMap::new();
         let mut row_key = 0i64;
         while row_key < rows.len() as i64 {
             rows = self.fill_next_rows(rows, row_key);
 
             // Remove any new line breaks and replace it with a new line
-            let current = Self::to_row_vec(rows[row_key as usize].clone());
+            let current = rows[row_key as usize].cells();
             for (column, cell) in current.iter().enumerate() {
                 let column = column as i64;
                 let mut cell = cell.clone();
-                let colspan = if shirabe_php_shim::instance_of::<TableCell>(&cell) {
-                    Self::cell_colspan(&cell)
+                let colspan = if cell.is_table_cell() {
+                    cell.colspan()
                 } else {
                     1
                 };
 
                 if self.column_max_widths.contains_key(&column)
-                    && Helper::width(&self.remove_decoration(&shirabe_php_shim::to_string(&cell)))
+                    && Helper::width(&self.remove_decoration(&cell.to_php_string()))
                         > self.column_max_widths[&column]
                 {
                     // TODO(phase-b): formatAndWrap requires a WrappableOutputFormatterInterface;
                     // downcasting dyn OutputFormatterInterface to it needs concrete knowledge.
                     let _ = colspan;
                     let wrapped: Option<String> = todo!();
-                    cell = PhpMixed::from(wrapped.unwrap_or_default());
+                    cell = Cell::Value(wrapped.unwrap_or_default());
                 }
-                let cell_str = shirabe_php_shim::to_string(&cell);
+                let cell_str = cell.to_php_string();
                 if shirabe_php_shim::strstr(&cell_str, "\n").is_none() {
                     continue;
                 }
@@ -776,35 +963,35 @@ impl Table {
                         .map(|line| OutputFormatter::escape_trailing_backslash(line))
                         .collect::<Vec<_>>(),
                 );
-                cell = if shirabe_php_shim::instance_of::<TableCell>(&cell) {
-                    Self::table_cell_to_mixed(TableCell::new2(
+                cell = if cell.is_table_cell() {
+                    Cell::Cell(TableCell::new2(
                         &escaped,
-                        Self::table_cell_options_colspan(Self::cell_colspan(&cell)),
+                        Self::table_cell_options_colspan(cell.colspan()),
                     ))
                 } else {
-                    PhpMixed::from(escaped.clone())
+                    Cell::Value(escaped.clone())
                 };
                 let lines = shirabe_php_shim::explode(
                     eol,
                     &shirabe_php_shim::str_replace(
                         eol,
                         &format!("<fg=default;bg=default></>{}", eol),
-                        &shirabe_php_shim::to_string(&cell),
+                        &cell.to_php_string(),
                     ),
                 );
                 for (line_key, line) in lines.into_iter().enumerate() {
                     let line_key = line_key as i64;
-                    let mut line = PhpMixed::from(line);
+                    let mut line = Cell::Value(line);
                     if colspan > 1 {
-                        line = Self::table_cell_to_mixed(TableCell::new2(
-                            &shirabe_php_shim::to_string(&line),
+                        line = Cell::Cell(TableCell::new2(
+                            &line.to_php_string(),
                             Self::table_cell_options_colspan(colspan),
                         ));
                     }
                     if 0 == line_key {
-                        let mut r = Self::to_row_vec(rows[row_key as usize].clone());
-                        Self::array_set(&mut r, column, line);
-                        rows[row_key as usize] = Self::from_row_vec(r);
+                        let mut r = rows[row_key as usize].cells();
+                        set_cell(&mut r, column, line);
+                        rows[row_key as usize] = Row::Cells(r);
                     } else {
                         if !unmerged_rows.contains_key(&row_key)
                             || !unmerged_rows[&row_key].contains_key(&line_key)
@@ -820,7 +1007,7 @@ impl Table {
                             .unwrap()
                             .get_mut(&line_key)
                             .unwrap();
-                        Self::vec_set(target, column, line);
+                        set_cell(target, column, line);
                     }
                 }
             }
@@ -830,24 +1017,18 @@ impl Table {
         // PHP returns a TableRows wrapping a generator that lazily yields row groups.
         // The generator borrows $this to call fillCells(). In Phase A we precompute the
         // row groups eagerly to preserve behavior, then hand them to TableRows.
-        let mut row_groups: Vec<Vec<PhpMixed>> = Vec::new();
+        let mut row_groups: Vec<Vec<Row>> = Vec::new();
         for (row_key, row) in rows.into_iter().enumerate() {
             let row_key = row_key as i64;
-            let mut row_group: Vec<PhpMixed> =
-                vec![if shirabe_php_shim::instance_of::<TableSeparator>(&row) {
-                    row
-                } else {
-                    Self::from_row_vec(self.fill_cells(Self::to_row_vec(row)))
-                }];
+            let mut row_group: Vec<Row> = vec![if row.is_table_separator() {
+                row
+            } else {
+                Row::Cells(self.fill_cells(row.cells()))
+            }];
 
             if let Some(extra) = unmerged_rows.get(&row_key) {
                 for r in extra.values() {
-                    let r = Self::from_row_vec(r.clone());
-                    row_group.push(if shirabe_php_shim::instance_of::<TableSeparator>(&r) {
-                        r
-                    } else {
-                        Self::from_row_vec(self.fill_cells(Self::to_row_vec(r)))
-                    });
+                    row_group.push(Row::Cells(self.fill_cells(r.clone())));
                 }
             }
             row_groups.push(row_group);
@@ -858,10 +1039,9 @@ impl Table {
 
     fn calculate_row_count(&mut self) -> i64 {
         let mut merged = self.headers.clone();
-        merged.push(Self::table_separator_to_mixed(TableSeparator::new()));
+        merged.push(Row::Separator(TableSeparator::new()));
         merged.extend(self.rows.clone());
-        let mut number_of_rows =
-            shirabe_php_shim::iterator_to_array(self.build_table_rows(merged)).len() as i64;
+        let mut number_of_rows = self.build_table_rows(merged).into_row_groups().len() as i64;
 
         if !self.headers.is_empty() {
             number_of_rows += 1; // Add row for header separator
@@ -875,31 +1055,18 @@ impl Table {
     }
 
     /// fill rows that contains rowspan > 1.
-    fn fill_next_rows(&self, rows: Vec<PhpMixed>, line: i64) -> Vec<PhpMixed> {
+    fn fill_next_rows(&self, rows: Vec<Row>, line: i64) -> Vec<Row> {
         let mut rows = rows;
-        let mut unmerged_rows: IndexMap<i64, IndexMap<i64, PhpMixed>> = IndexMap::new();
-        let current = Self::to_row_vec(rows[line as usize].clone());
+        let mut unmerged_rows: IndexMap<i64, IndexMap<i64, Cell>> = IndexMap::new();
+        let current = rows[line as usize].cells();
         for (column, cell) in current.iter().enumerate() {
             let column = column as i64;
             let cell = cell.clone();
-            if !shirabe_php_shim::is_null(&cell)
-                && !shirabe_php_shim::instance_of::<TableCell>(&cell)
-                && !shirabe_php_shim::is_scalar(&cell)
-                && !(shirabe_php_shim::is_object(&cell)
-                    && shirabe_php_shim::method_exists(&cell, "__toString"))
-            {
-                // PHP throws InvalidArgumentException; the @throws contract makes this a
-                // recoverable error. In Phase A we keep the panic placeholder as fill_next_rows
-                // does not yet return a Result in the call chain.
-                // TODO(phase-b): thread InvalidArgumentException through fill_next_rows.
-                panic!(
-                    "A cell must be a TableCell, a scalar or an object implementing \"__toString()\", \"{}\" given.",
-                    shirabe_php_shim::get_debug_type(&cell)
-                );
-            }
-            if shirabe_php_shim::instance_of::<TableCell>(&cell) && Self::cell_rowspan(&cell) > 1 {
-                let mut nb_lines = Self::cell_rowspan(&cell) - 1;
-                let cell_str = shirabe_php_shim::to_string(&cell);
+            // PHP validates here that a cell is null, a TableCell, a scalar, or a __toString object.
+            // The `Cell` type makes every variant valid, so the InvalidArgumentException is dead.
+            if cell.is_table_cell() && cell.rowspan() > 1 {
+                let mut nb_lines = cell.rowspan() - 1;
+                let cell_str = cell.to_php_string();
                 let mut lines = vec![cell.clone()];
                 if shirabe_php_shim::strstr(&cell_str, "\n").is_some() {
                     let eol = if shirabe_php_shim::str_contains(&cell_str, "\r\n") {
@@ -915,26 +1082,23 @@ impl Table {
                             &cell_str,
                         ),
                     );
-                    lines = exploded.into_iter().map(PhpMixed::from).collect();
+                    lines = exploded.into_iter().map(Cell::Value).collect();
                     nb_lines = if (lines.len() as i64) > nb_lines {
                         shirabe_php_shim::substr_count(&cell_str, eol)
                     } else {
                         nb_lines
                     };
 
-                    let mut r = Self::to_row_vec(rows[line as usize].clone());
-                    Self::array_set(
+                    let mut r = rows[line as usize].cells();
+                    set_cell(
                         &mut r,
                         column,
-                        Self::table_cell_to_mixed(TableCell::new2(
-                            &shirabe_php_shim::to_string(&lines[0]),
-                            Self::table_cell_options_colspan_style(
-                                Self::cell_colspan(&cell),
-                                Self::cell_get_style(&cell),
-                            ),
+                        Cell::Cell(TableCell::new2(
+                            &lines[0].to_php_string(),
+                            Self::table_cell_options_colspan_style(cell.colspan(), cell.style()),
                         )),
                     );
-                    rows[line as usize] = Self::from_row_vec(r);
+                    rows[line as usize] = Row::Cells(r);
                     lines.remove(0);
                 }
 
@@ -947,15 +1111,12 @@ impl Table {
                     let value = lines
                         .get(idx as usize)
                         .cloned()
-                        .unwrap_or_else(|| PhpMixed::from(""));
+                        .unwrap_or(Cell::Value(String::new()));
                     unmerged_rows.get_mut(&unmerged_row_key).unwrap().insert(
                         column,
-                        Self::table_cell_to_mixed(TableCell::new2(
-                            &shirabe_php_shim::to_string(&value),
-                            Self::table_cell_options_colspan_style(
-                                Self::cell_colspan(&cell),
-                                Self::cell_get_style(&cell),
-                            ),
+                        Cell::Cell(TableCell::new2(
+                            &value.to_php_string(),
+                            Self::table_cell_options_colspan_style(cell.colspan(), cell.style()),
                         )),
                     );
                     if nb_lines == unmerged_row_key - line {
@@ -968,34 +1129,34 @@ impl Table {
         for (unmerged_row_key, unmerged_row) in unmerged_rows.clone() {
             // we need to know if $unmergedRow will be merged or inserted into $rows
             let fits = (unmerged_row_key as usize) < rows.len()
-                && shirabe_php_shim::is_array(&rows[unmerged_row_key as usize])
-                && (self.get_number_of_columns(&Self::to_row_vec(
-                    rows[unmerged_row_key as usize].clone(),
-                )) + self.get_number_of_columns(
-                    &unmerged_rows[&unmerged_row_key]
-                        .values()
-                        .cloned()
-                        .collect::<Vec<_>>(),
-                ) <= self.number_of_columns.unwrap());
+                && matches!(rows[unmerged_row_key as usize], Row::Cells(_))
+                && (self.get_number_of_columns(&rows[unmerged_row_key as usize].cells())
+                    + self.get_number_of_columns(
+                        &unmerged_rows[&unmerged_row_key]
+                            .values()
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                    )
+                    <= self.number_of_columns.unwrap());
             if fits {
-                let mut target = Self::to_row_vec(rows[unmerged_row_key as usize].clone());
+                let mut target = rows[unmerged_row_key as usize].cells();
                 for (cell_key, cell) in unmerged_row {
                     // insert cell into row at cellKey position
                     shirabe_php_shim::array_splice(&mut target, cell_key, Some(0), vec![cell]);
                 }
-                rows[unmerged_row_key as usize] = Self::from_row_vec(target);
+                rows[unmerged_row_key as usize] = Row::Cells(target);
             } else {
                 let mut row = self.copy_row(&rows, unmerged_row_key - 1);
                 for (column, cell) in &unmerged_row {
-                    if shirabe_php_shim::to_bool(cell) {
-                        Self::vec_set(&mut row, *column, unmerged_row[column].clone());
+                    if cell.is_truthy() {
+                        set_cell(&mut row, *column, unmerged_row[column].clone());
                     }
                 }
                 shirabe_php_shim::array_splice(
                     &mut rows,
                     unmerged_row_key,
                     Some(0),
-                    vec![Self::from_row_vec(row)],
+                    vec![Row::Cells(row)],
                 );
             }
         }
@@ -1004,16 +1165,16 @@ impl Table {
     }
 
     /// fill cells for a row that contains colspan > 1.
-    fn fill_cells(&self, row: Vec<PhpMixed>) -> Vec<PhpMixed> {
-        let mut new_row: Vec<PhpMixed> = Vec::new();
+    fn fill_cells(&self, row: Vec<Cell>) -> Vec<Cell> {
+        let mut new_row: Vec<Cell> = Vec::new();
 
         for (column, cell) in row.iter().enumerate() {
             let column = column as i64;
             new_row.push(cell.clone());
-            if shirabe_php_shim::instance_of::<TableCell>(cell) && Self::cell_colspan(cell) > 1 {
-                for _position in (column + 1)..=(column + Self::cell_colspan(cell) - 1) {
+            if cell.is_table_cell() && cell.colspan() > 1 {
+                for _position in (column + 1)..=(column + cell.colspan() - 1) {
                     // insert empty value at column position
-                    new_row.push(PhpMixed::from(""));
+                    new_row.push(Cell::Value(String::new()));
                 }
             }
         }
@@ -1021,15 +1182,15 @@ impl Table {
         if new_row.is_empty() { row } else { new_row }
     }
 
-    fn copy_row(&self, rows: &[PhpMixed], line: i64) -> Vec<PhpMixed> {
-        let mut row = Self::to_row_vec(rows[line as usize].clone());
+    fn copy_row(&self, rows: &[Row], line: i64) -> Vec<Cell> {
+        let mut row = rows[line as usize].cells();
         for cell in &mut row {
             let cell_value = cell.clone();
-            *cell = PhpMixed::from("");
-            if shirabe_php_shim::instance_of::<TableCell>(&cell_value) {
-                *cell = Self::table_cell_to_mixed(TableCell::new2(
+            *cell = Cell::Value(String::new());
+            if cell_value.is_table_cell() {
+                *cell = Cell::Cell(TableCell::new2(
                     "",
-                    Self::table_cell_options_colspan(Self::cell_colspan(&cell_value)),
+                    Self::table_cell_options_colspan(cell_value.colspan()),
                 ));
             }
         }
@@ -1038,11 +1199,11 @@ impl Table {
     }
 
     /// Gets number of columns by row.
-    fn get_number_of_columns(&self, row: &[PhpMixed]) -> i64 {
+    fn get_number_of_columns(&self, row: &[Cell]) -> i64 {
         let mut columns = row.len() as i64;
         for column in row {
-            columns += if shirabe_php_shim::instance_of::<TableCell>(column) {
-                Self::cell_colspan(column) - 1
+            columns += if column.is_table_cell() {
+                column.colspan() - 1
             } else {
                 0
             };
@@ -1052,14 +1213,14 @@ impl Table {
     }
 
     /// Gets list of columns for the given row.
-    fn get_row_columns(&self, row: &[PhpMixed]) -> Vec<i64> {
+    fn get_row_columns(&self, row: &[Cell]) -> Vec<i64> {
         let mut columns: Vec<i64> = (0..self.number_of_columns.unwrap()).collect();
         for (cell_key, cell) in row.iter().enumerate() {
             let cell_key = cell_key as i64;
-            if shirabe_php_shim::instance_of::<TableCell>(cell) && Self::cell_colspan(cell) > 1 {
+            if cell.is_table_cell() && cell.colspan() > 1 {
                 // exclude grouped columns.
                 let excluded: Vec<i64> =
-                    ((cell_key + 1)..=(cell_key + Self::cell_colspan(cell) - 1)).collect();
+                    ((cell_key + 1)..=(cell_key + cell.colspan() - 1)).collect();
                 columns.retain(|c| !excluded.contains(c));
             }
         }
@@ -1074,28 +1235,26 @@ impl Table {
             let mut lengths: Vec<i64> = Vec::new();
             for group in groups {
                 for row in group {
-                    if shirabe_php_shim::instance_of::<TableSeparator>(row) {
+                    if row.is_table_separator() {
                         continue;
                     }
 
-                    let mut row_arr = Self::to_row_vec(row.clone());
+                    let mut row_arr = row.cells();
                     for i in 0..row_arr.len() {
                         let cell = row_arr[i].clone();
-                        if shirabe_php_shim::instance_of::<TableCell>(&cell) {
-                            let text_content =
-                                self.remove_decoration(&shirabe_php_shim::to_string(&cell));
+                        if cell.is_table_cell() {
+                            let text_content = self.remove_decoration(&cell.to_php_string());
                             let text_length = Helper::width(&text_content);
                             if text_length > 0 {
                                 let content_columns = shirabe_php_shim::mb_str_split(
                                     &text_content,
-                                    (text_length as f64 / Self::cell_colspan(&cell) as f64).ceil()
-                                        as i64,
+                                    (text_length as f64 / cell.colspan() as f64).ceil() as i64,
                                 );
                                 for (position, content) in content_columns.into_iter().enumerate() {
-                                    Self::vec_set(
+                                    set_cell(
                                         &mut row_arr,
                                         i as i64 + position as i64,
-                                        PhpMixed::from(content),
+                                        Cell::Value(content),
                                     );
                                 }
                             }
@@ -1123,12 +1282,11 @@ impl Table {
         ))
     }
 
-    fn get_cell_width(&self, row: &[PhpMixed], column: i64) -> i64 {
+    fn get_cell_width(&self, row: &[Cell], column: i64) -> i64 {
         let mut cell_width = 0;
 
-        if let Some(cell) = Self::row_get_index(row, column) {
-            cell_width =
-                Helper::width(&self.remove_decoration(&shirabe_php_shim::to_string(&cell)));
+        if let Some(cell) = row.get(column as usize) {
+            cell_width = Helper::width(&self.remove_decoration(&cell.to_php_string()));
         }
 
         let column_width = *self.column_widths.get(&column).unwrap_or(&0);
@@ -1219,33 +1377,25 @@ impl Table {
 
     fn resolve_style(
         &self,
-        name: PhpMixed,
+        name: StyleName,
     ) -> anyhow::Result<Result<TableStyle, InvalidArgumentException>> {
-        if shirabe_php_shim::instance_of::<TableStyle>(&name) {
-            // TODO(phase-b): extract the owned TableStyle out of PhpMixed.
-            todo!()
-        }
+        let name = match name {
+            StyleName::Style(style) => return Ok(Ok(style)),
+            StyleName::Name(name) => name,
+        };
 
-        let name_str = shirabe_php_shim::to_string(&name);
         let styles_guard = styles().lock().unwrap();
-        if let Some(_style) = styles_guard.as_ref().and_then(|s| s.get(&name_str)) {
-            // TODO(phase-b): TableStyle is not Clone; sharing semantics need resolving.
-            todo!()
+        if let Some(style) = styles_guard.as_ref().and_then(|s| s.get(&name)) {
+            return Ok(Ok(style.clone()));
         }
 
         Ok(Err(InvalidArgumentException(
             shirabe_php_shim::InvalidArgumentException {
-                message: format!("Style \"{}\" is not defined.", name_str),
+                message: format!("Style \"{}\" is not defined.", name),
                 code: 0,
             },
         )))
     }
-
-    // --- Phase A helpers for `mixed`/array semantics over PhpMixed -------------------------------
-    //
-    // These bridge PHP's dynamic typing (a cell is a TableCell, a scalar, null, or an array;
-    // a row is an array or a TableSeparator) onto PhpMixed. Their bodies are deferred to Phase B
-    // where the concrete PhpMixed representation is settled.
 
     fn formatter_is_wrappable(_output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
         // PHP: $this->output->getFormatter() instanceof WrappableOutputFormatterInterface
@@ -1272,84 +1422,27 @@ impl Table {
             .is_some()
     }
 
-    fn is_divider(_row: &PhpMixed, _divider: &TableSeparator) -> bool {
-        // PHP: $divider === $row (object identity)
-        todo!()
-    }
-
-    fn cell_colspan(_cell: &PhpMixed) -> i64 {
-        // PHP: $cell->getColspan()
-        todo!()
-    }
-
-    fn cell_rowspan(_cell: &PhpMixed) -> i64 {
-        // PHP: $cell->getRowspan()
-        todo!()
-    }
-
-    fn cell_get_style(_cell: &PhpMixed) -> Option<TableCellStyle> {
-        // PHP: $cell->getStyle()
-        todo!()
-    }
-
-    fn cell_style_is_table_cell_style(_cell: &PhpMixed) -> bool {
-        // PHP: $cell->getStyle() instanceof TableCellStyle
-        todo!()
-    }
-
-    fn table_cell_options_colspan(_colspan: i64) -> IndexMap<String, TableCellOption> {
+    fn table_cell_options_colspan(colspan: i64) -> IndexMap<String, TableCellOption> {
         // PHP: ['colspan' => $colspan]
-        todo!()
+        let mut options = IndexMap::new();
+        options.insert("colspan".to_string(), TableCellOption::Int(colspan));
+        options
     }
 
     fn table_cell_options_colspan_style(
-        _colspan: i64,
-        _style: Option<TableCellStyle>,
+        colspan: i64,
+        style: Option<Rc<TableCellStyle>>,
     ) -> IndexMap<String, TableCellOption> {
         // PHP: ['colspan' => $colspan, 'style' => $style]
-        todo!()
-    }
-
-    fn row_get(_row: &PhpMixed, _index: i64) -> Option<PhpMixed> {
-        // PHP: isset($row[$i]) ? $row[$i] : null, where $row is an array-typed PhpMixed
-        todo!()
-    }
-
-    fn row_get_index(_row: &[PhpMixed], _index: i64) -> Option<PhpMixed> {
-        // PHP: $row[$column] ?? null, honoring sparse integer keys
-        todo!()
-    }
-
-    fn array_set(_row: &mut [PhpMixed], _index: i64, _value: PhpMixed) {
-        // PHP: $row[$index] = $value (sparse assignment)
-        todo!()
-    }
-
-    fn vec_set(_row: &mut Vec<PhpMixed>, _index: i64, _value: PhpMixed) {
-        // PHP: $row[$index] = $value (sparse assignment)
-        todo!()
-    }
-
-    /// PHP rows/cells are integer-keyed arrays. We model a row as a positional
-    /// `Vec<PhpMixed>`. A cell that is a TableCell/TableSeparator cannot be carried by
-    /// PhpMixed (php-shim limitation), so such conversions are deferred.
-    fn to_row_vec(_row: PhpMixed) -> Vec<PhpMixed> {
-        // PHP: an array-typed value seen as a list of cells.
-        todo!()
-    }
-
-    fn from_row_vec(_row: Vec<PhpMixed>) -> PhpMixed {
-        // PHP: a list of cells seen as an array-typed value.
-        todo!()
-    }
-
-    /// PhpMixed cannot hold console value objects (TableCell/TableSeparator). The cell
-    /// representation is deferred to a later phase.
-    fn table_cell_to_mixed(_cell: TableCell) -> PhpMixed {
-        todo!()
-    }
-
-    fn table_separator_to_mixed(_separator: TableSeparator) -> PhpMixed {
-        todo!()
+        let mut options = IndexMap::new();
+        options.insert("colspan".to_string(), TableCellOption::Int(colspan));
+        options.insert(
+            "style".to_string(),
+            match style {
+                Some(style) => TableCellOption::Style(style),
+                None => TableCellOption::Null,
+            },
+        );
+        options
     }
 }

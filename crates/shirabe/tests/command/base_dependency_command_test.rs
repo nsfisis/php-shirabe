@@ -285,7 +285,6 @@ fn test_warning_when_dependencies_are_not_installed() {
 /// ref: BaseDependencyCommandTest::testWhyCommandOutputs (caseWhyProvider rolled in).
 #[test]
 #[serial]
-#[ignore = "panics in shirabe_php_shim::var::instance_of (crates/shirabe-php-shim/src/var.rs:191): PHP `instanceof` is not modeled (PhpMixed carries no runtime class), reached on the `why` command execution path"]
 fn test_why_command_outputs() {
     // caseWhyProvider: (package, --tree, --recursive, expected_output, expected_status_code)
     let cases: Vec<(&str, bool, bool, &str, i32)> = vec![

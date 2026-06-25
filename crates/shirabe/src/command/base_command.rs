@@ -579,10 +579,17 @@ impl BaseCommand for BaseCommandData {
     fn render_table(&self, table: Vec<PhpMixed>, output: Rc<RefCell<dyn OutputInterface>>) {
         let mut renderer = Table::new(output);
         renderer
-            .set_style(PhpMixed::from("compact"))
+            .set_style("compact".into())
             .expect("Table::set_style I/O cannot fail")
             .expect("'compact' is a built-in table style");
-        renderer.set_rows(table).render();
+        renderer
+            .set_rows(
+                table
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+            )
+            .render();
         let _ = TableSeparator::new();
     }
 

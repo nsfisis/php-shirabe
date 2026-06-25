@@ -4,7 +4,7 @@ use crate::symfony::console::exception::invalid_argument_exception::InvalidArgum
 use crate::symfony::console::exception::logic_exception::LogicException;
 
 /// Defines the styles for a Table.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TableStyle {
     padding_char: String,
     horizontal_outside_border_char: String,

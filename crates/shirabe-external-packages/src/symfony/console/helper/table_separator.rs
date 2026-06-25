@@ -22,6 +22,22 @@ impl TableSeparator {
             inner: TableCell::new("", options)?,
         })
     }
+
+    // PHP `TableSeparator extends TableCell`, so these inherited accessors remain available.
+    pub fn get_colspan(&self) -> i64 {
+        self.inner.get_colspan()
+    }
+
+    pub fn get_rowspan(&self) -> i64 {
+        self.inner.get_rowspan()
+    }
+
+    pub fn get_style(
+        &self,
+    ) -> Option<std::rc::Rc<crate::symfony::console::helper::table_cell_style::TableCellStyle>>
+    {
+        self.inner.get_style()
+    }
 }
 
 impl Default for TableSeparator {

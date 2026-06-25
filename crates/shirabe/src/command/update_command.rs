@@ -698,9 +698,9 @@ impl UpdateCommand {
         };
 
         let mut table = Table::new(output);
-        table.set_headers(vec![PhpMixed::String("Selected packages".to_string())]);
+        table.set_headers(vec!["Selected packages".into()]);
         for package in &packages {
-            table.add_row(PhpMixed::List(vec![PhpMixed::String(package.clone())]));
+            table.add_row(PhpMixed::List(vec![PhpMixed::String(package.clone())]).into());
         }
         table.render();
 
