@@ -405,8 +405,6 @@ fn test_config_reads() {
 /// shirabe-php-shim stream_set_blocking (stream.rs todo!(), requires fcntl(2)).
 #[test]
 #[serial]
-#[ignore = "list-form repositories drive Config::all -> RepositoryFactory, reaching \
-            shirabe-php-shim stream_set_blocking (stream.rs todo!(), requires fcntl(2))"]
 fn test_config_reads_repos_by_numeric_index() {
     let composer_json = serde_json::json!({"repositories": [{"type": "vcs", "url": "https://example.org"}, {"type": "composer", "url": "https://repo.packagist.org"}]});
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, false);
