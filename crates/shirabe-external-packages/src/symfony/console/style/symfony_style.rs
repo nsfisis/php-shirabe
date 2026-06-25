@@ -91,8 +91,11 @@ impl SymfonyStyle {
         escape: bool,
     ) {
         let messages: Vec<PhpMixed> = if shirabe_php_shim::is_array(&messages) {
-            // array_values($messages)
-            todo!()
+            match messages {
+                PhpMixed::Array(entries) => entries.into_values().collect(),
+                PhpMixed::List(items) => items,
+                _ => unreachable!("value is an array past the is_array guard"),
+            }
         } else {
             vec![messages]
         };
@@ -207,8 +210,8 @@ impl SymfonyStyle {
         _iterable: Vec<PhpMixed>,
         _max: Option<i64>,
     ) -> Vec<PhpMixed> {
-        // yield from $this->createProgressBar()->iterate($iterable, $max);
-        // $this->newLine(2);
+        // TODO(phase-c/d): PHP uses `yield from`; porting the generator semantics of
+        // ProgressBar::iterate() requires a streaming design not yet in place.
         todo!()
     }
 
@@ -436,6 +439,8 @@ impl SymfonyStyle {
         self.output.borrow().get_formatter()
     }
 
+    // TODO(phase-c/d): downcasting `dyn OutputInterface` to `dyn ConsoleOutputInterface`
+    // is not expressible with the current trait design (same as `output_style.rs`).
     fn is_console_output_interface(_output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
         todo!()
     }
@@ -446,12 +451,14 @@ impl SymfonyStyle {
         todo!()
     }
 
+    // TODO(phase-c/d): `PhpMixed` cannot carry a `TableSeparator` object, so the
+    // `$value instanceof TableSeparator` check has no faithful representation yet.
     fn is_table_separator(_value: &PhpMixed) -> bool {
         todo!()
     }
 
-    fn php_string(_value: &PhpMixed) -> String {
-        todo!()
+    fn php_string(value: &PhpMixed) -> String {
+        shirabe_php_shim::strval(value)
     }
 
     /// Bridges the `StyleInterface` validator (which yields `anyhow::Error`) to the
@@ -481,8 +488,11 @@ impl SymfonyStyle {
         let messages: Vec<PhpMixed> = if !shirabe_php_shim::is_iterable(&messages) {
             vec![messages]
         } else {
-            // iterate over the iterable
-            todo!()
+            match messages {
+                PhpMixed::Array(entries) => entries.into_values().collect(),
+                PhpMixed::List(items) => items,
+                _ => unreachable!("value is iterable past the is_iterable guard"),
+            }
         };
 
         for message in messages {
@@ -497,8 +507,11 @@ impl SymfonyStyle {
         let messages: Vec<PhpMixed> = if !shirabe_php_shim::is_iterable(&messages) {
             vec![messages]
         } else {
-            // iterate over the iterable
-            todo!()
+            match messages {
+                PhpMixed::Array(entries) => entries.into_values().collect(),
+                PhpMixed::List(items) => items,
+                _ => unreachable!("value is iterable past the is_iterable guard"),
+            }
         };
 
         for message in messages {
@@ -581,8 +594,11 @@ impl StyleInterface for SymfonyStyle {
         self.auto_prepend_text();
 
         let messages: Vec<PhpMixed> = if shirabe_php_shim::is_array(&message) {
-            // array_values($message)
-            todo!()
+            match message {
+                PhpMixed::Array(entries) => entries.into_values().collect(),
+                PhpMixed::List(items) => items,
+                _ => unreachable!("value is an array past the is_array guard"),
+            }
         } else {
             vec![message]
         };

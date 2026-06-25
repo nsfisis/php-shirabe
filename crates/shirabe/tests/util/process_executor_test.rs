@@ -204,3 +204,64 @@ fn test_escape_argument() {
         assert_eq!(unix, ProcessExecutor::escape(argument));
     }
 }
+
+// Exercises the ProcessExecutorMock infrastructure (cf.
+// composer/tests/Composer/Test/Mock/ProcessExecutorMock.php): expectations are matched in order,
+// stdout is captured back, stderr surfaces via get_error_output, and assert_complete (via the
+// guard) verifies the queue was fully consumed.
+#[test]
+fn test_mock_consumes_expectations_in_order() {
+    use crate::process_executor_mock::{cmd_full, get_process_executor_mock};
+    use shirabe::util::process_executor::MockHandler;
+
+    let (process, _guard) = get_process_executor_mock(
+        vec![
+            cmd_full("git command", 1, "out one", ""),
+            cmd_full(["git", "--version"], 0, "git version 2.0.0", "warn"),
+        ],
+        true,
+        MockHandler::default(),
+    );
+
+    let mut output = String::new();
+    let rc = process
+        .borrow_mut()
+        .execute("git command", &mut output, None)
+        .unwrap();
+    assert_eq!(1, rc);
+    assert_eq!("out one", output);
+
+    let mut output2 = String::new();
+    let rc2 = process
+        .borrow_mut()
+        .execute(&["git", "--version"], &mut output2, None)
+        .unwrap();
+    assert_eq!(0, rc2);
+    assert_eq!("git version 2.0.0", output2);
+    assert_eq!("warn", process.borrow().get_error_output());
+}
+
+// Non-strict mode falls back to the default handler for unexpected commands.
+#[test]
+fn test_mock_default_handler_for_unexpected_command() {
+    use crate::process_executor_mock::get_process_executor_mock;
+    use shirabe::util::process_executor::MockHandler;
+
+    let (process, _guard) = get_process_executor_mock(
+        vec![],
+        false,
+        MockHandler {
+            r#return: 7,
+            stdout: "fallback".to_string(),
+            stderr: String::new(),
+        },
+    );
+
+    let mut output = String::new();
+    let rc = process
+        .borrow_mut()
+        .execute("anything goes", &mut output, None)
+        .unwrap();
+    assert_eq!(7, rc);
+    assert_eq!("fallback", output);
+}

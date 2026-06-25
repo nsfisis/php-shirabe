@@ -12,10 +12,10 @@ use shirabe_external_packages::symfony::process::Process;
 use shirabe_external_packages::symfony::process::exception::ProcessSignaledException;
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, array_intersect, array_map, call_user_func,
-    defined, escapeshellarg, explode, implode, in_array, is_array, is_dir, is_numeric, is_string,
-    rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace,
-    trim, usleep,
+    LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
+    call_user_func, defined, escapeshellarg, explode, implode, in_array, is_array, is_dir,
+    is_numeric, is_string, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower,
+    strtr_array, substr_replace, trim, usleep,
 };
 
 use crate::io::IOInterface;
@@ -46,6 +46,77 @@ pub struct ProcessExecutor {
     id_gen: i64,
     /// @var bool
     allow_async: bool,
+    /// Test-only mock state. `None` in production; set via [`ProcessExecutor::__expects`] in tests.
+    /// Mirrors `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`.
+    mock: Option<ProcessExecutorMockState>,
+}
+
+/// Test-only state for the ProcessExecutorMock behaviour (cf.
+/// `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`). Held in
+/// [`ProcessExecutor::mock`]; always `None` in production builds.
+#[derive(Debug)]
+pub struct ProcessExecutorMockState {
+    /// `null` until configured via `expects`; once set, an empty list means "no more calls".
+    pub expectations: Option<Vec<MockExpectation>>,
+    pub strict: bool,
+    pub default_handler: MockHandler,
+    pub log: Vec<String>,
+}
+
+/// A single expected command (`array{cmd, return, stdout, stderr, callback}` in PHP).
+pub struct MockExpectation {
+    /// `string|list<string>`: a `PhpMixed::String` or `PhpMixed::List`.
+    pub cmd: PhpMixed,
+    pub r#return: i64,
+    pub stdout: String,
+    pub stderr: String,
+    /// Optional `callable` fired when the expectation is consumed. Rare in Composer's suite.
+    pub callback: Option<Box<dyn FnMut()>>,
+}
+
+impl std::fmt::Debug for MockExpectation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MockExpectation")
+            .field("cmd", &self.cmd)
+            .field("return", &self.r#return)
+            .field("stdout", &self.stdout)
+            .field("stderr", &self.stderr)
+            .field("callback", &self.callback.is_some())
+            .finish()
+    }
+}
+
+impl MockExpectation {
+    /// Builds an expectation from just a command (string or list), defaulting the rest, matching
+    /// PHP's handling of bare `string`/`list` entries in `expects`.
+    pub fn from_cmd(cmd: PhpMixed) -> Self {
+        Self {
+            cmd,
+            r#return: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+            callback: None,
+        }
+    }
+}
+
+/// The `{return, stdout, stderr}` default-handler triple used for unmatched commands in non-strict
+/// mode (`$defaultHandler` in PHP).
+#[derive(Debug, Clone)]
+pub struct MockHandler {
+    pub r#return: i64,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+impl Default for MockHandler {
+    fn default() -> Self {
+        Self {
+            r#return: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+        }
+    }
 }
 
 struct Job {
@@ -105,6 +176,7 @@ impl ProcessExecutor {
             max_jobs: 10,
             id_gen: 0,
             allow_async: false,
+            mock: None,
         };
         this.reset_max_jobs();
         this
@@ -297,6 +369,10 @@ impl ProcessExecutor {
     where
         O: IntoExecOutput<'o>,
     {
+        if self.mock.is_some() {
+            return self.mock_do_execute(command, cwd, output);
+        }
+
         self.output_command_run(&command, cwd, false);
 
         self.capture_output = output.capture_output();
@@ -334,12 +410,196 @@ impl ProcessExecutor {
             .unwrap_or(0))
     }
 
+    /// Mock replacement for `do_execute` when [`Self::mock`] is set (cf.
+    /// `ProcessExecutorMock::doExecute`). Logs the command, matches it against the head of the
+    /// expectation queue (exact `===`), pops on match (firing the optional callback), falls back to
+    /// the default handler in non-strict mode, or panics in strict mode. Emits stdout/stderr through
+    /// the output target and records `error_output`.
+    fn mock_do_execute<'o, O>(
+        &mut self,
+        command: PhpMixed,
+        cwd: Option<&str>,
+        mut output: O,
+    ) -> Result<i64>
+    where
+        O: IntoExecOutput<'o>,
+    {
+        let capture_output = output.capture_output();
+        self.capture_output = capture_output;
+        self.error_output = String::new();
+
+        let command_string = if is_array(&command) {
+            match &command {
+                PhpMixed::List(l) => implode(
+                    " ",
+                    &l.iter()
+                        .map(|v| v.as_string().unwrap_or("").to_string())
+                        .collect::<Vec<_>>(),
+                ),
+                PhpMixed::Array(m) => implode(
+                    " ",
+                    &m.values()
+                        .map(|v| v.as_string().unwrap_or("").to_string())
+                        .collect::<Vec<_>>(),
+                ),
+                _ => String::new(),
+            }
+        } else {
+            command.as_string().unwrap_or("").to_string()
+        };
+
+        let mock = self.mock.as_mut().unwrap();
+        mock.log.push(command_string.clone());
+
+        let matched = mock
+            .expectations
+            .as_ref()
+            .map(|exps| !exps.is_empty() && exps[0].cmd == command)
+            .unwrap_or(false);
+
+        let (stdout, stderr, r#return);
+        if matched {
+            let mut expect = mock.expectations.as_mut().unwrap().remove(0);
+            stdout = expect.stdout.clone();
+            stderr = expect.stderr.clone();
+            r#return = expect.r#return;
+            if let Some(callback) = expect.callback.as_mut() {
+                callback();
+            }
+        } else if !mock.strict {
+            stdout = mock.default_handler.stdout.clone();
+            stderr = mock.default_handler.stderr.clone();
+            r#return = mock.default_handler.r#return;
+        } else {
+            let expected = mock
+                .expectations
+                .as_ref()
+                .filter(|exps| !exps.is_empty())
+                .map(|exps| format!("Expected {:?} at this point.", exps[0].cmd))
+                .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
+            let received = mock.log[..mock.log.len().saturating_sub(1)].join(PHP_EOL);
+            panic!(
+                "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
+                command,
+                cwd.unwrap_or(""),
+                PHP_EOL,
+                expected,
+                PHP_EOL,
+                PHP_EOL,
+                received
+            );
+        }
+
+        // Feed stdout/stderr through the output target, mirroring the PHP `$callback(...)` calls.
+        match output.to_callback() {
+            Ok(mut callback) => {
+                if !stdout.is_empty() {
+                    callback(Process::OUT, &stdout);
+                }
+                if !stderr.is_empty() {
+                    callback(Process::ERR, &stderr);
+                }
+            }
+            Err(mut out) => {
+                let mut io = self.io.clone();
+                if !stdout.is_empty() {
+                    Self::output_handler(capture_output, &mut io, Process::OUT, &stdout);
+                }
+                if !stderr.is_empty() {
+                    Self::output_handler(capture_output, &mut io, Process::ERR, &stderr);
+                }
+                if capture_output {
+                    out.write_back(stdout.clone());
+                }
+            }
+        }
+
+        self.error_output = stderr;
+
+        Ok(r#return)
+    }
+
+    /// For testing only. Configures the mock expectation queue (cf. `ProcessExecutorMock::expects`).
+    /// Activates the mock branch in `do_execute`/`execute_async`.
+    pub fn __expects(
+        &mut self,
+        expectations: Vec<MockExpectation>,
+        strict: bool,
+        default_handler: MockHandler,
+    ) {
+        self.mock = Some(ProcessExecutorMockState {
+            expectations: Some(expectations),
+            strict,
+            default_handler,
+            log: Vec::new(),
+        });
+    }
+
+    /// For testing only. Asserts all configured expectations were consumed (cf.
+    /// `ProcessExecutorMock::assertComplete`). Panics with the remaining/received commands otherwise.
+    pub fn __assert_complete(&self) {
+        let Some(mock) = self.mock.as_ref() else {
+            return;
+        };
+        // Not configured to expect anything, so no need to react here.
+        let Some(expectations) = mock.expectations.as_ref() else {
+            return;
+        };
+
+        if !expectations.is_empty() {
+            let remaining: Vec<String> = expectations
+                .iter()
+                .map(|expect| {
+                    if is_array(&expect.cmd) {
+                        match &expect.cmd {
+                            PhpMixed::List(l) => implode(
+                                " ",
+                                &l.iter()
+                                    .map(|v| v.as_string().unwrap_or("").to_string())
+                                    .collect::<Vec<_>>(),
+                            ),
+                            PhpMixed::Array(m) => implode(
+                                " ",
+                                &m.values()
+                                    .map(|v| v.as_string().unwrap_or("").to_string())
+                                    .collect::<Vec<_>>(),
+                            ),
+                            _ => String::new(),
+                        }
+                    } else {
+                        expect.cmd.as_string().unwrap_or("").to_string()
+                    }
+                })
+                .collect();
+            panic!(
+                "There are still {} expected process calls which have not been consumed:{}{}{}{}Received calls:{}{}",
+                expectations.len(),
+                PHP_EOL,
+                remaining.join(PHP_EOL),
+                PHP_EOL,
+                PHP_EOL,
+                PHP_EOL,
+                mock.log.join(PHP_EOL)
+            );
+        }
+    }
+
     /// starts a process on the commandline in async mode
     pub async fn execute_async<C>(&mut self, command: C, cwd: Option<&str>) -> Result<Process>
     where
         C: IntoExecCommand,
     {
         let command = command.into_exec_command();
+        if self.mock.is_some() {
+            // PHP resolves the promise with a Process mock whose getOutput/isSuccessful/getExitCode
+            // reflect the doExecute result. We consume the expectation/log via mock_do_execute, but
+            // cannot fabricate a Process mock here: Process has no test seam in the external-packages
+            // crate (out of scope to modify). No portable test currently exercises the async mock
+            // path, so leave it unimplemented rather than returning a misleading Process.
+            let mut captured = PhpMixed::String(String::new());
+            let _result = self.mock_do_execute(command, cwd, &mut captured)?;
+            todo!("ProcessExecutorMock async path needs a Process mock seam in external-packages");
+        }
         if !self.allow_async {
             return Err(LogicException {
                 message: "You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string(),

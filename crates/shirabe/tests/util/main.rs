@@ -1,3 +1,6 @@
+#[path = "../common/process_executor_mock.rs"]
+mod process_executor_mock;
+
 mod auth_helper_test;
 mod bitbucket_test;
 mod config_validator_test;
