@@ -40,7 +40,10 @@ fn run_search_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str) {
 fn test_search() {
     // 'by name and description'
     run_search_case(
-        vec![("tokens".into(), PhpMixed::List(vec![PhpMixed::from("fancy")]))],
+        vec![(
+            "tokens".into(),
+            PhpMixed::List(vec![PhpMixed::from("fancy")]),
+        )],
         "bar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
     );
 
@@ -56,7 +59,10 @@ fn test_search() {
     // 'by name only'
     run_search_case(
         vec![
-            ("tokens".into(), PhpMixed::List(vec![PhpMixed::from("fancy")])),
+            (
+                "tokens".into(),
+                PhpMixed::List(vec![PhpMixed::from("fancy")]),
+            ),
             ("--only-name".into(), PhpMixed::from(true)),
         ],
         "vendor-2/fancy-package",
@@ -74,7 +80,10 @@ fn test_search() {
     // 'by type'
     run_search_case(
         vec![
-            ("tokens".into(), PhpMixed::List(vec![PhpMixed::from("vendor")])),
+            (
+                "tokens".into(),
+                PhpMixed::List(vec![PhpMixed::from("vendor")]),
+            ),
             ("--type".into(), PhpMixed::from("foo")),
         ],
         "vendor-2/fancy-package",
