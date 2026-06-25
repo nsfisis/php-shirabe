@@ -71,9 +71,16 @@ pub fn defined(name: &str) -> bool {
     )
 }
 
-pub fn method_exists(_object: &PhpMixed, _method_name: &str) -> bool {
-    // TODO(phase-d): requires runtime class/method reflection, which PhpMixed::Object does not carry.
-    todo!()
+// Models methods available on Composer's own runtime classes when given a class name string.
+// Shirabe is a native binary that does not run under a Composer-dumped autoloader, so the dumped
+// `Composer\Autoload\ClassLoader` (and its `getRegisteredLoaders`) is absent from the running
+// process; the class-name form therefore reports no such method. The object form needs runtime
+// reflection that PhpMixed::Object does not carry.
+pub fn method_exists(object_or_class: &PhpMixed, _method_name: &str) -> bool {
+    match object_or_class {
+        PhpMixed::String(_) => false,
+        _ => todo!(),
+    }
 }
 
 // Models the classes available in a standard PHP CLI environment running Composer:

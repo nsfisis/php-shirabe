@@ -322,10 +322,7 @@ impl RootPackageLoader {
 
             let or_split = Preg::split(r"\s*\|\|?\s*", req_version.trim());
             for or_constraint in &or_split {
-                let and_split = Preg::split(
-                    r"(?<!^|as|[=>< ,]) *(?<!-)[, ](?!-) *(?!,|as|$)",
-                    or_constraint,
-                );
+                let and_split = shirabe_semver::split_and_constraints(or_constraint);
                 for and_constraint in and_split {
                     constraints.push(and_constraint);
                 }

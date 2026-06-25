@@ -297,10 +297,7 @@ impl VersionParser {
         let mut or_groups: Vec<AnyConstraint> = Vec::new();
 
         for or_constraint in &or_constraints {
-            let and_constraints = php::preg_split(
-                "{(?<!^|as|[=>< ,]) *(?<!-)[, ](?!-) *(?!,|as|$)}",
-                or_constraint,
-            );
+            let and_constraints = split_and_constraints(or_constraint);
 
             let constraint_objects: Vec<AnyConstraint> = if and_constraints.len() > 1 {
                 let mut objs: Vec<AnyConstraint> = Vec::new();
@@ -760,5 +757,148 @@ impl VersionParser {
             "rc" => "RC".to_string(),
             _ => stability,
         }
+    }
+}
+
+/// Splits a single OR-group of a constraint string into its AND-separated parts.
+///
+/// Regex pattern compatibility:
+/// Composer splits on the PCRE delimiter `(?<!^|as|[=>< ,]) *(?<!-)[, ](?!-) *(?!,|as|$)`, which
+/// relies on look-behind/look-ahead the `regex` crate cannot express. This reproduces the PCRE
+/// semantics (greedy ` *` with backtracking around a single `,`/space core, guarded by the
+/// look-arounds) directly over the byte string. Constraint strings are ASCII, and `$` is treated
+/// as end-of-string.
+pub fn split_and_constraints(subject: &str) -> Vec<String> {
+    let b = subject.as_bytes();
+    let n = b.len();
+
+    let mut pieces: Vec<String> = Vec::new();
+    let mut last = 0usize;
+    let mut i = 0usize;
+    while i <= n {
+        if let Some(end) = match_and_delimiter(b, i) {
+            pieces.push(subject[last..i].to_string());
+            last = end;
+            i = end;
+        } else {
+            i += 1;
+        }
+    }
+    pieces.push(subject[last..].to_string());
+    pieces
+}
+
+/// Tries to match the AND-delimiter regex anchored at `i`, returning the match end on success.
+fn match_and_delimiter(b: &[u8], i: usize) -> Option<usize> {
+    let n = b.len();
+
+    // (?<!^|as|[=>< ,]): no match at the start, right after "as", or after one of `=><`, space, comma.
+    if i == 0 {
+        return None;
+    }
+    let prev = b[i - 1];
+    if matches!(prev, b'=' | b'>' | b'<' | b' ' | b',') {
+        return None;
+    }
+    if i >= 2 && b[i - 2] == b'a' && b[i - 1] == b's' {
+        return None;
+    }
+
+    // ` *` is greedy; find the end of the leading space run, then backtrack `j` toward `i`.
+    let mut space_end = i;
+    while space_end < n && b[space_end] == b' ' {
+        space_end += 1;
+    }
+
+    let mut j = space_end;
+    loop {
+        if j < n && matches!(b[j], b',' | b' ') {
+            // (?<!-) before the `[, ]` core and (?!-) after it.
+            let ok_before = b[j - 1] != b'-';
+            let ok_after = j + 1 >= n || b[j + 1] != b'-';
+            if ok_before && ok_after {
+                // Trailing ` *` is greedy; find its end, then backtrack `k`.
+                let mut trailing_end = j + 1;
+                while trailing_end < n && b[trailing_end] == b' ' {
+                    trailing_end += 1;
+                }
+                let mut k = trailing_end;
+                loop {
+                    // (?!,|as|$): the delimiter cannot abut a comma, an "as", or the string end.
+                    let at_end = k >= n;
+                    let is_comma = k < n && b[k] == b',';
+                    let is_as = k + 1 < n && b[k] == b'a' && b[k + 1] == b's';
+                    if !(at_end || is_comma || is_as) {
+                        return Some(k);
+                    }
+                    if k == j + 1 {
+                        break;
+                    }
+                    k -= 1;
+                }
+            }
+        }
+        if j == i {
+            break;
+        }
+        j -= 1;
+    }
+    None
+}
+
+#[cfg(test)]
+mod split_and_constraints_tests {
+    use super::split_and_constraints;
+
+    fn split(s: &str) -> Vec<String> {
+        split_and_constraints(s)
+    }
+
+    #[test]
+    fn splits_space_separated() {
+        assert_eq!(split(">=1.0 <2.0"), vec![">=1.0", "<2.0"]);
+    }
+
+    #[test]
+    fn splits_comma_separated() {
+        assert_eq!(split(">=1.0,<2.0"), vec![">=1.0", "<2.0"]);
+    }
+
+    #[test]
+    fn splits_comma_space_separated() {
+        assert_eq!(split(">=1.0, <2.0"), vec![">=1.0", "<2.0"]);
+    }
+
+    #[test]
+    fn collapses_multiple_spaces() {
+        assert_eq!(split(">=1.0   <2.0"), vec![">=1.0", "<2.0"]);
+    }
+
+    #[test]
+    fn does_not_split_after_operator() {
+        assert_eq!(split(">= 1.0"), vec![">= 1.0"]);
+    }
+
+    #[test]
+    fn does_not_split_hyphen_range() {
+        assert_eq!(split("1.0 - 2.0"), vec!["1.0 - 2.0"]);
+    }
+
+    #[test]
+    fn does_not_split_around_as() {
+        assert_eq!(split("1.0 as 1.1"), vec!["1.0 as 1.1"]);
+    }
+
+    #[test]
+    fn single_constraint_is_unchanged() {
+        assert_eq!(split("^1.0"), vec!["^1.0"]);
+    }
+
+    #[test]
+    fn three_and_constraints() {
+        assert_eq!(
+            split(">=1.0 <2.0 !=1.5"),
+            vec![">=1.0", "<2.0", "!=1.5"]
+        );
     }
 }

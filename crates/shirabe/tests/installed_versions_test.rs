@@ -7,6 +7,7 @@
 // IndexMap<String, PhpMixed> with the tmp root substituted for `$dir`.
 
 use indexmap::IndexMap;
+use serial_test::serial;
 use shirabe::installed_versions::InstalledVersions;
 use shirabe_php_shim::{PhpMixed, realpath};
 use shirabe_semver::VersionParser;
@@ -163,7 +164,7 @@ fn set_up() -> (TempDir, String) {
     (root, dir)
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_installed_packages() {
     let (_root, _dir) = set_up();
@@ -182,7 +183,7 @@ fn test_get_installed_packages() {
     assert_eq!(names, InstalledVersions::get_installed_packages());
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_is_installed() {
     let (_root, _dir) = set_up();
@@ -206,7 +207,7 @@ fn test_is_installed() {
     }
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_satisfies() {
     let (_root, _dir) = set_up();
@@ -241,7 +242,7 @@ fn test_satisfies() {
     }
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_version_ranges() {
     let (_root, _dir) = set_up();
@@ -265,7 +266,7 @@ fn test_get_version_ranges() {
     }
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_version() {
     let (_root, _dir) = set_up();
@@ -289,7 +290,7 @@ fn test_get_version() {
     }
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_pretty_version() {
     let (_root, _dir) = set_up();
@@ -313,7 +314,7 @@ fn test_get_pretty_version() {
     }
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_version_out_of_bounds() {
     let (_root, _dir) = set_up();
@@ -321,7 +322,7 @@ fn test_get_version_out_of_bounds() {
     assert!(InstalledVersions::get_version("not/installed").is_err());
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_root_package() {
     let (_root, dir) = set_up();
@@ -342,7 +343,7 @@ fn test_get_root_package() {
     assert_eq!(expected, InstalledVersions::get_root_package());
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_raw_data() {
     let (_root, dir) = set_up();
@@ -350,7 +351,7 @@ fn test_get_raw_data() {
     assert_eq!(fixture(&dir), InstalledVersions::get_raw_data());
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_reference() {
     let (_root, _dir) = set_up();
@@ -374,7 +375,7 @@ fn test_get_reference() {
     }
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_installed_packages_by_type() {
     let (_root, _dir) = set_up();
@@ -393,7 +394,7 @@ fn test_get_installed_packages_by_type() {
     );
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_get_install_path() {
     let (_root, dir) = set_up();
@@ -416,7 +417,7 @@ fn test_get_install_path() {
     );
 }
 
-#[ignore]
+#[serial]
 #[test]
 fn test_with_class_loader_loaded() {
     let (_root, _dir) = set_up();
