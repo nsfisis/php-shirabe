@@ -503,7 +503,6 @@ fn test_composer_lock_file_merge_conflict_simple_crlf() {
 }
 
 #[test]
-#[ignore]
 fn test_composer_lock_file_merge_conflict_complex() {
     // complex files have multiple conflict markers and can thus not be simply resolved
     let data =
@@ -514,7 +513,6 @@ fn test_composer_lock_file_merge_conflict_complex() {
 }
 
 #[test]
-#[ignore]
 fn test_composer_lock_file_merge_conflict_complex_crlf() {
     // complex files have multiple conflict markers and can thus not be simply resolved
     let data = std::fs::read_to_string(fixture_path(

@@ -24,7 +24,6 @@ fn test_hhvm_version_when_executing_in_hhvm() {
     assert_eq!(version_id_to_version(), version);
 }
 
-#[ignore]
 #[test]
 fn test_hhvm_version_when_executing_in_php() {
     let mut hhvm_detector = set_up();

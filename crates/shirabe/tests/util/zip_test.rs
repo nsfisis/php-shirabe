@@ -18,7 +18,6 @@ fn test_throws_exception_if_zip_extension_is_not_loaded() {
 }
 
 #[test]
-#[ignore]
 fn test_returns_nullif_the_zip_is_not_found() {
     let result = Zip::get_composer_json(&fixture("invalid.zip")).unwrap();
 
@@ -26,7 +25,6 @@ fn test_returns_nullif_the_zip_is_not_found() {
 }
 
 #[test]
-#[ignore]
 fn test_returns_null_if_the_zip_is_empty() {
     let result = Zip::get_composer_json(&fixture("empty.zip")).unwrap();
 
@@ -34,19 +32,16 @@ fn test_returns_null_if_the_zip_is_empty() {
 }
 
 #[test]
-#[ignore]
 fn test_throws_exception_if_the_zip_has_no_composer_json() {
     assert!(Zip::get_composer_json(&fixture("nojson.zip")).is_err());
 }
 
 #[test]
-#[ignore]
 fn test_throws_exception_if_the_composer_json_is_in_a_sub_subfolder() {
     assert!(Zip::get_composer_json(&fixture("subfolders.zip")).is_err());
 }
 
 #[test]
-#[ignore]
 fn test_returns_composer_json_in_zip_root() {
     let result = Zip::get_composer_json(&fixture("root.zip")).unwrap();
 
@@ -57,7 +52,6 @@ fn test_returns_composer_json_in_zip_root() {
 }
 
 #[test]
-#[ignore]
 fn test_returns_composer_json_in_first_folder() {
     let result = Zip::get_composer_json(&fixture("folder.zip")).unwrap();
 
@@ -68,13 +62,11 @@ fn test_returns_composer_json_in_first_folder() {
 }
 
 #[test]
-#[ignore]
 fn test_multiple_top_level_dirs_is_invalid() {
     assert!(Zip::get_composer_json(&fixture("multiple.zip")).is_err());
 }
 
 #[test]
-#[ignore]
 fn test_returns_composer_json_from_first_subfolder() {
     let result = Zip::get_composer_json(&fixture("single-sub.zip")).unwrap();
 

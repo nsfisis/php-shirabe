@@ -339,7 +339,6 @@ fn test_ssl_proxy() {
 }
 
 #[test]
-#[ignore]
 fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() {
     let _tear_down = TearDown;
     set_up();
