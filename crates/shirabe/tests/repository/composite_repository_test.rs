@@ -27,7 +27,6 @@ fn test_has_package() {
 }
 
 #[test]
-#[ignore]
 fn test_find_package() {
     let mut repo = CompositeRepository::new(vec![
         array_repo(vec![get_package("foo", "1")]),

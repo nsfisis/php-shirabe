@@ -153,7 +153,6 @@ fn provide_filter_require_tests() -> Vec<FilterCase> {
 }
 
 #[test]
-#[ignore]
 fn test_filter_required_packages() {
     for case in provide_filter_require_tests() {
         let pkgs = build_packages();
