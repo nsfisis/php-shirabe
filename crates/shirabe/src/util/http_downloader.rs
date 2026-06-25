@@ -54,6 +54,52 @@ pub struct HttpDownloader {
     disabled: bool,
     /// @var bool
     allow_async: bool,
+    /// Test-only internal hook. `None` in production. When `Some`, the request methods
+    /// (`get`/`copy`/`add`/`add_copy`) short-circuit to canned responses from the
+    /// expectation queue instead of performing real I/O. See ADR 0005 for the rationale
+    /// (the same internal-hook pattern used for `ProcessExecutor`). Mirrors
+    /// composer/tests/Composer/Test/Mock/HttpDownloaderMock.php.
+    mock: Option<HttpDownloaderMockState>,
+}
+
+/// For testing only. State backing the `HttpDownloaderMock`: an optional expectation queue,
+/// strict flag, default handler for undefined requests, and a log of received URLs.
+#[derive(Debug, Clone)]
+pub struct HttpDownloaderMockState {
+    expectations: Option<Vec<HttpDownloaderMockExpectation>>,
+    strict: bool,
+    default_handler: HttpDownloaderMockHandler,
+    log: Vec<String>,
+}
+
+/// For testing only. A single expected HTTP request and the canned response to return.
+/// `options` of `None` means "match any options"; otherwise the executed options must be
+/// exactly equal (PHP `===`).
+#[derive(Debug, Clone)]
+pub struct HttpDownloaderMockExpectation {
+    pub url: String,
+    pub options: Option<IndexMap<String, PhpMixed>>,
+    pub status: i64,
+    pub body: String,
+    pub headers: Vec<String>,
+}
+
+/// For testing only. The default response handler used for undefined requests when not strict.
+#[derive(Debug, Clone)]
+pub struct HttpDownloaderMockHandler {
+    pub status: i64,
+    pub body: String,
+    pub headers: Vec<String>,
+}
+
+impl Default for HttpDownloaderMockHandler {
+    fn default() -> Self {
+        Self {
+            status: 200,
+            body: String::new(),
+            headers: Vec::new(),
+        }
+    }
 }
 
 struct Job {
@@ -168,11 +214,15 @@ impl HttpDownloader {
             id_gen: 0,
             disabled,
             allow_async: false,
+            mock: None,
         }
     }
 
     /// Download a file synchronously
     pub fn get(&mut self, url: &str, options: IndexMap<String, PhpMixed>) -> Result<Response> {
+        if self.mock.is_some() {
+            return self.mock_get(url, &options);
+        }
         if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
@@ -201,6 +251,9 @@ impl HttpDownloader {
         url: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> Result<Response> {
+        if self.mock.is_some() {
+            return self.mock_get(url, &options);
+        }
         if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
@@ -228,6 +281,9 @@ impl HttpDownloader {
         to: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> Result<Response> {
+        if self.mock.is_some() {
+            return self.mock_get(url, &options);
+        }
         if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
@@ -255,6 +311,9 @@ impl HttpDownloader {
         to: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> Result<Response> {
+        if self.mock.is_some() {
+            return self.mock_get(url, &options);
+        }
         if url.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
@@ -822,6 +881,143 @@ impl HttpDownloader {
         extension_loaded("curl")
             && function_exists("curl_multi_exec")
             && function_exists("curl_multi_init")
+    }
+
+    /// For testing only. Mirrors HttpDownloaderMock::expects: installs the expectation queue,
+    /// strict flag and default handler used by the mock request path.
+    pub fn __expects(
+        &mut self,
+        expectations: Vec<HttpDownloaderMockExpectation>,
+        strict: bool,
+        default_handler: HttpDownloaderMockHandler,
+    ) {
+        self.mock = Some(HttpDownloaderMockState {
+            expectations: Some(expectations),
+            strict,
+            default_handler,
+            log: Vec::new(),
+        });
+    }
+
+    /// For testing only. Mirrors HttpDownloaderMock::assertComplete: panics if any expected
+    /// HTTP requests remain unconsumed.
+    pub fn __assert_complete(&self) {
+        let Some(mock) = &self.mock else {
+            return;
+        };
+        // this was not configured to expect anything, so no need to react here
+        let Some(expectations) = &mock.expectations else {
+            return;
+        };
+        if !expectations.is_empty() {
+            let urls: Vec<String> = expectations.iter().map(|e| e.url.clone()).collect();
+            panic!(
+                "There are still {} expected HTTP requests which have not been consumed:{}{}{}{}Received calls:{}{}",
+                expectations.len(),
+                shirabe_php_shim::PHP_EOL,
+                urls.join(shirabe_php_shim::PHP_EOL),
+                shirabe_php_shim::PHP_EOL,
+                shirabe_php_shim::PHP_EOL,
+                shirabe_php_shim::PHP_EOL,
+                mock.log.join(shirabe_php_shim::PHP_EOL),
+            );
+        }
+    }
+
+    /// For testing only. Mirrors HttpDownloaderMock::get: consumes the next matching expectation
+    /// (or falls back to the default handler when not strict) and returns the canned response.
+    fn mock_get(
+        &mut self,
+        file_url: &str,
+        options: &IndexMap<String, PhpMixed>,
+    ) -> Result<Response> {
+        if file_url.is_empty() {
+            return Err(LogicException {
+                message: "url cannot be an empty string".to_string(),
+                code: 0,
+            }
+            .into());
+        }
+
+        let mock = self.mock.as_mut().expect("mock_get called without a mock");
+        mock.log.push(file_url.to_string());
+
+        let matches_first = mock
+            .expectations
+            .as_ref()
+            .and_then(|e| e.first())
+            .is_some_and(|first| {
+                first.url == file_url
+                    && (first.options.is_none() || first.options.as_ref() == Some(options))
+            });
+
+        if matches_first {
+            let expect = mock.expectations.as_mut().unwrap().remove(0);
+            return Self::mock_respond(file_url, expect.status, expect.headers, expect.body);
+        }
+
+        if !mock.strict {
+            let handler = mock.default_handler.clone();
+            return Self::mock_respond(file_url, handler.status, handler.headers, handler.body);
+        }
+
+        let next_expected = mock
+            .expectations
+            .as_ref()
+            .and_then(|e| e.first())
+            .map(|first| {
+                let opts = if first.options.is_some() {
+                    format!(
+                        "\" with options \"{}",
+                        serde_json::to_string(&first.options).unwrap_or_default()
+                    )
+                } else {
+                    String::new()
+                };
+                format!("Expected \"{}{}\" at this point.", first.url, opts)
+            })
+            .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
+        let prior_calls = if mock.log.len() > 1 {
+            mock.log[..mock.log.len() - 1].join(shirabe_php_shim::PHP_EOL)
+        } else {
+            String::new()
+        };
+        panic!(
+            "Received unexpected request for \"{}\" with options \"{}\"{}{}{}Received calls:{}{}",
+            file_url,
+            serde_json::to_string(options).unwrap_or_default(),
+            shirabe_php_shim::PHP_EOL,
+            next_expected,
+            shirabe_php_shim::PHP_EOL,
+            shirabe_php_shim::PHP_EOL,
+            prior_calls,
+        );
+    }
+
+    /// For testing only. Mirrors HttpDownloaderMock::respond.
+    fn mock_respond(
+        url: &str,
+        status: i64,
+        headers: Vec<String>,
+        body: String,
+    ) -> Result<Response> {
+        if status < 400 {
+            return Ok(Response::new(
+                url.to_string(),
+                Some(status),
+                headers,
+                Some(body),
+            ));
+        }
+
+        let mut e = TransportException::new(
+            format!("The \"{}\" file could not be downloaded", url),
+            status,
+        );
+        e.set_headers(headers);
+        e.set_response(Some(body));
+
+        Err(e.into())
     }
 }
 

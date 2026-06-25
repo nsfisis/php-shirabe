@@ -1,3 +1,10 @@
+#[path = "../common/config_stub.rs"]
+mod config_stub;
+#[path = "../common/http_downloader_mock.rs"]
+mod http_downloader_mock;
+#[path = "../common/io_stub.rs"]
+mod io_stub;
+
 mod archive_downloader_test;
 mod download_manager_test;
 mod file_downloader_test;
