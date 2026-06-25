@@ -164,10 +164,10 @@ impl Url {
     pub fn sanitize(url: String) -> String {
         // GitHub repository rename result in redirect locations containing the access_token as GET parameter
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
-        let url = Preg::replace(r"([&?]access_token=)[^&]+", "$1***", &url);
+        let url = Preg::replace(r"{([&?]access_token=)[^&]+}", "$1***", &url);
 
         Preg::replace_callback(
-            r"(?i)^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@",
+            r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i",
             |m| {
                 let user = m
                     .get(&CaptureKey::ByName("user".to_string()))

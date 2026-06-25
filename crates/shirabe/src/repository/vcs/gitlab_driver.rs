@@ -238,6 +238,18 @@ impl GitLabDriver {
         Ok(())
     }
 
+    /// For testing only. Mirrors the `setAttribute($driver, 'branches', ...)` reflection
+    /// helper used by GitLabDriverTest to seed private state.
+    pub fn __set_branches(&mut self, branches: Option<IndexMap<String, String>>) {
+        self.branches = branches;
+    }
+
+    /// For testing only. Mirrors the `setAttribute($driver, 'tags', ...)` reflection
+    /// helper used by GitLabDriverTest to seed private state.
+    pub fn __set_tags(&mut self, tags: Option<IndexMap<String, String>>) {
+        self.tags = tags;
+    }
+
     /// Updates the HttpDownloader instance.
     /// Mainly useful for tests.
     ///

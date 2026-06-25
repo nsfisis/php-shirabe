@@ -19,6 +19,7 @@ pub const DATE_ATOM: &str = DATE_RFC3339;
 pub fn date_format_to_strftime(format: &str) -> &'static str {
     match format {
         "Y-m-d H:i:s" => "%Y-%m-%d %H:%M:%S",
+        "Y-m-d Hi" => "%Y-%m-%d %H%M",
         "Y-m-d" => "%Y-%m-%d",
         "Ymd" => "%Y%m%d",
         other => panic!("Unsupported PHP date format: {other:?}"),

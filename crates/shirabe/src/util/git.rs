@@ -132,6 +132,19 @@ impl Git {
         self.run_command(callables, url, cwd, initial_clone, command_output)
     }
 
+    /// For testing only. Public seam over the (deprecated) private `run_command`,
+    /// mirroring `Git::runCommand` as exercised by `GitTest`.
+    pub fn __run_command(
+        &mut self,
+        command_callable: Vec<Box<dyn Fn(&str) -> Vec<String>>>,
+        url: &str,
+        cwd: Option<&str>,
+        initial_clone: bool,
+        command_output: Option<&mut PhpMixed>,
+    ) -> Result<()> {
+        self.run_command(command_callable, url, cwd, initial_clone, command_output)
+    }
+
     /// @param callable|array<callable> $commandCallable
     /// @param mixed       $commandOutput  the output will be written into this var if passed by ref
     ///                                    if a callable is passed it will be used as output handler
@@ -1308,6 +1321,22 @@ impl Git {
             }
         }
         version.clone().unwrap_or(None)
+    }
+
+    /// For testing only. Resets the cached git `version` static so the next
+    /// `get_version` call re-runs `git --version`, mirroring the
+    /// `ReflectionProperty(GitUtil::class, 'version')->setValue(null, false)`
+    /// done in VersionGuesserTest's setUp/tearDown.
+    pub fn __reset_version() {
+        *VERSION.lock().unwrap() = None;
+    }
+
+    /// For testing only. Seeds the cached git `version` static, mirroring the
+    /// `ReflectionProperty(GitUtil::class, 'version')->setValue(null, $version)`
+    /// done in GitDownloaderTest's `initGitVersion`. `Some(v)` records a detected
+    /// version; `None` records that git is unavailable, both without shelling out.
+    pub fn __set_version(version: Option<String>) {
+        *VERSION.lock().unwrap() = Some(version);
     }
 
     /// @param string[] $credentials

@@ -233,20 +233,21 @@ pub fn array_search_mixed(
     haystack: &PhpMixed,
     strict: bool,
 ) -> Option<PhpMixed> {
-    if !strict {
-        // TODO(phase-c): non-strict array_search needs PHP's loose `==` comparison
-        // semantics. Only the strict path is implemented; loose comparison is
-        // deferred rather than approximated.
-        todo!("non-strict array_search (PHP loose comparison)");
-    }
+    let matches = |value: &PhpMixed| -> bool {
+        if strict {
+            value == needle
+        } else {
+            loose_eq(value, needle)
+        }
+    };
     match haystack {
         PhpMixed::List(items) => items
             .iter()
-            .position(|value| value == needle)
+            .position(matches)
             .map(|i| PhpMixed::Int(i as i64)),
         PhpMixed::Array(map) => map
             .iter()
-            .find(|(_, value)| *value == needle)
+            .find(|(_, value)| matches(value))
             .map(|(key, _)| php_key_to_mixed(key)),
         _ => None,
     }

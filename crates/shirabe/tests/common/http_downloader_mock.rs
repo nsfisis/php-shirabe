@@ -64,12 +64,7 @@ pub fn get_http_downloader_mock(
 ) -> (Rc<RefCell<HttpDownloader>>, HttpDownloaderMockGuard) {
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
     let config = Rc::new(RefCell::new(Config::new(false, None)));
-    let downloader = Rc::new(RefCell::new(HttpDownloader::new(
-        io,
-        config,
-        IndexMap::new(),
-        false,
-    )));
+    let downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(io, config)));
     downloader
         .borrow_mut()
         .__expects(expectations, strict, default_handler);

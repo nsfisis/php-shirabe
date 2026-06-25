@@ -63,7 +63,7 @@ impl Response {
 
     pub fn find_header_value(headers: &[String], name: &str) -> Option<String> {
         let mut value = None;
-        let pattern = format!("(?i)^{}:\\s*(.+?)\\s*$", preg_quote(name, None));
+        let pattern = format!("{{^{}:\\s*(.+?)\\s*$}}i", preg_quote(name, None));
         for header in headers {
             let mut matches: indexmap::IndexMap<
                 shirabe_external_packages::composer::pcre::CaptureKey,

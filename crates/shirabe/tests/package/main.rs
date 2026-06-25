@@ -1,3 +1,9 @@
+#[path = "../common/config_stub.rs"]
+mod config_stub;
+#[path = "../common/io_stub.rs"]
+mod io_stub;
+#[path = "../common/process_executor_mock.rs"]
+mod process_executor_mock;
 #[path = "../common/test_case.rs"]
 mod test_case;
 

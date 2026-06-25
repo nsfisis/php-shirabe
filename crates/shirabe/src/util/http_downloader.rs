@@ -883,6 +883,30 @@ impl HttpDownloader {
             && function_exists("curl_multi_init")
     }
 
+    /// For testing only. Builds an HttpDownloader whose request methods are fully
+    /// short-circuited by the mock (see [`HttpDownloader::__expects`]), without
+    /// constructing the real curl/rfs backends. Mirrors HttpDownloaderMock, which
+    /// extends HttpDownloader but never performs curl I/O.
+    pub fn __new_mock(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+    ) -> Self {
+        Self {
+            io,
+            config,
+            jobs: IndexMap::new(),
+            options: IndexMap::new(),
+            running_jobs: 0,
+            max_jobs: 12,
+            curl: None,
+            rfs: None,
+            id_gen: 0,
+            disabled: false,
+            allow_async: false,
+            mock: None,
+        }
+    }
+
     /// For testing only. Mirrors HttpDownloaderMock::expects: installs the expectation queue,
     /// strict flag and default handler used by the mock request path.
     pub fn __expects(
