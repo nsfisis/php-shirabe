@@ -299,31 +299,13 @@ impl PoolBuilder {
             }
         }
 
-        if let Some(event_dispatcher) = &self.event_dispatcher {
-            // TODO(plugin): PrePoolCreateEvent::new takes Request and Vec<Box<dyn RepositoryInterface>>
-            // by value but neither can be cloned (PHP class shared semantics). This event is purely
-            // plugin-facing and nothing in the no-plugin path reads it back, so it stays deferred
-            // until the plugin API drives an Rc-based migration of Request/repositories.
-            let mut pre_pool_create_event = PrePoolCreateEvent::new(
-                PluginEvents::PRE_POOL_CREATE.to_string(),
-                todo!("share repositories with PrePoolCreateEvent without moving"),
-                todo!("share Request with PrePoolCreateEvent without moving"),
-                self.acceptable_stabilities.clone(),
-                self.stability_flags.clone(),
-                self.root_aliases.clone(),
-                self.root_references.clone(),
-                self.packages.values().cloned().collect(),
-                self.unacceptable_fixed_or_locked_packages.to_vec(),
-            );
-            let pre_pool_create_event_name = pre_pool_create_event.get_name().to_string();
-            event_dispatcher.borrow_mut().dispatch(
-                Some(&pre_pool_create_event_name),
-                Some(&mut pre_pool_create_event),
-            )?;
-            // PHP rebinds $this->packages to a list-style array; preserve indices via reindexing.
-            // TODO(plugin)/TODO(phase-c): rebind self.packages from the (handle-based) event packages
-            // once EventDispatcher::dispatch returns the mutated event.
-            let _ = &pre_pool_create_event;
+        if self.event_dispatcher.is_some() {
+            // TODO(plugin): dispatch PluginEvents::PRE_POOL_CREATE. Constructing PrePoolCreateEvent
+            // would move the repositories and Request (neither clonable under PHP's shared
+            // semantics), and the event is purely plugin-facing: its mutations to the package list
+            // are never read back in the no-plugin path (Pool::new below reads self.packages
+            // directly). Skipped until the plugin API drives an Rc-based migration of
+            // Request/repositories so listeners can observe and mutate them.
         }
 
         let mut pool = Pool::new(

@@ -84,7 +84,7 @@ fn test_exception_when_running_unused_without_lock_file() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_warning_when_removing_non_existent_package() {
@@ -257,7 +257,7 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_remove_unused_package() {
@@ -323,7 +323,7 @@ fn test_remove_unused_package() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_remove_package_by_name() {
@@ -408,7 +408,7 @@ fn test_remove_package_by_name() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_remove_package_by_name_with_dry_run() {
@@ -495,7 +495,7 @@ fn test_remove_package_by_name_with_dry_run() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
@@ -553,7 +553,7 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
@@ -605,7 +605,7 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_remove_packages_by_vendor() {
@@ -689,7 +689,7 @@ fn test_remove_packages_by_vendor() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_remove_packages_by_vendor_with_dry_run() {
@@ -811,7 +811,7 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_package_still_present_error_when_no_install_flag_used() {
@@ -968,7 +968,7 @@ fn run_update_inherited_dependencies_flag_case(
     drop(tear_down);
 }
 
-#[ignore = "remove runs post-remove Installer; panics at crates/shirabe/src/composer.rs:500:36 'RefCell already mutably borrowed' (ComposerHandle::borrow during active borrow_mut) in unported install/update path"]
+#[ignore = "remove runs the post-remove Installer, which fails with 'Unknown installer type: metapackage': Factory::create_default_installers (factory.rs:1234-1256) registers no installers yet, blocked on the composer construction-ordering / shared-ownership rework (installers need the composer weak handle, available only after the Rc is established)"]
 #[test]
 #[serial]
 fn test_update_inherited_dependencies_flag_is_passed_to_post_remove_installer() {
