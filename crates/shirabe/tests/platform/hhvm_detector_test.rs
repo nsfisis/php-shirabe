@@ -13,7 +13,6 @@ fn set_up() -> HhvmDetector {
     hhvm_detector
 }
 
-#[ignore]
 #[test]
 fn test_hhvm_version_when_executing_in_hhvm() {
     let mut hhvm_detector = set_up();

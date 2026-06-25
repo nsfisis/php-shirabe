@@ -201,7 +201,6 @@ fn test_dont_filter_packages_by_ignored_advisories() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_dont_filter_packages_with_block_insecure_disabled() {
     let audit_config = AuditConfig::new(

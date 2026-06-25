@@ -3490,7 +3490,6 @@ fn test_add_config_setting_escapes() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_works_from_scratch() {
     let mut manipulator = JsonManipulator::new(
         r#"{

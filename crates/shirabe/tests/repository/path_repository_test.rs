@@ -39,7 +39,6 @@ fn coordinates(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
     map
 }
 
-#[ignore]
 #[test]
 fn test_load_package_from_file_system_with_incorrect_path() {
     let repository_url =
@@ -49,7 +48,6 @@ fn test_load_package_from_file_system_with_incorrect_path() {
     assert!(repository.__get_packages().is_err());
 }
 
-#[ignore]
 #[test]
 fn test_load_package_from_file_system_with_version() {
     let repository_url = [
@@ -120,7 +118,6 @@ fn test_load_package_from_file_system_with_wildcard() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_load_package_with_explicit_versions() {
     let mut versions: IndexMap<String, PhpMixed> = IndexMap::new();

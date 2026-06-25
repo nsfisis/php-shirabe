@@ -55,7 +55,6 @@ impl Drop for TearDown {
     }
 }
 
-#[ignore]
 #[test]
 fn test_select_single() {
     let _tear_down = TearDown;
@@ -83,7 +82,6 @@ fn test_select_single() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_newest() {
     let _tear_down = TearDown;
@@ -113,7 +111,6 @@ fn test_select_newest() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_newest_picks_latest() {
     let _tear_down = TearDown;
@@ -143,7 +140,6 @@ fn test_select_newest_picks_latest() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_newest_picks_latest_stable_with_prefer_stable() {
     let _tear_down = TearDown;
@@ -208,7 +204,6 @@ fn test_select_lowest_with_prefer_dev_over_prerelease() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_select_lowest_prefers_prerelease_over_dev() {
     let _tear_down = TearDown;
@@ -243,7 +238,6 @@ fn test_select_lowest_prefers_prerelease_over_dev() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
     let _tear_down = TearDown;
@@ -273,7 +267,6 @@ fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_newest_with_dev_picks_non_dev() {
     let _tear_down = TearDown;
@@ -303,7 +296,6 @@ fn test_select_newest_with_dev_picks_non_dev() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_newest_with_preferred_version_picks_preferred_version_if_available() {
     let _tear_down = TearDown;
@@ -343,7 +335,6 @@ fn test_select_newest_with_preferred_version_picks_preferred_version_if_availabl
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
     let _tear_down = TearDown;
@@ -374,7 +365,6 @@ fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
     let _tear_down = TearDown;
@@ -405,7 +395,6 @@ fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_repository_ordering_affects_priority() {
     let _tear_down = TearDown;
@@ -580,7 +569,6 @@ fn constraint(operator: &str, version: &str) -> AnyConstraint {
     SimpleConstraint::new(operator.to_string(), version.to_string(), None).into()
 }
 
-#[ignore]
 #[test]
 fn test_select_all_providers() {
     let _tear_down = TearDown;
@@ -627,7 +615,6 @@ fn test_select_all_providers() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_prefer_non_replacing_from_same_repo() {
     let _tear_down = TearDown;
@@ -668,7 +655,6 @@ fn test_prefer_non_replacing_from_same_repo() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_prefer_replacing_package_from_same_vendor() {
     let _tear_down = TearDown;
@@ -770,7 +756,6 @@ fn test_prefer_replacing_package_from_same_vendor() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_lowest() {
     let _tear_down = TearDown;

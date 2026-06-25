@@ -76,7 +76,6 @@ fn test_dev_warning_suppressed_for_self_update() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_process_isolation_works_multiple_times() {
     let _tear_down = TearDown;

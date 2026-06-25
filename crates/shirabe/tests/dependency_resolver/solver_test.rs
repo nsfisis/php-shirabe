@@ -715,7 +715,6 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_fix_locked() {
     let fixtures = set_up();
@@ -734,7 +733,6 @@ fn test_solver_fix_locked() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_fix_locked_with_alternative() {
     let fixtures = set_up();
@@ -754,7 +752,6 @@ fn test_solver_fix_locked_with_alternative() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_does_only_update() {
     let fixtures = set_up();
@@ -796,7 +793,6 @@ fn test_solver_update_does_only_update() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_single() {
     let fixtures = set_up();
@@ -820,7 +816,6 @@ fn test_solver_update_single() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_all() {
     let fixtures = set_up();
@@ -879,7 +874,6 @@ fn test_solver_update_all() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_current() {
     let fixtures = set_up();
@@ -901,7 +895,6 @@ fn test_solver_update_current() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_only_updates_selected_package() {
     let fixtures = set_up();
@@ -930,7 +923,6 @@ fn test_solver_update_only_updates_selected_package() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_constrained() {
     let fixtures = set_up();
@@ -957,7 +949,6 @@ fn test_solver_update_constrained() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_fully_constrained() {
     let fixtures = set_up();
@@ -1207,7 +1198,6 @@ fn test_install_one_of_two_alternatives() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_install_provider() {
     let fixtures = set_up();
@@ -1308,7 +1298,6 @@ fn test_skip_replacer_of_existing_package() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_no_install_replacer_of_missing_package() {
     let fixtures = set_up();
@@ -1803,7 +1792,6 @@ fn test_use_replacer_if_necessary() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_issue265() {
     let fixtures = set_up();
