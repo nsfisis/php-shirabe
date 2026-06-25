@@ -62,7 +62,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Returns the package type, e.g. library
     ///
     /// @return string The package type
-    fn get_type(&self) -> &str;
+    fn get_type(&self) -> String;
 
     /// Returns the package targetDir property
     ///

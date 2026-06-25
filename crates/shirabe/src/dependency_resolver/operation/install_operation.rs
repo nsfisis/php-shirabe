@@ -48,6 +48,10 @@ impl OperationInterface for InstallOperation {
     fn as_install_operation(&self) -> Option<&InstallOperation> {
         Some(self)
     }
+
+    fn get_package(&self) -> PackageInterfaceHandle {
+        self.package.clone()
+    }
 }
 
 impl std::fmt::Display for InstallOperation {

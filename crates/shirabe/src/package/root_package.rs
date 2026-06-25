@@ -266,7 +266,7 @@ impl PackageInterface for RootPackage {
     fn is_dev(&self) -> bool {
         self.inner.is_dev()
     }
-    fn get_type(&self) -> &str {
+    fn get_type(&self) -> String {
         self.inner.get_type()
     }
     fn get_target_dir(&self) -> Option<String> {

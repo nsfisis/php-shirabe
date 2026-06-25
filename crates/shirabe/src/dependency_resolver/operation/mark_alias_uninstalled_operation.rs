@@ -44,6 +44,10 @@ impl OperationInterface for MarkAliasUninstalledOperation {
                 .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
         )
     }
+
+    fn get_package(&self) -> crate::package::PackageInterfaceHandle {
+        self.package.clone().into()
+    }
 }
 
 impl std::fmt::Display for MarkAliasUninstalledOperation {

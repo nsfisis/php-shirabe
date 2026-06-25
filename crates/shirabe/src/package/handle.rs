@@ -201,7 +201,7 @@ macro_rules! delegate_package_interface_to_inner {
             fn is_dev(&self) -> bool {
                 self.$field.is_dev()
             }
-            fn get_type(&self) -> &str {
+            fn get_type(&self) -> String {
                 self.$field.get_type()
             }
             fn get_target_dir(&self) -> Option<String> {

@@ -270,11 +270,8 @@ impl PackageInterface for AliasPackage {
         self.dev_requires.clone()
     }
 
-    fn get_type(&self) -> &str {
-        // Delegates to the shared `aliasOf` handle, whose getters yield owned
-        // `String`s; a borrow cannot escape the `RefCell`. Use the handle API
-        // (`AliasPackageHandle::get_alias_of().get_type()`) instead.
-        todo!("AliasPackage::get_type cannot return &str across the aliasOf handle")
+    fn get_type(&self) -> String {
+        self.alias_of.get_type()
     }
 
     fn get_target_dir(&self) -> Option<String> {

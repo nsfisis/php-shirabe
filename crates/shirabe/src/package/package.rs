@@ -611,11 +611,8 @@ impl PackageInterface for Package {
     fn is_dev(&self) -> bool {
         self.dev
     }
-    fn get_type(&self) -> &str {
-        self.r#type
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .unwrap_or("library")
+    fn get_type(&self) -> String {
+        Package::get_type(self)
     }
     fn get_target_dir(&self) -> Option<String> {
         Package::get_target_dir(self)

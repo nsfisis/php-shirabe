@@ -47,6 +47,10 @@ impl OperationInterface for UninstallOperation {
     fn as_uninstall_operation(&self) -> Option<&UninstallOperation> {
         Some(self)
     }
+
+    fn get_package(&self) -> PackageInterfaceHandle {
+        self.package.clone()
+    }
 }
 
 impl std::fmt::Display for UninstallOperation {

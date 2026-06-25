@@ -23,6 +23,7 @@ use crate::dependency_resolver::RuleSet;
 use crate::package::AliasPackage;
 use crate::package::BasePackage;
 use crate::package::BasePackageHandle;
+use crate::repository::RepositoryInterface;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
@@ -214,12 +215,11 @@ impl Rule {
             if PlatformRepository::is_platform_package(link.get_target()) {
                 return false;
             }
-            // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
-            // returns Result while is_caused_by_lock returns bool; resolving needs the bool
-            // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
-            let locked_repo: Option<()> = todo!("request.get_locked_repository()");
-            if let Some(_locked_repo) = locked_repo {
-                let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
+            if let Some(locked_repo) = request.get_locked_repository() {
+                let packages = locked_repo
+                    .borrow_mut()
+                    .get_packages()
+                    .expect("LockArrayRepository::get_packages() never fails");
                 for package in packages {
                     let p = package.clone();
                     if p.get_name() == link.get_target() {
@@ -255,12 +255,11 @@ impl Rule {
             if PlatformRepository::is_platform_package(package_name) {
                 return false;
             }
-            // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
-            // returns Result while is_caused_by_lock returns bool; resolving needs the bool
-            // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
-            let locked_repo: Option<()> = todo!("request.get_locked_repository()");
-            if let Some(_locked_repo) = locked_repo {
-                let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
+            if let Some(locked_repo) = request.get_locked_repository() {
+                let packages = locked_repo
+                    .borrow_mut()
+                    .get_packages()
+                    .expect("LockArrayRepository::get_packages() never fails");
                 for package in packages {
                     let p = package.clone();
                     if p.get_name() == *package_name {

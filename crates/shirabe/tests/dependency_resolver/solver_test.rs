@@ -236,7 +236,6 @@ fn solve_expecting_problems(
     }
 }
 
-#[ignore]
 #[test]
 fn test_solver_install_single() {
     let fixtures = set_up();
@@ -258,7 +257,6 @@ fn test_solver_install_single() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_remove_if_not_requested() {
     let fixtures = set_up();
@@ -317,7 +315,6 @@ fn test_install_non_existing_package_fails() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_install_same_package_from_different_repositories() {
     let fixtures = set_up();
@@ -354,7 +351,6 @@ fn test_solver_install_same_package_from_different_repositories() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_install_with_deps() {
     let fixtures = set_up();
@@ -399,7 +395,6 @@ fn test_solver_install_with_deps() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_install_honours_not_equal_operator() {
     let fixtures = set_up();
@@ -452,7 +447,6 @@ fn test_solver_install_honours_not_equal_operator() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_install_with_deps_in_order() {
     let fixtures = set_up();
@@ -526,7 +520,6 @@ fn test_solver_install_with_deps_in_order() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_multi_package_name_version_resolution_depends_on_require_order() {
     let fixtures = set_up();
@@ -619,7 +612,6 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_multi_package_name_version_resolution_is_independent_of_require_order_if_ordered_descending_by_requirement()
  {
@@ -974,7 +966,6 @@ fn test_solver_update_fully_constrained() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_update_fully_constrained_prunes_installed_packages() {
     let fixtures = set_up();
@@ -1009,7 +1000,6 @@ fn test_solver_update_fully_constrained_prunes_installed_packages() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_all_jobs() {
     let fixtures = set_up();
@@ -1073,7 +1063,6 @@ fn test_solver_all_jobs() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_three_alternative_require_and_conflict() {
     let fixtures = set_up();
@@ -1131,7 +1120,6 @@ fn test_solver_three_alternative_require_and_conflict() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_solver_obsolete() {
     let fixtures = set_up();
@@ -1173,7 +1161,6 @@ fn test_solver_obsolete() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_install_one_of_two_alternatives() {
     let fixtures = set_up();
@@ -1241,7 +1228,6 @@ fn test_install_provider() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_skip_replacer_of_existing_package() {
     let fixtures = set_up();
@@ -1340,7 +1326,6 @@ fn test_no_install_replacer_of_missing_package() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_skip_replaced_package_if_replacer_is_selected() {
     let fixtures = set_up();
@@ -1397,7 +1382,6 @@ fn test_skip_replaced_package_if_replacer_is_selected() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_pick_older_if_newer_conflicts() {
     let fixtures = set_up();
@@ -1516,7 +1500,6 @@ fn test_pick_older_if_newer_conflicts() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_install_circular_require() {
     let fixtures = set_up();
@@ -1572,7 +1555,6 @@ fn test_install_circular_require() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_install_alternative_with_circular_require() {
     let fixtures = set_up();
@@ -1684,7 +1666,6 @@ fn test_install_alternative_with_circular_require() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_use_replacer_if_necessary() {
     let fixtures = set_up();
@@ -1908,7 +1889,6 @@ fn test_issue265() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented stub (in_array non-strict in php-shim)"]
 #[test]
 fn test_conflict_result_empty() {
     let fixtures = set_up();
@@ -1966,7 +1946,6 @@ fn test_conflict_result_empty() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented stub (in_array non-strict in php-shim)"]
 #[test]
 fn test_unsatisfiable_requires() {
     let fixtures = set_up();
@@ -2014,7 +1993,6 @@ fn test_unsatisfiable_requires() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented stub (Intervals::is_subset_of)"]
 #[test]
 fn test_require_mismatch_exception() {
     let fixtures = set_up();
@@ -2108,7 +2086,6 @@ fn test_require_mismatch_exception() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_learn_literals_with_sorted_rule_literals() {
     let fixtures = set_up();
@@ -2174,7 +2151,7 @@ fn test_learn_literals_with_sorted_rule_literals() {
     );
 }
 
-#[ignore]
+#[ignore = "solver emits fewer operations than PHP for recursive aliasOf deps: expects install b + install a + markAliasInstalled a, but only install a is produced; real solver alias-resolution discrepancy, not a stub"]
 #[test]
 fn test_install_recursive_alias_dependencies() {
     let fixtures = set_up();
@@ -2241,7 +2218,6 @@ fn test_install_recursive_alias_dependencies() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_install_dev_alias() {
     let fixtures = set_up();
@@ -2294,7 +2270,7 @@ fn test_install_dev_alias() {
     );
 }
 
-#[ignore]
+#[ignore = "solver omits the leading markAliasInstalled for an already-installed package's root alias (expects markAliasInstalled a after install a); real solver alias-resolution discrepancy, not a stub"]
 #[test]
 fn test_install_root_aliases_if_alias_of_is_installed() {
     let fixtures = set_up();
@@ -2368,7 +2344,6 @@ fn test_install_root_aliases_if_alias_of_is_installed() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_learn_positive_literal() {
     let fixtures = set_up();

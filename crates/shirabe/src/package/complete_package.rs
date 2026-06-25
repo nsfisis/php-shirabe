@@ -187,7 +187,7 @@ impl PackageInterface for CompletePackage {
         self.inner.is_dev()
     }
 
-    fn get_type(&self) -> &str {
+    fn get_type(&self) -> String {
         PackageInterface::get_type(&self.inner)
     }
 
