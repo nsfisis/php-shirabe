@@ -370,7 +370,7 @@ impl ArrayLoader {
             package.package_mut().set_is_default_branch(true);
         }
 
-        if let Some(source) = config.get("source").cloned() {
+        if let Some(source) = config.get("source").filter(|v| !v.is_null()).cloned() {
             let source_map = match &source {
                 PhpMixed::Array(m) => Some(m.clone()),
                 _ => None,
@@ -404,9 +404,12 @@ impl ArrayLoader {
             package
                 .package_mut()
                 .set_source_url(source_map.get("url").map(|v| strval(v)));
-            package
-                .package_mut()
-                .set_source_reference(source_map.get("reference").map(|v| strval(v)));
+            package.package_mut().set_source_reference(
+                source_map
+                    .get("reference")
+                    .filter(|v| !v.is_null())
+                    .map(|v| strval(v)),
+            );
             if let Some(mirrors) = source_map.get("mirrors") {
                 package
                     .package_mut()
@@ -414,7 +417,7 @@ impl ArrayLoader {
             }
         }
 
-        if let Some(dist) = config.get("dist").cloned() {
+        if let Some(dist) = config.get("dist").filter(|v| !v.is_null()).cloned() {
             let dist_map = match &dist {
                 PhpMixed::Array(m) => Some(m.clone()),
                 _ => None,
@@ -446,9 +449,12 @@ impl ArrayLoader {
             package
                 .package_mut()
                 .set_dist_url(dist_map.get("url").map(|v| strval(v)));
-            package
-                .package_mut()
-                .set_dist_reference(dist_map.get("reference").map(|v| strval(v)));
+            package.package_mut().set_dist_reference(
+                dist_map
+                    .get("reference")
+                    .filter(|v| !v.is_null())
+                    .map(|v| strval(v)),
+            );
             package
                 .package_mut()
                 .set_dist_sha1_checksum(dist_map.get("shasum").map(|v| strval(v)));

@@ -148,6 +148,14 @@ impl RepositoryInterfaceHandle {
 
     // --- InstalledRepositoryInterface helpers (valid only when the wrapped repository is one) ---
 
+    /// PHP `$repository instanceof InstalledRepositoryInterface`.
+    pub fn is_installed_repository_interface(&self) -> bool {
+        self.0
+            .borrow()
+            .as_installed_repository_interface()
+            .is_some()
+    }
+
     pub fn is_fresh(&self) -> bool {
         self.0
             .borrow()

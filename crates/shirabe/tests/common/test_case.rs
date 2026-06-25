@@ -4,11 +4,22 @@
 //! `#[path = "../common/test_case.rs"] mod test_case;`.
 #![allow(dead_code)]
 
+use indexmap::IndexMap;
+use shirabe::config::Config;
 use shirabe::console::application::ApplicationHandle;
+use shirabe::installer::InstallationManager;
+use shirabe::io::IOInterface;
+use shirabe::io::null_io::NullIO;
+use shirabe::json::JsonFile;
+use shirabe::package::Locker;
 use shirabe::package::handle::{
     CompleteAliasPackageHandle, CompletePackageHandle, PackageInterfaceHandle,
 };
+use shirabe::repository::{InstalledFilesystemRepository, WritableRepositoryInterface};
+use shirabe::util::http_downloader::HttpDownloader;
+use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
+use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::input::streamable_input_interface::StreamableInputInterface;
@@ -28,6 +39,13 @@ use tempfile::TempDir;
 pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
     CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
+}
+
+/// ref: TestCase::getPackage but returning the concrete `CompletePackageHandle` so the
+/// `CompletePackage`-only setters (`set_license`, `set_homepage`, ...) are reachable.
+pub fn get_complete_package(name: &str, version: &str) -> CompletePackageHandle {
+    let norm_version = VersionParser.normalize(version, None).unwrap();
+    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string())
 }
 
 /// ref: TestCase::getAliasPackage (default class CompleteAliasPackage)
@@ -150,6 +168,88 @@ pub fn init_temp_composer(
         prev_cwd,
         prev_composer_home,
     }
+}
+
+fn null_io() -> Rc<RefCell<dyn IOInterface>> {
+    Rc::new(RefCell::new(NullIO::new()))
+}
+
+/// ref: FactoryMock::createInstallationManager (the real installers are never created in tests, so a
+/// bare InstallationManager over a mock HttpDownloader suffices).
+fn installation_manager(io: &Rc<RefCell<dyn IOInterface>>) -> Rc<RefCell<InstallationManager>> {
+    let config = Rc::new(RefCell::new(Config::new(false, None)));
+    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(io.clone(), config)));
+    let r#loop = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
+    Rc::new(RefCell::new(InstallationManager::new(
+        r#loop,
+        io.clone(),
+        None,
+    )))
+}
+
+/// ref: TestCase::createInstalledJson
+///
+/// Creates a `vendor/composer/installed.json` in the CWD (which `init_temp_composer` has chdir()'d
+/// into) listing the given packages. `dev_packages` are recorded as the dev-package-name set.
+pub fn create_installed_json(
+    packages: &[PackageInterfaceHandle],
+    dev_packages: &[PackageInterfaceHandle],
+    dev_mode: bool,
+) {
+    std::fs::create_dir_all("vendor/composer").unwrap();
+    let json_file =
+        JsonFile::new("vendor/composer/installed.json".to_string(), None, None).unwrap();
+    let mut repo = InstalledFilesystemRepository::new(json_file, false, None, None).unwrap();
+    repo.set_dev_package_names(
+        dev_packages
+            .iter()
+            .map(|pkg| pkg.get_pretty_name())
+            .collect(),
+    );
+    for pkg in packages.iter().chain(dev_packages.iter()) {
+        repo.add_package(pkg.clone()).unwrap();
+        std::fs::create_dir_all(format!("vendor/{}", pkg.get_name())).unwrap();
+    }
+
+    let io = null_io();
+    let im = installation_manager(&io);
+    repo.write(dev_mode, &mut im.borrow_mut()).unwrap();
+}
+
+/// ref: TestCase::createComposerLock
+///
+/// Creates a `composer.lock` in the CWD (chdir()'d into by `init_temp_composer`) listing the given
+/// packages.
+pub fn create_composer_lock(
+    packages: &[PackageInterfaceHandle],
+    dev_packages: &[PackageInterfaceHandle],
+) {
+    let io = null_io();
+    let json_file = JsonFile::new("./composer.lock".to_string(), None, None).unwrap();
+    let composer_file_contents = std::fs::read_to_string("./composer.json").unwrap_or_default();
+    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let mut locker = Locker::new(
+        io.clone(),
+        json_file,
+        installation_manager(&io),
+        &composer_file_contents,
+        process,
+    );
+    locker
+        .set_lock_data(
+            packages.to_vec(),
+            Some(dev_packages.to_vec()),
+            IndexMap::new(),
+            IndexMap::new(),
+            vec![],
+            "dev",
+            IndexMap::new(),
+            false,
+            false,
+            IndexMap::new(),
+            true,
+        )
+        .unwrap();
 }
 
 /// ref: TestCase::getApplicationTester

@@ -147,10 +147,30 @@ impl RepositoryManager {
 
     fn create_repository_by_class(
         &self,
-        _class: &str,
-        _config: IndexMap<String, PhpMixed>,
+        class: &str,
+        config: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
-        todo!("Phase B: dynamic class instantiation by class name")
+        // PHP: `new $class($config, $this->io, $this->config, $this->httpDownloader,
+        // $this->eventDispatcher, $this->process)`. Rust cannot instantiate by string class name, so
+        // dispatch over the classes registered in `createDefaultRepositoryManager`.
+        match class {
+            "Composer\\Repository\\ComposerRepository" => Ok(RepositoryInterfaceHandle::new(
+                crate::repository::ComposerRepository::new(
+                    config,
+                    self.io.clone(),
+                    &self.config.borrow(),
+                    self.http_downloader.clone(),
+                    self.event_dispatcher.clone(),
+                )?,
+            )),
+            "Composer\\Repository\\PackageRepository" => Ok(RepositoryInterfaceHandle::new(
+                crate::repository::PackageRepository::new(config),
+            )),
+            other => todo!(
+                "Phase B: dynamic class instantiation by class name: {}",
+                other
+            ),
+        }
     }
 
     pub fn set_repository_class(&mut self, r#type: &str, class: &str) {

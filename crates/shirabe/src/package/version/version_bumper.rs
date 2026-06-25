@@ -54,9 +54,17 @@ impl VersionBumper {
             return Ok(pretty_constraint);
         }
 
+        // Regex pattern compatibility:
+        // PHP uses zero-width look-behind `(?<=,|\ |\||^)` and look-ahead `(?=,|$|\ |\||@)` to require
+        // a separator around the constraint. The `regex` crate supports neither, so the separators are
+        // matched as *consuming* groups instead. Only the `constraint` named group's own offset/length
+        // is used for the replacement below (never group 0), so consuming the surrounding separators
+        // does not shift the rewrite. The single-character `|`/space/comma separators are not consumed
+        // by both an adjacent trailing and leading match, but Composer never packs two same-major
+        // constraints around a single such separator (alternatives use `||`, ranges use spaces).
         let pattern = format!(
             r#"{{
-            (?<=,|\ |\||^) # leading separator
+            (?:^|[,\ |]) # leading separator
             (?P<constraint>
                 \^v?{major}(?:\.\d+)* # e.g. ^2.anything
                 | ~v?{major}(?:\.\d+){{1,3}} # e.g. ~2.2 or ~2.2.2 or ~2.2.2.2
@@ -64,7 +72,7 @@ impl VersionBumper {
                 | >=v?\d(?:\.\d+)* # e.g. >=2 or >=1.2 etc
                 | \* # full wildcard
             )
-            (?=,|$|\ |\||@) # trailing separator
+            (?:$|[,\ |@]) # trailing separator
         }}x"#,
             major = major
         );

@@ -672,15 +672,43 @@ pub fn fwrite_resource(resource: &PhpResource, data: &str) {
     fwrite(resource, data, None);
 }
 
-pub fn touch2(_path: &str, _mtime: i64) -> bool {
-    // TODO(phase-d): setting an explicit mtime needs utimensat(2), not exposed by std (no
-    // libc/filetime crate available).
-    todo!()
+// libc is already linked into every binary, so `utime` can be declared directly without an extra
+// crate (mirrors the `fcntl`/`statvfs` declarations elsewhere). PHP's `touch($path, $mtime, $atime)`
+// passes whole seconds, which matches `struct utimbuf`'s `time_t` fields.
+#[repr(C)]
+struct Utimbuf {
+    actime: std::os::raw::c_long,
+    modtime: std::os::raw::c_long,
 }
 
-pub fn touch3(_path: &str, _mtime: i64, _atime: i64) -> bool {
-    // TODO(phase-d): setting explicit mtime/atime needs utimensat(2); see touch2.
-    todo!()
+unsafe extern "C" {
+    fn utime(path: *const std::os::raw::c_char, times: *const Utimbuf) -> std::os::raw::c_int;
+}
+
+fn touch_impl(path: &str, mtime: i64, atime: i64) -> bool {
+    let Ok(c_path) = std::ffi::CString::new(path) else {
+        return false;
+    };
+    // PHP's `touch` creates the file first if it does not exist.
+    if !std::path::Path::new(path).exists() && !touch(path) {
+        return false;
+    }
+    let times = Utimbuf {
+        actime: atime as std::os::raw::c_long,
+        modtime: mtime as std::os::raw::c_long,
+    };
+    unsafe { utime(c_path.as_ptr(), &times) == 0 }
+}
+
+/// PHP `touch($path, $mtime)`: sets the modification time (and access time, per PHP, to the same
+/// value). Returns `false` (PHP failure) on error.
+pub fn touch2(path: &str, mtime: i64) -> bool {
+    touch_impl(path, mtime, mtime)
+}
+
+/// PHP `touch($path, $mtime, $atime)`.
+pub fn touch3(path: &str, mtime: i64, atime: i64) -> bool {
+    touch_impl(path, mtime, atime)
 }
 
 pub fn chmod(_path: &str, _mode: u32) -> bool {
@@ -1077,10 +1105,48 @@ pub fn clearstatcache2(_clear_realpath_cache: bool, _filename: &str) {
     // cache to invalidate.
 }
 
+// libc is already linked into every binary, so `statvfs` can be declared directly without an extra
+// crate (mirrors the `fcntl`/`select` declarations in stream.rs). The layout below matches Linux's
+// `struct statvfs`.
+#[cfg(target_os = "linux")]
+#[repr(C)]
+struct Statvfs {
+    f_bsize: std::os::raw::c_ulong,
+    f_frsize: std::os::raw::c_ulong,
+    f_blocks: u64,
+    f_bfree: u64,
+    f_bavail: u64,
+    f_files: u64,
+    f_ffree: u64,
+    f_favail: u64,
+    f_fsid: std::os::raw::c_ulong,
+    f_flag: std::os::raw::c_ulong,
+    f_namemax: std::os::raw::c_ulong,
+    f_spare: [std::os::raw::c_int; 6],
+}
+
+#[cfg(target_os = "linux")]
+unsafe extern "C" {
+    fn statvfs(path: *const std::os::raw::c_char, buf: *mut Statvfs) -> std::os::raw::c_int;
+}
+
+/// PHP `disk_free_space()`: the number of available bytes on the filesystem containing `directory`,
+/// computed via `statvfs(3)` (`f_bavail * f_frsize`). Returns `None` (PHP `false`) on failure.
+#[cfg(target_os = "linux")]
+pub fn disk_free_space(directory: &str) -> Option<f64> {
+    let c_path = std::ffi::CString::new(directory).ok()?;
+    let mut buf = std::mem::MaybeUninit::<Statvfs>::uninit();
+    let rc = unsafe { statvfs(c_path.as_ptr(), buf.as_mut_ptr()) };
+    if rc != 0 {
+        return None;
+    }
+    let buf = unsafe { buf.assume_init() };
+    Some(buf.f_bavail as f64 * buf.f_frsize as f64)
+}
+
+#[cfg(not(target_os = "linux"))]
 pub fn disk_free_space(_directory: &str) -> Option<f64> {
-    // TODO(phase-d): reading free space for an arbitrary path requires statvfs(3); std exposes no
-    // equivalent and no /proc file gives per-path free space (no libc/syscall crate available).
-    todo!()
+    None
 }
 
 pub const GLOB_MARK: i64 = 8;

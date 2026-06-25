@@ -14,7 +14,7 @@ pub struct ForgejoUrl {
 
 impl ForgejoUrl {
     pub const URL_REGEX: &'static str =
-        r"^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$";
+        r"{^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$}";
 
     fn new(owner: String, repository: String, origin_url: String, api_url: String) -> Self {
         Self {

@@ -364,12 +364,14 @@ impl InstalledRepository {
     }
 
     pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {
-        // TODO: type guard?
         assert!(
             repository.is::<LockArrayRepository>()
+                || repository.is_installed_repository_interface()
                 || repository.is::<RootPackageRepository>()
                 || repository.is::<PlatformRepository>(),
-            "An InstalledRepository can contain a repository of type: LockArrayRepository, RootPackageRepository or PlatformRepository"
+            "An InstalledRepository can not contain a repository of type {} ({})",
+            repository.get_repo_name(),
+            repository.get_repo_name()
         );
 
         self.inner.add_repository(repository);

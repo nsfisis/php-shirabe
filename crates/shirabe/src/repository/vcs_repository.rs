@@ -264,6 +264,16 @@ impl VcsRepository {
         &self.version_transport_exceptions
     }
 
+    /// For testing only: drives `initialize` (which shells out to the VCS driver to discover
+    /// tags/branches and load each package) and returns the packages collected by the inner
+    /// `ArrayRepository`, mirroring the polymorphic `RepositoryInterface::getPackages` dispatch
+    /// in PHP where `VcsRepository` inherits `getPackages` from `ArrayRepository`.
+    pub fn __get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+        self.initialize()?;
+        use crate::repository::RepositoryInterface;
+        self.inner.get_packages()
+    }
+
     pub fn initialize(&mut self) -> Result<()> {
         self.inner.initialize();
 
@@ -282,7 +292,7 @@ impl VcsRepository {
         self.version_parser = Some(VersionParser::new());
         if self.loader.is_none() {
             self.loader = Some(Box::new(ArrayLoader::new(
-                Some(todo!("phase-b: clone VersionParser")),
+                self.version_parser.clone(),
                 false,
             )));
         }

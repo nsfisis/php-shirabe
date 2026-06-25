@@ -7,6 +7,8 @@ use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::PathRepository;
+use shirabe::util::http_downloader::HttpDownloader;
+use shirabe::util::r#loop::Loop;
 use shirabe::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PhpMixed, file_get_contents, hash, realpath, serialize,
@@ -27,6 +29,16 @@ fn create_path_repo(options: IndexMap<String, PhpMixed>) -> PathRepository {
 
     let config = Rc::new(RefCell::new(Config::new(true, None)));
     let proc = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+
+    // ref: createPathRepo wires the ProcessExecutor through a Loop so the VersionGuesser's async
+    // git calls are permitted; constructing the Loop calls enable_async() on the shared executor.
+    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+        io.clone(),
+        config.clone(),
+        IndexMap::new(),
+        false,
+    )));
+    let _loop = Loop::new(http_downloader, Some(proc.clone()));
 
     PathRepository::new(options, io, config, None, None, Some(proc)).unwrap()
 }
@@ -68,7 +80,6 @@ fn test_load_package_from_file_system_with_version() {
     );
 }
 
-#[ignore = "version guessing for an unversioned package calls VersionGuesser::guess_git_version, which reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_load_package_from_file_system_without_version() {
     let repository_url = [
@@ -90,7 +101,6 @@ fn test_load_package_from_file_system_without_version() {
     assert!(!package_version.is_empty());
 }
 
-#[ignore = "the without-version fixture matched by the wildcard triggers VersionGuesser::guess_git_version, which reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_load_package_from_file_system_with_wildcard() {
     let repository_url =
@@ -197,7 +207,6 @@ fn test_url_remains_relative() {
     assert_eq!(Some(relative_url), package.get_dist_url());
 }
 
-#[ignore = "the wildcard url also matches the without-version fixture, whose version guessing reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_reference_none() {
     let options = coordinates(vec![("reference", PhpMixed::String("none".to_string()))]);
@@ -216,7 +225,6 @@ fn test_reference_none() {
     }
 }
 
-#[ignore = "the wildcard url also matches the without-version fixture, whose version guessing reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_reference_config() {
     let options = coordinates(vec![

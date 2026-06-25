@@ -108,7 +108,6 @@ fn test_supports_returns_false_no_deep_check() {
 
 // The remaining cases mock Perforce, the repository config and IO to drive initialization,
 // composer-file detection and cleanup; mocking is not available here.
-#[ignore]
 #[test]
 fn test_initialize_captures_variables_from_repo_config() {
     let SetUp {
@@ -132,9 +131,13 @@ fn test_initialize_captures_variables_from_repo_config() {
         IndexMap::new(),
         false,
     )));
-    let process = Rc::new(RefCell::new(shirabe::util::ProcessExecutor::new(Some(
-        io.clone(),
-    ))));
+    // ref: setUp uses getProcessExecutorMock(); the empty, non-strict mock lets Perforce's p4
+    // queries resolve with the default (exit 0) result so initialize() never shells out to p4.
+    let (process, _process_guard) = crate::process_executor_mock::get_process_executor_mock(
+        vec![],
+        false,
+        shirabe::util::process_executor::MockHandler::default(),
+    );
 
     let mut driver = PerforceDriver::new(repo_config, io, config, http_downloader, process);
     driver.initialize().unwrap();
