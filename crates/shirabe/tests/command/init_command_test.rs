@@ -359,8 +359,6 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
 
 #[test]
 #[serial]
-#[ignore = "drives InitCommand, which calls get_git_config -> ProcessExecutor::run_process; \
-            that path is not ported (shim is_callable and Process::start/run are todo!())"]
 fn test_run_command() {
     set_up();
 
@@ -487,8 +485,6 @@ fn test_run_command_invalid() {
 
 #[test]
 #[serial]
-#[ignore = "drives InitCommand, which calls get_git_config -> ProcessExecutor::run_process; \
-            that path is not ported (shim is_callable and Process::start/run are todo!())"]
 fn test_run_guess_name_from_dir_sanitizes_dir() {
     set_up();
 

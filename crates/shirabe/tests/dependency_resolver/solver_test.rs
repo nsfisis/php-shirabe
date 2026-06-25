@@ -277,7 +277,6 @@ fn test_solver_remove_if_not_requested() {
     );
 }
 
-#[ignore = "get_pretty_string path reaches an unimplemented stub (in_array non-strict in php-shim)"]
 #[test]
 fn test_install_non_existing_package_fails() {
     let fixtures = set_up();
