@@ -1246,17 +1246,17 @@ impl JsonManipulator {
         }
 
         // no node content match-able
-        let node_regex = format!(
-            "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&array))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(main_node), None)
-        );
-        let mut match_map: IndexMap<String, String> = IndexMap::new();
-        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            return Ok(false);
-        }
-
-        let children = match_map.get("content").cloned().unwrap_or_default();
+        let node = match json_grammar::find_top_level_key(
+            self.contents.as_bytes(),
+            JsonFile::encode(main_node).as_bytes(),
+            ValueKind::Array,
+        ) {
+            Some(node) => node,
+            None => return Ok(false),
+        };
+        let node_start = self.contents[..node.value_pos].to_string();
+        let node_end = self.contents[node.value_end..].to_string();
+        let children = self.contents[node.value_pos..node.value_end].to_string();
 
         // invalid match due to un-regexable content, abort
         if json_decode(&children, true)?.as_bool() == Some(false) {
@@ -1272,45 +1272,48 @@ impl JsonManipulator {
             return Ok(true);
         }
 
-        let mut content_regex = "(?&json)".to_string();
-        let start_regex: String;
-        let end_regex: String;
+        // Locate the byte range `[a..b]` to drop: the item at `node_index` together with one
+        // array separator (the trailing comma for the first item, otherwise the leading comma).
+        let cb = children.as_bytes();
+        let removal: Option<(usize, usize)> = (|| {
+            let mut i = json_grammar::skip_ws(cb, 1); // '[' then \s*
+            if node_index == 0 {
+                let a = i;
+                let mut e = json_grammar::scan_value(cb, a)?;
+                e = json_grammar::skip_ws(cb, e);
+                if cb.get(e) == Some(&b',') {
+                    e += 1;
+                }
+                e = json_grammar::skip_ws(cb, e);
+                Some((a, e))
+            } else {
+                i = json_grammar::scan_value(cb, i)?;
+                i = json_grammar::skip_ws(cb, i);
+                for _ in 0..(node_index - 1) {
+                    if cb.get(i) != Some(&b',') {
+                        return None;
+                    }
+                    i = json_grammar::scan_value(cb, i + 1)?;
+                    i = json_grammar::skip_ws(cb, i);
+                }
+                let a = i;
+                let mut b = json_grammar::skip_ws(cb, a);
+                if cb.get(b) == Some(&b',') {
+                    b += 1;
+                }
+                b = json_grammar::skip_ws(cb, b);
+                b = json_grammar::scan_value(cb, b)?;
+                Some((a, b))
+            }
+        })();
 
-        if node_index > 1 {
-            start_regex = format!("(?&json)\\s*+(?:,(?&json)\\s*+){{{}}}", node_index - 1);
-            // remove leading array separator in case we might remove the last
-            content_regex = format!("\\s*+,?\\s*+{}", content_regex);
-            end_regex = "(?:(\\s*+,\\s*+(?&json))*(?:\\s*+(?&json))?)\\s*+".to_string();
-        } else if node_index > 0 {
-            start_regex = "(?&json)\\s*+".to_string();
-            // remove leading array separator in case we might remove the last
-            content_regex = format!("\\s*+,?\\s*+{}", content_regex);
-            end_regex = "(?:(\\s*+,\\s*+(?&json))*(?:\\s*+(?&json))?)\\s*+".to_string();
-        } else {
-            start_regex = "\\s*+".to_string();
-            // remove trailing array separator when we delete first
-            content_regex = format!("{}\\s*+,?\\s*+", content_regex);
-            end_regex = "(?:((?&json)\\s*+,\\s*+)*(?:\\s*+(?&json))?)\\s*+".to_string();
-        }
-
-        let mut child_match: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(
-            &format!(
-                "{{{}(?P<start>\\[{})(?P<content>{})(?P<end>{}\\])}}sx",
-                Self::DEFINES,
-                start_regex,
-                content_regex,
-                end_regex
-            ),
-            &children,
-            &mut child_match,
-        ) {
+        if let Some((a, b)) = removal {
             self.contents = format!(
                 "{}{}{}{}",
-                match_map.get("start").cloned().unwrap_or_default(),
-                child_match.get("start").cloned().unwrap_or_default(),
-                child_match.get("end").cloned().unwrap_or_default(),
-                match_map.get("end").cloned().unwrap_or_default()
+                node_start,
+                &children[..a],
+                &children[b..],
+                node_end
             );
 
             return Ok(true);
