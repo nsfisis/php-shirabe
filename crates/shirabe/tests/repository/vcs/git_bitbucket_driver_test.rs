@@ -122,7 +122,6 @@ fn test_get_root_identifier_wrong_scm_type() {
 }
 
 #[test]
-#[ignore = "blocked by shim: getComposerInformation -> get_change_date -> shirabe_php_shim::date_create is todo!()"]
 fn test_driver() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -256,7 +255,6 @@ fn test_initialize_invalid_repository_url() {
 }
 
 #[test]
-#[ignore = "blocked by shim: getComposerInformation -> get_change_date -> shirabe_php_shim::date_create is todo!()"]
 fn test_invalid_support_data() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());

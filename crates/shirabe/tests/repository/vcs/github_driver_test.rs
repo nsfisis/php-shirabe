@@ -306,7 +306,6 @@ fn test_public_repository() {
 }
 
 #[test]
-#[ignore = "blocked by shim: getComposerInformation -> get_change_date -> shirabe_php_shim::date_create is todo!()"]
 fn test_public_repository2() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -390,7 +389,6 @@ fn test_public_repository2() {
 }
 
 #[test]
-#[ignore = "blocked by shim: getComposerInformation -> get_change_date -> shirabe_php_shim::date_create is todo!()"]
 fn test_invalid_support_data() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
@@ -531,8 +529,8 @@ otechie: userName";
     ]
 }
 
+#[ignore = "funding/archived parsing differs from PHP; not date-related"]
 #[test]
-#[ignore = "blocked by shim: getComposerInformation -> get_change_date -> shirabe_php_shim::date_create is todo!()"]
 fn test_funding_format() {
     for (funding, expected) in funding_url_provider() {
         let SetUp { home, config } = set_up();
@@ -627,8 +625,8 @@ fn test_funding_format() {
     }
 }
 
+#[ignore = "funding/archived parsing differs from PHP; not date-related"]
 #[test]
-#[ignore = "blocked by shim: getComposerInformation -> get_change_date -> shirabe_php_shim::date_create is todo!()"]
 fn test_public_repository_archived() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());

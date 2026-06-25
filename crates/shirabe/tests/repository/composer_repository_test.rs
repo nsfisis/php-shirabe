@@ -673,7 +673,6 @@ fn generate_security_advisory(
 // Ported and exercising the real getSecurityAdvisories path, but blocked by an unimplemented
 // production shim: constructing a full SecurityAdvisory parses `reportedAt` via
 // shirabe_php_shim::date_create (todo!(): needs the strtotime grammar parser).
-#[ignore = "production todo!(): shirabe_php_shim::date_create unimplemented (reached when parsing advisory reportedAt into a full SecurityAdvisory)"]
 #[test]
 fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_array_with_consecutive_keys()
  {
