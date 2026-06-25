@@ -85,52 +85,34 @@ impl JsonManipulator {
             return self.add_main_key(r#type, PhpMixed::Array(arr));
         }
 
-        let regex = format!(
-            "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?)(?P<property>{}\\s*:\\s*)(?P<value>(?&json))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(r#type), None),
-        );
-        let mut matches: IndexMap<String, String> = IndexMap::new();
-        if !Preg::is_match_named(&regex, &self.contents, &mut matches) {
-            return Ok(false);
-        }
-        let start = matches.get("start").cloned().unwrap_or_default();
-        let property = matches.get("property").cloned().unwrap_or_default();
-        let end = matches.get("end").cloned().unwrap_or_default();
+        let m = match json_grammar::find_top_level_key(
+            self.contents.as_bytes(),
+            JsonFile::encode(r#type).as_bytes(),
+            ValueKind::Json,
+        ) {
+            Some(m) => m,
+            None => return Ok(false),
+        };
+        let start = self.contents[..m.key_pos].to_string();
+        let property = self.contents[m.key_pos..m.value_pos].to_string();
+        let end = self.contents[m.value_end..].to_string();
 
-        let mut links = matches.get("value").cloned().unwrap_or_default();
+        let mut links = self.contents[m.value_pos..m.value_end].to_string();
 
         // try to find existing link
-        let package_regex = str_replace("/", "\\\\?/", &preg_quote(package, None));
-        let regex = format!(
-            "{{{}\"(?P<package>{})\"(\\s*:\\s*)(?&string)}}ix",
-            Self::DEFINES,
-            package_regex
-        );
-        let mut package_matches: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&regex, &links, &mut package_matches) {
-            // update existing link
-            let existing_package = package_matches.get("package").cloned().unwrap_or_default();
-            let package_regex = str_replace("/", "\\\\?/", &preg_quote(&existing_package, None));
-            let constraint_owned = constraint.to_string();
-            let existing_owned = existing_package.clone();
-            links = Preg::replace_callback(
-                &format!(
-                    "{{{}\"{}\"(?P<separator>\\s*:\\s*)(?&string)}}ix",
-                    Self::DEFINES,
-                    package_regex
-                ),
-                move |m: &IndexMap<CaptureKey, String>| -> String {
-                    format!(
-                        "{}{}\"{}\"",
-                        JsonFile::encode(&str_replace("\\/", "/", &existing_owned)),
-                        m.get(&CaptureKey::ByName("separator".to_string()))
-                            .cloned()
-                            .unwrap_or_default(),
-                        constraint_owned
-                    )
-                },
-                &links,
+        if let Some((key_start, key_end, value_start, value_end)) =
+            find_package_link(&links, package)
+        {
+            // update existing link: re-encode the existing key, keep its separator, swap the value
+            let existing_package = links[key_start + 1..key_end - 1].to_string();
+            let separator = links[key_end..value_start].to_string();
+            links = format!(
+                "{}{}{}\"{}\"{}",
+                &links[..key_start],
+                JsonFile::encode(&str_replace("\\/", "/", &existing_package)),
+                separator,
+                constraint,
+                &links[value_end..]
             );
         } else {
             let mut groups: IndexMap<CaptureKey, String> = IndexMap::new();
@@ -1560,6 +1542,62 @@ fn match_key_value(cb: &[u8], start: usize, name: &[u8]) -> Option<usize> {
     }
     p = json_grammar::skip_ws(cb, p + 1);
     json_grammar::scan_value(cb, p)
+}
+
+// Reproduces the PHP package-link pattern `"package"\s*:\s*(?&string)` (case-insensitive, with an
+// optional escaped slash where the name has `/`) over the `links` object text. Returns the byte
+// offsets `(key_quote_start, key_end, value_start, value_end)` of the first match, where `key_end`
+// is just past the key's closing quote and the value is a JSON string.
+fn find_package_link(links: &str, package: &str) -> Option<(usize, usize, usize, usize)> {
+    let cb = links.as_bytes();
+    let name = package.as_bytes();
+    for i in 0..cb.len() {
+        if cb[i] != b'"' {
+            continue;
+        }
+        let Some(key_end) = match_pkg_name(cb, i, name) else {
+            continue;
+        };
+        let mut p = json_grammar::skip_ws(cb, key_end);
+        if cb.get(p) != Some(&b':') {
+            continue;
+        }
+        p = json_grammar::skip_ws(cb, p + 1);
+        if cb.get(p) != Some(&b'"') {
+            continue;
+        }
+        let Some(value_end) = json_grammar::scan_string(cb, p) else {
+            continue;
+        };
+        return Some((i, key_end, p, value_end));
+    }
+    None
+}
+
+// Matches a quoted package key (case-insensitive; a `/` in `name` matches `/` or `\/`) starting at
+// `b[start] == '"'`. Returns the offset just past the closing quote.
+fn match_pkg_name(b: &[u8], start: usize, name: &[u8]) -> Option<usize> {
+    let mut p = start + 1;
+    for &nc in name {
+        if nc == b'/' {
+            if b.get(p) == Some(&b'\\') {
+                p += 1;
+            }
+            if b.get(p) != Some(&b'/') {
+                return None;
+            }
+            p += 1;
+        } else {
+            match b.get(p) {
+                Some(c) if c.eq_ignore_ascii_case(&nc) => p += 1,
+                _ => return None,
+            }
+        }
+    }
+    if b.get(p) != Some(&b'"') {
+        return None;
+    }
+    Some(p + 1)
 }
 
 // Lightweight clone of JsonManipulator's formatting logic, used inside Preg::replace_callback closures.
