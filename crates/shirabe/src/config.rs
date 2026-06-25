@@ -451,6 +451,12 @@ impl Config {
                 .collect();
             let new_repos_map: IndexMap<String, PhpMixed> = match &repositories_section {
                 PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                // A JSON array decodes to a List; in PHP it is an array with integer keys.
+                PhpMixed::List(items) => items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i.to_string(), v.clone()))
+                    .collect(),
                 _ => IndexMap::new(),
             };
             let new_repos: IndexMap<String, PhpMixed> = new_repos_map.into_iter().rev().collect();

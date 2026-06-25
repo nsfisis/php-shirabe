@@ -41,7 +41,6 @@ fn test_list_with_no_repositories() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: config.rs Config::merge only reads repositories when PhpMixed::Array (JSON object); list-form repositories decode to PhpMixed::List and are dropped (crates/shirabe/src/config.rs:452-455), so list-form repos are not listed and output falls back to the default packagist repo"]
 fn test_list_with_repositories_as_list() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -120,7 +119,6 @@ fn test_list_with_repositories_as_assoc() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_add_repository_with_type_and_url() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 
@@ -156,7 +154,6 @@ fn test_add_repository_with_type_and_url() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_add_repository_with_json() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 
@@ -351,7 +348,6 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
 
 #[test]
 #[serial]
-#[ignore = "src bug: config.rs Config::merge only reads repositories when PhpMixed::Array (JSON object); list-form repositories decode to PhpMixed::List and are dropped (crates/shirabe/src/config.rs:452-455), so get-url panics with 'There is no first repository defined'"]
 fn test_set_and_get_url_in_repository_list() {
     // change first of three
     run_set_and_get_url_list_case("first", 0, "https://new.example.org");
@@ -428,7 +424,6 @@ fn test_invalid_arg_combination_throws() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_prepend_repository_by_name_list_to_assoc() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -469,7 +464,6 @@ fn test_prepend_repository_by_name_list_to_assoc() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_append_repository_by_name_list_to_assoc() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -511,7 +505,6 @@ fn test_append_repository_by_name_list_to_assoc() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_prepend_repository_assoc_with_packagist_disabled() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -553,7 +546,6 @@ fn test_prepend_repository_assoc_with_packagist_disabled() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_append_repository_assoc_with_packagist_disabled() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -596,7 +588,6 @@ fn test_append_repository_assoc_with_packagist_disabled() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_add_before_and_after_by_name() {
     // Start with two repos as named-list and a disabled packagist boolean
     let tear_down = init_temp_composer(
@@ -671,7 +662,6 @@ fn test_add_before_and_after_by_name() {
 
 #[test]
 #[serial]
-#[ignore = "src bug: repository_command.rs:299 passes the un-delimited regex r\"^\\s*\\{\" to Preg::is_match (PHP source uses the delimited '{^\\s*\\{}'); compile_php_pattern rejects it, panicking at shirabe-php-shim/src/preg.rs:180 'invalid regex: unterminated regex pattern: ^\\s*\\{' on every add action"]
 fn test_add_same_name_replaces_existing() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 

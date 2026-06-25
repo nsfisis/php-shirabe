@@ -23,11 +23,11 @@ use crate::dependency_resolver::RuleSet;
 use crate::package::AliasPackage;
 use crate::package::BasePackage;
 use crate::package::BasePackageHandle;
-use crate::repository::RepositoryInterface;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 
 #[derive(Debug)]
