@@ -254,7 +254,6 @@ fn run_test_pool_optimizer(
     );
 }
 
-#[ignore]
 #[test]
 fn test_pool_optimizer() {
     let tests = provide_integration_tests();

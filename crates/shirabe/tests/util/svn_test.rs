@@ -42,7 +42,6 @@ fn url_provider() -> Vec<(&'static str, Vec<&'static str>)> {
 }
 
 #[test]
-#[ignore]
 fn test_credentials() {
     for (url, expect) in url_provider() {
         let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
@@ -55,7 +54,6 @@ fn test_credentials() {
 }
 
 #[test]
-#[ignore]
 fn test_interactive_string() {
     let url = "http://svn.example.org";
 
@@ -76,7 +74,6 @@ fn test_interactive_string() {
 }
 
 #[test]
-#[ignore]
 fn test_credentials_from_config() {
     let url = "http://svn.apache.org";
 
@@ -98,7 +95,6 @@ fn test_credentials_from_config() {
 }
 
 #[test]
-#[ignore]
 fn test_credentials_from_config_with_cache_credentials_true() {
     let url = "http://svn.apache.org";
 
@@ -121,7 +117,6 @@ fn test_credentials_from_config_with_cache_credentials_true() {
 }
 
 #[test]
-#[ignore]
 fn test_credentials_from_config_with_cache_credentials_false() {
     let url = "http://svn.apache.org";
 

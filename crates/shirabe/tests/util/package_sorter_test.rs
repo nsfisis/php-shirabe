@@ -141,7 +141,6 @@ fn sorting_orders_dependencies_higher_than_package_cases() -> Vec<(
 }
 
 #[test]
-#[ignore]
 fn test_sorting_orders_dependencies_higher_than_package() {
     for (packages, expected_ordered_list, weights) in
         sorting_orders_dependencies_higher_than_package_cases()

@@ -111,7 +111,6 @@ fn fix_config_when_load_config_is_false(
     expected_config
 }
 
-#[ignore]
 #[test]
 fn test_self_version() {
     let loader = set_up();
@@ -165,7 +164,6 @@ fn test_normalized_version_optimization() {
     assert_eq!("1.2.3.4", package.get_version());
 }
 
-#[ignore]
 #[test]
 fn test_parse_dump_default_load_config() {
     let loader = set_up();
@@ -176,7 +174,6 @@ fn test_parse_dump_default_load_config() {
     assert_eq!(expected_config, dumper.dump(package));
 }
 
-#[ignore]
 #[test]
 fn test_parse_dump_true_load_config() {
     let config = valid_config();
@@ -187,7 +184,6 @@ fn test_parse_dump_true_load_config() {
     assert_eq!(expected_config, dumper.dump(package));
 }
 
-#[ignore]
 #[test]
 fn test_parse_dump_false_load_config() {
     let config = valid_config();
@@ -388,7 +384,6 @@ fn provide_plugin_api_versions() -> Vec<&'static str> {
     ]
 }
 
-#[ignore]
 #[test]
 fn test_plugin_api_version_are_kept_as_declared() {
     let loader = set_up();
@@ -414,7 +409,6 @@ fn test_plugin_api_version_are_kept_as_declared() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_plugin_api_version_does_support_self_version() {
     let loader = set_up();
@@ -438,7 +432,6 @@ fn test_plugin_api_version_does_support_self_version() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_parse_links_integer_target() {
     let loader = set_up();
@@ -454,7 +447,6 @@ fn test_parse_links_integer_target() {
     assert!(links.contains_key("1"));
 }
 
-#[ignore]
 #[test]
 fn test_parse_links_invalid_version() {
     let loader = set_up();
@@ -532,7 +524,6 @@ fn test_branch_alias_integer_index() {
     assert_eq!(None, loader.get_branch_alias(&config).unwrap());
 }
 
-#[ignore]
 #[test]
 fn test_package_links_require() {
     let loader = set_up();
@@ -571,7 +562,6 @@ fn test_package_links_require_invalid() {
     assert_eq!(0, package.get_requires().len());
 }
 
-#[ignore]
 #[test]
 fn test_package_links_replace() {
     let loader = set_up();
