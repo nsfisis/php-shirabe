@@ -300,15 +300,36 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let mut repository_index: Option<PhpMixed> = None;
 
-        let repos = decoded
+        let repos_value = decoded
             .as_array()
             .and_then(|a| a.get("repositories"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+            .cloned();
+        // A list keeps integer indices (matching PHP's `is_int($index)` branch); an associative
+        // "repositories" object keeps string keys.
+        let is_list = repos_value.as_ref().and_then(|v| v.as_list()).is_some();
+        let repos: Vec<(String, PhpMixed)> =
+            if let Some(list) = repos_value.as_ref().and_then(|v| v.as_list()) {
+                list.iter()
+                    .enumerate()
+                    .map(|(i, v)| (i.to_string(), v.clone()))
+                    .collect()
+            } else {
+                repos_value
+                    .as_ref()
+                    .and_then(|v| v.as_array())
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect()
+            };
         for (index, repository) in &repos {
+            let index_value = if is_list {
+                PhpMixed::Int(index.parse::<i64>().unwrap_or(0))
+            } else {
+                PhpMixed::String(index.clone())
+            };
             if name == index.as_str() {
-                repository_index = Some(PhpMixed::String(index.clone()));
+                repository_index = Some(index_value);
                 break;
             }
 
@@ -317,7 +338,7 @@ impl JsonManipulator {
                 .and_then(|a| a.get("name"))
                 .and_then(|v| v.as_string());
             if Some(name) == repo_name {
-                repository_index = Some(PhpMixed::String(index.clone()));
+                repository_index = Some(index_value);
                 break;
             }
         }
@@ -327,68 +348,77 @@ impl JsonManipulator {
             None => return Ok(false),
         };
 
-        let mut list_regex: Option<String> = None;
+        // Locate the byte span of the target repository object within the contents.
+        let repo_span: Option<(usize, usize)> = if is_int(&repository_index) {
+            let n = repository_index.as_int().unwrap_or(0).max(0);
+            json_grammar::find_top_level_key(
+                self.contents.as_bytes(),
+                b"\"repositories\"",
+                ValueKind::Array,
+            )
+            .and_then(|reps| {
+                let cb = self.contents.as_bytes();
+                let mut i = json_grammar::skip_ws(cb, reps.value_pos + 1); // '[' then \s*
+                for _ in 0..n {
+                    i = json_grammar::scan_value(cb, i)?;
+                    i = json_grammar::skip_ws(cb, i);
+                    if cb.get(i) != Some(&b',') {
+                        return None;
+                    }
+                    i = json_grammar::skip_ws(cb, i + 1);
+                }
+                if cb.get(i) != Some(&b'{') {
+                    return None;
+                }
+                let e = json_grammar::scan_object(cb, i)?;
+                Some((i, e))
+            })
+        } else {
+            json_grammar::find_top_level_key(
+                self.contents.as_bytes(),
+                b"\"repositories\"",
+                ValueKind::Object,
+            )
+            .and_then(|reps| {
+                let obj = self.contents[reps.value_pos..reps.value_end].to_string();
+                let key = JsonFile::encode(&repository_index);
+                json_grammar::find_top_level_key(obj.as_bytes(), key.as_bytes(), ValueKind::Object)
+                    .map(|inner| (reps.value_pos + inner.value_pos, reps.value_pos + inner.value_end))
+            })
+        };
 
-        if is_int(&repository_index) {
-            let i_val = repository_index.as_int().unwrap_or(0);
-            list_regex = Some(format!(
-                "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?\"repositories\"\\s*:\\s*\\[\\s*((?&json)\\s*+,\\s*+){{{}}})(?P<repository>(?&object))(?P<end>.*)}}sx",
-                Self::DEFINES,
-                i_val.max(0)
-            ));
+        let (repo_pos, repo_end) = match repo_span {
+            Some(span) => span,
+            None => return Ok(false),
+        };
+
+        let raw_repo = self.contents[repo_pos..repo_end].to_string();
+        // invalid match due to un-regexable content, abort
+        if json_decode(&raw_repo, false)?.as_bool() == Some(false) {
+            return Ok(false);
         }
 
-        let object_regex = format!(
-            "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?\"repositories\"\\s*:\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?{}\\s*:\\s*)(?P<repository>(?&object))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(&repository_index), None)
-        );
-        let mut matches: IndexMap<String, String> = IndexMap::new();
+        let start_outer = self.contents[..repo_pos].to_string();
+        let end_outer = self.contents[repo_end..].to_string();
 
-        let list_match = list_regex
-            .as_ref()
-            .is_some_and(|r| Preg::is_match_named(r, &self.contents, &mut matches));
-        if list_match || Preg::is_match_named(&object_regex, &self.contents, &mut matches) {
-            // invalid match due to un-regexable content, abort
-            let raw_repo = matches.get("repository").cloned().unwrap_or_default();
-            if json_decode(&raw_repo, false)?.as_bool() == Some(false) {
-                return Ok(false);
-            }
-
-            let repository_regex = format!(
-                "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?\"url\"\\s*:\\s*)(?P<url>(?&string))(?P<end>.*)}}sx",
-                Self::DEFINES
-            );
-
-            let url_owned = url.to_string();
-            self.contents = format!(
+        // Replace the repository's "url" value, leaving the rest of the object untouched.
+        let new_raw_repo = match json_grammar::find_top_level_key(
+            raw_repo.as_bytes(),
+            b"\"url\"",
+            ValueKind::Json,
+        ) {
+            Some(u) => format!(
                 "{}{}{}",
-                matches.get("start").cloned().unwrap_or_default(),
-                Preg::replace_callback(
-                    &repository_regex,
-                    move |repository_matches: &IndexMap<CaptureKey, String>| -> String {
-                        format!(
-                            "{}{}{}",
-                            repository_matches
-                                .get(&CaptureKey::ByName("start".to_string()))
-                                .cloned()
-                                .unwrap_or_default(),
-                            JsonFile::encode(&url_owned),
-                            repository_matches
-                                .get(&CaptureKey::ByName("end".to_string()))
-                                .cloned()
-                                .unwrap_or_default()
-                        )
-                    },
-                    &raw_repo,
-                ),
-                matches.get("end").cloned().unwrap_or_default()
-            );
+                &raw_repo[..u.value_pos],
+                JsonFile::encode(url),
+                &raw_repo[u.value_end..]
+            ),
+            None => raw_repo,
+        };
 
-            return Ok(true);
-        }
+        self.contents = format!("{}{}{}", start_outer, new_raw_repo, end_outer);
 
-        Ok(false)
+        Ok(true)
     }
 
     pub fn insert_repository(
