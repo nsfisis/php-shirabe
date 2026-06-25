@@ -1125,7 +1125,7 @@ impl Git {
         }
 
         let result: Result<Option<String>> = (|| -> Result<Option<String>> {
-            let mut output_mixed = PhpMixed::String(String::new());
+            let mut output_mixed = PhpMixed::Null;
             if is_local_path_repository {
                 let mut output = String::new();
                 self.process.borrow_mut().execute_args(

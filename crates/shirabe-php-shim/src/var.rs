@@ -120,11 +120,15 @@ pub fn is_numeric(value: &PhpMixed) -> bool {
     }
 }
 
-pub fn is_callable(_value: &PhpMixed) -> bool {
-    // TODO(phase-d): PHP is_callable() checks whether the value names an existing function/method or
-    // is a closure. PhpMixed has no callable variant and the shim has no function registry, so
-    // callability cannot be determined.
-    todo!()
+pub fn is_callable(value: &PhpMixed) -> bool {
+    match value {
+        // Scalars and null are never callable in PHP.
+        PhpMixed::Null | PhpMixed::Bool(_) | PhpMixed::Int(_) | PhpMixed::Float(_) => false,
+        // TODO(phase-d): PHP is_callable() checks whether a string names an existing function, or an
+        // array/object resolves to a method/__invoke. PhpMixed has no callable variant and the shim
+        // has no function/method registry, so callability of these cannot be determined.
+        _ => todo!(),
+    }
 }
 
 pub fn is_object(_value: &PhpMixed) -> bool {

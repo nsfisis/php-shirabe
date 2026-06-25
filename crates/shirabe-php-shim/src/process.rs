@@ -371,14 +371,19 @@ pub fn pcntl_signal_get_handler(_signal: i64) -> PhpMixed {
     todo!()
 }
 
+unsafe extern "C" {
+    fn getuid() -> u32;
+    fn geteuid() -> u32;
+}
+
 pub fn posix_getuid() -> i64 {
-    // TODO(phase-d): getuid(2) is not reachable without a libc/syscall crate.
-    todo!()
+    // getuid(2) cannot fail; libc is already linked into every binary, so no extra crate is needed.
+    (unsafe { getuid() }) as i64
 }
 
 pub fn posix_geteuid() -> i64 {
-    // TODO(phase-d): geteuid(2) is not reachable without a libc/syscall crate.
-    todo!()
+    // geteuid(2) cannot fail; libc is already linked into every binary, so no extra crate is needed.
+    (unsafe { geteuid() }) as i64
 }
 
 pub fn posix_getpwuid(_uid: i64) -> PhpMixed {

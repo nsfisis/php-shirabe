@@ -181,7 +181,14 @@ impl ClassMapGenerator {
                 file_path = format!("{}/{}", cwd, file_path);
                 file_path = Self::normalize_path(&file_path);
             } else {
-                file_path = Preg::replace(r"{(?<!:)[\\/]{2,}}", "/", &file_path);
+                // Regex pattern compatibility:
+                // PHP collapses runs of 2+ slashes/backslashes into one, except when the run is
+                // immediately preceded by `:` (to preserve scheme separators like `phar://`). The
+                // `regex` crate has no look-behind, so the `(?<!:)` guard is turned into a consuming
+                // optional leading group `(^|[^:])` that is re-emitted in the replacement. Slash runs
+                // are always separated by path-segment characters, so consuming the single preceding
+                // char never prevents an adjacent run from matching.
+                file_path = Preg::replace(r"{(^|[^:])[\\/]{2,}}", "${1}/", &file_path);
             }
 
             if file_path.is_empty() {

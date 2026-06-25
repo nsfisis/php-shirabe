@@ -1327,10 +1327,142 @@ pub fn addcslashes(_string: &str, _charlist: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-pub fn php_strip_whitespace(_path: &str) -> String {
-    // TODO(phase-d): PHP strips comments and redundant whitespace using the PHP tokenizer; no PHP
-    // tokenizer is available in the shim.
-    todo!()
+pub fn php_strip_whitespace(path: &str) -> String {
+    // PHP `php_strip_whitespace()` tokenizes the source and re-emits it with comments removed and
+    // each run of whitespace collapsed to a single space. There is no PHP tokenizer in the shim, so
+    // this is a hand-written lexer that reproduces the observable effect for the cases the class-map
+    // generator depends on: it preserves single-quoted, double-quoted, backtick and heredoc/nowdoc
+    // string contents verbatim while dropping `//`, `#` and `/* */` comments and squeezing
+    // whitespace. On any read failure it returns an empty string, mirroring `@php_strip_whitespace`.
+    let contents = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(_) => return String::new(),
+    };
+
+    let b = contents;
+    let n = b.len();
+    let mut out: Vec<u8> = Vec::with_capacity(n);
+    let mut i = 0usize;
+
+    let push_space = |out: &mut Vec<u8>| {
+        if !out.is_empty() && *out.last().unwrap() != b' ' {
+            out.push(b' ');
+        }
+    };
+
+    while i < n {
+        let c = b[i];
+
+        // Line comments: // ... and # ...
+        if c == b'/' && i + 1 < n && b[i + 1] == b'/' {
+            i += 2;
+            while i < n && b[i] != b'\n' {
+                i += 1;
+            }
+            push_space(&mut out);
+            continue;
+        }
+        if c == b'#' {
+            i += 1;
+            while i < n && b[i] != b'\n' {
+                i += 1;
+            }
+            push_space(&mut out);
+            continue;
+        }
+        // Block comments: /* ... */
+        if c == b'/' && i + 1 < n && b[i + 1] == b'*' {
+            i += 2;
+            while i + 1 < n && !(b[i] == b'*' && b[i + 1] == b'/') {
+                i += 1;
+            }
+            i += 2;
+            push_space(&mut out);
+            continue;
+        }
+        // String literals: '...', "...", `...`
+        if c == b'\'' || c == b'"' || c == b'`' {
+            out.push(c);
+            i += 1;
+            while i < n {
+                let d = b[i];
+                out.push(d);
+                if d == b'\\' && i + 1 < n {
+                    out.push(b[i + 1]);
+                    i += 2;
+                    continue;
+                }
+                i += 1;
+                if d == c {
+                    break;
+                }
+            }
+            continue;
+        }
+        // Heredoc/Nowdoc: <<<LABEL ... LABEL
+        if c == b'<' && i + 2 < n && b[i + 1] == b'<' && b[i + 2] == b'<' {
+            let mut j = i + 3;
+            while j < n && (b[j] == b' ' || b[j] == b'\t') {
+                j += 1;
+            }
+            let nowdoc = j < n && b[j] == b'\'';
+            let quoted = j < n && (b[j] == b'\'' || b[j] == b'"');
+            if quoted {
+                j += 1;
+            }
+            let label_start = j;
+            while j < n && (b[j].is_ascii_alphanumeric() || b[j] == b'_') {
+                j += 1;
+            }
+            let label = b[label_start..j].to_vec();
+            if !label.is_empty() {
+                let _ = nowdoc;
+                // Emit verbatim from the opening marker until a line whose trimmed start matches the
+                // closing label.
+                let body_start = i;
+                let mut k = j;
+                // skip to end of the opening line
+                while k < n && b[k] != b'\n' {
+                    k += 1;
+                }
+                let mut closed = n;
+                while k < n {
+                    k += 1; // move past '\n'
+                    let line_start = k;
+                    let mut m = line_start;
+                    while m < n && (b[m] == b' ' || b[m] == b'\t') {
+                        m += 1;
+                    }
+                    if b[m..].starts_with(&label) {
+                        let after = m + label.len();
+                        let boundary =
+                            after >= n || !(b[after].is_ascii_alphanumeric() || b[after] == b'_');
+                        if boundary {
+                            closed = after;
+                            break;
+                        }
+                    }
+                    while k < n && b[k] != b'\n' {
+                        k += 1;
+                    }
+                }
+                out.extend_from_slice(&b[body_start..closed.min(n)]);
+                i = closed.min(n);
+                continue;
+            }
+        }
+        // Whitespace runs collapse to a single space.
+        if c == b' ' || c == b'\t' || c == b'\r' || c == b'\n' {
+            i += 1;
+            push_space(&mut out);
+            continue;
+        }
+
+        out.push(c);
+        i += 1;
+    }
+
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn hexdec(_s: &str) -> i64 {

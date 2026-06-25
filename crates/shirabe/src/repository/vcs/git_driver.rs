@@ -485,6 +485,12 @@ impl GitDriver {
 
         self.inner.write_cached_composer(identifier, composer)
     }
+
+    /// For testing only. Mirrors GitDriverTest::setRepoDir, which uses reflection to
+    /// set the private `repoDir` property.
+    pub fn __set_repo_dir(&mut self, repo_dir: String) {
+        self.repo_dir = repo_dir;
+    }
 }
 
 impl crate::repository::vcs::VcsDriverInterface for GitDriver {

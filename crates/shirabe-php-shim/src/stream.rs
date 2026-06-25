@@ -112,9 +112,28 @@ pub fn stream_isatty(stream: PhpResource) -> bool {
 }
 
 pub fn stream_get_wrappers() -> Vec<String> {
-    // TODO(phase-d): the registered wrapper set depends on compiled-in extensions and runtime
-    // `stream_wrapper_register` calls; neither is modeled, so a fixed list would be inaccurate.
-    todo!()
+    // The full registered set depends on compiled-in extensions and runtime
+    // `stream_wrapper_register` calls, which are not modeled. We return the wrappers always
+    // registered by a stock PHP CLI build (the environment Composer's tests assume): the core
+    // `php`/`file`/`glob`/`data` wrappers, the always-present `phar` wrapper, plus the
+    // `compress.*`/`http`/`ftp` family. Consumers only use this to recognise `wrapper://` prefixes.
+    [
+        "https",
+        "ftps",
+        "compress.zlib",
+        "compress.bzip2",
+        "php",
+        "file",
+        "glob",
+        "data",
+        "http",
+        "ftp",
+        "phar",
+        "zip",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
 }
 
 /// PHP `stream_copy_to_stream()`: copy the remaining bytes of `source` into `dest`, returning the

@@ -77,12 +77,21 @@ impl PhpFileParser {
         let contents = p.clean();
         drop(p);
 
+        // Regex pattern compatibility:
+        // PHP uses `\b(?<![\\$:>])<keyword>` to require the keyword to start at a word boundary and
+        // not be preceded by `\`, `$`, `:` or `>` (so `MyClass::class`, `$class`, `\class`,
+        // `Foo->class` are skipped). The `regex` crate has no look-behind, so `\b` + the negative
+        // look-behind are fused into a single consuming class `(?:^|[^...])` that excludes both the
+        // identifier characters (reproducing `\b`) and the four operator characters. The consumed
+        // separator lands in match group 0 only; the named groups are unaffected. The PCRE
+        // possessive quantifiers (`++`, `*+`) are performance-only and become plain `+`/`*`.
         let pattern2 = format!(
-            r"(?ix)
+            r"{{
             (?:
-                 \b(?<![\\$:>])(?P<type>class|interface|trait{et}) \s++ (?P<name>[a-zA-Z_\x7f-\xff:][a-zA-Z0-9_\x7f-\xff:\-]*+)
-               | \b(?<![\\$:>])(?P<ns>namespace) (?P<nsname>\s++[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*+(?:\s*+\\\\\s*+[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*+)*+)? \s*+ [\{{;]
-            )",
+                 (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<type>class|interface|trait{et}) \s+ (?P<name>[a-zA-Z_\x7f-\xff:][a-zA-Z0-9_\x7f-\xff:\-]*)
+               | (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<ns>namespace) (?P<nsname>\s+[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:\s*\\\s*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)*)? \s* [\{{;]
+            )
+        }}ix",
             et = extra_types
         );
         let mut matches: IndexMap<_, _> = IndexMap::new();

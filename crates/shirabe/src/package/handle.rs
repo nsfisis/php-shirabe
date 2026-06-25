@@ -1205,6 +1205,15 @@ macro_rules! impl_real_package_test_setters {
                     .set_extra(extra);
             }
 
+            /// For testing only: mirrors PHP `Package::setSuggests`.
+            pub fn __set_suggests(&self, suggests: indexmap::IndexMap<String, String>) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_suggests(suggests);
+            }
+
             /// For testing only: mirrors PHP `Package::setType`.
             pub fn __set_type(&self, r#type: String) {
                 self.0
@@ -1239,6 +1248,39 @@ macro_rules! impl_real_package_test_setters {
                     .as_package_mut()
                     .expect("real package handle invariant")
                     .set_target_dir(target_dir);
+            }
+
+            /// For testing only: mirrors PHP `Package::setAutoload`.
+            pub fn __set_autoload(
+                &self,
+                autoload: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_autoload(autoload);
+            }
+
+            /// For testing only: mirrors PHP `Package::setDevAutoload`.
+            pub fn __set_dev_autoload(
+                &self,
+                dev_autoload: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+            ) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_dev_autoload(dev_autoload);
+            }
+
+            /// For testing only: mirrors PHP `Package::setIncludePaths`.
+            pub fn __set_include_paths(&self, include_paths: Vec<String>) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_include_paths(include_paths);
             }
         }
     };

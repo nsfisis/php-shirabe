@@ -355,10 +355,10 @@ impl AutoloadGenerator {
                 .collect();
         }
 
-        let classmap_list = autoloads
+        let classmap_list: Vec<PhpMixed> = autoloads
             .get("classmap")
-            .and_then(|v| v.as_list())
-            .cloned()
+            .and_then(|v| v.as_array())
+            .map(|m| m.values().cloned().collect())
             .unwrap_or_default();
         for dir in &classmap_list {
             let dir_str = dir.as_string().unwrap_or("");
@@ -647,13 +647,20 @@ impl AutoloadGenerator {
             ),
         )?;
 
-        // PHP: __DIR__ refers to the directory of AutoloadGenerator.php
+        // PHP: __DIR__ refers to the directory of AutoloadGenerator.php, an absolute path
+        // independent of the cwd. The ClassLoader.php and LICENSE templates are bundled from the
+        // upstream composer source tree, resolved at build time relative to this crate's manifest
+        // (mirroring the InstalledVersions.php include in FilesystemRepository).
+        let autoload_dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../composer/src/Composer/Autoload"
+        );
         filesystem.safe_copy(
-            &format!("{}/ClassLoader.php", "composer/src/Composer/Autoload"),
+            &format!("{}/ClassLoader.php", autoload_dir),
             &format!("{}/ClassLoader.php", target_dir),
         )?;
         filesystem.safe_copy(
-            &format!("{}/../../../LICENSE", "composer/src/Composer/Autoload"),
+            &format!("{}/../../../LICENSE", autoload_dir),
             &format!("{}/LICENSE", target_dir),
         )?;
 
@@ -1407,7 +1414,7 @@ impl AutoloadGenerator {
         let mut loader = ClassLoader::new(None);
 
         // PHP: $map = require $targetDir . '/autoload_namespaces.php';
-        let map = shirabe_php_shim::php_require(&format!("{}/autoload_namespaces.php", target_dir));
+        let map = require_generated_php_array(&format!("{}/autoload_namespaces.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
@@ -1422,7 +1429,7 @@ impl AutoloadGenerator {
             }
         }
 
-        let map = shirabe_php_shim::php_require(&format!("{}/autoload_psr4.php", target_dir));
+        let map = require_generated_php_array(&format!("{}/autoload_psr4.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
@@ -1438,7 +1445,7 @@ impl AutoloadGenerator {
         }
 
         let class_map =
-            shirabe_php_shim::php_require(&format!("{}/autoload_classmap.php", target_dir));
+            require_generated_php_array(&format!("{}/autoload_classmap.php", target_dir));
         if class_map.as_bool() != Some(false)
             && !class_map.is_null()
             && let Some(cm) = class_map.as_array()
@@ -1558,7 +1565,7 @@ impl AutoloadGenerator {
         if file_exists(&format!("{}/autoload_files.php", target_dir)) {
             maps.insert(
                 "files".to_string(),
-                shirabe_php_shim::php_require(&format!("{}/autoload_files.php", target_dir)),
+                require_generated_php_array(&format!("{}/autoload_files.php", target_dir)),
             );
         }
 
@@ -1658,7 +1665,19 @@ impl AutoloadGenerator {
                 install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as i64)));
             }
 
-            let type_arr = type_value.as_array().cloned().unwrap_or_default();
+            // PHP iterates `$autoload[$type]` as a PHP array regardless of whether it is a
+            // string-keyed map (psr-0/psr-4) or a numerically-indexed list (classmap/files/
+            // exclude-from-classmap, which JSON decodes to `PhpMixed::List`). Normalize both into
+            // `(key, value)` pairs so list-form types are not silently skipped.
+            let type_arr: IndexMap<String, PhpMixed> = match type_value {
+                PhpMixed::Array(a) => a.clone(),
+                PhpMixed::List(l) => l
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i.to_string(), v.clone()))
+                    .collect(),
+                _ => IndexMap::new(),
+            };
             for (namespace, paths) in type_arr {
                 let namespace = if ["psr-4", "psr-0"].contains(&r#type) {
                     // normalize namespaces to ensure "\" becomes "" and others do not have leading separators as they are not needed
@@ -1912,6 +1931,284 @@ impl AutoloadGenerator {
 
         sorted_package_map
     }
+}
+
+/// Evaluates one of the `autoload_namespaces.php` / `autoload_psr4.php` / `autoload_classmap.php`
+/// files that `dump` just generated, returning the `return array(...)` payload with every path
+/// expression resolved to an absolute string. This stands in for PHP's `require $file` (there is no
+/// interpreter), exploiting the fact that the generated grammar is fixed and fully controlled here:
+/// a `$vendorDir = <expr>;` / `$baseDir = <expr>;` header followed by `return array( ... );` whose
+/// values are either a single path expression or `array(<expr>, ...)`. Each expression is a ` . `
+/// joined chain of `'literal'`, `$vendorDir`, `$baseDir`, `__DIR__`, and `dirname(...)` terms.
+/// Returns `PhpMixed::Bool(false)` when the file is absent (mirroring a failed `require`).
+fn require_generated_php_array(file: &str) -> PhpMixed {
+    let contents = match std::fs::read_to_string(file) {
+        Ok(c) => c,
+        Err(_) => return PhpMixed::Bool(false),
+    };
+
+    // __DIR__ inside the generated file is the directory that contains it.
+    let dir = std::path::Path::new(file)
+        .parent()
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_default();
+
+    let mut vendor_dir = String::new();
+    let mut base_dir = String::new();
+    for line in contents.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("$vendorDir = ") {
+            vendor_dir = eval_php_path_expr(rest.trim_end_matches(';'), &dir, "", "");
+        } else if let Some(rest) = line.strip_prefix("$baseDir = ") {
+            base_dir = eval_php_path_expr(rest.trim_end_matches(';'), &dir, &vendor_dir, "");
+        }
+    }
+
+    let start = match contents.find("return array(") {
+        Some(i) => i + "return array(".len(),
+        None => return PhpMixed::Array(IndexMap::new()),
+    };
+    let end = match contents.rfind(");") {
+        Some(i) => i,
+        None => return PhpMixed::Array(IndexMap::new()),
+    };
+    let body = &contents[start..end];
+
+    let mut map: IndexMap<String, PhpMixed> = IndexMap::new();
+    for entry in split_top_level_commas(body) {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        let Some(arrow) = find_top_level_arrow(entry) else {
+            continue;
+        };
+        let key_expr = entry[..arrow].trim();
+        let value_expr = entry[arrow + 2..].trim();
+        let key = eval_php_string_literal(key_expr);
+
+        let value = if let Some(inner) = value_expr
+            .strip_prefix("array(")
+            .and_then(|s| s.strip_suffix(')'))
+        {
+            let items: Vec<PhpMixed> = split_top_level_commas(inner)
+                .into_iter()
+                .filter(|p| !p.trim().is_empty())
+                .map(|p| {
+                    PhpMixed::String(eval_php_path_expr(p.trim(), &dir, &vendor_dir, &base_dir))
+                })
+                .collect();
+            PhpMixed::List(items)
+        } else {
+            PhpMixed::String(eval_php_path_expr(value_expr, &dir, &vendor_dir, &base_dir))
+        };
+        map.insert(key, value);
+    }
+
+    PhpMixed::Array(map)
+}
+
+/// Evaluates a single PHP path expression from a generated autoload file (e.g.
+/// `$baseDir . '/lib'`, `dirname(__DIR__)`, `'phar://' . $vendorDir . '/x'`).
+fn eval_php_path_expr(expr: &str, dir: &str, vendor_dir: &str, base_dir: &str) -> String {
+    let mut out = String::new();
+    for term in split_concat_terms(expr) {
+        let term = term.trim();
+        if term.starts_with('\'') {
+            out.push_str(&eval_php_string_literal(term));
+        } else if term == "__DIR__" {
+            out.push_str(dir);
+        } else if term == "$vendorDir" {
+            out.push_str(vendor_dir);
+        } else if term == "$baseDir" {
+            out.push_str(base_dir);
+        } else if term.starts_with("dirname(") {
+            out.push_str(&eval_php_dirname(term, dir, vendor_dir, base_dir));
+        }
+    }
+    out
+}
+
+/// Evaluates a (possibly nested) `dirname(...)` call against the same variable bindings.
+fn eval_php_dirname(term: &str, dir: &str, vendor_dir: &str, base_dir: &str) -> String {
+    let inner = term
+        .strip_prefix("dirname(")
+        .and_then(|s| s.strip_suffix(')'))
+        .unwrap_or("");
+    let resolved = eval_php_path_expr(inner, dir, vendor_dir, base_dir);
+    let path = resolved.trim_end_matches('/');
+    match path.rfind('/') {
+        Some(0) => "/".to_string(),
+        Some(i) => path[..i].to_string(),
+        None => ".".to_string(),
+    }
+}
+
+/// Unescapes a single-quoted PHP string literal (`'...'`), handling `\\` and `\'`.
+fn eval_php_string_literal(literal: &str) -> String {
+    let inner = literal
+        .trim()
+        .strip_prefix('\'')
+        .and_then(|s| s.strip_suffix('\''))
+        .unwrap_or(literal);
+    let mut out = String::new();
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('\\') => out.push('\\'),
+                Some('\'') => out.push('\''),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// Splits a PHP concatenation expression on top-level ` . ` separators, ignoring `.` inside string
+/// literals and inside parenthesised `dirname(...)` calls.
+fn split_concat_terms(expr: &str) -> Vec<String> {
+    let bytes: Vec<char> = expr.chars().collect();
+    let mut terms = Vec::new();
+    let mut current = String::new();
+    let mut in_string = false;
+    let mut depth = 0i32;
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_string {
+            current.push(c);
+            if c == '\\' && i + 1 < bytes.len() {
+                current.push(bytes[i + 1]);
+                i += 2;
+                continue;
+            }
+            if c == '\'' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            '\'' => {
+                in_string = true;
+                current.push(c);
+            }
+            '(' => {
+                depth += 1;
+                current.push(c);
+            }
+            ')' => {
+                depth -= 1;
+                current.push(c);
+            }
+            '.' if depth == 0
+                && i > 0
+                && bytes[i - 1] == ' '
+                && i + 1 < bytes.len()
+                && bytes[i + 1] == ' ' =>
+            {
+                terms.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(c),
+        }
+        i += 1;
+    }
+    if !current.trim().is_empty() {
+        terms.push(current.trim().to_string());
+    }
+    terms
+}
+
+/// Splits an `array(...)`/`return array(...)` body on top-level commas, ignoring commas inside
+/// string literals and nested parentheses.
+fn split_top_level_commas(body: &str) -> Vec<String> {
+    let chars: Vec<char> = body.chars().collect();
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut in_string = false;
+    let mut depth = 0i32;
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if in_string {
+            current.push(c);
+            if c == '\\' && i + 1 < chars.len() {
+                current.push(chars[i + 1]);
+                i += 2;
+                continue;
+            }
+            if c == '\'' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            '\'' => {
+                in_string = true;
+                current.push(c);
+            }
+            '(' => {
+                depth += 1;
+                current.push(c);
+            }
+            ')' => {
+                depth -= 1;
+                current.push(c);
+            }
+            ',' if depth == 0 => {
+                parts.push(std::mem::take(&mut current));
+            }
+            _ => current.push(c),
+        }
+        i += 1;
+    }
+    if !current.trim().is_empty() {
+        parts.push(current);
+    }
+    parts
+}
+
+/// Finds the byte offset of the top-level ` => ` separator in an array entry, skipping string
+/// literals and nested parentheses.
+fn find_top_level_arrow(entry: &str) -> Option<usize> {
+    let bytes = entry.as_bytes();
+    let mut in_string = false;
+    let mut depth = 0i32;
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_string {
+            if c == b'\\' {
+                i += 2;
+                continue;
+            }
+            if c == b'\'' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'\'' => in_string = true,
+            b'(' => depth += 1,
+            b')' => depth -= 1,
+            b'=' if depth == 0 && i + 1 < bytes.len() && bytes[i + 1] == b'>' => {
+                return Some(i);
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 pub fn composer_require(_file_identifier: &str, _file: &str) {

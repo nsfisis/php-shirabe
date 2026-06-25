@@ -254,12 +254,15 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
         "w" | "a" | "x" | "c" => (false, true),
         _ => (true, true), // r+, w+, a+, x+, c+, rw, ...
     };
-    // php://memory and php://temp are in-memory streams.
+    // php://memory and php://temp are in-memory streams. PHP's memory wrapper ignores the read /
+    // write restrictions implied by the mode: a memory stream opened with "w" is still readable
+    // (this is what Symfony's ApplicationTester relies on -- it opens "php://memory" with "w" and
+    // then rewinds + reads it back). So memory streams are always both readable and writable.
     if file == "php://memory" || file.starts_with("php://temp") {
         return Ok(StreamState::new(
             StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
-            readable,
-            writable,
+            true,
+            true,
             mode.to_string(),
             file.to_string(),
         ));

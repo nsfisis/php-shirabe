@@ -6,12 +6,22 @@ use std::rc::Rc;
 use indexmap::IndexMap;
 use shirabe::installer::SuggestedPackagesReporter;
 use shirabe::io::IOInterface;
+use shirabe::io::io_interface;
 use shirabe::io::null_io::NullIO;
+use shirabe::repository::{InstalledRepository, LockArrayRepository, RepositoryInterfaceHandle};
 
-/// Builds an IO mock and a SuggestedPackagesReporter over it. The IO mock
-/// (`getIOMock`) is not available here, so this remains a stub.
-fn set_up() {
-    todo!()
+use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
+use crate::test_case::get_package;
+
+/// ref: SuggestedPackagesReporterTest::setUp.
+///
+/// Builds an IO mock and a SuggestedPackagesReporter sharing it. The IOMockGuard runs
+/// assert_complete when it drops at the end of the test scope.
+fn set_up() -> (Rc<RefCell<IOMock>>, SuggestedPackagesReporter, IOMockGuard) {
+    let (mock, guard) = get_io_mock(io_interface::NORMAL).unwrap();
+    let io: Rc<RefCell<dyn IOInterface>> = mock.clone();
+    let reporter = SuggestedPackagesReporter::new(io);
+    (mock, reporter, guard)
 }
 
 /// ref: SuggestedPackagesReporterTest::getSuggestedPackageArray
@@ -28,12 +38,17 @@ fn reporter() -> SuggestedPackagesReporter {
     SuggestedPackagesReporter::new(io)
 }
 
-// These construct a SuggestedPackagesReporter with a mocked IO and assert its accumulated
-// suggestions and formatted output; mocking is not available here.
-#[ignore = "asserts IO mock output via getIOMock()->expects(); no IO mocking infrastructure exists and BufferIO::new/get_output are todo!()"]
 #[test]
 fn test_constructor() {
-    todo!()
+    let (mock, mut reporter, _guard) = set_up();
+    mock.borrow_mut()
+        .expects(vec![Expectation::text("b")], true)
+        .unwrap();
+
+    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
+    reporter
+        .output(SuggestedPackagesReporter::MODE_LIST, None, None)
+        .unwrap();
 }
 
 #[test]
@@ -77,44 +92,185 @@ fn test_add_package_appends() {
     );
 }
 
-#[ignore = "addSuggestionsFromPackage test mocks Package::getSuggests; set_suggests only exists on RootPackageHandle, so the non-root Package fixture with suggests cannot be expressed"]
 #[test]
 fn test_add_suggestions_from_package() {
-    todo!()
+    let mut reporter = reporter();
+
+    // PHP mocks getSuggests/getPrettyName; here a real package carries the suggests and name.
+    let package = get_package("package-pretty-name", "1.0.0");
+    let mut suggests = IndexMap::new();
+    suggests.insert("target-a".to_string(), "reason-a".to_string());
+    suggests.insert("target-b".to_string(), "reason-b".to_string());
+    package.__set_suggests(suggests);
+
+    reporter.add_suggestions_from_package(package);
+
+    let mut expected_a = IndexMap::new();
+    expected_a.insert("source".to_string(), "package-pretty-name".to_string());
+    expected_a.insert("target".to_string(), "target-a".to_string());
+    expected_a.insert("reason".to_string(), "reason-a".to_string());
+    let mut expected_b = IndexMap::new();
+    expected_b.insert("source".to_string(), "package-pretty-name".to_string());
+    expected_b.insert("target".to_string(), "target-b".to_string());
+    expected_b.insert("reason".to_string(), "reason-b".to_string());
+    assert_eq!(&vec![expected_a, expected_b], reporter.get_packages());
 }
 
-#[ignore = "asserts IO mock output via getIOMock()->expects(); no IO mocking infrastructure exists and BufferIO::new/get_output are todo!()"]
 #[test]
 fn test_output() {
-    todo!()
+    let (mock, mut reporter, _guard) = set_up();
+    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
+
+    mock.borrow_mut()
+        .expects(
+            vec![
+                Expectation::text("a suggests:"),
+                Expectation::text(" - b: c"),
+                Expectation::text(""),
+            ],
+            true,
+        )
+        .unwrap();
+
+    reporter
+        .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
+        .unwrap();
 }
 
-#[ignore = "asserts IO mock output via getIOMock()->expects(); no IO mocking infrastructure exists and BufferIO::new/get_output are todo!()"]
 #[test]
 fn test_output_with_no_suggestion_reason() {
-    todo!()
+    let (mock, mut reporter, _guard) = set_up();
+    reporter.add_package("a".to_string(), "b".to_string(), "".to_string());
+
+    mock.borrow_mut()
+        .expects(
+            vec![
+                Expectation::text("a suggests:"),
+                Expectation::text(" - b"),
+                Expectation::text(""),
+            ],
+            true,
+        )
+        .unwrap();
+
+    reporter
+        .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
+        .unwrap();
 }
 
-#[ignore = "asserts IO mock output via getIOMock()->expects(); no IO mocking infrastructure exists and BufferIO::new/get_output are todo!()"]
 #[test]
 fn test_output_ignores_formatting() {
-    todo!()
+    let (mock, mut reporter, _guard) = set_up();
+    reporter.add_package(
+        "source".to_string(),
+        "target1".to_string(),
+        "\x1b[1;37;42m Like us\r\non Facebook \x1b[0m".to_string(),
+    );
+    reporter.add_package(
+        "source".to_string(),
+        "target2".to_string(),
+        "<bg=green>Like us on Facebook</>".to_string(),
+    );
+
+    mock.borrow_mut()
+        .expects(
+            vec![
+                Expectation::text("source suggests:"),
+                Expectation::text(" - target1: [1;37;42m Like us on Facebook [0m"),
+                Expectation::text(" - target2: <bg=green>Like us on Facebook</>"),
+                Expectation::text(""),
+            ],
+            true,
+        )
+        .unwrap();
+
+    reporter
+        .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
+        .unwrap();
 }
 
-#[ignore = "asserts IO mock output via getIOMock()->expects(); no IO mocking infrastructure exists and BufferIO::new/get_output are todo!()"]
 #[test]
 fn test_output_multiple_packages() {
-    todo!()
+    let (mock, mut reporter, _guard) = set_up();
+    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
+    reporter.add_package(
+        "source package".to_string(),
+        "target".to_string(),
+        "because reasons".to_string(),
+    );
+
+    mock.borrow_mut()
+        .expects(
+            vec![
+                Expectation::text("a suggests:"),
+                Expectation::text(" - b: c"),
+                Expectation::text(""),
+                Expectation::text("source package suggests:"),
+                Expectation::text(" - target: because reasons"),
+                Expectation::text(""),
+            ],
+            true,
+        )
+        .unwrap();
+
+    reporter
+        .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
+        .unwrap();
 }
 
-#[ignore = "asserts IO mock output via getIOMock()->expects() and uses getMockBuilder mocks of InstalledRepository/PackageInterface; no mocking infrastructure exists"]
 #[test]
 fn test_output_skip_installed_packages() {
-    todo!()
+    let (mock, mut reporter, _guard) = set_up();
+
+    // PHP mocks two PackageInterfaces returning getNames() ['x','y'] and ['b']; only the 'b'
+    // match is consequential (it filters the 'a' -> 'b' suggestion). Real packages carry a
+    // single name, so the immaterial 'y' name is omitted.
+    let package1 = get_package("x", "1.0.0");
+    let package2 = get_package("b", "1.0.0");
+    let installed = LockArrayRepository::new(vec![package1, package2]).unwrap();
+    let mut repository = InstalledRepository::new(vec![RepositoryInterfaceHandle::new(installed)]);
+
+    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
+    reporter.add_package(
+        "source package".to_string(),
+        "target".to_string(),
+        "because reasons".to_string(),
+    );
+
+    mock.borrow_mut()
+        .expects(
+            vec![
+                Expectation::text("source package suggests:"),
+                Expectation::text(" - target: because reasons"),
+                Expectation::text(""),
+            ],
+            true,
+        )
+        .unwrap();
+
+    reporter
+        .output(
+            SuggestedPackagesReporter::MODE_BY_PACKAGE,
+            Some(&mut repository),
+            None,
+        )
+        .unwrap();
 }
 
-#[ignore = "uses getMockBuilder mock of InstalledRepository with ->expects($this->exactly(0)) call-count assertion; no mocking infrastructure exists"]
 #[test]
 fn test_output_not_getting_installed_packages_when_no_suggestions() {
-    todo!()
+    let (_mock, reporter, _guard) = set_up();
+
+    // PHP asserts getPackages() is called exactly 0 times. With no suggestions queued,
+    // get_filtered_suggestions short-circuits before touching the repository.
+    let installed = LockArrayRepository::new(vec![]).unwrap();
+    let mut repository = InstalledRepository::new(vec![RepositoryInterfaceHandle::new(installed)]);
+
+    reporter
+        .output(
+            SuggestedPackagesReporter::MODE_BY_PACKAGE,
+            Some(&mut repository),
+            None,
+        )
+        .unwrap();
 }

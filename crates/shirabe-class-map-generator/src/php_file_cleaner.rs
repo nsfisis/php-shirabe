@@ -34,8 +34,18 @@ impl PhpFileCleaner {
                 TypeConfigEntry {
                     name: r#type.clone(),
                     length: r#type.len(),
+                    // Regex pattern compatibility:
+                    // PHP uses `.\b(?<![$:>])<type>` anchored (`A`): it consumes the single char
+                    // before the keyword (`.`), requires a word boundary there (`\b`) and forbids
+                    // that char being `$`, `:` or `>`. The `regex` crate has no look-behind, so the
+                    // consumed char plus both guards collapse into one negated class
+                    // `[^a-zA-Z0-9_$:>]` (the `\w` set reproducing `\b`, plus the three operators).
+                    // The possessive quantifiers (`++`, `*+`) are performance-only and become plain
+                    // `+`/`*`. The leftmost-match semantics of `captures_at(.., offset)` stand in for
+                    // the dropped `A` (anchored) modifier, since the keyword is known to sit exactly
+                    // one char past the search offset.
                     pattern: format!(
-                        "{{.\\b(?<![$:>]){}\\s++[a-zA-Z_\\x7f-\\xff:][a-zA-Z0-9_\\x7f-\\xff:\\-]*+}}Ais",
+                        "{{[^a-zA-Z0-9_$:>]{}\\s+[a-zA-Z_\\x7f-\\xff:][a-zA-Z0-9_\\x7f-\\xff:\\-]*}}is",
                         r#type
                     ),
                 },

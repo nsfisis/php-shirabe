@@ -25,7 +25,12 @@ impl PregOffsetCaptureMatches {
 }
 
 pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
-    const SPECIAL: &str = ".\\+*?[^]$(){}=!<>|:-#";
+    // Regex pattern compatibility:
+    // PHP's preg_quote escapes `<` and `>` (PCRE treats `\<`/`\>` as literals), but the `regex`
+    // crate reads `\<`/`\>` as start-of-word / end-of-word boundary assertions. `<` and `>` are
+    // already literal in the `regex` crate, so they are emitted unescaped to preserve the intended
+    // literal match.
+    const SPECIAL: &str = ".\\+*?[^]$(){}=!|:-#";
     let mut out = String::new();
     for c in str.chars() {
         if c == '\0' {
@@ -43,7 +48,8 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
 // Returns whether the pattern matched; populates matches[0]=full match, matches[1..]=captures.
 // Optional groups that did not participate in the match are stored as None.
 pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>>) -> bool {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     matches.clear();
     match re.captures(subject) {
         Some(caps) => {
@@ -67,7 +73,8 @@ pub fn preg_split(pattern: &str, subject: &str) -> Vec<String> {
 // PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
 // match occurrence. Non-participating groups are reported as "".
 pub fn preg_match_all(pattern: &str, subject: &str) -> Vec<Vec<String>> {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let group_count = re.captures_len();
     let mut groups: Vec<Vec<String>> = vec![Vec::new(); group_count];
     for caps in re.captures_iter(subject) {
@@ -89,7 +96,8 @@ pub fn preg_match_all_set_order(
     subject: &str,
     matches: &mut Vec<Vec<String>>,
 ) -> usize {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let mut rows: Vec<Vec<String>> = Vec::new();
     for caps in re.captures_iter(subject) {
         rows.push(php_match_row(&caps));
@@ -100,7 +108,8 @@ pub fn preg_match_all_set_order(
 }
 
 pub fn preg_grep(pattern: &str, input: &[String]) -> Vec<String> {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     input.iter().filter(|s| re.is_match(s)).cloned().collect()
 }
 
@@ -109,7 +118,8 @@ pub fn preg_match_all_offset_capture(
     subject: &str,
     matches: &mut PregOffsetCaptureMatches,
 ) -> usize {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let group_count = re.captures_len();
     matches.groups = vec![Vec::new(); group_count];
 
@@ -139,7 +149,8 @@ pub fn preg_replace_callback<F>(
 where
     F: FnMut(&[Option<String>]) -> anyhow::Result<String>,
 {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0;
     for caps in re.captures_iter(subject) {
@@ -165,9 +176,18 @@ pub fn preg_match2(
     flags: i64,
     offset: usize,
 ) -> bool {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
-    let caps = re.captures_at(subject, offset);
+    // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate cannot
+    // anchor a `captures_at` search, so search the sub-slice beginning at `offset` and require the
+    // match to start at its head.
+    let caps = if anchored {
+        re.captures(&subject[offset..])
+            .filter(|c| c.get(0).map(|m| m.start()) == Some(0))
+    } else {
+        re.captures_at(subject, offset)
+    };
 
     matches.clear();
     if let Some(caps) = &caps {
@@ -185,7 +205,8 @@ pub fn preg_match_all2(
     flags: i64,
     offset: usize,
 ) -> usize {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
@@ -223,7 +244,8 @@ pub fn preg_match_all_offset_capture2(
     flags: i64,
     offset: usize,
 ) -> usize {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
@@ -260,7 +282,8 @@ pub fn preg_replace2(
     limit: i64,
     count: Option<&mut usize>,
 ) -> String {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let limit = if limit < 0 {
         usize::MAX
     } else {
@@ -298,7 +321,8 @@ pub fn preg_replace_callback2<
     count: Option<&mut usize>,
     flags: i64,
 ) -> String {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let names: Vec<Option<&str>> = re.capture_names().collect();
     let limit = if limit < 0 {
@@ -330,7 +354,8 @@ pub fn preg_replace_callback2<
 }
 
 pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<String> {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let no_empty = flags & PREG_SPLIT_NO_EMPTY != 0;
     let delim_capture = flags & PREG_SPLIT_DELIM_CAPTURE != 0;
     // `limit` counts the resulting pieces; a non-positive value means no limit.
@@ -371,7 +396,8 @@ pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<
 }
 
 pub fn preg_grep2(pattern: &str, array: &[&str], flags: i64) -> Vec<String> {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
+    let (re, _anchored) =
+        compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let invert = flags & PREG_GREP_INVERT != 0;
     array
         .iter()
@@ -386,7 +412,34 @@ pub fn preg_grep2(pattern: &str, array: &[&str], flags: i64) -> Vec<String> {
 // lookaround, backreferences) are not supported by `regex` and must be avoided
 // in the caller's pattern.
 // TODO(phase-c): replace with a faithful PCRE engine to restore full semantics.
-fn compile_php_pattern(pattern: &str) -> anyhow::Result<regex::Regex> {
+// PCRE treats `\<` and `\>` as escaped literal `<`/`>`, but the `regex` crate
+// reads them as start/end-of-word boundary assertions. Rewrite those escapes to
+// the literal characters so PCRE-sourced patterns (e.g. anything run through
+// `preg_quote`, which escapes `<` and `>`) keep their original meaning. A `\\`
+// escapes the following backslash, so `\\<` is left untouched.
+fn translate_pcre_literals(inner: &str) -> String {
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.peek() {
+                Some('<') | Some('>') => {
+                    out.push(chars.next().unwrap());
+                }
+                Some('\\') => {
+                    out.push('\\');
+                    out.push(chars.next().unwrap());
+                }
+                _ => out.push('\\'),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn compile_php_pattern(pattern: &str) -> anyhow::Result<(regex::Regex, bool)> {
     let delimiter = pattern
         .chars()
         .next()
@@ -412,13 +465,20 @@ fn compile_php_pattern(pattern: &str) -> anyhow::Result<regex::Regex> {
         .filter(|c| matches!(c, 'i' | 'x' | 's' | 'm'))
         .collect();
 
+    // PCRE's `A` (PCRE_ANCHORED) modifier requires the match to start exactly at the search offset.
+    // The `regex` crate has no per-search anchoring, so the offset-based callers
+    // (`preg_match2`/`preg_match_all2`) honour it by searching a sub-slice that begins at the offset;
+    // here we only surface the flag.
+    let anchored = modifiers.contains('A');
+
+    let inner = translate_pcre_literals(inner);
     let translated = if flags.is_empty() {
-        inner.to_string()
+        inner
     } else {
         format!("(?{flags}){inner}")
     };
 
-    Ok(regex::Regex::new(&translated)?)
+    Ok((regex::Regex::new(&translated)?, anchored))
 }
 
 // Expands a PHP preg replacement template against `caps`, appending bytes to
