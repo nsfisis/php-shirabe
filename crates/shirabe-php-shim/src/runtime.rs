@@ -227,14 +227,15 @@ pub fn spl_autoload_register(
 ) -> bool {
     let _ = (callback, throw, prepend);
     // TODO(phase-d): class autoloading has no analogue in compiled Rust (classes are not loaded by
-    // name at runtime).
-    todo!()
+    // name at runtime), so the callback is dropped. Returns success so callers that register an
+    // autoloader during startup can proceed; this is not a faithful implementation.
+    true
 }
 
 pub fn spl_autoload_unregister(callback: Box<dyn Fn(&str) -> PhpMixed + Send + Sync>) -> bool {
     let _ = callback;
-    // TODO(phase-d): see spl_autoload_register.
-    todo!()
+    // TODO(phase-d): see spl_autoload_register; nothing is registered, so this is a no-op stub.
+    true
 }
 
 static ERROR_REPORTING_LEVEL: std::sync::atomic::AtomicI64 =
