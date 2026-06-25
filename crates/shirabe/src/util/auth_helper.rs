@@ -534,14 +534,14 @@ impl AuthHelper {
                 true,
             ) && in_array(
                 PhpMixed::String(origin.to_string()),
-                &PhpMixed::List(
-                    self.config
-                        .borrow_mut()
-                        .get("gitlab-domains")
-                        .as_array()
-                        .map(|a| a.values().map(|v| v.clone()).collect())
-                        .unwrap_or_default(),
-                ),
+                &PhpMixed::List({
+                    let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
+                    match &gitlab_domains {
+                        PhpMixed::List(l) => l.clone(),
+                        PhpMixed::Array(a) => a.values().cloned().collect(),
+                        _ => vec![],
+                    }
+                }),
                 true,
             ) {
                 if password == "oauth2" {

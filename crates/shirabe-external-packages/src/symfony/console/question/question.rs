@@ -304,10 +304,16 @@ impl Question {
     }
 
     // PHP: `(bool) \count(array_filter(array_keys($array), 'is_string'))`.
-    // PhpMixed models a PHP array as either `List` (sequential int keys) or `Array`
-    // (string-keyed map), so the "has string keys" test reduces to the `Array` variant.
+    // A `List` has only sequential int keys, so it is never associative. An `Array` is
+    // associative only when at least one key is a genuine string key; PHP normalizes
+    // canonical-integer string keys (e.g. "0", "12") back to int keys, so those do not count.
+    // The same heuristic (a key is "string" iff it does not parse as an i64) is used by
+    // ConsoleIO::select when computing `$isAssoc` over the choice map.
     pub(crate) fn is_assoc(array: &PhpMixed) -> bool {
-        matches!(array, PhpMixed::Array(_))
+        match array {
+            PhpMixed::Array(map) => map.keys().any(|key| key.parse::<i64>().is_err()),
+            _ => false,
+        }
     }
 
     pub fn is_trimmable(&self) -> bool {

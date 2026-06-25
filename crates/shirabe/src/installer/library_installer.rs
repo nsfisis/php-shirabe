@@ -63,21 +63,23 @@ impl LibraryInstaller {
             Some("/"),
         );
         let binary_installer = binary_installer.unwrap_or_else(|| {
-            BinaryInstaller::new(
-                io.clone(),
-                rtrim(
-                    &composer_ref
-                        .get_config()
-                        .borrow_mut()
-                        .get_str("bin-dir")
-                        .unwrap_or_default(),
-                    Some("/"),
-                ),
-                composer_ref
+            let bin_dir = rtrim(
+                &composer_ref
                     .get_config()
                     .borrow_mut()
-                    .get_str("bin-compat")
+                    .get_str("bin-dir")
                     .unwrap_or_default(),
+                Some("/"),
+            );
+            let bin_compat = composer_ref
+                .get_config()
+                .borrow_mut()
+                .get_str("bin-compat")
+                .unwrap_or_default();
+            BinaryInstaller::new(
+                io.clone(),
+                bin_dir,
+                bin_compat,
                 Some(filesystem.clone()),
                 Some(vendor_dir.clone()),
             )

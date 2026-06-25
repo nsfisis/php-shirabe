@@ -1231,6 +1231,15 @@ macro_rules! impl_real_package_test_setters {
                     .expect("real package handle invariant")
                     .set_dist_sha1_checksum(sha1checksum);
             }
+
+            /// For testing only: mirrors PHP `Package::setTargetDir`.
+            pub fn __set_target_dir(&self, target_dir: Option<String>) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_target_dir(target_dir);
+            }
         }
     };
 }

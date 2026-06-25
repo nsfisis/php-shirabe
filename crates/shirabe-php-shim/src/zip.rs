@@ -1,8 +1,20 @@
+use crate::ErrorException;
 use crate::PhpMixed;
 use crate::{StreamBacking, StreamState};
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use zip::write::SimpleFileOptions;
+
+/// Test-only behaviour mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`, where
+/// `open`/`extractTo`/`count` are stubbed via `->willReturn(...)`/`->willThrowException(...)`.
+/// Held in [`ZipArchive::mock`]; always `None` in production.
+#[derive(Debug, Clone)]
+pub struct ZipArchiveMock {
+    pub open: Result<(), i64>,
+    pub count: i64,
+    /// `Ok(bool)` for `extractTo` returning a bool, `Err(..)` to throw an `\ErrorException`.
+    pub extract_to: Result<bool, String>,
+}
 
 /// Internal backing of an opened `ZipArchive`. PHP's `ZipArchive` multiplexes
 /// reading an existing archive and building a new one through the same handle;
@@ -25,6 +37,8 @@ enum ZipState {
 pub struct ZipArchive {
     pub num_files: i64,
     state: RefCell<ZipState>,
+    /// Test-only mock state. `None` in production; set via [`ZipArchive::__mock`] in tests.
+    mock: Option<ZipArchiveMock>,
 }
 
 impl Default for ZipArchive {
@@ -38,10 +52,24 @@ impl ZipArchive {
         Self {
             num_files: 0,
             state: RefCell::new(ZipState::Closed),
+            mock: None,
+        }
+    }
+
+    /// For testing only. Builds a mocked ZipArchive whose `open`/`count`/`extract_to` return the
+    /// configured values, mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`.
+    pub fn __mock(mock: ZipArchiveMock) -> Self {
+        Self {
+            num_files: mock.count,
+            state: RefCell::new(ZipState::Closed),
+            mock: Some(mock),
         }
     }
 
     pub fn open(&mut self, filename: &str, flags: i64) -> Result<(), i64> {
+        if let Some(mock) = &self.mock {
+            return mock.open;
+        }
         if flags & Self::CREATE != 0 {
             let file = match std::fs::File::create(filename) {
                 Ok(f) => f,
@@ -79,6 +107,9 @@ impl ZipArchive {
     }
 
     pub fn count(&self) -> i64 {
+        if let Some(mock) = &self.mock {
+            return mock.count;
+        }
         self.num_files
     }
 
@@ -113,12 +144,21 @@ impl ZipArchive {
         Some(stat)
     }
 
-    pub fn extract_to(&self, path: &str) -> bool {
+    pub fn extract_to(&self, path: &str) -> Result<bool, ErrorException> {
+        if let Some(mock) = &self.mock {
+            return mock.extract_to.clone().map_err(|message| ErrorException {
+                message,
+                code: 0,
+                severity: 1,
+                filename: String::new(),
+                lineno: 0,
+            });
+        }
         let mut state = self.state.borrow_mut();
         let ZipState::Reader(archive) = &mut *state else {
-            return false;
+            return Ok(false);
         };
-        archive.extract(path).is_ok()
+        Ok(archive.extract(path).is_ok())
     }
 
     pub fn locate_name(&self, name: &str) -> Option<i64> {

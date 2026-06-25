@@ -332,7 +332,7 @@ impl ZipDownloader {
                     }
                 }
 
-                let extract_result = zip_archive.extract_to(path);
+                let extract_result = zip_archive.extract_to(path)?;
 
                 if extract_result {
                     zip_archive.close();
@@ -392,6 +392,28 @@ impl ZipDownloader {
                 file, retval
             ),
         }
+    }
+
+    /// For testing only. Mirrors the test's `setPrivateProperty('hasZipArchive', ...)` reflection on
+    /// the `ZipDownloader::$hasZipArchive` static.
+    pub fn __set_has_zip_archive(value: Option<bool>) {
+        *HAS_ZIP_ARCHIVE.lock().unwrap() = value;
+    }
+
+    /// For testing only. Mirrors the test's `setPrivateProperty('isWindows', ...)` reflection.
+    pub fn __set_is_windows(value: Option<bool>) {
+        *IS_WINDOWS.lock().unwrap() = value;
+    }
+
+    /// For testing only. Mirrors the test's `setPrivateProperty('unzipCommands', ...)` reflection.
+    pub fn __set_unzip_commands(value: Option<Vec<Vec<String>>>) {
+        *UNZIP_COMMANDS.lock().unwrap() = value;
+    }
+
+    /// For testing only. Mirrors the test's `setPrivateProperty('zipArchiveObject', $zipArchive, $obj)`
+    /// reflection on the instance's `$zipArchiveObject` property.
+    pub fn __set_zip_archive_object(&mut self, value: Option<ZipArchive>) {
+        self.zip_archive_object = value;
     }
 }
 

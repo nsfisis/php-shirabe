@@ -16,11 +16,20 @@ use shirabe::installer::{InstallerInterface, LibraryInstaller};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::InstalledArrayRepository;
+use shirabe::repository::RepositoryInterface;
 use shirabe::repository::WritableRepositoryInterface;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
 
+use crate::downloader_stub::{DownloaderCall, DownloaderStub};
 use crate::test_case::get_package;
+
+fn run<F: std::future::Future>(future: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap()
+        .block_on(future)
+}
 
 /// Mirror of setUp(): builds the Composer/Config over temp root/vendor/bin dirs
 /// plus a real DownloadManager and a NullIO. The `_composer_rc` keeps the inner
@@ -33,6 +42,9 @@ struct SetUp {
     io: Rc<RefCell<dyn IOInterface>>,
     composer: PartialComposerWeakHandle,
     fs: Filesystem,
+    /// Recorded downloader operations forwarded by the LibraryInstaller, mirroring the
+    /// PHP DownloadManager mock's expectations on install/update/remove.
+    downloader_calls: Rc<RefCell<Vec<DownloaderCall>>>,
     _composer_rc: ComposerHandle,
 }
 
@@ -65,7 +77,10 @@ fn set_up() -> SetUp {
 
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
 
-    let dm = DownloadManager::new(io.clone(), false, None);
+    let mut dm = DownloadManager::new(io.clone(), false, None);
+    let downloader = DownloaderStub::new();
+    let downloader_calls = downloader.calls();
+    dm.set_downloader("fake", Rc::new(RefCell::new(downloader)));
     let dm_rc = Rc::new(RefCell::new(dm));
 
     let composer_rc = Rc::new(RefCell::new(PartialOrFullComposer::new_full()));
@@ -82,8 +97,19 @@ fn set_up() -> SetUp {
         io,
         composer: weak,
         fs,
+        downloader_calls,
         _composer_rc: composer,
     }
+}
+
+/// Builds a `dist`-installable test package backed by the `fake` downloader stub, so the
+/// real DownloadManager dispatches install/update/remove to the recording stub instead of
+/// erroring on a package with no installation source.
+fn get_installable_package(name: &str, version: &str) -> shirabe::package::PackageInterfaceHandle {
+    let package = get_package(name, version);
+    package.set_installation_source(Some("dist".to_string()));
+    package.set_dist_type(Some("fake".to_string()));
+    package
 }
 
 fn tear_down(setup: &mut SetUp) {
@@ -91,7 +117,6 @@ fn tear_down(setup: &mut SetUp) {
     setup.fs.remove_directory(&root).ok();
 }
 
-#[ignore]
 #[test]
 fn test_installer_creation_should_not_create_vendor_directory() {
     let mut setup = set_up();
@@ -103,7 +128,6 @@ fn test_installer_creation_should_not_create_vendor_directory() {
     tear_down(&mut setup);
 }
 
-#[ignore]
 #[test]
 fn test_installer_creation_should_not_create_bin_directory() {
     let mut setup = set_up();
@@ -115,7 +139,6 @@ fn test_installer_creation_should_not_create_bin_directory() {
     tear_down(&mut setup);
 }
 
-#[ignore]
 #[test]
 fn test_is_installed() {
     let mut setup = set_up();
@@ -142,24 +165,129 @@ fn test_is_installed() {
 }
 
 #[test]
-#[ignore = "requires PHPUnit mock of DownloadManager (expects(once)->method('install')->will(resolve(null))) and InstalledRepositoryInterface (expects(once)->addPackage); a real DownloadManager would attempt a download"]
 fn test_install() {
-    todo!()
+    let mut setup = set_up();
+    let mut library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let package = get_installable_package("some/package", "1.0.0");
+
+    // PHP asserts the DownloadManager mock's install() is called once with
+    // ($package, vendorDir/some/package); here the recording downloader stub
+    // captures the forwarded call instead.
+    let mut repository = InstalledArrayRepository::new().unwrap();
+
+    run(library.install(&mut repository, package.clone())).unwrap();
+
+    assert_eq!(
+        vec![DownloaderCall::Install {
+            package: "some/package".to_string(),
+            path: format!("{}/some/package", setup.vendor_dir),
+        }],
+        *setup.downloader_calls.borrow()
+    );
+    // PHP asserts repository->addPackage was called once with $package.
+    assert!(repository.has_package(package));
+
+    assert!(
+        std::path::Path::new(&setup.vendor_dir).exists(),
+        "Vendor dir should be created"
+    );
+    assert!(
+        std::path::Path::new(&setup.bin_dir).exists(),
+        "Bin dir should be created"
+    );
+
+    tear_down(&mut setup);
 }
 
 #[test]
-#[ignore = "requires PHPUnit mocks (Filesystem::rename, DownloadManager::update, repository hasPackage/add/remove with onConsecutiveCalls) and Package::setTargetDir, which is not exposed on PackageInterfaceHandle"]
 fn test_update() {
-    todo!()
+    let mut setup = set_up();
+
+    let initial = get_installable_package("vendor/package1", "1.0.0");
+    let target = get_installable_package("vendor/package1", "2.0.0");
+
+    initial.__set_target_dir(Some("oldtarget".to_string()));
+    target.__set_target_dir(Some("newtarget".to_string()));
+
+    // PHP mocks Filesystem::rename; here a real Filesystem renames the actual oldtarget
+    // dir, so it must exist first. The install path embeds the pretty-name twice because
+    // the package is named vendor/package1 and lives under vendorDir.
+    let old_target_dir = format!("{}/vendor/package1/oldtarget", setup.vendor_dir);
+    let new_target_dir = format!("{}/vendor/package1/newtarget", setup.vendor_dir);
+    fs::create_dir_all(&old_target_dir).unwrap();
+
+    let mut repository = InstalledArrayRepository::new().unwrap();
+    repository.add_package(initial.clone()).unwrap();
+
+    // The default Filesystem is fine; the LibraryInstaller's own filesystem performs the rename.
+    let mut library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+
+    run(library.update(&mut repository, initial.clone(), target.clone())).unwrap();
+
+    assert!(
+        std::path::Path::new(&new_target_dir).exists(),
+        "oldtarget should have been renamed to newtarget"
+    );
+    assert!(!std::path::Path::new(&old_target_dir).exists());
+
+    assert_eq!(
+        vec![DownloaderCall::Update {
+            initial: "vendor/package1".to_string(),
+            target: "vendor/package1".to_string(),
+            path: new_target_dir.clone(),
+        }],
+        *setup.downloader_calls.borrow()
+    );
+    assert!(!repository.has_package(initial.clone()));
+    assert!(repository.has_package(target.clone()));
+
+    assert!(
+        std::path::Path::new(&setup.vendor_dir).exists(),
+        "Vendor dir should be created"
+    );
+    assert!(
+        std::path::Path::new(&setup.bin_dir).exists(),
+        "Bin dir should be created"
+    );
+
+    // Updating again, with the initial package no longer installed, fails.
+    assert!(run(library.update(&mut repository, initial, target)).is_err());
+
+    tear_down(&mut setup);
 }
 
 #[test]
-#[ignore = "requires PHPUnit mock of DownloadManager (expects(once)->method('remove')->will(resolve(null))) and InstalledRepositoryInterface (hasPackage onConsecutiveCalls, removePackage)"]
 fn test_uninstall() {
-    todo!()
+    let mut setup = set_up();
+    let mut library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let package = get_installable_package("vendor/pkg", "1.0.0");
+
+    // PHP mocks hasPackage to return (true, false) over two calls; a real repository
+    // seeded with the package reproduces this naturally: present, then absent after
+    // the first uninstall removes it.
+    let mut repository = InstalledArrayRepository::new().unwrap();
+    repository.add_package(package.clone()).unwrap();
+
+    run(library.uninstall(&mut repository, package.clone())).unwrap();
+
+    assert_eq!(
+        vec![DownloaderCall::Remove {
+            package: "vendor/pkg".to_string(),
+            path: format!("{}/vendor/pkg", setup.vendor_dir),
+        }],
+        *setup.downloader_calls.borrow()
+    );
+    assert!(!repository.has_package(package.clone()));
+
+    // Uninstalling again, with the package no longer installed, fails.
+    assert!(run(library.uninstall(&mut repository, package)).is_err());
+
+    tear_down(&mut setup);
 }
 
-#[ignore]
 #[test]
 fn test_get_install_path_without_target_dir() {
     let mut setup = set_up();
@@ -176,9 +304,23 @@ fn test_get_install_path_without_target_dir() {
 }
 
 #[test]
-#[ignore = "Package::setTargetDir is not exposed on PackageInterfaceHandle, so the target-dir cannot be set on the test package"]
 fn test_get_install_path_with_target_dir() {
-    todo!()
+    let mut setup = set_up();
+    let mut library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let package = get_package("Foo/Bar", "1.0.0");
+    package.__set_target_dir(Some("Some/Namespace".to_string()));
+
+    assert_eq!(
+        format!(
+            "{}/{}/Some/Namespace",
+            setup.vendor_dir,
+            package.get_pretty_name()
+        ),
+        library.get_install_path(package).unwrap()
+    );
+
+    tear_down(&mut setup);
 }
 
 #[test]
