@@ -1,6 +1,8 @@
 //! ref: composer/tests/Composer/Test/Command/ValidateCommandTest.php
 
-use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use crate::test_case::{
+    RunOptions, create_composer_lock, get_application_tester, init_temp_composer,
+};
 use serial_test::serial;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::PhpMixed;
@@ -86,9 +88,9 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
 
 #[test]
 #[serial]
-#[ignore = "validate creates a Composer instance (create_composer_instance -> Factory) which \
-            reaches ProcessExecutor (git) -> shirabe-php-shim stream_set_blocking (stream.rs \
-            todo!(), requires fcntl(2))"]
+#[ignore = "validate creates a Composer instance (Factory::create_composer) which panics in \
+            PartialComposerHandle::borrow_partial at crates/shirabe/src/composer.rs:446 \
+            ('RefCell already mutably borrowed'); source-level borrow conflict, not a test issue"]
 fn test_validate() {
     for case in provide_validate_tests() {
         let _tear_down = init_temp_composer(Some(&case.composer_json), None, None, true);
@@ -128,11 +130,23 @@ fn test_validate_on_file_issues() {
 
 #[test]
 #[serial]
-#[ignore = "validate with a lock file creates a Composer instance and queries the Locker, reaching \
-            ProcessExecutor (git) -> shirabe-php-shim stream_set_blocking (stream.rs todo!(), \
-            requires fcntl(2))"]
+#[ignore = "validate with a lock file creates a Composer instance (Factory::create_composer) which \
+            panics in PartialComposerHandle::borrow_partial at crates/shirabe/src/composer.rs:446 \
+            ('RefCell already mutably borrowed'); source-level borrow conflict, not a test issue"]
 fn test_with_composer_lock() {
-    todo!()
+    let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
+    create_composer_lock(&[], &[]);
+
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(validate_input(vec![]), RunOptions::default())
+        .unwrap();
+
+    let expected = "<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid but your composer.lock has some errors\n# Lock file errors\n- Required package \"root/req\" is not present in the lock file.\nThis usually happens when composer files are incorrectly merged or the composer.json file is manually edited.\nRead more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md\nand prefer using the \"require\" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r";
+
+    assert_eq!(expected.trim(), app_tester.get_display().trim());
+
+    drop(tear_down);
 }
 
 #[test]
