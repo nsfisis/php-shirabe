@@ -59,7 +59,6 @@ fn test_config_validator_warns_on_script_alias_for_nonexistent_script() {
 }
 
 #[test]
-#[ignore]
 fn test_config_validator_warns_on_unnecessary_provide_replace() {
     let warnings = validate(&fixture("composer_provide-replace-requirements.json"));
 

@@ -54,7 +54,6 @@ fn get_archive_downloader(vendor_dir: Option<&str>) -> FileDownloader {
 }
 
 #[test]
-#[ignore]
 fn test_get_file_name() {
     let package = get_package("dummy/pkg", "1.0.0");
     package.set_dist_url(Some("http://example.com/script.js".to_string()));
@@ -68,7 +67,6 @@ fn test_get_file_name() {
 }
 
 #[test]
-#[ignore]
 fn test_process_url() {
     let downloader = get_archive_downloader(None);
 
@@ -80,7 +78,6 @@ fn test_process_url() {
 }
 
 #[test]
-#[ignore]
 fn test_process_url2() {
     let downloader = get_archive_downloader(None);
 
@@ -92,7 +89,6 @@ fn test_process_url2() {
 }
 
 #[test]
-#[ignore]
 fn test_process_url3() {
     let downloader = get_archive_downloader(None);
 

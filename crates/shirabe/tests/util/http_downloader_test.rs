@@ -17,7 +17,6 @@ fn test_capture_authentication_params_from_url() {
 }
 
 #[test]
-#[ignore]
 fn test_output_warnings() {
     let io: Rc<RefCell<BufferIO>> = Rc::new(RefCell::new(
         BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),

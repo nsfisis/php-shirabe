@@ -109,7 +109,6 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_https() {
 }
 
 #[test]
-#[ignore = "reaches Git::throw_exception -> Url::sanitize, whose preg pattern fails to parse in the regex crate (preg shim bug, unrelated to this test); production Url::sanitize must be fixed first"]
 fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive_without_authentication()
  {
     let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(|url: &str| {
@@ -269,7 +268,6 @@ fn run_command_private_bitbucket_with_authentication(
 }
 
 #[test]
-#[ignore = "after the first failing git command, Bitbucket::new constructs a real HttpDownloader -> CurlDownloader::new -> curl_multi_init(), which is todo!() in the curl shim; needs the curl shim or an injected HttpDownloader mock on Git"]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_ssh_token()
  {
     run_command_private_bitbucket_with_authentication(
@@ -282,7 +280,6 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 }
 
 #[test]
-#[ignore = "after the first failing git command, Bitbucket::new constructs a real HttpDownloader -> CurlDownloader::new -> curl_multi_init(), which is todo!() in the curl shim; needs the curl shim or an injected HttpDownloader mock on Git"]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_token()
  {
     run_command_private_bitbucket_with_authentication(
@@ -295,7 +292,6 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 }
 
 #[test]
-#[ignore = "after the first failing git command, Bitbucket::new constructs a real HttpDownloader -> CurlDownloader::new -> curl_multi_init(), which is todo!() in the curl shim; needs the curl shim or an injected HttpDownloader mock on Git"]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_git_token()
  {
     run_command_private_bitbucket_with_authentication(
@@ -320,7 +316,6 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 }
 
 #[test]
-#[ignore = "after the first failing git command, Bitbucket::new constructs a real HttpDownloader -> CurlDownloader::new -> curl_multi_init(), which is todo!() in the curl shim; needs the curl shim or an injected HttpDownloader mock on Git"]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_no_token()
  {
     run_command_private_bitbucket_with_authentication(
@@ -333,7 +328,6 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 }
 
 #[test]
-#[ignore = "after the first failing git command, Bitbucket::new constructs a real HttpDownloader -> CurlDownloader::new -> curl_multi_init(), which is todo!() in the curl shim; needs the curl shim or an injected HttpDownloader mock on Git"]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_git_no_token()
  {
     run_command_private_bitbucket_with_authentication(
@@ -346,7 +340,6 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 }
 
 #[test]
-#[ignore = "after the first failing git command, Bitbucket::new constructs a real HttpDownloader -> CurlDownloader::new -> curl_multi_init(), which is todo!() in the curl shim; needs the curl shim or an injected HttpDownloader mock on Git"]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_atat_token()
  {
     run_command_private_bitbucket_with_authentication(
@@ -421,7 +414,6 @@ fn test_sync_mirror_sanitizes_url_after_initial_clone() {
 }
 
 #[test]
-#[ignore = "the failed-update branch reaches Git::throw_exception -> Url::sanitize, whose preg pattern fails to parse in the regex crate (preg shim bug, unrelated to this test); production Url::sanitize must be fixed first"]
 fn test_sync_mirror_sanitizes_url_even_after_failed_update() {
     let dir = std::env::temp_dir().display().to_string();
 
