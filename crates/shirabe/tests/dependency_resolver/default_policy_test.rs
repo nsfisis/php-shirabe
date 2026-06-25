@@ -465,7 +465,6 @@ fn test_repository_ordering_affects_priority() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 fn test_select_local_repos_first() {
     let _tear_down = TearDown;

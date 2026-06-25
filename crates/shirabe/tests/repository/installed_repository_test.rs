@@ -34,7 +34,6 @@ fn provided_link() -> PhpMixed {
 }
 
 #[test]
-#[ignore]
 fn test_find_packages_with_replacers_and_providers() {
     let foo = loaded("foo", "1", vec![("replace", provided_link())]);
     let foo2 = get_package("foo", "2");

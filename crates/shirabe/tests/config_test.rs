@@ -379,7 +379,6 @@ fn test_fetching_relative_paths() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_override_github_protocols() {
     let mut config = Config::new(false, None);

@@ -8,7 +8,6 @@ use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 
 #[test]
-#[ignore]
 fn test_bump_requirement() {
     for (requirement, pretty_version, expected_requirement, branch_alias) in
         provide_bump_requirement_tests()

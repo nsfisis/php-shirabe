@@ -449,10 +449,6 @@ fn test_config_throws_for_invalid_arg_combination() {
 
 #[test]
 #[serial]
-#[ignore = "the command correctly throws, but Application::do_run's exception path calls \
-            hint_common_errors -> get_composer (a temp composer.json exists here), which reaches \
-            ProcessExecutor (git) -> shirabe-php-shim stream_set_blocking (stream.rs todo!(), \
-            requires fcntl(2))"]
 fn test_config_throws_for_invalid_severity() {
     let _tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
 
@@ -476,10 +472,6 @@ fn test_config_throws_for_invalid_severity() {
 
 #[test]
 #[serial]
-#[ignore = "the command correctly throws, but Application::do_run's exception path calls \
-            hint_common_errors -> get_composer (a temp composer.json exists here), which reaches \
-            ProcessExecutor (git) -> shirabe-php-shim stream_set_blocking (stream.rs todo!(), \
-            requires fcntl(2))"]
 fn test_config_throws_when_merging_array_with_object() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({"config": {"audit": {"ignore": ["CVE-2024-1234"]}}})),

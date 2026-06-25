@@ -3,7 +3,6 @@
 use shirabe::util::forgejo_url::ForgejoUrl;
 
 #[test]
-#[ignore]
 fn test_create() {
     for repo_url in create_provider() {
         let forgejo_url = ForgejoUrl::try_from(Some(repo_url));
@@ -29,13 +28,11 @@ fn create_provider() -> Vec<&'static str> {
 }
 
 #[test]
-#[ignore]
 fn test_create_invalid() {
     assert!(ForgejoUrl::create("https://example.org").is_err());
 }
 
 #[test]
-#[ignore]
 fn test_generate_ssh_url() {
     let forgejo_url = ForgejoUrl::create("git@codeberg.org:acme/repo.git").unwrap();
 

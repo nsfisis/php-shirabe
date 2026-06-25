@@ -80,7 +80,6 @@ fn check_transaction_operations(transaction: &Transaction, expected: Vec<Operati
 }
 
 #[test]
-#[ignore]
 fn test_transaction_generation_and_sorting() {
     let package_a = get_package("a/a", "dev-master");
     let package_a_alias = get_alias_package(&package_a, "1.0.x-dev");
