@@ -1223,6 +1223,15 @@ macro_rules! impl_real_package_test_setters {
                     .set_type(r#type);
             }
 
+            /// For testing only: mirrors PHP `Package::setBinaries`.
+            pub fn __set_binaries(&self, binaries: Vec<String>) {
+                self.0
+                    .borrow_mut()
+                    .as_package_mut()
+                    .expect("real package handle invariant")
+                    .set_binaries(binaries);
+            }
+
             /// For testing only: mirrors PHP `Package::setSourceType`.
             pub fn __set_source_type(&self, r#type: Option<String>) {
                 self.0

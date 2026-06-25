@@ -371,9 +371,21 @@ pub fn pcntl_signal_get_handler(_signal: i64) -> PhpMixed {
     todo!()
 }
 
+#[repr(C)]
+struct Passwd {
+    pw_name: *const std::os::raw::c_char,
+    pw_passwd: *const std::os::raw::c_char,
+    pw_uid: u32,
+    pw_gid: u32,
+    pw_gecos: *const std::os::raw::c_char,
+    pw_dir: *const std::os::raw::c_char,
+    pw_shell: *const std::os::raw::c_char,
+}
+
 unsafe extern "C" {
     fn getuid() -> u32;
     fn geteuid() -> u32;
+    fn getpwuid(uid: u32) -> *const Passwd;
 }
 
 pub fn posix_getuid() -> i64 {
@@ -386,9 +398,32 @@ pub fn posix_geteuid() -> i64 {
     (unsafe { geteuid() }) as i64
 }
 
-pub fn posix_getpwuid(_uid: i64) -> PhpMixed {
-    // TODO(phase-d): getpwuid(3) is not reachable without a libc/syscall crate.
-    todo!()
+pub fn posix_getpwuid(uid: i64) -> PhpMixed {
+    // getpwuid(3) via libc (already linked); mirrors PHP posix_getpwuid returning an associative
+    // array of the passwd entry, or false when no entry matches the uid.
+    let pw = unsafe { getpwuid(uid as u32) };
+    if pw.is_null() {
+        return PhpMixed::Bool(false);
+    }
+    let cstr = |p: *const std::os::raw::c_char| -> String {
+        if p.is_null() {
+            String::new()
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(p) }
+                .to_string_lossy()
+                .into_owned()
+        }
+    };
+    let pw = unsafe { &*pw };
+    let mut entry = indexmap::IndexMap::new();
+    entry.insert("name".to_string(), PhpMixed::String(cstr(pw.pw_name)));
+    entry.insert("passwd".to_string(), PhpMixed::String(cstr(pw.pw_passwd)));
+    entry.insert("uid".to_string(), PhpMixed::Int(pw.pw_uid as i64));
+    entry.insert("gid".to_string(), PhpMixed::Int(pw.pw_gid as i64));
+    entry.insert("gecos".to_string(), PhpMixed::String(cstr(pw.pw_gecos)));
+    entry.insert("dir".to_string(), PhpMixed::String(cstr(pw.pw_dir)));
+    entry.insert("shell".to_string(), PhpMixed::String(cstr(pw.pw_shell)));
+    PhpMixed::Array(entry)
 }
 
 pub fn posix_isatty(stream: PhpResource) -> bool {
