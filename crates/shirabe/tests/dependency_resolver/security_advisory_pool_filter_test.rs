@@ -16,7 +16,6 @@ use shirabe::repository::{PackageRepository, RepositoryInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
-#[ignore]
 #[test]
 fn test_filter_packages_by_advisories() {
     let audit_config = AuditConfig::new(
@@ -120,7 +119,6 @@ fn test_filter_packages_by_advisories() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_dont_filter_packages_by_ignored_advisories() {
     let mut ignore_list: IndexMap<String, Option<String>> = IndexMap::new();
