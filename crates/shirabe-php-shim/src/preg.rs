@@ -441,6 +441,12 @@ fn php_replacement_expand(template: &str, caps: &regex::Captures, out: &mut Vec<
                 out.push(b'\\');
                 i += 2;
             }
+            // A backslash escapes a following `$`, yielding a literal dollar sign (so an escaped
+            // `\$1` is not mistaken for the `$1` backreference).
+            b'\\' if i + 1 < bytes.len() && bytes[i + 1] == b'$' => {
+                out.push(b'$');
+                i += 2;
+            }
             b'$' if i + 1 < bytes.len() && bytes[i + 1] == b'{' => {
                 let rest = &bytes[i + 2..];
                 match rest.iter().position(|&b| b == b'}') {
