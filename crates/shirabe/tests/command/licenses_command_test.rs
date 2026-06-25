@@ -175,10 +175,6 @@ fn test_format_json() {
 
 #[test]
 #[serial]
-#[ignore = "SymfonyStyle::table reaches \
-            symfony_style.rs:445 is_console_output_interface() todo!() (downcasting \
-            dyn OutputInterface to dyn ConsoleOutputInterface is not expressible with the current \
-            trait design)"]
 fn test_format_summary() {
     let _tear_down = set_up();
 

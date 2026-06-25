@@ -14,6 +14,7 @@ use crate::symfony::console::helper::TableSeparator;
 use crate::symfony::console::input::InputInterface;
 use crate::symfony::console::output::ConsoleOutputInterface;
 use crate::symfony::console::output::OutputInterface;
+use crate::symfony::console::output::console_output::ConsoleOutput;
 use crate::symfony::console::output::TrimmedBufferOutput;
 use crate::symfony::console::output::output_interface::OUTPUT_NORMAL;
 use crate::symfony::console::question::ChoiceQuestion;
@@ -270,10 +271,9 @@ impl SymfonyStyle {
         style.set_cell_header_format("<info>%s</info>".to_string());
 
         let mut table = Table::new(output);
-        // PHP passes the cloned `TableStyle` instance directly; `set_style` here takes a
-        // `PhpMixed` name/style. Phase B leaves the polymorphic style passing as a TODO.
-        let _ = &style;
-        let _ = table.set_style("symfony-style-guide".into());
+        let _ = table.set_style(
+            crate::symfony::console::helper::table::StyleName::Style(style),
+        );
         table
     }
 
@@ -440,10 +440,12 @@ impl SymfonyStyle {
         self.output.borrow().get_formatter()
     }
 
-    // TODO(phase-c/d): downcasting `dyn OutputInterface` to `dyn ConsoleOutputInterface`
-    // is not expressible with the current trait design (same as `output_style.rs`).
-    fn is_console_output_interface(_output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
-        todo!()
+    fn is_console_output_interface(output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
+        // ConsoleOutput is the only OutputInterface implementor that also implements
+        // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this downcast.
+        shirabe_php_shim::AsAny::as_any(&*output.borrow())
+            .downcast_ref::<ConsoleOutput>()
+            .is_some()
     }
 
     fn as_console_output_interface(
