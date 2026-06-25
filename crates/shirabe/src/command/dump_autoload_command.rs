@@ -76,7 +76,7 @@ impl Command for DumpAutoloadCommand {
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full(&composer);
 
         // TODO(plugin): dispatch CommandEvent
         let command_event = CommandEvent::new(
