@@ -145,8 +145,11 @@ mod cli_tests {
             std::env::remove_var("LINES");
         }
 
+        // Force non-interactive: the suite must not block on a prompt (e.g. `init`) when run under
+        // a TTY, where Composer's own logic would otherwise keep interaction enabled.
         let mut argv = vec!["composer".to_string()];
         argv.extend(args.iter().map(|s| s.to_string()));
+        argv.push("--no-interaction".to_string());
         let result = catch_unwind(AssertUnwindSafe(|| crate::run(argv)));
 
         if let Some(orig) = original {
