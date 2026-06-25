@@ -8,14 +8,14 @@ use crate::symfony::console::helper::Helper;
 use crate::symfony::console::helper::ProgressBar;
 use crate::symfony::console::helper::SymfonyQuestionHelper;
 use crate::symfony::console::helper::Table;
-use crate::symfony::console::helper::table::{Cell, Row};
 use crate::symfony::console::helper::TableCell;
 use crate::symfony::console::helper::TableSeparator;
+use crate::symfony::console::helper::table::{Cell, Row};
 use crate::symfony::console::input::InputInterface;
 use crate::symfony::console::output::ConsoleOutputInterface;
 use crate::symfony::console::output::OutputInterface;
-use crate::symfony::console::output::console_output::ConsoleOutput;
 use crate::symfony::console::output::TrimmedBufferOutput;
+use crate::symfony::console::output::console_output::ConsoleOutput;
 use crate::symfony::console::output::output_interface::OUTPUT_NORMAL;
 use crate::symfony::console::question::ChoiceQuestion;
 use crate::symfony::console::question::ConfirmationQuestion;
@@ -271,9 +271,9 @@ impl SymfonyStyle {
         style.set_cell_header_format("<info>%s</info>".to_string());
 
         let mut table = Table::new(output);
-        let _ = table.set_style(
-            crate::symfony::console::helper::table::StyleName::Style(style),
-        );
+        let _ = table.set_style(crate::symfony::console::helper::table::StyleName::Style(
+            style,
+        ));
         table
     }
 

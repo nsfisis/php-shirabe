@@ -201,11 +201,7 @@ impl Command for LicensesCommand {
 
                 let mut table = Table::new(output);
                 table.set_style("compact".into())??;
-                table.set_headers(vec![
-                    "Name".into(),
-                    "Version".into(),
-                    "Licenses".into(),
-                ]);
+                table.set_headers(vec!["Name".into(), "Version".into(), "Licenses".into()]);
                 for package in &packages {
                     let link = PackageInfo::get_view_source_or_homepage_url(package.clone());
                     let name = if let Some(link) = link {
@@ -227,14 +223,17 @@ impl Command for LicensesCommand {
                     } else {
                         pkg_licenses.join(", ")
                     };
-                    table.add_row(PhpMixed::List(vec![
-                        PhpMixed::String(name),
-                        PhpMixed::String(package.get_full_pretty_version(
-                            true,
-                            crate::package::DisplayMode::SourceRefIfDev,
-                        )),
-                        PhpMixed::String(licenses_str),
-                    ]).into());
+                    table.add_row(
+                        PhpMixed::List(vec![
+                            PhpMixed::String(name),
+                            PhpMixed::String(package.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            )),
+                            PhpMixed::String(licenses_str),
+                        ])
+                        .into(),
+                    );
                 }
                 table.render();
             }

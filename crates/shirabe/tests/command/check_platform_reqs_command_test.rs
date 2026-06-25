@@ -48,11 +48,7 @@ fn run_platform_reqs_are_satisfied_case(
 
 #[test]
 #[serial]
-#[ignore = "src porting bug: check_platform_reqs_command.rs:288-294 wraps the existing \
-            InstalledRepository inside a SECOND InstalledRepository (instead of PHP line 89 \
-            `$installedRepo->addRepository(new PlatformRepository(...))`), tripping the \
-            add_repository assertion at installed_repository.rs:367 (\"An InstalledRepository can \
-            not contain a repository of type installed repo ...\"). Cannot fix from test files."]
+#[ignore = "reaches a RefCell re-entrancy panic at crates/shirabe/src/downloader/file_downloader.rs:136 (\"RefCell already borrowed\") on the platform-package resolution path; src borrow bug, not fixable from the test"]
 fn test_platform_reqs_are_satisfied() {
     // 'Disables checking of require-dev packages requirements.'
     run_platform_reqs_are_satisfied_case(
@@ -105,11 +101,6 @@ fn test_exception_thrown_if_no_lockfile_found() {
 
 #[test]
 #[serial]
-#[ignore = "src porting bug: check_platform_reqs_command.rs:288-294 wraps the existing \
-            InstalledRepository inside a SECOND InstalledRepository (instead of PHP line 89 \
-            `$installedRepo->addRepository(new PlatformRepository(...))`), tripping the \
-            add_repository assertion at installed_repository.rs:367 (\"An InstalledRepository can \
-            not contain a repository of type installed repo ...\"). Cannot fix from test files."]
 fn test_failed_platform_requirement() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({

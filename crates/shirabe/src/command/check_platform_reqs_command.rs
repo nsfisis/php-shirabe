@@ -285,13 +285,10 @@ impl Command for CheckPlatformReqsCommand {
         let mut requires_sorted: Vec<(String, Vec<Link>)> = requires.into_iter().collect();
         requires_sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let installed_repo_with_platform = InstalledRepository::new(vec![
-            crate::repository::RepositoryInterfaceHandle::new(installed_repo),
-            crate::repository::RepositoryInterfaceHandle::new(PlatformRepository::new(
-                vec![],
-                indexmap::IndexMap::new(),
-            )?),
-        ]);
+        installed_repo.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+            PlatformRepository::new(vec![], indexmap::IndexMap::new())?,
+        ));
+        let installed_repo_with_platform = installed_repo;
 
         let mut results: Vec<CheckResult> = vec![];
         let mut exit_code = 0;

@@ -455,10 +455,7 @@ impl Table {
     }
 
     /// Adds a row to the table, and re-renders the table.
-    pub fn append_row(
-        &mut self,
-        row: Row,
-    ) -> anyhow::Result<Result<&mut Self, RuntimeException>> {
+    pub fn append_row(&mut self, row: Row) -> anyhow::Result<Result<&mut Self, RuntimeException>> {
         if !Self::output_is_console_section(&self.output) {
             return Ok(Err(RuntimeException(shirabe_php_shim::RuntimeException {
                 message: format!(
@@ -515,11 +512,7 @@ impl Table {
         let rows: Vec<Row>;
         if self.horizontal {
             let mut horizontal_rows: IndexMap<i64, Vec<Cell>> = IndexMap::new();
-            let header0 = self
-                .headers
-                .first()
-                .map(|h| h.cells())
-                .unwrap_or_default();
+            let header0 = self.headers.first().map(|h| h.cells()).unwrap_or_default();
             for (i, header) in header0.into_iter().enumerate() {
                 let i = i as i64;
                 horizontal_rows.insert(i, vec![header]);
@@ -787,12 +780,7 @@ impl Table {
     }
 
     /// Renders table row.
-    fn render_row(
-        &self,
-        row: Vec<Cell>,
-        cell_format: String,
-        first_cell_format: Option<String>,
-    ) {
+    fn render_row(&self, row: Vec<Cell>, cell_format: String, first_cell_format: Option<String>) {
         let mut row_content = self.render_column_separator(BORDER_OUTSIDE);
         let columns = self.get_row_columns(&row);
         let last = columns.len() as i64 - 1;

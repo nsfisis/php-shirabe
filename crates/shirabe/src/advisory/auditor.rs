@@ -467,10 +467,13 @@ impl Auditor {
                 table
                     .set_horizontal(true)
                     .set_headers(headers.into_iter().map(|h| h.into()).collect());
-                table.add_row(ConsoleIO::sanitize(
-                    PhpMixed::List(row.into_iter().map(PhpMixed::String).collect()),
-                    false,
-                ).into());
+                table.add_row(
+                    ConsoleIO::sanitize(
+                        PhpMixed::List(row.into_iter().map(PhpMixed::String).collect()),
+                        false,
+                    )
+                    .into(),
+                );
                 table
                     .set_column_width(1, 80)
                     .set_column_max_width(1, 80)
@@ -589,13 +592,16 @@ impl Auditor {
             } else {
                 "none".to_string()
             };
-            table.add_row(ConsoleIO::sanitize(
-                PhpMixed::List(vec![
-                    PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
-                    PhpMixed::String(replacement),
-                ]),
-                false,
-            ).into());
+            table.add_row(
+                ConsoleIO::sanitize(
+                    PhpMixed::List(vec![
+                        PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
+                        PhpMixed::String(replacement),
+                    ]),
+                    false,
+                )
+                .into(),
+            );
         }
 
         table.render();
