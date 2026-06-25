@@ -896,9 +896,6 @@ mod split_and_constraints_tests {
 
     #[test]
     fn three_and_constraints() {
-        assert_eq!(
-            split(">=1.0 <2.0 !=1.5"),
-            vec![">=1.0", "<2.0", "!=1.5"]
-        );
+        assert_eq!(split(">=1.0 <2.0 !=1.5"), vec![">=1.0", "<2.0", "!=1.5"]);
     }
 }
