@@ -1048,18 +1048,17 @@ impl JsonManipulator {
         }
 
         // main node content not match-able
-        let node_regex = format!(
-            "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&array))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(main_node), None)
-        );
-
-        let mut match_map: IndexMap<String, String> = IndexMap::new();
-        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            return Ok(false);
-        }
-
-        let mut children = match_map.get("content").cloned().unwrap_or_default();
+        let node = match json_grammar::find_top_level_key(
+            self.contents.as_bytes(),
+            JsonFile::encode(main_node).as_bytes(),
+            ValueKind::Array,
+        ) {
+            Some(node) => node,
+            None => return Ok(false),
+        };
+        let node_start = self.contents[..node.value_pos].to_string();
+        let node_end = self.contents[node.value_end..].to_string();
+        let mut children = self.contents[node.value_pos..node.value_end].to_string();
         // invalid match due to un-regexable content, abort
         if json_decode(&children, false)?.as_bool() == Some(false) {
             return Ok(false);
@@ -1140,23 +1139,7 @@ impl JsonManipulator {
             .into());
         }
 
-        let children_owned = children;
-        self.contents = Preg::replace_callback(
-            &node_regex,
-            move |m: &IndexMap<CaptureKey, String>| -> String {
-                format!(
-                    "{}{}{}",
-                    m.get(&CaptureKey::ByName("start".to_string()))
-                        .cloned()
-                        .unwrap_or_default(),
-                    children_owned,
-                    m.get(&CaptureKey::ByName("end".to_string()))
-                        .cloned()
-                        .unwrap_or_default()
-                )
-            },
-            &self.contents,
-        );
+        self.contents = format!("{}{}{}", node_start, children, node_end);
 
         Ok(true)
     }
@@ -1199,76 +1182,51 @@ impl JsonManipulator {
         }
 
         // main node content not match-able
-        let node_regex = format!(
-            "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&array))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(main_node), None)
-        );
-
-        let mut match_map: IndexMap<String, String> = IndexMap::new();
-        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            return Ok(false);
-        }
-
-        let mut children = match_map.get("content").cloned().unwrap_or_default();
+        let node = match json_grammar::find_top_level_key(
+            self.contents.as_bytes(),
+            JsonFile::encode(main_node).as_bytes(),
+            ValueKind::Array,
+        ) {
+            Some(node) => node,
+            None => return Ok(false),
+        };
+        let node_start = self.contents[..node.value_pos].to_string();
+        let node_end = self.contents[node.value_end..].to_string();
+        let children = self.contents[node.value_pos..node.value_end].to_string();
         // invalid match due to un-regexable content, abort
         if json_decode(&children, false)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
-        let list_skip_to_item_regex = format!(
-            "{{{}^(?P<start>\\[\\s*((?&json)\\s*+,\\s*?){{{}}})(?P<space_before_item>(\\s*))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            index.max(0)
-        );
-
-        let value_capture = value.clone();
-        let formatter = ManipulatorFormatter {
-            newline: self.newline.clone(),
-            indent: self.indent.clone(),
+        // Skip past the first `index` array items (each `value <ws> , <lazy ws>`) and insert the new
+        // value before the item at `index`, preserving the whitespace that precedes it.
+        let new_children = {
+            let cb = children.as_bytes();
+            let mut i = json_grammar::skip_ws(cb, 1); // '[' then \s*
+            for _ in 0..index.max(0) {
+                i = json_grammar::scan_value(cb, i)
+                    .ok_or_else(|| anyhow::anyhow!("insert_list_item: malformed list"))?;
+                i = json_grammar::skip_ws(cb, i);
+                if cb.get(i) != Some(&b',') {
+                    return Ok(false);
+                }
+                i += 1;
+            }
+            let start_end = i;
+            let sbi_end = json_grammar::skip_ws(cb, i);
+            let space_before_item = &children[start_end..sbi_end];
+            let formatted = self.format(&value, 1, false)?;
+            format!(
+                "{}{}{},{}{}",
+                &children[..start_end],
+                space_before_item,
+                formatted,
+                space_before_item,
+                &children[sbi_end..]
+            )
         };
-        children = Preg::replace_callback(
-            &list_skip_to_item_regex,
-            move |m: &IndexMap<CaptureKey, String>| -> String {
-                format!(
-                    "{}{}{},{}{}",
-                    m.get(&CaptureKey::ByName("start".to_string()))
-                        .cloned()
-                        .unwrap_or_default(),
-                    m.get(&CaptureKey::ByName("space_before_item".to_string()))
-                        .cloned()
-                        .unwrap_or_default(),
-                    formatter
-                        .format(&value_capture, 1, false)
-                        .unwrap_or_default(),
-                    m.get(&CaptureKey::ByName("space_before_item".to_string()))
-                        .cloned()
-                        .unwrap_or_default(),
-                    m.get(&CaptureKey::ByName("end".to_string()))
-                        .cloned()
-                        .unwrap_or_default()
-                )
-            },
-            &children,
-        );
 
-        let children_owned = children;
-        self.contents = Preg::replace_callback(
-            &node_regex,
-            move |m: &IndexMap<CaptureKey, String>| -> String {
-                format!(
-                    "{}{}{}",
-                    m.get(&CaptureKey::ByName("start".to_string()))
-                        .cloned()
-                        .unwrap_or_default(),
-                    children_owned,
-                    m.get(&CaptureKey::ByName("end".to_string()))
-                        .cloned()
-                        .unwrap_or_default()
-                )
-            },
-            &self.contents,
-        );
+        self.contents = format!("{}{}{}", node_start, new_children, node_end);
 
         Ok(true)
     }
