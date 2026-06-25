@@ -3412,7 +3412,7 @@ fn test_add_repository_converts_from_assoc_to_list() {
 
     assert!(
         manipulator
-            .add_repository("foo", arr(&[("type", s("composer"))]), false)
+            .add_repository("foo", arr(&[("type", s("composer"))]), true)
             .unwrap()
     );
     assert_eq!(

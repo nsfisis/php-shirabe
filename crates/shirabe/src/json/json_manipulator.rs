@@ -273,8 +273,11 @@ impl JsonManipulator {
                         return Ok(false);
                     }
                 } else {
-                    let repo: IndexMap<String, PhpMixed> =
-                        repository.as_array().cloned().unwrap_or_default();
+                    let repo: IndexMap<String, PhpMixed> = repository
+                        .as_array()
+                        .or_else(|| repository.as_object())
+                        .cloned()
+                        .unwrap_or_default();
                     // prepend name property
                     let mut prepended: IndexMap<String, PhpMixed> = IndexMap::new();
                     prepended.insert(
@@ -513,10 +516,19 @@ impl JsonManipulator {
             .map(|v| v.as_object().is_some())
             .unwrap_or(false);
 
-        let repos: IndexMap<String, PhpMixed> = repositories_value
-            .as_ref()
-            .and_then(|v| v.as_object().cloned())
-            .unwrap_or_default();
+        // `repositories` may be an associative object or a positional list; in either case iterate
+        // it as (index, repository) pairs.
+        let repos: Vec<(String, PhpMixed)> =
+            if let Some(o) = repositories_value.as_ref().and_then(|v| v.as_object()) {
+                o.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            } else if let Some(l) = repositories_value.as_ref().and_then(|v| v.as_list()) {
+                l.iter()
+                    .enumerate()
+                    .map(|(i, v)| (i.to_string(), v.clone()))
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
         for (repository_index, repository) in &repos {
             if repository_index == name && is_assoc {
@@ -555,8 +567,11 @@ impl JsonManipulator {
                     return Ok(true);
                 }
             } else {
-                let repository_as_array: IndexMap<String, PhpMixed> =
-                    repository.as_array().cloned().unwrap_or_default();
+                let repository_as_array: IndexMap<String, PhpMixed> = repository
+                    .as_array()
+                    .or_else(|| repository.as_object())
+                    .cloned()
+                    .unwrap_or_default();
 
                 if repository_as_array
                     .get(name)
@@ -1453,7 +1468,13 @@ impl JsonManipulator {
         }
 
         let value = decoded_arr.get(key).cloned().unwrap_or(PhpMixed::Null);
-        if is_array(&value) && value.as_array().map(|a| a.len()).unwrap_or(0) == 0 {
+        // PHP `count($val)` applies to both associative and positional arrays.
+        let count = value
+            .as_array()
+            .map(|a| a.len())
+            .or_else(|| value.as_list().map(|l| l.len()))
+            .unwrap_or(0);
+        if is_array(&value) && count == 0 {
             return self.remove_main_key(key);
         }
 
