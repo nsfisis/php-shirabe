@@ -51,7 +51,7 @@ impl PackageRepository {
         }
     }
 
-    pub fn initialize(&mut self) -> anyhow::Result<Result<(), InvalidRepositoryException>> {
+    pub fn initialize(&self) -> anyhow::Result<Result<(), InvalidRepositoryException>> {
         self.inner.initialize();
 
         let mut loader =
@@ -84,64 +84,91 @@ impl PackageRepository {
         use crate::repository::RepositoryInterface;
         Preg::replace(r"^array ", "package ", &self.inner.get_repo_name())
     }
+
+    // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to load
+    // the configured packages. Without virtual dispatch we trigger that load here before delegating
+    // to the inner repository; ArrayRepository's own lazy check then sees the populated array and
+    // skips re-initializing it.
+    fn ensure_initialized(&self) -> anyhow::Result<()> {
+        if !self.inner.is_initialized() {
+            self.initialize()?.map_err(anyhow::Error::new)?;
+        }
+        Ok(())
+    }
 }
 
 impl RepositoryInterface for PackageRepository {
-    // The structural methods are inherited from ArrayRepository in PHP, where they trigger the
-    // overridden initialize() that loads packages from config. Wiring that virtual dispatch is a
-    // Phase C concern; the advisory paths below are what is exercised so far.
+    // The structural methods are inherited from ArrayRepository in PHP, where the lazy package load
+    // is driven by the overridden initialize(). Here each one first ensures that load has happened
+    // (see ensure_initialized), then delegates to the inner ArrayRepository.
     fn count(&self) -> anyhow::Result<usize> {
-        todo!()
+        self.ensure_initialized()?;
+        self.inner.count()
     }
 
-    fn has_package(&self, _package: PackageInterfaceHandle) -> bool {
-        todo!()
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+        // TODO(phase-d): hasPackage returns bool and cannot surface an initialization error; a
+        // failed load leaves the inner repository with whatever packages were added before the
+        // failure.
+        let _ = self.ensure_initialized();
+        self.inner.has_package(package)
     }
 
     fn find_package(
         &mut self,
-        _name: &str,
-        _constraint: FindPackageConstraint,
+        name: &str,
+        constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
-        todo!()
+        self.ensure_initialized()?;
+        self.inner.find_package(name, constraint)
     }
 
     fn find_packages(
         &mut self,
-        _name: &str,
-        _constraint: Option<FindPackageConstraint>,
+        name: &str,
+        constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
-        todo!()
+        self.ensure_initialized()?;
+        self.inner.find_packages(name, constraint)
     }
 
     fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
-        todo!()
+        self.ensure_initialized()?;
+        self.inner.get_packages()
     }
 
     fn load_packages(
         &mut self,
-        _package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
-        _acceptable_stabilities: IndexMap<String, i64>,
-        _stability_flags: IndexMap<String, i64>,
-        _already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
-        todo!()
+        self.ensure_initialized()?;
+        self.inner.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
     }
 
     fn search(
         &mut self,
-        _query: String,
-        _mode: i64,
-        _type: Option<String>,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
     ) -> anyhow::Result<Vec<SearchResult>> {
-        todo!()
+        self.ensure_initialized()?;
+        self.inner.search(query, mode, r#type)
     }
 
     fn get_providers(
         &mut self,
-        _package_name: String,
+        package_name: String,
     ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
-        todo!()
+        self.ensure_initialized()?;
+        self.inner.get_providers(package_name)
     }
 
     fn get_repo_name(&self) -> String {
