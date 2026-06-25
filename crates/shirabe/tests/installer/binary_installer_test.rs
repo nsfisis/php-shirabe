@@ -20,11 +20,14 @@ impl Drop for TearDown {
     }
 }
 
-// This installs a PHP binary and then executes it via ProcessExecutor, asserting the
-// program's output. It needs a real PHP runtime, the binary-proxy generation, and a
-// mocked Package's getBinaries(), none of which are available here.
+// This installs a PHP binary (via NullIO + Package::__set_binaries + a real tempdir) and then
+// executes it through ProcessExecutor, asserting its output. Setup and binary-proxy generation
+// all work; the remaining blocker is real subprocess I/O: ProcessExecutor -> symfony Process
+// drives its pipe reads through `stream_select`/`stream_set_blocking`, both of which are still
+// `todo!()` in shirabe-php-shim (they require select(2)/fcntl(2) over the child pipe fds, which
+// the shim does not yet expose). Un-ignore once that pipe-reading layer is implemented.
 #[test]
-#[ignore = "needs PHPUnit getMockBuilder mocks of IOInterface and Package::getBinaries() plus a real PHP runtime to execute the installed binary and assert its output"]
+#[ignore = "ProcessExecutor cannot read a real child's output yet: shirabe_php_shim::{stream_select, stream_set_blocking} are todo!() (need select(2)/fcntl(2) over child pipe fds)"]
 fn test_install_and_exec_binary_with_full_compat() {
     todo!()
 }

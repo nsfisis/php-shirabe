@@ -9,18 +9,21 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::HgDriver;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::PhpMixed;
+use shirabe::util::http_downloader::HttpDownloaderMockHandler;
+use shirabe::util::process_executor::MockHandler;
+use shirabe_php_shim::{PhpMixed, RuntimeException};
 use tempfile::TempDir;
+
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
 
 struct SetUp {
     home: TempDir,
     config: Config,
-    // The IOInterface mock is not ported.
-    io: (),
 }
 
 fn set_up() -> SetUp {
-    let io = ();
     let home = TempDir::new().unwrap();
     let mut config = Config::new(true, None);
     let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -32,7 +35,7 @@ fn set_up() -> SetUp {
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
-    SetUp { home, config, io }
+    SetUp { home, config }
 }
 
 fn tear_down(home: &std::path::Path) {
@@ -76,32 +79,94 @@ fn test_supports() {
     }
 }
 
-// The remaining cases construct an HgDriver, which requires an HttpDownloader
-// (curl_multi_init is todo!() in the php-shim) and a mocked ProcessExecutor to feed
-// hg command output, neither of which is available here.
 #[test]
-#[ignore = "requires getProcessExecutorMock with expects() hg branches/bookmarks command-sequence assertions and a getMockBuilder HttpDownloader mock; no ProcessExecutorMock/HttpDownloader mocking infrastructure exists"]
 fn test_get_branches_filter_invalid_branch_names() {
-    let SetUp { home, config, io } = set_up();
+    let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
-    let _ = (&config, &io);
-    todo!()
+
+    let config = Rc::new(RefCell::new(config));
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+
+    let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
+        get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
+
+    let stdout = "default 1:dbf6c8acb640\n--help  1:dbf6c8acb640";
+    let stdout1 = "help    1:dbf6c8acb641\n--help  1:dbf6c8acb641\n";
+
+    let (process, _process_guard): (_, ProcessExecutorMockGuard) = get_process_executor_mock(
+        vec![
+            cmd_full(["hg", "branches"], 0, stdout, ""),
+            cmd_full(["hg", "bookmarks"], 0, stdout1, ""),
+        ],
+        false,
+        MockHandler::default(),
+    );
+
+    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    repo_config.insert(
+        "url".to_string(),
+        PhpMixed::String("https://example.org/acme.git".to_string()),
+    );
+
+    let mut driver = HgDriver::new(repo_config, io, config, http_downloader, process);
+
+    let branches = driver.get_branches().unwrap();
+    let mut expected: IndexMap<String, String> = IndexMap::new();
+    expected.insert("help".to_string(), "dbf6c8acb641".to_string());
+    expected.insert("default".to_string(), "dbf6c8acb640".to_string());
+    assert_eq!(expected, branches);
 }
 
 #[test]
-#[ignore = "requires getProcessExecutorMock and a getMockBuilder HttpDownloader mock to construct HgDriver; no ProcessExecutorMock/HttpDownloader mocking infrastructure exists"]
 fn test_file_get_content_invalid_identifier() {
-    let SetUp { home, config, io } = set_up();
+    let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
-    let _ = (&config, &io);
-    todo!()
+
+    let config = Rc::new(RefCell::new(config));
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+
+    let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
+        get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
+
+    let (process, _process_guard): (_, ProcessExecutorMockGuard) =
+        get_process_executor_mock(vec![], false, MockHandler::default());
+
+    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    repo_config.insert(
+        "url".to_string(),
+        PhpMixed::String("https://example.org/acme.git".to_string()),
+    );
+
+    let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
+
+    assert_eq!(None, driver.get_file_content("file.txt", "h").unwrap());
+
+    let err = driver.get_file_content("file.txt", "-h").unwrap_err();
+    assert!(err.downcast_ref::<RuntimeException>().is_some());
 }
 
 #[test]
-#[ignore = "requires getProcessExecutorMock and a getMockBuilder HttpDownloader mock to construct HgDriver; no ProcessExecutorMock/HttpDownloader mocking infrastructure exists"]
 fn test_get_change_date_invalid_identifier() {
-    let SetUp { home, config, io } = set_up();
+    let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
-    let _ = (&config, &io);
-    todo!()
+
+    let config = Rc::new(RefCell::new(config));
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+
+    let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
+        get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
+
+    let (process, _process_guard): (_, ProcessExecutorMockGuard) =
+        get_process_executor_mock(vec![], false, MockHandler::default());
+
+    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    repo_config.insert(
+        "url".to_string(),
+        PhpMixed::String("https://example.org/acme.git".to_string()),
+    );
+
+    let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
+
+    let err = driver.get_change_date("-r foo").unwrap_err();
+    assert!(err.downcast_ref::<RuntimeException>().is_some());
 }

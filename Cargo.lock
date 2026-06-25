@@ -1917,6 +1917,7 @@ dependencies = [
  "jsonschema",
  "md5",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "serial_test",

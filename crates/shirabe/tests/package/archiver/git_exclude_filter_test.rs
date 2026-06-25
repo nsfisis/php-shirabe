@@ -3,7 +3,6 @@
 use shirabe::package::archiver::git_exclude_filter::GitExcludeFilter;
 
 #[test]
-#[ignore]
 fn test_pattern_escape() {
     for (ignore, expected) in provide_patterns() {
         let filter = GitExcludeFilter::new("/".to_string());

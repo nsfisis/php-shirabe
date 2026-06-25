@@ -132,8 +132,8 @@ impl SvnDriver {
                 .unwrap_or(false),
         );
 
-        self.get_branches();
-        self.get_tags();
+        self.get_branches()?;
+        self.get_tags()?;
         Ok(())
     }
 
@@ -332,18 +332,16 @@ impl SvnDriver {
         Ok(None)
     }
 
-    pub fn get_tags(&mut self) -> &IndexMap<String, String> {
+    pub fn get_tags(&mut self) -> Result<&IndexMap<String, String>> {
         if self.tags.is_none() {
             let mut tags: IndexMap<String, String> = IndexMap::new();
 
             // PHP: if ($this->tagsPath !== false) — tagsPath is "string"; treat empty string as false
             if !self.tags_path.is_empty() {
-                let output = self
-                    .execute(
-                        vec!["svn".to_string(), "ls".to_string(), "--verbose".to_string()],
-                        &format!("{}/{}", self.base_url, self.tags_path),
-                    )
-                    .unwrap_or_default();
+                let output = self.execute(
+                    vec!["svn".to_string(), "ls".to_string(), "--verbose".to_string()],
+                    &format!("{}/{}", self.base_url, self.tags_path),
+                )?;
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
                     for line in self.inner.process.borrow().split_lines(&output) {
@@ -375,10 +373,10 @@ impl SvnDriver {
             self.tags = Some(tags);
         }
 
-        self.tags.as_ref().unwrap()
+        Ok(self.tags.as_ref().unwrap())
     }
 
-    pub fn get_branches(&mut self) -> &IndexMap<String, String> {
+    pub fn get_branches(&mut self) -> Result<&IndexMap<String, String>> {
         if self.branches.is_none() {
             let mut branches: IndexMap<String, String> = IndexMap::new();
 
@@ -388,12 +386,10 @@ impl SvnDriver {
                 format!("{}/{}", self.base_url, self.trunk_path.as_ref().unwrap())
             };
 
-            let output = self
-                .execute(
-                    vec!["svn".to_string(), "ls".to_string(), "--verbose".to_string()],
-                    &trunk_parent,
-                )
-                .unwrap_or_default();
+            let output = self.execute(
+                vec!["svn".to_string(), "ls".to_string(), "--verbose".to_string()],
+                &trunk_parent,
+            )?;
             if !output.is_empty() {
                 for line in self.inner.process.borrow().split_lines(&output) {
                     let line = trim(&line, None);
@@ -422,12 +418,10 @@ impl SvnDriver {
 
             // PHP: if ($this->branchesPath !== false) — branchesPath is "string"; treat empty string as false
             if !self.branches_path.is_empty() {
-                let output = self
-                    .execute(
-                        vec!["svn".to_string(), "ls".to_string(), "--verbose".to_string()],
-                        &format!("{}/{}", self.base_url, self.branches_path),
-                    )
-                    .unwrap_or_default();
+                let output = self.execute(
+                    vec!["svn".to_string(), "ls".to_string(), "--verbose".to_string()],
+                    &format!("{}/{}", self.base_url, self.branches_path),
+                )?;
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
                     for line in self
@@ -465,7 +459,7 @@ impl SvnDriver {
             self.branches = Some(branches);
         }
 
-        self.branches.as_ref().unwrap()
+        Ok(self.branches.as_ref().unwrap())
     }
 
     pub fn supports(
@@ -624,11 +618,11 @@ impl crate::repository::vcs::VcsDriverInterface for SvnDriver {
     }
 
     fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
-        Ok(self.get_branches().clone())
+        Ok(self.get_branches()?.clone())
     }
 
     fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
-        Ok(self.get_tags().clone())
+        Ok(self.get_tags()?.clone())
     }
 
     fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {

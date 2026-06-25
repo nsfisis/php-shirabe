@@ -1031,4 +1031,61 @@ impl RemoteFilesystem {
     fn normalize_result(&self, result: Option<&str>) -> Option<String> {
         result.map(|s| s.to_string())
     }
+
+    /// For testing only. Invokes the private `get_options_for_url`, mirroring the
+    /// `ReflectionMethod` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
+    pub fn __get_options_for_url(
+        &mut self,
+        origin_url: &str,
+        additional_options: IndexMap<String, PhpMixed>,
+    ) -> IndexMap<String, PhpMixed> {
+        self.get_options_for_url(origin_url, additional_options)
+    }
+
+    /// For testing only. Sets the private `file_url`, mirroring the
+    /// `ReflectionProperty` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
+    pub fn __set_file_url(&mut self, file_url: &str) {
+        self.file_url = file_url.to_string();
+    }
+
+    /// For testing only. Invokes the private `callback_get`, mirroring the
+    /// `ReflectionMethod` access in `RemoteFilesystemTest::callCallbackGet`.
+    pub fn __callback_get(
+        &mut self,
+        notification_code: i64,
+        severity: i64,
+        message: Option<String>,
+        message_code: i64,
+        bytes_transferred: i64,
+        bytes_max: i64,
+    ) -> anyhow::Result<()> {
+        self.callback_get(
+            notification_code,
+            severity,
+            message,
+            message_code,
+            bytes_transferred,
+            bytes_max,
+        )
+    }
+
+    /// For testing only. Reads the private `bytes_max`.
+    pub fn __bytes_max(&self) -> i64 {
+        self.bytes_max
+    }
+
+    /// For testing only. Sets the private `bytes_max`.
+    pub fn __set_bytes_max(&mut self, bytes_max: i64) {
+        self.bytes_max = bytes_max;
+    }
+
+    /// For testing only. Sets the private `progress`.
+    pub fn __set_progress(&mut self, progress: bool) {
+        self.progress = progress;
+    }
+
+    /// For testing only. Reads the private `last_progress`.
+    pub fn __last_progress(&self) -> Option<i64> {
+        self.last_progress
+    }
 }

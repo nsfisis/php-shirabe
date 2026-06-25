@@ -35,7 +35,7 @@ impl GitExcludeFilter {
     }
 
     fn parse_git_attributes_line_static(line: &str) -> Option<(String, bool, bool)> {
-        let parts = Preg::split(r"\s+", line);
+        let parts = Preg::split(r"#\s+#", line);
 
         if parts.len() == 2 && parts[1] == "export-ignore" {
             return Some(BaseExcludeFilterBase::generate_pattern(&parts[0]));

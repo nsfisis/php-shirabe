@@ -76,9 +76,14 @@ pub fn defined(name: &str) -> bool {
 // `Composer\Autoload\ClassLoader` (and its `getRegisteredLoaders`) is absent from the running
 // process; the class-name form therefore reports no such method. The object form needs runtime
 // reflection that PhpMixed::Object does not carry.
-pub fn method_exists(object_or_class: &PhpMixed, _method_name: &str) -> bool {
+pub fn method_exists(object_or_class: &PhpMixed, method_name: &str) -> bool {
     match object_or_class {
         PhpMixed::String(_) => false,
+        // `ZipArchiver::archive` guards `$zip->setExternalAttributesName(...)` with
+        // `method_exists($zip, 'setExternalAttributesName')` (only available with libzip >= 0.11.2).
+        // The `zip`-crate-backed shim cannot amend an already-written entry's external attributes,
+        // so the method is deliberately absent here and the guard reports it missing.
+        PhpMixed::Null if method_name == "setExternalAttributesName" => false,
         _ => todo!(),
     }
 }

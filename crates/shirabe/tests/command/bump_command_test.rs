@@ -41,11 +41,10 @@ fn test_bump_fails_on_non_existing_composer_file() {
 
 #[test]
 #[serial]
-#[ignore = "BumpCommand::initialize constructs a full Composer (Factory::create_http_downloader \
-            -> CurlDownloader::new -> curl_multi_init), and the curl subsystem in shirabe-php-shim \
-            is still todo!(). Only reachable once the HTTP/curl layer is ported. The companion \
-            test_bump_fails_on_non_existing_composer_file covers the same error-output capture path \
-            without reaching curl (the missing composer.json makes Composer construction a no-op)."]
+#[ignore = "CurlDownloader::new no longer panics (HTTP layer is now reqwest-based), but this path \
+            still reaches an unrelated todo!() in shirabe-php-shim stream_set_blocking (stream.rs), \
+            which requires fcntl(2). The companion test_bump_fails_on_non_existing_composer_file \
+            covers the same error-output capture path without reaching that shim."]
 fn test_bump_fails_on_write_error_to_composer_file() {
     if shirabe_php_shim::function_exists("posix_getuid") && shirabe_php_shim::posix_getuid() == 0 {
         // ref: $this->markTestSkipped('Cannot run as root');

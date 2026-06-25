@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ZipArchiverTest.php
 
 use indexmap::IndexMap;
+use serial_test::serial;
 use shirabe::package::archiver::{ArchiverInterface, ZipArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::Platform;
@@ -116,8 +117,8 @@ impl ArchiverTestCase {
     }
 }
 
-#[ignore = "ZipArchiver::archive and the ZipArchive reader (open/get_from_name/...) are todo!() in the php-shim"]
 #[test]
+#[serial]
 fn test_simple_files() {
     let mut test_case = ArchiverTestCase::set_up();
 
@@ -137,8 +138,8 @@ fn test_simple_files() {
     test_case.assert_zip_archive(files);
 }
 
-#[ignore = "ZipArchiver::archive and the ZipArchive reader (open/get_from_name/...) are todo!() in the php-shim"]
 #[test]
+#[serial]
 fn test_gitignore_exclude_negation() {
     for include in ["!/docs", "!/docs/"] {
         let mut test_case = ArchiverTestCase::set_up();
@@ -154,8 +155,8 @@ fn test_gitignore_exclude_negation() {
     }
 }
 
-#[ignore = "ZipArchiver::archive and the ZipArchive reader (open/get_from_name/...) are todo!() in the php-shim"]
 #[test]
+#[serial]
 fn test_folder_with_backslashes() {
     if Platform::is_windows() {
         // markTestSkipped('Folder names cannot contain backslashes on Windows.')

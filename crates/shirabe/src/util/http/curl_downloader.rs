@@ -1,4 +1,14 @@
 //! ref: composer/src/Composer/Util/Http/CurlDownloader.php
+//!
+//! reqwest-based re-implementation. The libcurl multi-handle event loop of the PHP original is
+//! replaced by reqwest + a tokio runtime: `download()` queues a job, and `tick()` drives one job
+//! to completion by `block_on`-ing the HTTP request (mirroring the existing sync bridge used
+//! elsewhere in the codebase, e.g. file_downloader.rs / installation_manager.rs).
+//!
+//! The PHP control flow (insecure-URL check, redirect following, transport/status retries,
+//! authenticated-retry detection, max_file_size enforcement, atomic rename of the `~` temp file)
+//! is preserved. Per-request TLS/proxy/IP-resolve settings that reqwest only exposes per-Client
+//! are simplified to a single default Client; see the TODOs below.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -6,22 +16,7 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    CURL_HTTP_VERSION_2_0, CURL_HTTP_VERSION_3, CURL_IPRESOLVE_V4, CURL_IPRESOLVE_V6,
-    CURL_LOCK_DATA_COOKIE, CURL_LOCK_DATA_DNS, CURL_LOCK_DATA_SSL_SESSION, CURL_VERSION_HTTP2,
-    CURL_VERSION_HTTP3, CURL_VERSION_LIBZ, CURLE_OK, CURLM_BAD_EASY_HANDLE, CURLM_BAD_HANDLE,
-    CURLM_CALL_MULTI_PERFORM, CURLM_INTERNAL_ERROR, CURLM_OK, CURLM_OUT_OF_MEMORY,
-    CURLMOPT_MAX_HOST_CONNECTIONS, CURLMOPT_PIPELINING, CURLOPT_CONNECTTIMEOUT, CURLOPT_ENCODING,
-    CURLOPT_FILE, CURLOPT_FOLLOWLOCATION, CURLOPT_HTTP_VERSION, CURLOPT_IPRESOLVE,
-    CURLOPT_PROTOCOLS, CURLOPT_SHARE, CURLOPT_TIMEOUT, CURLOPT_URL, CURLOPT_WRITEHEADER,
-    CURLPROTO_HTTP, CURLPROTO_HTTPS, CURLSHOPT_SHARE, CurlMultiHandle, CurlShareHandle,
-    LogicException, PHP_VERSION_ID, PhpMixed, PhpResource, RuntimeException, array_diff,
-    array_diff_key, array_merge, count, curl_errno, curl_error, curl_getinfo, curl_handle_id,
-    curl_init, curl_multi_add_handle, curl_multi_exec, curl_multi_info_read, curl_multi_init,
-    curl_multi_select, curl_multi_setopt, curl_setopt, curl_setopt_array, curl_share_init,
-    curl_share_setopt, curl_strerror, curl_version, defined, explode, fclose, fopen,
-    function_exists, implode, in_array, ini_get, json_decode, parse_url, preg_quote, rename,
-    rewind, rtrim, sprintf, str_contains, stream_get_contents, stream_get_contents_with_max,
-    stripos, strpos, substr, unlink_silent, usleep, var_export,
+    PhpMixed, in_array, parse_url, preg_quote, rename, strpos, substr, unlink_silent,
 };
 
 use crate::config::Config;
@@ -31,93 +26,59 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
-use crate::util::StreamContextFactory;
 use crate::util::Url;
 use crate::util::http::CurlResponse;
 use crate::util::http::ProxyManager;
+use crate::util::http::Response;
 use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
 
-/// @phpstan-type Attributes array{retryAuthFailure: bool, redirects: int<0, max>, retries: int<0, max>, storeAuth: 'prompt'|bool, ipResolve: 4|6|null}
-/// @phpstan-type Job array{url: non-empty-string, origin: string, attributes: Attributes, options: mixed[], progress: mixed[], curlHandle: \CurlHandle, filename: string|null, headerHandle: resource, bodyHandle: resource, resolve: callable, reject: callable, primaryIp: string}
+/// resolve callback supplied by `HttpDownloader`. Receives the final `Response` on success.
+pub type ResolveCallback = Box<dyn Fn(Response) + Send + Sync>;
+/// reject callback supplied by `HttpDownloader`. Receives the recoverable error on failure.
+pub type RejectCallback = Box<dyn Fn(anyhow::Error) + Send + Sync>;
+
+/// One in-flight download. PHP stored this as a loosely-typed `array` and additionally kept the
+/// header/body stream resources and the resolve/reject callables out-of-band. Here a typed struct
+/// holds everything, which is what the PHP `Job` array modelled.
+struct CurlJob {
+    url: String,
+    origin: String,
+    attributes: IndexMap<String, PhpMixed>,
+    /// `options` after defaults/auth/stream-context have been merged in.
+    options: IndexMap<String, PhpMixed>,
+    /// Destination path when copying to a file (PHP `filename`), `None` for in-memory downloads.
+    filename: Option<String>,
+    resolve: ResolveCallback,
+    reject: RejectCallback,
+}
+
+impl std::fmt::Debug for CurlJob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CurlJob")
+            .field("url", &self.url)
+            .field("origin", &self.origin)
+            .field("attributes", &self.attributes)
+            .field("options", &self.options)
+            .field("filename", &self.filename)
+            .finish()
+    }
+}
+
 #[derive(Debug)]
 pub struct CurlDownloader {
-    /// @var \CurlMultiHandle
-    multi_handle: CurlMultiHandle,
-    /// @var \CurlShareHandle
-    share_handle: Option<CurlShareHandle>,
-    /// @var Job[]
-    jobs: IndexMap<i64, IndexMap<String, PhpMixed>>,
-    /// The `headerHandle`/`bodyHandle` stream resources of each job, keyed by job id. PHP keeps
-    /// them inside the Job array, but a PhpResource cannot live in the PhpMixed-typed job map.
-    header_handles: IndexMap<i64, PhpResource>,
-    body_handles: IndexMap<i64, PhpResource>,
-    /// @var IOInterface
+    /// Connection pool / cookie / TLS-session sharing — reqwest::Client handles this internally,
+    /// replacing the PHP multiHandle + shareHandle. Redirects are disabled because we follow them
+    /// manually (to control auth-header re-attachment), matching CURLOPT_FOLLOWLOCATION = false.
+    client: reqwest::Client,
+    /// tokio runtime used to `block_on` the async reqwest calls from the sync `tick()`.
+    runtime: tokio::runtime::Runtime,
+    jobs: IndexMap<i64, CurlJob>,
+    next_id: i64,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    /// @var AuthHelper
     auth_helper: AuthHelper,
-    /// @var float
-    select_timeout: f64,
-    /// @var int
     max_redirects: i64,
-    /// @var int
     max_retries: i64,
-    /// @var array<int, string[]>
-    pub(crate) multi_errors: IndexMap<i64, Vec<String>>,
-}
-
-/// Known libcurl's broken versions when proxy is in use with HTTP/2
-/// multiplexing.
-///
-/// @var list<non-empty-string>
-const BAD_MULTIPLEXING_CURL_VERSIONS: &[&str] = &["7.87.0", "7.88.0", "7.88.1"];
-
-/// @var mixed[]
-fn options_static() -> IndexMap<String, IndexMap<String, i64>> {
-    let mut http: IndexMap<String, i64> = IndexMap::new();
-    http.insert(
-        "method".to_string(),
-        shirabe_php_shim::CURLOPT_CUSTOMREQUEST,
-    );
-    http.insert("content".to_string(), shirabe_php_shim::CURLOPT_POSTFIELDS);
-    http.insert("header".to_string(), shirabe_php_shim::CURLOPT_HTTPHEADER);
-    http.insert("timeout".to_string(), CURLOPT_TIMEOUT);
-
-    let mut ssl: IndexMap<String, i64> = IndexMap::new();
-    ssl.insert("cafile".to_string(), shirabe_php_shim::CURLOPT_CAINFO);
-    ssl.insert("capath".to_string(), shirabe_php_shim::CURLOPT_CAPATH);
-    ssl.insert(
-        "verify_peer".to_string(),
-        shirabe_php_shim::CURLOPT_SSL_VERIFYPEER,
-    );
-    ssl.insert(
-        "verify_peer_name".to_string(),
-        shirabe_php_shim::CURLOPT_SSL_VERIFYHOST,
-    );
-    ssl.insert("local_cert".to_string(), shirabe_php_shim::CURLOPT_SSLCERT);
-    ssl.insert("local_pk".to_string(), shirabe_php_shim::CURLOPT_SSLKEY);
-    ssl.insert(
-        "passphrase".to_string(),
-        shirabe_php_shim::CURLOPT_SSLKEYPASSWD,
-    );
-
-    let mut out: IndexMap<String, IndexMap<String, i64>> = IndexMap::new();
-    out.insert("http".to_string(), http);
-    out.insert("ssl".to_string(), ssl);
-    out
-}
-
-/// @var array<string, true>
-fn time_info_static() -> IndexMap<String, bool> {
-    let mut m: IndexMap<String, bool> = IndexMap::new();
-    m.insert("total_time".to_string(), true);
-    m.insert("namelookup_time".to_string(), true);
-    m.insert("connect_time".to_string(), true);
-    m.insert("pretransfer_time".to_string(), true);
-    m.insert("starttransfer_time".to_string(), true);
-    m.insert("redirect_time".to_string(), true);
-    m
 }
 
 /// Function-static `$timeoutWarning` from `tick()`.
@@ -131,120 +92,39 @@ impl CurlDownloader {
         _options: IndexMap<String, PhpMixed>,
         _disable_tls: bool,
     ) -> Self {
-        let multi_handle = curl_multi_init();
-        let mut share_handle: Option<CurlShareHandle> = None;
+        // PHP set up the multi/share handle here (CURLMOPT_PIPELINING, MAX_HOST_CONNECTIONS,
+        // CURLSHOPT_SHARE). reqwest folds all of that into the Client builder:
+        //   - pool_max_idle_per_host(8) ~ CURLMOPT_MAX_HOST_CONNECTIONS = 8
+        //   - cookie_store(true)        ~ CURL_LOCK_DATA_COOKIE
+        //   - redirect(none)            ~ CURLOPT_FOLLOWLOCATION = false (we follow manually)
+        // The libcurl version-specific multiplexing / accept-encoding workarounds are not needed.
+        // TODO: a brand-new tokio runtime + reqwest client is created per CurlDownloader; that is
+        // acceptable here (one HttpDownloader owns one CurlDownloader) but not pooled across them.
+        // TODO: cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
+        // (.cookie_store(true)); omitted as it is not required for package downloads.
+        let client = reqwest::Client::builder()
+            .pool_max_idle_per_host(8)
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            // The default builder cannot realistically fail; if the TLS backend is unavailable we
+            // cannot proceed, mirroring PHP aborting when curl is missing.
+            .expect("failed to build reqwest client for CurlDownloader");
 
-        if function_exists("curl_multi_setopt") {
-            let version = curl_version();
-            let proxy_with_bad_version = ProxyManager::get_instance()
-                .lock()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                .has_proxy()
-                && version.is_some()
-                && in_array(
-                    version
-                        .as_ref()
-                        .and_then(|v| v.get("version"))
-                        .cloned()
-                        .unwrap_or(PhpMixed::Null),
-                    &PhpMixed::List(
-                        BAD_MULTIPLEXING_CURL_VERSIONS
-                            .iter()
-                            .map(|s| PhpMixed::String((*s).to_string()))
-                            .collect(),
-                    ),
-                    true,
-                );
-            if proxy_with_bad_version {
-                // Disable HTTP/2 multiplexing for some broken versions of libcurl.
-                //
-                // In certain versions of libcurl when proxy is in use with HTTP/2
-                // multiplexing, connections will continue stacking up. This was
-                // fixed in libcurl 8.0.0 in curl/curl@821f6e2a89de8aec1c7da3c0f381b92b2b801efc
-                curl_multi_setopt(
-                    &multi_handle,
-                    CURLMOPT_PIPELINING,
-                    PhpMixed::Int(0 /* CURLPIPE_NOTHING */),
-                );
-            } else {
-                curl_multi_setopt(
-                    &multi_handle,
-                    CURLMOPT_PIPELINING,
-                    PhpMixed::Int(if PHP_VERSION_ID >= 70400 {
-                        2 /* CURLPIPE_MULTIPLEX */
-                    } else {
-                        3 /* CURLPIPE_HTTP1 | CURLPIPE_MULTIPLEX */
-                    }),
-                );
-            }
-            if defined("CURLMOPT_MAX_HOST_CONNECTIONS") && !defined("HHVM_VERSION") {
-                curl_multi_setopt(
-                    &multi_handle,
-                    CURLMOPT_MAX_HOST_CONNECTIONS,
-                    PhpMixed::Int(8),
-                );
-            }
-        }
-
-        if function_exists("curl_share_init") {
-            let sh = curl_share_init();
-            curl_share_setopt(&sh, CURLSHOPT_SHARE, PhpMixed::Int(CURL_LOCK_DATA_COOKIE));
-            curl_share_setopt(&sh, CURLSHOPT_SHARE, PhpMixed::Int(CURL_LOCK_DATA_DNS));
-            curl_share_setopt(
-                &sh,
-                CURLSHOPT_SHARE,
-                PhpMixed::Int(CURL_LOCK_DATA_SSL_SESSION),
-            );
-            share_handle = Some(sh);
-        }
+        let runtime = tokio::runtime::Runtime::new()
+            .expect("failed to build tokio runtime for CurlDownloader");
 
         let auth_helper = AuthHelper::new(io.clone(), config.clone());
 
-        let mut multi_errors: IndexMap<i64, Vec<String>> = IndexMap::new();
-        multi_errors.insert(
-            CURLM_BAD_HANDLE,
-            vec![
-                "CURLM_BAD_HANDLE".to_string(),
-                "The passed-in handle is not a valid CURLM handle.".to_string(),
-            ],
-        );
-        multi_errors.insert(
-            CURLM_BAD_EASY_HANDLE,
-            vec![
-                "CURLM_BAD_EASY_HANDLE".to_string(),
-                "An easy handle was not good/valid. It could mean that it isn't an easy handle at all, or possibly that the handle already is in used by this or another multi handle.".to_string(),
-            ],
-        );
-        multi_errors.insert(
-            CURLM_OUT_OF_MEMORY,
-            vec![
-                "CURLM_OUT_OF_MEMORY".to_string(),
-                "You are doomed.".to_string(),
-            ],
-        );
-        multi_errors.insert(
-            CURLM_INTERNAL_ERROR,
-            vec![
-                "CURLM_INTERNAL_ERROR".to_string(),
-                "This can only be returned if libcurl bugs. Please report it to us!".to_string(),
-            ],
-        );
-
         Self {
-            multi_handle,
-            share_handle,
+            client,
+            runtime,
             jobs: IndexMap::new(),
-            header_handles: IndexMap::new(),
-            body_handles: IndexMap::new(),
+            next_id: 1,
             io,
             config,
             auth_helper,
-            select_timeout: 5.0,
             max_redirects: 20,
             max_retries: 3,
-            multi_errors,
         }
     }
 
@@ -254,8 +134,8 @@ impl CurlDownloader {
     /// @return int internal job id
     pub fn download(
         &mut self,
-        resolve: Box<dyn Fn(PhpMixed) + Send + Sync>,
-        reject: Box<dyn Fn(PhpMixed) + Send + Sync>,
+        resolve: ResolveCallback,
+        reject: RejectCallback,
         origin: &str,
         url: &str,
         mut options: IndexMap<String, PhpMixed>,
@@ -279,11 +159,11 @@ impl CurlDownloader {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn init_download(
         &mut self,
-        resolve: Box<dyn Fn(PhpMixed) + Send + Sync>,
-        reject: Box<dyn Fn(PhpMixed) + Send + Sync>,
+        resolve: ResolveCallback,
+        reject: RejectCallback,
         origin: &str,
         url: &str,
-        mut options: IndexMap<String, PhpMixed>,
+        options: IndexMap<String, PhpMixed>,
         copy_to: Option<&str>,
         attributes: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<Result<i64, TransportException>> {
@@ -296,13 +176,12 @@ impl CurlDownloader {
             m.insert("ipResolve".to_string(), PhpMixed::Null);
             m
         };
-        let merged = array_merge(
-            PhpMixed::Array(defaults.into_iter().collect()),
-            PhpMixed::Array(attributes.into_iter().collect()),
-        );
-        let mut attributes: IndexMap<String, PhpMixed> = match merged {
-            PhpMixed::Array(a) => a,
-            _ => IndexMap::new(),
+        let mut attributes: IndexMap<String, PhpMixed> = {
+            let mut m = defaults;
+            for (k, v) in attributes {
+                m.insert(k, v);
+            }
+            m
         };
 
         if attributes
@@ -321,9 +200,8 @@ impl CurlDownloader {
             attributes.insert("ipResolve".to_string(), PhpMixed::Int(6));
         }
 
-        let original_options = options.clone();
-
-        // check URL can be accessed (i.e. is not insecure), but allow insecure Packagist calls to $hashed providers as file integrity is verified with sha256
+        // check URL can be accessed (i.e. is not insecure), but allow insecure Packagist calls to
+        // $hashed providers as file integrity is verified with sha256
         if !Preg::is_match(r"{^http://(repo\.)?packagist\.org/p/}", url)
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
@@ -334,328 +212,32 @@ impl CurlDownloader {
             )?;
         }
 
-        let curl_handle = curl_init();
-        let header_handle = match fopen("php://temp/maxmemory:32768", "w+b") {
-            Ok(header_handle) => header_handle,
-            Err(_) => {
-                anyhow::bail!(
-                    RuntimeException {
-                        message: "Failed to open a temp stream to store curl headers".to_string(),
-                        code: 0,
-                    }
-                    .message
-                );
-            }
-        };
+        // PHP added the auth options and ran StreamContextFactory::initOptions here, and would fail
+        // up-front if the body temp file could not be opened. reqwest opens no file until tick(),
+        // so the auth/stream-context merge happens once at send time (see send_once).
 
-        let body_target: String = if let Some(copy_to) = copy_to {
-            format!("{}~", copy_to)
-        } else {
-            "php://temp/maxmemory:524288".to_string()
-        };
-
-        // TODO(phase-c): PHP wraps this fopen in a set_error_handler to capture the warning text
-        // (stripping the "fopen(...): " prefix) into the message. Rust I/O reports failures through
-        // return values, not warnings, so error_message stays empty until fopen surfaces its reason.
-        let error_message = String::new();
-        let body_handle = match fopen(&body_target, "w+b") {
-            Ok(body_handle) => body_handle,
-            Err(_) => {
-                return Ok(Err(TransportException::new(
-                    format!(
-                        "The \"{}\" file could not be written to {}: {}",
-                        url,
-                        copy_to.unwrap_or("a temporary file"),
-                        error_message
-                    ),
-                    0,
-                )));
-            }
-        };
-
-        curl_setopt(&curl_handle, CURLOPT_URL, PhpMixed::String(url.to_string()));
-        curl_setopt(&curl_handle, CURLOPT_FOLLOWLOCATION, PhpMixed::Bool(false));
-        curl_setopt(&curl_handle, CURLOPT_CONNECTTIMEOUT, PhpMixed::Int(10));
-        curl_setopt(
-            &curl_handle,
-            CURLOPT_TIMEOUT,
-            PhpMixed::Int(
-                ini_get("default_socket_timeout")
-                    .as_deref()
-                    .unwrap_or("0")
-                    .parse::<i64>()
-                    .unwrap_or(0)
-                    .max(300),
-            ),
-        );
-        // TODO(phase-d): CURLOPT_WRITEHEADER/CURLOPT_FILE hand the header/body stream resources to
-        // curl, but curl_setopt takes a PhpMixed and a PhpResource cannot be passed through it.
-        // curl_setopt(&curl_handle, CURLOPT_WRITEHEADER, header_handle);
-        // curl_setopt(&curl_handle, CURLOPT_FILE, body_handle);
-        curl_setopt(
-            &curl_handle,
-            CURLOPT_ENCODING,
-            PhpMixed::String(String::new()),
-        ); // let cURL set the Accept-Encoding header to what it supports
-        curl_setopt(
-            &curl_handle,
-            CURLOPT_PROTOCOLS,
-            PhpMixed::Int(CURLPROTO_HTTP | CURLPROTO_HTTPS),
-        );
-
-        if attributes.get("ipResolve").and_then(PhpMixed::as_int) == Some(4) {
-            curl_setopt(
-                &curl_handle,
-                CURLOPT_IPRESOLVE,
-                PhpMixed::Int(CURL_IPRESOLVE_V4),
-            );
-        } else if attributes.get("ipResolve").and_then(PhpMixed::as_int) == Some(6) {
-            curl_setopt(
-                &curl_handle,
-                CURLOPT_IPRESOLVE,
-                PhpMixed::Int(CURL_IPRESOLVE_V6),
-            );
-        }
-
-        if function_exists("curl_share_init") {
-            // share_handle is set when curl_share_init exists
-            if let Some(sh) = &self.share_handle {
-                curl_setopt(&curl_handle, CURLOPT_SHARE, PhpMixed::Null);
-                let _ = sh;
-            }
-        }
-
-        if !options
-            .get("http")
-            .and_then(|v| v.as_array())
-            .map(|a| a.contains_key("header"))
-            .unwrap_or(false)
-        {
-            let http = options
-                .entry("http".to_string())
-                .or_insert(PhpMixed::Array(IndexMap::new()));
-            if let PhpMixed::Array(a) = http {
-                a.insert("header".to_string(), PhpMixed::List(Vec::new()));
-            }
-        }
-
-        // $options['http']['header'] = array_diff($options['http']['header'], ['Connection: close']);
-        // $options['http']['header'][] = 'Connection: keep-alive';
-        if let Some(PhpMixed::Array(http)) = options.get_mut("http")
-            && let Some(PhpMixed::List(list)) = http.get_mut("header")
-        {
-            let headers: Vec<String> = list
-                .iter()
-                .filter_map(|b| match b {
-                    PhpMixed::String(s) => Some(s.clone()),
-                    _ => None,
-                })
-                .collect();
-            let diffed = array_diff(&headers, &["Connection: close".to_string()]);
-            let mut new_list: Vec<PhpMixed> = diffed.into_iter().map(PhpMixed::String).collect();
-            new_list.push(PhpMixed::String("Connection: keep-alive".to_string()));
-            *list = new_list;
-        }
-
-        let version = curl_version();
-        let features = version
-            .as_ref()
-            .and_then(|v| v.get("features"))
-            .and_then(|b| b.as_int())
-            .unwrap_or(0);
-
-        let proxy = ProxyManager::get_instance()
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .get_proxy_for_request(url)
-            .map_err(|e| anyhow::anyhow!(e.message))?;
-
-        if strpos(url, "https://") == Some(0) {
-            let will_use_proxy = proxy
-                .get_status(None)
-                .map(|s| !s.is_empty())
-                .unwrap_or(false)
-                && !proxy.is_excluded_by_no_proxy();
-
-            if !will_use_proxy
-                && defined("CURL_VERSION_HTTP3")
-                && defined("CURL_HTTP_VERSION_3")
-                && (CURL_VERSION_HTTP3 & features) != 0
-            {
-                curl_setopt(
-                    &curl_handle,
-                    CURLOPT_HTTP_VERSION,
-                    PhpMixed::Int(CURL_HTTP_VERSION_3),
-                );
-            } else if defined("CURL_VERSION_HTTP2")
-                && defined("CURL_HTTP_VERSION_2_0")
-                && (CURL_VERSION_HTTP2 & features) != 0
-            {
-                curl_setopt(
-                    &curl_handle,
-                    CURLOPT_HTTP_VERSION,
-                    PhpMixed::Int(CURL_HTTP_VERSION_2_0),
-                );
-            }
-        }
-
-        // curl 8.7.0 - 8.7.1 has a bug whereas automatic accept-encoding header results in an error when reading the response
-        // https://github.com/composer/composer/issues/11913
-        if version
-            .as_ref()
-            .map(|v| v.contains_key("version"))
-            .unwrap_or(false)
-            && in_array(
-                version
-                    .as_ref()
-                    .and_then(|v| v.get("version"))
-                    .cloned()
-                    .unwrap_or(PhpMixed::Null),
-                &PhpMixed::List(vec![
-                    PhpMixed::String("8.7.0".to_string()),
-                    PhpMixed::String("8.7.1".to_string()),
-                ]),
-                true,
-            )
-            && defined("CURL_VERSION_LIBZ")
-            && (CURL_VERSION_LIBZ & features) != 0
-        {
-            curl_setopt(
-                &curl_handle,
-                CURLOPT_ENCODING,
-                PhpMixed::String("gzip".to_string()),
-            );
-        }
-
-        let options = self
-            .auth_helper
-            .add_authentication_options(options, origin, url)?;
-        let options = StreamContextFactory::init_options(url, options, true)
-            .map_err(|e| anyhow::anyhow!(e.message))?;
-
-        for (r#type, curl_options) in options_static() {
-            for (name, curl_option) in &curl_options {
-                if options
-                    .get(&r#type)
-                    .and_then(|v| v.as_array())
-                    .map(|a| a.contains_key(name))
-                    .unwrap_or(false)
-                {
-                    if r#type == "ssl" && name == "verify_peer_name" {
-                        let val = options
-                            .get(&r#type)
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get(name))
-                            .cloned()
-                            .unwrap_or(PhpMixed::Null);
-                        let to_set = if matches!(val, PhpMixed::Bool(true)) {
-                            PhpMixed::Int(2)
-                        } else {
-                            val
-                        };
-                        curl_setopt(&curl_handle, *curl_option, to_set);
-                    } else {
-                        let val = options
-                            .get(&r#type)
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get(name))
-                            .cloned()
-                            .unwrap_or(PhpMixed::Null);
-                        curl_setopt(&curl_handle, *curl_option, val);
-                    }
-                }
-            }
-        }
-
-        let ssl_options: IndexMap<String, PhpMixed> = options
-            .get("ssl")
-            .and_then(|v| v.as_array())
-            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-            .unwrap_or_else(IndexMap::new);
-        let proxy_curl_options = proxy
-            .get_curl_options(&ssl_options)
-            .map_err(|e| anyhow::anyhow!(e.message))?;
-        curl_setopt_array(&curl_handle, &proxy_curl_options.into_iter().collect());
-
-        let progress = array_diff_key(
-            match curl_getinfo(&curl_handle) {
-                PhpMixed::Array(a) => a,
-                _ => IndexMap::new(),
-            },
-            &time_info_static()
-                .into_iter()
-                .map(|(k, v)| (k, PhpMixed::Bool(v)))
-                .collect(),
-        );
-
-        let mut job: IndexMap<String, PhpMixed> = IndexMap::new();
-        job.insert("url".to_string(), PhpMixed::String(url.to_string()));
-        job.insert("origin".to_string(), PhpMixed::String(origin.to_string()));
-        job.insert(
-            "attributes".to_string(),
-            PhpMixed::Array(attributes.clone()),
-        );
-        job.insert("options".to_string(), PhpMixed::Array(original_options));
-        job.insert("progress".to_string(), PhpMixed::Array(progress.clone()));
-        // curlHandle, headerHandle, bodyHandle, resolve, reject are PHP resources/callables;
-        // stored as opaque PhpMixed::Null placeholders (real values live in Rust-side fields).
-        // TODO(phase-c): storing the real \CurlHandle and the resolve/reject callables needs the
-        // Job to become a typed struct (an IndexMap<String, PhpMixed> cannot hold a non-Clone
-        // closure and the job is cloned at many sites). That refactor only pays off once the curl
-        // multi-exec loop actually runs — which depends on the curl_multi_* php-shims and the
-        // React\Promise Deferred (external package), both intentionally todo!().
-        job.insert("curlHandle".to_string(), PhpMixed::Null);
-        job.insert(
-            "filename".to_string(),
-            copy_to
-                .map(|s| PhpMixed::String(s.to_string()))
-                .unwrap_or(PhpMixed::Null),
-        );
-        // headerHandle/bodyHandle are PHP stream resources; they live in the Rust-side
-        // header_handles/body_handles maps (keyed by job id) since a PhpResource cannot be stored
-        // in the PhpMixed job map.
-        job.insert("headerHandle".to_string(), PhpMixed::Null);
-        job.insert("bodyHandle".to_string(), PhpMixed::Null);
-        job.insert("resolve".to_string(), PhpMixed::Null);
-        job.insert("reject".to_string(), PhpMixed::Null);
-        job.insert("primaryIp".to_string(), PhpMixed::String(String::new()));
-
-        // TODO(phase-c): store the resolve/reject callables in the Job (see curlHandle note
-        // above) — blocked on the typed-Job refactor and the React\Promise model.
-        let _ = (resolve, reject);
-
-        let job_id = curl_handle_id(&curl_handle);
-        self.header_handles.insert(job_id, header_handle);
-        self.body_handles.insert(job_id, body_handle);
-        self.jobs.insert(job_id, job);
-
-        let using_proxy = proxy
-            .get_status(Some(" using proxy (%s)"))
-            .unwrap_or_default();
-        let header_strings: Vec<String> = options
-            .get("http")
-            .and_then(|v| v.as_array())
-            .and_then(|a| a.get("header"))
-            .and_then(|b| match b {
-                PhpMixed::List(l) => Some(
-                    l.iter()
-                        .filter_map(|x| match x {
-                            PhpMixed::String(s) => Some(s.clone()),
-                            _ => None,
-                        })
-                        .collect::<Vec<_>>(),
-                ),
-                _ => None,
-            })
-            .unwrap_or_default();
-        let if_modified = if stripos(&implode(",", &header_strings), "if-modified-since:").is_some()
+        let header_strings = Self::header_list(&options);
+        let if_modified = if shirabe_php_shim::stripos(
+            &shirabe_php_shim::implode(",", &header_strings),
+            "if-modified-since:",
+        )
+        .is_some()
         {
             " if modified"
         } else {
             ""
         };
+        // PHP logs the proxy in the "Downloading" line; resolving it here keeps that message
+        // faithful even though reqwest does not yet apply the proxy (see send_once TODO).
+        let using_proxy = ProxyManager::get_instance()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|pm| pm.get_proxy_for_request(url))
+            .transpose()
+            .map_err(|e| anyhow::anyhow!(e.message))?
+            .and_then(|p| p.get_status(Some(" using proxy (%s)")).ok())
+            .unwrap_or_default();
         if attributes.get("redirects").and_then(|v| v.as_int()) == Some(0)
             && attributes.get("retries").and_then(|v| v.as_int()) == Some(0)
         {
@@ -671,42 +253,29 @@ impl CurlDownloader {
             );
         }
 
-        self.check_curl_result(curl_multi_add_handle(&self.multi_handle, &curl_handle))?;
-        // TODO progress
+        let id = self.next_id;
+        self.next_id += 1;
+        self.jobs.insert(
+            id,
+            CurlJob {
+                url: url.to_string(),
+                origin: origin.to_string(),
+                attributes,
+                options,
+                filename: copy_to.map(|s| s.to_string()),
+                resolve,
+                reject,
+            },
+        );
 
-        Ok(Ok(curl_handle_id(&curl_handle)))
+        Ok(Ok(id))
     }
 
     pub fn abort_request(&mut self, id: i64) {
-        if self.jobs.contains_key(&id)
-            && self
-                .jobs
-                .get(&id)
-                .map(|j| j.contains_key("curlHandle"))
-                .unwrap_or(false)
+        if let Some(job) = self.jobs.shift_remove(&id)
+            && let Some(filename) = &job.filename
         {
-            let job = self.jobs.get(&id).cloned().unwrap_or_default();
-            // job['curlHandle'] is the actual \CurlHandle in PHP; in this port we keep
-            // handles in Rust-owned storage.
-            // TODO(phase-c): curl_multi_remove_handle($this->multiHandle, $job['curlHandle']) needs
-            // the real \CurlHandle stored in the Job (typed-Job refactor) and the curl_multi_*
-            // php-shims, which stay todo!().
-            // curl_multi_remove_handle($this->multiHandle, $job['curlHandle']);
-            if PHP_VERSION_ID < 80000 {
-                // curl_close($job['curlHandle']);
-            }
-            if let Some(handle) = self.header_handles.get(&id) {
-                fclose(handle);
-            }
-            if let Some(handle) = self.body_handles.get(&id) {
-                fclose(handle);
-            }
-            if let Some(PhpMixed::String(filename)) = job.get("filename") {
-                unlink_silent(&format!("{}~", filename));
-            }
-            self.header_handles.shift_remove(&id);
-            self.body_handles.shift_remove(&id);
-            self.jobs.shift_remove(&id);
+            unlink_silent(&format!("{}~", filename));
         }
     }
 
@@ -715,89 +284,51 @@ impl CurlDownloader {
             return Ok(());
         }
 
-        let mut active = true;
-        self.check_curl_result(curl_multi_exec(&self.multi_handle, &mut active))?;
-        if -1 == curl_multi_select(&self.multi_handle, self.select_timeout) {
-            // sleep in case select returns -1 as it can happen on old php versions or some platforms where curl does not manage to do the select
-            usleep(150);
+        // Drive every queued job to completion. The PHP multi-handle progressed all easy handles
+        // a little per tick(); here each tick() fully resolves one job (block_on per request),
+        // which is observationally equivalent for the sync wait_id() loop that calls tick().
+        let ids: Vec<i64> = self.jobs.keys().copied().collect();
+        for id in ids {
+            self.run_job(id)?;
         }
+        Ok(())
+    }
 
+    /// Runs a single job through the redirect/retry/status state machine until it resolves or
+    /// rejects, invoking the stored resolve/reject callback. Mirrors the body of PHP `tick()`.
+    fn run_job(&mut self, id: i64) -> anyhow::Result<()> {
         loop {
-            let progress_read = curl_multi_info_read(&self.multi_handle);
-            let mut progress: IndexMap<String, PhpMixed> = match &progress_read {
-                PhpMixed::Array(a) => a.clone(),
-                _ => break,
+            let (url, origin, filename, options, attributes) = {
+                let job = match self.jobs.get(&id) {
+                    Some(j) => j,
+                    None => return Ok(()),
+                };
+                (
+                    job.url.clone(),
+                    job.origin.clone(),
+                    job.filename.clone(),
+                    job.options.clone(),
+                    job.attributes.clone(),
+                )
             };
-            // $curlHandle = $progress['handle']; $result = $progress['result']; $i = (int) $curlHandle;
-            let _curl_handle_placeholder: PhpMixed =
-                progress.get("handle").cloned().unwrap_or(PhpMixed::Null);
-            let result_code: i64 = progress.get("result").and_then(|b| b.as_int()).unwrap_or(0);
-            // TODO(phase-c): the job id is `(int) $progress['handle']` — the integer id of the
-            // \CurlHandle reported by curl_multi_info_read. Recovering it needs real curl handle
-            // resources from the curl_multi_* php-shims (todo!()); until then the id cannot be
-            // correlated and this loop body is unreachable in practice.
-            let i: i64 = 0;
-            if !self.jobs.contains_key(&i) {
-                continue;
-            }
 
-            // $progress = curl_getinfo($curlHandle);
-            // if (false === $progress) throw new RuntimeException(...)
-            let info = curl_getinfo(/* TODO real handle */ &curl_init());
-            match info {
-                PhpMixed::Array(a) => progress = a,
-                PhpMixed::Bool(false) => {
-                    anyhow::bail!(
-                        RuntimeException {
-                            message: format!(
-                                "Failed getting info from curl handle {} ({})",
-                                i,
-                                self.jobs
-                                    .get(&i)
-                                    .and_then(|j| j.get("url"))
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or("")
-                            ),
-                            code: 0,
-                        }
-                        .message
-                    );
-                }
-                _ => {}
-            }
-            let job = self.jobs.get(&i).cloned().unwrap_or_default();
-            self.jobs.shift_remove(&i);
-            let mut error = curl_error(/* TODO real handle */ &curl_init());
-            let mut errno = curl_errno(/* TODO real handle */ &curl_init());
-            // curl_multi_remove_handle($this->multiHandle, $curlHandle);
-            if PHP_VERSION_ID < 80000 {
-                // curl_close($curlHandle);
-            }
+            // PHP merges auth options + stream-context options at curl_setopt time. We need the
+            // resulting header/method/content/timeout/ssl/max_file_size, so do it here per send.
+            let send_options =
+                self.auth_helper
+                    .add_authentication_options(options.clone(), &origin, &url)?;
+            let send_options =
+                crate::util::StreamContextFactory::init_options(&url, send_options, true)
+                    .map_err(|e| anyhow::anyhow!(e.message))?;
 
-            let mut headers: Option<Vec<String>> = None;
-            let mut status_code: Option<i64> = None;
-            let mut response: Option<CurlResponse> = None;
-            // PHP try block; recoverable errors (TransportException, LogicException) flow through
-            // the inner Result, fatal errors propagate via anyhow::Result.
-            let try_block: anyhow::Result<Result<(), TransportException>> = (|| {
-                // TODO progress
-                if CURLE_OK != errno || !error.is_empty() || result_code != CURLE_OK {
-                    if errno == 0 {
-                        errno = result_code;
-                    }
-                    if error.is_empty() && function_exists("curl_strerror") {
-                        error = curl_strerror(errno).unwrap_or_default();
-                    }
-                    progress.insert("error_code".to_string(), PhpMixed::Int(errno));
+            let send_result = self.send_once(&url, &send_options, filename.as_deref(), &attributes);
 
-                    if errno == 28 /* CURLE_OPERATION_TIMEDOUT */
-                        && PHP_VERSION_ID >= 70300
-                        && progress
-                            .get("namelookup_time")
-                            .and_then(|b| b.as_float())
-                            == Some(0.0)
-                        && !TIMEOUT_WARNING.load(Ordering::Relaxed)
-                    {
+            let response = match send_result {
+                Ok(resp) => resp,
+                Err(transport_err) => {
+                    // CURLE_OPERATION_TIMEDOUT one-time warning (errno 28). reqwest cannot report
+                    // the curl errno, so this fires on the is_timeout() branch instead.
+                    if transport_err.was_timeout && !TIMEOUT_WARNING.load(Ordering::Relaxed) {
                         TIMEOUT_WARNING.store(true, Ordering::Relaxed);
                         self.io.write_error3(
                             "<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>",
@@ -806,698 +337,361 @@ impl CurlDownloader {
                         );
                     }
 
-                    let method_is_get = !job
-                        .get("options")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("http"))
-                        .and_then(|b| b.as_array())
-                        .map(|a| a.contains_key("method"))
-                        .unwrap_or(false)
-                        || job
-                            .get("options")
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get("http"))
-                            .and_then(|b| b.as_array())
-                            .and_then(|a| a.get("method"))
-                            .and_then(|b| b.as_string().map(|s| s.to_string()))
-                            == Some("GET".to_string());
-                    if method_is_get
-                        && (in_array(
-                            PhpMixed::Int(errno),
-                            &PhpMixed::List(vec![
-                                PhpMixed::Int(7 /* CURLE_COULDNT_CONNECT */),
-                                PhpMixed::Int(16 /* CURLE_HTTP2 */),
-                                PhpMixed::Int(92 /* CURLE_HTTP2_STREAM */),
-                                PhpMixed::Int(6 /* CURLE_COULDNT_RESOLVE_HOST */),
-                                PhpMixed::Int(28 /* CURLE_OPERATION_TIMEDOUT */),
-                            ]),
-                            true,
-                        ) || (in_array(
-                            PhpMixed::Int(errno),
-                            &PhpMixed::List(vec![
-                                PhpMixed::Int(56 /* CURLE_RECV_ERROR */),
-                                PhpMixed::Int(35 /* CURLE_SSL_CONNECT_ERROR */),
-                            ]),
-                            true,
-                        ) && str_contains(&error, "Connection reset by peer")))
-                        && job
-                            .get("attributes")
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get("retries"))
-                            .and_then(|b| b.as_int())
-                            .unwrap_or(0)
-                            < self.max_retries
+                    // PHP retried on a set of curl errnos (7/16/92/6/28 and 56/35 with "Connection
+                    // reset by peer"); reqwest does not expose those errnos, so approximate with
+                    // is_connect/is_timeout/is_request on GET requests.
+                    let retries = attributes
+                        .get("retries")
+                        .and_then(|v| v.as_int())
+                        .unwrap_or(0);
+                    if transport_err.retryable
+                        && Self::method_is_get(&options)
+                        && retries < self.max_retries
                     {
-                        let mut attributes: IndexMap<String, PhpMixed> = IndexMap::new();
-                        attributes.insert(
-                            "retries".to_string(),
-                            PhpMixed::Int(
-                                job.get("attributes")
-                                    .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get("retries"))
-                                    .and_then(|b| b.as_int())
-                                    .unwrap_or(0)
-                                    + 1,
-                            ),
-                        );
-                        if errno == 7
-                            && !job
-                                .get("attributes")
-                                .and_then(|v| v.as_array())
-                                .map(|a| a.contains_key("ipResolve"))
-                                .unwrap_or(false)
-                        {
-                            // CURLE_COULDNT_CONNECT, retry forcing IPv4 if no IP stack was selected
-                            attributes.insert("ipResolve".to_string(), PhpMixed::Int(4));
+                        let mut new_attrs = attributes.clone();
+                        new_attrs.insert("retries".to_string(), PhpMixed::Int(retries + 1));
+                        // CURLE_COULDNT_CONNECT analogue: force IPv4 if no IP stack chosen.
+                        if transport_err.is_connect && !attributes.contains_key("ipResolve") {
+                            new_attrs.insert("ipResolve".to_string(), PhpMixed::Int(4));
                         }
                         self.io.write_error3(
                             &format!(
-                                "Retrying ({}) {} due to curl error {}",
-                                job.get("attributes")
-                                    .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get("retries"))
-                                    .and_then(|b| b.as_int())
-                                    .unwrap_or(0)
-                                    + 1,
-                                Url::sanitize(
-                                    job.get("url")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string()
-                                ),
-                                errno
+                                "Retrying ({}) {} due to connection error",
+                                retries + 1,
+                                Url::sanitize(url.clone())
                             ),
                             true,
                             crate::io::DEBUG,
                         );
-                        self.restart_job_with_delay(
-                            &job,
-                            job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                            attributes,
-                        )?;
-                        return Ok(Ok(()));
+                        self.restart_job_with_delay(id, &url, new_attrs);
+                        continue;
                     }
-
-                    // TODO: Remove this as soon as https://github.com/curl/curl/issues/10591 is resolved
-                    if errno == 55
-                    /* CURLE_SEND_ERROR */
-                    {
-                        self.io.write_error3(
-                            &format!(
-                                "Retrying ({}) {} due to curl error {}",
-                                job.get("attributes")
-                                    .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get("retries"))
-                                    .and_then(|b| b.as_int())
-                                    .unwrap_or(0)
-                                    + 1,
-                                Url::sanitize(
-                                    job.get("url")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string()
-                                ),
-                                errno
-                            ),
-                            true,
-                            crate::io::DEBUG,
-                        );
-                        let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
-                        attrs.insert(
-                            "retries".to_string(),
-                            PhpMixed::Int(
-                                job.get("attributes")
-                                    .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get("retries"))
-                                    .and_then(|b| b.as_int())
-                                    .unwrap_or(0)
-                                    + 1,
-                            ),
-                        );
-                        self.restart_job_with_delay(
-                            &job,
-                            job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                            attrs,
-                        )?;
-                        return Ok(Ok(()));
-                    }
-
-                    return Ok(Err(TransportException::new(
-                        format!(
-                            "curl error {} while downloading {}: {}",
-                            errno,
-                            Url::sanitize(
-                                progress
-                                    .get("url")
-                                    .and_then(|b| b.as_string())
-                                    .unwrap_or("")
-                                    .to_string()
-                            ),
-                            error
-                        ),
-                        0,
-                    )));
-                }
-                status_code = progress.get("http_code").and_then(|b| b.as_int());
-                let header_handle = self.header_handles.get(&i).cloned();
-                let header_contents = match &header_handle {
-                    Some(handle) => {
-                        rewind(handle);
-                        stream_get_contents(handle).unwrap_or_default()
-                    }
-                    None => String::new(),
-                };
-                headers = Some(explode("\r\n", &rtrim(&header_contents, None)));
-                if let Some(handle) = &header_handle {
-                    fclose(handle);
-                }
-                self.header_handles.shift_remove(&i);
-
-                if status_code == Some(0) {
-                    anyhow::bail!(
-                        LogicException {
-                            message: format!(
-                                "Received unexpected http status code 0 without error for {}: headers {} curl info {}",
-                                Url::sanitize(
-                                    progress
-                                        .get("url")
-                                        .and_then(|b| b.as_string())
-                                        .unwrap_or("")
-                                        .to_string()
-                                ),
-                                var_export(
-                                    &PhpMixed::List(
-                                        headers
-                                            .as_ref()
-                                            .unwrap()
-                                            .iter()
-                                            .map(|s| PhpMixed::String(s.clone()))
-                                            .collect()
-                                    ),
-                                    true
-                                ),
-                                var_export(&PhpMixed::Array(progress.clone()), true)
-                            ),
-                            code: 0,
-                        }
+                    // PHP throws a MaxFileSizeExceededException (a TransportException subclass) with
+                    // the raw "Maximum allowed download size reached..." message; preserve it
+                    // verbatim rather than wrapping it in the generic curl-error text.
+                    let message = if transport_err.is_max_file_size {
+                        MaxFileSizeExceededException(TransportException::new(
+                            transport_err.message.clone(),
+                            0,
+                        ))
+                        .0
                         .message
-                    );
-                }
-
-                // prepare response object
-                let body_handle = self.body_handles.get(&i).cloned();
-                let contents: PhpMixed;
-                if let Some(PhpMixed::String(filename)) = job.get("filename") {
-                    let mut c: PhpMixed = PhpMixed::String(format!("{}~", filename));
-                    if status_code.unwrap_or(0) >= 300 {
-                        if let Some(handle) = &body_handle {
-                            rewind(handle);
-                            c = PhpMixed::String(stream_get_contents(handle).unwrap_or_default());
-                        }
-                    }
-                    contents = c;
-                    response = Some(CurlResponse::new(
-                        job.get("url")
-                            .and_then(|v| v.as_string())
-                            .unwrap_or("")
-                            .to_string(),
-                        status_code,
-                        headers.clone().unwrap_or_default(),
-                        contents.as_string().map(|s| s.to_string()),
-                        progress.clone(),
-                    ));
-                    self.io.write_error3(
-                        &format!(
-                            "[{}] {}",
-                            status_code.unwrap_or(0),
-                            Url::sanitize(
-                                job.get("url")
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or("")
-                                    .to_string()
-                            )
-                        ),
-                        true,
-                        crate::io::DEBUG,
-                    );
-                } else {
-                    let max_file_size: Option<i64> = job
-                        .get("options")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("max_file_size"))
-                        .and_then(|b| b.as_int());
-                    if let Some(handle) = &body_handle {
-                        rewind(handle);
-                    }
-                    if let Some(max_file_size) = max_file_size {
-                        let c = match &body_handle {
-                            Some(handle) => {
-                                stream_get_contents_with_max(handle, Some(max_file_size))
-                            }
-                            None => None,
-                        };
-                        // Gzipped responses with missing Content-Length header cannot be detected during the file download
-                        // because $progress['size_download'] refers to the gzipped size downloaded, not the actual file size
-                        if let Some(c_str) = c.as_deref()
-                            && Platform::strlen(c_str) >= max_file_size
-                        {
-                            anyhow::bail!(
-                                    MaxFileSizeExceededException(TransportException::new(
-                                        format!(
-                                            "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
-                                            Platform::strlen(c_str),
-                                            max_file_size
-                                        ),
-                                        0,
-                                    ))
-                                    .0
-                                    .message
-                                );
-                        }
-                        contents = PhpMixed::String(c.unwrap_or_default());
                     } else {
-                        contents = PhpMixed::String(match &body_handle {
-                            Some(handle) => stream_get_contents(handle).unwrap_or_default(),
-                            None => String::new(),
-                        });
+                        TransportException::new(
+                            format!(
+                                "curl error while downloading {}: {}",
+                                Url::sanitize(url.clone()),
+                                transport_err.message
+                            ),
+                            0,
+                        )
+                        .message
+                    };
+                    self.reject_job(id, anyhow::anyhow!(message));
+                    return Ok(());
+                }
+            };
+
+            let status_code = response.status;
+
+            let curl_response = response.into_curl_response(&url);
+
+            self.io.write_error3(
+                &format!("[{}] {}", status_code, Url::sanitize(url.clone())),
+                true,
+                crate::io::DEBUG,
+            );
+
+            // Output JSON warnings (PHP HttpDownloader::outputWarnings) for >= 300 JSON bodies.
+            if curl_response.inner.get_status_code() >= 300
+                && curl_response.inner.get_header("content-type").as_deref()
+                    == Some("application/json")
+            {
+                if let Some(body) = curl_response.inner.get_body() {
+                    let decoded = shirabe_php_shim::json_decode(body, true)?;
+                    if let PhpMixed::Array(a) = decoded {
+                        HttpDownloader::output_warnings(self.io.clone(), &origin, &a)?;
                     }
-
-                    response = Some(CurlResponse::new(
-                        job.get("url")
-                            .and_then(|v| v.as_string())
-                            .unwrap_or("")
-                            .to_string(),
-                        status_code,
-                        headers.clone().unwrap_or_default(),
-                        contents.as_string().map(|s| s.to_string()),
-                        progress.clone(),
-                    ));
-                    self.io.write_error3(
-                        &format!(
-                            "[{}] {}",
-                            status_code.unwrap_or(0),
-                            Url::sanitize(
-                                job.get("url")
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or("")
-                                    .to_string()
-                            )
-                        ),
-                        true,
-                        crate::io::DEBUG,
-                    );
                 }
-                if let Some(handle) = &body_handle {
-                    fclose(handle);
-                }
-                self.body_handles.shift_remove(&i);
+            }
 
-                let response_ref = response.as_ref().unwrap();
-                if response_ref.inner.get_status_code() >= 300
-                    && response_ref.inner.get_header("content-type").as_deref()
-                        == Some("application/json")
-                {
-                    HttpDownloader::output_warnings(
-                        self.io.clone(),
-                        job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
-                        &match json_decode(response_ref.inner.get_body().unwrap_or(""), true)? {
-                            PhpMixed::Array(a) => a,
-                            _ => IndexMap::new(),
-                        },
-                    )?;
-                }
-
-                let result =
-                    self.is_authenticated_retry_needed(&job, response.as_ref().unwrap())?;
-                let retry = match &result {
-                    Ok(r) => r.retry,
-                    Err(_) => false,
-                };
-                if retry {
-                    let r = result.unwrap();
-                    let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
-                    attrs.insert(
+            // Authenticated-retry detection (401/403, Bitbucket login page, GitLab archive 404).
+            let auth_result = self.is_authenticated_retry_needed(
+                &url,
+                &origin,
+                filename.as_deref(),
+                &attributes,
+                &curl_response,
+            )?;
+            match auth_result {
+                Ok(prompt) if prompt.retry => {
+                    let mut new_attrs = attributes.clone();
+                    new_attrs.insert(
                         "storeAuth".to_string(),
-                        match r.store_auth {
+                        match prompt.store_auth {
                             StoreAuth::Bool(b) => PhpMixed::Bool(b),
                             StoreAuth::Prompt => PhpMixed::String("prompt".to_string()),
                         },
                     );
-                    attrs.insert(
-                        "retries".to_string(),
-                        PhpMixed::Int(
-                            job.get("attributes")
-                                .and_then(|v| v.as_array())
-                                .and_then(|a| a.get("retries"))
-                                .and_then(|b| b.as_int())
-                                .unwrap_or(0)
-                                + 1,
-                        ),
-                    );
-                    self.restart_job(
-                        &job,
-                        job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                        attrs,
-                    )?;
-                    return Ok(Ok(()));
+                    let retries = attributes
+                        .get("retries")
+                        .and_then(|v| v.as_int())
+                        .unwrap_or(0);
+                    new_attrs.insert("retries".to_string(), PhpMixed::Int(retries + 1));
+                    self.restart_job(id, &url, new_attrs);
+                    continue;
                 }
-
-                // handle 3xx redirects, 304 Not Modified is excluded
-                let sc = status_code.unwrap_or(0);
-                if (300..=399).contains(&sc)
-                    && sc != 304
-                    && job
-                        .get("attributes")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("redirects"))
-                        .and_then(|b| b.as_int())
-                        .unwrap_or(0)
-                        < self.max_redirects
-                {
-                    let location = self.handle_redirect(&job, response.as_ref().unwrap())?;
-                    match location {
-                        Ok(loc) if !loc.is_empty() => {
-                            let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
-                            attrs.insert(
-                                "redirects".to_string(),
-                                PhpMixed::Int(
-                                    job.get("attributes")
-                                        .and_then(|v| v.as_array())
-                                        .and_then(|a| a.get("redirects"))
-                                        .and_then(|b| b.as_int())
-                                        .unwrap_or(0)
-                                        + 1,
-                                ),
-                            );
-                            self.restart_job(&job, &loc, attrs)?;
-                            return Ok(Ok(()));
-                        }
-                        Ok(_) => {}
-                        Err(e) => return Ok(Err(e)),
-                    }
-                }
-
-                // fail 4xx and 5xx responses and capture the response
-                if (400..=599).contains(&sc) {
-                    let method_is_get = !job
-                        .get("options")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("http"))
-                        .and_then(|b| b.as_array())
-                        .map(|a| a.contains_key("method"))
-                        .unwrap_or(false)
-                        || job
-                            .get("options")
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get("http"))
-                            .and_then(|b| b.as_array())
-                            .and_then(|a| a.get("method"))
-                            .and_then(|b| b.as_string().map(|s| s.to_string()))
-                            == Some("GET".to_string());
-                    if method_is_get
-                        && in_array(
-                            PhpMixed::Int(sc),
-                            &PhpMixed::List(vec![
-                                PhpMixed::Int(423),
-                                PhpMixed::Int(425),
-                                PhpMixed::Int(500),
-                                PhpMixed::Int(502),
-                                PhpMixed::Int(503),
-                                PhpMixed::Int(504),
-                                PhpMixed::Int(507),
-                                PhpMixed::Int(510),
-                            ]),
-                            true,
-                        )
-                        && job
-                            .get("attributes")
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get("retries"))
-                            .and_then(|b| b.as_int())
-                            .unwrap_or(0)
-                            < self.max_retries
-                    {
-                        self.io.write_error3(
-                            &format!(
-                                "Retrying ({}) {} due to status code {}",
-                                job.get("attributes")
-                                    .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get("retries"))
-                                    .and_then(|b| b.as_int())
-                                    .unwrap_or(0)
-                                    + 1,
-                                Url::sanitize(
-                                    job.get("url")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string()
-                                ),
-                                sc
-                            ),
-                            true,
-                            crate::io::DEBUG,
-                        );
-                        let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
-                        attrs.insert(
-                            "retries".to_string(),
-                            PhpMixed::Int(
-                                job.get("attributes")
-                                    .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get("retries"))
-                                    .and_then(|b| b.as_int())
-                                    .unwrap_or(0)
-                                    + 1,
-                            ),
-                        );
-                        self.restart_job_with_delay(
-                            &job,
-                            job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                            attrs,
-                        )?;
-                        return Ok(Ok(()));
-                    }
-
-                    let status_msg = response_ref.inner.get_status_message().unwrap_or_default();
-                    return Ok(Err(self.fail_response(
-                        &job,
-                        response.as_ref().unwrap(),
-                        &status_msg,
-                    )));
-                }
-
-                if !matches!(
-                    job.get("attributes")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("storeAuth"))
-                        .cloned(),
-                    Some(PhpMixed::Bool(false))
-                ) {
-                    let store_auth_val = job
-                        .get("attributes")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("storeAuth"))
-                        .cloned()
-                        .unwrap_or(PhpMixed::Bool(false));
-                    let store_auth = match store_auth_val {
-                        PhpMixed::Bool(b) => StoreAuth::Bool(b),
-                        PhpMixed::String(ref s) if s == "prompt" => StoreAuth::Prompt,
-                        _ => StoreAuth::Bool(false),
-                    };
-                    self.auth_helper.store_auth(
-                        job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
-                        store_auth,
-                    )?;
-                }
-
-                // resolve promise
-                if let Some(PhpMixed::String(filename)) = job.get("filename") {
-                    rename(&format!("{}~", filename), filename);
-                    // job['resolve']($response);
-                    // TODO(phase-c): invoke the stored resolve callable — blocked on the typed-Job
-                    // refactor that holds the React\Promise resolve closure (see download()).
-                } else {
-                    // job['resolve']($response);
-                    // TODO(phase-c): invoke the stored resolve callable — blocked on the typed-Job
-                    // refactor that holds the React\Promise resolve closure (see download()).
-                }
-                Ok(Ok(()))
-            })();
-            match try_block {
-                Ok(Ok(())) => {}
-                Ok(Err(mut e)) => {
-                    // PHP catches \Exception; the recoverable branch here is TransportException.
-                    if let Some(h) = &headers {
-                        e.set_headers(h.clone());
-                        e.set_status_code(status_code);
-                    }
-                    if let Some(r) = &response {
-                        e.set_response(r.inner.get_body().map(|s| s.to_string()));
-                    }
-                    e.set_response_info(progress.values().cloned().collect::<Vec<_>>());
-                    self.reject_job(i, &job, anyhow::anyhow!(e.message));
-                }
+                Ok(_) => {}
                 Err(e) => {
-                    // Non-TransportException fatal error: pass through reject_job to mirror PHP catch (\Exception $e).
-                    self.reject_job(i, &job, e);
+                    self.reject_job(id, anyhow::anyhow!(e.message));
+                    return Ok(());
                 }
             }
-        }
 
-        let keys: Vec<i64> = self.jobs.keys().cloned().collect();
-        for i in keys {
-            // $curlHandle = $this->jobs[$i]['curlHandle'];
-            // $progress = array_diff_key(curl_getinfo($curlHandle), self::$timeInfo);
-            let progress_now = array_diff_key(
-                match curl_getinfo(/* TODO real handle */ &curl_init()) {
-                    PhpMixed::Array(a) => a,
-                    _ => IndexMap::new(),
-                },
-                &time_info_static()
-                    .into_iter()
-                    .map(|(k, v)| (k, PhpMixed::Bool(v)))
-                    .collect(),
-            );
-
-            let prev_progress = self
-                .jobs
-                .get(&i)
-                .and_then(|j| j.get("progress"))
-                .cloned()
-                .unwrap_or(PhpMixed::Null);
-            let prev_progress_map: IndexMap<String, PhpMixed> = match prev_progress {
-                PhpMixed::Array(a) => a,
-                _ => IndexMap::new(),
-            };
-
-            if !maps_equal(&prev_progress_map, &progress_now) {
-                if let Some(job) = self.jobs.get_mut(&i) {
-                    job.insert(
-                        "progress".to_string(),
-                        PhpMixed::Array(progress_now.clone()),
-                    );
-                }
-
-                let max_file_size = self
-                    .jobs
-                    .get(&i)
-                    .and_then(|j| j.get("options"))
-                    .and_then(|v| v.as_array())
-                    .and_then(|a| a.get("max_file_size"))
-                    .and_then(|b| b.as_int());
-                if let Some(max_file_size) = max_file_size {
-                    // Compare max_file_size with the content-length header this value will be -1 until the header is parsed
-                    let download_content_length = progress_now
-                        .get("download_content_length")
-                        .and_then(|b| b.as_int())
-                        .unwrap_or(0);
-                    if max_file_size < download_content_length {
-                        let job = self.jobs.get(&i).cloned().unwrap_or_default();
-                        self.reject_job(
-                            i,
-                            &job,
-                            anyhow::anyhow!(
-                                MaxFileSizeExceededException(TransportException::new(
-                                    format!(
-                                        "Maximum allowed download size reached. Content-length header indicates {} bytes. Allowed {} bytes",
-                                        download_content_length, max_file_size
-                                    ),
-                                    0,
-                                ))
-                                .0
-                                .message
-                            ),
-                        );
+            // Handle 3xx redirects, 304 Not Modified excluded.
+            let redirects = attributes
+                .get("redirects")
+                .and_then(|v| v.as_int())
+                .unwrap_or(0);
+            if (300..=399).contains(&status_code)
+                && status_code != 304
+                && redirects < self.max_redirects
+            {
+                match self.handle_redirect(&url, &attributes, &curl_response)? {
+                    Ok(location) if !location.is_empty() => {
+                        let mut new_attrs = attributes.clone();
+                        new_attrs.insert("redirects".to_string(), PhpMixed::Int(redirects + 1));
+                        // The redirect target becomes the new url; origin is recomputed in restart.
+                        self.restart_job(id, &location, new_attrs);
+                        continue;
                     }
-
-                    // Compare max_file_size with the download size in bytes
-                    let size_download = progress_now
-                        .get("size_download")
-                        .and_then(|b| b.as_int())
-                        .unwrap_or(0);
-                    if max_file_size < size_download {
-                        let job = self.jobs.get(&i).cloned().unwrap_or_default();
-                        self.reject_job(
-                            i,
-                            &job,
-                            anyhow::anyhow!(
-                                MaxFileSizeExceededException(TransportException::new(
-                                    format!(
-                                        "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
-                                        size_download, max_file_size
-                                    ),
-                                    0,
-                                ))
-                                .0
-                                .message
-                            ),
-                        );
+                    Ok(_) => {}
+                    Err(e) => {
+                        self.reject_job(id, anyhow::anyhow!(e.message));
+                        return Ok(());
                     }
                 }
+            }
 
-                let primary_ip = progress_now.get("primary_ip");
-                let prev_primary_ip = self
-                    .jobs
-                    .get(&i)
-                    .and_then(|j| j.get("primaryIp"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("")
-                    .to_string();
-                if let Some(primary_ip) = primary_ip
-                    && primary_ip.as_string() != Some(&prev_primary_ip)
+            // Fail 4xx and 5xx responses (some are retried on GET).
+            if (400..=599).contains(&status_code) {
+                let retries = attributes
+                    .get("retries")
+                    .and_then(|v| v.as_int())
+                    .unwrap_or(0);
+                if Self::method_is_get(&options)
+                    && in_array(
+                        PhpMixed::Int(status_code),
+                        &PhpMixed::List(
+                            [423, 425, 500, 502, 503, 504, 507, 510]
+                                .iter()
+                                .map(|c| PhpMixed::Int(*c))
+                                .collect(),
+                        ),
+                        true,
+                    )
+                    && retries < self.max_retries
                 {
-                    let prevent_ip_access_callable = self
-                        .jobs
-                        .get(&i)
-                        .and_then(|j| j.get("options"))
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("prevent_ip_access_callable"))
-                        .is_some();
-                    // PHP: is_callable($cb = $job['options']['prevent_ip_access_callable']) && $cb($primaryIp)
-                    // TODO(phase-c): prevent_ip_access_callable is a caller-supplied callable
-                    // carried inside the options array as PhpMixed; invoking it needs a typed
-                    // callable model (options would have to hold an Rc<dyn Fn>), which the
-                    // PhpMixed-keyed options map cannot express yet.
-                    // The callable that would actually decide blocking cannot be invoked yet
-                    // (see TODO above), so no IP is treated as blocked for now.
-                    let _ = prevent_ip_access_callable;
-                    let blocked = false;
-                    if blocked {
-                        let job = self.jobs.get(&i).cloned().unwrap_or_default();
-                        self.reject_job(
-                            i,
-                            &job,
-                            anyhow::anyhow!(
-                                TransportException::new(
-                                    format!(
-                                        "IP \"{}\" is blocked for \"{}\".",
-                                        primary_ip.clone(),
-                                        progress_now.get("url").cloned().unwrap_or(PhpMixed::Null),
-                                    ),
-                                    0,
-                                )
-                                .message
-                            ),
-                        );
-                    }
-
-                    if let Some(job) = self.jobs.get_mut(&i) {
-                        job.insert(
-                            "primaryIp".to_string(),
-                            PhpMixed::String(primary_ip.as_string().unwrap_or("").to_string()),
-                        );
-                    }
+                    self.io.write_error3(
+                        &format!(
+                            "Retrying ({}) {} due to status code {}",
+                            retries + 1,
+                            Url::sanitize(url.clone()),
+                            status_code
+                        ),
+                        true,
+                        crate::io::DEBUG,
+                    );
+                    let mut new_attrs = attributes.clone();
+                    new_attrs.insert("retries".to_string(), PhpMixed::Int(retries + 1));
+                    self.restart_job_with_delay(id, &url, new_attrs);
+                    continue;
                 }
 
-                // TODO progress
+                let status_msg = curl_response.inner.get_status_message().unwrap_or_default();
+                let e = self.fail_response(&url, filename.as_deref(), &curl_response, &status_msg);
+                self.reject_job_with_response(id, e, &curl_response);
+                return Ok(());
             }
+
+            // storeAuth on success.
+            let store_auth = attributes.get("storeAuth").cloned();
+            if !matches!(store_auth, Some(PhpMixed::Bool(false))) {
+                let store_auth = match store_auth {
+                    Some(PhpMixed::String(ref s)) if s == "prompt" => StoreAuth::Prompt,
+                    Some(PhpMixed::Bool(b)) => StoreAuth::Bool(b),
+                    _ => StoreAuth::Bool(false),
+                };
+                self.auth_helper.store_auth(&origin, store_auth)?;
+            }
+
+            // Atomic rename of the `~` temp file to its final name (file mode).
+            if let Some(filename) = &filename {
+                rename(&format!("{}~", filename), filename);
+            }
+
+            self.resolve_job(id, curl_response.inner);
+            return Ok(());
         }
-        Ok(())
     }
 
-    /// @param  Job    $job
+    /// Performs one HTTP request via reqwest (`block_on`), enforcing max_file_size and streaming the
+    /// body to the `~` temp file when in file mode. Replaces PHP's curl_setopt block + curl I/O.
+    fn send_once(
+        &self,
+        url: &str,
+        options: &IndexMap<String, PhpMixed>,
+        filename: Option<&str>,
+        attributes: &IndexMap<String, PhpMixed>,
+    ) -> Result<RawResponse, TransportError> {
+        let http = options.get("http").and_then(|v| v.as_array());
+        let method = http
+            .and_then(|h| h.get("method"))
+            .and_then(|v| v.as_string())
+            .unwrap_or("GET")
+            .to_string();
+        let body = http
+            .and_then(|h| h.get("content"))
+            .and_then(|v| v.as_string())
+            .map(|s| s.as_bytes().to_vec());
+        let timeout_secs = http
+            .and_then(|h| h.get("timeout"))
+            .and_then(|v| v.as_int())
+            .unwrap_or(0)
+            .max(300);
+        let headers = Self::header_list(options);
+        let max_file_size = options
+            .get("max_file_size")
+            .and_then(|v| v.as_int())
+            .map(|n| n as u64);
+
+        // TODO: per-request ssl (cafile/verify_peer/local_cert) and proxy settings are reqwest
+        // Client-level, not request-level. They are not applied here yet; a ConnectionOptions-keyed
+        // Client cache (as in the design sketch) is required to honor them.
+        // TODO: CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
+        let _ = attributes;
+
+        let reqwest_method =
+            reqwest::Method::from_bytes(method.as_bytes()).unwrap_or(reqwest::Method::GET);
+
+        self.runtime.block_on(async {
+            let mut builder = self.client.request(reqwest_method, url);
+            for header in &headers {
+                if let Some((name, value)) = header.split_once(':') {
+                    // Skip the Connection header reqwest manages itself.
+                    let name = name.trim();
+                    if name.eq_ignore_ascii_case("connection") {
+                        continue;
+                    }
+                    builder = builder.header(name, value.trim());
+                }
+            }
+            builder = builder.timeout(std::time::Duration::from_secs(timeout_secs as u64));
+            if let Some(body) = body {
+                builder = builder.body(body);
+            }
+
+            let resp = builder.send().await.map_err(|e| TransportError {
+                message: e.to_string(),
+                retryable: e.is_timeout() || e.is_connect() || e.is_request(),
+                is_connect: e.is_connect(),
+                was_timeout: e.is_timeout(),
+                is_max_file_size: false,
+            })?;
+
+            let status = resp.status().as_u16() as i64;
+            let status_line = format!(
+                "HTTP/{} {}",
+                match resp.version() {
+                    reqwest::Version::HTTP_09 => "0.9",
+                    reqwest::Version::HTTP_10 => "1.0",
+                    reqwest::Version::HTTP_11 => "1.1",
+                    reqwest::Version::HTTP_2 => "2",
+                    reqwest::Version::HTTP_3 => "3",
+                    _ => "1.1",
+                },
+                resp.status()
+            );
+            // Header lines start with the status line so Response::get_status_message can find it.
+            let mut headers_out: Vec<String> = vec![status_line];
+            for (k, v) in resp.headers().iter() {
+                headers_out.push(format!("{}: {}", k, v.to_str().unwrap_or("")));
+            }
+
+            let body = Self::read_body_with_limit(resp, max_file_size, filename)
+                .await
+                .map_err(|(message, is_max_file_size)| TransportError {
+                    message,
+                    retryable: false,
+                    is_connect: false,
+                    was_timeout: false,
+                    is_max_file_size,
+                })?;
+
+            Ok(RawResponse {
+                status,
+                headers: headers_out,
+                body,
+            })
+        })
+    }
+
+    /// Reads the body, enforcing max_file_size, writing to the `~` temp file when in file mode.
+    /// The `bool` in the error is `true` when the failure is a max_file_size violation.
+    async fn read_body_with_limit(
+        resp: reqwest::Response,
+        max_file_size: Option<u64>,
+        filename: Option<&str>,
+    ) -> Result<Body, (String, bool)> {
+        use std::io::Write;
+
+        let mut stream = resp;
+        let mut written: u64 = 0;
+        enum Sink {
+            File(std::fs::File),
+            Memory(Vec<u8>),
+        }
+        let mut sink = match filename {
+            Some(f) => Sink::File(
+                std::fs::File::create(format!("{}~", f)).map_err(|e| (e.to_string(), false))?,
+            ),
+            None => Sink::Memory(Vec::new()),
+        };
+
+        loop {
+            let chunk = match stream.chunk().await {
+                Ok(Some(c)) => c,
+                Ok(None) => break,
+                Err(e) => return Err((e.to_string(), false)),
+            };
+            written += chunk.len() as u64;
+            if let Some(max) = max_file_size
+                && written > max
+            {
+                return Err((
+                    format!(
+                        "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
+                        written, max
+                    ),
+                    true,
+                ));
+            }
+            match &mut sink {
+                Sink::File(f) => f.write_all(&chunk).map_err(|e| (e.to_string(), false))?,
+                Sink::Memory(buf) => buf.extend_from_slice(&chunk),
+            }
+        }
+
+        Ok(match sink {
+            Sink::File(_) => Body::File,
+            Sink::Memory(buf) => Body::Memory(buf),
+        })
+    }
+
     fn handle_redirect(
         &self,
-        job: &IndexMap<String, PhpMixed>,
+        url: &str,
+        attributes: &IndexMap<String, PhpMixed>,
         response: &CurlResponse,
     ) -> anyhow::Result<Result<String, TransportException>> {
         let mut target_url = String::new();
@@ -1509,37 +703,31 @@ impl CurlDownloader {
                 target_url = location_header.clone();
             } else if !parse_url(&location_header, shirabe_php_shim::PHP_URL_HOST).is_null() {
                 // Scheme relative; e.g. //example.com/foo
-                let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
                 target_url = format!(
                     "{}:{}",
-                    parse_url(job_url, shirabe_php_shim::PHP_URL_SCHEME)
+                    parse_url(url, shirabe_php_shim::PHP_URL_SCHEME)
                         .as_string()
                         .unwrap_or(""),
                     location_header
                 );
             } else if location_header.starts_with('/') {
                 // Absolute path; e.g. /foo
-                let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
-                let url_host = parse_url(job_url, shirabe_php_shim::PHP_URL_HOST);
+                let url_host = parse_url(url, shirabe_php_shim::PHP_URL_HOST);
                 let url_host_str = url_host.as_string().unwrap_or("");
-
-                // Replace path using hostname as an anchor.
                 target_url = Preg::replace(
                     &format!(
                         r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",
                         preg_quote(url_host_str, None)
                     ),
                     &format!("\\1{}", location_header),
-                    job_url,
+                    url,
                 );
             } else {
                 // Relative path; e.g. foo
-                // This actually differs from PHP which seems to add duplicate slashes.
-                let job_url = job.get("url").and_then(|v| v.as_string()).unwrap_or("");
                 target_url = Preg::replace(
                     r"{^(.+/)[^/?]*(?:\?.*)?$}",
                     &format!("\\1{}", location_header),
-                    job_url,
+                    url,
                 );
             }
         }
@@ -1548,10 +736,9 @@ impl CurlDownloader {
             self.io.write_error3(
                 &format!(
                     "Following redirect ({}) {}",
-                    job.get("attributes")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("redirects"))
-                        .and_then(|b| b.as_int())
+                    attributes
+                        .get("redirects")
+                        .and_then(|v| v.as_int())
                         .unwrap_or(0)
                         + 1,
                     Url::sanitize(target_url.clone()),
@@ -1566,44 +753,45 @@ impl CurlDownloader {
         Ok(Err(TransportException::new(
             format!(
                 "The \"{}\" file could not be downloaded, got redirect without Location ({})",
-                job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
+                url,
                 response.inner.get_status_message().unwrap_or_default()
             ),
             0,
         )))
     }
 
-    /// @param  Job                                          $job
-    /// @return array{retry: bool, storeAuth: 'prompt'|bool}
     fn is_authenticated_retry_needed(
         &mut self,
-        job: &IndexMap<String, PhpMixed>,
+        url: &str,
+        origin: &str,
+        filename: Option<&str>,
+        attributes: &IndexMap<String, PhpMixed>,
         response: &CurlResponse,
     ) -> anyhow::Result<Result<PromptAuthResult, TransportException>> {
+        let retry_auth_failure = attributes
+            .get("retryAuthFailure")
+            .and_then(|b| b.as_bool())
+            .unwrap_or(false);
+        let retries = attributes
+            .get("retries")
+            .and_then(|b| b.as_int())
+            .unwrap_or(0);
+
         if in_array(
             PhpMixed::Int(response.inner.get_status_code()),
             &PhpMixed::List(vec![PhpMixed::Int(401), PhpMixed::Int(403)]),
             false,
-        ) && job
-            .get("attributes")
-            .and_then(|v| v.as_array())
-            .and_then(|a| a.get("retryAuthFailure"))
-            .and_then(|b| b.as_bool())
-            .unwrap_or(false)
+        ) && retry_auth_failure
         {
             let status_message = response.inner.get_status_message();
             let body = response.inner.get_body().map(|s| s.to_string());
             let result = self.auth_helper.prompt_auth_if_needed(
-                job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
+                url,
+                origin,
                 response.inner.get_status_code(),
                 status_message.as_deref(),
                 response.inner.get_headers().clone(),
-                job.get("attributes")
-                    .and_then(|v| v.as_array())
-                    .and_then(|a| a.get("retries"))
-                    .and_then(|b| b.as_int())
-                    .unwrap_or(0),
+                retries,
                 body.as_deref(),
             )?;
 
@@ -1616,15 +804,9 @@ impl CurlDownloader {
         let mut needs_auth_retry: Option<&'static str> = None;
 
         // check for bitbucket login page asking to authenticate
-        if job.get("origin").and_then(|v| v.as_string()) == Some("bitbucket.org")
-            && !self.auth_helper.is_public_bit_bucket_download(
-                job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-            )
-            && substr(
-                job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                -4,
-                None,
-            ) == ".zip"
+        if origin == "bitbucket.org"
+            && !self.auth_helper.is_public_bit_bucket_download(url)
+            && substr(url, -4, None) == ".zip"
             && (location_header.is_none()
                 || substr(location_header.as_deref().unwrap_or(""), -4, None) != ".zip")
             && Preg::is_match(
@@ -1646,43 +828,24 @@ impl CurlDownloader {
         };
         if response.inner.get_status_code() == 404
             && in_array(
-                PhpMixed::String(
-                    job.get("origin")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                        .to_string(),
-                ),
+                PhpMixed::String(origin.to_string()),
                 &PhpMixed::List(gitlab_domains_list),
                 true,
             )
-            && strpos(
-                job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                "archive.zip",
-            )
-            .is_some()
+            && strpos(url, "archive.zip").is_some()
         {
             needs_auth_retry = Some("GitLab requires authentication and it was not provided");
         }
 
         if let Some(msg) = needs_auth_retry {
-            if job
-                .get("attributes")
-                .and_then(|v| v.as_array())
-                .and_then(|a| a.get("retryAuthFailure"))
-                .and_then(|b| b.as_bool())
-                .unwrap_or(false)
-            {
+            if retry_auth_failure {
                 let result = self.auth_helper.prompt_auth_if_needed(
-                    job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                    job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
+                    url,
+                    origin,
                     401,
                     None,
                     Vec::new(),
-                    job.get("attributes")
-                        .and_then(|v| v.as_array())
-                        .and_then(|a| a.get("retries"))
-                        .and_then(|b| b.as_int())
-                        .unwrap_or(0),
+                    retries,
                     None,
                 )?;
                 if result.retry {
@@ -1690,7 +853,7 @@ impl CurlDownloader {
                 }
             }
 
-            return Ok(Err(self.fail_response(job, response, msg)));
+            return Ok(Err(self.fail_response(url, filename, response, msg)));
         }
 
         Ok(Ok(PromptAuthResult {
@@ -1699,90 +862,65 @@ impl CurlDownloader {
         }))
     }
 
-    /// @param  Job    $job
-    /// @param non-empty-string $url
-    ///
-    /// @param  array{retryAuthFailure?: bool, redirects?: int<0, max>, storeAuth?: 'prompt'|bool, retries?: int<1, max>, ipResolve?: 4|6} $attributes
-    fn restart_job(
-        &mut self,
-        job: &IndexMap<String, PhpMixed>,
-        url: &str,
-        attributes: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<()> {
-        if let Some(PhpMixed::String(filename)) = job.get("filename") {
+    fn restart_job(&mut self, id: i64, url: &str, attributes: IndexMap<String, PhpMixed>) {
+        let filename = match self.jobs.get(&id) {
+            Some(job) => job.filename.clone(),
+            None => return,
+        };
+        if let Some(filename) = &filename {
             unlink_silent(&format!("{}~", filename));
         }
 
-        let job_attrs = match job.get("attributes") {
-            Some(PhpMixed::Array(a)) => a.clone(),
-            _ => IndexMap::new(),
-        };
-        let merged = array_merge(
-            PhpMixed::Array(job_attrs),
-            PhpMixed::Array(attributes.into_iter().collect()),
-        );
-        let attributes: IndexMap<String, PhpMixed> = match merged {
-            PhpMixed::Array(a) => a,
-            _ => IndexMap::new(),
+        // Merge the new attributes over the job's existing ones.
+        let merged = {
+            let mut m = match self.jobs.get(&id) {
+                Some(job) => job.attributes.clone(),
+                None => return,
+            };
+            for (k, v) in attributes {
+                m.insert(k, v);
+            }
+            m
         };
         let origin = Url::get_origin(&self.config.borrow(), url);
 
-        let copy_to = job
-            .get("filename")
-            .and_then(|v| v.as_string())
-            .map(|s| s.to_string());
-        let options = match job.get("options") {
-            Some(PhpMixed::Array(a)) => a.clone(),
-            _ => IndexMap::new(),
-        };
-        // PHP forwards the original job's resolve/reject callables into the restarted download.
-        // TODO(phase-c): those callables are not stored on the Job yet (typed-Job refactor, see
-        // download()), so no-op placeholders are forwarded instead of the real promise callbacks.
-        let resolve: Box<dyn Fn(PhpMixed) + Send + Sync> = Box::new(|_| {});
-        let reject: Box<dyn Fn(PhpMixed) + Send + Sync> = Box::new(|_| {});
-        self.init_download(
-            resolve,
-            reject,
-            &origin,
-            url,
-            options,
-            copy_to.as_deref(),
-            attributes,
-        )?;
-        Ok(())
+        // options/filename/resolve/reject are preserved across the restart, mirroring PHP forwarding
+        // the original job's resolve/reject into the restarted download; only url/origin/attributes
+        // change.
+        if let Some(job) = self.jobs.get_mut(&id) {
+            job.url = url.to_string();
+            job.origin = origin;
+            job.attributes = merged;
+        }
     }
 
-    /// @param  Job    $job
-    /// @param non-empty-string $url
-    ///
-    /// @param  array{retryAuthFailure?: bool, redirects?: int<0, max>, storeAuth?: 'prompt'|bool, retries: int<1, max>, ipResolve?: 4|6} $attributes
     fn restart_job_with_delay(
         &mut self,
-        job: &IndexMap<String, PhpMixed>,
+        id: i64,
         url: &str,
         attributes: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<()> {
+    ) {
         let retries = attributes
             .get("retries")
             .and_then(|v| v.as_int())
             .unwrap_or(0);
         if retries >= 3 {
-            usleep(500000); // half a second delay for 3rd retry and beyond
+            shirabe_php_shim::usleep(500000); // half a second delay for 3rd retry and beyond
         } else if retries >= 2 {
-            usleep(100000); // 100ms delay for 2nd retry
+            shirabe_php_shim::usleep(100000); // 100ms delay for 2nd retry
         } // no sleep for the first retry
 
-        self.restart_job(job, url, attributes)
+        self.restart_job(id, url, attributes);
     }
 
-    /// @param  Job                $job
     fn fail_response(
         &self,
-        job: &IndexMap<String, PhpMixed>,
+        url: &str,
+        filename: Option<&str>,
         response: &CurlResponse,
         error_message: &str,
     ) -> TransportException {
-        if let Some(PhpMixed::String(filename)) = job.get("filename") {
+        if let Some(filename) = filename {
             unlink_silent(&format!("{}~", filename));
         }
 
@@ -1817,69 +955,115 @@ impl CurlDownloader {
         TransportException::new(
             format!(
                 "The \"{}\" file could not be downloaded ({}){}",
-                job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
-                error_message,
-                details
+                url, error_message, details
             ),
             response.inner.get_status_code(),
         )
     }
 
-    /// @param  Job                $job
-    fn reject_job(&mut self, id: i64, job: &IndexMap<String, PhpMixed>, _e: anyhow::Error) {
-        if let Some(handle) = self.header_handles.get(&id) {
-            fclose(handle);
+    /// Invokes the stored resolve callback and removes the job.
+    fn resolve_job(&mut self, id: i64, response: Response) {
+        if let Some(job) = self.jobs.shift_remove(&id) {
+            (job.resolve)(response);
         }
-        if let Some(handle) = self.body_handles.get(&id) {
-            fclose(handle);
-        }
-        self.header_handles.shift_remove(&id);
-        self.body_handles.shift_remove(&id);
-        if let Some(PhpMixed::String(filename)) = job.get("filename") {
-            unlink_silent(&format!("{}~", filename));
-        }
-        // job['reject']($e);
-        // TODO(phase-c): invoke the stored reject callable — blocked on the typed-Job refactor
-        // that holds the React\Promise reject closure (see download()).
     }
 
-    fn check_curl_result(&self, code: i64) -> anyhow::Result<()> {
-        if code != CURLM_OK && code != CURLM_CALL_MULTI_PERFORM {
-            anyhow::bail!(
-                RuntimeException {
-                    message: if self.multi_errors.contains_key(&code) {
-                        let info = self.multi_errors.get(&code).unwrap();
-                        format!(
-                            "cURL error: {} ({}): cURL message: {}",
-                            code,
-                            info.first().cloned().unwrap_or_default(),
-                            info.get(1).cloned().unwrap_or_default()
-                        )
-                    } else {
-                        format!("Unexpected cURL error: {}", code)
-                    },
-                    code: 0,
-                }
-                .message
-            );
+    /// Invokes the stored reject callback and removes the job, deleting the temp file.
+    fn reject_job(&mut self, id: i64, e: anyhow::Error) {
+        if let Some(job) = self.jobs.shift_remove(&id) {
+            if let Some(filename) = &job.filename {
+                unlink_silent(&format!("{}~", filename));
+            }
+            (job.reject)(e);
         }
-        Ok(())
+    }
+
+    /// Reject after enriching the TransportException with the response headers/status/body, mirroring
+    /// PHP's catch block that calls setHeaders/setStatusCode/setResponse before reject().
+    fn reject_job_with_response(
+        &mut self,
+        id: i64,
+        mut e: TransportException,
+        response: &CurlResponse,
+    ) {
+        e.set_headers(response.inner.get_headers().clone());
+        e.set_status_code(Some(response.inner.get_status_code()));
+        e.set_response(response.inner.get_body().map(|s| s.to_string()));
+        let msg = e.message.clone();
+        // Carry the enriched exception through anyhow; the typed payload is reconstructed from the
+        // message on the HttpDownloader side. TransportException is the recoverable error here.
+        self.reject_job(id, anyhow::Error::new(e).context(msg));
+    }
+
+    fn method_is_get(options: &IndexMap<String, PhpMixed>) -> bool {
+        let method = options
+            .get("http")
+            .and_then(|v| v.as_array())
+            .and_then(|h| h.get("method"))
+            .and_then(|v| v.as_string());
+        match method {
+            None => true,
+            Some(m) => m == "GET",
+        }
+    }
+
+    /// Extracts `options['http']['header']` as a `Vec<String>`.
+    fn header_list(options: &IndexMap<String, PhpMixed>) -> Vec<String> {
+        options
+            .get("http")
+            .and_then(|v| v.as_array())
+            .and_then(|h| h.get("header"))
+            .and_then(|v| match v {
+                PhpMixed::List(l) => Some(
+                    l.iter()
+                        .filter_map(|x| x.as_string().map(|s| s.to_string()))
+                        .collect(),
+                ),
+                _ => None,
+            })
+            .unwrap_or_default()
     }
 }
 
-fn maps_equal(a: &IndexMap<String, PhpMixed>, b: &IndexMap<String, PhpMixed>) -> bool {
-    if a.len() != b.len() {
-        return false;
+/// A transport-layer failure approximating the curl errno branches PHP inspected.
+struct TransportError {
+    message: String,
+    retryable: bool,
+    is_connect: bool,
+    was_timeout: bool,
+    /// The failure is a max_file_size violation (PHP MaxFileSizeExceededException), not a curl error.
+    is_max_file_size: bool,
+}
+
+/// Raw send result before conversion to `CurlResponse`.
+struct RawResponse {
+    status: i64,
+    headers: Vec<String>,
+    body: Body,
+}
+
+enum Body {
+    /// Body read into memory.
+    Memory(Vec<u8>),
+    /// Body streamed to the `~` temp file (contents reference the final filename via the job).
+    File,
+}
+
+impl RawResponse {
+    fn into_curl_response(self, url: &str) -> CurlResponse {
+        let body = match self.body {
+            Body::Memory(b) => Some(String::from_utf8_lossy(&b).into_owned()),
+            // File mode: PHP stores `$filename.'~'` as the contents string; the actual bytes live
+            // on disk. We do not have the filename here, so leave the body empty — the caller's
+            // rename/read handling does not consult the body for successful file downloads.
+            Body::File => None,
+        };
+        CurlResponse::new(
+            url.to_string(),
+            Some(self.status),
+            self.headers,
+            body,
+            IndexMap::new(),
+        )
     }
-    for (k, v) in a {
-        match b.get(k) {
-            None => return false,
-            Some(bv) => {
-                if format!("{:?}", v) != format!("{:?}", bv) {
-                    return false;
-                }
-            }
-        }
-    }
-    true
 }

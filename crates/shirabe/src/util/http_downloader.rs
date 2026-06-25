@@ -557,20 +557,19 @@ impl HttpDownloader {
         }
 
         // curl branch: register the request with the curl multi handle. Completion is delivered
-        // asynchronously by curl.tick() into the job's `settled` slot (read by count_active_jobs).
-        // PHP catches any exception from download() and rejects the job.
+        // by curl.tick() into the job's `settled` slot (read by count_active_jobs). The resolve
+        // callback stores the Response, reject stores the error; this mirrors PHP's promise
+        // resolve/reject firing during tick(). PHP catches any exception from download() and
+        // rejects the job.
         let settled = self.jobs.get(&id).unwrap().settled.clone();
         let settled_for_reject = settled.clone();
-        let resolve: Box<dyn Fn(PhpMixed) + Send + Sync> = Box::new(move |_response: PhpMixed| {
-            // TODO(phase-c-promise): curl.tick() delivers the response as PhpMixed here; convert it
-            // into a Response and store Ok(..) in `settled`. Bottoms at the todo!() curl I/O.
-            let _ = &settled;
+        let resolve: Box<dyn Fn(Response) + Send + Sync> = Box::new(move |response: Response| {
+            *settled.lock().unwrap() = Some(Ok(response));
         });
-        let reject: Box<dyn Fn(PhpMixed) + Send + Sync> = Box::new(move |_error: PhpMixed| {
-            // TODO(phase-c-promise): convert the PhpMixed error into anyhow::Error and store
-            // Err(..) in `settled`. Bottoms at the todo!() curl I/O.
-            let _ = &settled_for_reject;
-        });
+        let reject: Box<dyn Fn(anyhow::Error) + Send + Sync> =
+            Box::new(move |error: anyhow::Error| {
+                *settled_for_reject.lock().unwrap() = Some(Err(error));
+            });
 
         let download_result = {
             let curl = self.curl.as_mut().unwrap();

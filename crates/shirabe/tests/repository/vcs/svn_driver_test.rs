@@ -9,8 +9,14 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::SvnDriver;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::PhpMixed;
+use shirabe::util::http_downloader::HttpDownloaderMockHandler;
+use shirabe::util::process_executor::MockHandler;
+use shirabe_php_shim::{PhpMixed, RuntimeException};
 use tempfile::TempDir;
+
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
 
 struct SetUp {
     home: TempDir,
@@ -75,13 +81,61 @@ fn test_support() {
     }
 }
 
-// Constructs an SvnDriver and runs an svn command via a mocked ProcessExecutor; mocking is
-// not available here.
-#[ignore = "requires ProcessExecutor mock (getProcessExecutorMock/expects) and IOInterface/HttpDownloader mocks, none available"]
 #[test]
 fn test_wrong_credentials_in_url() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
-    let _ = &config;
-    todo!()
+
+    let config = Rc::new(RefCell::new(config));
+    let console: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+
+    let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
+        get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
+
+    let mut output = String::from("svn: OPTIONS of 'https://corp.svn.local/repo':");
+    output.push_str(" authorization failed: Could not authenticate to server:");
+    output.push_str(" rejected Basic challenge (https://corp.svn.local/)");
+
+    let authed_command = [
+        "svn",
+        "ls",
+        "--verbose",
+        "--non-interactive",
+        "--username",
+        "till",
+        "--password",
+        "secret",
+        "--",
+        "https://till:secret@corp.svn.local/repo/trunk",
+    ];
+
+    let (process, _process_guard): (_, ProcessExecutorMockGuard) = get_process_executor_mock(
+        vec![
+            cmd_full(authed_command, 1, "", output.clone()),
+            cmd_full(authed_command, 1, "", output.clone()),
+            cmd_full(authed_command, 1, "", output.clone()),
+            cmd_full(authed_command, 1, "", output.clone()),
+            cmd_full(authed_command, 1, "", output.clone()),
+            cmd_full(authed_command, 1, "", output.clone()),
+            cmd_full(["svn", "--version"], 0, "1.2.3", ""),
+        ],
+        true,
+        MockHandler::default(),
+    );
+
+    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    repo_config.insert(
+        "url".to_string(),
+        PhpMixed::String("https://till:secret@corp.svn.local/repo".to_string()),
+    );
+
+    let mut svn = SvnDriver::new(repo_config, console, config, http_downloader, process);
+    let err = svn.initialize().unwrap_err();
+    let runtime = err
+        .downcast_ref::<RuntimeException>()
+        .expect("expected RuntimeException");
+    assert_eq!(
+        "Repository https://till:secret@corp.svn.local/repo could not be processed, wrong credentials provided (svn: OPTIONS of 'https://corp.svn.local/repo': authorization failed: Could not authenticate to server: rejected Basic challenge (https://corp.svn.local/))",
+        runtime.message
+    );
 }
