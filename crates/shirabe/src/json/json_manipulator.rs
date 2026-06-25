@@ -386,7 +386,12 @@ impl JsonManipulator {
                 let obj = self.contents[reps.value_pos..reps.value_end].to_string();
                 let key = JsonFile::encode(&repository_index);
                 json_grammar::find_top_level_key(obj.as_bytes(), key.as_bytes(), ValueKind::Object)
-                    .map(|inner| (reps.value_pos + inner.value_pos, reps.value_pos + inner.value_end))
+                    .map(|inner| {
+                        (
+                            reps.value_pos + inner.value_pos,
+                            reps.value_pos + inner.value_end,
+                        )
+                    })
             })
         };
 
@@ -1436,8 +1441,9 @@ impl JsonManipulator {
         // Match the key only when its value is an empty object `{ <space> }`.
         let encoded_key = JsonFile::encode(key);
         let cb = self.contents.as_bytes();
-        let key_match = json_grammar::find_top_level_key(cb, encoded_key.as_bytes(), ValueKind::Object)
-            .filter(|m| json_grammar::skip_ws(cb, m.value_pos + 1) == m.value_end - 1);
+        let key_match =
+            json_grammar::find_top_level_key(cb, encoded_key.as_bytes(), ValueKind::Object)
+                .filter(|m| json_grammar::skip_ws(cb, m.value_pos + 1) == m.value_end - 1);
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let removal = &self.contents[m.value_pos..m.value_end];

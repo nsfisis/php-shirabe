@@ -293,7 +293,10 @@ mod tests {
         assert!(full(scan_value, "[]"));
         assert!(full(scan_value, r#"{"a": 1, "b": [true, null]}"#));
         assert!(full(scan_value, "{}"));
-        assert!(full(scan_value, "{\n    \"a\": {\n        \"b\": \"c\"\n    }\n}"));
+        assert!(full(
+            scan_value,
+            "{\n    \"a\": {\n        \"b\": \"c\"\n    }\n}"
+        ));
         assert_eq!(scan_value(br#"{"a": }"#, 0), None); // missing value
         assert_eq!(scan_value(br#"{"a" 1}"#, 0), None); // missing colon
     }
@@ -309,7 +312,10 @@ mod tests {
         let c = "{\n    \"foo\": \"bar\",\n    \"require\": {\n        \"a\": \"1\"\n    }\n}";
         let m = find_top_level_key(c.as_bytes(), br#""require""#, ValueKind::Object).unwrap();
         assert_eq!(&c[m.key_pos..m.value_pos], "\"require\": ");
-        assert_eq!(&c[m.value_pos..m.value_end], "{\n        \"a\": \"1\"\n    }");
+        assert_eq!(
+            &c[m.value_pos..m.value_end],
+            "{\n        \"a\": \"1\"\n    }"
+        );
         // first key
         let m2 = find_top_level_key(c.as_bytes(), br#""foo""#, ValueKind::Json).unwrap();
         assert_eq!(&c[m2.value_pos..m2.value_end], "\"bar\"");
