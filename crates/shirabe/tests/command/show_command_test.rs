@@ -78,7 +78,7 @@ fn run_show_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str, requires: s
 
 use crate::test_case::{create_composer_lock, create_installed_json};
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_default_shows_installed_with_version_and_description() {
@@ -92,7 +92,7 @@ vendor/package 1.0.0 description of installed package",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_with_installed_and_self() {
@@ -111,7 +111,7 @@ vendor/package 1.0.0 description of installed package",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_with_locked_and_self() {
@@ -127,7 +127,7 @@ vendor/locked 3.0.0 description of locked package",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_with_available() {
@@ -144,7 +144,6 @@ vendor/package generic description",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_show_with_direct_shows_nothing_if_no_deps() {
@@ -158,7 +157,7 @@ fn test_show_with_direct_shows_nothing_if_no_deps() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_with_direct_shows_only_root_deps() {
@@ -172,7 +171,7 @@ fn test_show_with_direct_shows_only_root_deps() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_outdated_deps() {
@@ -217,7 +216,7 @@ outdated/major 1.0.0 ~ 2.0.0 from today",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_direct_only_show_direct_deps_with_updated() {
@@ -237,7 +236,7 @@ outdated/major 1.0.0 ~ 2.0.0",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
@@ -251,7 +250,7 @@ fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_major_only() {
@@ -273,7 +272,7 @@ outdated/major 1.0.0 ~ 2.0.0",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_minor_only() {
@@ -296,7 +295,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_patch_only() {
@@ -320,7 +319,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_and_warns() {
@@ -393,7 +392,7 @@ vendor/package 1.1.0 ~ 1.0.0",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_without_warning_for_higher_versions() {
@@ -439,7 +438,6 @@ vendor/package 1.1.0 <highlight>! 1.2.0</highlight>",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_show_direct_with_name_does_not_show_transient_dependencies() {
@@ -487,7 +485,6 @@ fn test_show_direct_with_name_does_not_show_transient_dependencies() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_show_direct_with_name_only_shows_direct_dependents() {
@@ -566,7 +563,6 @@ fn assert_all_platform_packages(output: &str) {
     }
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_show_platform_only_shows_platform_packages() {
@@ -602,7 +598,7 @@ fn test_show_platform_only_shows_platform_packages() {
     assert_all_platform_packages(output.trim());
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_platform_works_without_composer_json() {
@@ -651,7 +647,7 @@ fn test_show_platform_works_without_composer_json() {
     assert_eq!(0, status_code);
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_outdated_with_zero_major() {
@@ -755,7 +751,7 @@ zerozero/major 0.0.1 ~ 0.0.2",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_all_shows_all_sections() {
@@ -813,7 +809,6 @@ installed:
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_locked_requires_valid_lock_file() {
@@ -838,7 +833,6 @@ fn test_locked_requires_valid_lock_file() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_locked_shows_all_locked() {
@@ -884,7 +878,6 @@ vendor/locked2 2.0.0 description of locked2 package",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_invalid_option_combinations() {
@@ -946,7 +939,6 @@ fn test_invalid_option_combinations() {
     }
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_ignored_option_combinations() {
@@ -988,7 +980,6 @@ fn test_ignored_option_combinations() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_self_and_name_only() {
@@ -1013,7 +1004,6 @@ fn test_self_and_name_only() {
     assert_eq!("vendor/package", app_tester.get_display().trim());
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_self_and_package_combination() {
@@ -1040,7 +1030,7 @@ fn test_self_and_package_combination() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_self() {
@@ -1090,7 +1080,6 @@ fn test_self() {
     assert_eq!(expected_string, app_tester.get_display());
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_not_installed_error() {
@@ -1120,7 +1109,7 @@ fn test_not_installed_error() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_no_dev_option() {
@@ -1155,7 +1144,6 @@ fn test_no_dev_option() {
     assert_eq!("vendor/package 1.0.0", app_tester.get_display().trim());
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_package_filter() {
@@ -1251,7 +1239,7 @@ fn run_not_existing_package_case(package: &str, options: Vec<(&str, PhpMixed)>, 
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_no_options() {
@@ -1262,7 +1250,7 @@ fn test_not_existing_package_with_no_options() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_all_option() {
@@ -1273,7 +1261,7 @@ fn test_not_existing_package_with_all_option() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_locked_option() {
@@ -1284,7 +1272,7 @@ fn test_not_existing_package_with_locked_option() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_platform_with_platform_option() {
@@ -1295,7 +1283,7 @@ fn test_not_existing_platform_with_platform_option() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_platform_without_platform_option() {
@@ -1306,7 +1294,6 @@ fn test_not_existing_platform_without_platform_option() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_working_dir() {
@@ -1379,7 +1366,6 @@ fn run_specific_package_and_tree_case(
     assert_eq!(expected, app_tester.get_display().trim());
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
 #[test]
 #[serial]
 fn test_specific_package_and_tree_just_package() {
@@ -1387,7 +1373,7 @@ fn test_specific_package_and_tree_just_package() {
     run_specific_package_and_tree_case(vec![pkg], vec![], "vendor/package 1.0.0");
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_specific_package_and_tree_with_one_package_requirement() {
@@ -1412,7 +1398,7 @@ fn test_specific_package_and_tree_with_one_package_requirement() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_specific_package_and_tree_with_platform_requirement() {
@@ -1437,7 +1423,7 @@ fn test_specific_package_and_tree_with_platform_requirement() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_specific_package_and_tree_with_json_format() {
@@ -1457,7 +1443,7 @@ fn test_specific_package_and_tree_with_json_format() {
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition() (TODO placeholder); no package argument or options are defined, so every show invocation fails with an option/argument-does-not-exist InvalidArgumentException (the outdated command proxies into show and fails identically). Unported src path; cannot fix from test files."]
+#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_name_only_prints_no_trailing_whitespace() {

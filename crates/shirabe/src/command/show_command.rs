@@ -25,6 +25,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
+use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::PolicyInterface;
@@ -55,10 +56,6 @@ use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
-
-// keep InputOption referenced; the configure() definition list is currently abbreviated
-#[allow(dead_code)]
-const _INPUT_OPTION_REF: i64 = InputOption::VALUE_NONE;
 
 #[derive(Debug)]
 pub struct ShowCommand {
@@ -95,8 +92,119 @@ impl Command for ShowCommand {
         self.set_name("show")?;
         self.set_aliases(vec!["info".to_string()])?;
         self.set_description("Shows information about packages");
+        // TODO(cli-completion): the package/ignore suggestion closures (suggestPackageBasedOnMode /
+        // suggestInstalledPackage) and the format option's allowed-value list are dropped, matching
+        // the InputArgument/InputOption API which does not yet carry completion metadata.
+        let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
+            InputOption::new(
+                name,
+                shortcut.map(|s| PhpMixed::String(s.to_string())),
+                Some(InputOption::VALUE_NONE),
+                description,
+                None,
+            )
+            .unwrap()
+            .into()
+        };
         self.set_definition(&[
-            // TODO(cli-completion): wire up suggest_package_based_on_mode / suggest_installed_package closures here.
+            InputArgument::new(
+                "package",
+                Some(InputArgument::OPTIONAL),
+                "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "version",
+                Some(InputArgument::OPTIONAL),
+                "Version or version constraint to inspect",
+                None,
+            )
+            .unwrap()
+            .into(),
+            opt_none("all", None, "List all packages"),
+            opt_none("locked", None, "List all locked packages"),
+            opt_none(
+                "installed",
+                Some("i"),
+                "List installed packages only (enabled by default, only present for BC).",
+            ),
+            opt_none("platform", Some("p"), "List platform packages only"),
+            opt_none("available", Some("a"), "List available packages only"),
+            opt_none("self", Some("s"), "Show the root package information"),
+            opt_none("name-only", Some("N"), "List package names only"),
+            opt_none("path", Some("P"), "Show package paths"),
+            opt_none("tree", Some("t"), "List the dependencies as a tree"),
+            opt_none("latest", Some("l"), "Show the latest version"),
+            opt_none(
+                "outdated",
+                Some("o"),
+                "Show the latest version but only for packages that are outdated",
+            ),
+            InputOption::new(
+                "ignore",
+                None,
+                Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
+                "Ignore specified package(s). Can contain wildcards (*). Use it with the --outdated option if you don't want to be informed about new versions of some packages.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            opt_none(
+                "major-only",
+                Some("M"),
+                "Show only packages that have major SemVer-compatible updates. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "minor-only",
+                Some("m"),
+                "Show only packages that have minor SemVer-compatible updates. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "patch-only",
+                None,
+                "Show only packages that have patch SemVer-compatible updates. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "sort-by-age",
+                Some("A"),
+                "Displays the installed version's age, and sorts packages oldest first. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "direct",
+                Some("D"),
+                "Shows only packages that are directly required by the root package",
+            ),
+            opt_none(
+                "strict",
+                None,
+                "Return a non-zero exit code when there are outdated packages",
+            ),
+            InputOption::new(
+                "format",
+                Some(PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Format of the output: text or json",
+                Some(PhpMixed::String("text".to_string())),
+            )
+            .unwrap()
+            .into(),
+            opt_none("no-dev", None, "Disables search in require-dev packages."),
+            InputOption::new(
+                "ignore-platform-req",
+                None,
+                Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
+                "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option",
+                None,
+            )
+            .unwrap()
+            .into(),
+            opt_none(
+                "ignore-platform-reqs",
+                None,
+                "Ignore all platform requirements (php & ext- packages). Use with the --outdated option",
+            ),
         ]);
         self.set_help(
             "The show command displays detailed information about a package, or\n\
