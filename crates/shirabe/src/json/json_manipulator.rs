@@ -811,17 +811,17 @@ impl JsonManipulator {
         }
 
         // no node content match-able
-        let node_regex = format!(
-            "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&object))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(main_node), None)
-        );
-        let mut match_map: IndexMap<String, String> = IndexMap::new();
-        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            return Ok(false);
-        }
-
-        let children = match_map.get("content").cloned().unwrap_or_default();
+        let node = match json_grammar::find_top_level_key(
+            self.contents.as_bytes(),
+            JsonFile::encode(main_node).as_bytes(),
+            ValueKind::Object,
+        ) {
+            Some(node) => node,
+            None => return Ok(false),
+        };
+        let node_start = self.contents[..node.value_pos].to_string();
+        let node_end = self.contents[node.value_end..].to_string();
+        let children = self.contents[node.value_pos..node.value_end].to_string();
 
         // invalid match due to un-regexable content, abort
         if json_decode(&children, true)?.is_null()
@@ -869,23 +869,13 @@ impl JsonManipulator {
         let key_regex = str_replace("/", "\\\\?/", &preg_quote(&name_owned, None));
         let mut children_clean: Option<String> = None;
         if Preg::is_match3(&format!("{{\"{}\"\\s*:}}i", key_regex), &children, None) {
-            // find best match for the value of "name"
-            let mut all_matches: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
-            if Preg::is_match_all3(
-                &format!(
-                    "{{{}\"{}\"\\s*:\\s*(?:(?&json))}}x",
-                    Self::DEFINES,
-                    key_regex
-                ),
-                &children,
-                Some(&mut all_matches),
-            ) {
+            // find best match for the value of "name". The PHP pattern `"name"\s*:\s*(?&json)` is
+            // not anchored, so it can match the key at several nesting levels; collect every such
+            // occurrence and keep the longest, reproducing PHP's behaviour.
+            let key_value_matches = find_key_value_matches(&children, &name_owned);
+            if !key_value_matches.is_empty() {
                 let mut best_match: String = String::new();
-                let first_group = all_matches
-                    .get(&CaptureKey::ByIndex(0))
-                    .cloned()
-                    .unwrap_or_default();
-                for m in &first_group {
+                for m in &key_value_matches {
                     if strlen(&best_match) < strlen(m) {
                         best_match = m.clone();
                     }
@@ -931,27 +921,9 @@ impl JsonManipulator {
             &mut empty_match,
         ) && empty_match.get("content").is_none()
         {
-            let newline = self.newline.clone();
-            let indent = self.indent.clone();
-
-            self.contents = Preg::replace_callback(
-                &node_regex,
-                move |matches: &IndexMap<CaptureKey, String>| -> String {
-                    format!(
-                        "{}{{{}{}}}{}",
-                        matches
-                            .get(&CaptureKey::ByName("start".to_string()))
-                            .cloned()
-                            .unwrap_or_default(),
-                        newline,
-                        indent,
-                        matches
-                            .get(&CaptureKey::ByName("end".to_string()))
-                            .cloned()
-                            .unwrap_or_default()
-                    )
-                },
-                &self.contents,
+            self.contents = format!(
+                "{}{{{}{}}}{}",
+                node_start, self.newline, self.indent, node_end
             );
 
             // we have a subname, so we restore the rest of $name
@@ -981,53 +953,28 @@ impl JsonManipulator {
             return Ok(true);
         }
 
-        let name_capture = name_owned.clone();
-        let sub_name_capture = sub_name.clone();
-        let children_clean_capture = children_clean.clone();
-        let formatter = ManipulatorFormatter {
-            newline: self.newline.clone(),
-            indent: self.indent.clone(),
-        };
-        self.contents = Preg::replace_callback(
-            &node_regex,
-            move |matches: &IndexMap<CaptureKey, String>| -> String {
-                let content_key = CaptureKey::ByName("content".to_string());
-                let start_key = CaptureKey::ByName("start".to_string());
-                let end_key = CaptureKey::ByName("end".to_string());
-                let mut children_clean = children_clean_capture.clone();
-                if let Some(ref sub) = sub_name_capture {
-                    let mut cur_val = json_decode(
-                        matches.get(&content_key).map(|s| s.as_str()).unwrap_or(""),
-                        true,
-                    )
-                    .unwrap_or(PhpMixed::Null);
-                    if let Some(arr) = cur_val.as_array_mut() {
-                        if let Some(inner) =
-                            arr.get_mut(&name_capture).and_then(|v| v.as_array_mut())
-                        {
-                            inner.shift_remove(sub);
-                        }
-                        let now_empty = arr
-                            .get(&name_capture)
-                            .and_then(|v| v.as_array())
-                            .map(|a| a.is_empty())
-                            .unwrap_or(false);
-                        if now_empty {
-                            arr.insert(name_capture.clone(), PhpMixed::Object(IndexMap::new()));
-                        }
-                    }
-                    children_clean = formatter.format(&cur_val, 0, true).unwrap_or_default();
+        // The node content matched here is the original `children` object; rebuild it with the
+        // subkey removed when a sub_name is in play.
+        let mut children_final = children_clean.clone();
+        if let Some(ref sub) = sub_name {
+            let mut cur_val = json_decode(&children, true).unwrap_or(PhpMixed::Null);
+            if let Some(arr) = cur_val.as_array_mut() {
+                if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut()) {
+                    inner.shift_remove(sub);
                 }
+                let now_empty = arr
+                    .get(&name_owned)
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.is_empty())
+                    .unwrap_or(false);
+                if now_empty {
+                    arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
+                }
+            }
+            children_final = self.format(&cur_val, 0, true)?;
+        }
 
-                format!(
-                    "{}{}{}",
-                    matches.get(&start_key).cloned().unwrap_or_default(),
-                    children_clean,
-                    matches.get(&end_key).cloned().unwrap_or_default()
-                )
-            },
-            &self.contents,
-        );
+        self.contents = format!("{}{}{}", node_start, children_final, node_end);
 
         Ok(true)
     }
@@ -1562,6 +1509,57 @@ impl JsonManipulator {
     pub(crate) fn detect_indenting(&mut self) {
         self.indent = JsonFile::detect_indenting(Some(&self.contents));
     }
+}
+
+// Reproduces the non-anchored PHP pattern `"name"\s*:\s*(?&json)` over `children`: returns every
+// substring where the raw key token `"name"` (allowing an escaped slash `\/` wherever the name has
+// `/`) is followed by `\s*:\s*` and a JSON value, in left-to-right, non-overlapping order.
+fn find_key_value_matches(children: &str, name: &str) -> Vec<String> {
+    let cb = children.as_bytes();
+    let name_bytes = name.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < cb.len() {
+        if let Some(end) = match_key_value(cb, i, name_bytes) {
+            out.push(children[i..end].to_string());
+            i = end;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+fn match_key_value(cb: &[u8], start: usize, name: &[u8]) -> Option<usize> {
+    if cb.get(start) != Some(&b'"') {
+        return None;
+    }
+    let mut p = start + 1;
+    for &nc in name {
+        if nc == b'/' {
+            if cb.get(p) == Some(&b'\\') {
+                p += 1;
+            }
+            if cb.get(p) != Some(&b'/') {
+                return None;
+            }
+            p += 1;
+        } else {
+            if cb.get(p) != Some(&nc) {
+                return None;
+            }
+            p += 1;
+        }
+    }
+    if cb.get(p) != Some(&b'"') {
+        return None;
+    }
+    p = json_grammar::skip_ws(cb, p + 1);
+    if cb.get(p) != Some(&b':') {
+        return None;
+    }
+    p = json_grammar::skip_ws(cb, p + 1);
+    json_grammar::scan_value(cb, p)
 }
 
 // Lightweight clone of JsonManipulator's formatting logic, used inside Preg::replace_callback closures.
