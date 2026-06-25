@@ -11,6 +11,7 @@ use shirabe_php_shim::{
 };
 
 use crate::json::JsonFile;
+use crate::json::json_grammar::{self, ValueKind};
 use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
@@ -659,18 +660,17 @@ impl JsonManipulator {
         }
 
         // main node content not match-able
-        let node_regex = format!(
-            "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&object))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(main_node), None)
-        );
-
-        let mut match_map: IndexMap<String, String> = IndexMap::new();
-        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            return Ok(false);
-        }
-
-        let mut children = match_map.get("content").cloned().unwrap_or_default();
+        let node = match json_grammar::find_top_level_key(
+            self.contents.as_bytes(),
+            JsonFile::encode(main_node).as_bytes(),
+            ValueKind::Object,
+        ) {
+            Some(node) => node,
+            None => return Ok(false),
+        };
+        let node_start = self.contents[..node.value_pos].to_string();
+        let node_end = self.contents[node.value_end..].to_string();
+        let mut children = self.contents[node.value_pos..node.value_end].to_string();
         // invalid match due to un-regexable content, abort
         if json_decode(&children, false)?.is_null()
             || json_decode(&children, false)?.as_bool() == Some(false)
@@ -678,47 +678,34 @@ impl JsonManipulator {
             return Ok(false);
         }
 
-        // child exists
-        let child_regex = format!(
-            "{{{}(?P<start>\"{}\"\\s*:\\s*)(?P<content>(?&json))(?P<end>,?)}}x",
-            Self::DEFINES,
-            preg_quote(&name_owned, None)
+        // child exists. The child pattern looks for the raw `"name"` key token within the children
+        // object and rewrites its value in place; the surrounding `"name"\s*:\s*` and optional comma
+        // are preserved as-is.
+        let child_key = format!("\"{}\"", name_owned);
+        let child = json_grammar::find_top_level_key(
+            children.as_bytes(),
+            child_key.as_bytes(),
+            ValueKind::Json,
         );
-        let mut child_match_map: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&child_regex, &children, &mut child_match_map) {
-            let value_capture = value.clone();
-            let sub_name_capture = sub_name.clone();
-            let formatter = ManipulatorFormatter {
-                newline: self.newline.clone(),
-                indent: self.indent.clone(),
-            };
-            children = Preg::replace_callback(
-                &child_regex,
-                move |matches: &IndexMap<CaptureKey, String>| -> String {
-                    let content_key = CaptureKey::ByName("content".to_string());
-                    let start_key = CaptureKey::ByName("start".to_string());
-                    let end_key = CaptureKey::ByName("end".to_string());
-                    let mut value_local = value_capture.clone();
-                    if sub_name_capture.is_some() && matches.get(&content_key).is_some() {
-                        let mut cur_val = json_decode(matches.get(&content_key).unwrap(), true)
-                            .unwrap_or(PhpMixed::Null);
-                        if !is_array(&cur_val) {
-                            cur_val = PhpMixed::Array(IndexMap::new());
-                        }
-                        if let Some(arr) = cur_val.as_array_mut() {
-                            arr.insert(sub_name_capture.clone().unwrap(), value_local.clone());
-                        }
-                        value_local = cur_val;
-                    }
-
-                    format!(
-                        "{}{}{}",
-                        matches.get(&start_key).cloned().unwrap_or_default(),
-                        formatter.format(&value_local, 1, false).unwrap_or_default(),
-                        matches.get(&end_key).cloned().unwrap_or_default()
-                    )
-                },
-                &children,
+        if let Some(cm) = child {
+            let content_str = children[cm.value_pos..cm.value_end].to_string();
+            let mut value_local = value.clone();
+            if sub_name.is_some() {
+                let mut cur_val = json_decode(&content_str, true).unwrap_or(PhpMixed::Null);
+                if !is_array(&cur_val) {
+                    cur_val = PhpMixed::Array(IndexMap::new());
+                }
+                if let Some(arr) = cur_val.as_array_mut() {
+                    arr.insert(sub_name.clone().unwrap(), value_local.clone());
+                }
+                value_local = cur_val;
+            }
+            let formatted = self.format(&value_local, 1, false)?;
+            children = format!(
+                "{}{}{}",
+                &children[..cm.value_pos],
+                formatted,
+                &children[cm.value_end..]
             );
         } else {
             let mut leading_match: IndexMap<String, String> = IndexMap::new();
@@ -809,23 +796,7 @@ impl JsonManipulator {
             }
         }
 
-        let children_owned = children;
-        self.contents = Preg::replace_callback(
-            &node_regex,
-            move |m: &IndexMap<CaptureKey, String>| -> String {
-                format!(
-                    "{}{}{}",
-                    m.get(&CaptureKey::ByName("start".to_string()))
-                        .cloned()
-                        .unwrap_or_default(),
-                    children_owned,
-                    m.get(&CaptureKey::ByName("end".to_string()))
-                        .cloned()
-                        .unwrap_or_default()
-                )
-            },
-            &self.contents,
-        );
+        self.contents = format!("{}{}{}", node_start, children, node_end);
 
         Ok(true)
     }
@@ -1395,27 +1366,29 @@ impl JsonManipulator {
         let content = self.format(&content, 0, false)?;
 
         // key exists already
-        let regex = format!(
-            "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?)(?P<key>{}\\s*:\\s*(?&json))(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(key), None)
-        );
-        let mut matches: IndexMap<String, String> = IndexMap::new();
-        if decoded.as_array().and_then(|a| a.get(key)).is_some()
-            && Preg::is_match_named(&regex, &self.contents, &mut matches)
-        {
+        let encoded_key = JsonFile::encode(key);
+        let key_match = if decoded.as_array().and_then(|a| a.get(key)).is_some() {
+            json_grammar::find_top_level_key(
+                self.contents.as_bytes(),
+                encoded_key.as_bytes(),
+                ValueKind::Json,
+            )
+        } else {
+            None
+        };
+        if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
-            let key_match = matches.get("key").cloned().unwrap_or_default();
-            if json_decode(&format!("{{{}}}", key_match), false)?.is_null() {
+            let key_capture = &self.contents[m.key_pos..m.value_end];
+            if json_decode(&format!("{{{}}}", key_capture), false)?.is_null() {
                 return Ok(false);
             }
 
             self.contents = format!(
                 "{}{}: {}{}",
-                matches.get("start").cloned().unwrap_or_default(),
-                JsonFile::encode(key),
+                &self.contents[..m.key_pos],
+                encoded_key,
                 content,
-                matches.get("end").cloned().unwrap_or_default()
+                &self.contents[m.value_end..]
             );
 
             return Ok(true);
@@ -1475,22 +1448,30 @@ impl JsonManipulator {
         }
 
         // key exists already
-        let regex = format!(
-            "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?)(?P<removal>{}\\s*:\\s*(?&json))\\s*,?\\s*(?P<end>.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(key), None)
+        let encoded_key = JsonFile::encode(key);
+        let key_match = json_grammar::find_top_level_key(
+            self.contents.as_bytes(),
+            encoded_key.as_bytes(),
+            ValueKind::Json,
         );
-        let mut matches: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&regex, &self.contents, &mut matches) {
+        if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
-            let removal = matches.get("removal").cloned().unwrap_or_default();
+            let removal = &self.contents[m.key_pos..m.value_end];
             if json_decode(&format!("{{{}}}", removal), false)?.is_null() {
                 return Ok(false);
             }
 
+            // The pattern consumes `\s*,?\s*` between the removed key and the rest (`end`).
+            let cb = self.contents.as_bytes();
+            let mut e = json_grammar::skip_ws(cb, m.value_end);
+            if cb.get(e) == Some(&b',') {
+                e += 1;
+            }
+            e = json_grammar::skip_ws(cb, e);
+
             // check that we are not leaving a dangling comma on the previous line if the last line was removed
-            let mut start = matches.get("start").cloned().unwrap_or_default();
-            let end = matches.get("end").cloned().unwrap_or_default();
+            let mut start = self.contents[..m.key_pos].to_string();
+            let end = self.contents[e..].to_string();
             if Preg::is_match3("#,\\s*$#", &start, None) && Preg::is_match3("#^\\}$#", &end, None) {
                 start = rtrim(
                     &Preg::replace("#,(\\s*)$#", "$1", &start),
@@ -1517,24 +1498,24 @@ impl JsonManipulator {
             return Ok(true);
         }
 
-        let regex = format!(
-            "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?{}\\s*:\\s*)(?P<removal>\\{{(?P<removal_space>\\s*+)\\}})(?P<end>\\s*,?\\s*.*)}}sx",
-            Self::DEFINES,
-            preg_quote(&JsonFile::encode(key), None)
-        );
-        let mut matches: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&regex, &self.contents, &mut matches) {
+        // Match the key only when its value is an empty object `{ <space> }`.
+        let encoded_key = JsonFile::encode(key);
+        let cb = self.contents.as_bytes();
+        let key_match = json_grammar::find_top_level_key(cb, encoded_key.as_bytes(), ValueKind::Object)
+            .filter(|m| json_grammar::skip_ws(cb, m.value_pos + 1) == m.value_end - 1);
+        if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
-            let removal = matches.get("removal").cloned().unwrap_or_default();
-            if json_decode(&removal, false)?.as_bool() == Some(false) {
+            let removal = &self.contents[m.value_pos..m.value_end];
+            if json_decode(removal, false)?.as_bool() == Some(false) {
                 return Ok(false);
             }
 
+            let removal_space = &self.contents[m.value_pos + 1..m.value_end - 1];
             self.contents = format!(
                 "{}[{}]{}",
-                matches.get("start").cloned().unwrap_or_default(),
-                matches.get("removal_space").cloned().unwrap_or_default(),
-                matches.get("end").cloned().unwrap_or_default()
+                &self.contents[..m.value_pos],
+                removal_space,
+                &self.contents[m.value_end..]
             );
 
             return Ok(true);

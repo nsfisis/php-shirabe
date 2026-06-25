@@ -176,6 +176,87 @@ pub fn scan_object(b: &[u8], p: usize) -> Option<usize> {
     }
 }
 
+/// The kind of value a top-level key must hold for a match to be accepted, mirroring whether the
+/// PHP pattern captures `(?&json)`, `(?&object)` or `(?&array)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueKind {
+    Json,
+    Object,
+    Array,
+}
+
+/// A located top-level key/value within a JSON object's text. All fields are byte offsets into the
+/// scanned contents:
+/// - `key_pos`: where the `"key"` token begins (after `\s* { \s*` and any preceding pairs)
+/// - `value_pos`: where the value begins (after `"key" \s* : \s*`)
+/// - `value_end`: just past the value
+#[derive(Debug, Clone, Copy)]
+pub struct KeyMatch {
+    pub key_pos: usize,
+    pub value_pos: usize,
+    pub value_end: usize,
+}
+
+/// Locates a top-level key whose token text is exactly `encoded_key` (e.g. `"config"`), reproducing
+/// the JsonManipulator patterns of the form
+/// `\s* \{ \s* (?: (?&string) \s* : (?&json) \s* , \s* )*? KEY \s* : \s* (value)`.
+///
+/// Returns `None` when the object cannot be parsed up to the key, or the target value is not of the
+/// requested `kind` (matching how the PCRE grammar would fail and the caller would abort).
+pub fn find_top_level_key(
+    contents: &[u8],
+    encoded_key: &[u8],
+    kind: ValueKind,
+) -> Option<KeyMatch> {
+    let mut i = skip_ws(contents, 0);
+    if contents.get(i) != Some(&b'{') {
+        return None;
+    }
+    i = skip_ws(contents, i + 1);
+    loop {
+        // Each top-level entry must start with a string key.
+        if contents.get(i) != Some(&b'"') {
+            return None;
+        }
+        let key_pos = i;
+        let key_end = scan_string(contents, i)?;
+        let is_target = &contents[key_pos..key_end] == encoded_key;
+
+        let colon = skip_ws(contents, key_end);
+        if contents.get(colon) != Some(&b':') {
+            return None;
+        }
+        let value_pos = skip_ws(contents, colon + 1);
+
+        if is_target {
+            let value_end = match kind {
+                ValueKind::Json => scan_value(contents, value_pos),
+                ValueKind::Object if contents.get(value_pos) == Some(&b'{') => {
+                    scan_object(contents, value_pos)
+                }
+                ValueKind::Array if contents.get(value_pos) == Some(&b'[') => {
+                    scan_array(contents, value_pos)
+                }
+                _ => None,
+            };
+            // Keys are unique, so a wrong-kind target cannot match later either.
+            return value_end.map(|value_end| KeyMatch {
+                key_pos,
+                value_pos,
+                value_end,
+            });
+        }
+
+        // A non-target entry must be a complete `key : value ,` pair to keep scanning.
+        let value_end = scan_value(contents, value_pos)?;
+        let comma = skip_ws(contents, value_end);
+        if contents.get(comma) != Some(&b',') {
+            return None;
+        }
+        i = skip_ws(contents, comma + 1);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,5 +302,20 @@ mod tests {
     fn value_stops_at_end_of_value() {
         // scan_value reports the end of the value, leaving trailing content.
         assert_eq!(scan_value(br#"{"a": 1}, "rest""#, 0), Some(8));
+    }
+
+    #[test]
+    fn finds_top_level_key() {
+        let c = "{\n    \"foo\": \"bar\",\n    \"require\": {\n        \"a\": \"1\"\n    }\n}";
+        let m = find_top_level_key(c.as_bytes(), br#""require""#, ValueKind::Object).unwrap();
+        assert_eq!(&c[m.key_pos..m.value_pos], "\"require\": ");
+        assert_eq!(&c[m.value_pos..m.value_end], "{\n        \"a\": \"1\"\n    }");
+        // first key
+        let m2 = find_top_level_key(c.as_bytes(), br#""foo""#, ValueKind::Json).unwrap();
+        assert_eq!(&c[m2.value_pos..m2.value_end], "\"bar\"");
+        // missing key
+        assert!(find_top_level_key(c.as_bytes(), br#""nope""#, ValueKind::Json).is_none());
+        // wrong kind
+        assert!(find_top_level_key(c.as_bytes(), br#""foo""#, ValueKind::Array).is_none());
     }
 }
