@@ -38,8 +38,12 @@ impl OutputStyle {
             .get_error_output()
     }
 
-    fn is_console_output_interface(_output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
-        todo!()
+    fn is_console_output_interface(output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
+        // ConsoleOutput is the only OutputInterface implementor that also implements
+        // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this downcast.
+        shirabe_php_shim::AsAny::as_any(&*output.borrow())
+            .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
+            .is_some()
     }
 
     fn as_console_output_interface(
