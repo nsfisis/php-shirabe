@@ -171,14 +171,11 @@ mod cli_tests {
 
     run_no_panic_tests! {
         run_about => "about",
-        #[ignore = "currently panics"]
         run_archive => "archive",
         run_audit => "audit",
-        #[ignore = "currently panics"]
         run_browse => "browse",
         run_bump => "bump",
         run_check_platform_reqs => "check-platform-reqs",
-        #[ignore = "currently panics"]
         run_clear_cache => "clear-cache",
         run_config => "config",
         run_create_project => "create-project",
@@ -189,7 +186,6 @@ mod cli_tests {
         run_exec => "exec",
         run_fund => "fund",
         run_global => "global",
-        #[ignore = "currently panics"]
         run_init => "init",
         run_install => "install",
         run_licenses => "licenses",
