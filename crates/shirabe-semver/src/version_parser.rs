@@ -651,6 +651,7 @@ impl VersionParser {
                 }
             };
 
+            let version_error = version_result.as_ref().err().map(|e| e.to_string());
             if let Ok(mut version) = version_result {
                 let op = if op_str.is_empty() { "=" } else { &op_str };
 
@@ -682,6 +683,12 @@ impl VersionParser {
                     final_op, version, None,
                 ))]);
             }
+
+            let mut message = format!("Could not parse version constraint {}", constraint);
+            if let Some(error) = version_error {
+                message.push_str(&format!(": {}", error));
+            }
+            anyhow::bail!(message);
         }
 
         anyhow::bail!("Could not parse version constraint {}", constraint)

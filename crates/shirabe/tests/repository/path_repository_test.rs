@@ -68,7 +68,7 @@ fn test_load_package_from_file_system_with_version() {
     );
 }
 
-#[ignore]
+#[ignore = "version guessing for an unversioned package calls VersionGuesser::guess_git_version, which reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_load_package_from_file_system_without_version() {
     let repository_url = [
@@ -90,7 +90,7 @@ fn test_load_package_from_file_system_without_version() {
     assert!(!package_version.is_empty());
 }
 
-#[ignore]
+#[ignore = "the without-version fixture matched by the wildcard triggers VersionGuesser::guess_git_version, which reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_load_package_from_file_system_with_wildcard() {
     let repository_url =
@@ -160,7 +160,7 @@ fn test_load_package_with_explicit_versions() {
 }
 
 /// Verify relative repository URLs remain relative, see #4439
-#[ignore]
+#[ignore = "relies on the process cwd being the test's __DIR__ (the Repository fixtures dir) so the computed relative url resolves; under cargo the cwd is the crate manifest dir, so the relative url does not point at the fixture and getPackages errors"]
 #[test]
 fn test_url_remains_relative() {
     // realpath() does not fully expand the paths
@@ -197,7 +197,7 @@ fn test_url_remains_relative() {
     assert_eq!(Some(relative_url), package.get_dist_url());
 }
 
-#[ignore]
+#[ignore = "the wildcard url also matches the without-version fixture, whose version guessing reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_reference_none() {
     let options = coordinates(vec![("reference", PhpMixed::String("none".to_string()))]);
@@ -216,7 +216,7 @@ fn test_reference_none() {
     }
 }
 
-#[ignore]
+#[ignore = "the wildcard url also matches the without-version fixture, whose version guessing reaches stream_set_blocking (fcntl(2) not implemented, todo!()) and aborts the process"]
 #[test]
 fn test_reference_config() {
     let options = coordinates(vec![

@@ -27,6 +27,7 @@ pub mod stream_context_factory;
 pub mod svn;
 pub mod sync_helper;
 pub mod tar;
+pub mod tls_helper;
 pub mod url;
 pub mod zip;
 
@@ -58,5 +59,6 @@ pub use stream_context_factory::*;
 pub use svn::*;
 pub use sync_helper::*;
 pub use tar::*;
+pub use tls_helper::*;
 pub use url::*;
 pub use zip::*;

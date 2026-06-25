@@ -37,7 +37,6 @@ fn test_update_requires() {
 }
 
 #[test]
-#[ignore]
 fn test_update_dev_requires() {
     let alias = alias();
     assert!(alias.get_dev_requires().is_empty());
@@ -46,7 +45,6 @@ fn test_update_dev_requires() {
 }
 
 #[test]
-#[ignore]
 fn test_update_conflicts() {
     let alias = alias();
     assert!(alias.get_conflicts().is_empty());
@@ -55,7 +53,6 @@ fn test_update_conflicts() {
 }
 
 #[test]
-#[ignore]
 fn test_update_provides() {
     let alias = alias();
     assert!(alias.get_provides().is_empty());
@@ -64,7 +61,6 @@ fn test_update_provides() {
 }
 
 #[test]
-#[ignore]
 fn test_update_replaces() {
     let alias = alias();
     assert!(alias.get_replaces().is_empty());

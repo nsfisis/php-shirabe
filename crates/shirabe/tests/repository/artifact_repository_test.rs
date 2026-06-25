@@ -35,7 +35,7 @@ fn create_repo(url: &str) -> ArtifactRepository {
 }
 
 #[test]
-#[ignore]
+#[ignore = "the artifacts fixtures dir contains a .tar file (jsonInRootTarFile); scanning it routes through Tar::get_composer_json -> PharData::new which is todo!()"]
 fn test_extracts_configs_from_zip_archives() {
     if set_up() {
         return;
@@ -85,7 +85,7 @@ fn test_extracts_configs_from_zip_archives() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "the artifacts fixtures dir contains a .tar file (jsonInRootTarFile); scanning it routes through Tar::get_composer_json -> PharData::new which is todo!()"]
 fn test_absolute_repo_url_creates_absolute_url_packages() {
     if set_up() {
         return;
@@ -106,7 +106,7 @@ fn test_absolute_repo_url_creates_absolute_url_packages() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "the relative url is resolved from the process cwd (the crate manifest dir under cargo, not the composer test root), so the artifacts dir is not found; additionally the dir contains a .tar file routing through PharData::new which is todo!()"]
 fn test_relative_repo_url_creates_relative_url_packages() {
     if set_up() {
         return;

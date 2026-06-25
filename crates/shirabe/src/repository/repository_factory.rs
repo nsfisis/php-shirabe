@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
+    php_to_string,
 };
 
 use crate::config::Config;
@@ -318,15 +319,11 @@ impl RepositoryFactory {
         repo: &IndexMap<String, PhpMixed>,
         existing_repos: &IndexMap<String, T>,
     ) -> String {
-        let mut name = match index {
-            PhpMixed::Int(_) => {
-                if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
-                    Preg::replace("{^https?://}i", "", url)
-                } else {
-                    index.as_string().unwrap_or("").to_string()
-                }
-            }
-            _ => index.as_string().unwrap_or("").to_string(),
+        let mut name = if matches!(index, PhpMixed::Int(_)) && repo.contains_key("url") {
+            let url = repo.get("url").and_then(|v| v.as_string()).unwrap_or("");
+            Preg::replace("{^https?://}i", "", url)
+        } else {
+            php_to_string(index)
         };
         while existing_repos.contains_key(&name) {
             name.push('2');

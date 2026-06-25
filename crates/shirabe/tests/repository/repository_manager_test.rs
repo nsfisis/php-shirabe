@@ -72,7 +72,6 @@ fn str_config(pairs: &[(&str, PhpMixed)]) -> IndexMap<String, PhpMixed> {
 }
 
 #[test]
-#[ignore]
 fn test_prepend() {
     let SetUp { tmpdir } = set_up();
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
@@ -90,7 +89,7 @@ fn test_prepend() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "create_repository routes to RepositoryManager::create_repository_by_class, which is todo!() (dynamic instantiation by class name not yet ported)"]
 fn test_repo_creation() {
     let SetUp { tmpdir } = set_up();
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
@@ -176,7 +175,7 @@ fn test_repo_creation() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "the first case (\"pear\", a registered type) reaches RepositoryManager::create_repository_by_class, which is todo!() (dynamic instantiation by class name not yet ported), before the \"invalid\" case can be checked"]
 fn test_invalid_repo_creation_throws() {
     let SetUp { tmpdir } = set_up();
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());

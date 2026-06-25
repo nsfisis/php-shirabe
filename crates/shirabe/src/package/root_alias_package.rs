@@ -92,18 +92,35 @@ impl RootPackageInterface for RootAliasPackage {
     }
 
     fn set_dev_requires(&mut self, dev_requires: IndexMap<String, Link>) {
+        self.inner.inner.dev_requires = self
+            .inner
+            .inner
+            .replace_self_version_dependencies(dev_requires.clone(), Link::TYPE_DEV_REQUIRE);
+
         self.alias_of.set_dev_requires(dev_requires);
     }
 
     fn set_conflicts(&mut self, conflicts: IndexMap<String, Link>) {
+        self.inner.inner.conflicts = self
+            .inner
+            .inner
+            .replace_self_version_dependencies(conflicts.clone(), Link::TYPE_CONFLICT);
         self.alias_of.set_conflicts(conflicts);
     }
 
     fn set_provides(&mut self, provides: IndexMap<String, Link>) {
+        self.inner.inner.provides = self
+            .inner
+            .inner
+            .replace_self_version_dependencies(provides.clone(), Link::TYPE_PROVIDE);
         self.alias_of.set_provides(provides);
     }
 
     fn set_replaces(&mut self, replaces: IndexMap<String, Link>) {
+        self.inner.inner.replaces = self
+            .inner
+            .inner
+            .replace_self_version_dependencies(replaces.clone(), Link::TYPE_REPLACE);
         self.alias_of.set_replaces(replaces);
     }
 

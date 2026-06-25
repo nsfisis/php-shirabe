@@ -1063,19 +1063,22 @@ impl ValidatingArrayLoader {
                     .and_then(|v| v.as_array())
                     .cloned()
                     .unwrap_or_default();
-                if !section.contains_key("type") {
+                // Mirror PHP `isset()`, which is false for both missing keys and null values.
+                let isset =
+                    |key: &str| matches!(section.get(key), Some(v) if !matches!(v, PhpMixed::Null));
+                if !isset("type") {
                     self.errors
                         .push(format!("{}.type : must be present", src_type));
                 }
-                if !section.contains_key("url") {
+                if !isset("url") {
                     self.errors
                         .push(format!("{}.url : must be present", src_type));
                 }
-                if src_type == "source" && !section.contains_key("reference") {
+                if src_type == "source" && !isset("reference") {
                     self.errors
                         .push(format!("{}.reference : must be present", src_type));
                 }
-                if let Some(type_val) = section.get("type")
+                if let Some(type_val) = section.get("type").filter(|_| isset("type"))
                     && !is_string(type_val)
                 {
                     self.errors.push(format!(
@@ -1084,7 +1087,7 @@ impl ValidatingArrayLoader {
                         get_debug_type(type_val)
                     ));
                 }
-                if let Some(url_val) = section.get("url")
+                if let Some(url_val) = section.get("url").filter(|_| isset("url"))
                     && !is_string(url_val)
                 {
                     self.errors.push(format!(
@@ -1093,7 +1096,7 @@ impl ValidatingArrayLoader {
                         get_debug_type(url_val)
                     ));
                 }
-                if let Some(ref_val) = section.get("reference")
+                if let Some(ref_val) = section.get("reference").filter(|_| isset("reference"))
                     && !is_string(ref_val)
                     && !is_int(ref_val)
                 {
@@ -1103,7 +1106,7 @@ impl ValidatingArrayLoader {
                         get_debug_type(ref_val)
                     ));
                 }
-                if let Some(ref_val) = section.get("reference") {
+                if let Some(ref_val) = section.get("reference").filter(|_| isset("reference")) {
                     let ref_str = php_to_string(ref_val);
                     if Preg::is_match("{^\\s*-}", &ref_str) {
                         self.errors.push(format!(
@@ -1112,7 +1115,7 @@ impl ValidatingArrayLoader {
                         ));
                     }
                 }
-                if let Some(url_val) = section.get("url") {
+                if let Some(url_val) = section.get("url").filter(|_| isset("url")) {
                     let url_str = php_to_string(url_val);
                     if Preg::is_match("{^\\s*-}", &url_str) {
                         self.errors.push(format!(

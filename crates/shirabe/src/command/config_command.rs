@@ -823,14 +823,27 @@ impl Command for ConfigCommand {
                                 PhpMixed::List(value.as_list().cloned().unwrap_or_default()),
                             );
                         } else {
-                            // PHP "+" operator on arrays: keep keys from left, fill from right
-                            let mut merged: IndexMap<String, PhpMixed> =
-                                value.as_array().cloned().unwrap_or_default();
-                            if let Some(cv) = current_value.as_array() {
-                                for (k, v) in cv {
-                                    if !merged.contains_key(k) {
-                                        merged.insert(k.clone(), v.clone());
-                                    }
+                            // PHP "+" operator on arrays: keep keys from left, fill from right.
+                            // A list participates with its integer indices as keys.
+                            let mut merged: IndexMap<String, PhpMixed> = match &value {
+                                PhpMixed::List(l) => l
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, v)| (i.to_string(), v.clone()))
+                                    .collect(),
+                                _ => value.as_array().cloned().unwrap_or_default(),
+                            };
+                            let fill: IndexMap<String, PhpMixed> = match &current_value {
+                                PhpMixed::List(l) => l
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, v)| (i.to_string(), v.clone()))
+                                    .collect(),
+                                _ => current_value.as_array().cloned().unwrap_or_default(),
+                            };
+                            for (k, v) in fill {
+                                if !merged.contains_key(&k) {
+                                    merged.insert(k, v);
                                 }
                             }
                             value = PhpMixed::Array(merged);

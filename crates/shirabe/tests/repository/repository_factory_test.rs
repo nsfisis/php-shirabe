@@ -12,7 +12,6 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
 
 #[test]
-#[ignore]
 fn test_manager_with_all_repository_types() {
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
     let config = Rc::new(RefCell::new(Config::new(false, None)));
@@ -97,7 +96,6 @@ fn generate_repository_name_provider() -> Vec<(
 }
 
 #[test]
-#[ignore]
 fn test_generate_repository_name() {
     for (index, repo_pairs, existing_keys, expected) in generate_repository_name_provider() {
         let repo: IndexMap<String, PhpMixed> = repo_pairs

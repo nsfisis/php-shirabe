@@ -1,25 +1,167 @@
 //! ref: composer/tests/Composer/Test/Command/ValidateCommandTest.php
 
+use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use serial_test::serial;
+use shirabe::util::platform::Platform;
+use shirabe_php_shim::PhpMixed;
+
+/// ref: ValidateCommandTest::MINIMAL_VALID_CONFIGURATION
+fn minimal_valid_configuration() -> serde_json::Value {
+    serde_json::json!({
+        "name": "test/suite",
+        "type": "library",
+        "description": "A generical test suite",
+        "license": "MIT",
+        "repositories": {
+            "packages": {
+                "type": "package",
+                "package": [
+                    {"name": "root/req", "version": "1.0.0", "require": {"dep/pkg": "^1"}},
+                    {"name": "dep/pkg", "version": "1.0.0"},
+                    {"name": "dep/pkg", "version": "1.0.1"},
+                    {"name": "dep/pkg", "version": "1.0.2"}
+                ]
+            }
+        },
+        "require": {
+            "root/req": "1.*"
+        }
+    })
+}
+
+fn validate_input(command: Vec<(PhpMixed, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+    let mut input = vec![(PhpMixed::from("command"), PhpMixed::from("validate"))];
+    input.extend(command);
+    input
+}
+
+struct ValidateCase {
+    name: &'static str,
+    composer_json: serde_json::Value,
+    command: Vec<(PhpMixed, PhpMixed)>,
+    expected: &'static str,
+}
+
+/// ref: provideValidateTests
+fn provide_validate_tests() -> Vec<ValidateCase> {
+    // $publishDataStripped = array_diff_key(MINIMAL_VALID_CONFIGURATION, ['name','type','description','license'])
+    let publish_data_stripped = serde_json::json!({
+        "repositories": {
+            "packages": {
+                "type": "package",
+                "package": [
+                    {"name": "root/req", "version": "1.0.0", "require": {"dep/pkg": "^1"}},
+                    {"name": "dep/pkg", "version": "1.0.0"},
+                    {"name": "dep/pkg", "version": "1.0.1"},
+                    {"name": "dep/pkg", "version": "1.0.2"}
+                ]
+            }
+        },
+        "require": {
+            "root/req": "1.*"
+        }
+    });
+
+    vec![
+        ValidateCase {
+            name: "validation passing",
+            composer_json: minimal_valid_configuration(),
+            command: vec![],
+            expected: "<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid",
+        },
+        ValidateCase {
+            name: "passing but with warnings",
+            composer_json: publish_data_stripped.clone(),
+            command: vec![],
+            expected: "./composer.json is valid for simple usage with Composer but has\nstrict errors that make it unable to be published as a package\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n# Publish errors\n- name : The property name is required\n- description : The property description is required\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+        },
+        ValidateCase {
+            name: "passing without publish-check",
+            composer_json: publish_data_stripped,
+            command: vec![(PhpMixed::from("--no-check-publish"), PhpMixed::Bool(true))],
+            expected: "./composer.json is valid, but with a few warnings\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+        },
+    ]
+}
+
 #[test]
-#[ignore = "missing TestCase::init_temp_composer and get_application_tester (ApplicationTester with run/get_display) infrastructure"]
+#[serial]
+#[ignore = "validate creates a Composer instance (create_composer_instance -> Factory) which \
+            reaches ProcessExecutor (git) -> shirabe-php-shim stream_set_blocking (stream.rs \
+            todo!(), requires fcntl(2))"]
 fn test_validate() {
-    todo!()
+    for case in provide_validate_tests() {
+        let _tear_down = init_temp_composer(Some(&case.composer_json), None, None, true);
+
+        let mut app_tester = get_application_tester();
+        app_tester
+            .run(validate_input(case.command), RunOptions::default())
+            .unwrap_or_else(|e| panic!("case {:?}: run failed: {:?}", case.name, e));
+
+        assert_eq!(
+            case.expected.trim(),
+            app_tester.get_display().trim(),
+            "case {:?}",
+            case.name
+        );
+    }
 }
 
 #[test]
-#[ignore = "missing TestCase::init_temp_composer and get_application_tester (ApplicationTester with run/get_display) infrastructure"]
+#[serial]
 fn test_validate_on_file_issues() {
-    todo!()
+    let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
+    std::fs::remove_file(tear_down.working_dir().join("composer.json")).unwrap();
+
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(validate_input(vec![]), RunOptions::default())
+        .unwrap();
+
+    assert_eq!(
+        "./composer.json not found.",
+        app_tester.get_display().trim()
+    );
+
+    drop(tear_down);
 }
 
 #[test]
-#[ignore = "missing TestCase::init_temp_composer / create_composer_lock and get_application_tester (ApplicationTester) infrastructure"]
+#[serial]
+#[ignore = "validate with a lock file creates a Composer instance and queries the Locker, reaching \
+            ProcessExecutor (git) -> shirabe-php-shim stream_set_blocking (stream.rs todo!(), \
+            requires fcntl(2))"]
 fn test_with_composer_lock() {
     todo!()
 }
 
 #[test]
-#[ignore = "missing TestCase::init_temp_composer and get_application_tester (ApplicationTester with run/get_display/get_status_code) infrastructure"]
+#[serial]
 fn test_unaccessible_file() {
-    todo!()
+    if Platform::is_windows() {
+        // ref: $this->markTestSkipped('Does not run on windows');
+        return;
+    }
+    if shirabe_php_shim::function_exists("posix_getuid") && shirabe_php_shim::posix_getuid() == 0 {
+        // ref: $this->markTestSkipped('Cannot run as root');
+        return;
+    }
+
+    let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
+    let composer_json = tear_down.working_dir().join("composer.json");
+    shirabe_php_shim::chmod(&composer_json.to_string_lossy(), 0o200);
+
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(validate_input(vec![]), RunOptions::default())
+        .unwrap();
+
+    assert_eq!(
+        "./composer.json is not readable.",
+        app_tester.get_display().trim()
+    );
+    assert_eq!(3, app_tester.get_status_code());
+
+    shirabe_php_shim::chmod(&composer_json.to_string_lossy(), 0o700);
+    drop(tear_down);
 }

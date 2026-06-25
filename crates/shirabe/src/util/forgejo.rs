@@ -124,7 +124,7 @@ impl Forgejo {
             Err(e) => {
                 let code = e
                     .downcast_ref::<crate::downloader::TransportException>()
-                    .and_then(|te| te.get_status_code())
+                    .map(|te| te.code)
                     .unwrap_or(0);
                 if [403, 401, 404].contains(&code) {
                     self.io.write_error3(

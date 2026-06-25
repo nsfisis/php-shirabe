@@ -4,7 +4,10 @@ use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe_php_shim::PhpMixed;
 
-#[ignore = "missing TestCase::create_installed_json / create_composer_lock infrastructure and full bump flow (require_composer reaches the network)"]
+#[ignore = "needs create_installed_json / create_composer_lock helpers \
+            (InstalledFilesystemRepository / Locker::set_lock_data), and BumpCommand::execute calls \
+            require_composer -> Factory, reaching ProcessExecutor (git) -> shirabe-php-shim \
+            stream_set_blocking (stream.rs todo!(), requires fcntl(2))"]
 #[test]
 fn test_bump() {
     todo!()
