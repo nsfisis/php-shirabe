@@ -61,7 +61,6 @@ fn json_config_source(config: &std::path::Path) -> JsonConfigSource {
     JsonConfigSource::new(Rc::new(RefCell::new(json_file)), false)
 }
 
-#[ignore]
 #[test]
 fn test_add_repository() {
     let tear_down = set_up();
@@ -85,7 +84,6 @@ fn test_add_repository() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_add_repository_as_list() {
     let tear_down = set_up();
@@ -109,7 +107,6 @@ fn test_add_repository_as_list() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_add_repository_with_options() {
     let tear_down = set_up();
@@ -144,7 +141,6 @@ fn test_add_repository_with_options() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_remove_repository() {
     let tear_down = set_up();
@@ -160,7 +156,6 @@ fn test_remove_repository() {
     assert_file_equals(&fixture_path("composer-empty.json"), &config);
 }
 
-#[ignore]
 #[test]
 fn test_add_packagist_repository_with_false_value() {
     let tear_down = set_up();
@@ -177,7 +172,6 @@ fn test_add_packagist_repository_with_false_value() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_remove_packagist() {
     let tear_down = set_up();
@@ -343,7 +337,6 @@ fn provide_add_link_data() -> Vec<(PathBuf, &'static str, &'static str, &'static
     ]
 }
 
-#[ignore]
 #[test]
 fn test_add_link() {
     for (source_file, r#type, name, value, compare_against) in provide_add_link_data() {
@@ -476,7 +469,6 @@ fn provide_remove_link_data() -> Vec<(PathBuf, &'static str, &'static str, PathB
     ]
 }
 
-#[ignore]
 #[test]
 fn test_remove_link() {
     for (source_file, r#type, name, compare_against) in provide_remove_link_data() {

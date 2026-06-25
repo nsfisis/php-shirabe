@@ -17,7 +17,6 @@ fn arr(pairs: &[(&str, PhpMixed)]) -> PhpMixed {
 }
 
 #[test]
-#[ignore]
 fn test_add_link() {
     let cases: Vec<(&str, &str, &str, &str, &str)> = vec![
         (
@@ -1287,7 +1286,6 @@ fn test_add_link() {
 }
 
 #[test]
-#[ignore]
 fn test_add_link_and_sort_packages() {
     let cases: Vec<(&str, &str, &str, &str, bool, &str)> = vec![
         (
@@ -1367,7 +1365,6 @@ fn test_add_link_and_sort_packages() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_sub_node() {
     let cases: Vec<(&str, &str, bool, Option<&str>)> = vec![
         (
@@ -1686,7 +1683,6 @@ fn test_remove_sub_node() {
 }
 
 #[test]
-#[ignore]
 fn test_add_repository() {
     let cases: Vec<(&str, &str, &str, PhpMixed, bool)> = vec![
         (
@@ -1934,7 +1930,6 @@ fn test_add_repository() {
 }
 
 #[test]
-#[ignore]
 fn test_set_url_in_repository() {
     let cases: Vec<(&str, &str, &str, &str)> = vec![
         (
@@ -2192,7 +2187,6 @@ fn test_set_url_in_repository() {
 }
 
 #[test]
-#[ignore]
 fn test_add_list_item() {
     let cases: Vec<(&str, &str, &str, PhpMixed, bool)> = vec![
         (
@@ -2504,7 +2498,6 @@ fn test_add_list_item() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_list_item() {
     let cases: Vec<(&str, &str, &str, i64)> = vec![
         (
@@ -2619,7 +2612,6 @@ fn test_remove_list_item() {
 }
 
 #[test]
-#[ignore]
 fn test_insert_list_item() {
     let cases: Vec<(&str, &str, &str, PhpMixed, i64)> = vec![
         (
@@ -2757,7 +2749,6 @@ fn test_insert_list_item() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_sub_node_from_require() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -2819,7 +2810,6 @@ fn test_remove_sub_node_from_require() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_sub_node_preserves_object_type_when_empty() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -2841,7 +2831,6 @@ fn test_remove_sub_node_preserves_object_type_when_empty() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_sub_node_preserves_object_type_when_empty2() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -2871,7 +2860,6 @@ fn test_remove_sub_node_preserves_object_type_when_empty2() {
 }
 
 #[test]
-#[ignore]
 fn test_add_sub_node_in_require() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -2939,7 +2927,6 @@ fn test_add_sub_node_in_require() {
 }
 
 #[test]
-#[ignore]
 fn test_add_extra_with_package() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -2991,7 +2978,6 @@ fn test_add_extra_with_package() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_with_package() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3052,7 +3038,6 @@ fn test_add_config_with_package() {
 }
 
 #[test]
-#[ignore]
 fn test_add_suggest_with_package() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3104,7 +3089,6 @@ fn test_add_suggest_with_package() {
 }
 
 #[test]
-#[ignore]
 fn test_add_repository_can_initialize_empty_repositories() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3135,7 +3119,6 @@ fn test_add_repository_can_initialize_empty_repositories() {
 }
 
 #[test]
-#[ignore]
 fn test_add_repository_can_initialize_from_scratch() {
     let mut manipulator = JsonManipulator::new("{\n\t\"a\": \"b\"\n}".to_string()).unwrap();
 
@@ -3151,7 +3134,6 @@ fn test_add_repository_can_initialize_from_scratch() {
 }
 
 #[test]
-#[ignore]
 fn test_add_repository_can_append() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3192,7 +3174,6 @@ fn test_add_repository_can_append() {
 }
 
 #[test]
-#[ignore]
 fn test_add_repository_can_prepend() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3233,7 +3214,6 @@ fn test_add_repository_can_prepend() {
 }
 
 #[test]
-#[ignore]
 fn test_add_repository_can_override_deep_repos() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3351,7 +3331,6 @@ fn test_insert_repository_before_and_after_by_name() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_repository_removes_from_assoc_but_does_not_converts_from_assoc_to_list() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3460,7 +3439,6 @@ fn test_add_repository_converts_from_assoc_to_list() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_escapes() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3513,7 +3491,6 @@ fn test_add_config_setting_works_from_scratch() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_can_add() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3539,7 +3516,6 @@ fn test_add_config_setting_can_add() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_can_overwrite() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3566,7 +3542,6 @@ fn test_add_config_setting_can_overwrite() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_can_overwrite_numbers() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3595,7 +3570,6 @@ fn test_add_config_setting_can_overwrite_numbers() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_can_overwrite_arrays() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3655,7 +3629,6 @@ fn test_add_config_setting_can_overwrite_arrays() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_can_add_sub_key_in_empty_config() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3685,7 +3658,6 @@ fn test_add_config_setting_can_add_sub_key_in_empty_config() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_can_add_sub_key_in_empty_val() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3734,7 +3706,6 @@ fn test_add_config_setting_can_add_sub_key_in_empty_val() {
 }
 
 #[test]
-#[ignore]
 fn test_add_config_setting_can_add_sub_key_in_hash() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3768,7 +3739,6 @@ fn test_add_config_setting_can_add_sub_key_in_hash() {
 }
 
 #[test]
-#[ignore]
 fn test_add_root_setting_does_not_break_dots() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3798,7 +3768,6 @@ fn test_add_root_setting_does_not_break_dots() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_config_setting_can_remove_sub_key_in_hash() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3832,7 +3801,6 @@ fn test_remove_config_setting_can_remove_sub_key_in_hash() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_config_setting_can_remove_sub_key_in_hash_with_siblings() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3889,7 +3857,6 @@ fn test_add_main_key() {
 }
 
 #[test]
-#[ignore]
 fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3911,7 +3878,6 @@ fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit() {
 }
 
 #[test]
-#[ignore]
 fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit2() {
     let mut manipulator = JsonManipulator::new("{}".to_string()).unwrap();
 
@@ -3926,7 +3892,6 @@ fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit2() {
 }
 
 #[test]
-#[ignore]
 fn test_update_main_key() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3947,7 +3912,6 @@ fn test_update_main_key() {
 }
 
 #[test]
-#[ignore]
 fn test_update_main_key2() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -3979,7 +3943,6 @@ fn test_update_main_key2() {
 }
 
 #[test]
-#[ignore]
 fn test_update_main_key3() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -4014,7 +3977,6 @@ fn test_update_main_key3() {
 }
 
 #[test]
-#[ignore]
 fn test_update_main_key_with_content_having_dollar_sign_followed_by_digit() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -4035,7 +3997,6 @@ fn test_update_main_key_with_content_having_dollar_sign_followed_by_digit() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_main_key() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -4109,7 +4070,6 @@ fn test_remove_main_key() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_main_key_if_empty() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -4166,7 +4126,6 @@ fn test_remove_main_key_if_empty() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_main_key_removes_key_where_value_is_null() {
     let mut manipulator = JsonManipulator::new(r#"{"foo":9000,"bar":null}"#.to_string()).unwrap();
 
@@ -4198,7 +4157,6 @@ fn test_indent_detection() {
 }
 
 #[test]
-#[ignore]
 fn test_remove_main_key_at_end_of_file() {
     let mut manipulator = JsonManipulator::new(
         "{\n    \"require\": {\n        \"package/a\": \"*\"\n    }\n}\n".to_string(),
@@ -4232,7 +4190,6 @@ fn test_remove_main_key_at_end_of_file() {
 }
 
 #[test]
-#[ignore]
 fn test_escaped_unicode_does_not_cause_backtrack_limit_error_github_issue8131() {
     let mut manipulator = JsonManipulator::new(
         r#"{
@@ -4264,7 +4221,6 @@ fn test_escaped_unicode_does_not_cause_backtrack_limit_error_github_issue8131() 
 }
 
 #[test]
-#[ignore]
 fn test_large_file_does_not_cause_backtrack_limit_error_github_issue9595() {
     let mut manipulator = JsonManipulator::new(
         r#"{
