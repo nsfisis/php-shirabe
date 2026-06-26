@@ -42,7 +42,7 @@ use shirabe_semver;
 
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::autoload::AutoloadGenerator;
+use crate::autoload::AutoloadGeneratorInterface;
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::GithubActionError;
@@ -56,9 +56,9 @@ use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
 use crate::dependency_resolver::Solver;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::dependency_resolver::operation::OperationInterface;
-use crate::downloader::DownloadManager;
+use crate::downloader::DownloadManagerInterface;
 use crate::downloader::TransportException;
-use crate::event_dispatcher::EventDispatcher;
+use crate::event_dispatcher::EventDispatcherInterface;
 use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
@@ -67,7 +67,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::AliasPackageHandle;
 use crate::package::CompleteAliasPackageHandle;
 use crate::package::Link;
-use crate::package::Locker;
+use crate::package::LockerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::package::base_package;
@@ -83,7 +83,7 @@ use crate::repository::InstalledRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryManager;
+use crate::repository::RepositoryManagerInterface;
 use crate::repository::RepositorySet;
 use crate::repository::RootPackageRepository;
 use crate::script::ScriptEvents;
@@ -98,12 +98,13 @@ pub struct Installer {
     pub(crate) package: RootPackageInterfaceHandle,
     // TODO can we get rid of the below and just use the package itself?
     pub(crate) fixed_root_package: RootPackageInterfaceHandle,
-    pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
-    pub(crate) repository_manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-    pub(crate) locker: std::rc::Rc<std::cell::RefCell<Locker>>,
-    pub(crate) installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
-    pub(crate) event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-    pub(crate) autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
+    pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+    pub(crate) repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
+    pub(crate) locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+    pub(crate) installation_manager:
+        std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    pub(crate) event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+    pub(crate) autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     pub(crate) prefer_source: bool,
     pub(crate) prefer_dist: bool,
     pub(crate) optimize_autoloader: bool,
@@ -155,12 +156,12 @@ impl Installer {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         package: RootPackageInterfaceHandle,
-        download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
-        repository_manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-        locker: std::rc::Rc<std::cell::RefCell<Locker>>,
-        installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
-        event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-        autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
+        download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+        repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
+        locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+        autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     ) -> Self {
         let suggested_packages_reporter = std::rc::Rc::new(std::cell::RefCell::new(
             SuggestedPackagesReporter::new(io.clone()),
@@ -249,7 +250,7 @@ impl Installer {
             self.write_lock = false;
             self.dump_autoloader = false;
             let repository_manager = self.repository_manager.clone();
-            self.mock_local_repositories(&mut repository_manager.borrow_mut())?;
+            self.mock_local_repositories(&mut *repository_manager.borrow_mut())?;
         }
 
         if self.download_only {
@@ -409,7 +410,7 @@ impl Installer {
                     .as_installed_repository_interface_mut()
                     .unwrap(),
                 self.package.clone(),
-                &mut self.installation_manager.borrow_mut(),
+                &mut *self.installation_manager.borrow_mut(),
                 "composer",
                 self.optimize_autoloader,
                 None,
@@ -1651,7 +1652,10 @@ impl Installer {
     /// Replace local repositories with InstalledArrayRepository instances
     ///
     /// This is to prevent any accidental modification of the existing repos on disk
-    fn mock_local_repositories(&self, rm: &mut RepositoryManager) -> anyhow::Result<()> {
+    fn mock_local_repositories(
+        &self,
+        rm: &mut dyn RepositoryManagerInterface,
+    ) -> anyhow::Result<()> {
         let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         for package in rm.get_local_repository().get_packages()? {
             packages.insert(package.to_string(), PackageInterfaceHandle::dup(&package));

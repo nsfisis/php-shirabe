@@ -19,7 +19,7 @@ use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::Locker;
+use crate::package::LockerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::package::base_package::{self};
@@ -738,7 +738,7 @@ impl PluginManager {
 
     fn parse_allowed_plugins(
         allow_plugins_config: PhpMixed,
-        mut locker: Option<&mut Locker>,
+        mut locker: Option<&mut dyn LockerInterface>,
     ) -> Option<IndexMap<String, bool>> {
         // PHP: [] === $allowPluginsConfig && $locker !== null && $locker->isLocked() && version_compare($locker->getPluginApi(), '2.2.0', '<')
         let is_empty_array = allow_plugins_config

@@ -285,7 +285,7 @@ impl BumpCommand {
             composer
                 .get_locker()
                 .borrow_mut()
-                .update_hash(&composer_json, None::<fn(_) -> _>)?;
+                .update_hash(&composer_json, None)?;
         }
 
         if dry_run && change_count > 0 {

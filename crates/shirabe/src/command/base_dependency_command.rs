@@ -152,7 +152,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     RepositoryFactory::default_repos(
                         Some(self.get_io()),
                         Some(composer.get_config()),
-                        Some(&mut rm.borrow_mut()),
+                        Some(&mut *rm.borrow_mut()),
                     )?
                     .into_values()
                     .collect(),

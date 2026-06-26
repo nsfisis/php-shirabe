@@ -269,7 +269,7 @@ impl Command for DumpAutoloadCommand {
             &config_ref,
             local_repo,
             package,
-            &mut installation_manager_ref,
+            &mut *installation_manager_ref,
             "composer",
             optimize,
             None,

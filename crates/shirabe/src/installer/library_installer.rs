@@ -8,7 +8,7 @@ use shirabe_php_shim::{
 };
 
 use crate::composer::PartialComposerWeakHandle;
-use crate::downloader::DownloadManager;
+use crate::downloader::DownloadManagerInterface;
 use crate::installer::BinaryInstaller;
 use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
@@ -24,7 +24,8 @@ use crate::util::Silencer;
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
     pub(crate) vendor_dir: String,
-    pub(crate) download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>>,
+    pub(crate) download_manager:
+        Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) r#type: Option<String>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -192,7 +193,9 @@ impl LibraryInstaller {
         self.vendor_dir = realpath(&self.vendor_dir).unwrap_or_default();
     }
 
-    pub(crate) fn get_download_manager(&self) -> &std::rc::Rc<std::cell::RefCell<DownloadManager>> {
+    pub(crate) fn get_download_manager(
+        &self,
+    ) -> &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
         // PHP: assert($this->downloadManager instanceof DownloadManager, new \LogicException(...))
         assert!(
             self.download_manager.is_some(),

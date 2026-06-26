@@ -15,6 +15,7 @@ use crate::json::JsonFile;
 use crate::repository::FilesystemRepository;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositoryManager;
+use crate::repository::RepositoryManagerInterface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 
@@ -98,7 +99,7 @@ impl RepositoryFactory {
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         repository: &str,
         allow_filesystem: bool,
-        rm: Option<&mut RepositoryManager>,
+        rm: Option<&mut dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let repo_config =
             Self::config_from_string(io.clone(), config, repository, allow_filesystem)?;
@@ -109,7 +110,7 @@ impl RepositoryFactory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         repo_config: IndexMap<String, PhpMixed>,
-        rm: Option<&mut RepositoryManager>,
+        rm: Option<&mut dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let mut owned_rm;
         let rm = if let Some(rm) = rm {
@@ -134,7 +135,7 @@ impl RepositoryFactory {
     pub fn default_repos(
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-        rm: Option<&mut RepositoryManager>,
+        rm: Option<&mut dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
         let config = match config {
             Some(c) => c,
@@ -235,7 +236,7 @@ impl RepositoryFactory {
     }
 
     fn create_repos(
-        rm: &mut RepositoryManager,
+        rm: &mut dyn RepositoryManagerInterface,
         repo_configs: Vec<PhpMixed>,
     ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
         let mut repo_map: IndexMap<String, RepositoryInterfaceHandle> = IndexMap::new();

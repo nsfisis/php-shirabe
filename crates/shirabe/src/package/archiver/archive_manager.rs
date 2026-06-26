@@ -49,9 +49,8 @@ impl ArchiveManager {
         self.archivers.push(archiver);
     }
 
-    pub fn set_overwrite_files(&mut self, overwrite_files: bool) -> &mut Self {
+    pub fn set_overwrite_files(&mut self, overwrite_files: bool) {
         self.overwrite_files = overwrite_files;
-        self
     }
 
     pub fn get_package_filename_parts(
@@ -312,5 +311,31 @@ impl ArchiveManager {
 
         formats.dedup();
         formats
+    }
+}
+
+// Composer's Composer::setArchiveManager() accepts any ArchiveManager subclass, so plugins may
+// swap in a replacement. The interface captures the methods reached through Composer's accessor.
+pub trait ArchiveManagerInterface: std::fmt::Debug {
+    fn archive(
+        &mut self,
+        package: CompletePackageInterfaceHandle,
+        format: String,
+        target_dir: String,
+        file_name: Option<String>,
+        ignore_filters: bool,
+    ) -> anyhow::Result<String>;
+}
+
+impl ArchiveManagerInterface for ArchiveManager {
+    fn archive(
+        &mut self,
+        package: CompletePackageInterfaceHandle,
+        format: String,
+        target_dir: String,
+        file_name: Option<String>,
+        ignore_filters: bool,
+    ) -> anyhow::Result<String> {
+        self.archive(package, format, target_dir, file_name, ignore_filters)
     }
 }

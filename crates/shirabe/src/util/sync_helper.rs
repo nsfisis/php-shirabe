@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/SyncHelper.php
 
-use crate::downloader::DownloadManager;
+use crate::downloader::DownloadManagerInterface;
 use crate::downloader::DownloaderInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::r#loop::Loop;
@@ -9,7 +9,7 @@ use shirabe_php_shim::PhpMixed;
 
 pub enum DownloaderOrManager<'a> {
     Interface(&'a std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>),
-    Manager(&'a std::rc::Rc<std::cell::RefCell<DownloadManager>>),
+    Manager(&'a std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>),
 }
 
 impl<'a> DownloaderOrManager<'a> {

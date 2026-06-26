@@ -15,7 +15,7 @@ use crate::dependency_resolver::PoolOptimizer;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
 use crate::downloader::TransportException;
-use crate::event_dispatcher::EventDispatcher;
+use crate::event_dispatcher::EventDispatcherInterface;
 use crate::io::IOInterface;
 use crate::io::NullIO;
 use crate::package::AliasPackageHandle;
@@ -451,7 +451,7 @@ impl RepositorySet {
         &mut self,
         request: &mut Request,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
         pool_optimizer: Option<PoolOptimizer>,
         ignored_types: Vec<String>,
         allowed_types: Option<Vec<String>>,

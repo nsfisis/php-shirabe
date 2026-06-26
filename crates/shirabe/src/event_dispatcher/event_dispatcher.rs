@@ -125,10 +125,8 @@ impl EventDispatcher {
     }
 
     /// Set whether script handlers are active or not
-    pub fn set_run_scripts(&mut self, run_scripts: bool) -> &mut Self {
+    pub fn set_run_scripts(&mut self, run_scripts: bool) {
         self.run_scripts = run_scripts;
-
-        self
     }
 
     /// Dispatch an event
@@ -1193,7 +1191,7 @@ impl EventDispatcher {
 
         let installation_manager = composer.get_installation_manager();
         let package_map = generator.build_package_map(
-            &mut installation_manager.borrow_mut(),
+            &mut *installation_manager.borrow_mut(),
             package.clone(),
             packages,
         )?;
@@ -1243,5 +1241,70 @@ impl EventDispatcher {
             PhpMixed::List(l) => l.is_empty(),
             _ => false,
         }
+    }
+}
+
+// Composer's PartialComposer::setEventDispatcher() accepts any EventDispatcher subclass, so plugins
+// may swap in a replacement. The interface captures the methods reached through Composer's accessor
+// and through the `Rc<RefCell<dyn EventDispatcherInterface>>` references fed from it.
+pub trait EventDispatcherInterface: std::fmt::Debug {
+    fn dispatch(
+        &mut self,
+        event_name: Option<&str>,
+        event: Option<&mut dyn EventInterface>,
+    ) -> anyhow::Result<i64>;
+    fn dispatch_script(
+        &mut self,
+        event_name: &str,
+        dev_mode: bool,
+        additional_args: Vec<String>,
+        flags: IndexMap<String, PhpMixed>,
+    ) -> anyhow::Result<i64>;
+    fn dispatch_installer_event(
+        &mut self,
+        event_name: &str,
+        dev_mode: bool,
+        execute_operations: bool,
+        transaction: Transaction,
+    ) -> anyhow::Result<i64>;
+    fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
+    fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
+}
+
+impl EventDispatcherInterface for EventDispatcher {
+    fn dispatch(
+        &mut self,
+        event_name: Option<&str>,
+        event: Option<&mut dyn EventInterface>,
+    ) -> anyhow::Result<i64> {
+        self.dispatch(event_name, event)
+    }
+
+    fn dispatch_script(
+        &mut self,
+        event_name: &str,
+        dev_mode: bool,
+        additional_args: Vec<String>,
+        flags: IndexMap<String, PhpMixed>,
+    ) -> anyhow::Result<i64> {
+        self.dispatch_script(event_name, dev_mode, additional_args, flags)
+    }
+
+    fn dispatch_installer_event(
+        &mut self,
+        event_name: &str,
+        dev_mode: bool,
+        execute_operations: bool,
+        transaction: Transaction,
+    ) -> anyhow::Result<i64> {
+        self.dispatch_installer_event(event_name, dev_mode, execute_operations, transaction)
+    }
+
+    fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64) {
+        self.add_listener(event_name, listener, priority);
+    }
+
+    fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool {
+        self.has_event_listeners(event)
     }
 }

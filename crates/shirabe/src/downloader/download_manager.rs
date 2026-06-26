@@ -60,28 +60,22 @@ impl DownloadManager {
     /// Makes downloader prefer source installation over the dist.
     ///
     /// @param  bool            $preferSource prefer downloading from source
-    pub fn set_prefer_source(&mut self, prefer_source: bool) -> &mut Self {
+    pub fn set_prefer_source(&mut self, prefer_source: bool) {
         self.prefer_source = prefer_source;
-
-        self
     }
 
     /// Makes downloader prefer dist installation over the source.
     ///
     /// @param  bool            $preferDist prefer downloading from dist
-    pub fn set_prefer_dist(&mut self, prefer_dist: bool) -> &mut Self {
+    pub fn set_prefer_dist(&mut self, prefer_dist: bool) {
         self.prefer_dist = prefer_dist;
-
-        self
     }
 
     /// Sets fine tuned preference settings for package level source/dist selection.
     ///
     /// @param array<string, string> $preferences array of preferences by package patterns
-    pub fn set_preferences(&mut self, preferences: IndexMap<String, String>) -> &mut Self {
+    pub fn set_preferences(&mut self, preferences: IndexMap<String, String>) {
         self.package_preferences = preferences;
-
-        self
     }
 
     /// Sets installer downloader for a specific installation type.
@@ -92,11 +86,9 @@ impl DownloadManager {
         &mut self,
         r#type: &str,
         downloader: std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
-    ) -> &mut Self {
+    ) {
         let r#type = strtolower(r#type);
         self.downloaders.insert(r#type, downloader);
-
-        self
     }
 
     /// Returns downloader for a specific installation type.
@@ -549,5 +541,128 @@ impl DownloadManager {
         }
 
         rtrim(dir, Some("\\/"))
+    }
+}
+
+// Composer's Composer::setDownloadManager() accepts any DownloadManager subclass, so plugins may
+// swap in a replacement. The interface captures the methods reached through Composer's accessor and
+// through the `Rc<RefCell<dyn DownloadManagerInterface>>` references fed from it.
+#[async_trait::async_trait(?Send)]
+pub trait DownloadManagerInterface: std::fmt::Debug {
+    fn set_prefer_source(&mut self, prefer_source: bool);
+    fn set_prefer_dist(&mut self, prefer_dist: bool);
+    fn get_downloader_for_package(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
+    async fn download(
+        &self,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>>;
+    async fn prepare(
+        &self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>>;
+    async fn install(
+        &self,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+    ) -> Result<Option<PhpMixed>>;
+    async fn update(
+        &self,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        target_dir: &str,
+    ) -> Result<Option<PhpMixed>>;
+    async fn remove(
+        &self,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+    ) -> Result<Option<PhpMixed>>;
+    async fn cleanup(
+        &self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>>;
+}
+
+#[async_trait::async_trait(?Send)]
+impl DownloadManagerInterface for DownloadManager {
+    fn set_prefer_source(&mut self, prefer_source: bool) {
+        self.set_prefer_source(prefer_source);
+    }
+
+    fn set_prefer_dist(&mut self, prefer_dist: bool) {
+        self.set_prefer_dist(prefer_dist);
+    }
+
+    fn get_downloader_for_package(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>> {
+        self.get_downloader_for_package(package)
+    }
+
+    async fn download(
+        &self,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>> {
+        self.download(package, target_dir, prev_package).await
+    }
+
+    async fn prepare(
+        &self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>> {
+        self.prepare(r#type, package, target_dir, prev_package)
+            .await
+    }
+
+    async fn install(
+        &self,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+    ) -> Result<Option<PhpMixed>> {
+        self.install(package, target_dir).await
+    }
+
+    async fn update(
+        &self,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        target_dir: &str,
+    ) -> Result<Option<PhpMixed>> {
+        self.update(initial, target, target_dir).await
+    }
+
+    async fn remove(
+        &self,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+    ) -> Result<Option<PhpMixed>> {
+        self.remove(package, target_dir).await
+    }
+
+    async fn cleanup(
+        &self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        target_dir: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>> {
+        self.cleanup(r#type, package, target_dir, prev_package)
+            .await
     }
 }

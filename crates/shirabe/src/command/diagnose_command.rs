@@ -34,7 +34,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
-use crate::package::Locker;
+use crate::package::LockerInterface;
 use crate::package::RootPackage;
 use crate::package::version::VersionParser;
 use crate::plugin::CommandEvent;
@@ -284,7 +284,7 @@ impl Command for DiagnoseCommand {
                 io.write_no_newline("Checking composer.lock: ");
                 let locker = c.get_locker().clone();
                 let locker = locker.borrow();
-                let r = self.check_composer_lock_schema(&locker)?;
+                let r = self.check_composer_lock_schema(&*locker)?;
                 self.output_result(r);
             }
         }
@@ -487,7 +487,7 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_composer_lock_schema(&self, locker: &Locker) -> anyhow::Result<PhpMixed> {
+    fn check_composer_lock_schema(&self, locker: &dyn LockerInterface) -> anyhow::Result<PhpMixed> {
         let json = locker.get_json_file();
 
         match json.validate_schema(JsonFile::LOCK_SCHEMA, None) {

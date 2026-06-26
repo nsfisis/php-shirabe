@@ -791,3 +791,78 @@ impl InstallationManager {
         }
     }
 }
+
+// Composer's PartialComposer::setInstallationManager() accepts any InstallationManager subclass, so
+// plugins may swap in a replacement. The interface captures the methods reached through Composer's
+// accessor and through the `&mut dyn InstallationManagerInterface` references fed from it.
+pub trait InstallationManagerInterface: std::fmt::Debug {
+    fn add_installer(&mut self, installer: Box<dyn InstallerInterface>);
+    fn remove_installer(&mut self, installer: &dyn InstallerInterface);
+    fn disable_plugins(&mut self);
+    fn is_package_installed(
+        &mut self,
+        repo: &dyn InstalledRepositoryInterface,
+        package: PackageInterfaceHandle,
+    ) -> Result<bool>;
+    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
+    fn execute(
+        &mut self,
+        repo: &mut dyn InstalledRepositoryInterface,
+        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        dev_mode: bool,
+        run_scripts: bool,
+        download_only: bool,
+    ) -> Result<()>;
+    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
+    fn set_output_progress(&mut self, output_progress: bool);
+    fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+}
+
+impl InstallationManagerInterface for InstallationManager {
+    fn add_installer(&mut self, installer: Box<dyn InstallerInterface>) {
+        self.add_installer(installer);
+    }
+
+    fn remove_installer(&mut self, installer: &dyn InstallerInterface) {
+        self.remove_installer(installer);
+    }
+
+    fn disable_plugins(&mut self) {
+        self.disable_plugins();
+    }
+
+    fn is_package_installed(
+        &mut self,
+        repo: &dyn InstalledRepositoryInterface,
+        package: PackageInterfaceHandle,
+    ) -> Result<bool> {
+        self.is_package_installed(repo, package)
+    }
+
+    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+        self.ensure_binaries_presence(package);
+    }
+
+    fn execute(
+        &mut self,
+        repo: &mut dyn InstalledRepositoryInterface,
+        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        dev_mode: bool,
+        run_scripts: bool,
+        download_only: bool,
+    ) -> Result<()> {
+        self.execute(repo, operations, dev_mode, run_scripts, download_only)
+    }
+
+    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+        self.get_install_path(package)
+    }
+
+    fn set_output_progress(&mut self, output_progress: bool) {
+        self.set_output_progress(output_progress);
+    }
+
+    fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+        self.notify_installs(io);
+    }
+}

@@ -865,7 +865,7 @@ impl CreateProjectCommand {
                     RepositoryFactory::default_repos(
                         Some(io.clone()),
                         Some(config.clone()),
-                        Some(&mut rm.borrow_mut()),
+                        Some(&mut *rm.borrow_mut()),
                     )?
                     .into_iter()
                     .map(|(_, v)| v)
@@ -998,9 +998,8 @@ impl CreateProjectCommand {
         }
 
         let dm = composer.get_download_manager();
-        dm.borrow_mut()
-            .set_prefer_source(prefer_source)
-            .set_prefer_dist(prefer_dist);
+        dm.borrow_mut().set_prefer_source(prefer_source);
+        dm.borrow_mut().set_prefer_dist(prefer_dist);
 
         let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs.clone());
         let installation_manager = composer.get_installation_manager().clone();

@@ -642,14 +642,13 @@ impl Locker {
     }
 
     /// Updates the lock file's hash in-place from a given composer.json's JsonFile
-    pub fn update_hash<F>(
+    pub fn update_hash(
         &mut self,
         composer_json: &JsonFile,
-        data_processor: Option<F>,
-    ) -> Result<()>
-    where
-        F: FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>,
-    {
+        data_processor: Option<
+            Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
+        >,
+    ) -> Result<()> {
         let contents = file_get_contents(composer_json.get_path());
         let contents = match contents {
             Some(s) => s,
@@ -999,6 +998,159 @@ impl Locker {
         }
 
         Ok(missing_requirement_info)
+    }
+}
+
+// Composer's Composer::setLocker() accepts any Locker subclass, so plugins may swap in a
+// replacement. The interface captures the methods reached through Composer's accessor and through
+// the `&mut dyn LockerInterface` / `&dyn LockerInterface` references fed from it.
+pub trait LockerInterface: std::fmt::Debug {
+    fn get_json_file(&self) -> &JsonFile;
+    fn is_locked(&mut self) -> bool;
+    fn is_fresh(&mut self) -> Result<bool>;
+    fn get_locked_repository(&mut self, with_dev_reqs: bool) -> Result<LockArrayRepositoryHandle>;
+    fn get_dev_package_names(&mut self) -> Result<Vec<String>>;
+    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> Result<Vec<Link>>;
+    fn get_minimum_stability(&mut self) -> Result<String>;
+    fn get_stability_flags(&mut self) -> Result<IndexMap<String, String>>;
+    fn get_prefer_stable(&mut self) -> Result<Option<bool>>;
+    fn get_prefer_lowest(&mut self) -> Result<Option<bool>>;
+    fn get_platform_overrides(&mut self) -> Result<IndexMap<String, String>>;
+    fn get_aliases(&mut self) -> Result<Vec<IndexMap<String, String>>>;
+    fn get_plugin_api(&mut self) -> Result<String>;
+    fn get_lock_data(&mut self) -> Result<IndexMap<String, PhpMixed>>;
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
+    fn set_lock_data(
+        &mut self,
+        packages: Vec<PackageInterfaceHandle>,
+        dev_packages: Option<Vec<PackageInterfaceHandle>>,
+        platform_reqs: IndexMap<String, String>,
+        platform_dev_reqs: IndexMap<String, String>,
+        aliases: Vec<IndexMap<String, PhpMixed>>,
+        minimum_stability: &str,
+        stability_flags: IndexMap<String, i64>,
+        prefer_stable: bool,
+        prefer_lowest: bool,
+        platform_overrides: IndexMap<String, PhpMixed>,
+        write: bool,
+    ) -> Result<bool>;
+    fn update_hash(
+        &mut self,
+        composer_json: &JsonFile,
+        data_processor: Option<
+            Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
+        >,
+    ) -> Result<()>;
+    fn get_missing_requirement_info(
+        &mut self,
+        package: RootPackageInterfaceHandle,
+        include_dev: bool,
+    ) -> Result<Vec<String>>;
+}
+
+impl LockerInterface for Locker {
+    fn get_json_file(&self) -> &JsonFile {
+        self.get_json_file()
+    }
+
+    fn is_locked(&mut self) -> bool {
+        self.is_locked()
+    }
+
+    fn is_fresh(&mut self) -> Result<bool> {
+        self.is_fresh()
+    }
+
+    fn get_locked_repository(&mut self, with_dev_reqs: bool) -> Result<LockArrayRepositoryHandle> {
+        self.get_locked_repository(with_dev_reqs)
+    }
+
+    fn get_dev_package_names(&mut self) -> Result<Vec<String>> {
+        self.get_dev_package_names()
+    }
+
+    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> Result<Vec<Link>> {
+        self.get_platform_requirements(with_dev_reqs)
+    }
+
+    fn get_minimum_stability(&mut self) -> Result<String> {
+        self.get_minimum_stability()
+    }
+
+    fn get_stability_flags(&mut self) -> Result<IndexMap<String, String>> {
+        self.get_stability_flags()
+    }
+
+    fn get_prefer_stable(&mut self) -> Result<Option<bool>> {
+        self.get_prefer_stable()
+    }
+
+    fn get_prefer_lowest(&mut self) -> Result<Option<bool>> {
+        self.get_prefer_lowest()
+    }
+
+    fn get_platform_overrides(&mut self) -> Result<IndexMap<String, String>> {
+        self.get_platform_overrides()
+    }
+
+    fn get_aliases(&mut self) -> Result<Vec<IndexMap<String, String>>> {
+        self.get_aliases()
+    }
+
+    fn get_plugin_api(&mut self) -> Result<String> {
+        self.get_plugin_api()
+    }
+
+    fn get_lock_data(&mut self) -> Result<IndexMap<String, PhpMixed>> {
+        self.get_lock_data()
+    }
+
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
+    fn set_lock_data(
+        &mut self,
+        packages: Vec<PackageInterfaceHandle>,
+        dev_packages: Option<Vec<PackageInterfaceHandle>>,
+        platform_reqs: IndexMap<String, String>,
+        platform_dev_reqs: IndexMap<String, String>,
+        aliases: Vec<IndexMap<String, PhpMixed>>,
+        minimum_stability: &str,
+        stability_flags: IndexMap<String, i64>,
+        prefer_stable: bool,
+        prefer_lowest: bool,
+        platform_overrides: IndexMap<String, PhpMixed>,
+        write: bool,
+    ) -> Result<bool> {
+        self.set_lock_data(
+            packages,
+            dev_packages,
+            platform_reqs,
+            platform_dev_reqs,
+            aliases,
+            minimum_stability,
+            stability_flags,
+            prefer_stable,
+            prefer_lowest,
+            platform_overrides,
+            write,
+        )
+    }
+
+    fn update_hash(
+        &mut self,
+        composer_json: &JsonFile,
+        data_processor: Option<
+            Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
+        >,
+    ) -> Result<()> {
+        self.update_hash(composer_json, data_processor)
+    }
+
+    fn get_missing_requirement_info(
+        &mut self,
+        package: RootPackageInterfaceHandle,
+        include_dev: bool,
+    ) -> Result<Vec<String>> {
+        self.get_missing_requirement_info(package, include_dev)
     }
 }
 

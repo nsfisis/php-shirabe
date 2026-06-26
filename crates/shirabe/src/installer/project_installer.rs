@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Installer/ProjectInstaller.php
 
-use crate::downloader::DownloadManager;
+use crate::downloader::DownloadManagerInterface;
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
@@ -10,14 +10,14 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 #[derive(Debug)]
 pub struct ProjectInstaller {
     install_path: String,
-    download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+    download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
 }
 
 impl ProjectInstaller {
     pub fn new(
         install_path: &str,
-        dm: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        dm: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
         let install_path = format!("{}/", install_path.replace('\\', "/").trim_end_matches('/'));

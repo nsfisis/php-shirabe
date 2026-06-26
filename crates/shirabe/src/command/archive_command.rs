@@ -19,7 +19,7 @@ use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::archiver::ArchiveManager;
+use crate::package::archiver::ArchiveManagerInterface;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
 use crate::plugin::CommandEvent;
@@ -222,31 +222,32 @@ impl ArchiveCommand {
         let mut owned_archive_manager;
         let composer_archive_manager;
         let mut composer_archive_manager_ref;
-        let archive_manager: &mut ArchiveManager = if let Some(composer) = &composer_guard {
-            composer_archive_manager = composer.get_archive_manager().clone();
-            composer_archive_manager_ref = composer_archive_manager.borrow_mut();
-            &mut composer_archive_manager_ref
-        } else {
-            let factory = Factory;
-            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
-            let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-                Factory::create_http_downloader(io.clone(), config, indexmap::IndexMap::new())?,
-            ));
-            let download_manager = factory.create_download_manager(
-                io.clone(),
-                config,
-                &http_downloader,
-                &process,
-                None,
-            )?;
-            let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-                http_downloader.clone(),
-                Some(process),
-            )));
-            owned_archive_manager =
-                factory.create_archive_manager(&config.borrow(), &download_manager, &loop_)?;
-            &mut owned_archive_manager
-        };
+        let archive_manager: &mut dyn ArchiveManagerInterface =
+            if let Some(composer) = &composer_guard {
+                composer_archive_manager = composer.get_archive_manager().clone();
+                composer_archive_manager_ref = composer_archive_manager.borrow_mut();
+                &mut *composer_archive_manager_ref
+            } else {
+                let factory = Factory;
+                let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+                let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+                    Factory::create_http_downloader(io.clone(), config, indexmap::IndexMap::new())?,
+                ));
+                let download_manager = factory.create_download_manager(
+                    io.clone(),
+                    config,
+                    &http_downloader,
+                    &process,
+                    None,
+                )?;
+                let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
+                    http_downloader.clone(),
+                    Some(process),
+                )));
+                owned_archive_manager =
+                    factory.create_archive_manager(&config.borrow(), &download_manager, &loop_)?;
+                &mut owned_archive_manager
+            };
 
         let package: crate::package::CompletePackageInterfaceHandle =
             if let Some(name) = package_name {

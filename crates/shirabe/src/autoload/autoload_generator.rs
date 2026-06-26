@@ -21,12 +21,12 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::installer::InstallationManager;
+use crate::installer::InstallationManagerInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::json::JsonFile;
-use crate::package::Locker;
+use crate::package::LockerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
@@ -107,11 +107,11 @@ impl AutoloadGenerator {
         config: &Config,
         local_repo: &mut dyn InstalledRepositoryInterface,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: &mut InstallationManager,
+        installation_manager: &mut dyn InstallationManagerInterface,
         target_dir: &str,
         scan_psr_packages: bool,
         suffix: Option<String>,
-        locker: Option<&mut Locker>,
+        locker: Option<&mut dyn LockerInterface>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         let mut scan_psr_packages = scan_psr_packages;
@@ -732,7 +732,7 @@ impl AutoloadGenerator {
 
     pub fn build_package_map(
         &self,
-        installation_manager: &mut InstallationManager,
+        installation_manager: &mut dyn InstallationManagerInterface,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
@@ -1927,6 +1927,132 @@ impl AutoloadGenerator {
         }
 
         sorted_package_map
+    }
+}
+
+// Composer's Composer::setAutoloadGenerator() accepts any AutoloadGenerator subclass, so plugins
+// may swap in a replacement. The interface captures the methods reached through Composer's accessor
+// and through the `Rc<RefCell<dyn AutoloadGeneratorInterface>>` references fed from it.
+pub trait AutoloadGeneratorInterface: std::fmt::Debug {
+    fn set_dev_mode(&mut self, dev_mode: bool);
+    fn set_class_map_authoritative(&mut self, class_map_authoritative: bool);
+    fn set_apcu(&mut self, apcu: bool, apcu_prefix: Option<String>);
+    fn set_run_scripts(&mut self, run_scripts: bool);
+    fn set_dry_run(&mut self, dry_run: bool);
+    fn set_platform_requirement_filter(
+        &mut self,
+        platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
+    );
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
+    fn dump(
+        &mut self,
+        config: &Config,
+        local_repo: &mut dyn InstalledRepositoryInterface,
+        root_package: RootPackageInterfaceHandle,
+        installation_manager: &mut dyn InstallationManagerInterface,
+        target_dir: &str,
+        scan_psr_packages: bool,
+        suffix: Option<String>,
+        locker: Option<&mut dyn LockerInterface>,
+        strict_ambiguous: bool,
+    ) -> anyhow::Result<ClassMap>;
+    fn build_package_map(
+        &self,
+        installation_manager: &mut dyn InstallationManagerInterface,
+        root_package: RootPackageInterfaceHandle,
+        packages: Vec<PackageInterfaceHandle>,
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>>;
+    fn parse_autoloads(
+        &self,
+        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        root_package: RootPackageInterfaceHandle,
+        filtered_dev_packages: PhpMixed,
+    ) -> IndexMap<String, PhpMixed>;
+    fn create_loader(
+        &self,
+        autoloads: &IndexMap<String, PhpMixed>,
+        vendor_dir: Option<String>,
+    ) -> ClassLoader;
+}
+
+impl AutoloadGeneratorInterface for AutoloadGenerator {
+    fn set_dev_mode(&mut self, dev_mode: bool) {
+        self.set_dev_mode(dev_mode);
+    }
+
+    fn set_class_map_authoritative(&mut self, class_map_authoritative: bool) {
+        self.set_class_map_authoritative(class_map_authoritative);
+    }
+
+    fn set_apcu(&mut self, apcu: bool, apcu_prefix: Option<String>) {
+        self.set_apcu(apcu, apcu_prefix);
+    }
+
+    fn set_run_scripts(&mut self, run_scripts: bool) {
+        self.set_run_scripts(run_scripts);
+    }
+
+    fn set_dry_run(&mut self, dry_run: bool) {
+        self.set_dry_run(dry_run);
+    }
+
+    fn set_platform_requirement_filter(
+        &mut self,
+        platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
+    ) {
+        self.set_platform_requirement_filter(platform_requirement_filter);
+    }
+
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
+    fn dump(
+        &mut self,
+        config: &Config,
+        local_repo: &mut dyn InstalledRepositoryInterface,
+        root_package: RootPackageInterfaceHandle,
+        installation_manager: &mut dyn InstallationManagerInterface,
+        target_dir: &str,
+        scan_psr_packages: bool,
+        suffix: Option<String>,
+        locker: Option<&mut dyn LockerInterface>,
+        strict_ambiguous: bool,
+    ) -> anyhow::Result<ClassMap> {
+        self.dump(
+            config,
+            local_repo,
+            root_package,
+            installation_manager,
+            target_dir,
+            scan_psr_packages,
+            suffix,
+            locker,
+            strict_ambiguous,
+        )
+    }
+
+    fn build_package_map(
+        &self,
+        installation_manager: &mut dyn InstallationManagerInterface,
+        root_package: RootPackageInterfaceHandle,
+        packages: Vec<PackageInterfaceHandle>,
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
+        self.build_package_map(installation_manager, root_package, packages)
+    }
+
+    fn parse_autoloads(
+        &self,
+        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        root_package: RootPackageInterfaceHandle,
+        filtered_dev_packages: PhpMixed,
+    ) -> IndexMap<String, PhpMixed> {
+        self.parse_autoloads(package_map, root_package, filtered_dev_packages)
+    }
+
+    fn create_loader(
+        &self,
+        autoloads: &IndexMap<String, PhpMixed>,
+        vendor_dir: Option<String>,
+    ) -> ClassLoader {
+        self.create_loader(autoloads, vendor_dir)
     }
 }
 

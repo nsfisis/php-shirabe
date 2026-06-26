@@ -3,15 +3,15 @@
 
 use shirabe_external_packages::composer::pcre::Preg;
 
-use crate::autoload::AutoloadGenerator;
+use crate::autoload::AutoloadGeneratorInterface;
 use crate::config::Config;
-use crate::downloader::DownloadManager;
-use crate::event_dispatcher::EventDispatcher;
-use crate::installer::InstallationManager;
-use crate::package::archiver::ArchiveManager;
-use crate::package::{Locker, RootPackageInterfaceHandle};
+use crate::downloader::DownloadManagerInterface;
+use crate::event_dispatcher::EventDispatcherInterface;
+use crate::installer::InstallationManagerInterface;
+use crate::package::archiver::ArchiveManagerInterface;
+use crate::package::{LockerInterface, RootPackageInterfaceHandle};
 use crate::plugin::PluginManager;
-use crate::repository::RepositoryManager;
+use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
 
 // TODO: change this information to Shirabe version.
@@ -37,10 +37,10 @@ pub struct PartialComposer {
     global: bool,
     package: Option<RootPackageInterfaceHandle>,
     r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
-    repository_manager: Option<std::rc::Rc<std::cell::RefCell<RepositoryManager>>>,
-    installation_manager: Option<std::rc::Rc<std::cell::RefCell<InstallationManager>>>,
+    repository_manager: Option<std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>>,
+    installation_manager: Option<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>,
     config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
 }
 
 impl PartialComposer {
@@ -70,34 +70,40 @@ impl PartialComposer {
 
     pub fn set_repository_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
     ) {
         self.repository_manager = Some(manager);
     }
 
-    pub fn get_repository_manager(&self) -> std::rc::Rc<std::cell::RefCell<RepositoryManager>> {
+    pub fn get_repository_manager(
+        &self,
+    ) -> std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
         self.repository_manager.as_ref().unwrap().clone()
     }
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
     ) {
         self.installation_manager = Some(manager);
     }
 
-    pub fn get_installation_manager(&self) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
+    pub fn get_installation_manager(
+        &self,
+    ) -> std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
         self.installation_manager.as_ref().unwrap().clone()
     }
 
     pub fn set_event_dispatcher(
         &mut self,
-        event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+        event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
     ) {
         self.event_dispatcher = Some(event_dispatcher);
     }
 
-    pub fn get_event_dispatcher(&self) -> std::rc::Rc<std::cell::RefCell<EventDispatcher>> {
+    pub fn get_event_dispatcher(
+        &self,
+    ) -> std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
         self.event_dispatcher.as_ref().unwrap().clone()
     }
 
@@ -114,12 +120,12 @@ impl PartialComposer {
 #[derive(Debug)]
 pub struct Composer {
     partial: PartialComposer,
-    locker: Option<std::rc::Rc<std::cell::RefCell<Locker>>>,
-    download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>>,
+    locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+    download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     // TODO(plugin): plugin_manager is part of the plugin API
     plugin_manager: Option<std::rc::Rc<std::cell::RefCell<PluginManager>>>,
-    autoload_generator: Option<std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>>,
-    archive_manager: Option<std::rc::Rc<std::cell::RefCell<ArchiveManager>>>,
+    autoload_generator: Option<std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>>,
+    archive_manager: Option<std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>>>,
 }
 
 impl Default for Composer {
@@ -140,33 +146,37 @@ impl Composer {
         }
     }
 
-    pub fn set_locker(&mut self, locker: std::rc::Rc<std::cell::RefCell<Locker>>) {
+    pub fn set_locker(&mut self, locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>) {
         self.locker = Some(locker);
     }
 
-    pub fn get_locker(&self) -> std::rc::Rc<std::cell::RefCell<Locker>> {
+    pub fn get_locker(&self) -> std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
         self.locker.as_ref().unwrap().clone()
     }
 
     pub fn set_download_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     ) {
         self.download_manager = Some(manager);
     }
 
-    pub fn get_download_manager(&self) -> std::rc::Rc<std::cell::RefCell<DownloadManager>> {
+    pub fn get_download_manager(
+        &self,
+    ) -> std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
         self.download_manager.as_ref().unwrap().clone()
     }
 
     pub fn set_archive_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<ArchiveManager>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>>,
     ) {
         self.archive_manager = Some(manager);
     }
 
-    pub fn get_archive_manager(&self) -> std::rc::Rc<std::cell::RefCell<ArchiveManager>> {
+    pub fn get_archive_manager(
+        &self,
+    ) -> std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>> {
         self.archive_manager.as_ref().unwrap().clone()
     }
 
@@ -182,12 +192,14 @@ impl Composer {
 
     pub fn set_autoload_generator(
         &mut self,
-        autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
+        autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     ) {
         self.autoload_generator = Some(autoload_generator);
     }
 
-    pub fn get_autoload_generator(&self) -> std::rc::Rc<std::cell::RefCell<AutoloadGenerator>> {
+    pub fn get_autoload_generator(
+        &self,
+    ) -> std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> {
         self.autoload_generator.as_ref().unwrap().clone()
     }
 
@@ -225,40 +237,45 @@ impl Composer {
 
     pub fn set_repository_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<crate::repository::RepositoryManager>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>>,
     ) {
         self.partial.set_repository_manager(manager);
     }
 
     pub fn get_repository_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<crate::repository::RepositoryManager>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>> {
         self.partial.get_repository_manager()
     }
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<crate::installer::InstallationManager>>,
+        manager: std::rc::Rc<
+            std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>,
+        >,
     ) {
         self.partial.set_installation_manager(manager);
     }
 
     pub fn get_installation_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<crate::installer::InstallationManager>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>> {
         self.partial.get_installation_manager()
     }
 
     pub fn set_event_dispatcher(
         &mut self,
-        dispatcher: std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>>,
+        dispatcher: std::rc::Rc<
+            std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
+        >,
     ) {
         self.partial.set_event_dispatcher(dispatcher);
     }
 
     pub fn get_event_dispatcher(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>
+    {
         self.partial.get_event_dispatcher()
     }
 
@@ -366,7 +383,7 @@ impl PartialOrFullComposer {
 
     pub fn set_repository_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<crate::repository::RepositoryManager>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>>,
     ) {
         match self {
             Self::Full(full) => full.set_repository_manager(manager),
@@ -376,7 +393,7 @@ impl PartialOrFullComposer {
 
     pub fn get_repository_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<crate::repository::RepositoryManager>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>> {
         match self {
             Self::Full(full) => full.get_repository_manager(),
             Self::Partial(partial) => partial.get_repository_manager(),
@@ -385,7 +402,9 @@ impl PartialOrFullComposer {
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<crate::installer::InstallationManager>>,
+        manager: std::rc::Rc<
+            std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>,
+        >,
     ) {
         match self {
             Self::Full(full) => full.set_installation_manager(manager),
@@ -395,7 +414,7 @@ impl PartialOrFullComposer {
 
     pub fn get_installation_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<crate::installer::InstallationManager>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>> {
         match self {
             Self::Full(full) => full.get_installation_manager(),
             Self::Partial(partial) => partial.get_installation_manager(),
@@ -404,7 +423,9 @@ impl PartialOrFullComposer {
 
     pub fn set_event_dispatcher(
         &mut self,
-        dispatcher: std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>>,
+        dispatcher: std::rc::Rc<
+            std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
+        >,
     ) {
         match self {
             Self::Full(full) => full.set_event_dispatcher(dispatcher),
@@ -414,7 +435,8 @@ impl PartialOrFullComposer {
 
     pub fn get_event_dispatcher(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>
+    {
         match self {
             Self::Full(full) => full.get_event_dispatcher(),
             Self::Partial(partial) => partial.get_event_dispatcher(),

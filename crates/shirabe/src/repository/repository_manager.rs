@@ -196,3 +196,46 @@ impl RepositoryManager {
         self.local_repository.clone().unwrap()
     }
 }
+
+// Composer's PartialComposer::setRepositoryManager() accepts any RepositoryManager subclass, so
+// plugins may swap in a replacement. The interface captures the methods reached through Composer's
+// accessor and through the `&mut RepositoryManager` parameters fed from it.
+pub trait RepositoryManagerInterface: std::fmt::Debug {
+    fn get_local_repository(&self) -> RepositoryInterfaceHandle;
+    fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+    fn create_repository(
+        &self,
+        r#type: &str,
+        config: IndexMap<String, PhpMixed>,
+        name: Option<&str>,
+    ) -> anyhow::Result<RepositoryInterfaceHandle>;
+    fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
+    fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+}
+
+impl RepositoryManagerInterface for RepositoryManager {
+    fn get_local_repository(&self) -> RepositoryInterfaceHandle {
+        self.get_local_repository()
+    }
+
+    fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
+        self.get_repositories()
+    }
+
+    fn create_repository(
+        &self,
+        r#type: &str,
+        config: IndexMap<String, PhpMixed>,
+        name: Option<&str>,
+    ) -> anyhow::Result<RepositoryInterfaceHandle> {
+        self.create_repository(r#type, config, name)
+    }
+
+    fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {
+        self.add_repository(repository);
+    }
+
+    fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle) {
+        self.set_local_repository(repository);
+    }
+}

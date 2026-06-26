@@ -2383,7 +2383,7 @@ impl ApplicationHandle {
 
                                     let installation_manager = composer.get_installation_manager();
                                     let package_map = generator.build_package_map(
-                                        &mut installation_manager.borrow_mut(),
+                                        &mut *installation_manager.borrow_mut(),
                                         root_package.clone(),
                                         vec![],
                                     )?;
