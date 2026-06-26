@@ -72,10 +72,15 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
             expected: "<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid",
         },
         ValidateCase {
+            // WORDING NOTE: upstream asserts justinrainbow's property-prefixed strings
+            // "- name : The property name is required" / "- description : The property description
+            // is required". The jsonschema crate reports the same required violations as
+            // "\"name\" is a required property" (no property prefix; the property name is embedded
+            // in the message). Matches the divergence already accepted in json_file_test.
             name: "passing but with warnings",
             composer_json: publish_data_stripped.clone(),
             command: vec![],
-            expected: "./composer.json is valid for simple usage with Composer but has\nstrict errors that make it unable to be published as a package\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n# Publish errors\n- name : The property name is required\n- description : The property description is required\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+            expected: "./composer.json is valid for simple usage with Composer but has\nstrict errors that make it unable to be published as a package\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n# Publish errors\n- \"name\" is a required property\n- \"description\" is a required property\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
         },
         ValidateCase {
             name: "passing without publish-check",
@@ -88,9 +93,6 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
 
 #[test]
 #[serial]
-#[ignore = "validate creates a Composer instance (Factory::create_composer) which panics in \
-            PartialComposerHandle::borrow_partial at crates/shirabe/src/composer.rs:446 \
-            ('RefCell already mutably borrowed'); source-level borrow conflict, not a test issue"]
 fn test_validate() {
     for case in provide_validate_tests() {
         let _tear_down = init_temp_composer(Some(&case.composer_json), None, None, true);
@@ -130,9 +132,6 @@ fn test_validate_on_file_issues() {
 
 #[test]
 #[serial]
-#[ignore = "validate with a lock file creates a Composer instance (Factory::create_composer) which \
-            panics in PartialComposerHandle::borrow_partial at crates/shirabe/src/composer.rs:446 \
-            ('RefCell already mutably borrowed'); source-level borrow conflict, not a test issue"]
 fn test_with_composer_lock() {
     let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
     create_composer_lock(&[], &[]);

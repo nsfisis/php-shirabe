@@ -197,7 +197,7 @@ impl Command for ValidateCommand {
         let mut lock_errors: Vec<String> = vec![];
         let composer =
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?;
-        let composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full(&composer);
         let check_lock = (check_lock
             && composer
                 .get_config()
