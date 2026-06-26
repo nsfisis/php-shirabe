@@ -529,24 +529,6 @@ pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
     todo!()
 }
 
-thread_local! {
-    static SHUTDOWN_FUNCTIONS: std::cell::RefCell<Vec<Box<dyn Fn()>>> =
-        const { std::cell::RefCell::new(Vec::new()) };
-}
-
-pub fn register_shutdown_function(callback: Box<dyn Fn()>) {
-    SHUTDOWN_FUNCTIONS.with(|f| f.borrow_mut().push(callback));
-}
-
-// Runs the registered shutdown functions in registration order, mirroring PHP
-// executing them at the end of the request. Must be invoked at every process exit.
-pub fn run_shutdown_functions() {
-    let functions = SHUTDOWN_FUNCTIONS.with(|f| std::mem::take(&mut *f.borrow_mut()));
-    for callback in &functions {
-        callback();
-    }
-}
-
 pub fn composer_dev_warning_time() -> i64 {
     // TODO(phase-d): COMPOSER_DEV_WARNING_TIME is a build-time constant baked into Composer's release
     // artifact; it has no fixed value in source and must be provided by the build process.
@@ -590,8 +572,6 @@ pub fn phpinfo(_what: i64) {
 }
 
 pub fn exit(status: i64) -> ! {
-    // PHP runs registered shutdown functions before terminating.
-    run_shutdown_functions();
     std::process::exit(status as i32);
 }
 

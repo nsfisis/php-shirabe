@@ -45,12 +45,12 @@ use shirabe_external_packages::symfony::process::exception::ProcessTimedOutExcep
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
     RuntimeException, bin2hex, chdir, date_default_timezone_get, date_default_timezone_set,
-    defined, dirname, disk_free_space, error_get_last, extension_loaded, file_exists,
-    file_get_contents, file_put_contents, function_exists, getcwd, getmypid, glob, in_array,
-    ini_set, is_array, is_dir, is_file, is_string, is_subclass_of, json_decode,
-    memory_get_peak_usage, memory_get_usage, microtime, php_uname, posix_getuid, random_bytes,
-    realpath, register_shutdown_function, restore_error_handler, round, str_contains, str_replace,
-    strpos, strtoupper, sys_get_temp_dir, time, unlink,
+    defined, dirname, disk_free_space, extension_loaded, file_exists, file_get_contents,
+    file_put_contents, function_exists, getcwd, getmypid, glob, in_array, ini_set, is_array,
+    is_dir, is_file, is_string, is_subclass_of, json_decode, memory_get_peak_usage,
+    memory_get_usage, microtime, php_uname, posix_getuid, random_bytes, realpath,
+    restore_error_handler, round, str_contains, str_replace, strpos, strtoupper, sys_get_temp_dir,
+    time, unlink,
 };
 
 use crate::command::AboutCommand;
@@ -148,7 +148,6 @@ impl Application {
 "#;
 
     pub fn new(name: String, mut version: String) -> Self {
-        static SHUTDOWN_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         if version.is_empty() {
             version = composer::get_version();
         }
@@ -167,23 +166,10 @@ impl Application {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
-        SHUTDOWN_REGISTERED.get_or_init(|| {
-            register_shutdown_function(Box::new(|| {
-                let last_error = error_get_last();
-
-                let message = last_error
-                    .as_ref()
-                    .and_then(|m| m.get("message"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("");
-                if !message.is_empty()
-                    && (strpos(message, "Allowed memory").is_some()
-                        || strpos(message, "exceeded memory").is_some())
-                {
-                    println!("\nCheck https://getcomposer.org/doc/articles/troubleshooting.md#memory-limit-errors for more info on how to handle out of memory errors.");
-                }
-            }));
-        });
+        // TODO(phase-d): Composer registers shutdown function that reports special message for
+        // OOM. In Shirabe, limit of memory allocation has effect only on PHP side so that the
+        // corresponding shutdown function should be registered in PHP runtime, not here.
+        // if (!$shutdownRegistered) { ... }
 
         let initial_working_directory = getcwd();
 

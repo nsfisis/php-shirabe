@@ -1,6 +1,6 @@
 //! ref: composer/bin/composer
 
-use shirabe_php_shim::{PHP_ENV, PHP_SERVER, run_shutdown_functions};
+use shirabe_php_shim::{PHP_ENV, PHP_SERVER};
 
 fn main() {
     // Take the $_ENV / $_SERVER snapshots before any putenv() mutates the real environment.
@@ -9,7 +9,6 @@ fn main() {
     std::sync::LazyLock::force(&PHP_SERVER);
 
     let result = shirabe::run(std::env::args().collect());
-    run_shutdown_functions();
     let mut exit_code = match result {
         Ok(exit_code) => exit_code,
         Err(e) => {
