@@ -218,7 +218,7 @@ impl ArchiveCommand {
         ignore_filters: bool,
         composer: Option<&PartialComposerHandle>,
     ) -> Result<i64> {
-        let composer_guard = composer.map(crate::command::composer_full);
+        let composer_guard = composer.map(crate::composer::composer_full);
         let mut owned_archive_manager;
         let composer_archive_manager;
         let mut composer_archive_manager_ref;
@@ -256,7 +256,7 @@ impl ArchiveCommand {
                 }
             } else {
                 let rc = self.require_composer(None, None)?;
-                let composer = crate::command::composer_full(&rc);
+                let composer = crate::composer::composer_full(&rc);
                 composer.get_package().clone().into()
             };
 
@@ -299,7 +299,7 @@ impl ArchiveCommand {
         let repo;
 
         if let Some(composer) = self.try_composer(None, None) {
-            let composer = crate::command::composer_full(&composer);
+            let composer = crate::composer::composer_full(&composer);
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();

@@ -84,7 +84,7 @@ impl Command for ReinstallCommand {
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full(&composer);
+        let composer = crate::composer::composer_full(&composer);
         let io = self.get_io();
 
         let repository_manager = composer.get_repository_manager().clone();

@@ -111,7 +111,7 @@ impl HomeCommand {
         let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {
-            let composer = crate::command::composer_full(&composer);
+            let composer = crate::composer::composer_full(&composer);
             let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![];
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
                 RootPackageRepository::new(crate::package::RootPackageInterfaceHandle::dup(
@@ -199,7 +199,7 @@ impl Command for HomeCommand {
         let packages = if packages.is_empty() {
             io.write_error("No package specified, opening homepage for the root package");
             let composer_rc = self.require_composer(None, None)?;
-            let composer_ref = crate::command::composer_full(&composer_rc);
+            let composer_ref = crate::composer::composer_full(&composer_rc);
             vec![composer_ref.get_package().get_name().to_string()]
         } else {
             packages

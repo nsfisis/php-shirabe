@@ -2390,7 +2390,7 @@ impl ApplicationHandle {
                                 let composer_opt =
                                     application.borrow_mut().get_composer(false, None, None)?;
                                 if let Some(composer) = composer_opt {
-                                    let composer = crate::command::composer_full(&composer);
+                                    let composer = crate::composer::composer_full(&composer);
                                     let root_package = composer.get_package();
                                     let generator = composer.get_autoload_generator().clone();
                                     let generator = generator.borrow();

@@ -114,7 +114,7 @@ impl Command for SuggestsCommand {
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::composer::composer_full(&composer);
 
         let mut installed_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(RootPackageRepository::new(

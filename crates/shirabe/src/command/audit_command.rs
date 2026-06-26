@@ -127,7 +127,7 @@ impl Command for AuditCommand {
             return Ok(0);
         }
 
-        let composer = crate::command::composer_full(&composer);
+        let composer = crate::composer::composer_full(&composer);
         let auditor = Auditor;
         let mut repo_set = RepositorySet::new(
             "stable",
@@ -245,7 +245,7 @@ impl AuditCommand {
         composer: &PartialComposerHandle,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<Vec<crate::package::PackageInterfaceHandle>> {
-        let composer = crate::command::composer_full_mut(composer);
+        let composer = crate::composer::composer_full(composer);
         if input
             .borrow()
             .get_option("locked")?

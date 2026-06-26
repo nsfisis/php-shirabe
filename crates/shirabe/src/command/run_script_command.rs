@@ -84,7 +84,7 @@ impl RunScriptCommand {
 
     fn get_scripts(&self) -> Result<Vec<(String, String)>> {
         let composer = self.require_composer(None, None)?;
-        let scripts = crate::command::composer_full(&composer)
+        let scripts = crate::composer::composer_full(&composer)
             .get_package()
             .get_scripts();
         drop(composer);
@@ -257,7 +257,7 @@ impl Command for RunScriptCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let dispatcher = crate::command::composer_full(&composer)
+        let dispatcher = crate::composer::composer_full(&composer)
             .get_event_dispatcher()
             .clone();
         let dev_mode = input.borrow().get_option("dev")?.as_bool().unwrap_or(false)

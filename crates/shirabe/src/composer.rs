@@ -557,11 +557,3 @@ pub fn composer_full(composer: &PartialComposerHandle) -> std::cell::Ref<'_, Com
             .expect("a fully loaded Composer is required here")
     })
 }
-
-/// Mutably borrows a polymorphic `PartialComposer` as a fully-loaded `Composer`. See [`composer_full`].
-pub fn composer_full_mut(composer: &PartialComposerHandle) -> std::cell::RefMut<'_, Composer> {
-    std::cell::RefMut::map(composer.as_rc().borrow_mut(), |c| {
-        c.as_full_mut()
-            .expect("a fully loaded Composer is required here")
-    })
-}

@@ -110,7 +110,7 @@ impl Command for ScriptAliasCommand {
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let dispatcher = crate::command::composer_full(&composer)
+        let dispatcher = crate::composer::composer_full(&composer)
             .get_event_dispatcher()
             .clone();
 

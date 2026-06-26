@@ -100,7 +100,7 @@ impl BumpCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::composer::composer_full(&composer);
         let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
             || composer
                 .get_config()

@@ -324,7 +324,7 @@ impl Command for ShowCommand {
         // init repos
         let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
         if let Some(ref composer) = composer {
-            let composer = crate::command::composer_full(composer);
+            let composer = crate::composer::composer_full(composer);
             if let Some(p) = composer
                 .get_config()
                 .borrow()
@@ -387,7 +387,7 @@ impl Command for ShowCommand {
         } else if input.borrow().get_option("available")?.as_bool() == Some(true) {
             let mut ir = InstalledRepository::new(vec![platform_repo.clone().into()]);
             if let Some(ref composer) = composer {
-                let composer = crate::command::composer_full(composer);
+                let composer = crate::composer::composer_full(composer);
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     composer
                         .get_repository_manager()
@@ -416,7 +416,7 @@ impl Command for ShowCommand {
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             }
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
-            let composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
+            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
             let local_repo = composer_ref
                 .get_repository_manager()
                 .borrow()
@@ -473,7 +473,7 @@ impl Command for ShowCommand {
             repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
         } else if input.borrow().get_option("locked")?.as_bool() == Some(true) {
             if composer.is_none()
-                || !crate::command::composer_full_mut(composer.as_ref().unwrap())
+                || !crate::composer::composer_full(composer.as_ref().unwrap())
                     .get_locker()
                     .borrow_mut()
                     .is_locked()
@@ -484,7 +484,7 @@ impl Command for ShowCommand {
                 }
                 .into());
             }
-            let composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
+            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
             let locker_rc = composer_ref.get_locker().clone();
             let mut locker = locker_rc.borrow_mut();
             let lr = locker.get_locked_repository(
@@ -508,12 +508,12 @@ impl Command for ShowCommand {
             let _guard_from_existing;
             let composer_local = match composer.as_ref() {
                 Some(c) => {
-                    _guard_from_existing = crate::command::composer_full(c);
+                    _guard_from_existing = crate::composer::composer_full(c);
                     &*_guard_from_existing
                 }
                 None => {
                     composer_local_owned = self.require_composer(None, None)?;
-                    _guard_from_existing = crate::command::composer_full(&composer_local_owned);
+                    _guard_from_existing = crate::composer::composer_full(&composer_local_owned);
                     &*_guard_from_existing
                 }
             };
@@ -586,7 +586,7 @@ impl Command for ShowCommand {
         }
 
         if let Some(ref composer) = composer {
-            let composer = crate::command::composer_full(composer);
+            let composer = crate::composer::composer_full(composer);
             let mut command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "show",
@@ -1629,7 +1629,7 @@ impl ShowCommand {
             None => return vec![],
             Some(c) => c,
         };
-        let composer = crate::command::composer_full(&composer_rc);
+        let composer = crate::composer::composer_full(&composer_rc);
 
         let root_package = composer.get_package();
 
@@ -2741,7 +2741,7 @@ impl ShowCommand {
         // find the latest version allowed in this repo set
         let name = package.get_name();
         let repo_set = self.get_repository_set(composer)?;
-        let composer_ref = crate::command::composer_full(composer);
+        let composer_ref = crate::composer::composer_full(composer);
         let mut version_selector =
             VersionSelector::new(repo_set, Some(&mut *platform_repo.borrow_mut()))?;
         let mut stability = composer_ref
@@ -2862,7 +2862,7 @@ impl ShowCommand {
         &self,
         composer: &PartialComposerHandle,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
-        let composer = crate::command::composer_full(composer);
+        let composer = crate::composer::composer_full(composer);
         if self.repository_set.borrow().is_none() {
             let mut rs = RepositorySet::new(
                 &composer.get_package().get_minimum_stability(),

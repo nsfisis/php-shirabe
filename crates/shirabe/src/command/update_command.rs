@@ -117,7 +117,7 @@ impl Command for UpdateCommand {
         }
 
         let composer_handle = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full(&composer_handle);
+        let composer = crate::composer::composer_full(&composer_handle);
 
         if !HttpDownloader::is_curl_enabled() {
             io.write_error3(
@@ -578,7 +578,7 @@ impl UpdateCommand {
             .into());
         }
 
-        let composer_ref = crate::command::composer_full(composer);
+        let composer_ref = crate::composer::composer_full(composer);
         let platform_req_filter = self.get_platform_requirement_filter(input);
         let stability_flags = composer_ref.get_package().get_stability_flags();
         let requires = array_merge_map(
@@ -715,7 +715,7 @@ impl UpdateCommand {
     }
 
     fn create_version_selector(&self, composer: &PartialComposerHandle) -> Result<VersionSelector> {
-        let composer = crate::command::composer_full(composer);
+        let composer = crate::composer::composer_full(composer);
         let root_aliases: Vec<crate::repository::RootAliasInput> = composer
             .get_package()
             .get_aliases()

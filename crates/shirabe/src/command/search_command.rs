@@ -138,7 +138,7 @@ impl Command for SearchCommand {
         } else {
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?
         };
-        let composer_ref = crate::command::composer_full(&composer);
+        let composer_ref = crate::composer::composer_full(&composer);
         let local_repo = composer_ref
             .get_repository_manager()
             .borrow()

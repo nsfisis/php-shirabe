@@ -218,7 +218,7 @@ impl Command for RemoveCommand {
             .unwrap_or(false)
         {
             let composer = self.require_composer(None, None)?;
-            let composer = crate::command::composer_full_mut(&composer);
+            let composer = crate::composer::composer_full(&composer);
             {
                 let locker = composer.get_locker().clone();
                 let mut locker = locker.borrow_mut();
@@ -475,7 +475,7 @@ impl Command for RemoveCommand {
 
         // TODO(plugin): deactivate installed plugins
         if let Some(composer_opt) = self.try_composer(None, None) {
-            let composer_opt = crate::command::composer_full(&composer_opt);
+            let composer_opt = crate::composer::composer_full(&composer_opt);
             composer_opt
                 .get_plugin_manager()
                 .borrow_mut()
@@ -484,7 +484,7 @@ impl Command for RemoveCommand {
 
         self.reset_composer();
         let composer_handle = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full(&composer_handle);
+        let composer = crate::composer::composer_full(&composer_handle);
 
         if dry_run {
             let root_package = composer.get_package();

@@ -44,7 +44,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         inverted: bool,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::composer::composer_full(&composer);
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.get_name(), input, output) via composer.get_event_dispatcher()
 
         let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =

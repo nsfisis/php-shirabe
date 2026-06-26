@@ -372,11 +372,11 @@ impl CreateProjectCommand {
             && add_repository
         {
             for (index, repo) in repos.iter().enumerate() {
-                let config = crate::command::composer_full(&composer_handle).get_config();
+                let config = crate::composer::composer_full(&composer_handle).get_config();
                 let repo_config =
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let composer_json_repositories_config =
-                    crate::command::composer_full(&composer_handle)
+                    crate::composer::composer_full(&composer_handle)
                         .get_config()
                         .borrow()
                         .get_repositories();
@@ -426,7 +426,7 @@ impl CreateProjectCommand {
             }
         }
 
-        let composer = crate::command::composer_full_mut(&composer_handle);
+        let composer = crate::composer::composer_full(&composer_handle);
 
         let process = composer
             .get_loop()
@@ -804,7 +804,7 @@ impl CreateProjectCommand {
             disable_plugins,
             Some(disable_scripts),
         )?;
-        let composer = crate::command::composer_full(&composer_handle);
+        let composer = crate::composer::composer_full(&composer_handle);
         let config = composer.get_config();
         // set the base dir here again on the new config instance, as otherwise in case the vendor dir is defined in an env var for example it would still override the value set above by $config->all()
         config.borrow_mut().set_base_dir(Some(directory.clone()));

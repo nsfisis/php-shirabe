@@ -108,7 +108,7 @@ impl Command for DiagnoseCommand {
 
         let config: std::rc::Rc<std::cell::RefCell<Config>>;
         if let Some(ref mut c) = composer {
-            let c = crate::command::composer_full(c);
+            let c = crate::composer::composer_full(c);
             config = c.get_config().clone();
 
             let command_event = CommandEvent::new6(
@@ -267,7 +267,7 @@ impl Command for DiagnoseCommand {
         ));
 
         if let Some(ref mut c) = composer {
-            let c = crate::command::composer_full_mut(c);
+            let c = crate::composer::composer_full(c);
             io.write(&format!(
                 "Active plugins: {}",
                 implode(

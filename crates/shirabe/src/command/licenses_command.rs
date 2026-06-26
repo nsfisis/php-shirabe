@@ -112,7 +112,7 @@ impl Command for LicensesCommand {
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let composer = crate::command::composer_full_mut(&composer_handle);
+        let composer = crate::composer::composer_full(&composer_handle);
         let root = composer.get_package();
 
         let packages = if input

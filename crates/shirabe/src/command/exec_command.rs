@@ -39,7 +39,7 @@ impl ExecCommand {
 
     fn get_binaries(&self, for_display: bool) -> Result<Vec<String>> {
         let composer = self.require_composer(None, None)?;
-        let composer_ref = crate::command::composer_full_mut(&composer);
+        let composer_ref = crate::composer::composer_full(&composer);
         let bin_dir = composer_ref
             .get_config()
             .borrow_mut()
@@ -155,7 +155,7 @@ impl Command for ExecCommand {
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
-                let bin_dir = crate::command::composer_full_mut(&composer)
+                let bin_dir = crate::composer::composer_full(&composer)
                     .get_config()
                     .borrow_mut()
                     .get("bin-dir")
@@ -188,7 +188,7 @@ impl Command for ExecCommand {
             .unwrap_or("")
             .to_string();
 
-        let dispatcher = crate::command::composer_full(&composer)
+        let dispatcher = crate::composer::composer_full(&composer)
             .get_event_dispatcher()
             .clone();
         dispatcher.borrow_mut().add_listener(

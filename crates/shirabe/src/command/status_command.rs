@@ -52,7 +52,7 @@ impl StatusCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::composer::composer_full(&composer);
         let io = self.get_io().clone();
 
         let mut errors: IndexMap<String, String> = IndexMap::new();
@@ -342,7 +342,7 @@ impl Command for StatusCommand {
     ) -> anyhow::Result<i64> {
         let composer_rc = self.require_composer(None, None)?;
         {
-            let composer = crate::command::composer_full(&composer_rc);
+            let composer = crate::composer::composer_full(&composer_rc);
 
             // TODO(plugin): dispatch CommandEvent
             let command_event =
@@ -366,7 +366,7 @@ impl Command for StatusCommand {
         let exit_code = self.do_execute(input)?;
 
         {
-            let composer = crate::command::composer_full(&composer_rc);
+            let composer = crate::composer::composer_full(&composer_rc);
             composer
                 .get_event_dispatcher()
                 .borrow_mut()

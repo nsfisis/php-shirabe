@@ -278,7 +278,7 @@ impl Command for RequireCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full(&composer);
+        let composer = crate::composer::composer_full(&composer);
         let repository_manager = composer.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();
         let repos = repository_manager.get_repositories();
@@ -753,7 +753,7 @@ impl RequireCommand {
         // Update packages
         self.reset_composer()?;
         let composer_handle = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full_mut(&composer_handle);
+        let composer = crate::composer::composer_full(&composer_handle);
 
         self.dependency_resolution_completed.set(false);
         // PHP: $composer->getEventDispatcher()->addListener(InstallerEvents::PRE_OPERATIONS_EXEC,
@@ -1056,7 +1056,7 @@ impl RequireCommand {
         fixed: bool,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::composer::composer_full(&composer);
         let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
         let mut requirements: IndexMap<String, String> = IndexMap::new();
         let mut version_selector = VersionSelector::new(
