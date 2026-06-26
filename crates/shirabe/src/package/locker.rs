@@ -30,6 +30,7 @@ use crate::repository::InstalledRepository;
 use crate::repository::LockArrayRepository;
 use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
@@ -911,10 +912,13 @@ impl Locker {
                 description: "Required (in require-dev)".to_string(),
             });
         }
-        let root_repo = RootPackageRepository::new(RootPackageInterfaceHandle::dup(&package));
+        let root_repo: RepositoryInterfaceHandle = RepositoryInterfaceHandle::new(
+            RootPackageRepository::new(RootPackageInterfaceHandle::dup(&package)),
+        );
 
         for set in &sets {
-            let installed_repo = InstalledRepository::new(vec![/* set.repo, root_repo */]);
+            let installed_repo =
+                InstalledRepository::new(vec![set.repo.clone().into(), root_repo.clone()]);
 
             // PHP: call_user_func([$package, $set['method']])
             let links = match set.method.as_str() {
@@ -986,8 +990,6 @@ impl Locker {
                     missing_requirements = true;
                 }
             }
-            let _ = root_repo;
-            let _ = installed_repo;
         }
 
         if missing_requirements {
