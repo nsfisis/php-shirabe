@@ -571,10 +571,6 @@ pub fn phpinfo(_what: i64) {
     todo!()
 }
 
-pub fn exit(status: i64) -> ! {
-    std::process::exit(status as i32);
-}
-
 pub fn sapi_windows_vt100_support(_resource: &crate::PhpResource) -> bool {
     // TODO(phase-d): Windows-only SAPI function; not defined on the non-Windows target this build
     // models (function_exists reports it absent).
