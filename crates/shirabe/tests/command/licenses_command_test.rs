@@ -190,7 +190,7 @@ fn test_format_summary() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    let expected = vec![
+    let expected = [
         ("-", "-"),
         ("License", "Number of dependencies"),
         ("-", "-"),

@@ -1,15 +1,10 @@
 //! ref: composer/src/Composer/Command/SuggestsCommand.php
 
-use crate::advisory::AuditConfig;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::SuggestedPackagesReporter;
-use crate::io::IOInterface;
 use crate::repository::InstalledRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
@@ -119,7 +114,7 @@ impl Command for SuggestsCommand {
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full_mut(&composer);
 
         let mut installed_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(RootPackageRepository::new(

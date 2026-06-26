@@ -18,8 +18,8 @@ use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
 use shirabe_external_packages::symfony::console::question::Question;
 use shirabe_external_packages::symfony::console::question::QuestionInterface;
 use shirabe_php_shim::{
-    AsAny, PhpMixed, array_search, function_exists, implode, in_array, is_array, is_string,
-    mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat, strip_tags, strlen,
+    PhpMixed, array_search, function_exists, implode, in_array, is_array, is_string,
+    mb_check_encoding, mb_convert_encoding, microtime, str_repeat, strip_tags, strlen,
 };
 use std::cell::RefCell;
 

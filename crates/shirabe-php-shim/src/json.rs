@@ -33,7 +33,6 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     // them when a call site needs them.
     let mut s = if flags & JSON_PRETTY_PRINT != 0 {
         // PHP's JSON_PRETTY_PRINT uses a 4-space indent.
-        use serde::Serialize;
         let mut buf = Vec::new();
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);

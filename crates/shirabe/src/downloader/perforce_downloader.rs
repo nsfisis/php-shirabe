@@ -8,7 +8,6 @@ use crate::downloader::VcsDownloader;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::Filesystem;
@@ -17,7 +16,6 @@ use crate::util::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::any::Any;
 
 #[derive(Debug)]
 pub struct PerforceDownloader {
@@ -48,8 +46,8 @@ impl PerforceDownloader {
     }
 
     pub fn init_perforce(&mut self, package: PackageInterfaceHandle, path: String, url: String) {
-        if self.perforce.is_some() {
-            self.perforce.as_mut().unwrap().initialize_path(&path);
+        if let Some(perforce) = self.perforce.as_mut() {
+            perforce.initialize_path(&path);
             return;
         }
 

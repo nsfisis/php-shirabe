@@ -1,6 +1,5 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
 
-use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 use crate::symfony::console::input::argv_input::ArgvInput;

@@ -49,7 +49,7 @@ struct SetUp {
 }
 
 fn set_up() -> SetUp {
-    let mut fs = Filesystem::new(None);
+    let fs = Filesystem::new(None);
 
     let root = TempDir::new().unwrap();
     let root_dir = fs::canonicalize(root.path())

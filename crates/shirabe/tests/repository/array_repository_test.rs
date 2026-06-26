@@ -49,7 +49,7 @@ fn reprs(results: &[SearchResult]) -> Vec<(String, Option<String>, Abandoned)> {
 
 #[test]
 fn test_add_package() {
-    let mut repo = ArrayRepository::new(vec![]).unwrap();
+    let repo = ArrayRepository::new(vec![]).unwrap();
     repo.add_package(get_package("foo", "1")).unwrap();
 
     assert_eq!(1, repo.count().unwrap());
@@ -75,7 +75,7 @@ fn test_remove_package() {
 
 #[test]
 fn test_has_package() {
-    let mut repo = ArrayRepository::new(vec![]).unwrap();
+    let repo = ArrayRepository::new(vec![]).unwrap();
     repo.add_package(get_package("foo", "1")).unwrap();
     repo.add_package(get_package("bar", "2")).unwrap();
 
@@ -102,7 +102,7 @@ fn test_find_packages() {
 #[test]
 #[ignore]
 fn test_automatically_add_aliased_package_but_not_remove() {
-    let mut repo = ArrayRepository::new(vec![]).unwrap();
+    let repo = ArrayRepository::new(vec![]).unwrap();
 
     let package = get_package("foo", "1");
     let alias = get_alias_package(&package, "2");

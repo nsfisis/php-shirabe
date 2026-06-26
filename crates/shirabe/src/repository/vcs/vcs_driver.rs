@@ -12,7 +12,6 @@ use crate::io::IOInterface;
 use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::VcsDriverInterface;
-use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use crate::util::http::Response;
@@ -150,7 +149,7 @@ impl VcsDriverBase {
             && let Some(res) = self.cache.as_mut().and_then(|c| c.read(identifier))
         {
             let parsed = JsonFile::parse_json(Some(&res), None)?;
-            let composer: Option<IndexMap<String, PhpMixed>> = parsed.as_array().map(|m| m.clone());
+            let composer: Option<IndexMap<String, PhpMixed>> = parsed.as_array().cloned();
             self.info_cache
                 .insert(identifier.to_string(), composer.clone());
             return Ok(Some(composer));

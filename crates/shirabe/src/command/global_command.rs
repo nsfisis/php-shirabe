@@ -3,7 +3,6 @@
 use std::path::Path;
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::ArgvInput;
@@ -11,22 +10,15 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
-use shirabe_php_shim::{AsAny, LogicException, RuntimeException, chdir};
+use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
 use crate::util::Platform;
 
@@ -86,7 +78,7 @@ impl GlobalCommand {
             Platform::clear_env("COMPOSER");
         }
 
-        let mut config = Factory::create_config(None, None)?;
+        let config = Factory::create_config(None, None)?;
         let home = config.get("home").as_string().unwrap_or("").to_string();
 
         if !Path::new(&home).is_dir() {

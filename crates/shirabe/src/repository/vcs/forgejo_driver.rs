@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    DATE_RFC3339, PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
+    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
 };
 
 use crate::cache::Cache;
@@ -17,7 +17,6 @@ use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
-use crate::repository::vcs::VcsDriverInterface;
 use crate::util::Forgejo;
 use crate::util::ForgejoRepositoryData;
 use crate::util::ForgejoUrl;
@@ -341,7 +340,7 @@ impl ForgejoDriver {
             let composer = if self.inner.should_cache(identifier) {
                 if let Some(res) = self.inner.cache.as_mut().and_then(|c| c.read(identifier)) {
                     let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
-                    parsed.as_array().map(|m| m.clone())
+                    parsed.as_array().cloned()
                 } else {
                     let file_content = self.get_file_content("composer.json", identifier)?;
                     let c = VcsDriverBase::finish_base_composer_information(

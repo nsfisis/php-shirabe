@@ -6,9 +6,9 @@ use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    DATE_RFC3339, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    array_search_mixed, array_shift, ctype_alnum, empty, explode, extension_loaded, implode,
-    in_array, is_array, is_string, ord, sprintf, strpos, strtolower,
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
+    array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array, is_array,
+    is_string, ord, strpos, strtolower,
 };
 
 use crate::cache::Cache;
@@ -20,7 +20,6 @@ use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
-use crate::repository::vcs::VcsDriverInterface;
 use crate::util::GitLab;
 use crate::util::HttpDownloader;
 use crate::util::http::Response;
@@ -284,9 +283,7 @@ impl GitLabDriver {
                     .as_mut()
                     .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
-                JsonFile::parse_json(Some(&res), None)?
-                    .as_array()
-                    .map(|m| m.clone())
+                JsonFile::parse_json(Some(&res), None)?.as_array().cloned()
             } else {
                 let file_content = self.get_file_content("composer.json", identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(

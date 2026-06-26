@@ -1,13 +1,11 @@
 //! ref: composer/src/Composer/Command/AuditCommand.php
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_fill_keys, array_merge,
-    implode, in_array,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, implode, in_array,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,14 +16,9 @@ use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
 use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::repository::CanonicalPackagesTrait;
-use crate::repository::InstalledRepository;
-use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 
@@ -252,7 +245,7 @@ impl AuditCommand {
         composer: &PartialComposerHandle,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<Vec<crate::package::PackageInterfaceHandle>> {
-        let mut composer = crate::command::composer_full_mut(composer);
+        let composer = crate::command::composer_full_mut(composer);
         if input
             .borrow()
             .get_option("locked")?

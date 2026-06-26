@@ -6,8 +6,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, base64_encode, explode,
-    in_array, is_array, is_string, json_decode, parse_url, sprintf, str_replace, strpos,
-    strtolower, substr, trim,
+    in_array, is_array, is_string, json_decode, parse_url, str_replace, strpos, strtolower, substr,
+    trim,
 };
 
 use crate::config::Config;
@@ -475,7 +475,7 @@ impl AuthHelper {
             .and_then(|h| h.get("header"))
             .and_then(|v| v.as_list())
         {
-            Some(list) => list.iter().cloned().collect(),
+            Some(list) => list.to_vec(),
             None => vec![],
         };
 
@@ -496,7 +496,9 @@ impl AuthHelper {
                     username,
                 )));
             } else if password == "custom-headers" {
+                // TODO:
                 // Handle custom HTTP headers from auth.json
+                #[allow(unused_assignments)]
                 let mut custom_headers: PhpMixed = PhpMixed::Null;
                 // PHP: if (is_string($auth['username']))
                 // username field is always String in our IndexMap representation

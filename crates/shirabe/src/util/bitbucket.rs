@@ -451,7 +451,7 @@ impl Bitbucket {
             return false;
         }
 
-        let access_token = match origin_config.get("access-token").map(|v| v.clone()) {
+        let access_token = match origin_config.get("access-token").cloned() {
             Some(t) => t,
             None => return false,
         };

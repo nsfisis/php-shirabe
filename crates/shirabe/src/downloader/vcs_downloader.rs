@@ -4,9 +4,8 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, count, explode,
-    get_class, get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr,
-    trim,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, explode,
+    get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
 };
 
 use crate::config::Config;

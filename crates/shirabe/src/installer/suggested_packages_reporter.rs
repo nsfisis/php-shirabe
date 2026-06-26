@@ -166,8 +166,10 @@ impl SuggestedPackagesReporter {
     ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         let suggested_packages = self.get_packages();
         let mut installed_names: Vec<String> = Vec::new();
-        if installed_repo.is_some() && !suggested_packages.is_empty() {
-            for package in installed_repo.unwrap().get_packages()? {
+        if let Some(installed_repo) = installed_repo
+            && !suggested_packages.is_empty()
+        {
+            for package in installed_repo.get_packages()? {
                 installed_names.extend(package.get_names(true));
             }
         }

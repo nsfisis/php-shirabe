@@ -721,10 +721,10 @@ impl Filesystem {
         if scheme.is_none() || scheme.as_deref() == Some("file") || scheme.as_deref() == Some("gs")
         {
             if let Some(tmp_file) = shirabe_php_shim::tempnam(&hierarchy, prefix) {
-                if let Some(scheme) = &scheme {
-                    if scheme != "gs" {
-                        return Ok(format!("{}://{}", scheme, tmp_file));
-                    }
+                if let Some(scheme) = &scheme
+                    && scheme != "gs"
+                {
+                    return Ok(format!("{}://{}", scheme, tmp_file));
                 }
                 return Ok(tmp_file);
             }

@@ -56,8 +56,8 @@ impl DebugFormatterHelper {
         format!(
             "{}<bg=blue;fg=white> {} </> <fg=blue>{}</>\n",
             self.get_border(id),
-            prefix.to_string(),
-            message.to_string(),
+            prefix,
+            message,
         )
     }
 
@@ -81,7 +81,7 @@ impl DebugFormatterHelper {
                 message.push_str(&format!(
                     "{}<bg=red;fg=white> {} </> ",
                     self.get_border(id),
-                    error_prefix.to_string(),
+                    error_prefix,
                 ));
                 self.started.get_mut(id).unwrap().err = true;
             }
@@ -91,7 +91,7 @@ impl DebugFormatterHelper {
                 &format!(
                     "\n{}<bg=red;fg=white> {} </> ",
                     self.get_border(id),
-                    error_prefix.to_string(),
+                    error_prefix,
                 ),
                 buffer,
             ));
@@ -104,7 +104,7 @@ impl DebugFormatterHelper {
                 message.push_str(&format!(
                     "{}<bg=green;fg=white> {} </> ",
                     self.get_border(id),
-                    prefix.to_string(),
+                    prefix,
                 ));
                 self.started.get_mut(id).unwrap().out = true;
             }
@@ -114,7 +114,7 @@ impl DebugFormatterHelper {
                 &format!(
                     "\n{}<bg=green;fg=white> {} </> ",
                     self.get_border(id),
-                    prefix.to_string(),
+                    prefix,
                 ),
                 buffer,
             ));
@@ -134,19 +134,19 @@ impl DebugFormatterHelper {
         if successful {
             return format!(
                 "{}{}<bg=green;fg=white> {} </> <fg=green>{}</>\n",
-                trailing_eol.to_string(),
+                trailing_eol,
                 self.get_border(id),
-                prefix.to_string(),
-                message.to_string(),
+                prefix,
+                message,
             );
         }
 
         let message = format!(
             "{}{}<bg=red;fg=white> {} </> <fg=red>{}</>\n",
-            trailing_eol.to_string(),
+            trailing_eol,
             self.get_border(id),
-            prefix.to_string(),
-            message.to_string(),
+            prefix,
+            message,
         );
 
         if let Some(session) = self.started.get_mut(id) {
@@ -158,10 +158,7 @@ impl DebugFormatterHelper {
     }
 
     fn get_border(&self, id: &str) -> String {
-        format!(
-            "<bg={}> </>",
-            COLORS[self.started[id].border as usize].to_string(),
-        )
+        format!("<bg={}> </>", COLORS[self.started[id].border as usize],)
     }
 }
 

@@ -26,10 +26,7 @@ struct SetUp {
 // ref: VcsRepositoryTest::initialize. Builds a fixture git repository on disk by shelling out to
 // git. Returns None when git is unavailable (mirroring markTestSkipped).
 fn set_up() -> Option<SetUp> {
-    if which_git().is_none() {
-        // 'This test needs a git binary in the PATH to be able to run'
-        return None;
-    }
+    which_git()?;
 
     let composer_home = TempDir::new().unwrap();
     let git_repo = TempDir::new().unwrap();

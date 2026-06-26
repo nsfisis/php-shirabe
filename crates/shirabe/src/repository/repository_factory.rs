@@ -11,7 +11,6 @@ use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::factory::Factory;
 use crate::io::IOInterface;
-use crate::io::IOInterfaceMutable;
 use crate::json::JsonFile;
 use crate::repository::FilesystemRepository;
 use crate::repository::RepositoryInterfaceHandle;
@@ -84,7 +83,7 @@ impl RepositoryFactory {
         if repository.starts_with('{') {
             let parsed = JsonFile::parse_json(Some(repository), None)?;
             let repo_config: IndexMap<String, PhpMixed> =
-                parsed.as_array().map(|m| m.clone()).unwrap_or_default();
+                parsed.as_array().cloned().unwrap_or_default();
             return Ok(repo_config);
         }
 

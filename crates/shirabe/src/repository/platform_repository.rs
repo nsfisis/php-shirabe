@@ -7,15 +7,13 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn, array_slice,
-    array_slice_strs, explode, get_class, implode, in_array, is_string, sprintf, str_replace,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
+    array_slice_strs, explode, get_class, implode, in_array, is_string, str_replace,
     str_starts_with, strpos, strtolower, var_export,
 };
-use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::composer;
-use crate::composer::ComposerHandle;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageHandle;
 use crate::package::CompletePackageInterface;
@@ -27,7 +25,7 @@ use crate::package::version::VersionParser;
 use crate::platform::HhvmDetector;
 use crate::platform::Runtime;
 use crate::platform::Version;
-use crate::plugin::plugin_interface::{self, PluginInterface};
+use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use crate::util::Silencer;

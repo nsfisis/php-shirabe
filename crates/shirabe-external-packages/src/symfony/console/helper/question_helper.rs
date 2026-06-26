@@ -19,7 +19,6 @@ use crate::symfony::console::question::ChoiceQuestion;
 use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::terminal::Terminal;
 use crate::symfony::string::s;
-use shirabe_php_shim::AsAny;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -126,10 +125,23 @@ impl QuestionHelper {
         let autocomplete = question.get_autocompleter_callback();
 
         let ret: PhpMixed;
-        if autocomplete.is_none()
-            || !STTY.load(std::sync::atomic::Ordering::SeqCst)
-            || !Terminal::has_stty_available()
+
+        if let Some(autocomplete) = autocomplete
+            && STTY.load(std::sync::atomic::Ordering::SeqCst)
+            && Terminal::has_stty_available()
         {
+            let callback = autocomplete;
+            // The autocompleter callback yields an iterable (Option here); PHP
+            // treats a null result as an empty list of suggestions.
+            let callback = move |input: &str| callback(input).unwrap_or_default();
+            let autocomplete =
+                self.autocomplete(Rc::clone(&output), question, &input_stream, &callback);
+            ret = PhpMixed::String(if question.is_trimmable() {
+                shirabe_php_shim::trim(&autocomplete, None)
+            } else {
+                autocomplete
+            });
+        } else {
             let mut r: PhpMixed = PhpMixed::Bool(false);
             if question.is_hidden() {
                 match self.get_hidden_response(
@@ -182,18 +194,6 @@ impl QuestionHelper {
                 }
             }
             ret = r;
-        } else {
-            let callback = autocomplete.unwrap();
-            // The autocompleter callback yields an iterable (Option here); PHP
-            // treats a null result as an empty list of suggestions.
-            let callback = move |input: &str| callback(input).unwrap_or_default();
-            let autocomplete =
-                self.autocomplete(Rc::clone(&output), question, &input_stream, &callback);
-            ret = PhpMixed::String(if question.is_trimmable() {
-                shirabe_php_shim::trim(&autocomplete, None)
-            } else {
-                autocomplete
-            });
         }
 
         let mut ret = ret;
@@ -318,12 +318,12 @@ impl QuestionHelper {
     ) {
         let message = if let Some(helper_set) = self.get_helper_set() {
             let formatter = helper_set.borrow().get_formatter();
-            let message = formatter.borrow().format_block(
+
+            formatter.borrow().format_block(
                 FormatBlockMessages::String(error.message.clone()),
                 "error",
                 false,
-            );
-            message
+            )
         } else {
             format!("<error>{}</error>", error.message)
         };
@@ -476,7 +476,6 @@ impl QuestionHelper {
                                     )
                             })
                             .collect();
-                        num_matches = matches.len() as i64;
                         ofs = -1;
                     }
 

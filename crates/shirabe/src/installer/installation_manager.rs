@@ -5,8 +5,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_search_mixed, array_splice, array_unshift, count,
-    http_build_query, json_encode, str_contains, str_replace, strpos, strtolower, ucfirst,
+    InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
+    str_contains, str_replace, strpos, strtolower,
 };
 
 use crate::dependency_resolver::operation::InstallOperation;
@@ -17,14 +17,10 @@ use crate::dependency_resolver::operation::UninstallOperation;
 use crate::dependency_resolver::operation::UpdateOperation;
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
-use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::installer::PackageEvents;
-use crate::installer::PluginInstaller;
-use crate::io::ConsoleIO;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Platform;

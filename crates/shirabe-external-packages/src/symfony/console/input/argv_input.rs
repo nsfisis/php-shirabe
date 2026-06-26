@@ -270,10 +270,10 @@ impl ArgvInput {
                 format!(
                     "No arguments expected for \"{}\" command, got \"{}\".",
                     symfony_command_name.clone().unwrap(),
-                    token.to_string(),
+                    token,
                 )
             } else {
-                format!("No arguments expected, got \"{}\".", token.to_string())
+                format!("No arguments expected, got \"{}\".", token)
             };
 
             return Err(
@@ -288,7 +288,7 @@ impl ArgvInput {
     fn add_short_option(&mut self, shortcut: &str, value: PhpMixed) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: format!("The \"-{}\" option does not exist.", shortcut.to_string()),
+                message: format!("The \"-{}\" option does not exist.", shortcut),
                 code: 0,
             })
             .into());
@@ -308,7 +308,7 @@ impl ArgvInput {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: format!("The \"--{}\" option does not exist.", name.to_string()),
+                    message: format!("The \"--{}\" option does not exist.", name),
                     code: 0,
                 })
                 .into());
@@ -317,10 +317,7 @@ impl ArgvInput {
             let option_name = self.inner.definition.negation_to_name(name)?;
             if !matches!(value, PhpMixed::Null) {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: format!(
-                        "The \"--{}\" option does not accept a value.",
-                        name.to_string(),
-                    ),
+                    message: format!("The \"--{}\" option does not accept a value.", name,),
                     code: 0,
                 })
                 .into());
@@ -336,10 +333,7 @@ impl ArgvInput {
 
         if !matches!(value, PhpMixed::Null) && !option.accept_value() {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: format!(
-                    "The \"--{}\" option does not accept a value.",
-                    name.to_string(),
-                ),
+                message: format!("The \"--{}\" option does not accept a value.", name,),
                 code: 0,
             })
             .into());
@@ -364,7 +358,7 @@ impl ArgvInput {
         if matches!(value, PhpMixed::Null) {
             if option.is_value_required() {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: format!("The \"--{}\" option requires a value.", name.to_string()),
+                    message: format!("The \"--{}\" option requires a value.", name),
                     code: 0,
                 })
                 .into());

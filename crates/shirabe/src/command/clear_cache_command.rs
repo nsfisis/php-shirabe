@@ -15,7 +15,6 @@ use crate::command::base_command::base_command_initialize;
 use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 
 #[derive(Debug)]

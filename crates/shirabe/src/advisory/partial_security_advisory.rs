@@ -7,7 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed, UnexpectedValueException};
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 

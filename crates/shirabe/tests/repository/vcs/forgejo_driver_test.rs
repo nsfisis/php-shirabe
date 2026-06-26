@@ -10,7 +10,7 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::ForgejoDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
-use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
+use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::PhpMixed;
 use tempfile::TempDir;
 

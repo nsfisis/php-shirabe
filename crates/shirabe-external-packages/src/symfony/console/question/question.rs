@@ -26,15 +26,15 @@ pub trait QuestionInterface: std::fmt::Debug {
 
     fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>>;
 
-    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)>;
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>>;
 
     fn get_validator(
         &self,
-    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)>;
+    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>;
 
     fn get_max_attempts(&self) -> Option<i64>;
 
-    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)>;
+    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed>;
 
     fn is_trimmable(&self) -> bool;
 
@@ -178,13 +178,13 @@ impl Question {
                     // array_merge(array_keys($values), array_values($values))
                     let mut merged: Vec<PhpMixed> =
                         array.keys().map(|k| PhpMixed::String(k.clone())).collect();
-                    merged.extend(array.values().map(|v| v.clone()));
+                    merged.extend(array.values().cloned());
                     merged
                 } else {
                     // array_values($values)
                     match &values {
-                        PhpMixed::List(list) => list.iter().cloned().collect(),
-                        PhpMixed::Array(array) => array.values().map(|v| v.clone()).collect(),
+                        PhpMixed::List(list) => list.to_vec(),
+                        PhpMixed::Array(array) => array.values().cloned().collect(),
                         _ => unreachable!(),
                     }
                 };
@@ -200,7 +200,7 @@ impl Question {
                 // list/array elements, otherwise treat as an empty iterator.
                 let cached: Vec<PhpMixed> = match values {
                     PhpMixed::List(list) => list.into_iter().collect(),
-                    PhpMixed::Array(array) => array.into_values().map(|v| v).collect(),
+                    PhpMixed::Array(array) => array.into_values().collect(),
                     _ => Vec::new(),
                 };
                 Some(Box::new(move |_input: &str| Some(cached.clone())))
@@ -212,7 +212,7 @@ impl Question {
     }
 
     /// Gets the callback function used for the autocompleter.
-    pub fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)> {
+    pub fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
         self.autocompleter_callback.as_deref()
     }
 
@@ -251,7 +251,7 @@ impl Question {
     /// Gets the validator for the question.
     pub fn get_validator(
         &self,
-    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)> {
+    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
         self.validator.as_deref()
     }
 
@@ -299,7 +299,7 @@ impl Question {
     /// Gets the normalizer for the response.
     ///
     /// The normalizer can ba a callable (a string), a closure or a class implementing __invoke.
-    pub fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)> {
+    pub fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
         self.normalizer.as_deref()
     }
 
@@ -352,13 +352,13 @@ impl QuestionInterface for Question {
         self.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
         self.get_autocompleter_callback()
     }
 
     fn get_validator(
         &self,
-    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)> {
+    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
         self.get_validator()
     }
 
@@ -366,7 +366,7 @@ impl QuestionInterface for Question {
         self.get_max_attempts()
     }
 
-    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)> {
+    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
         self.get_normalizer()
     }
 

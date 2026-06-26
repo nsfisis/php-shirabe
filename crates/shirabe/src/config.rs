@@ -12,9 +12,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
-    array_merge, array_reverse, array_search_mixed, array_unique, empty, filter_var_url, implode,
-    in_array, is_array, is_int, is_string, parse_url, php_to_string, rtrim, strtolower, strtoupper,
-    strtr, substr, trigger_error,
+    array_merge, array_search_mixed, array_unique, empty, filter_var_url, implode, in_array,
+    is_array, is_string, parse_url, php_to_string, rtrim, strtolower, strtoupper, strtr, substr,
+    trigger_error,
 };
 use std::cell::RefCell;
 
@@ -219,7 +219,7 @@ impl Config {
     /// @param bool    $useEnvironment Use COMPOSER_ environment variables to replace config settings
     /// @param ?string $baseDir        Optional base directory of the config
     pub fn new(use_environment: bool, base_dir: Option<String>) -> Self {
-        let mut this = Self {
+        let this = Self {
             // load defaults
             config: Self::default_config(),
             repositories: Self::default_repositories(),

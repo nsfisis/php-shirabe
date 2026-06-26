@@ -1218,7 +1218,7 @@ fn run_not_existing_package_case(package: &str, options: Vec<(&str, PhpMixed)>, 
         true,
     );
     let pkg = get_package("vendor/package", "1.0.0");
-    create_installed_json(&[pkg.clone()], &[], true);
+    create_installed_json(std::slice::from_ref(&pkg), &[], true);
     create_composer_lock(&[pkg], &[]);
 
     let mut pairs = vec![

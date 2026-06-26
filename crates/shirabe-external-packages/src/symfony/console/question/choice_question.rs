@@ -265,13 +265,13 @@ impl QuestionInterface for ChoiceQuestion {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&(dyn Fn(&str) -> Option<Vec<PhpMixed>>)> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
         self.inner.get_autocompleter_callback()
     }
 
     fn get_validator(
         &self,
-    ) -> Option<&(dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>)> {
+    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
         self.inner.get_validator()
     }
 
@@ -279,7 +279,7 @@ impl QuestionInterface for ChoiceQuestion {
         self.inner.get_max_attempts()
     }
 
-    fn get_normalizer(&self) -> Option<&(dyn Fn(PhpMixed) -> PhpMixed)> {
+    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
         self.inner.get_normalizer()
     }
 

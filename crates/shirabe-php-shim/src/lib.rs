@@ -480,8 +480,8 @@ impl StreamState {
         writable: bool,
         mode: String,
         uri: String,
-    ) -> PhpResource {
-        PhpResource::Stream(std::rc::Rc::new(std::cell::RefCell::new(StreamState {
+    ) -> StreamState {
+        StreamState {
             backing,
             readable,
             writable,
@@ -489,6 +489,6 @@ impl StreamState {
             closed: false,
             mode,
             uri,
-        })))
+        }
     }
 }

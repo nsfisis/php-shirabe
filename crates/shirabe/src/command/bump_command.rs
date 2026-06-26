@@ -3,7 +3,6 @@
 use crate::io::io_interface;
 use crate::package::base_package;
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -12,21 +11,15 @@ use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writab
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::json::JsonManipulator;
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
 use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
@@ -107,7 +100,7 @@ impl BumpCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full_mut(&composer);
         let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
             || composer
                 .get_config()
@@ -184,7 +177,7 @@ impl BumpCommand {
                 .iter()
                 .map(|constraint| Preg::replace(r"{[:= ].+}", "", constraint))
                 .collect();
-            let mut unique_lower: Vec<String> = packages_filter
+            let unique_lower: Vec<String> = packages_filter
                 .iter()
                 .map(|s| strtolower(s))
                 .collect::<std::collections::HashSet<_>>()

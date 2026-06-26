@@ -5,9 +5,7 @@
 // place of TestCase::getUniqueTmpDirectory, which is not ported.
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{
-    dirname, file_exists, file_put_contents, is_dir, is_file, mkdir, symlink, touch,
-};
+use shirabe_php_shim::{file_exists, file_put_contents, is_dir, mkdir, symlink, touch};
 
 // PHP's setUp/tearDown build workingDir/testFile under TestCase::getUniqueTmpDirectory; the
 // on-disk tests below instead create their own tempfile::TempDir inline, so no shared fixture

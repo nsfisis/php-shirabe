@@ -35,9 +35,8 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_flip, array_map, array_merge, array_unique, array_values,
-    clone, count, defined, gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array,
-    intval, is_dir, is_numeric, is_string, sprintf, strcmp, strpos, strtolower, touch, usort,
+    PhpMixed, RuntimeException, array_map, array_unique, defined, gc_collect_cycles, gc_disable,
+    gc_enable, implode, intval, is_dir, is_numeric, strcmp, strpos, strtolower, touch, usort,
 };
 use shirabe_semver;
 
@@ -51,17 +50,12 @@ use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::LocalRepoTransaction;
 use crate::dependency_resolver::LockTransaction;
 use crate::dependency_resolver::PolicyInterface;
-use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::PoolOptimizer;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
 use crate::dependency_resolver::Solver;
-use crate::dependency_resolver::SolverProblemsException;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
-use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::OperationInterface;
-use crate::dependency_resolver::operation::UninstallOperation;
-use crate::dependency_resolver::operation::UpdateOperation;
 use crate::downloader::DownloadManager;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
@@ -72,16 +66,11 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::AliasPackageHandle;
 use crate::package::CompleteAliasPackageHandle;
-use crate::package::CompletePackage;
-use crate::package::CompletePackageInterface;
 use crate::package::Link;
 use crate::package::Locker;
-use crate::package::Package;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterface;
 use crate::package::RootPackageInterfaceHandle;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
@@ -91,7 +80,6 @@ use crate::repository::CanonicalPackagesTrait;
 use crate::repository::CompositeRepository;
 use crate::repository::InstalledArrayRepository;
 use crate::repository::InstalledRepository;
-use crate::repository::InstalledRepositoryInterface;
 use crate::repository::PlatformRepository;
 use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryInterface;
@@ -581,7 +569,7 @@ impl Installer {
 
         let mut locked_repository: Option<crate::repository::LockArrayRepositoryHandle> = None;
 
-        let mut try_load_locked = || -> anyhow::Result<
+        let try_load_locked = || -> anyhow::Result<
             Result<Option<crate::repository::LockArrayRepositoryHandle>, ParsingException>,
         > {
                 if self.locker.borrow_mut().is_locked() {
@@ -961,7 +949,7 @@ impl Installer {
             return Ok(0);
         }
 
-        let mut result_repo = ArrayRepository::new(vec![])?;
+        let result_repo = ArrayRepository::new(vec![])?;
         let loader = ArrayLoader::new(None, true);
         let dumper = ArrayDumper::new();
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
@@ -1506,9 +1494,12 @@ impl Installer {
         }
 
         let mut preferred_versions: Option<IndexMap<String, String>> = None;
-        if for_update && self.minimal_update && locked_repo.is_some() {
+        if for_update
+            && self.minimal_update
+            && let Some(locked_repo) = locked_repo
+        {
             let mut versions: IndexMap<String, String> = IndexMap::new();
-            let pkgs = locked_repo.unwrap().borrow_mut().get_canonical_packages()?;
+            let pkgs = locked_repo.borrow_mut().get_canonical_packages()?;
             for pkg in pkgs {
                 if pkg.as_alias().is_some()
                     || (self.update_allow_list.is_some()

@@ -147,10 +147,8 @@ impl BinaryInstaller {
                 // still checking for symlinks here for legacy support
                 self.filesystem.borrow_mut().unlink(&link);
             }
-            if is_file(&format!("{}.bat", link)) {
-                self.filesystem
-                    .borrow_mut()
-                    .unlink(&format!("{}.bat", link));
+            if is_file(format!("{}.bat", link)) {
+                self.filesystem.borrow_mut().unlink(format!("{}.bat", link));
             }
         }
 

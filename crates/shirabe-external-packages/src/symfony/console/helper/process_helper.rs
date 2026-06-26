@@ -4,7 +4,6 @@ use crate::symfony::console::helper::debug_formatter_helper::DebugFormatterHelpe
 use crate::symfony::console::helper::helper::Helper;
 use crate::symfony::console::helper::helper_interface::HelperInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
-use crate::symfony::console::output::console_output_interface::ConsoleOutputInterface;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use crate::symfony::process::exception::process_failed_exception::ProcessFailedException;
 use crate::symfony::process::process::Process;
@@ -221,7 +220,8 @@ impl ProcessHelper {
         &self,
         output: Rc<RefCell<dyn OutputInterface>>,
         process: &Process,
-        mut callback: Option<Box<dyn FnMut(&str, &str)>>,
+        // TODO: remove allow(unused_mut) once todo!() is resolved.
+        #[allow(unused_mut)] mut callback: Option<Box<dyn FnMut(&str, &str)>>,
     ) -> Box<dyn FnMut(&str, &str)> {
         // PHP: `if ($output instanceof ConsoleOutputInterface) { $output =
         // $output->getErrorOutput(); }`. Downcasting a shared `dyn

@@ -20,7 +20,7 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 
 use shirabe_external_packages::symfony::console::output::output_interface;
-use shirabe_php_shim::{PHP_EOL, PhpMixed};
+use shirabe_php_shim::PHP_EOL;
 
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
 

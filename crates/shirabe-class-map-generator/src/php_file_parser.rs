@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, error_get_last, file_exists,
-    file_get_contents, function_exists, is_file, is_readable, ltrim, php_strip_whitespace, sprintf,
+    file_get_contents, function_exists, is_file, is_readable, ltrim, php_strip_whitespace,
     str_replace_array, strrpos, substr, trim, version_compare,
 };
 use std::sync::OnceLock;

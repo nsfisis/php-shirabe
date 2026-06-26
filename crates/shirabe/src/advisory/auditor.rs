@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php
 
-use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -18,7 +17,6 @@ use crate::json::JsonFile;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
-use crate::package::base_package::BasePackage;
 use crate::repository::RepositorySet;
 use crate::util::PackageInfo;
 

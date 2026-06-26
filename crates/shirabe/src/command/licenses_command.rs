@@ -1,7 +1,5 @@
 //! ref: composer/src/Composer/Command/LicensesCommand.php
 
-use std::any::Any;
-
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -15,22 +13,13 @@ use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::package::BasePackage;
-use crate::package::CompletePackage;
-use crate::package::CompletePackageInterface;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
-use crate::repository::CanonicalPackagesTrait;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryUtils;
 use crate::util::PackageInfo;
@@ -123,7 +112,7 @@ impl Command for LicensesCommand {
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let mut composer = crate::command::composer_full_mut(&composer_handle);
+        let composer = crate::command::composer_full_mut(&composer_handle);
         let root = composer.get_package();
 
         let packages = if input

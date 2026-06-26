@@ -9,26 +9,21 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, array_fill_keys, array_intersect,
-    array_keys, array_map, array_merge, array_unique, count, empty, file_exists, file_get_contents,
-    file_put_contents, filesize, implode, is_writable, sprintf, strtolower, unlink,
+    PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
+    array_merge, array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
+    implode, is_writable, strtolower, unlink,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::PackageDiscoveryTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use crate::dependency_resolver::Request;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
 use crate::installer::InstallerEvents;
 use crate::io::IOInterface;
@@ -45,7 +40,6 @@ use crate::plugin::PluginEvents;
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::PlatformRepositoryHandle;
-use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 use crate::util::Filesystem;
 use crate::util::PackageSorter;
@@ -269,7 +263,7 @@ impl Command for RequireCommand {
                     .to_string()
             };
 
-            /// @see https://github.com/composer/composer/pull/8313#issuecomment-532637955
+            // @see https://github.com/composer/composer/pull/8313#issuecomment-532637955
             if package_type != "project"
                 && !input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             {
@@ -482,14 +476,13 @@ impl Command for RequireCommand {
                 let warn_msg = format!(
                     "{} is currently present in the {} key and you ran the command {} the --dev flag, which will move it to the {} key.",
                     package.clone(),
-                    remove_key.to_string(),
+                    remove_key,
                     if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
                         "with"
                     } else {
                         "without"
-                    }
-                    .to_string(),
-                    require_key.to_string(),
+                    },
+                    require_key,
                 );
                 self.get_io().warning(&warn_msg, &[]);
             }
@@ -501,8 +494,7 @@ impl Command for RequireCommand {
                         "these requirements"
                     } else {
                         "this requirement"
-                    }
-                    .to_string(),
+                    },
                 );
                 if !self.get_io().ask_confirmation(q1, false) {
                     let q2 = format!(
@@ -511,8 +503,7 @@ impl Command for RequireCommand {
                             "without"
                         } else {
                             "with"
-                        }
-                        .to_string(),
+                        },
                     );
                     if !self.get_io().ask_confirmation(q2, true) {
                         return Ok(0);
@@ -762,7 +753,7 @@ impl RequireCommand {
         // Update packages
         self.reset_composer()?;
         let composer_handle = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer_handle);
+        let composer = crate::command::composer_full_mut(&composer_handle);
 
         self.dependency_resolution_completed.set(false);
         // PHP: $composer->getEventDispatcher()->addListener(InstallerEvents::PRE_OPERATIONS_EXEC,
@@ -1065,7 +1056,7 @@ impl RequireCommand {
         fixed: bool,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full_mut(&composer);
         let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
         let mut requirements: IndexMap<String, String> = IndexMap::new();
         let mut version_selector = VersionSelector::new(

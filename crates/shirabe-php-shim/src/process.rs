@@ -253,13 +253,14 @@ pub fn proc_open(
             2 => (ChildPipe::Err(child.stderr.take().unwrap()), true, false),
             _ => unreachable!(),
         };
-        let resource = StreamState::new(
-            StreamBacking::Pipe(pipe),
-            readable,
-            writable,
-            mode,
-            format!("pipe:fd{}", fd),
-        );
+        let resource =
+            PhpResource::Stream(std::rc::Rc::new(std::cell::RefCell::new(StreamState::new(
+                StreamBacking::Pipe(pipe),
+                readable,
+                writable,
+                mode,
+                format!("pipe:fd{}", fd),
+            ))));
         pipes.insert(fd, resource);
     }
 

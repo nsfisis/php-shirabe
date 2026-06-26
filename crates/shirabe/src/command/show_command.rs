@@ -20,22 +20,18 @@ use std::rc::Rc;
 
 use shirabe_semver::constraint::AnyConstraint;
 
-use crate::advisory::AuditConfig;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::PolicyInterface;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::package::Link;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::version::VersionParser;
@@ -224,7 +220,7 @@ impl Command for ShowCommand {
             self.init_styles(output.clone());
         }
 
-        let mut composer = self.try_composer(None, None);
+        let composer = self.try_composer(None, None);
 
         if input.borrow().get_option("installed")?.as_bool() == Some(true)
             && input.borrow().get_option("self")?.as_bool() != Some(true)
@@ -420,7 +416,7 @@ impl Command for ShowCommand {
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             }
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
-            let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
+            let composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
             let local_repo = composer_ref
                 .get_repository_manager()
                 .borrow()
@@ -488,7 +484,7 @@ impl Command for ShowCommand {
                 }
                 .into());
             }
-            let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
+            let composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
             let locker_rc = composer_ref.get_locker().clone();
             let mut locker = locker_rc.borrow_mut();
             let lr = locker.get_locked_repository(
@@ -1901,7 +1897,7 @@ impl ShowCommand {
                 if r#type == "psr-0" || r#type == "psr-4" {
                     if let PhpMixed::Array(map) = autoloads {
                         for (name, path) in map.iter() {
-                            let path_str = match &*path {
+                            let path_str = match path {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .filter_map(|p| p.as_string().map(|s| s.to_string()))
@@ -2594,7 +2590,7 @@ impl ShowCommand {
 
             let circular_warn = if in_array(
                 PhpMixed::String(require_name.clone()),
-                &PhpMixed::List(current_tree.iter().cloned().collect()),
+                &PhpMixed::List(current_tree.to_vec()),
                 true,
             ) {
                 "(circular dependency aborted here)"
@@ -2648,7 +2644,7 @@ impl ShowCommand {
 
                 if !in_array(
                     PhpMixed::String(require_name.clone()),
-                    &PhpMixed::List(current_tree.iter().cloned().collect()),
+                    &PhpMixed::List(current_tree.to_vec()),
                     true,
                 ) {
                     current_tree.push(PhpMixed::String(require_name.clone()));
@@ -2824,21 +2820,21 @@ impl ShowCommand {
             }
         }
 
-        let show_warnings_box: Box<dyn Fn(PackageInterfaceHandle) -> bool>;
-        if self.get_io().is_verbose() {
-            show_warnings_box = Box::new(|_p: PackageInterfaceHandle| -> bool { true });
-        } else {
-            let package_version = package.get_version();
-            show_warnings_box = Box::new(move |candidate: PackageInterfaceHandle| -> bool {
-                if candidate.get_version().starts_with("dev-")
-                    || package_version.starts_with("dev-")
-                {
-                    return false;
-                }
+        let show_warnings_box: Box<dyn Fn(PackageInterfaceHandle) -> bool> =
+            if self.get_io().is_verbose() {
+                Box::new(|_p: PackageInterfaceHandle| -> bool { true })
+            } else {
+                let package_version = package.get_version();
+                Box::new(move |candidate: PackageInterfaceHandle| -> bool {
+                    if candidate.get_version().starts_with("dev-")
+                        || package_version.starts_with("dev-")
+                    {
+                        return false;
+                    }
 
-                version_compare(&candidate.get_version(), &package_version, "<=")
-            });
-        }
+                    version_compare(&candidate.get_version(), &package_version, "<=")
+                })
+            };
         // TODO(phase-c): PHP passes $showWarnings (true or a closure) as the last argument, but the
         // closure form requires modeling a callable inside PhpMixed; hardcoding true until then.
         let _ = show_warnings_box;

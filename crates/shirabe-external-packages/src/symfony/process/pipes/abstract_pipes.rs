@@ -15,7 +15,7 @@ pub struct AbstractPipes {
 
 impl AbstractPipes {
     pub fn new(input: PhpMixed) -> Self {
-        let mut input_buffer = String::new();
+        let input_buffer;
         let stored_input;
         // TODO(plugin): `$input instanceof \Iterator` is not modeled. The PHP `is_resource($input)`
         // branch never applies: a PhpMixed is never a resource, so input is never stored as-is here.
@@ -81,9 +81,7 @@ impl AbstractPipes {
         let mut w: Vec<PhpResource> = vec![stdin.clone()];
 
         // let's have a look if something changed in streams
-        if php::stream_select(&mut r, &mut w, &mut e, 0, Some(0)).is_none() {
-            return None;
-        }
+        php::stream_select(&mut r, &mut w, &mut e, 0, Some(0))?;
 
         if !self.input_buffer.is_empty() {
             let written = php::fwrite(&stdin, &self.input_buffer, None).unwrap_or(0) as usize;

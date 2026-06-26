@@ -29,7 +29,7 @@ fn test_pool() {
     let mut pool = create_pool(vec![package.clone()]);
 
     assert!(same_packages(
-        &[package.clone()],
+        std::slice::from_ref(&package),
         &pool.what_provides("foo", None)
     ));
     assert!(same_packages(&[package], &pool.what_provides("foo", None)));

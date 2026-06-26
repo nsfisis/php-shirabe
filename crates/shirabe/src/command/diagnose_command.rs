@@ -10,35 +10,30 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
-    CURL_HTTP_VERSION_2_0, CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD, INFO_GENERAL,
+    CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD, INFO_GENERAL,
     InvalidArgumentException, OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT, PHP_BINARY, PHP_EOL,
-    PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count,
-    curl_version, defined, disk_free_space, extension_loaded, file_exists, filter_var_boolean,
-    function_exists, get_class, get_class_err, hash, implode, ini_get, ioncube_loader_iversion,
-    ioncube_loader_version, is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, sprintf,
-    str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
+    PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, curl_version, defined,
+    disk_free_space, extension_loaded, file_exists, filter_var_boolean, function_exists,
+    get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
+    is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, str_contains, str_replace,
+    str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer;
-use crate::composer::ComposerHandle;
-use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::BufferIO;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
-use crate::package::CompletePackageInterface;
 use crate::package::Locker;
 use crate::package::RootPackage;
 use crate::package::version::VersionParser;
@@ -149,7 +144,7 @@ impl Command for DiagnoseCommand {
         config_inner.insert("secure-http".to_string(), PhpMixed::Bool(false));
         let mut secure_http_wrap: IndexMap<String, PhpMixed> = IndexMap::new();
         secure_http_wrap.insert("config".to_string(), PhpMixed::Array(config_inner));
-        let mut config = config;
+        let config = config;
         config
             .borrow_mut()
             .merge(&secure_http_wrap, Config::SOURCE_COMMAND);
@@ -272,7 +267,7 @@ impl Command for DiagnoseCommand {
         ));
 
         if let Some(ref mut c) = composer {
-            let mut c = crate::command::composer_full_mut(c);
+            let c = crate::command::composer_full_mut(c);
             io.write(&format!(
                 "Active plugins: {}",
                 implode(
@@ -692,12 +687,12 @@ impl DiagnoseCommand {
             let first = provider_includes_arr
                 .values()
                 .next()
-                .map(|v| v.clone())
+                .cloned()
                 .unwrap_or(PhpMixed::Null);
             let hash_val = first
                 .as_array()
                 .and_then(|a| a.get("sha256"))
-                .map(|v| v.clone())
+                .cloned()
                 .unwrap_or(PhpMixed::Null);
             let path = str_replace(
                 "%hash%",
@@ -828,7 +823,7 @@ impl DiagnoseCommand {
             .and_then(|a| a.get("resources"))
             .and_then(|v| v.as_array())
             .and_then(|a| a.get("core"))
-            .map(|v| v.clone())
+            .cloned()
             .unwrap_or(PhpMixed::Null))
     }
 
@@ -863,13 +858,13 @@ impl DiagnoseCommand {
         let mut errors: Vec<PhpMixed> = vec![];
         let io = self.get_io();
 
-        if file_exists(&format!("{}/keys.tags.pub", home))
-            && file_exists(&format!("{}/keys.dev.pub", home))
+        if file_exists(format!("{}/keys.tags.pub", home))
+            && file_exists(format!("{}/keys.dev.pub", home))
         {
             io.write("");
         }
 
-        if file_exists(&format!("{}/keys.tags.pub", home)) {
+        if file_exists(format!("{}/keys.tags.pub", home)) {
             io.write(&format!(
                 "Tags Public Key Fingerprint: {}",
                 Keys::fingerprint(&format!("{}/keys.tags.pub", home))?
@@ -880,7 +875,7 @@ impl DiagnoseCommand {
             ));
         }
 
-        if file_exists(&format!("{}/keys.dev.pub", home)) {
+        if file_exists(format!("{}/keys.dev.pub", home)) {
             io.write(&format!(
                 "Dev Public Key Fingerprint: {}",
                 Keys::fingerprint(&format!("{}/keys.dev.pub", home))?
@@ -1278,7 +1273,7 @@ impl DiagnoseCommand {
             warnings.insert("uopz".to_string(), PhpMixed::Bool(true));
         }
 
-        let mut out_fn = |msg: &str, style: &str, output: &mut String| {
+        let out_fn = |msg: &str, style: &str, output: &mut String| {
             output.push_str(&format!("<{}>{}</{}>{}", style, msg, style, PHP_EOL));
         };
 

@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
@@ -10,22 +9,14 @@ use shirabe_php_shim::filter_var_url;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterfaceHandle;
-use crate::package::PackageInterface;
-use crate::package::RootPackageInterface;
 use crate::repository::RepositoryFactory;
-use crate::repository::RepositoryInterface;
 use crate::repository::RootPackageRepository;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;

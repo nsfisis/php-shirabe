@@ -8,7 +8,7 @@ use shirabe_php_shim::{
     STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
     array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
     filter_var_boolean, gethostbyname, http_clear_last_response_headers,
-    http_get_last_response_headers, ini_get, json_decode, parse_url, preg_quote, sprintf, strpos,
+    http_get_last_response_headers, ini_get, json_decode, parse_url, preg_quote, strpos,
     strtolower, strtr, substr, trim, zlib_decode,
 };
 

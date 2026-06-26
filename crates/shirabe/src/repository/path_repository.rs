@@ -276,7 +276,7 @@ impl PathRepository {
                 args
             });
             if reference == "auto"
-                && shirabe_php_shim::is_dir(&format!("{}/.git", path.trim_end_matches('/')))
+                && shirabe_php_shim::is_dir(format!("{}/.git", path.trim_end_matches('/')))
                 && self
                     .process
                     .borrow_mut()

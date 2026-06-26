@@ -86,12 +86,12 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
             }
             PhpMixed::Array(map) => {
                 for (key, value) in map {
-                    if let Ok(n) = key.parse::<i64>() {
-                        if n.to_string() == key {
-                            result.insert(next_int.to_string(), value);
-                            next_int += 1;
-                            continue;
-                        }
+                    if let Ok(n) = key.parse::<i64>()
+                        && n.to_string() == key
+                    {
+                        result.insert(next_int.to_string(), value);
+                        next_int += 1;
+                        continue;
                     }
                     result.insert(key, value);
                 }
@@ -123,12 +123,12 @@ pub fn array_merge_map<V>(
     let mut next_int: i64 = 0;
     for array in [array1, array2] {
         for (key, value) in array {
-            if let Ok(n) = key.parse::<i64>() {
-                if n.to_string() == key {
-                    result.insert(next_int.to_string(), value);
-                    next_int += 1;
-                    continue;
-                }
+            if let Ok(n) = key.parse::<i64>()
+                && n.to_string() == key
+            {
+                result.insert(next_int.to_string(), value);
+                next_int += 1;
+                continue;
             }
             result.insert(key, value);
         }
@@ -437,10 +437,10 @@ fn merge_entries(value: PhpMixed) -> Vec<(MergeKey, PhpMixed)> {
 }
 
 fn merge_parse_key(key: String) -> MergeKey {
-    if let Ok(n) = key.parse::<i64>() {
-        if n.to_string() == key {
-            return MergeKey::Int(n);
-        }
+    if let Ok(n) = key.parse::<i64>()
+        && n.to_string() == key
+    {
+        return MergeKey::Int(n);
     }
     MergeKey::Str(key)
 }
@@ -561,10 +561,10 @@ pub fn array_diff_key(
 /// Map a PHP array key (always stored as a `String` here) back to its PHP value
 /// type: an integer-like key becomes an int, anything else stays a string.
 fn php_key_to_mixed(key: &str) -> PhpMixed {
-    if let Ok(n) = key.parse::<i64>() {
-        if n.to_string() == key {
-            return PhpMixed::Int(n);
-        }
+    if let Ok(n) = key.parse::<i64>()
+        && n.to_string() == key
+    {
+        return PhpMixed::Int(n);
     }
     PhpMixed::String(key.to_string())
 }
@@ -664,7 +664,7 @@ pub fn krsort<V>(array: &mut IndexMap<i64, V>) {
     array.sort_by(|k1, _, k2, _| k2.cmp(k1));
 }
 
-pub fn uasort<T, F>(array: &mut Vec<T>, compare: F)
+pub fn uasort<T, F>(array: &mut [T], compare: F)
 where
     F: FnMut(&T, &T) -> i64,
 {
@@ -684,7 +684,7 @@ pub fn sort<T: Ord>(_array: &mut Vec<T>) {
     _array.sort();
 }
 
-pub fn sort_with_flags<T: Ord>(array: &mut Vec<T>, flags: i64) {
+pub fn sort_with_flags<T: Ord>(array: &mut [T], flags: i64) {
     if flags != SORT_REGULAR {
         // TODO(phase-d): flag-specific comparison (SORT_NUMERIC/SORT_STRING/
         // SORT_NATURAL/SORT_FLAG_CASE) cannot be expressed for a generic
@@ -717,10 +717,11 @@ pub fn ksort<V>(array: &mut IndexMap<String, V>) {
 // TODO(phase-d): full SORT_REGULAR semantics for mixed integer/non-numeric-string
 // keys are not reproduced; every current caller uses homogeneous string keys.
 fn php_sort_regular_key(a: &str, b: &str) -> std::cmp::Ordering {
-    if let (Ok(na), Ok(nb)) = (a.parse::<i64>(), b.parse::<i64>()) {
-        if na.to_string() == a && nb.to_string() == b {
-            return na.cmp(&nb);
-        }
+    if let (Ok(na), Ok(nb)) = (a.parse::<i64>(), b.parse::<i64>())
+        && na.to_string() == a
+        && nb.to_string() == b
+    {
+        return na.cmp(&nb);
     }
     a.cmp(b)
 }
@@ -737,7 +738,7 @@ where
     array.sort_by(|k1, _, k2, _| callback(k1, k2).cmp(&0));
 }
 
-pub fn sort_natural_flag_case(values: &mut Vec<String>) {
+pub fn sort_natural_flag_case(values: &mut [String]) {
     values.sort_by(|a, b| crate::strnatcasecmp(a, b).cmp(&0));
 }
 

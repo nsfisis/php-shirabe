@@ -14,7 +14,6 @@ use crate::symfony::console::helper::table_style::TableStyle;
 use crate::symfony::console::output::console_section_output::ConsoleSectionOutput;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::AsAny;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -509,8 +508,7 @@ impl Table {
 
     /// Renders table to output.
     pub fn render(&mut self) {
-        let rows: Vec<Row>;
-        if self.horizontal {
+        let rows: Vec<Row> = if self.horizontal {
             let mut horizontal_rows: IndexMap<i64, Vec<Cell>> = IndexMap::new();
             let header0 = self.headers.first().map(|h| h.cells()).unwrap_or_default();
             for (i, header) in header0.into_iter().enumerate() {
@@ -538,13 +536,13 @@ impl Table {
                     }
                 }
             }
-            rows = horizontal_rows.into_values().map(Row::Cells).collect();
+            horizontal_rows.into_values().map(Row::Cells).collect()
         } else {
             let mut merged = self.headers.clone();
             merged.push(Row::HeaderDivider);
             merged.extend(self.rows.clone());
-            rows = merged;
-        }
+            merged
+        };
 
         self.calculate_number_of_columns(&rows);
 

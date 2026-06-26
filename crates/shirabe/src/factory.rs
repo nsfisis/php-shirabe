@@ -7,11 +7,10 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyleInterface;
 use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, Phar, PhpMixed,
-    RuntimeException, UnexpectedValueException, ZipArchive, array_keys, array_replace_recursive,
-    class_exists, dirname, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    implode, in_array, is_array, is_dir, is_file, is_string, json_decode, mkdir, pathinfo,
-    realpath, rename, str_replace, strpos, strtr, substr, trim,
+    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
+    UnexpectedValueException, array_replace_recursive, class_exists, dirname, extension_loaded,
+    file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode,
+    mkdir, pathinfo, realpath, rename, strpos, strtr, substr, trim,
 };
 
 use crate::autoload::AutoloadGenerator;
@@ -40,16 +39,11 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::exception::NoSslException;
 use crate::installer::BinaryInstaller;
 use crate::installer::InstallationManager;
-use crate::installer::LibraryInstaller;
-use crate::installer::MetapackageInstaller;
-use crate::installer::PluginInstaller;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::io::IOInterfaceMutable;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
 use crate::package::Locker;
-use crate::package::RootPackageInterface;
 use crate::package::RootPackageInterfaceHandle;
 use crate::package::archiver::ArchiveManager;
 use crate::package::archiver::PharArchiver;
@@ -178,8 +172,8 @@ impl Factory {
         let user_dir = Self::get_user_dir()?;
         if PHP_OS == "Darwin" {
             // Migrate existing cache dir in old location if present
-            if is_dir(&format!("{}/cache", home))
-                && !is_dir(&format!("{}/Library/Caches/composer", user_dir))
+            if is_dir(format!("{}/cache", home))
+                && !is_dir(format!("{}/Library/Caches/composer", user_dir))
             {
                 let from = format!("{}/cache", home);
                 let to = format!("{}/Library/Caches/composer", user_dir);
@@ -189,8 +183,7 @@ impl Factory {
             return Ok(format!("{}/Library/Caches/composer", user_dir));
         }
 
-        if home == format!("{}/.composer", user_dir).as_str() && is_dir(&format!("{}/cache", home))
-        {
+        if home == format!("{}/.composer", user_dir).as_str() && is_dir(format!("{}/cache", home)) {
             return Ok(format!("{}/cache", home));
         }
 
@@ -303,7 +296,7 @@ impl Factory {
                 config.get_str("data-dir")?,
             ];
             for dir in &dirs {
-                if !file_exists(&format!("{}/.htaccess", dir)) {
+                if !file_exists(format!("{}/.htaccess", dir)) {
                     if !is_dir(dir) {
                         let dir_owned = dir.clone();
                         let _ = Silencer::call(|| {

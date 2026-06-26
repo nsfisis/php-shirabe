@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Command/CompleteCommand.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::AsAny;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
@@ -327,7 +326,7 @@ impl Command for CompleteCommand {
                 }
                 Some(command) => {
                     command.borrow().merge_application_definition(false);
-                    completion_input.bind(&*command.borrow().get_definition())?;
+                    completion_input.bind(&command.borrow().get_definition())?;
 
                     if CompletionInput::TYPE_OPTION_NAME == completion_input.get_completion_type() {
                         self.log(&format!(

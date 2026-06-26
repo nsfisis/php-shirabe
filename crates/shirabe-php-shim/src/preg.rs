@@ -366,7 +366,7 @@ pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<
     };
 
     let mut result: Vec<String> = Vec::new();
-    let mut push = |s: &str, result: &mut Vec<String>| {
+    let push = |s: &str, result: &mut Vec<String>| {
         if !(no_empty && s.is_empty()) {
             result.push(s.to_string());
         }

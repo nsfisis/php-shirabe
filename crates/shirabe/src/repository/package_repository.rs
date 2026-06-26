@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Repository/PackageRepository.php
 
-use crate::advisory::SecurityAdvisory;
 use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;

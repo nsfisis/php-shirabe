@@ -23,10 +23,10 @@ impl CaBundle {
     // not consult OpenSSL's default cert locations, does not validate the
     // candidate before returning it, and has no bundled cacert.pem fallback.
     pub fn get_system_ca_root_bundle_path(_logger: ()) -> String {
-        if let Ok(file) = std::env::var("SSL_CERT_FILE") {
-            if std::path::Path::new(&file).is_file() {
-                return file;
-            }
+        if let Ok(file) = std::env::var("SSL_CERT_FILE")
+            && std::path::Path::new(&file).is_file()
+        {
+            return file;
         }
 
         const CA_FILE_PATHS: &[&str] = &[
@@ -49,10 +49,10 @@ impl CaBundle {
             }
         }
 
-        if let Ok(dir) = std::env::var("SSL_CERT_DIR") {
-            if std::path::Path::new(&dir).is_dir() {
-                return dir;
-            }
+        if let Ok(dir) = std::env::var("SSL_CERT_DIR")
+            && std::path::Path::new(&dir).is_dir()
+        {
+            return dir;
         }
 
         const CA_DIR_PATHS: &[&str] = &["/etc/pki/tls/certs", "/etc/ssl/certs"];

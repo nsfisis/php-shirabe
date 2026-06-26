@@ -237,14 +237,14 @@ vendor2/package2 suggests:
     // 'with lockfile, show suggested (excluding dev)'
     run_suggest_case(
         true,
-        &[no_dev.clone()],
+        std::slice::from_ref(&no_dev),
         "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 1 additional suggestions by transitive dependencies can be shown with --all",
     );
     // 'without lockfile, show suggested (excluding dev)'
-    run_suggest_case(false, &[no_dev.clone()], basic);
+    run_suggest_case(false, std::slice::from_ref(&no_dev), basic);
 
     let all_suggested = "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
@@ -257,8 +257,8 @@ vendor5/dev-package suggests:
 
 vendor6/package6 suggests:
  - vendor7/transitive: helpful for vendor6/package6";
-    run_suggest_case(true, &[all.clone()], all_suggested);
-    run_suggest_case(false, &[all.clone()], all_suggested);
+    run_suggest_case(true, std::slice::from_ref(&all), all_suggested);
+    run_suggest_case(false, std::slice::from_ref(&all), all_suggested);
 
     // 'with lockfile, show all suggested (excluding dev)'
     run_suggest_case(
@@ -273,8 +273,8 @@ vendor6/package6 suggests:
     run_suggest_case(false, &[all.clone(), no_dev.clone()], all_suggested);
 
     // grouped by package
-    run_suggest_case(true, &[by_package.clone()], basic);
-    run_suggest_case(false, &[by_package.clone()], basic);
+    run_suggest_case(true, std::slice::from_ref(&by_package), basic);
+    run_suggest_case(false, std::slice::from_ref(&by_package), basic);
     run_suggest_case(
         true,
         &[by_package.clone(), no_dev.clone()],
@@ -293,8 +293,16 @@ vendor4/dev-suggested is suggested by:
  - vendor2/package2: helpful for vendor2/package2
 
 2 additional suggestions by transitive dependencies can be shown with --all";
-    run_suggest_case(true, &[by_suggestion.clone()], by_suggestion_out);
-    run_suggest_case(false, &[by_suggestion.clone()], by_suggestion_out);
+    run_suggest_case(
+        true,
+        std::slice::from_ref(&by_suggestion),
+        by_suggestion_out,
+    );
+    run_suggest_case(
+        false,
+        std::slice::from_ref(&by_suggestion),
+        by_suggestion_out,
+    );
     run_suggest_case(
         true,
         &[by_suggestion.clone(), no_dev.clone()],
@@ -367,8 +375,8 @@ vendor3/suggested is suggested by:
     // list suggested
     let list_out = "vendor3/suggested
 vendor4/dev-suggested";
-    run_suggest_case(true, &[list.clone()], list_out);
-    run_suggest_case(false, &[list.clone()], list_out);
+    run_suggest_case(true, std::slice::from_ref(&list), list_out);
+    run_suggest_case(false, std::slice::from_ref(&list), list_out);
     run_suggest_case(true, &[list.clone(), no_dev.clone()], "vendor3/suggested");
     run_suggest_case(false, &[list.clone(), no_dev.clone()], list_out);
 

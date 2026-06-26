@@ -9,7 +9,7 @@ use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package::{self};
 use crate::repository::PlatformRepository;
 
 #[derive(Debug)]

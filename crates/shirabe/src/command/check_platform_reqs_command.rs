@@ -11,14 +11,9 @@ use shirabe_semver::constraint::SimpleConstraint;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::Link;
@@ -200,7 +195,7 @@ impl Command for CheckPlatformReqsCommand {
         _output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full_mut(&composer);
         let io = self.get_io();
 
         let no_dev = input

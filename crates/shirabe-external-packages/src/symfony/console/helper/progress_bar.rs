@@ -584,7 +584,7 @@ impl ProgressBar {
             Box::new(
                 |bar: &ProgressBar, output: &Rc<RefCell<dyn OutputInterface>>| {
                     let complete_bars = bar.get_bar_offset();
-                    let mut display = shirabe_php_shim::str_repeat(
+                    let display = shirabe_php_shim::str_repeat(
                         &bar.get_bar_character(),
                         complete_bars as usize,
                     );

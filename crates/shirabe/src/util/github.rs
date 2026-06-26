@@ -6,7 +6,6 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
 
 use crate::config::Config;
-use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;

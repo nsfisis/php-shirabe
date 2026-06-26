@@ -4,7 +4,6 @@ use std::cell::RefCell;
 
 use indexmap::IndexMap;
 use shirabe_semver::CompilingMatcher;
-use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::dependency_resolver::PolicyInterface;

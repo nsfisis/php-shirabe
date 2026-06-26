@@ -187,6 +187,10 @@ impl DOMNodeList {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, DOMNode> {
         self.0.iter()
     }

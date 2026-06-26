@@ -7,31 +7,23 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, array_map, strtolower};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, strtolower};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use crate::dependency_resolver::Request;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::package::BasePackage;
 use crate::package::base_package;
-use crate::repository::CanonicalPackagesTrait;
 use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
@@ -226,7 +218,7 @@ impl Command for RemoveCommand {
             .unwrap_or(false)
         {
             let composer = self.require_composer(None, None)?;
-            let mut composer = crate::command::composer_full_mut(&composer);
+            let composer = crate::command::composer_full_mut(&composer);
             {
                 let locker = composer.get_locker().clone();
                 let mut locker = locker.borrow_mut();
@@ -240,7 +232,7 @@ impl Command for RemoveCommand {
                 }
             }
 
-            let mut locked_repo = composer
+            let locked_repo = composer
                 .get_locker()
                 .borrow_mut()
                 .get_locked_repository(true)?;

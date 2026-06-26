@@ -11,24 +11,18 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, count, empty, in_array, sprintf, strtolower,
+    array_keys, array_merge_map, array_search_in_vec, in_array, strtolower,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
-use crate::advisory::Auditor;
 use crate::command::BumpCommand;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
-use crate::config::Config;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::dependency_resolver::request::{self, Request, UpdateAllowTransitiveDeps};
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -40,7 +34,6 @@ use crate::plugin::PluginEvents;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 use crate::util::HttpDownloader;
 
@@ -516,7 +509,7 @@ impl Command for UpdateCommand {
                     true,
                     io_interface::NORMAL,
                 );
-                let mut bump_command = BumpCommand::new();
+                let bump_command = BumpCommand::new();
                 bump_command.set_composer(composer_handle.clone());
                 result = bump_command.do_bump(
                     io.clone(),
@@ -707,7 +700,7 @@ impl UpdateCommand {
         if io.ask_confirmation(
             format!(
                 "Would you like to continue and update the above package{} [<comment>yes</comment>]? ",
-                if 1 == packages.len() { "" } else { "s" }.to_string(),
+                if 1 == packages.len() { "" } else { "s" },
             ),
             true,
         ) {

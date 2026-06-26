@@ -5,7 +5,6 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
@@ -13,7 +12,7 @@ use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed, RuntimeException, dirname, is_dir, is_writable};
+use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable};
 
 #[derive(Debug)]
 pub struct HgDriver {

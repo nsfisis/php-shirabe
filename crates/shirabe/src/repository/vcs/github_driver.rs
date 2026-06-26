@@ -6,10 +6,9 @@ use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    DATE_RFC3339, InvalidArgumentException, PhpMixed, RuntimeException, array_diff,
-    array_key_exists, array_map, array_search_mixed, base64_decode, basename, count, empty,
-    explode, extension_loaded, in_array, parse_url_all, sprintf, strpos, strtolower, substr, trim,
-    urlencode,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_key_exists, array_map,
+    array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array,
+    parse_url_all, strpos, strtolower, substr, trim, urlencode,
 };
 
 use crate::cache::Cache;
@@ -21,7 +20,6 @@ use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
-use crate::repository::vcs::VcsDriverInterface;
 use crate::util::GitHub;
 use crate::util::http::Response;
 
@@ -279,7 +277,7 @@ impl GitHubDriver {
                     .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
                 let parsed = JsonFile::parse_json(Some(&res), None)?;
-                parsed.as_array().map(|m| m.clone())
+                parsed.as_array().cloned()
             } else {
                 let file_content = self.get_file_content("composer.json", identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(

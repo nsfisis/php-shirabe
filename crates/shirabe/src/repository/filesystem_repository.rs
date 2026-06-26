@@ -7,10 +7,9 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    Exception, InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL,
-    UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
-    get_class_err, get_debug_type, in_array, is_array, is_null, is_string, ksort, realpath, sort,
-    sort_with_flags, str_repeat, strtr, trim, usort, var_export,
+    Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
+    array_flip, dirname, r#eval, file_get_contents, get_class_err, get_debug_type, in_array,
+    is_array, is_null, is_string, ksort, realpath, str_repeat, trim, usort, var_export,
 };
 
 use crate::config::is_php_integer_key;
@@ -160,7 +159,7 @@ impl FilesystemRepository {
             }
         };
 
-        let mut loader = ArrayLoader::new(None, true);
+        let loader = ArrayLoader::new(None, true);
         if let Some(packages_list) = packages.as_list() {
             for package_data in packages_list.iter() {
                 let cfg = package_data.as_array().cloned().unwrap_or_default();

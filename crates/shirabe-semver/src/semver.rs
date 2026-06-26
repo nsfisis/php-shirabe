@@ -3,7 +3,6 @@
 use std::sync::OnceLock;
 
 use crate::comparator::Comparator;
-use crate::constraint::AnyConstraint;
 use crate::constraint::SimpleConstraint;
 use crate::version_parser::VersionParser;
 

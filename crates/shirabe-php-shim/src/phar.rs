@@ -1,6 +1,3 @@
-use crate::PhpMixed;
-use indexmap::IndexMap;
-
 #[derive(Debug)]
 pub struct Phar {
     path: String,

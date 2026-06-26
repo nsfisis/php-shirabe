@@ -470,7 +470,7 @@ fn expected_auth_setting(username: &str, password: &str) -> PhpMixed {
 
 #[test]
 fn test_store_auth_automatically() {
-    let mut f = set_up();
+    let f = set_up();
     let origin = "github.com";
     expects_authentication(&f.io, origin, "my_username", "my_password");
 
@@ -497,7 +497,7 @@ fn test_store_auth_automatically() {
 
 #[test]
 fn test_store_auth_with_prompt_yes_answer() {
-    let mut f = set_up();
+    let f = set_up();
     let origin = "github.com";
     expects_authentication(&f.io, origin, "my_username", "my_password");
     let config_source_name = "https://api.gitlab.com/source";
@@ -536,7 +536,7 @@ fn test_store_auth_with_prompt_yes_answer() {
 
 #[test]
 fn test_store_auth_with_prompt_no_answer() {
-    let mut f = set_up();
+    let f = set_up();
     let origin = "github.com";
     let config_source_name = "https://api.gitlab.com/source";
 

@@ -17,11 +17,9 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
@@ -428,7 +426,7 @@ impl CreateProjectCommand {
             }
         }
 
-        let mut composer = crate::command::composer_full_mut(&composer_handle);
+        let composer = crate::command::composer_full_mut(&composer_handle);
 
         let process = composer
             .get_loop()
@@ -741,37 +739,40 @@ impl CreateProjectCommand {
         if stability.is_none() {
             if package_version.is_none() {
                 stability = Some("stable".to_string());
-            } else if {
-                let mut matched: IndexMap<CaptureKey, String> = IndexMap::new();
-                let ok = Preg::is_match3(
-                    &format!(
-                        "{{^[^,\\s]*?@({})$}}i",
-                        implode(
-                            "|",
-                            &STABILITIES
-                                .keys()
-                                .map(|k| k.to_string())
-                                .collect::<Vec<_>>()
-                        )
-                    ),
-                    package_version.as_deref().unwrap_or(""),
-                    Some(&mut matched),
-                );
-                if ok {
-                    stability = Some(
-                        matched
-                            .get(&CaptureKey::ByIndex(1))
-                            .cloned()
-                            .unwrap_or_default(),
-                    );
-                }
-                ok
-            } {
-                // stability already set above
             } else {
-                stability = Some(VersionParser::parse_stability(
-                    package_version.as_deref().unwrap_or(""),
-                ));
+                let ok = {
+                    let mut matched: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let ok = Preg::is_match3(
+                        &format!(
+                            "{{^[^,\\s]*?@({})$}}i",
+                            implode(
+                                "|",
+                                &STABILITIES
+                                    .keys()
+                                    .map(|k| k.to_string())
+                                    .collect::<Vec<_>>()
+                            )
+                        ),
+                        package_version.as_deref().unwrap_or(""),
+                        Some(&mut matched),
+                    );
+                    if ok {
+                        stability = Some(
+                            matched
+                                .get(&CaptureKey::ByIndex(1))
+                                .cloned()
+                                .unwrap_or_default(),
+                        );
+                    }
+                    ok
+                };
+                if ok {
+                    // stability already set above
+                } else {
+                    stability = Some(VersionParser::parse_stability(
+                        package_version.as_deref().unwrap_or(""),
+                    ));
+                }
             }
         }
 
@@ -1032,7 +1033,7 @@ impl CreateProjectCommand {
         // ensure that the env var being set does not interfere with create-project
         // as it is probably not meant to be used here, so we do not use it if a composer.json can be found
         // in the project
-        if file_exists(&format!("{}/composer.json", directory))
+        if file_exists(format!("{}/composer.json", directory))
             && Platform::get_env("COMPOSER").is_some()
         {
             Platform::clear_env("COMPOSER");

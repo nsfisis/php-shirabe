@@ -9,7 +9,6 @@ use crate::symfony::console::helper::ProgressBar;
 use crate::symfony::console::helper::SymfonyQuestionHelper;
 use crate::symfony::console::helper::Table;
 use crate::symfony::console::helper::TableCell;
-use crate::symfony::console::helper::TableSeparator;
 use crate::symfony::console::helper::table::{Cell, Row};
 use crate::symfony::console::input::InputInterface;
 use crate::symfony::console::output::ConsoleOutputInterface;
@@ -429,7 +428,7 @@ impl SymfonyStyle {
             ));
 
             if let Some(style) = style {
-                *line = format!("<{}>{}</>", style.to_string(), line.clone());
+                *line = format!("<{}>{}</>", style, line.clone());
             }
         }
 
@@ -722,8 +721,7 @@ impl StyleInterface for SymfonyStyle {
         default: Option<PhpMixed>,
     ) -> PhpMixed {
         let default = if let Some(default) = default {
-            let values =
-                shirabe_php_shim::array_flip(&PhpMixed::List(choices.iter().cloned().collect()));
+            let values = shirabe_php_shim::array_flip(&PhpMixed::List(choices.to_vec()));
             // $default = $values[$default] ?? $default;
             let resolved = match &values {
                 PhpMixed::Array(map) => map.get(&default.to_string()).cloned(),

@@ -16,13 +16,7 @@ pub struct FormatterHelper {
 impl FormatterHelper {
     /// Formats a message within a section.
     pub fn format_section(&self, section: &str, message: &str, style: &str) -> String {
-        format!(
-            "<{}>[{}]</{}> {}",
-            style.to_string(),
-            section.to_string(),
-            style.to_string(),
-            message.to_string(),
-        )
+        format!("<{}>[{}]</{}> {}", style, section, style, message,)
     }
 
     /// Formats a message as a block of text.
@@ -66,12 +60,7 @@ impl FormatterHelper {
 
         let mut i = 0;
         while i < messages.len() {
-            messages[i] = format!(
-                "<{}>{}</{}>",
-                style.to_string(),
-                messages[i].clone(),
-                style.to_string(),
-            );
+            messages[i] = format!("<{}>{}</{}>", style, messages[i].clone(), style,);
             i += 1;
         }
 

@@ -406,12 +406,11 @@ impl CurlDownloader {
             if curl_response.inner.get_status_code() >= 300
                 && curl_response.inner.get_header("content-type").as_deref()
                     == Some("application/json")
+                && let Some(body) = curl_response.inner.get_body()
             {
-                if let Some(body) = curl_response.inner.get_body() {
-                    let decoded = shirabe_php_shim::json_decode(body, true)?;
-                    if let PhpMixed::Array(a) = decoded {
-                        HttpDownloader::output_warnings(self.io.clone(), &origin, &a)?;
-                    }
+                let decoded = shirabe_php_shim::json_decode(body, true)?;
+                if let PhpMixed::Array(a) = decoded {
+                    HttpDownloader::output_warnings(self.io.clone(), &origin, &a)?;
                 }
             }
 
@@ -527,7 +526,7 @@ impl CurlDownloader {
 
             // Atomic rename of the `~` temp file to its final name (file mode).
             if let Some(filename) = &filename {
-                rename(&format!("{}~", filename), filename);
+                rename(format!("{}~", filename), filename);
             }
 
             self.resolve_job(id, curl_response.inner);

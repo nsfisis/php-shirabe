@@ -114,7 +114,7 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "An argument with name \"{}\" already exists.",
-                    argument.get_name().to_string(),
+                    argument.get_name(),
                 ),
                 code: 0,
             })
@@ -125,8 +125,8 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "Cannot add a required argument \"{}\" after an array argument \"{}\".",
-                    argument.get_name().to_string(),
-                    last_array_argument.get_name().to_string(),
+                    argument.get_name(),
+                    last_array_argument.get_name(),
                 ),
                 code: 0,
             })
@@ -139,8 +139,8 @@ impl InputDefinition {
             return Err(LogicException(shirabe_php_shim::LogicException {
                 message: format!(
                     "Cannot add a required argument \"{}\" after an optional one \"{}\".",
-                    argument.get_name().to_string(),
-                    last_optional_argument.get_name().to_string(),
+                    argument.get_name(),
+                    last_optional_argument.get_name(),
                 ),
                 code: 0,
             })
@@ -260,20 +260,14 @@ impl InputDefinition {
             && !option.equals(existing)
         {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!(
-                    "An option named \"{}\" already exists.",
-                    option.get_name().to_string(),
-                ),
+                message: format!("An option named \"{}\" already exists.", option.get_name(),),
                 code: 0,
             })
             .into());
         }
         if self.negations.contains_key(option.get_name()) {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!(
-                    "An option named \"{}\" already exists.",
-                    option.get_name().to_string(),
-                ),
+                message: format!("An option named \"{}\" already exists.", option.get_name(),),
                 code: 0,
             })
             .into());
@@ -329,7 +323,7 @@ impl InputDefinition {
         if !self.has_option(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"--{}\" option does not exist.", name.to_string()),
+                    message: format!("The \"--{}\" option does not exist.", name),
                     code: 0,
                 })
                 .into(),
@@ -381,7 +375,7 @@ impl InputDefinition {
         match self.shortcuts.get(shortcut) {
             None => Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"-{}\" option does not exist.", shortcut.to_string()),
+                    message: format!("The \"-{}\" option does not exist.", shortcut),
                     code: 0,
                 })
                 .into(),
@@ -395,7 +389,7 @@ impl InputDefinition {
         match self.negations.get(negation) {
             None => Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"--{}\" option does not exist.", negation.to_string()),
+                    message: format!("The \"--{}\" option does not exist.", negation),
                     code: 0,
                 })
                 .into(),
@@ -432,19 +426,19 @@ impl InputDefinition {
 
                 let shortcut = match option.get_shortcut() {
                     Some(shortcut) => {
-                        format!("-{}|", shortcut.to_string())
+                        format!("-{}|", shortcut)
                     }
                     None => String::new(),
                 };
                 let negation = if option.is_negatable() {
-                    format!("|--no-{}", option.get_name().to_string())
+                    format!("|--no-{}", option.get_name())
                 } else {
                     String::new()
                 };
                 elements.push(format!(
                     "[{}--{}{}{}]",
                     shortcut,
-                    option.get_name().to_string(),
+                    option.get_name(),
                     value,
                     negation,
                 ));

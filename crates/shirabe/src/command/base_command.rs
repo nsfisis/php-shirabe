@@ -12,8 +12,8 @@ use shirabe_external_packages::symfony::console::helper::TableSeparator;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    AsAny, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array, is_string,
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
+    count, explode, in_array, is_string,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,9 +23,7 @@ use crate::advisory::Auditor;
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::Application;
-use crate::console::input::InputArgument;
 use crate::console::input::InputDefinitionItem;
-use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;

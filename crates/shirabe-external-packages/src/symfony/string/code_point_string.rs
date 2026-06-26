@@ -157,7 +157,7 @@ fn php_wordwrap(text: &str, linelength: i64, breakchar: &str, docut: bool) -> St
             out.extend_from_slice(&text[laststart as usize..lastspace as usize]);
             out.extend_from_slice(breakchar);
             laststart = lastspace + 1;
-            lastspace = lastspace + 1;
+            lastspace += 1;
         }
         current += 1;
     }

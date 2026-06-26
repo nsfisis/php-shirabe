@@ -7,10 +7,9 @@ use std::sync::Mutex;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
-    array_merge_recursive, clearstatcache, count, explode, implode, in_array, is_array,
-    is_callable, is_dir, preg_quote, rawurldecode, rawurlencode, str_contains, str_ends_with,
-    str_replace, str_replace_array, strlen, strpos, substr, trim, version_compare,
+    InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map, clearstatcache,
+    explode, implode, in_array, is_callable, is_dir, preg_quote, rawurldecode, rawurlencode,
+    str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 
 use crate::config::Config;
@@ -175,10 +174,10 @@ impl Git {
         let cwd_string = cwd.map(|s| s.to_string());
 
         // PHP closure: $runCommands = function ($url) use (...) { ... };
-        let mut run_commands_inline = |url_arg: &str,
-                                       this_process: &mut ProcessExecutor,
-                                       last_cmd: &mut PhpMixed,
-                                       command_output: Option<&mut PhpMixed>|
+        let run_commands_inline = |url_arg: &str,
+                                   this_process: &mut ProcessExecutor,
+                                   last_cmd: &mut PhpMixed,
+                                   command_output: Option<&mut PhpMixed>|
          -> i64 {
             let collect_outputs = !command_output
                 .as_ref()
@@ -656,7 +655,7 @@ impl Git {
                 }
             } else if let Some(m) = self.get_authentication_failure(url) {
                 // private non-github/gitlab/bitbucket repo that failed to authenticate
-                let mut m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let mut m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 let mut auth_parts: Option<String> = None;
@@ -746,7 +745,7 @@ impl Git {
                             username,
                             Some(password),
                         );
-                        let mut auth_helper = AuthHelper::new(self.io.clone(), self.config.clone());
+                        let auth_helper = AuthHelper::new(self.io.clone(), self.config.clone());
                         let store_auth_enum = match &store_auth {
                             PhpMixed::String(s) if s == "prompt" => StoreAuth::Prompt,
                             PhpMixed::Bool(b) => StoreAuth::Bool(*b),
@@ -776,7 +775,6 @@ impl Git {
                 }
                 _ => last_command.as_string().unwrap_or("").to_string(),
             };
-            let mut error_msg = self.process.borrow().get_error_output().to_string();
             if (credentials.len() as i64) > 0 {
                 last_command_str = self.mask_credentials(&last_command_str, &credentials);
                 error_msg = self.mask_credentials(&error_msg, &credentials);
@@ -923,9 +921,10 @@ impl Git {
         pretty_version: Option<&str>,
     ) -> Result<bool> {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
-            if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref) && pretty_version.is_some() {
-                let branch =
-                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", pretty_version.unwrap());
+            if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref)
+                && let Some(pretty_version) = pretty_version
+            {
+                let branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", pretty_version);
                 let mut branches: Option<String> = None;
                 let mut tags: Option<String> = None;
                 let mut output = String::new();

@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, array_flip, array_flip_strings, array_map, array_merge, array_search,
-    array_search_mixed, count, in_array, microtime, number_format, round, sprintf, strpos,
+    LogicException, PhpMixed, array_flip_strings, array_map, in_array, microtime, number_format,
+    round, strpos,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::Intervals;
@@ -25,16 +25,11 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::AliasPackageHandle;
 use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackageHandle;
-use crate::package::CompletePackage;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::version::StabilityFilter;
-use crate::plugin::PluginEvents;
-use crate::plugin::PrePoolCreateEvent;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 

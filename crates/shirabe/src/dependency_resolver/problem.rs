@@ -5,25 +5,19 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, php_to_string,
-    phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
-    strtolower, substr, substr_count, version_compare,
+    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, phpversion,
+    spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos, strtolower, substr,
+    substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::advisory::SecurityAdvisory;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::rule::{self, Rule};
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
 use crate::package::BasePackageHandle;
-use crate::package::CompletePackageInterface;
 use crate::package::Link;
-use crate::package::PackageInterface;
-use crate::package::RootPackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;

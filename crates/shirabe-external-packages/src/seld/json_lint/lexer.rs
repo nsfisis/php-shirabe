@@ -170,7 +170,7 @@ impl Lexer {
         let past_length = self.offset as i64 - self.match_.len() as i64;
         let prefix = if past_length > 20 { "..." } else { "" };
         let start = (past_length - 20).max(0) as usize;
-        let len = past_length.min(20).max(0) as usize;
+        let len = past_length.clamp(0, 20) as usize;
         let slice = substr_bytes(&self.input, start, len);
         let mut out = prefix.as_bytes().to_vec();
         out.extend_from_slice(&slice);

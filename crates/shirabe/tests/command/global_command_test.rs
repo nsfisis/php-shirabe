@@ -287,7 +287,7 @@ fn test_global_update() {
     let composer_home_str = tear_down.working_dir().to_string_lossy().to_string();
 
     let pkg = get_package("vendor/pkg", "1.0.0");
-    create_installed_json(&[pkg.clone()], &[], true);
+    create_installed_json(std::slice::from_ref(&pkg), &[], true);
     create_composer_lock(&[pkg], &[]);
 
     Platform::put_env("COMPOSER_HOME", &composer_home_str);

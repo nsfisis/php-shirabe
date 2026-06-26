@@ -63,7 +63,7 @@ fn test_foreach() {
         rule_set_iterator.next();
     }
 
-    let expected = vec![
+    let expected = [
         rules[&RuleSet::TYPE_REQUEST][0].clone(),
         rules[&RuleSet::TYPE_REQUEST][1].clone(),
         rules[&RuleSet::TYPE_LEARNED][0].clone(),

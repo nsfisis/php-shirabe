@@ -324,16 +324,16 @@ fn test_ssl_proxy() {
             )]);
             assert_eq!(expected_options, options);
         } else {
-            match StreamContextFactory::get_context(
-                "http://example.org",
-                IndexMap::new(),
-                IndexMap::new(),
-            ) {
-                // The catch in PHP asserts the exception is a TransportException; the return type
-                // here already guarantees that.
-                Ok(_) => panic!(),
-                Err(_) => {}
-            }
+            // The catch in PHP asserts the exception is a TransportException; the return type
+            // here already guarantees that.
+            assert!(
+                StreamContextFactory::get_context(
+                    "http://example.org",
+                    IndexMap::new(),
+                    IndexMap::new(),
+                )
+                .is_err()
+            );
         }
     }
 }
@@ -351,7 +351,7 @@ fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() 
             ),
         )]),
     )]);
-    let expected_header = vec![
+    let expected_header = [
         s("User-agent: foo"),
         s("X-Foo: bar"),
         s("Authorization: Basic aW52YWxpZA=="),

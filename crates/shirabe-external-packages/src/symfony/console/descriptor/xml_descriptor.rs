@@ -336,14 +336,8 @@ impl XmlDescriptor {
     /// getInputOptionDocument when the default is an array (returns it verbatim).
     fn default_values_as_strings(&self, default: &PhpMixed) -> Vec<String> {
         match default {
-            PhpMixed::List(list) => list
-                .iter()
-                .map(|v| shirabe_php_shim::php_to_string(v))
-                .collect(),
-            PhpMixed::Array(arr) => arr
-                .values()
-                .map(|v| shirabe_php_shim::php_to_string(v))
-                .collect(),
+            PhpMixed::List(list) => list.iter().map(shirabe_php_shim::php_to_string).collect(),
+            PhpMixed::Array(arr) => arr.values().map(shirabe_php_shim::php_to_string).collect(),
             _ => vec![],
         }
     }

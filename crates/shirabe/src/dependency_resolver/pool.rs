@@ -9,7 +9,6 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::advisory::AnySecurityAdvisory;
-use crate::package::BasePackage;
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 

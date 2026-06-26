@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Repository/ArrayRepository.php
 
-use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Weak;
 

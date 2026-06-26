@@ -450,7 +450,7 @@ impl InstalledVersions {
                     .cloned();
                 if let Some(cached) = cached {
                     installed.push(cached);
-                } else if is_file(&format!("{}/composer/installed.php", vendor_dir)) {
+                } else if is_file(format!("{}/composer/installed.php", vendor_dir)) {
                     let required =
                         require_php_file(&format!("{}/composer/installed.php", vendor_dir));
                     let required_map: IndexMap<String, PhpMixed> =

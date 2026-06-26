@@ -27,7 +27,7 @@ pub struct ParsingExceptionDetails {
 pub struct ParsingException {
     pub message: String,
     pub code: i64,
-    pub(crate) details: ParsingExceptionDetails,
+    pub(crate) details: Box<ParsingExceptionDetails>,
 }
 
 impl ParsingException {
@@ -35,7 +35,7 @@ impl ParsingException {
         Self {
             message,
             code: 0,
-            details,
+            details: Box::new(details),
         }
     }
 

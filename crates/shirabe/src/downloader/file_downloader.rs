@@ -26,13 +26,9 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::io::IOInterfaceMutable;
 use crate::io::NullIO;
 use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
-use crate::plugin::PluginEvents;
-use crate::plugin::PostFileDownloadEvent;
-use crate::plugin::PreFileDownloadEvent;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
@@ -111,7 +107,7 @@ impl FileDownloader {
             ))))
         });
 
-        let mut this = Self {
+        let this = Self {
             io,
             config,
             http_downloader,
@@ -123,10 +119,12 @@ impl FileDownloader {
             additional_cleanup_paths: IndexMap::new(),
         };
 
-        if this.cache.is_some() && this.cache.as_ref().unwrap().borrow().gc_is_necessary() {
+        if let Some(cache) = &this.cache
+            && cache.borrow().gc_is_necessary()
+        {
             // PHP: writeError('Running cache garbage collection', true, io_interface::VERY_VERBOSE)
             this.io.write_error("Running cache garbage collection");
-            this.cache.as_ref().unwrap().borrow_mut().gc(
+            cache.borrow_mut().gc(
                 this.config
                     .borrow_mut()
                     .get("cache-files-ttl")
@@ -537,8 +535,8 @@ impl DownloaderInterface for FileDownloader {
         }
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         self.filesystem.borrow_mut().rename(
-            &self.get_file_name(package.clone(), path),
-            &format!(
+            self.get_file_name(package.clone(), path),
+            format!(
                 "{}/{}",
                 path,
                 self.get_dist_path(package.clone(), PATHINFO_BASENAME)
@@ -626,10 +624,10 @@ impl ChangeReportInterface for FileDownloader {
         // httpDownloader->wait() / process->wait(); the single-threaded sync bridge block_on's the
         // download/install futures, so a rejection surfaces directly as the Err captured below.
         let result: Result<String> = (|| -> Result<String> {
-            if is_dir(&format!("{}_compare", target_dir)) {
+            if is_dir(format!("{}_compare", target_dir)) {
                 self.filesystem
                     .borrow_mut()
-                    .remove_directory(&format!("{}_compare", target_dir))?;
+                    .remove_directory(format!("{}_compare", target_dir))?;
             }
 
             tokio::runtime::Runtime::new()
@@ -655,7 +653,7 @@ impl ChangeReportInterface for FileDownloader {
             let output = comparer.get_changed_as_string(true, false);
             self.filesystem
                 .borrow_mut()
-                .remove_directory(&format!("{}_compare", target_dir))?;
+                .remove_directory(format!("{}_compare", target_dir))?;
             Ok(output)
         })();
 
@@ -710,9 +708,11 @@ impl FileDownloader {
 
     pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
         let mut last_cache_writes = self.last_cache_writes.lock().unwrap();
-        if self.cache.is_some() && last_cache_writes.contains_key(&package.get_name()) {
+        if let Some(cache) = &self.cache
+            && last_cache_writes.contains_key(&package.get_name())
+        {
             let key = last_cache_writes.get(&package.get_name()).unwrap().clone();
-            self.cache.as_ref().unwrap().borrow_mut().remove(&key);
+            cache.borrow_mut().remove(&key);
             last_cache_writes.shift_remove(&package.get_name());
         }
     }

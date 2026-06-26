@@ -6,7 +6,6 @@ use crate::symfony::console::output::output_interface;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::style::symfony_style::SymfonyStyle;
-use shirabe_php_shim::AsAny;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
@@ -46,8 +45,7 @@ impl SymfonyQuestionHelper {
                     "yes"
                 } else {
                     "no"
-                }
-                .to_string(),
+                },
             );
         } else if let Some(choice_question) = question.as_choice().filter(|q| q.is_multiselect()) {
             let choices = choice_question.get_choices();

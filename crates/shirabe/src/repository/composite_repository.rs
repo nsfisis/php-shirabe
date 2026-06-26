@@ -1,7 +1,5 @@
 //! ref: composer/src/Composer/Repository/CompositeRepository.php
 
-use std::any::Any;
-
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 

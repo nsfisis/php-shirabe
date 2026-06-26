@@ -4,7 +4,6 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{strnatcasecmp, version_compare};
 
 use crate::package::Link;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 
 pub struct PackageSorter;

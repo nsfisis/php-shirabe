@@ -11,7 +11,6 @@ use shirabe_php_shim::{
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::package::BasePackage;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
 use crate::repository::ArrayRepository;

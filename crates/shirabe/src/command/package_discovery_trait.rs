@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/PackageDiscoveryTrait.php
 
 use crate::io::io_interface;
-use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -10,13 +9,11 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
-    array_slice, array_unshift, array_values, asort, count, explode, file_get_contents, implode,
-    in_array, is_array, is_file, is_numeric, is_string, json_decode, levenshtein, sprintf, strlen,
-    strpos, trim,
+    array_slice, asort, explode, file_get_contents, implode, in_array, is_array, is_file,
+    is_numeric, json_decode, levenshtein, strlen, strpos, trim,
 };
 
 use crate::command::BaseCommand;
-use crate::composer::PartialComposerHandle;
 use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
@@ -558,7 +555,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "Package {} has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
-                            name.to_string(),
+                            name,
                             self.get_platform_exception_details(
                                 candidate.clone(),
                                 platform_repo,
@@ -612,7 +609,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 return Err(InvalidArgumentException {
                     message: format!(
                         "Could not find a version of package {} matching your minimum-stability ({}). Require it with an explicit version constraint allowing its desired stability.",
-                        name.to_string(),
+                        name,
                         effective_minimum_stability.clone(),
                     ),
                     code: 0,
@@ -654,7 +651,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "Could not find package {} in any version matching your PHP version, PHP extensions and Composer version{}{}",
-                            name.to_string(),
+                            name,
                             self.get_platform_exception_details(
                                 candidate.clone(),
                                 platform_repo,
@@ -683,7 +680,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "Could not find package {}. It was however found via repository search, which indicates a consistency issue with the repository.",
-                            name.to_string(),
+                            name,
                         ),
                         code: 0,
                     }
@@ -720,7 +717,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 return Err(InvalidArgumentException {
                     message: format!(
                         "Could not find package {}.\n\nDid you mean {}?\n    {}",
-                        name.to_string(),
+                        name,
                         if similar.len() > 1 {
                             "one of these"
                         } else {
@@ -736,7 +733,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             return Err(InvalidArgumentException {
                 message: format!(
                     "Could not find a matching version of package {}. Check the package spelling, your version constraint and that the package is available in a stability which matches your minimum-stability ({}).",
-                    name.to_string(),
+                    name,
                     effective_minimum_stability,
                 ),
                 code: 0,

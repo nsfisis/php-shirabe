@@ -338,7 +338,7 @@ impl JsonFile {
         schema_file: Option<&str>,
     ) -> Result<bool> {
         let mut is_composer_schema_file = false;
-        let mut schema_file = match schema_file {
+        let schema_file = match schema_file {
             Some(f) => f.into(),
             None => {
                 if schema == Self::LOCK_SCHEMA {

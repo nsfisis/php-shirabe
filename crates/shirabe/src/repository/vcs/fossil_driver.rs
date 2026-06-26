@@ -4,9 +4,7 @@ use crate::io::io_interface;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    DATE_RFC3339, PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable,
-};
+use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable};
 
 use crate::cache::Cache;
 use crate::config::Config;

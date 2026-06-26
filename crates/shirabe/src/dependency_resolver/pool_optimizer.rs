@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, implode, ksort};
+use shirabe_php_shim::{implode, ksort};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
@@ -14,7 +14,6 @@ use crate::dependency_resolver::PolicyInterface;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
 use crate::package::BasePackageHandle;
-use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 
 /// Optimizes a given pool

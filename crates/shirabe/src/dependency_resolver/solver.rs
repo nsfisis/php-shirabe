@@ -5,15 +5,12 @@ use std::rc::Rc;
 
 use indexmap::IndexMap;
 
-use shirabe_php_shim::{
-    PhpMixed, array_pop, array_shift, array_unshift, microtime, spl_object_hash, sprintf,
-};
+use shirabe_php_shim::{array_shift, array_unshift, microtime, spl_object_hash};
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::dependency_resolver::Decisions;
 use crate::dependency_resolver::GenericRule;
 use crate::dependency_resolver::LockTransaction;
-use crate::dependency_resolver::MultiConflictRule;
 use crate::dependency_resolver::PolicyInterface;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Problem;

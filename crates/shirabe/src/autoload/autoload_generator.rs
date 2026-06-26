@@ -7,14 +7,12 @@ use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_keys, array_map,
-    array_merge, array_merge_map, array_merge_recursive, array_reverse, array_shift, array_slice,
-    array_slice_strs, array_unique, bin2hex, explode, file_exists, file_get_contents, hash,
-    implode, in_array, is_array, krsort, ksort, ltrim, preg_quote, random_bytes, realpath, sprintf,
-    str_contains, str_replace, str_starts_with, strlen, strpos, strtr, substr, substr_count, trim,
-    unlink, var_export,
+    InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
+    array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
+    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, preg_quote,
+    random_bytes, realpath, str_contains, str_replace, str_starts_with, strlen, strpos, strtr,
+    substr, substr_count, trim, unlink, var_export,
 };
-use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
 
 use crate::autoload::ClassLoader;
@@ -29,7 +27,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::json::JsonFile;
 use crate::package::Locker;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
@@ -516,7 +513,7 @@ impl AutoloadGenerator {
             if suffix.is_none() && Filesystem::is_readable(&format!("{}/autoload.php", vendor_path))
             {
                 let content =
-                    file_get_contents(&format!("{}/autoload.php", vendor_path)).unwrap_or_default();
+                    file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default();
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::match3(
                     "{ComposerAutoloaderInit([^:\\s]+)::}",
@@ -624,8 +621,8 @@ impl AutoloadGenerator {
                 &format!("{}/platform_check.php", target_dir),
                 platform_check_content.as_ref().unwrap(),
             )?;
-        } else if file_exists(&format!("{}/platform_check.php", target_dir)) {
-            unlink(&format!("{}/platform_check.php", target_dir));
+        } else if file_exists(format!("{}/platform_check.php", target_dir)) {
+            unlink(format!("{}/platform_check.php", target_dir));
         }
         filesystem.file_put_contents_if_modified(
             &format!("{}/autoload.php", vendor_path),
@@ -1562,7 +1559,7 @@ impl AutoloadGenerator {
         let prefix = "\0Composer\\Autoload\\ClassLoader\0";
         let prefix_len = strlen(prefix);
         let mut maps: IndexMap<String, PhpMixed> = IndexMap::new();
-        if file_exists(&format!("{}/autoload_files.php", target_dir)) {
+        if file_exists(format!("{}/autoload_files.php", target_dir)) {
             maps.insert(
                 "files".to_string(),
                 require_generated_php_array(&format!("{}/autoload_files.php", target_dir)),
@@ -1687,7 +1684,7 @@ impl AutoloadGenerator {
                 };
                 // PHP: foreach ((array) $paths as $path) — handles scalar by wrapping in an array
                 let path_list: Vec<PhpMixed> = match &paths {
-                    PhpMixed::List(l) => l.iter().cloned().collect(),
+                    PhpMixed::List(l) => l.to_vec(),
                     PhpMixed::Array(a) => a.values().cloned().collect(),
                     other => vec![other.clone()],
                 };

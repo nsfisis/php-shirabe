@@ -14,7 +14,6 @@ use shirabe_external_packages::symfony::console::command_loader::command_loader_
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
-use shirabe_external_packages::symfony::console::exception::ExceptionInterface;
 use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
 use shirabe_external_packages::symfony::console::exception::invalid_option_exception::InvalidOptionException;
 use shirabe_external_packages::symfony::console::exception::logic_exception::LogicException as ConsoleLogicException;
@@ -34,7 +33,6 @@ use shirabe_external_packages::symfony::console::input::InputOption;
 use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
-use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::{
     self as output_interface, OutputInterface,
@@ -46,20 +44,18 @@ use shirabe_external_packages::symfony::console::terminal::Terminal;
 use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
-    RuntimeException, UnexpectedValueException, array_merge, bin2hex, chdir, count,
-    date_default_timezone_get, date_default_timezone_set, defined, dirname, disk_free_space,
-    error_get_last, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    function_exists, get_class, getcwd, getmypid, glob, in_array, ini_set, is_array, is_dir,
-    is_file, is_string, is_subclass_of, json_decode, memory_get_peak_usage, memory_get_usage,
-    method_exists, microtime, php_uname, posix_getuid, random_bytes, realpath,
-    register_shutdown_function, restore_error_handler, round, sprintf, str_contains, str_replace,
+    RuntimeException, bin2hex, chdir, date_default_timezone_get, date_default_timezone_set,
+    defined, dirname, disk_free_space, error_get_last, extension_loaded, file_exists,
+    file_get_contents, file_put_contents, function_exists, getcwd, getmypid, glob, in_array,
+    ini_set, is_array, is_dir, is_file, is_string, is_subclass_of, json_decode,
+    memory_get_peak_usage, memory_get_usage, microtime, php_uname, posix_getuid, random_bytes,
+    realpath, register_shutdown_function, restore_error_handler, round, str_contains, str_replace,
     strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 
 use crate::command::AboutCommand;
 use crate::command::ArchiveCommand;
 use crate::command::AuditCommand;
-use crate::command::BaseCommand;
 use crate::command::BumpCommand;
 use crate::command::CheckPlatformReqsCommand;
 use crate::command::ClearCacheCommand;
@@ -91,7 +87,6 @@ use crate::command::SuggestsCommand;
 use crate::command::UpdateCommand;
 use crate::command::ValidateCommand;
 use crate::composer;
-use crate::composer::ComposerHandle;
 use crate::composer::PartialComposerHandle;
 use crate::console::GithubActionError;
 use crate::downloader::TransportException;
@@ -796,7 +791,7 @@ impl Application {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
         if !self.has(name) {
             return Err(CommandNotFoundException::new(
-                format!("The command \"{}\" does not exist.", name.to_string()),
+                format!("The command \"{}\" does not exist.", name),
                 Vec::new(),
                 0,
             )
@@ -808,7 +803,7 @@ impl Application {
             return Err(CommandNotFoundException::new(
                 format!(
                     "The \"{}\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\".",
-                    name.to_string(),
+                    name,
                 ),
                 Vec::new(),
                 0,
@@ -911,7 +906,7 @@ impl Application {
         if namespaces.is_empty() {
             let mut message = format!(
                 "There are no commands defined in the \"{}\" namespace.",
-                namespace.to_string(),
+                namespace,
             );
 
             let alternatives = self.find_alternatives(namespace, &all_namespaces);
@@ -938,7 +933,7 @@ impl Application {
             return Err(NamespaceNotFoundException(CommandNotFoundException::new(
                 format!(
                     "The namespace \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                    namespace.to_string(),
+                    namespace,
                     self.get_abbreviation_suggestions(&namespaces),
                 ),
                 namespaces.clone(),
@@ -1140,8 +1135,7 @@ impl Application {
                     return Err(CommandNotFoundException::new(
                         format!(
                             "SymfonyCommand \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                            name.to_string(),
-                            suggestions,
+                            name, suggestions,
                         ),
                         commands.clone(),
                         0,
@@ -1156,7 +1150,7 @@ impl Application {
 
         if command.borrow().is_hidden() {
             return Err(CommandNotFoundException::new(
-                format!("The command \"{}\" does not exist.", name.to_string()),
+                format!("The command \"{}\" does not exist.", name),
                 Vec::new(),
                 0,
             )
@@ -2045,7 +2039,7 @@ impl ApplicationHandle {
                 &no_composer_json_commands_pm,
                 true,
             )
-            && !file_exists(&Factory::get_composer_file().unwrap_or_default())
+            && !file_exists(Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
                 || (!input
@@ -2069,7 +2063,7 @@ impl ApplicationHandle {
 
             // abort when we reach the home dir or top of the filesystem
             while dirname(&dir) != dir && dir != home {
-                if file_exists(&format!(
+                if file_exists(format!(
                     "{}/{}",
                     dir,
                     Factory::get_composer_file().unwrap_or_default()

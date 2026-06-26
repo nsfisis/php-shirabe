@@ -38,13 +38,12 @@ fn load_package(
 
     let mut id: Option<i64> = None;
     // PHP: !empty($data['id'])
-    if let Some(id_val) = data.get("id") {
-        if let Some(i) = id_val.as_int() {
-            if i != 0 {
-                id = Some(i);
-                data.shift_remove("id");
-            }
-        }
+    if let Some(id_val) = data.get("id")
+        && let Some(i) = id_val.as_int()
+        && i != 0
+    {
+        id = Some(i);
+        data.shift_remove("id");
     }
 
     let pkg = loader.load(data, None).unwrap();
@@ -267,10 +266,10 @@ fn get_package_result_set(
             if let Some(source_reference) = package.get_source_reference() {
                 suffix = format!("#{}", source_reference);
             }
-            if let Some(repo) = package.get_repository() {
-                if repo.is::<LockArrayRepository>() {
-                    suffix.push_str(" (locked)");
-                }
+            if let Some(repo) = package.get_repository()
+                && repo.is::<LockArrayRepository>()
+            {
+                suffix.push_str(" (locked)");
             }
 
             if let Some(alias) = package.as_alias() {
@@ -460,18 +459,18 @@ fn run_test_pool_builder(
     // PHP: foreach ($packageRepos as $packages)
     for repo_entry in package_repos.as_list().unwrap() {
         // PHP: isset($packages['type'])
-        if let Some(repo_map) = repo_entry.as_array() {
-            if repo_map.contains_key("type") {
-                let repo = RepositoryFactory::create_repo(
-                    io.clone(),
-                    &config,
-                    repo_map.clone(),
-                    Some(&mut rm),
-                )
-                .unwrap();
-                repository_set.add_repository(repo).unwrap();
-                continue;
-            }
+        if let Some(repo_map) = repo_entry.as_array()
+            && repo_map.contains_key("type")
+        {
+            let repo = RepositoryFactory::create_repo(
+                io.clone(),
+                &config,
+                repo_map.clone(),
+                Some(&mut rm),
+            )
+            .unwrap();
+            repository_set.add_repository(repo).unwrap();
+            continue;
         }
 
         let repo = ArrayRepository::new(vec![]).unwrap();

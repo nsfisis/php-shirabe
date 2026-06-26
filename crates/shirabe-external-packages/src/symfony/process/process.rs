@@ -1045,28 +1045,26 @@ impl Process {
             return Ok(());
         }
 
-        if let Some(timeout) = self.timeout {
-            if timeout < php::microtime() - self.starttime.unwrap_or(0.0) {
-                self.stop(0.0, None);
+        if let Some(timeout) = self.timeout
+            && timeout < php::microtime() - self.starttime.unwrap_or(0.0)
+        {
+            self.stop(0.0, None);
 
-                return Err(ProcessTimedOutException::new(
-                    self,
-                    ProcessTimedOutException::TYPE_GENERAL,
-                )
-                .into());
-            }
+            return Err(ProcessTimedOutException::new(
+                self,
+                ProcessTimedOutException::TYPE_GENERAL,
+            )
+            .into());
         }
 
-        if let Some(idle_timeout) = self.idle_timeout {
-            if idle_timeout < php::microtime() - self.last_output_time.unwrap_or(0.0) {
-                self.stop(0.0, None);
+        if let Some(idle_timeout) = self.idle_timeout
+            && idle_timeout < php::microtime() - self.last_output_time.unwrap_or(0.0)
+        {
+            self.stop(0.0, None);
 
-                return Err(ProcessTimedOutException::new(
-                    self,
-                    ProcessTimedOutException::TYPE_IDLE,
-                )
-                .into());
-            }
+            return Err(
+                ProcessTimedOutException::new(self, ProcessTimedOutException::TYPE_IDLE).into(),
+            );
         }
 
         Ok(())
@@ -1242,13 +1240,14 @@ impl Process {
                 self.cached_exit_code = exitcode;
             }
 
-            if let Some(cached) = self.cached_exit_code {
-                if !running && exitcode == Some(-1) {
-                    self.process_information
-                        .as_mut()
-                        .unwrap()
-                        .insert("exitcode".to_string(), PhpMixed::Int(cached));
-                }
+            if let Some(cached) = self.cached_exit_code
+                && !running
+                && exitcode == Some(-1)
+            {
+                self.process_information
+                    .as_mut()
+                    .unwrap()
+                    .insert("exitcode".to_string(), PhpMixed::Int(cached));
             }
         }
 
@@ -1386,11 +1385,11 @@ impl Process {
             if signaled && termsig > 0 {
                 // if process has been signaled, no exitcode but a valid termsig, apply Unix convention
                 self.exitcode = Some(128 + termsig);
-            } else if self.is_sigchild_enabled() {
-                if let Some(i) = self.process_information.as_mut() {
-                    i.insert("signaled".to_string(), PhpMixed::Bool(true));
-                    i.insert("termsig".to_string(), PhpMixed::Int(-1));
-                }
+            } else if self.is_sigchild_enabled()
+                && let Some(i) = self.process_information.as_mut()
+            {
+                i.insert("signaled".to_string(), PhpMixed::Bool(true));
+                i.insert("termsig".to_string(), PhpMixed::Int(-1));
             }
         }
 
@@ -1659,13 +1658,11 @@ impl Process {
                         key, commandline
                     ))
                     .into()),
-                    Some(v) if matches!(v, PhpMixed::Bool(false)) => {
-                        Err(InvalidArgumentException::new(format!(
-                            "Command line is missing a value for parameter \"{}\": {}",
-                            key, commandline
-                        ))
-                        .into())
-                    }
+                    Some(PhpMixed::Bool(false)) => Err(InvalidArgumentException::new(format!(
+                        "Command line is missing a value for parameter \"{}\": {}",
+                        key, commandline
+                    ))
+                    .into()),
                     Some(v) => Ok(self.escape_argument(Some(&to_php_string(v)))),
                 }
             },

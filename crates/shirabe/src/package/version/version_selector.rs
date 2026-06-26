@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Package/Version/VersionSelector.php
 
 use crate::io::io_interface;
-use std::any::Any;
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -139,7 +138,7 @@ impl VersionSelector {
             let mut already_seen_names: IndexMap<String, bool> = IndexMap::new();
             let mut found_package: Option<crate::package::PackageInterfaceHandle> = None;
 
-            'pkgs: for pkg in candidates.iter() {
+            for pkg in candidates.iter() {
                 let reqs = pkg.get_requires();
                 let mut skip = false;
                 'reqs: for (name, link) in &reqs {

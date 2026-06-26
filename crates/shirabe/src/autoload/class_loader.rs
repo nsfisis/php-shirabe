@@ -4,8 +4,7 @@ use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, array_merge, array_values,
-    call_user_func_array, defined, file_exists, function_exists, include_file, ini_get,
+    DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, defined, file_exists, include_file,
     spl_autoload_register, spl_autoload_unregister, stream_resolve_include_path, strlen, strpos,
     strrpos, strtr, substr,
 };

@@ -5,9 +5,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
-    array_reverse, count, empty, explode, implode, in_array, is_array, is_int, is_numeric,
-    json_decode, preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp,
-    strpos, substr, trim, uksort,
+    array_reverse, empty, explode, implode, in_array, is_array, is_int, is_numeric, json_decode,
+    preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp, strpos, substr,
+    trim, uksort,
 };
 
 use crate::json::JsonFile;
@@ -838,7 +838,7 @@ impl JsonManipulator {
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
-        if main_node_value.map(|v| empty(v)).unwrap_or(true) {
+        if main_node_value.map(empty).unwrap_or(true) {
             return Ok(true);
         }
 
@@ -1220,7 +1220,7 @@ impl JsonManipulator {
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
-        if main_node_value.map(|v| empty(v)).unwrap_or(true) {
+        if main_node_value.map(empty).unwrap_or(true) {
             return Ok(true);
         }
 

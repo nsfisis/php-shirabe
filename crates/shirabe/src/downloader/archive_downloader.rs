@@ -12,7 +12,6 @@ use std::path::{Path, PathBuf};
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
@@ -165,11 +164,8 @@ pub trait ArchiveDownloader {
                 }
 
                 let content_dir = get_folder_content(&temporary_dir);
-                let single_dir_at_top_level = content_dir.len() == 1
-                    && content_dir
-                        .first()
-                        .map(|file| is_dir(file))
-                        .unwrap_or(false);
+                let single_dir_at_top_level =
+                    content_dir.len() == 1 && content_dir.first().map(is_dir).unwrap_or(false);
 
                 if rename_as_one {
                     // if the target $path is clear, we can rename the whole package in one go instead of looping over the contents

@@ -9,35 +9,27 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, array_key_exists,
-    array_reverse, array_search, clone, get_class, get_class_obj, implode, in_array, is_a,
-    is_array, is_string, ksort, preg_quote, str_replace, strrpos, strtr, substr, trigger_error,
-    trim, var_export, var_export_str, version_compare,
+    get_class_obj, implode, ksort, trigger_error, trim, var_export_str, version_compare,
 };
-use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::composer::PartialComposerHandle;
 use crate::composer::{ComposerHandle, ComposerWeakHandle};
-use crate::event_dispatcher::EventSubscriberInterface;
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::CompletePackage;
-use crate::package::Link;
 use crate::package::Locker;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package::{self};
 use crate::package::version::VersionParser;
-use crate::plugin::Capable;
 use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryUtils;
-use crate::repository::RootPackageRepository;
 use crate::util::PackageSorter;
 
 #[derive(Debug)]
@@ -413,30 +405,37 @@ impl PluginManager {
             return Ok(());
         }
 
-        if source_package.is_none() {
-            trigger_error(
-                "Calling PluginManager::addPlugin without $sourcePackage is deprecated, if you are using this please get in touch with us to explain the use case",
-                E_USER_DEPRECATED,
-            );
-        } else {
-            let sp = source_package.as_ref().unwrap();
-            let plugin_optional = sp
-                .get_extra()
-                .get("plugin-optional")
-                .map(|v| v.as_bool() == Some(true))
-                .unwrap_or(false);
-            if !self.is_plugin_allowed(&sp.get_name(), is_global_plugin, plugin_optional, true)? {
-                self.io.write_error(&format!(
-                    "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
-                    get_class_obj(&*plugin),
-                    sp.get_name(),
-                    if is_global_plugin || self.running_in_global_dir {
-                        "(installed globally) "
-                    } else {
-                        ""
-                    }
-                ));
-                return Ok(());
+        match &source_package {
+            None => {
+                trigger_error(
+                    "Calling PluginManager::addPlugin without $sourcePackage is deprecated, if you are using this please get in touch with us to explain the use case",
+                    E_USER_DEPRECATED,
+                );
+            }
+            Some(sp) => {
+                let plugin_optional = sp
+                    .get_extra()
+                    .get("plugin-optional")
+                    .map(|v| v.as_bool() == Some(true))
+                    .unwrap_or(false);
+                if !self.is_plugin_allowed(
+                    &sp.get_name(),
+                    is_global_plugin,
+                    plugin_optional,
+                    true,
+                )? {
+                    self.io.write_error(&format!(
+                        "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
+                        get_class_obj(&*plugin),
+                        sp.get_name(),
+                        if is_global_plugin || self.running_in_global_dir {
+                            "(installed globally) "
+                        } else {
+                            ""
+                        }
+                    ));
+                    return Ok(());
+                }
             }
         }
 

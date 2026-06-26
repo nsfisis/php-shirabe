@@ -177,7 +177,7 @@ fn test_ask_and_validate() {
     // PHP asserts the helper receives a Question with a validator. Behaviorally, an always-true
     // validator passes the answer straight through.
     let (console_io, _output) = make_console_io_with_answer("answer\n");
-    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(|value| Ok(value));
+    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(Ok);
     let result = console_io
         .ask_and_validate(
             "Why?".to_string(),

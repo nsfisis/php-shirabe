@@ -8,8 +8,7 @@ use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
 use shirabe_php_shim::PhpMixed;
 
-#[path = "../../common/test_case.rs"]
-mod test_case;
+use crate::test_case;
 
 fn s(v: &str) -> PhpMixed {
     PhpMixed::String(v.to_string())
@@ -1002,7 +1001,6 @@ fn test_load_warnings() {
 fn test_load_skips_warning_data_when_ignoring_errors() {
     for (mut cfg, _expected_warnings, must_check, expected_array) in warning_provider() {
         if !must_check {
-            assert!(true);
             continue;
         }
         let (internal_loader, calls) = MockLoader::new();

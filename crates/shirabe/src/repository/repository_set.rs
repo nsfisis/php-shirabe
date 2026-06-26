@@ -1,18 +1,14 @@
 //! ref: composer/src/Composer/Repository/RepositorySet.php
 
-use std::any::Any;
-
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, array_merge, ksort, strtolower,
-};
+use shirabe_php_shim::{LogicException, RuntimeException, ksort, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
+use crate::advisory::AnySecurityAdvisory;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::PoolBuilder;
 use crate::dependency_resolver::PoolOptimizer;
@@ -27,13 +23,11 @@ use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::StabilityFilter;
-use crate::repository::AdvisoryProviderInterface;
 use crate::repository::CompositeRepository;
 use crate::repository::InstalledRepository;
-use crate::repository::InstalledRepositoryInterface;
 use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
-use crate::repository::{FindPackageConstraint, RepositoryInterface, RepositoryInterfaceHandle};
+use crate::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
 
 #[derive(Debug, Clone)]
 pub struct RootAliasEntry {

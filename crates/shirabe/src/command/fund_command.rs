@@ -1,7 +1,5 @@
 //! ref: composer/src/Composer/Command/FundCommand.php
 
-use std::any::Any;
-
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -15,21 +13,12 @@ use shirabe_semver::constraint::MatchAllConstraint;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::package::AliasPackage;
-use crate::package::CompletePackage;
-use crate::package::CompletePackageInterface;
-use crate::package::PackageInterface;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package::{self};
 use crate::repository::CompositeRepository;
 use crate::repository::RepositoryInterface;
 

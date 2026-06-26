@@ -62,7 +62,7 @@ impl TextDescriptor {
         self.write_text(
             &format!(
                 "  <info>{}</info>  {}{}{}",
-                argument.get_name().to_string(),
+                argument.get_name(),
                 shirabe_php_shim::str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 Preg::replace(
@@ -114,14 +114,14 @@ impl TextDescriptor {
         let synopsis = format!(
             "{}{}",
             if option.get_shortcut().is_some() {
-                format!("-{}, ", option.get_shortcut().unwrap().to_string())
+                format!("-{}, ", option.get_shortcut().unwrap())
             } else {
                 "    ".to_string()
             },
             if option.is_negatable() {
                 format!("--{0}|--no-{0}", option.get_name().to_string())
             } else {
-                format!("--{0}{1}", option.get_name().to_string(), value.clone())
+                format!("--{0}{1}", option.get_name(), value.clone())
             }
         );
 
@@ -400,10 +400,11 @@ impl TextDescriptor {
                     };
                     self.write_text(
                         &format!(
-                            "  <info>{}</info>{}{}",
+                            "  <info>{}</info>{}{}{}",
                             name.clone(),
                             shirabe_php_shim::str_repeat(" ", spacing_width as usize),
-                            format!("{}{}", command_aliases, command.get_description()),
+                            command_aliases,
+                            command.get_description(),
                         ),
                         &options,
                     );

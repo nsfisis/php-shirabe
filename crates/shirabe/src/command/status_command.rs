@@ -5,19 +5,13 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::VersionGuesser;
@@ -58,7 +52,7 @@ impl StatusCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full_mut(&composer);
         let io = self.get_io().clone();
 
         let mut errors: IndexMap<String, String> = IndexMap::new();

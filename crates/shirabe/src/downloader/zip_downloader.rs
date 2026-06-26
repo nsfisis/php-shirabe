@@ -2,9 +2,7 @@
 
 use crate::downloader::ArchiveDownloader;
 use crate::downloader::ChangeReportInterface;
-use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
@@ -13,7 +11,6 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::process::ExecutableFinder;
-use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists,
@@ -290,69 +287,69 @@ impl ZipDownloader {
                 zip_archive.open(file, 0)
             };
 
-            if retval.is_ok() {
-                let archive_size = filesize(file);
-                let total_files = zip_archive.count();
-                if total_files > 0 {
-                    let mut total_size: i64 = 0;
-                    let mut inspect_all = false;
-                    let mut files_to_inspect = total_files.min(5);
-                    let mut i: i64 = 0;
-                    while i < files_to_inspect {
-                        let stat_index = if inspect_all {
-                            i
-                        } else {
-                            random_int(0..total_files)
-                        };
-                        if let Some(stat) = zip_archive.stat_index(stat_index) {
-                            let size = stat.get("size").and_then(|v| v.as_int()).unwrap_or(0);
-                            let comp_size =
-                                stat.get("comp_size").and_then(|v| v.as_int()).unwrap_or(0);
-                            total_size += size;
-                            if !inspect_all && size > comp_size * 200 {
-                                total_size = 0;
-                                inspect_all = true;
-                                i = -1;
-                                files_to_inspect = total_files;
+            match retval {
+                Ok(_) => {
+                    let archive_size = filesize(file);
+                    let total_files = zip_archive.count();
+                    if total_files > 0 {
+                        let mut total_size: i64 = 0;
+                        let mut inspect_all = false;
+                        let mut files_to_inspect = total_files.min(5);
+                        let mut i: i64 = 0;
+                        while i < files_to_inspect {
+                            let stat_index = if inspect_all {
+                                i
+                            } else {
+                                random_int(0..total_files)
+                            };
+                            if let Some(stat) = zip_archive.stat_index(stat_index) {
+                                let size = stat.get("size").and_then(|v| v.as_int()).unwrap_or(0);
+                                let comp_size =
+                                    stat.get("comp_size").and_then(|v| v.as_int()).unwrap_or(0);
+                                total_size += size;
+                                if !inspect_all && size > comp_size * 200 {
+                                    total_size = 0;
+                                    inspect_all = true;
+                                    i = -1;
+                                    files_to_inspect = total_files;
+                                }
                             }
+                            i += 1;
                         }
-                        i += 1;
-                    }
-                    if let Some(archive_sz) = archive_size
-                        && total_size > archive_sz * 100
-                        && total_size > 50 * 1024 * 1024
-                    {
-                        return Err(RuntimeException {
+                        if let Some(archive_sz) = archive_size
+                            && total_size > archive_sz * 100
+                            && total_size > 50 * 1024 * 1024
+                        {
+                            return Err(RuntimeException {
                                 message: format!(
                                     "Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)",
                                     package.get_name(),
                                 ),
                                 code: 0,
                             }.into());
+                        }
                     }
+
+                    let extract_result = zip_archive.extract_to(path)?;
+
+                    if extract_result {
+                        zip_archive.close();
+                        return Ok(None);
+                    }
+
+                    Err(RuntimeException {
+                        message: format!(
+                            "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
+                            package.get_name(),
+                        ),
+                        code: 0,
+                    }.into())
                 }
-
-                let extract_result = zip_archive.extract_to(path)?;
-
-                if extract_result {
-                    zip_archive.close();
-                    return Ok(None);
-                }
-
-                Err(RuntimeException {
-                    message: format!(
-                        "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
-                        package.get_name(),
-                    ),
-                    code: 0,
-                }.into())
-            } else {
-                let code = retval.unwrap_err();
-                Err(UnexpectedValueException {
+                Err(code) => Err(UnexpectedValueException {
                     message: self.get_error_message(code, file).trim_end().to_string(),
                     code,
                 }
-                .into())
+                .into()),
             }
         })();
 

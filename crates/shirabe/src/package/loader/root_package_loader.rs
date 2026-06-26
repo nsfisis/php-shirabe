@@ -2,22 +2,17 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, UnexpectedValueException, strtolower, ucfirst,
-};
+use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, strtolower};
 
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::CompletePackageInterface;
-use crate::package::PackageInterface;
-use crate::package::RootPackageInterface;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
-use crate::package::{BasePackage, RootPackage, STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::RepositoryFactory;
 use crate::repository::RepositoryManager;
 use crate::util::Platform;

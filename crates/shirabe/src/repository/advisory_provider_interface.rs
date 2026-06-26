@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/AdvisoryProviderInterface.php
 
-use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
+use crate::advisory::AnySecurityAdvisory;
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 

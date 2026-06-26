@@ -346,12 +346,12 @@ pub fn stream_select(
     // emit a warning for them. We skip them here, leaving them out of the ready set.
     let mut prepare = |set: &mut FdSet, resources: &[PhpResource]| {
         for resource in resources {
-            if let Some(fd) = resource.raw_fd() {
-                if (fd as usize) < FD_SETSIZE {
-                    set.set(fd);
-                    if fd + 1 > nfds {
-                        nfds = fd + 1;
-                    }
+            if let Some(fd) = resource.raw_fd()
+                && (fd as usize) < FD_SETSIZE
+            {
+                set.set(fd);
+                if fd + 1 > nfds {
+                    nfds = fd + 1;
                 }
             }
         }

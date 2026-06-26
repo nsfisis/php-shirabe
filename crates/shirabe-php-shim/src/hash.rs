@@ -1,6 +1,5 @@
 use crate::bin2hex;
 use sha1::Digest as _;
-use sha2::Digest as _;
 
 pub fn hash(algo: &str, data: &str) -> String {
     crate::bin2hex(&calculate_hash(algo, data.as_bytes()))

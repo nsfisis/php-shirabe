@@ -6,9 +6,9 @@ use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    DATE_RFC3339, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    array_key_exists, array_search_mixed, extension_loaded, http_build_query_mixed, implode,
-    in_array, is_array, sprintf, strpos,
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
+    array_search_mixed, extension_loaded, http_build_query_mixed, implode, in_array, is_array,
+    strpos,
 };
 
 use crate::cache::Cache;
@@ -257,9 +257,7 @@ impl GitBitbucketDriver {
             if self.inner.should_cache(identifier) && {
                 let res = self.inner.cache.as_mut().and_then(|c| c.read(identifier));
                 if let Some(res) = res {
-                    composer = JsonFile::parse_json(Some(&res), None)?
-                        .as_array()
-                        .map(|m| m.clone());
+                    composer = JsonFile::parse_json(Some(&res), None)?.as_array().cloned();
                     true
                 } else {
                     false
@@ -343,30 +341,35 @@ impl GitBitbucketDriver {
                     let support_entry = composer_map
                         .entry("support".to_string())
                         .or_insert(PhpMixed::Array(IndexMap::new()));
-                    if hash.is_none() {
-                        if let PhpMixed::Array(support_map) = support_entry {
-                            support_map.insert(
-                                "source".to_string(),
-                                PhpMixed::String(format!(
-                                    "https://{}/{}/{}/src",
-                                    self.inner.origin_url.clone(),
-                                    self.owner.clone(),
-                                    self.repository.clone(),
-                                )),
-                            );
+                    match &hash {
+                        None => {
+                            if let PhpMixed::Array(support_map) = support_entry {
+                                support_map.insert(
+                                    "source".to_string(),
+                                    PhpMixed::String(format!(
+                                        "https://{}/{}/{}/src",
+                                        self.inner.origin_url.clone(),
+                                        self.owner.clone(),
+                                        self.repository.clone(),
+                                    )),
+                                );
+                            }
                         }
-                    } else if let PhpMixed::Array(support_map) = support_entry {
-                        support_map.insert(
-                            "source".to_string(),
-                            PhpMixed::String(format!(
-                                "https://{}/{}/{}/src/{}/?at={}",
-                                self.inner.origin_url.clone(),
-                                self.owner.clone(),
-                                self.repository.clone(),
-                                hash.unwrap(),
-                                label.clone(),
-                            )),
-                        );
+                        Some(hash) => {
+                            if let PhpMixed::Array(support_map) = support_entry {
+                                support_map.insert(
+                                    "source".to_string(),
+                                    PhpMixed::String(format!(
+                                        "https://{}/{}/{}/src/{}/?at={}",
+                                        self.inner.origin_url.clone(),
+                                        self.owner.clone(),
+                                        self.repository.clone(),
+                                        hash,
+                                        label.clone(),
+                                    )),
+                                );
+                            }
+                        }
                     }
                 }
                 let support_has_issues = composer_map
@@ -432,7 +435,7 @@ impl GitBitbucketDriver {
             self.owner.clone(),
             self.repository.clone(),
             identifier,
-            file.to_string(),
+            file,
         );
 
         Ok(self
@@ -500,7 +503,7 @@ impl GitBitbucketDriver {
             "https://bitbucket.org/{}/{}/get/{}.zip",
             self.owner.clone(),
             self.repository.clone(),
-            identifier.to_string(),
+            identifier,
         );
 
         let mut m: IndexMap<String, String> = IndexMap::new();

@@ -1,12 +1,10 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSetGenerator.php
 
-use std::any::Any;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 use crate::dependency_resolver::GenericRule;
 use crate::dependency_resolver::MultiConflictRule;

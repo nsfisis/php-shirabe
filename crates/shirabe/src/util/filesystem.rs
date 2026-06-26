@@ -4,14 +4,13 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::filesystem::exception::IOException;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, ErrorException, InvalidArgumentException, LogicException, PhpMixed,
-    RuntimeException, UnexpectedValueException, array_pop, basename, chdir, clearstatcache,
-    clearstatcache2, copy, count, dirname, error_get_last, explode, fclose, feof, file_exists,
-    file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread,
-    function_exists, fwrite, implode, is_array, is_dir, is_file, is_link, is_readable, lstat,
-    mkdir, react_promise_resolve, rename, rmdir, rtrim, sprintf, str_contains, str_repeat,
-    str_replace, str_starts_with, strlen, strpos, strtolower, strtoupper, strtr, substr,
-    substr_count, symlink, touch, unlink, usleep, var_export,
+    DIRECTORY_SEPARATOR, ErrorException, LogicException, PhpMixed, RuntimeException, array_pop,
+    basename, chdir, clearstatcache, clearstatcache2, copy, dirname, error_get_last, explode,
+    fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime, filemtime,
+    filesize, fopen, fread, function_exists, fwrite, implode, is_dir, is_file, is_link,
+    is_readable, lstat, mkdir, rename, rmdir, rtrim, str_contains, str_repeat, str_replace,
+    str_starts_with, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch,
+    unlink, usleep, var_export,
 };
 
 use std::path::Path;
@@ -246,9 +245,9 @@ impl Filesystem {
 
         for file in &ri {
             if file.is_dir() {
-                self.rmdir(&file.get_pathname())?;
+                self.rmdir(file.get_pathname())?;
             } else {
-                self.unlink(&file.get_pathname())?;
+                self.unlink(file.get_pathname())?;
             }
         }
 

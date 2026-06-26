@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents, file_put_contents,
-    implode, is_writable, sprintf,
+    implode, is_writable,
 };
 
 use crate::config::ConfigSourceInterface;
@@ -37,7 +37,7 @@ impl JsonConfigSource {
                 return Err(RuntimeException {
                     message: format!(
                         "The file \"{}\" is not writable.",
-                        self.file.borrow().get_path().to_string(),
+                        self.file.borrow().get_path(),
                     ),
                     code: 0,
                 }
@@ -48,7 +48,7 @@ impl JsonConfigSource {
                 return Err(RuntimeException {
                     message: format!(
                         "The file \"{}\" is not readable.",
-                        self.file.borrow().get_path().to_string(),
+                        self.file.borrow().get_path(),
                     ),
                     code: 0,
                 }
@@ -401,7 +401,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                     return Err(RuntimeException {
                         message: format!(
                             "The referenced repository \"{}\" does not exist.",
-                            reference_name.to_string(),
+                            reference_name,
                         ),
                         code: 0,
                     }

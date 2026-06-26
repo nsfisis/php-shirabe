@@ -6,13 +6,12 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::{
-    Exception, InvalidArgumentException, LogicException, PATH_SEPARATOR, PHP_VERSION_ID, PhpMixed,
-    RuntimeException, array_pop, array_push, array_search_in_vec, array_splice, class_exists,
-    count_mixed, defined, file_exists, get_class, hash, implode, ini_get, is_a, is_array,
-    is_callable, is_object, is_string, krsort, method_exists, preg_quote, realpath,
-    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
-    sprintf, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper,
-    substr, trim,
+    InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
+    array_search_in_vec, array_splice, class_exists, defined, file_exists, get_class, hash,
+    implode, ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, preg_quote,
+    realpath, spl_autoload_functions, spl_autoload_register, spl_autoload_unregister,
+    spl_object_hash, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos,
+    strtoupper, substr, trim,
 };
 
 use crate::autoload::ClassLoader;
@@ -27,11 +26,8 @@ use crate::event_dispatcher::ScriptExecutionException;
 use crate::installer::BinaryInstaller;
 use crate::installer::InstallerEvent;
 use crate::installer::PackageEvent;
-use crate::io::ConsoleIO;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::plugin::CommandEvent;
-use crate::plugin::PreCommandRunEvent;
 use crate::repository::RepositoryInterface;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
@@ -366,9 +362,10 @@ impl EventDispatcher {
                     };
                     self.io.write_error3(
                         &format!(
-                            "> {}: {}",
+                            "> {}: {}->{}",
                             formatted_event_name_with_args.clone(),
-                            format!("{}->{}", prefix, method_name),
+                            prefix,
+                            method_name,
                         ),
                         true,
                         crate::io::VERBOSE,
@@ -441,7 +438,7 @@ impl EventDispatcher {
                                 self.io.write_error3(&format!(
                                     "<error>Script {} handling the {} event returned with error code {}</error>",
                                     callable_str.clone(),
-                                    event.get_name().to_string(),
+                                    event.get_name(),
                                     exit_code
                                 ), true, crate::io::QUIET);
 
@@ -494,7 +491,7 @@ impl EventDispatcher {
                                             &format!(
                                                 "<error>Script {} was called via {}</error>",
                                                 callable_str.clone(),
-                                                event.get_name().to_string(),
+                                                event.get_name(),
                                             ),
                                             true,
                                             crate::io::QUIET,
@@ -538,7 +535,7 @@ impl EventDispatcher {
                                     &format!(
                                         "<error>Script {} handling the {} event terminated with an exception</error>",
                                         callable_str.clone(),
-                                        event.get_name().to_string(),
+                                        event.get_name(),
                                     ),
                                     true,
                                     crate::io::QUIET,
@@ -637,7 +634,7 @@ impl EventDispatcher {
 
                         if self.io.is_verbose() {
                             self.io.write_error3(
-                                &format!("> {}: {}", event.get_name().to_string(), exec.clone()),
+                                &format!("> {}: {}", event.get_name(), exec.clone()),
                                 true,
                                 crate::io::NORMAL,
                             );
@@ -762,7 +759,7 @@ impl EventDispatcher {
                             self.io.write_error3(&format!(
                                 "<error>Script {} handling the {} event returned with error code {}</error>",
                                 callable_str.clone(),
-                                event.get_name().to_string(),
+                                event.get_name(),
                                 exit_code
                             ), true, crate::io::QUIET);
 
@@ -863,18 +860,13 @@ impl EventDispatcher {
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
-                &format!(
-                    "> {}: {}::{}",
-                    event.get_name().to_string(),
-                    class_name.to_string(),
-                    method_name.to_string(),
-                ),
+                &format!("> {}: {}::{}", event.get_name(), class_name, method_name,),
                 true,
                 crate::io::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
             self.io.write_error3(
-                &format!("> {}::{}", class_name.to_string(), method_name.to_string()),
+                &format!("> {}::{}", class_name, method_name),
                 true,
                 crate::io::NORMAL,
             );
@@ -1211,8 +1203,8 @@ impl EventDispatcher {
             shirabe_php_shim::PhpMixed::Bool(false),
         );
 
-        if self.loader.is_some() {
-            self.loader.as_mut().unwrap().unregister();
+        if let Some(loader) = self.loader.as_mut() {
+            loader.unregister();
         }
 
         let vendor_dir = composer
@@ -1222,7 +1214,7 @@ impl EventDispatcher {
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_default();
-        let mut loader = generator.create_loader(&map, Some(vendor_dir.clone()));
+        let loader = generator.create_loader(&map, Some(vendor_dir.clone()));
         loader.register(false);
         self.loader = Some(loader);
         Ok(())

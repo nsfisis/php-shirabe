@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/ScriptAliasCommand.php
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -10,16 +9,11 @@ use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_st
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::util::Platform;
 
 #[derive(Debug)]

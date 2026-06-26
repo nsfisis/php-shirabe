@@ -10,7 +10,6 @@ use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::Rule;
 use crate::dependency_resolver::RuleSetIterator;
-use crate::package::BasePackageHandle;
 use crate::repository::RepositorySet;
 
 #[derive(Debug)]

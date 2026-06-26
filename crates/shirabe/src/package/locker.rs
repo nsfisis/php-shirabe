@@ -8,7 +8,7 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array, is_int,
-    ksort, realpath, sprintf, strcmp, strtolower, touch2, trim, usort,
+    ksort, realpath, strcmp, strtolower, touch2, trim, usort,
 };
 
 use crate::installer::InstallationManager;
@@ -18,14 +18,13 @@ use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackageHandle;
 use crate::package::Link;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
-use crate::plugin::plugin_interface::{self, PluginInterface};
+use crate::plugin::plugin_interface::{self};
 use crate::repository::FindPackageConstraint;
 use crate::repository::InstalledRepository;
 use crate::repository::LockArrayRepository;
@@ -161,15 +160,19 @@ impl Locker {
         };
 
         let content_hash = lock_map.get("content-hash");
-        if content_hash.is_some() && !shirabe_php_shim::empty(content_hash.unwrap()) {
+        if let Some(content_hash) = content_hash
+            && !shirabe_php_shim::empty(content_hash)
+        {
             // There is a content hash key, use that instead of the file hash
-            return Ok(self.content_hash == content_hash.unwrap().as_string().unwrap_or(""));
+            return Ok(self.content_hash == content_hash.as_string().unwrap_or(""));
         }
 
         // BC support for old lock files without content-hash
         let lock_hash = lock_map.get("hash");
-        if lock_hash.is_some() && !shirabe_php_shim::empty(lock_hash.unwrap()) {
-            return Ok(self.hash == lock_hash.unwrap().as_string().unwrap_or(""));
+        if let Some(lock_hash) = lock_hash
+            && !shirabe_php_shim::empty(lock_hash)
+        {
+            return Ok(self.hash == lock_hash.as_string().unwrap_or(""));
         }
 
         // should not be reached unless the lock file is corrupted, so assume it's out of date
@@ -301,12 +304,14 @@ impl Locker {
         let mut requirements: IndexMap<String, Link> = IndexMap::new();
 
         let platform_value = lock_data.get("platform");
-        if platform_value.is_some() && !shirabe_php_shim::empty(platform_value.unwrap()) {
+        if let Some(platform_value) = platform_value
+            && !shirabe_php_shim::empty(platform_value)
+        {
             requirements = self.loader.parse_links(
                 "__root__",
                 "1.0.0",
                 Link::TYPE_REQUIRE,
-                match platform_value.unwrap() {
+                match platform_value {
                     PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                     _ => IndexMap::new(),
                 },
@@ -315,14 +320,14 @@ impl Locker {
 
         let platform_dev_value = lock_data.get("platform-dev");
         if with_dev_reqs
-            && platform_dev_value.is_some()
-            && !shirabe_php_shim::empty(platform_dev_value.unwrap())
+            && let Some(platform_dev_value) = platform_dev_value
+            && !shirabe_php_shim::empty(platform_dev_value)
         {
             let dev_requirements = self.loader.parse_links(
                 "__root__",
                 "1.0.0",
                 Link::TYPE_REQUIRE,
-                match platform_dev_value.unwrap() {
+                match platform_dev_value {
                     PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                     _ => IndexMap::new(),
                 },
@@ -730,7 +735,7 @@ impl Locker {
                 return Err(LogicException {
                     message: format!(
                         "Package \"{}\" has no version or name and can not be locked",
-                        package.to_string(),
+                        package,
                     ),
                     code: 0,
                 }
@@ -953,14 +958,11 @@ impl Locker {
                                 for provider_link in provider_links.values() {
                                     if provider_link.get_target() == link.get_target() {
                                         description = format!(
-                                            "{} as {} by {}",
+                                            "{} as {} by {} {}",
                                             verb,
-                                            provider_link.get_pretty_constraint().to_string(),
-                                            format!(
-                                                "{} {}",
-                                                provider.get_pretty_name(),
-                                                provider.get_pretty_version()
-                                            ),
+                                            provider_link.get_pretty_constraint(),
+                                            provider.get_pretty_name(),
+                                            provider.get_pretty_version(),
                                         );
                                         break 'outer;
                                     }

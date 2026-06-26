@@ -6,8 +6,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, dirname, get_class, implode, in_array, preg_quote, rtrim, sprintf,
-    str_replace, strtolower, usort,
+    array_reverse, array_shift, dirname, implode, in_array, preg_quote, rtrim, str_replace,
+    strtolower, usort,
 };
 
 use crate::downloader::DownloaderInterface;
@@ -162,7 +162,7 @@ impl DownloadManager {
                     shirabe_php_shim::get_class_obj(&*downloader.borrow()),
                     downloader_installation_source,
                     installation_source.clone().unwrap_or_default(),
-                    package.to_string(),
+                    package,
                 ),
                 code: 0,
             }

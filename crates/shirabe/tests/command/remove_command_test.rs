@@ -282,7 +282,7 @@ fn test_remove_unused_package() {
     let required_package = get_package("root/req", "1.0.0");
     let extraneous_package = get_package("not/req", "1.0.0");
 
-    create_installed_json(&[required_package.clone()], &[], true);
+    create_installed_json(std::slice::from_ref(&required_package), &[], true);
     create_composer_lock(&[required_package.clone(), extraneous_package.clone()], &[]);
 
     let mut app_tester = get_application_tester();
@@ -825,8 +825,8 @@ fn test_package_still_present_error_when_no_install_flag_used() {
     );
     let root_req_package = get_package("root/req", "1.0.0");
 
-    create_installed_json(&[root_req_package.clone()], &[], true);
-    create_composer_lock(&[root_req_package.clone()], &[]);
+    create_installed_json(std::slice::from_ref(&root_req_package), &[], true);
+    create_composer_lock(std::slice::from_ref(&root_req_package), &[]);
 
     let mut app_tester = get_application_tester();
     let status_code = app_tester
@@ -915,8 +915,8 @@ fn run_update_inherited_dependencies_flag_case(
     let root_req_package = get_package("root/req", "1.0.0");
     root_req_package.__set_type("metapackage".to_string());
 
-    create_installed_json(&[root_req_package.clone()], &[], true);
-    create_composer_lock(&[root_req_package.clone()], &[]);
+    create_installed_json(std::slice::from_ref(&root_req_package), &[], true);
+    create_composer_lock(std::slice::from_ref(&root_req_package), &[]);
 
     let mut app_tester = get_application_tester();
     let status_code = app_tester

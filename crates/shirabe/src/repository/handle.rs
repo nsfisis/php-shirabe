@@ -9,9 +9,8 @@ use shirabe_semver::constraint::AnyConstraint;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
-    FindPackageConstraint, InstalledRepositoryInterface, LoadPackagesResult, LockArrayRepository,
-    PlatformRepository, ProviderInfo, RepositoryInterface, SearchResult,
-    WritableRepositoryInterface,
+    FindPackageConstraint, LoadPackagesResult, LockArrayRepository, PlatformRepository,
+    ProviderInfo, RepositoryInterface, SearchResult,
 };
 
 /// Shared reference to a repository. Corresponds to PHP `RepositoryInterface`.

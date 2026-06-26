@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string, json_encode,
-    ltrim, sprintf, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+    ltrim, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
 use crate::package::CompleteAliasPackageHandle;
@@ -21,9 +21,9 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::RootAliasPackageHandle;
 use crate::package::RootPackage;
 use crate::package::RootPackageHandle;
+use crate::package::SUPPORTED_LINK_TYPES;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
-use crate::package::{BasePackage, SUPPORTED_LINK_TYPES};
 
 #[derive(Debug)]
 pub struct ArrayLoader {
@@ -100,7 +100,7 @@ fn php_to_map(value: &PhpMixed) -> IndexMap<String, PhpMixed> {
 fn php_to_string_vec(value: &PhpMixed) -> Vec<String> {
     match value {
         PhpMixed::List(l) => l.iter().map(strval).collect(),
-        PhpMixed::Array(m) => m.values().map(|v| strval(v)).collect(),
+        PhpMixed::Array(m) => m.values().map(strval).collect(),
         _ => Vec::new(),
     }
 }
@@ -389,8 +389,7 @@ impl ArrayLoader {
                             config
                                 .get("name")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
-                                .to_string(),
+                                .unwrap_or(""),
                         json_encode(&source).unwrap_or_default(),
                     ),
                     code: 0,
@@ -400,15 +399,15 @@ impl ArrayLoader {
             let source_map = source_map.unwrap();
             package
                 .package_mut()
-                .set_source_type(source_map.get("type").map(|v| strval(v)));
+                .set_source_type(source_map.get("type").map(strval));
             package
                 .package_mut()
-                .set_source_url(source_map.get("url").map(|v| strval(v)));
+                .set_source_url(source_map.get("url").map(strval));
             package.package_mut().set_source_reference(
                 source_map
                     .get("reference")
                     .filter(|v| !v.is_null())
-                    .map(|v| strval(v)),
+                    .map(strval),
             );
             if let Some(mirrors) = source_map.get("mirrors") {
                 package
@@ -434,8 +433,7 @@ impl ArrayLoader {
                             config
                                 .get("name")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
-                                .to_string(),
+                                .unwrap_or(""),
                         json_encode(&dist).unwrap_or_default(),
                     ),
                     code: 0,
@@ -445,19 +443,19 @@ impl ArrayLoader {
             let dist_map = dist_map.unwrap();
             package
                 .package_mut()
-                .set_dist_type(dist_map.get("type").map(|v| strval(v)));
+                .set_dist_type(dist_map.get("type").map(strval));
             package
                 .package_mut()
-                .set_dist_url(dist_map.get("url").map(|v| strval(v)));
+                .set_dist_url(dist_map.get("url").map(strval));
             package.package_mut().set_dist_reference(
                 dist_map
                     .get("reference")
                     .filter(|v| !v.is_null())
-                    .map(|v| strval(v)),
+                    .map(strval),
             );
             package
                 .package_mut()
-                .set_dist_sha1_checksum(dist_map.get("shasum").map(|v| strval(v)));
+                .set_dist_sha1_checksum(dist_map.get("shasum").map(strval));
             if let Some(mirrors) = dist_map.get("mirrors") {
                 package
                     .package_mut()
@@ -598,7 +596,7 @@ impl ArrayLoader {
         {
             let keywords_vec: Vec<String> = match keywords {
                 PhpMixed::List(list) => list.iter().map(strval).collect(),
-                PhpMixed::Array(map) => map.values().map(|v| strval(v)).collect(),
+                PhpMixed::Array(map) => map.values().map(strval).collect(),
                 _ => vec![],
             };
             package.complete_mut().set_keywords(keywords_vec);

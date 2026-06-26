@@ -5,8 +5,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_key_exists, is_array, sprintf, stripos, strrpos, strtr,
-    substr, trim,
+    PhpMixed, RuntimeException, array_key_exists, stripos, strrpos, strtr, substr, trim,
 };
 
 use crate::cache::Cache;
@@ -187,8 +186,7 @@ impl SvnDriver {
                 }
 
                 let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
-                let composer: Option<IndexMap<String, PhpMixed>> =
-                    parsed.as_array().map(|m| m.clone());
+                let composer: Option<IndexMap<String, PhpMixed>> = parsed.as_array().cloned();
                 self.inner
                     .info_cache
                     .insert(identifier.to_string(), composer.clone());
@@ -380,10 +378,10 @@ impl SvnDriver {
         if self.branches.is_none() {
             let mut branches: IndexMap<String, String> = IndexMap::new();
 
-            let trunk_parent = if self.trunk_path.is_none() {
-                format!("{}/", self.base_url)
+            let trunk_parent = if let Some(trunk_path) = self.trunk_path.as_ref() {
+                format!("{}/{}", self.base_url, trunk_path)
             } else {
-                format!("{}/{}", self.base_url, self.trunk_path.as_ref().unwrap())
+                format!("{}/", self.base_url)
             };
 
             let output = self.execute(

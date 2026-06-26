@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
@@ -9,18 +8,13 @@ use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
@@ -138,7 +132,7 @@ impl Command for InstallCommand {
         }
 
         let composer_handle = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer_handle);
+        let composer = crate::command::composer_full_mut(&composer_handle);
 
         if !composer.get_locker().borrow_mut().is_locked() && !HttpDownloader::is_curl_enabled() {
             io.write_error("<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>");

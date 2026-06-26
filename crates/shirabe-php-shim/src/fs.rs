@@ -259,13 +259,15 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
     // (this is what Symfony's ApplicationTester relies on -- it opens "php://memory" with "w" and
     // then rewinds + reads it back). So memory streams are always both readable and writable.
     if file == "php://memory" || file.starts_with("php://temp") {
-        return Ok(StreamState::new(
-            StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
-            true,
-            true,
-            mode.to_string(),
-            file.to_string(),
-        ));
+        return Ok(PhpResource::Stream(std::rc::Rc::new(
+            std::cell::RefCell::new(StreamState::new(
+                StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
+                true,
+                true,
+                mode.to_string(),
+                file.to_string(),
+            )),
+        )));
     }
     let uri = file.to_string();
     let mut options = std::fs::OpenOptions::new();
@@ -284,13 +286,15 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
         _ => options.read(true),
     };
     let file = options.open(file)?;
-    Ok(StreamState::new(
-        StreamBacking::File(file),
-        readable,
-        writable,
-        mode.to_string(),
-        uri,
-    ))
+    Ok(PhpResource::Stream(std::rc::Rc::new(
+        std::cell::RefCell::new(StreamState::new(
+            StreamBacking::File(file),
+            readable,
+            writable,
+            mode.to_string(),
+            uri,
+        )),
+    )))
 }
 
 /// PHP `fwrite()`. `length` caps the number of bytes written (`None` = whole string).
@@ -380,7 +384,6 @@ pub fn fclose(stream: &PhpResource) -> bool {
             if state.closed {
                 return false;
             }
-            use std::io::Write;
             let _ = state.backing.as_rws().flush();
             state.closed = true;
             true
@@ -430,10 +433,10 @@ fn fgets_read_line<R: std::io::Read + ?Sized>(
     let mut line = Vec::new();
     let mut byte = [0u8; 1];
     loop {
-        if let Some(max) = limit {
-            if line.len() >= max {
-                break;
-            }
+        if let Some(max) = limit
+            && line.len() >= max
+        {
+            break;
         }
         let n = r.read(&mut byte)?;
         if n == 0 {
@@ -478,7 +481,6 @@ pub fn fgetc(stream: &PhpResource) -> Option<String> {
 
 /// PHP `ftell()`: the current position, or `None` for `false`-on-failure.
 pub fn ftell(stream: &PhpResource) -> Option<i64> {
-    use std::io::Seek;
     match stream {
         PhpResource::Stdin
         | PhpResource::Stdout
@@ -501,7 +503,6 @@ pub fn ftell(stream: &PhpResource) -> Option<i64> {
 
 /// PHP `fseek()`. Returns 0 on success, -1 on failure.
 pub fn fseek(stream: &PhpResource, offset: i64, whence: i64) -> i64 {
-    use std::io::Seek;
     let from = match whence {
         SEEK_CUR => std::io::SeekFrom::Current(offset),
         SEEK_END => std::io::SeekFrom::End(offset),

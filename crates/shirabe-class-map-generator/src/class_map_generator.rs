@@ -9,8 +9,8 @@ use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
     PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, is_string,
-    pathinfo, preg_quote, realpath, sprintf, str_replace, str_starts_with, stream_get_wrappers,
-    strlen, strpos, strrpos, strtr, substr,
+    pathinfo, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers, strlen,
+    strpos, strrpos, strtr, substr,
 };
 use std::path::PathBuf;
 
@@ -89,8 +89,7 @@ impl ClassMapGenerator {
             }));
         }
 
-        let base_path: Option<String>;
-        if autoload_type != "classmap" {
+        let base_path: Option<String> = if autoload_type != "classmap" {
             if !is_string(&path) {
                 return Err(anyhow::anyhow!(InvalidArgumentException {
                     message:
@@ -105,10 +104,10 @@ impl ClassMapGenerator {
                     code: 0,
                 }));
             }
-            base_path = path.as_string().map(|s| s.to_string());
+            path.as_string().map(|s| s.to_string())
         } else {
-            base_path = None;
-        }
+            None
+        };
 
         let files: Vec<PathBuf> = if is_string(&path) {
             let path_str = path.as_string().unwrap_or("");

@@ -406,7 +406,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
         self.merge_application_definition(true);
 
         // bind the input against the command specific arguments/options
-        match input.borrow_mut().bind(&*self.get_definition()) {
+        match input.borrow_mut().bind(&self.get_definition()) {
             Ok(()) => {}
             Err(e) => {
                 if !self.get_ignore_validation_errors() {
@@ -458,17 +458,16 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
 
         input.borrow_mut().validate()?;
 
-        let status_code: PhpMixed;
-        if self.get_code().is_some() {
+        let status_code: PhpMixed = if self.get_code().is_some() {
             let code = self.get_code();
             let code = code.as_ref().unwrap();
-            status_code = code(&mut *input.borrow_mut(), &mut *output.borrow_mut());
+            code(&mut *input.borrow_mut(), &mut *output.borrow_mut())
         } else {
             let executed = self.execute(input.clone(), output.clone())?;
-            status_code = PhpMixed::from(executed);
             // PHP also raises \TypeError when execute() does not return int; in this
             // strongly-typed port execute() already returns an int, so the check is moot.
-        }
+            PhpMixed::from(executed)
+        };
 
         // is_numeric($statusCode) ? (int) $statusCode : 0
         Ok(shirabe_php_shim::is_numeric_to_int(&status_code))

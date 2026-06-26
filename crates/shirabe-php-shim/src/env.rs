@@ -8,11 +8,21 @@ pub fn getenv<K: AsRef<std::ffi::OsStr>>(key: K) -> Option<std::ffi::OsString> {
     std::env::var_os(key)
 }
 
+/// # Safety
+///
+/// Wraps [`std::env::set_var`], which is unsafe: the caller must ensure no other
+/// thread is concurrently reading or writing the process environment for the
+/// duration of this call.
 pub unsafe fn putenv<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
     // TODO: validate key and value format to avoid panic?
     unsafe { std::env::set_var(key, value) }
 }
 
+/// # Safety
+///
+/// Wraps [`std::env::remove_var`], which is unsafe: the caller must ensure no other
+/// thread is concurrently reading or writing the process environment for the
+/// duration of this call.
 pub unsafe fn putenv_clear<K: AsRef<std::ffi::OsStr>>(key: K) {
     // TODO: validate key and value format to avoid panic?
     unsafe { std::env::remove_var(key) }

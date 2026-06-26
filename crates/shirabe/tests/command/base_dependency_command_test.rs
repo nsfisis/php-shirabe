@@ -263,8 +263,8 @@ fn test_warning_when_dependencies_are_not_installed() {
         let some_dev_required_package = get_package("vendor2/package1", "1.0.0");
 
         create_composer_lock(
-            &[some_required_package.clone()],
-            &[some_dev_required_package.clone()],
+            std::slice::from_ref(&some_required_package),
+            std::slice::from_ref(&some_dev_required_package),
         );
 
         let mut input: Vec<(PhpMixed, PhpMixed)> =
@@ -403,7 +403,7 @@ fn test_why_command_outputs() {
                 second_required_package.clone(),
                 third_required_package.clone(),
             ],
-            &[some_dev_required_package.clone()],
+            std::slice::from_ref(&some_dev_required_package),
         );
         create_installed_json(
             &[
@@ -411,7 +411,7 @@ fn test_why_command_outputs() {
                 second_required_package.clone(),
                 third_required_package.clone(),
             ],
-            &[some_dev_required_package.clone()],
+            std::slice::from_ref(&some_dev_required_package),
             true,
         );
 
@@ -571,14 +571,14 @@ fn test_why_not_command_outputs() {
         let second_dev_nested_required_package = get_package("vendor2/package3", "1.4.0");
 
         create_composer_lock(
-            &[some_required_package.clone()],
+            std::slice::from_ref(&some_required_package),
             &[
                 first_dev_required_package.clone(),
                 second_dev_required_package.clone(),
             ],
         );
         create_installed_json(
-            &[some_required_package.clone()],
+            std::slice::from_ref(&some_required_package),
             &[
                 first_dev_required_package.clone(),
                 second_dev_required_package.clone(),

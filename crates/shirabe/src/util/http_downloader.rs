@@ -10,11 +10,9 @@ use shirabe_php_shim::{
     extension_loaded, file_get_contents, function_exists, implode, is_numeric, rawurldecode,
     stream_context_create, stripos, strpos, substr, ucfirst,
 };
-use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::composer;
-use crate::composer::ComposerHandle;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;

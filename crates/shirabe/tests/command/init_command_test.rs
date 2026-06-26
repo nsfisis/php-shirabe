@@ -602,7 +602,7 @@ fn test_format_authors() {
 fn test_get_git_config() {
     set_up();
 
-    let mut command = InitCommand::new();
+    let command = InitCommand::new();
     let git_config = command.__get_git_config();
     assert!(git_config.contains_key("user.name"));
     assert!(git_config.contains_key("user.email"));

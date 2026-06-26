@@ -12,9 +12,7 @@ use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, extension_loaded};
 
-use crate::http_downloader_mock::{
-    HttpDownloaderMockGuard, expect, expect_full, get_http_downloader_mock,
-};
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 
 // Mirrors GitLabDriverTest::setUp's `gitlab-domains` configuration.

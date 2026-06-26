@@ -10,31 +10,23 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, JsonObject, PhpMixed, RuntimeException, array_filter,
-    array_filter_use_key, array_is_list, array_map, array_merge, array_unique, count,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array, is_array,
-    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, sort, sprintf, str_replace,
-    str_starts_with, strpos, strtolower, system, touch, var_export,
+    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, str_replace, strpos,
+    strtolower, system, touch, var_export,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::BaseConfigCommand;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
-use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package::{self};
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
@@ -355,7 +347,7 @@ impl Command for ConfigCommand {
             properties_defaults.insert("suggest".to_string(), PhpMixed::List(vec![]));
             properties_defaults.insert("extra".to_string(), PhpMixed::List(vec![]));
             let raw_data = config_file.borrow_mut().read()?;
-            let mut data = config.borrow_mut().all(0)?;
+            let data = config.borrow_mut().all(0)?;
             let mut source = config.borrow_mut().get_source_of_value(&setting_key);
 
             let mut value: PhpMixed;
@@ -443,7 +435,7 @@ impl Command for ConfigCommand {
                 if value.as_array().map(|a| a.is_empty()).unwrap_or(false) {
                     let schema = JsonFile::parse_json(
                         Some(
-                            &file_get_contents(&JsonFile::composer_schema_path())
+                            &file_get_contents(JsonFile::composer_schema_path())
                                 .unwrap_or_default(),
                         ),
                         Some("composer.schema.json"),
@@ -1468,24 +1460,24 @@ impl ConfigCommand {
                 String::new()
             };
 
-            let link: String;
-            if k.is_some() && strpos(k.as_ref().unwrap(), "repositories") == Some(0) {
-                link = "https://getcomposer.org/doc/05-repositories.md".to_string();
-            } else {
-                let id_source = if k.as_deref() == Some("") || k.is_none() {
-                    key.clone()
+            let link: String =
+                if k.is_some() && strpos(k.as_ref().unwrap(), "repositories") == Some(0) {
+                    "https://getcomposer.org/doc/05-repositories.md".to_string()
                 } else {
-                    k.clone().unwrap()
+                    let id_source = if k.as_deref() == Some("") || k.is_none() {
+                        key.clone()
+                    } else {
+                        k.clone().unwrap()
+                    };
+                    let id = Preg::replace("{\\..*$}", "", &id_source);
+                    let id = Preg::replace(
+                        "{[^a-z0-9]}i",
+                        "-",
+                        &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
+                    );
+                    let id = Preg::replace("{-+}", "-", &id);
+                    format!("https://getcomposer.org/doc/06-config.md#{}", id)
                 };
-                let id = Preg::replace("{\\..*$}", "", &id_source);
-                let id = Preg::replace(
-                    "{[^a-z0-9]}i",
-                    "-",
-                    &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
-                );
-                let id = Preg::replace("{-+}", "-", &id);
-                link = format!("https://getcomposer.org/doc/06-config.md#{}", id);
-            }
             if is_string(&raw_val)
                 && raw_val
                     .as_string()

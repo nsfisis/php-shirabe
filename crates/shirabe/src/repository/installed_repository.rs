@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/InstalledRepository.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::LogicException;
 use shirabe_php_shim::array_merge_map;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -12,7 +11,6 @@ use crate::package::Link;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::repository::CompositeRepository;
-use crate::repository::InstalledRepositoryInterface;
 use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RootPackageRepository;
@@ -118,7 +116,7 @@ impl InstalledRepository {
         };
         let mut results: Vec<DependentsEntry> = vec![];
 
-        let mut packages_found = packages_found.unwrap_or_else(|| needles.clone());
+        let packages_found = packages_found.unwrap_or_else(|| needles.clone());
 
         let mut root_package: Option<BasePackageHandle> = None;
         for package in self.inner.get_packages()? {

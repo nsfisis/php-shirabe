@@ -182,7 +182,7 @@ impl JsonParser {
 
         let mut symbol: Option<i64> = None;
         let mut pre_error_symbol: Option<i64> = None;
-        let mut err_str: Option<String> = None;
+        let err_str: Option<String> = None;
 
         loop {
             let mut state = state_.stack[state_.stack.len() - 1];
@@ -241,27 +241,25 @@ impl JsonParser {
                         message = Some(msg);
                     }
 
-                    let mut errstr = format!("Parse error on line {}:\n", yylineno + 1);
-                    errstr.push_str(&lexer.show_position());
-                    errstr.push('\n');
+                    let mut err_str = format!("Parse error on line {}:\n", yylineno + 1);
+                    err_str.push_str(&lexer.show_position());
+                    err_str.push('\n');
                     if let Some(msg) = &message {
-                        errstr.push_str(msg);
+                        err_str.push_str(msg);
                     } else {
-                        errstr.push_str(if expected.len() > 1 {
+                        err_str.push_str(if expected.len() > 1 {
                             "Expected one of: "
                         } else {
                             "Expected: "
                         });
-                        errstr.push_str(&expected.join(", "));
+                        err_str.push_str(&expected.join(", "));
                     }
 
                     let past = lexer.get_past_input();
                     let trimmed = trim_bytes(&past);
                     if trimmed.last() == Some(&b',') {
-                        errstr.push_str(" - It appears you have an extra trailing comma");
+                        err_str.push_str(" - It appears you have an extra trailing comma");
                     }
-
-                    err_str = Some(errstr.clone());
 
                     let token = if let Some(name) = self.terminals_.get(&sym) {
                         super::parsing_exception::ParsingExceptionToken::Name(name.to_string())
@@ -275,7 +273,7 @@ impl JsonParser {
                         loc: Some(yyloc_to_loc(&yyloc)),
                         expected: Some(expected.clone()),
                     };
-                    return Err(ParsingException::new(errstr, details).into());
+                    return Err(ParsingException::new(err_str, details).into());
                 }
 
                 // recovery path (recovering != 0). Not reachable for this grammar because the error
@@ -396,7 +394,7 @@ impl JsonParser {
 
     fn fail_on_bom(&self, input: &str) -> Result<(), ParsingException> {
         let bom = [0xEF, 0xBB, 0xBF];
-        if input.as_bytes().len() >= 3 && input.as_bytes()[0..3] == bom {
+        if input.len() >= 3 && input.as_bytes()[0..3] == bom {
             return Err(ParsingException::new(
                 "BOM detected, make sure your input does not include a Unicode Byte-Order-Mark"
                     .to_string(),
@@ -500,9 +498,9 @@ impl ParseState {
                     // PHP inserts $this->lexer->showPosition() here; the lexer is owned by parse()
                     // and not reachable from this method, so the position line is omitted. Only the
                     // "Duplicate key" body is read by ConfigValidator (DETECT_KEY_CONFLICTS).
-                    let mut errstr = format!("Parse error on line {}:\n", yylineno + 1);
-                    errstr.push('\n');
-                    errstr.push_str(&format!("Duplicate key: {key}"));
+                    let mut err_str = format!("Parse error on line {}:\n", yylineno + 1);
+                    err_str.push('\n');
+                    err_str.push_str(&format!("Duplicate key: {key}"));
                     let mut details: IndexMap<String, PhpMixed> = IndexMap::new();
                     // PHP details: array('line' => $yylineno+1); the 'key' entry is read by
                     // ConfigValidator, so include it as well (PHP DuplicateKeyException stores the
@@ -510,7 +508,7 @@ impl ParseState {
                     details.insert("key".to_string(), PhpMixed::String(key.clone()));
                     details.insert("line".to_string(), PhpMixed::Int(yylineno + 1));
                     return Err(DuplicateKeyException {
-                        message: errstr,
+                        message: err_str,
                         code: 0,
                         details,
                     }
@@ -641,11 +639,11 @@ fn string_interpolation_all(input: &str) -> String {
                     && bytes[i + 2..i + 6].iter().all(|b| b.is_ascii_hexdigit()) =>
                 {
                     let hex = &input[i + 2..i + 6];
-                    if let Ok(cp) = u32::from_str_radix(hex, 16) {
-                        if let Some(c) = char::from_u32(cp) {
-                            let mut buf = [0u8; 4];
-                            out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
-                        }
+                    if let Ok(cp) = u32::from_str_radix(hex, 16)
+                        && let Some(c) = char::from_u32(cp)
+                    {
+                        let mut buf = [0u8; 4];
+                        out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
                     }
                     i += 6;
                     continue;
@@ -714,29 +712,27 @@ fn detect_unescaped_backslash(input: &[u8]) -> Option<String> {
             // `.` cannot cross a newline; PCRE `.+?` would stop — no match across lines here.
             return None;
         }
-        if c == b'\\' {
-            if consumed_one {
-                let next = input.get(i + 1).copied();
-                let bad = match next {
-                    None => true, // `[^...]` requires a char; if none, no match
-                    Some(b) => !valid_escape(b) && b != b'\n',
-                };
-                if next.is_some() && bad {
-                    // capture group 1: the `\`, the disallowed char, then up to 3 more (...)?
-                    let start = i;
-                    let mut end = i + 2; // backslash + the [^...] char
-                    // (...)? = exactly 3 chars if present
-                    let mut extra = 0;
-                    let mut k = end;
-                    while extra < 3 && k < n && input[k] != b'\n' {
-                        k += 1;
-                        extra += 1;
-                    }
-                    if extra == 3 {
-                        end = k;
-                    }
-                    return Some(String::from_utf8_lossy(&input[start..end]).into_owned());
+        if c == b'\\' && consumed_one {
+            let next = input.get(i + 1).copied();
+            let bad = match next {
+                None => true, // `[^...]` requires a char; if none, no match
+                Some(b) => !valid_escape(b) && b != b'\n',
+            };
+            if next.is_some() && bad {
+                // capture group 1: the `\`, the disallowed char, then up to 3 more (...)?
+                let start = i;
+                let mut end = i + 2; // backslash + the [^...] char
+                // (...)? = exactly 3 chars if present
+                let mut extra = 0;
+                let mut k = end;
+                while extra < 3 && k < n && input[k] != b'\n' {
+                    k += 1;
+                    extra += 1;
                 }
+                if extra == 3 {
+                    end = k;
+                }
+                return Some(String::from_utf8_lossy(&input[start..end]).into_owned());
             }
         }
         consumed_one = true;

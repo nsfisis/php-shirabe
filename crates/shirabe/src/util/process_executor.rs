@@ -12,10 +12,9 @@ use shirabe_external_packages::symfony::process::Process;
 use shirabe_external_packages::symfony::process::exception::ProcessSignaledException;
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
-    LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
-    call_user_func, defined, escapeshellarg, explode, implode, in_array, is_array, is_dir,
-    is_numeric, is_string, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower,
-    strtr_array, substr_replace, trim, usleep,
+    LogicException, PHP_EOL, PhpMixed, array_intersect, array_map, call_user_func, escapeshellarg,
+    explode, implode, in_array, is_array, is_dir, is_numeric, is_string, rtrim, sprintf,
+    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim, usleep,
 };
 
 use crate::io::IOInterface;
@@ -102,21 +101,11 @@ impl MockExpectation {
 
 /// The `{return, stdout, stderr}` default-handler triple used for unmatched commands in non-strict
 /// mode (`$defaultHandler` in PHP).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MockHandler {
     pub r#return: i64,
     pub stdout: String,
     pub stderr: String,
-}
-
-impl Default for MockHandler {
-    fn default() -> Self {
-        Self {
-            r#return: 0,
-            stdout: String::new(),
-            stderr: String::new(),
-        }
-    }
 }
 
 struct Job {
@@ -232,7 +221,7 @@ impl ProcessExecutor {
         cwd: Option<&str>,
         env: Option<IndexMap<String, String>>,
         tty: bool,
-        mut output: O,
+        output: O,
     ) -> Result<Option<i64>>
     where
         O: IntoExecOutput<'o>,
@@ -323,7 +312,7 @@ impl ProcessExecutor {
                 Err(mut output) => {
                     let capture_output = self.capture_output;
                     let mut io = self.io.clone();
-                    let mut callback = move |r#type: &str, buffer: &str| {
+                    let callback = move |r#type: &str, buffer: &str| {
                         Self::output_handler(capture_output, &mut io, r#type, buffer);
                         false
                     };
@@ -381,19 +370,21 @@ impl ProcessExecutor {
         let mut env: Option<IndexMap<String, String>> = None;
 
         let requires_git_dir_env = self.requires_git_dir_env(&command);
-        if cwd.is_some() && requires_git_dir_env {
-            let is_bare_repository = !is_dir(&format!("{}/.git", rtrim(cwd.unwrap(), Some("/"))));
+        if let Some(cwd) = cwd
+            && requires_git_dir_env
+        {
+            let is_bare_repository = !is_dir(format!("{}/.git", rtrim(cwd, Some("/"))));
             if is_bare_repository {
                 let mut config_value = PhpMixed::String(String::new());
                 let mut git_env: IndexMap<String, String> = IndexMap::new();
-                git_env.insert("GIT_DIR".to_string(), cwd.unwrap().to_string());
+                git_env.insert("GIT_DIR".to_string(), cwd.to_string());
                 self.run_process(
                     PhpMixed::List(vec![
                         PhpMixed::String("git".to_string()),
                         PhpMixed::String("config".to_string()),
                         PhpMixed::String("safe.bareRepository".to_string()),
                     ]),
-                    cwd,
+                    Some(cwd),
                     Some(git_env.clone()),
                     tty,
                     &mut config_value,
@@ -419,7 +410,7 @@ impl ProcessExecutor {
         &mut self,
         command: PhpMixed,
         cwd: Option<&str>,
-        mut output: O,
+        output: O,
     ) -> Result<i64>
     where
         O: IntoExecOutput<'o>,
@@ -688,7 +679,7 @@ impl ProcessExecutor {
 
         self.output_command_run(&command, cwd.as_deref(), true);
 
-        let process_result: Result<Process> = (if is_string(&command) {
+        let process_result: Result<Process> = if is_string(&command) {
             Process::from_shell_commandline(
                 command.as_string().unwrap_or(""),
                 cwd.as_deref(),
@@ -712,7 +703,7 @@ impl ProcessExecutor {
                 code: 0,
             }
             .into())
-        });
+        };
         let process = match process_result {
             Ok(p) => p,
             Err(e) => {
@@ -908,7 +899,7 @@ impl ProcessExecutor {
         } else if let PhpMixed::List(list) = command {
             let parts: Vec<String> = array_map(
                 |v| Self::escape(v.as_string().unwrap_or("")),
-                &list.iter().cloned().collect::<Vec<_>>(),
+                &list.to_vec(),
             );
             implode(" ", &parts)
         } else {

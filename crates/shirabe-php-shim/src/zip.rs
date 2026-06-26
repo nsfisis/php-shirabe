@@ -210,13 +210,15 @@ impl ZipArchive {
         let mut file = archive.by_name(name).ok()?;
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut file, &mut buf).ok()?;
-        Some(StreamState::new(
-            StreamBacking::Memory(std::io::Cursor::new(buf)),
-            true,
-            false,
-            "r".to_string(),
-            format!("zip://{}", name),
-        ))
+        Some(crate::PhpResource::Stream(std::rc::Rc::new(
+            std::cell::RefCell::new(StreamState::new(
+                StreamBacking::Memory(std::io::Cursor::new(buf)),
+                true,
+                false,
+                "r".to_string(),
+                format!("zip://{}", name),
+            )),
+        )))
     }
 
     pub fn add_empty_dir(&self, local_name: &str) -> bool {

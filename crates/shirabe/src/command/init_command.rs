@@ -10,30 +10,24 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed, array_filter,
-    array_flip, array_flip_strings, array_intersect_key, array_keys, array_map, basename, empty,
-    explode, file, file_exists, file_get_contents, file_put_contents, function_exists,
-    get_current_user, implode, is_dir, is_string, preg_quote, realpath, sprintf, str_replace,
-    strpos, strtolower, trim, ucwords,
+    FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
+    array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
+    file_exists, file_get_contents, file_put_contents, get_current_user, implode, is_dir,
+    is_string, preg_quote, realpath, str_replace, strpos, strtolower, trim, ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::PackageDiscoveryTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package::{self};
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::PlatformRepositoryHandle;
@@ -848,7 +842,7 @@ impl Command for InitCommand {
             );
 
             // --autoload - input and validation
-            let mut autoload = input
+            let autoload = input
                 .borrow()
                 .get_option("autoload")?
                 .as_string()

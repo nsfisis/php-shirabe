@@ -24,9 +24,8 @@ use crate::io::IOInterfaceImmutable;
 use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::StabilityFilter;
 use crate::package::version::VersionParser;
@@ -789,7 +788,7 @@ impl ComposerRepository {
                 r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i",
                 &query,
                 Some(&mut match_groups),
-            ) && self.list_url.is_some()
+            ) && let Some(list_url) = self.list_url.as_ref()
             {
                 let q = match_groups
                     .get(&CaptureKey::ByName("query".to_string()))
@@ -801,7 +800,7 @@ impl ComposerRepository {
                     .unwrap_or_default();
                 let url = format!(
                     "{}?vendor={}&filter={}",
-                    self.list_url.as_ref().unwrap(),
+                    list_url,
                     urlencode(&vendor),
                     urlencode(&format!("{}*", q)),
                 );
@@ -1025,11 +1024,8 @@ impl ComposerRepository {
                     http_map.insert("header".to_string(), PhpMixed::List(arr));
                 }
                 let mut headers = match http_map.get("header") {
-                    Some(b) => match b {
-                        PhpMixed::List(l) => l.clone(),
-                        _ => vec![],
-                    },
-                    None => vec![],
+                    Some(PhpMixed::List(l)) => l.clone(),
+                    _ => vec![],
                 };
                 headers.push(PhpMixed::String(
                     "Content-type: application/x-www-form-urlencoded".to_string(),
@@ -1229,14 +1225,10 @@ impl ComposerRepository {
             return Ok(vec![]);
         }
 
-        if self.providers_url.is_some() && self.provider_listing.is_some() {
-            return Ok(self
-                .provider_listing
-                .as_ref()
-                .unwrap()
-                .keys()
-                .cloned()
-                .collect());
+        if self.providers_url.is_some()
+            && let Some(provider_listing) = self.provider_listing.as_ref()
+        {
+            return Ok(provider_listing.keys().cloned().collect());
         }
 
         Ok(vec![])
@@ -1292,18 +1284,14 @@ impl ComposerRepository {
             let hash_opt: Option<String>;
             let url: String;
             let cache_key: String;
-            if self.lazy_providers_url.is_some()
+            if let Some(lazy_providers_url) = self.lazy_providers_url.as_ref()
                 && !self
                     .provider_listing
                     .as_ref()
                     .is_some_and(|m| m.contains_key(name))
             {
                 hash_opt = None;
-                url = self
-                    .lazy_providers_url
-                    .as_ref()
-                    .unwrap()
-                    .replace("%package%", name);
+                url = lazy_providers_url.replace("%package%", name);
                 cache_key = format!("provider-{}.json", strtr(name, "/", "$"));
                 use_last_modified_check = true;
             } else if let Some(providers_url) = self.providers_url.clone() {
@@ -1477,7 +1465,7 @@ impl ComposerRepository {
         for versions_mixed in packages_inner.iter() {
             // $versions can be either array<string, array> or list<array>
             let iter_versions: Vec<PhpMixed> = match versions_mixed {
-                PhpMixed::Array(a) => a.values().map(|v| v.clone()).collect(),
+                PhpMixed::Array(a) => a.values().cloned().collect(),
                 PhpMixed::List(l) => l.clone(),
                 _ => continue,
             };
@@ -2946,11 +2934,8 @@ impl ComposerRepository {
                     http_map.insert("header".to_string(), PhpMixed::List(arr));
                 }
                 let mut headers = match http_map.get("header") {
-                    Some(b) => match b {
-                        PhpMixed::List(l) => l.clone(),
-                        _ => vec![],
-                    },
-                    None => vec![],
+                    Some(PhpMixed::List(l)) => l.clone(),
+                    _ => vec![],
                 };
                 headers.push(PhpMixed::String(format!(
                     "If-Modified-Since: {}",
@@ -3106,11 +3091,8 @@ impl ComposerRepository {
                     http_map.insert("header".to_string(), PhpMixed::List(arr));
                 }
                 let mut headers = match http_map.get("header") {
-                    Some(b) => match b {
-                        PhpMixed::List(l) => l.clone(),
-                        _ => vec![],
-                    },
-                    None => vec![],
+                    Some(PhpMixed::List(l)) => l.clone(),
+                    _ => vec![],
                 };
                 headers.push(PhpMixed::String(format!(
                     "If-Modified-Since: {}",

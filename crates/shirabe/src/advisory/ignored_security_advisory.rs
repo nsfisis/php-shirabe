@@ -3,7 +3,6 @@
 use crate::advisory::SecurityAdvisory;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug, Clone, serde::Serialize)]

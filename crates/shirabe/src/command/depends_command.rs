@@ -1,25 +1,18 @@
 //! ref: composer/src/Composer/Command/DependsCommand.php
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::BaseDependencyCommand;
 use crate::command::base_command::base_command_initialize;
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
 
 #[derive(Debug)]
 pub struct DependsCommand {

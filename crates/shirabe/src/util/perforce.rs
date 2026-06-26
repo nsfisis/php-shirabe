@@ -6,7 +6,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, PhpResource, chdir, count, date, explode, fclose, feof, fgets,
+    Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode, str_replace_array, strcmp, strlen,
     strpos, strrpos, substr, time, trim,
 };
@@ -390,7 +390,7 @@ impl Perforce {
             p4_create_client_command,
             None,
             None,
-            file_get_contents(&self.get_p4_client_spec())
+            file_get_contents(self.get_p4_client_spec())
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
             None,

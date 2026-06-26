@@ -1,24 +1,16 @@
 //! ref: composer/src/Composer/Command/AboutCommand.php
 
 use anyhow::Result;
-use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::advisory::AuditConfig;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
 use crate::composer;
-use crate::composer::PartialComposerHandle;
-use crate::config::Config;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
 
 #[derive(Debug)]
 pub struct AboutCommand {

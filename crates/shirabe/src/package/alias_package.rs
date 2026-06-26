@@ -3,7 +3,6 @@
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, in_array};
-use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::BasePackage;

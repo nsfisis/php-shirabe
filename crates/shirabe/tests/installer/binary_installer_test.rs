@@ -104,7 +104,7 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
 
     let mut proc = ProcessExecutor::new(None);
     let mut output = String::new();
-    proc.execute(&format!("{}/binary arg", setup.bin_dir), &mut output, None)
+    proc.execute(format!("{}/binary arg", setup.bin_dir), &mut output, None)
         .unwrap();
     assert_eq!("", proc.get_error_output());
     assert_eq!("success arg", output);

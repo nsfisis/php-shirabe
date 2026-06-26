@@ -7,7 +7,7 @@ use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::GitLab;
-use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
+use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe_php_shim::PhpMixed;
 
 use crate::config_stub::ConfigStubBuilder;

@@ -38,4 +38,15 @@ zip = "8.6.0"
 
 [workspace.lints.rust]
 async_fn_in_trait = "allow"
-unused = "allow"
+dead_code = "allow"
+unreachable_code = "allow"
+unused_must_use = "allow"
+unused_variables = "allow"
+
+[workspace.lints.clippy]
+await_holding_refcell_ref = "allow"
+diverging_sub_expression = "allow"
+if_same_then_else = "allow"
+large_enum_variant = "allow"
+module_inception = "allow"
+type_complexity = "allow"

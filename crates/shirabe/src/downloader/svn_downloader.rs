@@ -447,7 +447,7 @@ impl VcsDownloader for SvnDownloader {
     }
 
     fn has_metadata_repository(&self, path: &str) -> bool {
-        is_dir(&format!("{}/.svn", path))
+        is_dir(format!("{}/.svn", path))
     }
 }
 

@@ -4,12 +4,11 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::ca_bundle::CaBundle;
 use shirabe_php_shim::{
     HHVM_VERSION, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, PhpMixed,
-    RuntimeException, array_replace_recursive, curl_version, extension_loaded, function_exists,
-    php_uname, stream_context_create, stripos, uasort,
+    array_replace_recursive, curl_version, extension_loaded, function_exists, php_uname,
+    stream_context_create, stripos, uasort,
 };
 
 use crate::composer;
-use crate::composer::ComposerHandle;
 use crate::downloader::TransportException;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;

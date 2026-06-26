@@ -1,14 +1,12 @@
 //! ref: composer/src/Composer/DependencyResolver/Rule.php
 
-use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, array_filter, array_keys, array_shift,
-    array_values, implode, is_object,
+    LogicException, PhpMixed, RuntimeException, array_keys, array_shift, implode,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -19,12 +17,8 @@ use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Problem;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::Rule2Literals;
-use crate::dependency_resolver::RuleSet;
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
 use crate::package::BasePackageHandle;
 use crate::package::Link;
-use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
@@ -598,7 +592,7 @@ impl Rule {
                 )
             }
             r if r == RULE_LEARNED => {
-                /// @TODO currently still generates way too much output to be helpful, and in some cases can even lead to endless recursion
+                // @TODO currently still generates way too much output to be helpful, and in some cases can even lead to endless recursion
                 // (PHP commented-out alternative code preserved)
                 let learned_string = " (conflict analysis result)";
 

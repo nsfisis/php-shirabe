@@ -9,11 +9,8 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueExcept
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
 
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::io::IOInterface;
+use crate::command::BaseCommand;
 use crate::io::IOInterfaceImmutable;
-use crate::package::CompletePackageInterface;
-use crate::package::Link;
 use crate::package::Package;
 use crate::package::RootPackage;
 use crate::package::version::VersionParser;
@@ -47,7 +44,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         inverted: bool,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let mut composer = crate::command::composer_full_mut(&composer);
+        let composer = crate::command::composer_full_mut(&composer);
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.get_name(), input, output) via composer.get_event_dispatcher()
 
         let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
@@ -148,79 +145,85 @@ pub trait BaseDependencyCommand: BaseCommand {
             &needle,
             FindPackageConstraint::String(text_constraint.clone()),
         )?;
-        if matched_package.is_none() {
-            let rm = composer.get_repository_manager();
-            let mut default_repos = CompositeRepository::new(
-                RepositoryFactory::default_repos(
-                    Some(self.get_io()),
-                    Some(composer.get_config()),
-                    Some(&mut rm.borrow_mut()),
-                )?
-                .into_values()
-                .collect(),
-            );
-            if let Some(r#match) = default_repos.find_package(
-                &needle,
-                FindPackageConstraint::String(text_constraint.clone()),
-            )? {
-                installed_repo.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-                    InstalledArrayRepository::new_with_packages(vec![
-                        crate::package::PackageInterfaceHandle::dup(&r#match),
-                    ])?,
-                ));
-            } else if PlatformRepository::is_platform_package(&needle) {
-                let parser = VersionParser::new();
-                let platform_constraint = parser.parse_constraints(&text_constraint)?;
-                if platform_constraint.get_lower_bound() != Bound::zero() {
-                    let version = platform_constraint
-                        .get_lower_bound()
-                        .get_version()
-                        .to_string();
-                    let temp_platform_pkg = Package::new(needle.clone(), version.clone(), version);
+        match &matched_package {
+            None => {
+                let rm = composer.get_repository_manager();
+                let mut default_repos = CompositeRepository::new(
+                    RepositoryFactory::default_repos(
+                        Some(self.get_io()),
+                        Some(composer.get_config()),
+                        Some(&mut rm.borrow_mut()),
+                    )?
+                    .into_values()
+                    .collect(),
+                );
+                if let Some(r#match) = default_repos.find_package(
+                    &needle,
+                    FindPackageConstraint::String(text_constraint.clone()),
+                )? {
                     installed_repo.add_repository(
                         crate::repository::RepositoryInterfaceHandle::new(
                             InstalledArrayRepository::new_with_packages(vec![
-                                crate::package::PackageHandle::from_package(temp_platform_pkg)
-                                    .into(),
+                                crate::package::PackageInterfaceHandle::dup(&r#match),
                             ])?,
                         ),
                     );
+                } else if PlatformRepository::is_platform_package(&needle) {
+                    let parser = VersionParser::new();
+                    let platform_constraint = parser.parse_constraints(&text_constraint)?;
+                    if platform_constraint.get_lower_bound() != Bound::zero() {
+                        let version = platform_constraint
+                            .get_lower_bound()
+                            .get_version()
+                            .to_string();
+                        let temp_platform_pkg =
+                            Package::new(needle.clone(), version.clone(), version);
+                        installed_repo.add_repository(
+                            crate::repository::RepositoryInterfaceHandle::new(
+                                InstalledArrayRepository::new_with_packages(vec![
+                                    crate::package::PackageHandle::from_package(temp_platform_pkg)
+                                        .into(),
+                                ])?,
+                            ),
+                        );
+                    }
+                } else {
+                    self.get_io().write_error(&format!(
+                        "<error>Package \"{}\" could not be found with constraint \"{}\", results below will most likely be incomplete.</error>",
+                        needle, text_constraint
+                    ));
                 }
-            } else {
+            }
+            Some(matched) if PlatformRepository::is_platform_package(&needle) => {
+                let extra_notice = if matched
+                    .get_extra()
+                    .get("config.platform")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
+                    " (version provided by config.platform)"
+                } else {
+                    ""
+                };
                 self.get_io().write_error(&format!(
-                    "<error>Package \"{}\" could not be found with constraint \"{}\", results below will most likely be incomplete.</error>",
-                    needle, text_constraint
+                    "<info>Package \"{} {}\" found in version \"{}\"{}.</info>",
+                    needle,
+                    text_constraint,
+                    matched.get_pretty_version(),
+                    extra_notice
                 ));
             }
-        } else if PlatformRepository::is_platform_package(&needle) {
-            let matched = matched_package.as_ref().unwrap();
-            let extra_notice = if matched
-                .get_extra()
-                .get("config.platform")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-            {
-                " (version provided by config.platform)"
-            } else {
-                ""
-            };
-            self.get_io().write_error(&format!(
-                "<info>Package \"{} {}\" found in version \"{}\"{}.</info>",
-                needle,
-                text_constraint,
-                matched.get_pretty_version(),
-                extra_notice
-            ));
-        } else if inverted {
-            let matched = matched_package.as_ref().unwrap();
-            self.get_io().write(&format!(
-                "<comment>Package \"{}\" {} is already installed! To find out why, run `composer why {}`</comment>",
-                needle,
-                matched.get_pretty_version(),
-                needle
-            ));
+            Some(matched) if inverted => {
+                self.get_io().write(&format!(
+                    "<comment>Package \"{}\" {} is already installed! To find out why, run `composer why {}`</comment>",
+                    needle,
+                    matched.get_pretty_version(),
+                    needle
+                ));
 
-            return Ok(0);
+                return Ok(0);
+            }
+            Some(_) => {}
         }
 
         let mut needles = vec![needle.clone()];

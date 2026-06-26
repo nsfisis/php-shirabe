@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
-    preg_quote, realpath, rtrim, sprintf, strlen, strpos, substr, trim, version_compare,
+    preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
 };
 
 use crate::cache::Cache;
@@ -18,7 +18,6 @@ use crate::downloader::VcsDownloader;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Git as GitUtil;
@@ -1395,7 +1394,7 @@ impl VcsDownloader for GitDownloader {
     fn has_metadata_repository(&self, path: &str) -> bool {
         let path = self.normalize_path(path);
 
-        is_dir(&format!("{}/.git", path))
+        is_dir(format!("{}/.git", path))
     }
 }
 

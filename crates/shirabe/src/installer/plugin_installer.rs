@@ -13,7 +13,7 @@ use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use anyhow::Result;
-use shirabe_php_shim::{LogicException, PhpMixed, UnexpectedValueException, empty};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]
 pub struct PluginInstaller {

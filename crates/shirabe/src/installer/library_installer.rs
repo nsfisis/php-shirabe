@@ -1,7 +1,5 @@
 //! ref: composer/src/Composer/Installer/LibraryInstaller.php
 
-use std::any::Any;
-
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{

@@ -3,13 +3,11 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
     PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
     function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,
     strnatcasecmp, strpos, substr, trim, usort,
 };
-use shirabe_semver::VersionParser as SemverVersionParser;
 
 use crate::config::Config;
 use crate::io::IOInterface;
@@ -415,7 +413,7 @@ impl VersionGuesser {
                 array_map(|k: &String| k.clone(), &array_keys(&driver.get_branches()?));
 
             // try to find the best (nearest) version branch to assume this feature's version
-            let mut result = self.guess_feature_version(
+            let result = self.guess_feature_version(
                 package_config,
                 Some(version.clone()),
                 branches,
@@ -687,16 +685,13 @@ impl VersionGuesser {
                 let m1 = matches.get(1).cloned().unwrap_or_default();
                 let m2 = matches.get(2).cloned();
                 let m3 = matches.get(3).cloned();
-                if m2.is_some()
-                    && m3.is_some()
-                    && (branches_path == *m2.as_ref().unwrap()
-                        || tags_path == *m2.as_ref().unwrap())
+                if let Some(m2) = m2.as_ref()
+                    && let Some(m3) = m3.as_ref()
+                    && (branches_path == *m2 || tags_path == *m2)
                 {
                     // we are in a branches path
-                    let version = self
-                        .version_parser
-                        .normalize_branch(m3.as_deref().unwrap())?;
-                    let pretty_version = format!("dev-{}", m3.as_ref().unwrap());
+                    let version = self.version_parser.normalize_branch(m3)?;
+                    let pretty_version = format!("dev-{}", m3);
 
                     return Ok(Some(VersionData {
                         version: Some(version),

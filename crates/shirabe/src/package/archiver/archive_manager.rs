@@ -9,9 +9,7 @@ use shirabe_php_shim::{
 
 use crate::downloader::DownloadManager;
 use crate::json::JsonFile;
-use crate::package::CompletePackageInterface;
 use crate::package::CompletePackageInterfaceHandle;
-use crate::package::RootPackageInterface;
 use crate::package::archiver::ArchiverInterface;
 use crate::package::archiver::PharArchiver;
 use crate::package::archiver::ZipArchiver;

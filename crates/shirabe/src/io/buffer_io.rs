@@ -10,8 +10,8 @@ use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::output::StreamOutput;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite,
-    rewind, stream_get_contents, strip_tags,
+    PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, rewind,
+    stream_get_contents, strip_tags,
 };
 
 #[derive(Debug)]
