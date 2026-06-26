@@ -324,9 +324,10 @@ impl FilesystemRepository {
                 &repo_dir,
             )?;
 
+            let installed_php = format!("<?php return {};\n", self.dump_to_php_code(&versions, 0));
             self.filesystem.borrow_mut().file_put_contents_if_modified(
                 &format!("{}/installed.php", repo_dir),
-                &format!("<?php return {};\n", self.dump_to_php_code(&versions, 0)),
+                &installed_php,
             );
             self.filesystem.borrow_mut().file_put_contents_if_modified(
                 &format!("{}/InstalledVersions.php", repo_dir),
