@@ -25,11 +25,11 @@ pub mod script;
 pub mod self_update;
 pub mod util;
 
+/// ref: composer/bin/composer
 pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
     use crate::console::ApplicationHandle;
     use crate::util::Platform;
     use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
-    use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 
     // TODO(php-runtime): the full initialization process in composer/bin/composer should be ported
     // somewhere else that communicates with the real PHP runtime.
@@ -40,8 +40,7 @@ pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
     );
 
     let application = ApplicationHandle::new("Composer".to_string(), String::new())?;
-    let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?))
-        as std::rc::Rc<std::cell::RefCell<dyn InputInterface>>;
+    let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?));
     application.run(Some(input), None)
 }
 

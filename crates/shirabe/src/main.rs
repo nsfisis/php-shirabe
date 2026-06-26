@@ -9,15 +9,12 @@ fn main() {
     std::sync::LazyLock::force(&PHP_SERVER);
 
     let result = shirabe::run(std::env::args().collect());
-    let mut exit_code = match result {
+    let exit_code = match result {
         Ok(exit_code) => exit_code,
         Err(e) => {
             eprintln!("{}", e);
             1
         }
     };
-    if exit_code > 255 {
-        exit_code = 255;
-    }
-    std::process::exit(exit_code);
+    std::process::exit(exit_code.min(255));
 }
