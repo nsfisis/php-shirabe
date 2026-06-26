@@ -60,7 +60,8 @@ impl PackageRepository {
                 PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                 _ => IndexMap::new(),
             };
-            let package_loaded = match loader.load(config_map, "") {
+            let package_loaded = match loader.load(config_map, "Composer\\Package\\CompletePackage")
+            {
                 Ok(p) => p,
                 Err(e) => {
                     let msg = format!(
