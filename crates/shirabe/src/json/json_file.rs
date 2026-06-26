@@ -404,11 +404,25 @@ impl JsonFile {
         let errors: Vec<String> = validator
             .iter_errors(&data_value)
             .map(|error| {
-                let property = error
+                let mut property = error
                     .instance_path()
                     .as_str()
                     .trim_start_matches('/')
                     .replace('/', ".");
+                // A missing required property is reported against its parent object, so the
+                // instance path is the parent (empty at the root). Composer points the error at
+                // the missing property itself, so append its name to match the `PROPERTY : MESSAGE`
+                // shape.
+                if let jsonschema::error::ValidationErrorKind::Required { property: missing } =
+                    error.kind()
+                    && let Some(name) = missing.as_str()
+                {
+                    if property.is_empty() {
+                        property = name.to_string();
+                    } else {
+                        property = format!("{}.{}", property, name);
+                    }
+                }
                 if property.is_empty() {
                     error.to_string()
                 } else {

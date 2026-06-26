@@ -74,13 +74,14 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
         ValidateCase {
             // WORDING NOTE: upstream asserts justinrainbow's property-prefixed strings
             // "- name : The property name is required" / "- description : The property description
-            // is required". The jsonschema crate reports the same required violations as
-            // "\"name\" is a required property" (no property prefix; the property name is embedded
-            // in the message). Matches the divergence already accepted in json_file_test.
+            // is required". The jsonschema crate phrases the message differently, but the property
+            // prefix is reconstructed, so the shape matches:
+            // "- name : \"name\" is a required property". Matches the divergence already accepted in
+            // json_file_test.
             name: "passing but with warnings",
             composer_json: publish_data_stripped.clone(),
             command: vec![],
-            expected: "./composer.json is valid for simple usage with Composer but has\nstrict errors that make it unable to be published as a package\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n# Publish errors\n- \"name\" is a required property\n- \"description\" is a required property\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+            expected: "./composer.json is valid for simple usage with Composer but has\nstrict errors that make it unable to be published as a package\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n# Publish errors\n- name : \"name\" is a required property\n- description : \"description\" is a required property\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
         },
         ValidateCase {
             name: "passing without publish-check",
