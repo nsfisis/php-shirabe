@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/FactoryTest.php
 
+use serial_test::serial;
 use shirabe::factory::Factory;
 use shirabe::util::platform::Platform;
 
@@ -16,6 +17,7 @@ impl Drop for TearDown {
 }
 
 #[test]
+#[serial]
 #[ignore = "requires PHPUnit-style mocks: an IOInterface mock verifying writeError is called exactly once with the exact warning, plus a Config mock stubbing get('disable-tls')=>true; no such mock/expectation infrastructure (e.g. mockall) exists"]
 fn test_default_values_are_as_expected() {
     let _tear_down = TearDown;
@@ -24,7 +26,7 @@ fn test_default_values_are_as_expected() {
 }
 
 #[test]
-#[ignore = "depends on COMPOSER being unset, but sibling tests set it and race it on the process-global env under parallel execution"]
+#[serial]
 fn test_get_composer_json_path() {
     let _tear_down = TearDown;
 
@@ -32,7 +34,7 @@ fn test_get_composer_json_path() {
 }
 
 #[test]
-#[ignore = "mutates the global COMPOSER env and races the from_env case under parallel execution"]
+#[serial]
 fn test_get_composer_json_path_fails_if_dir() {
     let _tear_down = TearDown;
 
@@ -49,6 +51,7 @@ fn test_get_composer_json_path_fails_if_dir() {
 }
 
 #[test]
+#[serial]
 fn test_get_composer_json_path_from_env() {
     let _tear_down = TearDown;
 

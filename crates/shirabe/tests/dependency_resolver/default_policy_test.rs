@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/DefaultPolicyTest.php
 
 use indexmap::IndexMap;
+use serial_test::serial;
 use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
 use shirabe::package::Link;
@@ -56,6 +57,7 @@ impl Drop for TearDown {
 }
 
 #[test]
+#[serial]
 fn test_select_single() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -83,6 +85,7 @@ fn test_select_single() {
 }
 
 #[test]
+#[serial]
 fn test_select_newest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -112,6 +115,7 @@ fn test_select_newest() {
 }
 
 #[test]
+#[serial]
 fn test_select_newest_picks_latest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -141,6 +145,7 @@ fn test_select_newest_picks_latest() {
 }
 
 #[test]
+#[serial]
 fn test_select_newest_picks_latest_stable_with_prefer_stable() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -170,6 +175,7 @@ fn test_select_newest_picks_latest_stable_with_prefer_stable() {
 
 #[ignore]
 #[test]
+#[serial]
 fn test_select_lowest_with_prefer_dev_over_prerelease() {
     let _tear_down = TearDown;
 
@@ -205,6 +211,7 @@ fn test_select_lowest_with_prefer_dev_over_prerelease() {
 }
 
 #[test]
+#[serial]
 fn test_select_lowest_prefers_prerelease_over_dev() {
     let _tear_down = TearDown;
 
@@ -239,6 +246,7 @@ fn test_select_lowest_prefers_prerelease_over_dev() {
 }
 
 #[test]
+#[serial]
 fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -268,6 +276,7 @@ fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
 }
 
 #[test]
+#[serial]
 fn test_select_newest_with_dev_picks_non_dev() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -297,6 +306,7 @@ fn test_select_newest_with_dev_picks_non_dev() {
 }
 
 #[test]
+#[serial]
 fn test_select_newest_with_preferred_version_picks_preferred_version_if_available() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -336,6 +346,7 @@ fn test_select_newest_with_preferred_version_picks_preferred_version_if_availabl
 }
 
 #[test]
+#[serial]
 fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -366,6 +377,7 @@ fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
 }
 
 #[test]
+#[serial]
 fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -396,6 +408,7 @@ fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
 }
 
 #[test]
+#[serial]
 fn test_repository_ordering_affects_priority() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -466,6 +479,7 @@ fn test_repository_ordering_affects_priority() {
 }
 
 #[test]
+#[serial]
 fn test_select_local_repos_first() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -569,6 +583,7 @@ fn constraint(operator: &str, version: &str) -> AnyConstraint {
 }
 
 #[test]
+#[serial]
 fn test_select_all_providers() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -615,6 +630,7 @@ fn test_select_all_providers() {
 }
 
 #[test]
+#[serial]
 fn test_prefer_non_replacing_from_same_repo() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -655,6 +671,7 @@ fn test_prefer_non_replacing_from_same_repo() {
 }
 
 #[test]
+#[serial]
 fn test_prefer_replacing_package_from_same_vendor() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -756,6 +773,7 @@ fn test_prefer_replacing_package_from_same_vendor() {
 }
 
 #[test]
+#[serial]
 fn test_select_lowest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
