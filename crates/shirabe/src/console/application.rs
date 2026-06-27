@@ -2577,6 +2577,13 @@ impl ApplicationHandle {
     pub fn set_catch_exceptions(&self, boolean: bool) {
         self.0.borrow_mut().set_catch_exceptions(boolean);
     }
+
+    /// For testing only: exposes the application as a Symfony base-application handle, the way
+    /// console commands receive it via `getApplication()`, so tests can build an
+    /// `ApplicationDescription` over it.
+    pub fn __base_application(&self) -> std::rc::Rc<std::cell::RefCell<dyn BaseApplication>> {
+        self.0.clone()
+    }
 }
 
 impl ApplicationHandle {
