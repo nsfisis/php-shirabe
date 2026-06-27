@@ -2,9 +2,8 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CURL_VERSION_HTTPS_PROXY, CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO,
-    CURLOPT_PROXY_CAPATH, CURLOPT_PROXYAUTH, CURLOPT_PROXYUSERPWD, InvalidArgumentException,
-    PhpMixed, curl_version,
+    CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO, CURLOPT_PROXY_CAPATH,
+    CURLOPT_PROXYAUTH, CURLOPT_PROXYUSERPWD, InvalidArgumentException, PhpMixed,
 };
 
 use crate::downloader::TransportException;
@@ -51,13 +50,9 @@ impl RequestProxy {
         &self,
         ssl_options: &IndexMap<String, PhpMixed>,
     ) -> Result<IndexMap<i64, PhpMixed>, TransportException> {
-        if self.is_secure() && !self.supports_secure_proxy() {
-            return Err(TransportException::new(
-                "Cannot use an HTTPS proxy. PHP >= 7.3 and cUrl >= 7.52.0 are required."
-                    .to_string(),
-                0,
-            ));
-        }
+        // PHP guards an HTTPS proxy behind `is_secure() && !supports_secure_proxy()` because
+        // libcurl < 7.52.0 cannot speak TLS to a proxy. Shirabe always can (see
+        // supports_secure_proxy), so the guard is dropped.
 
         let mut options: IndexMap<i64, PhpMixed> = IndexMap::new();
         options.insert(
@@ -110,20 +105,10 @@ impl RequestProxy {
         self.url.as_deref().unwrap_or("").starts_with("https://")
     }
 
+    /// Whether a TLS connection to the proxy itself (an `https://` proxy URL) is supported.
+    /// In PHP this depends on the libcurl build (`CURL_VERSION_HTTPS_PROXY`, curl >= 7.52.0).
+    /// Shirabe's HTTP layer is reqwest with a rustls backend, which always supports it.
     pub fn supports_secure_proxy(&self) -> bool {
-        let version = match curl_version() {
-            None => return false,
-            Some(v) => v,
-        };
-
-        if !shirabe_php_shim::defined("CURL_VERSION_HTTPS_PROXY") {
-            return false;
-        }
-
-        let features = version
-            .get("features")
-            .and_then(|v| v.as_int())
-            .unwrap_or(0);
-        (features & CURL_VERSION_HTTPS_PROXY) != 0
+        true
     }
 }

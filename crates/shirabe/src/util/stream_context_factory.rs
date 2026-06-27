@@ -4,8 +4,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::ca_bundle::CaBundle;
 use shirabe_php_shim::{
     HHVM_VERSION, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, PhpMixed,
-    array_replace_recursive, curl_version, extension_loaded, function_exists, php_uname,
-    stream_context_create, stripos, uasort,
+    array_replace_recursive, extension_loaded, function_exists, php_uname, stream_context_create,
+    stripos, uasort,
 };
 
 use crate::composer;
@@ -159,15 +159,11 @@ impl StreamContextFactory {
         };
 
         let http_version = if for_curl {
-            let curl = curl_version().unwrap_or_default();
-            let version = curl
-                .get("version")
-                .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string();
-            format!("cURL {}", version)
+            // PHP reports `cURL <version>` here. Shirabe's "curl" transport is backed by reqwest,
+            // so name reqwest as the HTTP stack in the User-Agent.
+            "reqwest"
         } else {
-            "streams".to_string()
+            "streams"
         };
 
         let has_user_agent = options

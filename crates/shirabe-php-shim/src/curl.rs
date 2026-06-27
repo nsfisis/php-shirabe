@@ -75,6 +75,9 @@ pub struct CurlMultiHandle;
 pub struct CurlShareHandle;
 
 pub fn curl_version() -> Option<IndexMap<String, PhpMixed>> {
+    // Shirabe's HTTP layer is reqwest, not libcurl; no consumer needs real curl_version() data
+    // (the User-Agent reports "reqwest", RequestProxy::supports_secure_proxy is unconditionally
+    // true, and DiagnoseCommand has a phase-D TODO). Left unimplemented until a real need arises.
     todo!()
 }
 

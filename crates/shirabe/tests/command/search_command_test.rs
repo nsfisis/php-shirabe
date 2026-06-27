@@ -36,7 +36,7 @@ fn run_search_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str) {
 
 #[test]
 #[serial]
-#[ignore = "searching a `package`-type repo constructs an HTTP downloader whose User-Agent build calls curl_version() (todo!() in shirabe-php-shim::curl); the HTTP layer is not yet ported"]
+#[ignore = "searching a `package`-type repo returns incomplete results (some matching packages are dropped); the search/repository path is not yet fully ported"]
 fn test_search() {
     // 'by name and description'
     run_search_case(

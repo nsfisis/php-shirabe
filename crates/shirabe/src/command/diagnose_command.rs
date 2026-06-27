@@ -10,9 +10,8 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
-    CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD, INFO_GENERAL,
-    InvalidArgumentException, OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT, PHP_BINARY, PHP_EOL,
-    PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, curl_version, defined,
+    INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT,
+    PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, defined,
     disk_free_space, extension_loaded, file_exists, filter_var_boolean, function_exists,
     get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
     is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, str_contains, str_replace,
@@ -1039,62 +1038,9 @@ impl DiagnoseCommand {
                 return "<error>disabled via disable_functions, using php streams fallback, which reduces performance</error>".to_string();
             }
 
-            let version = curl_version();
-            let version_arr = version.unwrap_or_default();
-            let libz_version = version_arr
-                .get("libz_version")
-                .and_then(|v| v.as_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or("missing")
-                .to_string();
-            let brotli_version = version_arr
-                .get("brotli_version")
-                .and_then(|v| v.as_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or("missing")
-                .to_string();
-            let ssl_version = version_arr
-                .get("ssl_version")
-                .and_then(|v| v.as_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or("missing")
-                .to_string();
-            let features = version_arr
-                .get("features")
-                .and_then(|v| v.as_int())
-                .unwrap_or(0);
-            let has_zstd = features != 0
-                && defined("CURL_VERSION_ZSTD")
-                && 0 != (features & CURL_VERSION_ZSTD);
-            let mut http_versions = "1.0, 1.1".to_string();
-            if features != 0
-                && defined("CURL_VERSION_HTTP2")
-                && defined("CURL_HTTP_VERSION_2_0")
-                && (CURL_VERSION_HTTP2 & features) != 0
-            {
-                http_versions.push_str(", 2");
-            }
-            if features != 0
-                && defined("CURL_VERSION_HTTP3")
-                && (features & CURL_VERSION_HTTP3) != 0
-            {
-                http_versions.push_str(", 3");
-            }
-
-            let curl_version_str = version_arr
-                .get("version")
-                .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string();
-            return format!(
-                "<comment>{}</comment> libz <comment>{}</comment> brotli <comment>{}</comment> zstd <comment>{}</comment> ssl <comment>{}</comment> HTTP <comment>{}</comment>",
-                curl_version_str,
-                libz_version,
-                brotli_version,
-                if has_zstd { "supported" } else { "missing" },
-                ssl_version,
-                http_versions
-            );
+            // TODO(phase-d): Shirabe does not use cURL, we will consider what should be shown here
+            // later.
+            return "TODO: curl_version()".to_string();
         }
 
         "<error>missing, using php streams fallback, which reduces performance</error>".to_string()
