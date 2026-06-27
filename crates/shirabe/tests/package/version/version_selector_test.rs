@@ -12,11 +12,13 @@ use shirabe::package::CompleteAliasPackageHandle;
 use shirabe::package::CompletePackageHandle;
 use shirabe::package::Link;
 use shirabe::package::PackageInterfaceHandle;
+use shirabe::package::handle::PackageHandle;
 use shirabe::package::version::VersionSelector;
 use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::PlatformRepository;
 use shirabe::repository::RepositorySetInterface;
 use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION};
 use shirabe_semver::constraint::AnyConstraint;
 
 use shirabe_external_packages::symfony::console::output::output_interface;
@@ -544,7 +546,130 @@ fn test_false_returned_on_no_packages() {
 }
 
 #[test]
-#[ignore = "branch-alias cases need Package::set_extra, exposed only on RootPackageHandle, not on the PackageHandle/PackageInterfaceHandle passed to find_recommended_require_version"]
+#[ignore = "date-based cases (v20121020) fail: shirabe_semver::VersionParser::normalize yields \
+            20121020.0.0.0 instead of PHP's date-aware 20121020, so find_recommended_require_version \
+            returns ^20121020.0 rather than leaving the version untouched. Faithful port; un-ignore \
+            once normalize handles date(time) versions like PHP"]
 fn test_find_recommended_require_version() {
-    todo!()
+    let php_version = format!(
+        "{}.{}.{}",
+        PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION
+    );
+    // real version, expected recommendation, [branch-alias], [pkg name]
+    let cases: Vec<(String, &str, Option<&str>, &str)> = vec![
+        ("1.2.1".to_string(), "^1.2", None, "foo/bar"),
+        ("1.2".to_string(), "^1.2", None, "foo/bar"),
+        ("v1.2.1".to_string(), "^1.2", None, "foo/bar"),
+        ("3.1.2-pl2".to_string(), "^3.1", None, "foo/bar"),
+        ("3.1.2-patch".to_string(), "^3.1", None, "foo/bar"),
+        ("2.0-beta.1".to_string(), "^2.0@beta", None, "foo/bar"),
+        ("3.1.2-alpha5".to_string(), "^3.1@alpha", None, "foo/bar"),
+        ("3.0-RC2".to_string(), "^3.0@RC", None, "foo/bar"),
+        ("0.1.0".to_string(), "^0.1.0", None, "foo/bar"),
+        ("0.1.3".to_string(), "^0.1.3", None, "foo/bar"),
+        ("0.0.3".to_string(), "^0.0.3", None, "foo/bar"),
+        ("0.0.3-alpha".to_string(), "^0.0.3@alpha", None, "foo/bar"),
+        ("0.0.3.4-alpha".to_string(), "^0.0.3@alpha", None, "foo/bar"),
+        ("3.0.0.2-RC2".to_string(), "^3.0@RC", None, "foo/bar"),
+        ("1.2.1.1020402".to_string(), "^1.2", None, "foo/bar"),
+        // date-based versions are not touched at all
+        ("v20121020".to_string(), "v20121020", None, "foo/bar"),
+        ("v20121020.2".to_string(), "v20121020.2", None, "foo/bar"),
+        // dev packages without alias are not touched at all
+        ("dev-master".to_string(), "dev-master", None, "foo/bar"),
+        ("3.1.2-dev".to_string(), "3.1.2-dev", None, "foo/bar"),
+        // dev packages with alias inherit the alias
+        (
+            "dev-master".to_string(),
+            "^2.1@dev",
+            Some("2.1.x-dev"),
+            "foo/bar",
+        ),
+        (
+            "dev-master".to_string(),
+            "^2.1@dev",
+            Some("2.1-dev"),
+            "foo/bar",
+        ),
+        (
+            "dev-master".to_string(),
+            "^2.1@dev",
+            Some("2.1.3.x-dev"),
+            "foo/bar",
+        ),
+        (
+            "dev-master".to_string(),
+            "^2.0@dev",
+            Some("2.x-dev"),
+            "foo/bar",
+        ),
+        (
+            "dev-master".to_string(),
+            "^0.3.0@dev",
+            Some("0.3.x-dev"),
+            "foo/bar",
+        ),
+        (
+            "dev-master".to_string(),
+            "^0.0.3@dev",
+            Some("0.0.3.x-dev"),
+            "foo/bar",
+        ),
+        (
+            "dev-master".to_string(),
+            "dev-master",
+            Some(VersionParser::DEFAULT_BRANCH_ALIAS),
+            "foo/bar",
+        ),
+        // numeric alias
+        (
+            "3.x-dev".to_string(),
+            "^3.0@dev",
+            Some("3.0.x-dev"),
+            "foo/bar",
+        ),
+        (
+            "3.x-dev".to_string(),
+            "^3.0@dev",
+            Some("3.0-dev"),
+            "foo/bar",
+        ),
+        // ext in sync with php
+        (php_version.clone(), "*", None, "ext-filter"),
+        // ext versioned individually
+        ("3.0.5".to_string(), "^3.0", None, "ext-xdebug"),
+    ];
+
+    let version_parser = VersionParser::new();
+    for (pretty_version, expected_version, branch_alias, package_name) in &cases {
+        let repository_set = MockRepositorySet::new();
+        let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
+
+        let package = PackageHandle::new(
+            package_name.to_string(),
+            version_parser.normalize(pretty_version, None).unwrap(),
+            pretty_version.clone(),
+        );
+
+        if let Some(branch_alias) = branch_alias {
+            let mut alias_map: IndexMap<String, PhpMixed> = IndexMap::new();
+            alias_map.insert(
+                pretty_version.clone(),
+                PhpMixed::String(branch_alias.to_string()),
+            );
+            let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
+            extra.insert("branch-alias".to_string(), PhpMixed::Array(alias_map));
+            package.__set_extra(extra);
+        }
+
+        let recommended = version_selector
+            .find_recommended_require_version(package.into())
+            .unwrap();
+
+        // assert that the recommended version is what we expect
+        assert_eq!(
+            *expected_version, recommended,
+            "pretty_version {pretty_version:?}"
+        );
+    }
 }
