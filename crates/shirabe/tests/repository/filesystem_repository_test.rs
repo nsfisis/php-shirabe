@@ -9,14 +9,16 @@ use shirabe::installed_versions::InstalledVersions;
 use shirabe::installer::{InstallationManagerInterface, InstallerInterface};
 use shirabe::io::IOInterface;
 use shirabe::json::json_file::JsonFile;
-use shirabe::package::PackageInterfaceHandle;
+use shirabe::package::loader::ArrayLoader;
+use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, RootPackageHandle};
 use shirabe::repository::InstalledRepositoryInterface;
 use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
+use shirabe_semver::VersionParser;
 
-use crate::test_case::get_package;
+use crate::test_case::{get_alias_package, get_package};
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
 /// materialized as a real temp file whose decoded JSON reproduces the mock return value exactly.
@@ -89,54 +91,32 @@ fn test_unexistent_repository_file() {
     assert_eq!(packages.len(), 0);
 }
 
-/// Stub for `InstallationManagerInterface` whose `getInstallPath` returns a fixed path, mirroring
-/// the PHPUnit mock built with `disableOriginalConstructor()`. Only `get_install_path` is reached by
-/// `FilesystemRepository::write`; the call counter backs PHP's `expects($this->exactly(2))`.
-#[derive(Debug)]
-struct InstallPathStub {
-    calls: Rc<RefCell<i64>>,
-    fixed_path: String,
-}
-
-impl InstallationManagerInterface for InstallPathStub {
-    fn add_installer(&mut self, _installer: Box<dyn InstallerInterface>) {
-        unimplemented!()
-    }
-    fn remove_installer(&mut self, _installer: &dyn InstallerInterface) {
-        unimplemented!()
-    }
-    fn disable_plugins(&mut self) {
-        unimplemented!()
-    }
-    fn is_package_installed(
-        &mut self,
-        _repo: &dyn InstalledRepositoryInterface,
-        _package: PackageInterfaceHandle,
-    ) -> anyhow::Result<bool> {
-        unimplemented!()
-    }
-    fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) {
-        unimplemented!()
-    }
-    fn execute(
-        &mut self,
-        _repo: &mut dyn InstalledRepositoryInterface,
-        _operations: Vec<Rc<dyn OperationInterface>>,
-        _dev_mode: bool,
-        _run_scripts: bool,
-        _download_only: bool,
-    ) -> anyhow::Result<()> {
-        unimplemented!()
-    }
-    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
-        *self.calls.borrow_mut() += 1;
-        Some(self.fixed_path.clone())
-    }
-    fn set_output_progress(&mut self, _output_progress: bool) {
-        unimplemented!()
-    }
-    fn notify_installs(&mut self, _io: Rc<RefCell<dyn IOInterface>>) {
-        unimplemented!()
+mockall::mock! {
+    /// Mocks the PHPUnit `InstallationManager` mock built with `disableOriginalConstructor()`. Only
+    /// `get_install_path` is reached by `FilesystemRepository::write`.
+    #[derive(Debug)]
+    pub InstallationManager {}
+    impl InstallationManagerInterface for InstallationManager {
+        fn add_installer(&mut self, installer: Box<dyn InstallerInterface>);
+        fn remove_installer(&mut self, installer: &dyn InstallerInterface);
+        fn disable_plugins(&mut self);
+        fn is_package_installed(
+            &mut self,
+            repo: &dyn InstalledRepositoryInterface,
+            package: PackageInterfaceHandle,
+        ) -> anyhow::Result<bool>;
+        fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
+        fn execute(
+            &mut self,
+            repo: &mut dyn InstalledRepositoryInterface,
+            operations: Vec<Rc<dyn OperationInterface>>,
+            dev_mode: bool,
+            run_scripts: bool,
+            download_only: bool,
+        ) -> anyhow::Result<()>;
+        fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
+        fn set_output_progress(&mut self, output_progress: bool);
+        fn notify_installs(&mut self, io: Rc<RefCell<dyn IOInterface>>);
     }
 }
 
@@ -162,11 +142,11 @@ fn test_repository_write() {
     let json = JsonFile::new(json_path.clone(), None, None).unwrap();
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
 
-    let calls = Rc::new(RefCell::new(0i64));
-    let mut im = InstallPathStub {
-        calls: calls.clone(),
-        fixed_path: format!("{}/vendor/woop/woop", repo_dir),
-    };
+    let mut im = MockInstallationManager::new();
+    let fixed_path = format!("{}/vendor/woop/woop", repo_dir);
+    im.expect_get_install_path()
+        .times(2)
+        .returning(move |_| Some(fixed_path.clone()));
 
     repository.set_dev_package_names(vec!["mypkg2".to_string()]);
     repository
@@ -176,9 +156,6 @@ fn test_repository_write() {
         .add_package(get_package("mypkg", "0.1.10"))
         .unwrap();
     repository.write(true, &mut im).unwrap();
-
-    // PHP asserts getInstallPath is called exactly twice (once per installed package).
-    assert_eq!(*calls.borrow(), 2);
 
     let written = std::fs::read_to_string(&json_path).unwrap();
     let actual: serde_json::Value = serde_json::from_str(&written).unwrap();
@@ -195,10 +172,159 @@ fn test_repository_write() {
     fs.remove_directory(&repo_dir).ok();
 }
 
+/// chdir()s into a fresh temp dir on construction and restores the previous cwd on drop, mirroring
+/// PHP's `getUniqueTmpDirectory()` + `chdir($dir)`. The cwd is restored before the temp tree is
+/// removed so the directory (the cwd itself) can be deleted cleanly.
+struct CwdGuard {
+    temp: tempfile::TempDir,
+    prev_cwd: std::path::PathBuf,
+}
+
+impl CwdGuard {
+    fn new() -> Self {
+        let temp = tempfile::TempDir::new().unwrap();
+        let prev_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(temp.path()).unwrap();
+        Self { temp, prev_cwd }
+    }
+
+    fn path(&self) -> std::path::PathBuf {
+        self.temp.path().to_path_buf()
+    }
+}
+
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.prev_cwd);
+    }
+}
+
+/// ref: TestCase::configureLinks, inlined for the single package being configured.
+fn configure_links(
+    name: &str,
+    pretty_version: &str,
+    description: &str,
+    links: &[(&str, &str)],
+) -> IndexMap<String, Link> {
+    let mut map: IndexMap<String, PhpMixed> = IndexMap::new();
+    for (target, constraint) in links {
+        map.insert(
+            (*target).to_string(),
+            PhpMixed::String((*constraint).to_string()),
+        );
+    }
+    ArrayLoader::new(None, false)
+        .parse_links(name, pretty_version, description, map)
+        .unwrap()
+}
+
 #[test]
-#[ignore = "needs get_root_package + configure_links test helpers (not present in tests/common; project_test_port_link_setters describes them via ArrayLoader::load_packages but this branch lacks them) plus exact byte-match of the generated installed.php fixture under a chdir"]
 fn test_repository_writes_installed_php() {
-    todo!()
+    let guard = CwdGuard::new();
+    let dir = guard.path();
+    let dir = dir.to_str().unwrap();
+
+    let json = JsonFile::new(format!("{}/installed.json", dir), None, None).unwrap();
+
+    let root_package = RootPackageHandle::new(
+        "__root__".to_string(),
+        VersionParser.normalize("dev-master", None).unwrap(),
+        "dev-master".to_string(),
+    );
+    root_package.set_source_reference(Some("sourceref-by-default".to_string()));
+    root_package.set_dist_reference(Some("distref".to_string()));
+    root_package.set_provides(configure_links(
+        "__root__",
+        "dev-master",
+        Link::TYPE_PROVIDE,
+        &[("foo/impl", "2.0")],
+    ));
+    let root_package = RootAliasPackageHandle::new(
+        root_package,
+        VersionParser.normalize("1.10.x-dev", None).unwrap(),
+        "1.10.x-dev".to_string(),
+    );
+
+    let mut repository =
+        FilesystemRepository::new(json, true, Some(root_package.into()), None).unwrap();
+    repository.set_dev_package_names(vec!["c/c".to_string()]);
+
+    let pkg = get_package("a/provider", "1.1");
+    pkg.__set_provides(configure_links(
+        "a/provider",
+        "1.1",
+        Link::TYPE_PROVIDE,
+        &[("foo/impl", "^1.1"), ("foo/impl2", "2.0")],
+    ));
+    pkg.set_dist_reference(Some("distref-as-no-source".to_string()));
+    repository.add_package(pkg).unwrap();
+
+    let pkg = get_package("a/provider2", "1.2");
+    pkg.__set_provides(configure_links(
+        "a/provider2",
+        "1.2",
+        Link::TYPE_PROVIDE,
+        &[("foo/impl", "self.version"), ("foo/impl2", "2.0")],
+    ));
+    pkg.set_source_reference(Some("sourceref".to_string()));
+    pkg.set_dist_reference(Some("distref-as-installed-from-dist".to_string()));
+    pkg.set_installation_source(Some("dist".to_string()));
+    repository.add_package(pkg.clone()).unwrap();
+
+    repository
+        .add_package(get_alias_package(&pkg, "1.4"))
+        .unwrap();
+
+    let pkg = get_package("b/replacer", "2.2");
+    pkg.__set_replaces(configure_links(
+        "b/replacer",
+        "2.2",
+        Link::TYPE_REPLACE,
+        &[("foo/impl2", "self.version"), ("foo/replaced", "^3.0")],
+    ));
+    repository.add_package(pkg).unwrap();
+
+    let pkg = get_package("c/c", "3.0");
+    pkg.set_dist_reference(Some(
+        "{${passthru('bash -i')}} Foo\\Bar\n\ttab\u{0b}verticaltab\0".to_string(),
+    ));
+    repository.add_package(pkg).unwrap();
+
+    let pkg = get_package("meta/package", "3.0");
+    pkg.__set_type("metapackage".to_string());
+    repository.add_package(pkg).unwrap();
+
+    let mut im = MockInstallationManager::new();
+    let cwd = dir.to_string();
+    im.expect_get_install_path().returning(move |package| {
+        // check for empty paths handling
+        if package.get_type() == "metapackage" {
+            return Some(String::new());
+        }
+        if package.get_name() == "c/c" {
+            // check for absolute paths
+            return Some("/foo/bar/ven\\do{}r/c/c${}".to_string());
+        }
+        if package.get_name() == "a/provider" {
+            return Some("vendor/{${passthru('bash -i')}}".to_string());
+        }
+        // check for cwd
+        if package.as_root().is_some() {
+            return Some(cwd.clone());
+        }
+        // check for relative paths
+        Some(format!("vendor/{}", package.get_name()))
+    });
+
+    repository.write(true, &mut im).unwrap();
+
+    let expected = std::fs::read_to_string(format!(
+        "{}/../../composer/tests/Composer/Test/Repository/Fixtures/installed.php",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let actual = std::fs::read_to_string(format!("{}/installed.php", dir)).unwrap();
+    assert_eq!(expected, actual);
 }
 
 #[ignore]
