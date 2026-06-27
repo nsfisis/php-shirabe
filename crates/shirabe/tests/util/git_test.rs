@@ -4,16 +4,72 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
-use shirabe::config::Config;
+use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::git::Git;
+use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 
 use crate::config_stub::ConfigStubBuilder;
+use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+
+// No-op ConfigSourceInterface, equivalent to PHPUnit's
+// `getMockBuilder(Config::class)` auto-stubbing getConfigSource/getAuthConfigSource:
+// the Bitbucket OAuth flow writes the token through these, but GitTest never asserts
+// on them.
+#[derive(Debug)]
+struct NullConfigSource;
+
+impl ConfigSourceInterface for NullConfigSource {
+    fn add_repository(
+        &mut self,
+        _name: &str,
+        _config: PhpMixed,
+        _append: bool,
+    ) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn insert_repository(
+        &mut self,
+        _name: &str,
+        _config: PhpMixed,
+        _reference_name: &str,
+        _offset: i64,
+    ) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn set_repository_url(&mut self, _name: &str, _url: &str) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn remove_repository(&mut self, _name: &str) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn add_config_setting(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
+        Ok(())
+    }
+    fn remove_config_setting(&mut self, _name: &str) -> anyhow::Result<()> {
+        Ok(())
+    }
+    fn add_property(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn remove_property(&mut self, _name: &str) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn add_link(&mut self, _type: &str, _name: &str, _value: &str) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn remove_link(&mut self, _type: &str, _name: &str) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn get_name(&self) -> String {
+        "null".to_string()
+    }
+}
 
 // PHP's `commandCallable` returns a bare string (`'git command'`); Rust's `run_command`
 // flattens each callable to a `Vec<String>` and hands it to `execute_args`, which always
@@ -351,10 +407,122 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
     );
 }
 
+// privateBitbucketWithOauthProvider helper.
+fn run_command_private_bitbucket_interactive_with_oauth(
+    git_url: &str,
+    expected_url: &str,
+    initial_config: Option<(&str, &str)>,
+) {
+    let expected_url_owned = expected_url.to_string();
+    let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(move |url: &str| {
+        if url != expected_url_owned {
+            return vec!["git command failing".to_string()];
+        }
+        vec!["git command ok".to_string()]
+    });
+
+    let mut config = ConfigStubBuilder::new()
+        .with(
+            "gitlab-domains",
+            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+        )
+        .with(
+            "github-domains",
+            PhpMixed::List(vec![PhpMixed::String("github.com".to_string())]),
+        )
+        .build();
+    config.set_config_source(Box::new(NullConfigSource));
+    config.set_auth_config_source(Box::new(NullConfigSource));
+
+    let mut expected_calls: Vec<MockExpectation> = Vec::new();
+    expected_calls.push(cmd_full(vec!["git command failing"], 1, "", ""));
+    if initial_config.is_some() {
+        expected_calls.push(cmd_full(vec!["git command failing"], 1, "", ""));
+    } else {
+        expected_calls.push(cmd_full(
+            vec!["git", "config", "bitbucket.accesstoken"],
+            1,
+            "",
+            "",
+        ));
+    }
+    expected_calls.push(cmd_full(vec!["git command ok"], 0, "", ""));
+
+    let (process, _guard) = get_process_executor_mock(expected_calls, true, MockHandler::default());
+
+    let mut hidden_answers: IndexMap<String, String> = IndexMap::new();
+    hidden_answers.insert(
+        "Consumer Key (hidden): ".to_string(),
+        "my-consumer-key".to_string(),
+    );
+    hidden_answers.insert(
+        "Consumer Secret (hidden): ".to_string(),
+        "my-consumer-secret".to_string(),
+    );
+
+    let mut io = IOStub::new()
+        .with_is_interactive(true)
+        .with_ask_confirmation(true)
+        .with_ask_and_hide_answer_responses(hidden_answers);
+    if let Some((username, password)) = initial_config {
+        io = io.with_authentication("bitbucket.org", username, Some(password.to_string()));
+    }
+
+    let (downloader, _http_guard) = get_http_downloader_mock(
+        vec![expect_full(
+            "https://bitbucket.org/site/oauth2/access_token",
+            None,
+            200,
+            r#"{"expires_in": 600, "access_token": "my-access-token"}"#,
+            vec![],
+        )],
+        true,
+        HttpDownloaderMockHandler::default(),
+    );
+
+    let mut git = build_git(io, config, process);
+    git.set_http_downloader(downloader);
+
+    git.__run_command(vec![command_callable], git_url, None, true, None)
+        .unwrap();
+}
+
 #[test]
-#[ignore = "interactive Bitbucket OAuth flow needs IOStub::askConfirmation/askAndHideAnswer/setAuthentication stateful callbacks and getHttpDownloaderMock; IOStub only supports fixed willReturn values, not the willReturnCallback-based stateful initial_config mutation this test relies on"]
-fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth() {
-    todo!()
+fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_ssh() {
+    run_command_private_bitbucket_interactive_with_oauth(
+        "git@bitbucket.org:acme/repo.git",
+        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
+        None,
+    );
+}
+
+#[test]
+fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_https_git()
+ {
+    run_command_private_bitbucket_interactive_with_oauth(
+        "https://bitbucket.org/acme/repo.git",
+        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
+        None,
+    );
+}
+
+#[test]
+fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_https() {
+    run_command_private_bitbucket_interactive_with_oauth(
+        "https://bitbucket.org/acme/repo",
+        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
+        None,
+    );
+}
+
+#[test]
+fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_preconfigured()
+ {
+    run_command_private_bitbucket_interactive_with_oauth(
+        "git@bitbucket.org:acme/repo.git",
+        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
+        Some(("someuseralsoswappedfortoken", "little green men")),
+    );
 }
 
 #[test]

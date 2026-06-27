@@ -29,6 +29,10 @@ pub struct IOStub {
     ask: Option<PhpMixed>,
     ask_confirmation: Option<bool>,
     ask_and_hide_answer: Option<Option<String>>,
+    // Keyed `askAndHideAnswer` replies, mirroring tests whose willReturnCallback
+    // switches on the question string. Unknown questions return `''` like PHP's
+    // `switch` default.
+    ask_and_hide_answer_responses: Option<indexmap::IndexMap<String, String>>,
 }
 
 impl IOStub {
@@ -79,6 +83,29 @@ impl IOStub {
         self.ask_and_hide_answer = Some(value);
         self
     }
+    pub fn with_ask_and_hide_answer_responses(
+        mut self,
+        value: indexmap::IndexMap<String, String>,
+    ) -> Self {
+        self.ask_and_hide_answer_responses = Some(value);
+        self
+    }
+
+    // Pre-seeds the in-memory auth store, equivalent to a willReturnCallback that
+    // reads a captured `$initial_config`. Reads delegate to `BaseIO` as long as the
+    // `with_has_authentication`/`with_get_authentication` overrides are left unset.
+    pub fn with_authentication(
+        mut self,
+        repository_name: impl Into<String>,
+        username: impl Into<String>,
+        password: Option<String>,
+    ) -> Self {
+        let mut auth = indexmap::IndexMap::new();
+        auth.insert("username".to_string(), Some(username.into()));
+        auth.insert("password".to_string(), password);
+        self.authentications.insert(repository_name.into(), auth);
+        self
+    }
 }
 
 impl IOInterfaceImmutable for IOStub {
@@ -127,7 +154,10 @@ impl IOInterfaceImmutable for IOStub {
     ) -> anyhow::Result<PhpMixed> {
         Ok(default)
     }
-    fn ask_and_hide_answer(&self, _question: String) -> Option<String> {
+    fn ask_and_hide_answer(&self, question: String) -> Option<String> {
+        if let Some(responses) = &self.ask_and_hide_answer_responses {
+            return Some(responses.get(&question).cloned().unwrap_or_default());
+        }
         self.ask_and_hide_answer.clone().unwrap_or(None)
     }
     fn select(
