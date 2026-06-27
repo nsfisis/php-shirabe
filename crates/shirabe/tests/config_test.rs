@@ -1,11 +1,21 @@
 //! ref: composer/tests/Composer/Test/ConfigTest.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::advisory::Auditor;
 use shirabe::config::Config;
+use shirabe::io::IOInterface;
+use shirabe::io::io_interface;
 use shirabe::util::Platform;
 use shirabe_php_shim::PhpMixed;
+
+#[path = "common/io_mock.rs"]
+#[allow(dead_code)] // io_mock exposes more helpers than this binary uses
+mod io_mock;
+use io_mock::{Expectation, get_io_mock};
 
 /// Builds a `['config' => {...}]` map for `Config::merge`.
 fn config_section(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
@@ -487,9 +497,31 @@ fn test_prohibited_urls_throw_exception() {
 }
 
 #[test]
-#[ignore = "getIOMock() is not ported yet"]
 fn test_prohibited_urls_warning_verify_peer() {
-    todo!()
+    let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
+    io_mock
+        .borrow_mut()
+        .expects(
+            vec![Expectation::text(
+                "<warning>Warning: Accessing example.org with verify_peer and verify_peer_name disabled.</warning>",
+            )],
+            true,
+        )
+        .unwrap();
+
+    let mut config = Config::new(false, None);
+    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let mut repo_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    repo_options.insert(
+        "ssl".to_string(),
+        PhpMixed::Array(map(vec![
+            ("verify_peer", PhpMixed::Bool(false)),
+            ("verify_peer_name", PhpMixed::Bool(false)),
+        ])),
+    );
+    config
+        .prohibit_url_by_config("https://example.org", Some(io), &repo_options)
+        .unwrap();
 }
 
 #[ignore]
