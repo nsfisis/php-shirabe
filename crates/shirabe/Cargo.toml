@@ -26,6 +26,7 @@ tokio.workspace = true
 url.workspace = true
 
 [dev-dependencies]
+mockall.workspace = true
 serial_test.workspace = true
 tempfile.workspace = true
 

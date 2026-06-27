@@ -22,6 +22,7 @@ fastrand = "2.4.1"
 indexmap = { version = "2.14.0", features = ["serde"] }
 jsonschema = { version = "0.46.6", default-features = false }
 md5 = "0.7.0"
+mockall = "0.14.0"
 regex = "1.12.3"
 reqwest = "0.13.4"
 serde = { version = "1.0.228", features = ["derive"] }
