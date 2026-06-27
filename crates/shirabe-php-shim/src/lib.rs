@@ -88,6 +88,12 @@ impl serde::Serialize for PhpMixed {
                 seq.end()
             }
             PhpMixed::Array(entries) => {
+                // PHP arrays do not distinguish an empty map from an empty list, and
+                // `json_encode([])` always emits `[]`. Mirror that so an empty associative
+                // array encodes as `[]` rather than `{}`.
+                if entries.is_empty() {
+                    return serializer.serialize_seq(Some(0))?.end();
+                }
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
                     map.serialize_entry(k, v)?;
