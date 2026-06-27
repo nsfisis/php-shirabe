@@ -34,7 +34,7 @@ fn test_list_with_no_repositories() {
         app_tester.get_display().trim()
     );
     // composer.json should remain unchanged
-    assert_eq!(serde_json::json!({}), read_composer_json());
+    assert_eq!(serde_json::json!([]), read_composer_json());
 
     drop(tear_down);
 }
@@ -216,7 +216,7 @@ fn test_remove_repository() {
     if let Some(repositories) = json.get("repositories") {
         assert_eq!(&serde_json::json!([]), repositories);
     } else {
-        assert_eq!(serde_json::json!({}), json);
+        assert_eq!(serde_json::json!([]), json);
     }
 
     drop(tear_down);
@@ -392,7 +392,7 @@ fn test_disable_and_enable_packagist() {
         )
         .unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(serde_json::json!({}), read_composer_json());
+    assert_eq!(serde_json::json!([]), read_composer_json());
 
     drop(tear_down);
 }

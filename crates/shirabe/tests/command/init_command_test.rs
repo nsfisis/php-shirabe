@@ -159,9 +159,6 @@ fn test_namespace_from_missing_package_name() {
 }
 
 /// @return iterable<string, array{0: array<string, mixed>, 1: array<string, mixed>}>
-///
-/// Empty `require` is `{}` (PHP's `new \stdClass`), not `[]`, to match what the command writes:
-/// shirabe's `json_decode` keeps the empty object/array distinction that PHP collapses.
 fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
     vec![
         // name argument
@@ -169,7 +166,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
             }),
             vec![opt("--name", "test/pkg")],
         ),
@@ -177,7 +174,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
         (
             serde_json::json!({
                 "name": "test/pkg",
-                "require": {},
+                "require": [],
                 "authors": [{ "name": "Mr. Test", "email": "test@example.org" }],
             }),
             vec![
@@ -189,7 +186,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
         (
             serde_json::json!({
                 "name": "test/pkg",
-                "require": {},
+                "require": [],
                 "authors": [{ "name": "Mr. Test" }],
             }),
             vec![opt("--name", "test/pkg"), opt("--author", "Mr. Test")],
@@ -199,7 +196,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "repositories": [{ "type": "vcs", "url": "http://packages.example.com" }],
             }),
             vec![
@@ -215,7 +212,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "repositories": [
                     { "type": "vcs", "url": "http://vcs.example.com" },
                     { "type": "composer", "url": "http://composer.example.com" },
@@ -243,7 +240,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "minimum-stability": "dev",
             }),
             vec![opt("--name", "test/pkg"), opt("--stability", "dev")],
@@ -277,7 +274,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "require-dev": { "first/pkg": "1.0.0" },
             }),
             vec![
@@ -290,7 +287,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "require-dev": { "first/pkg": "1.0.0", "second/pkg": "^3.4" },
             }),
             vec![
@@ -303,7 +300,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "autoload": { "psr-4": { "Test\\Pkg\\": "testMapping/" } },
             }),
             vec![opt("--name", "test/pkg"), opt("--autoload", "testMapping/")],
@@ -313,7 +310,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "homepage": "https://example.org/",
             }),
             vec![
@@ -326,7 +323,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "description": "My first example package",
             }),
             vec![
@@ -339,7 +336,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "type": "project",
             }),
             vec![opt("--name", "test/pkg"), opt("--type", "project")],
@@ -349,7 +346,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
             serde_json::json!({
                 "name": "test/pkg",
                 "authors": [default_authors()],
-                "require": {},
+                "require": [],
                 "license": "MIT",
             }),
             vec![opt("--name", "test/pkg"), opt("--license", "MIT")],
@@ -510,7 +507,7 @@ fn test_run_guess_name_from_dir_sanitizes_dir() {
     let expected = serde_json::json!({
         "name": "vendor-name/foo-bar_baz.qux",
         "authors": [default_authors()],
-        "require": {},
+        "require": [],
     });
     assert_eq!(
         expected,
@@ -562,7 +559,7 @@ fn test_interactive_run() {
         "license": "AGPL-3.0-only",
         "authors": [{ "name": "Mr. Test", "email": "test@example.org" }],
         "minimum-stability": "stable",
-        "require": {},
+        "require": [],
     });
     assert_eq!(expected, read_composer_json(&dir));
 }

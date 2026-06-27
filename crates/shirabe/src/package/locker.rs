@@ -705,7 +705,8 @@ impl Locker {
                 })
                 .unwrap_or(false);
             if should_replace {
-                lock_data.insert(key.to_string(), PhpMixed::Array(IndexMap::new()));
+                // PHP: new \stdClass() — empty JSON object
+                lock_data.insert(key.to_string(), PhpMixed::Object(IndexMap::new()));
             }
         }
 

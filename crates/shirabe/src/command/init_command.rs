@@ -226,8 +226,8 @@ impl Command for InitCommand {
                 .unwrap_or_default();
             let formatted = self.format_requirements(req_list)?;
             if formatted.is_empty() {
-                // PHP: new \stdClass — represented as an empty IndexMap (JSON object)
-                PhpMixed::Array(IndexMap::new())
+                // PHP: new \stdClass — empty JSON object
+                PhpMixed::Object(IndexMap::new())
             } else {
                 PhpMixed::Array(
                     formatted
@@ -238,7 +238,7 @@ impl Command for InitCommand {
             }
         } else {
             // PHP: new \stdClass
-            PhpMixed::Array(IndexMap::new())
+            PhpMixed::Object(IndexMap::new())
         };
         options.insert("require".to_string(), require_value);
 
@@ -254,7 +254,7 @@ impl Command for InitCommand {
                 .unwrap_or_default();
             let formatted = self.format_requirements(req_list)?;
             let value = if formatted.is_empty() {
-                PhpMixed::Array(IndexMap::new())
+                PhpMixed::Object(IndexMap::new())
             } else {
                 PhpMixed::Array(
                     formatted

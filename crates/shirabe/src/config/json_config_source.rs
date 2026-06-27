@@ -98,7 +98,7 @@ impl JsonConfigSource {
                     && inner.is_empty()
                 {
                     // PHP: $config[$prop] = new \stdClass;
-                    map.insert(prop.to_string(), PhpMixed::Array(IndexMap::new()));
+                    map.insert(prop.to_string(), PhpMixed::Object(IndexMap::new()));
                 }
             }
             for prop in ["psr-0", "psr-4"] {
@@ -108,14 +108,15 @@ impl JsonConfigSource {
                         && let Some(PhpMixed::Array(inner_map)) = autoload_map.get(prop)
                         && inner_map.is_empty()
                     {
-                        autoload_map.insert(prop.to_string(), PhpMixed::Array(IndexMap::new()));
+                        autoload_map.insert(prop.to_string(), PhpMixed::Object(IndexMap::new()));
                     }
                     if let Some(autoload_dev) = map.get_mut("autoload-dev")
                         && let PhpMixed::Array(autoload_dev_map) = autoload_dev
                         && let Some(PhpMixed::Array(inner_map)) = autoload_dev_map.get(prop)
                         && inner_map.is_empty()
                     {
-                        autoload_dev_map.insert(prop.to_string(), PhpMixed::Array(IndexMap::new()));
+                        autoload_dev_map
+                            .insert(prop.to_string(), PhpMixed::Object(IndexMap::new()));
                     }
                 }
             }
@@ -136,7 +137,7 @@ impl JsonConfigSource {
                     && let Some(PhpMixed::Array(inner_map)) = cfg_map.get(prop)
                     && inner_map.is_empty()
                 {
-                    cfg_map.insert(prop.to_string(), PhpMixed::Array(IndexMap::new()));
+                    cfg_map.insert(prop.to_string(), PhpMixed::Object(IndexMap::new()));
                 }
             }
             self.file.borrow().write(config)?;
