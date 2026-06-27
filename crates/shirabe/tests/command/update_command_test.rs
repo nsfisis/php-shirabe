@@ -235,7 +235,7 @@ Your requirements could not be resolved to an installable set of packages.
 
 #[test]
 #[serial]
-#[ignore = "UpdateCommand::configure sets an empty InputDefinition (Phase-C: InputArgument/InputOption modeling pending), so the command rejects its own options, failing with e.g. \"The \\\"--dry-run\\\" option does not exist.\""]
+#[ignore = "regex porting: a Preg pattern starting with \"^array \" fails to compile in shirabe-php-shim preg.rs (\"unterminated regex pattern\"); unrelated to InputDefinition"]
 fn test_update() {
     for (label, composer_json, command, expected, create_lock) in provide_updates() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
@@ -260,7 +260,7 @@ fn test_update() {
 
 #[test]
 #[serial]
-#[ignore = "UpdateCommand::configure sets an empty InputDefinition (Phase-C: InputArgument/InputOption modeling pending), so the command rejects its own options, failing with e.g. \"The \\\"--dry-run\\\" option does not exist.\""]
+#[ignore = "resolver does not emit the temporary-update-constraint conflict; it performs the upgrade instead of reporting \"conflicts with your temporary update constraint\""]
 fn test_update_with_patch_only() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -352,7 +352,7 @@ Lock file operations: 0 installs, 2 updates, 0 removals
 
 #[test]
 #[serial]
-#[ignore = "UpdateCommand::configure sets an empty InputDefinition (Phase-C: InputArgument/InputOption modeling pending), so the command rejects its own options, failing with e.g. \"The \\\"--dry-run\\\" option does not exist.\""]
+#[ignore = "interactive selection path unported: --interactive requires a TTY and errors with \"--interactive cannot be used in non-interactive terminals.\""]
 fn test_interactive_mode_throws_if_no_package_to_update() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -383,7 +383,7 @@ fn test_interactive_mode_throws_if_no_package_to_update() {
 
 #[test]
 #[serial]
-#[ignore = "UpdateCommand::configure sets an empty InputDefinition (Phase-C: InputArgument/InputOption modeling pending), so the command rejects its own options, failing with e.g. \"The \\\"--dry-run\\\" option does not exist.\""]
+#[ignore = "interactive selection path unported: --interactive requires a TTY and errors with \"--interactive cannot be used in non-interactive terminals.\""]
 fn test_interactive_mode_throws_if_no_package_entered() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -439,7 +439,7 @@ Package operations: 0 installs, 1 update, 0 removals
 
 #[test]
 #[serial]
-#[ignore = "UpdateCommand::configure sets an empty InputDefinition (Phase-C: InputArgument/InputOption modeling pending), so the command rejects its own options, failing with e.g. \"The \\\"--dry-run\\\" option does not exist.\""]
+#[ignore = "interactive selection path unported: --interactive requires a TTY and errors with \"--interactive cannot be used in non-interactive terminals.\""]
 fn test_interactive_tmp() {
     for (package_names, expected) in provide_interactive_updates() {
         let composer_json = serde_json::json!({
@@ -519,7 +519,6 @@ fn test_interactive_tmp() {
 
 #[test]
 #[serial]
-#[ignore = "UpdateCommand::configure sets an empty InputDefinition (Phase-C: InputArgument/InputOption modeling pending), so the command rejects its own options, failing with e.g. \"The \\\"--dry-run\\\" option does not exist.\""]
 fn test_no_security_blocking_allows_insecure_packages() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": {
@@ -601,7 +600,7 @@ fn test_no_security_blocking_allows_insecure_packages() {
 
 #[test]
 #[serial]
-#[ignore = "UpdateCommand::configure sets an empty InputDefinition (Phase-C: InputArgument/InputOption modeling pending), so the command rejects its own options, failing with e.g. \"The \\\"--dry-run\\\" option does not exist.\""]
+#[ignore = "solver error \"Fixed package __root__ 1.0.0+no-version-set was not added to solver pool.\" on the no-lockfile bump path (resolver pool construction)"]
 fn test_bump_after_update_without_lockfile() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
