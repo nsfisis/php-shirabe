@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Installer/PluginInstaller.php
 
 use crate::composer::PartialComposerWeakHandle;
-use crate::installer::BinaryInstaller;
 use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::installer::LibraryInstaller;
@@ -25,7 +24,9 @@ impl PluginInstaller {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: PartialComposerWeakHandle,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
-        binary_installer: Option<BinaryInstaller>,
+        binary_installer: Option<
+            std::rc::Rc<std::cell::RefCell<dyn crate::installer::BinaryInstallerInterface>>,
+        >,
     ) -> Self {
         Self {
             inner: LibraryInstaller::new(

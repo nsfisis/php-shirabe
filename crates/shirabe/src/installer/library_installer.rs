@@ -30,7 +30,7 @@ pub struct LibraryInstaller {
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) r#type: Option<String>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    pub(crate) binary_installer: Box<dyn BinaryInstallerInterface>,
+    pub(crate) binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>,
 }
 
 impl LibraryInstaller {
@@ -40,7 +40,7 @@ impl LibraryInstaller {
         composer: PartialComposerWeakHandle,
         r#type: Option<String>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
-        binary_installer: Option<BinaryInstaller>,
+        binary_installer: Option<std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>>,
     ) -> Self {
         let composer_rc = composer
             .upgrade()
@@ -62,31 +62,32 @@ impl LibraryInstaller {
                 .unwrap_or_default(),
             Some("/"),
         );
-        let binary_installer: Box<dyn BinaryInstallerInterface> = match binary_installer {
-            Some(binary_installer) => Box::new(binary_installer),
-            None => {
-                let bin_dir = rtrim(
-                    &composer_ref
+        let binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>> =
+            match binary_installer {
+                Some(binary_installer) => binary_installer,
+                None => {
+                    let bin_dir = rtrim(
+                        &composer_ref
+                            .get_config()
+                            .borrow_mut()
+                            .get_str("bin-dir")
+                            .unwrap_or_default(),
+                        Some("/"),
+                    );
+                    let bin_compat = composer_ref
                         .get_config()
                         .borrow_mut()
-                        .get_str("bin-dir")
-                        .unwrap_or_default(),
-                    Some("/"),
-                );
-                let bin_compat = composer_ref
-                    .get_config()
-                    .borrow_mut()
-                    .get_str("bin-compat")
-                    .unwrap_or_default();
-                Box::new(BinaryInstaller::new(
-                    io.clone(),
-                    bin_dir,
-                    bin_compat,
-                    Some(filesystem.clone()),
-                    Some(vendor_dir.clone()),
-                ))
-            }
-        };
+                        .get_str("bin-compat")
+                        .unwrap_or_default();
+                    std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
+                        io.clone(),
+                        bin_dir,
+                        bin_compat,
+                        Some(filesystem.clone()),
+                        Some(vendor_dir.clone()),
+                    )))
+                }
+            };
 
         Self {
             composer,
@@ -101,7 +102,10 @@ impl LibraryInstaller {
 
     /// For testing only: swap the binary installer for a recording double, mirroring the
     /// constructor injection PHPUnit performs with a mocked BinaryInstaller.
-    pub fn __set_binary_installer(&mut self, binary_installer: Box<dyn BinaryInstallerInterface>) {
+    pub fn __set_binary_installer(
+        &mut self,
+        binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>,
+    ) {
         self.binary_installer = binary_installer;
     }
 
@@ -109,6 +113,7 @@ impl LibraryInstaller {
     pub fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
         let install_path = self.get_install_path(package.clone()).unwrap();
         self.binary_installer
+            .borrow_mut()
             .install_binaries(package, &install_path, false);
     }
 
@@ -317,13 +322,16 @@ impl InstallerInterface for LibraryInstaller {
 
         // remove the binaries if it appears the package files are missing
         if !Filesystem::is_readable(&download_path) && repo.has_package(package.clone()) {
-            self.binary_installer.remove_binaries(package.clone());
+            self.binary_installer
+                .borrow_mut()
+                .remove_binaries(package.clone());
         }
 
         let _ = self.install_code(package.clone()).await?;
 
         let install_path = self.get_install_path(package.clone()).unwrap();
         self.binary_installer
+            .borrow_mut()
             .install_binaries(package.clone(), &install_path, true);
         if !repo.has_package(package.clone()) {
             repo.add_package(PackageInterfaceHandle::dup(&package));
@@ -348,11 +356,14 @@ impl InstallerInterface for LibraryInstaller {
 
         self.initialize_vendor_dir();
 
-        self.binary_installer.remove_binaries(initial.clone());
+        self.binary_installer
+            .borrow_mut()
+            .remove_binaries(initial.clone());
         let _ = self.update_code(initial.clone(), target.clone()).await?;
 
         let install_path = self.get_install_path(target.clone()).unwrap();
         self.binary_installer
+            .borrow_mut()
             .install_binaries(target.clone(), &install_path, true);
         repo.remove_package(initial.clone());
         if !repo.has_package(target.clone()) {
@@ -378,7 +389,9 @@ impl InstallerInterface for LibraryInstaller {
         let _ = self.remove_code(package.clone()).await?;
 
         let download_path = self.get_package_base_path(package.clone());
-        self.binary_installer.remove_binaries(package.clone());
+        self.binary_installer
+            .borrow_mut()
+            .remove_binaries(package.clone());
         repo.remove_package(package.clone());
 
         if strpos(&package.get_name(), "/").is_some_and(|pos| pos != 0) {

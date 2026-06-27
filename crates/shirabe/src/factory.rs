@@ -10,7 +10,7 @@ use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
     UnexpectedValueException, array_replace_recursive, class_exists, dirname, extension_loaded,
     file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode,
-    mkdir, pathinfo, realpath, rename, strpos, strtr, substr, trim,
+    mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr, substr, trim,
 };
 
 use crate::autoload::AutoloadGenerator;
@@ -725,8 +725,10 @@ impl Factory {
                             .set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(am)));
                     }
 
-                    // add installers to the manager (must happen after download manager is created since they read it out of $composer)
-                    self.create_default_installers(&im, &composer, io.clone(), Some(&process));
+                    // PHP adds the installers here, but LibraryInstaller/PluginInstaller upgrade the
+                    // Composer back-reference in their constructors, which is not yet upgradeable
+                    // inside Rc::new_cyclic. Registration is deferred until after the Rc is built
+                    // (see create_default_installers call below).
 
                     // init locker if possible
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
@@ -797,6 +799,26 @@ impl Factory {
         );
         if let Some(e) = build_error {
             return Err(e);
+        }
+
+        // add installers to the manager (must happen after download manager is created since they
+        // read it out of $composer). Deferred to here because LibraryInstaller/PluginInstaller
+        // upgrade the Composer back-reference in their constructors, which only becomes upgradeable
+        // once Rc::new_cyclic has returned.
+        {
+            let im = composer.borrow().get_installation_manager();
+            let process = composer
+                .borrow()
+                .get_loop()
+                .borrow()
+                .get_process_executor()
+                .cloned();
+            self.create_default_installers(
+                &im,
+                PartialComposerWeakHandle::from_weak(std::rc::Rc::downgrade(&composer)),
+                io.clone(),
+                process.as_ref(),
+            );
         }
 
         // initialize plugin manager
@@ -1195,58 +1217,66 @@ impl Factory {
 
     fn create_default_installers(
         &self,
-        im: &std::rc::Rc<std::cell::RefCell<InstallationManager>>,
-        composer: &PartialOrFullComposer,
+        im: &std::rc::Rc<std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>>,
+        composer: PartialComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
             process.map(std::rc::Rc::clone),
         )));
-        let bin_dir = trim(
-            &composer
-                .get_config()
+        let (bin_dir, bin_compat, vendor_dir) = {
+            let composer_rc = composer
+                .upgrade()
+                .expect("Composer must outlive create_default_installers");
+            let composer_ref = composer_rc.borrow_partial();
+            let config = composer_ref.get_config();
+            let bin_dir = rtrim(
+                &config.borrow_mut().get_str("bin-dir").unwrap_or_default(),
+                Some("/"),
+            );
+            let bin_compat = config
                 .borrow_mut()
-                .get_str("bin-dir")
-                .unwrap_or_default(),
-            Some("/"),
-        );
-        let bin_compat = composer
-            .get_config()
-            .borrow_mut()
-            .get_str("bin-compat")
-            .unwrap_or_default();
-        let vendor_dir = trim(
-            &composer
-                .get_config()
-                .borrow_mut()
-                .get_str("vendor-dir")
-                .unwrap_or_default(),
-            Some("/"),
-        );
-        // PHP: $binaryInstaller = new BinaryInstaller(...);
-        //      $im->addInstaller(new LibraryInstaller($io, $composer, null, $fs, $binaryInstaller));
-        //      $im->addInstaller(new PluginInstaller($io, $composer, $fs, $binaryInstaller));
-        //      $im->addInstaller(new MetapackageInstaller($io));
-        // The same BinaryInstaller object is shared by the Library and Plugin installers.
-        // TODO(phase-c): two coupled blockers. (1) Sharing one BinaryInstaller requires
-        // Rc<RefCell<BinaryInstaller>>; LibraryInstaller/PluginInstaller currently own a
-        // `BinaryInstaller` by value. (2) Both installers' constructors take a
-        // PartialComposerWeakHandle, but create_default_installers runs (line 737) before the
-        // composer is wrapped in its shared Rc, so no weak handle is obtainable here yet —
-        // installer registration must move after the composer Rc is established. Both are part of
-        // the composer construction-ordering / shared-ownership rework, so no installers are
-        // registered for now.
-        let _binary_installer = BinaryInstaller::new(
-            io.clone(),
-            bin_dir.clone(),
-            bin_compat.clone(),
-            Some(fs.clone()),
-            Some(vendor_dir.clone()),
-        );
+                .get_str("bin-compat")
+                .unwrap_or_default();
+            let vendor_dir = rtrim(
+                &config
+                    .borrow_mut()
+                    .get_str("vendor-dir")
+                    .unwrap_or_default(),
+                Some("/"),
+            );
+            (bin_dir, bin_compat, vendor_dir)
+        };
 
-        // TODO(phase-b): InstallationManager not clone-able; need shared Rc<RefCell<>>
-        let _ = im;
+        // The same BinaryInstaller object is shared by the Library and Plugin installers.
+        let binary_installer: std::rc::Rc<
+            std::cell::RefCell<dyn crate::installer::BinaryInstallerInterface>,
+        > = std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
+            io.clone(),
+            bin_dir,
+            bin_compat,
+            Some(fs.clone()),
+            Some(vendor_dir),
+        )));
+
+        im.borrow_mut()
+            .add_installer(Box::new(crate::installer::LibraryInstaller::new(
+                io.clone(),
+                composer.clone(),
+                None,
+                Some(fs.clone()),
+                Some(binary_installer.clone()),
+            )));
+        im.borrow_mut()
+            .add_installer(Box::new(crate::installer::PluginInstaller::new(
+                io.clone(),
+                composer,
+                Some(fs),
+                Some(binary_installer),
+            )));
+        im.borrow_mut()
+            .add_installer(Box::new(crate::installer::MetapackageInstaller::new(io)));
     }
 
     fn purge_packages(

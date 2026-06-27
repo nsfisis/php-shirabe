@@ -366,9 +366,11 @@ fn test_ensure_binaries_installed() {
         None,
         None,
     );
-    library.__set_binary_installer(Box::new(RecordingBinaryInstaller {
-        calls: calls.clone(),
-    }));
+    library.__set_binary_installer(std::rc::Rc::new(std::cell::RefCell::new(
+        RecordingBinaryInstaller {
+            calls: calls.clone(),
+        },
+    )));
     let package = get_package("foo/bar", "1.0.0");
     let expected_path = library.get_install_path(package.clone()).unwrap();
 
