@@ -78,7 +78,7 @@ fn run_show_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str, requires: s
 
 use crate::test_case::{create_composer_lock, create_installed_json};
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_default_shows_installed_with_version_and_description() {
@@ -92,7 +92,7 @@ vendor/package 1.0.0 description of installed package",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_with_installed_and_self() {
@@ -111,7 +111,6 @@ vendor/package 1.0.0 description of installed package",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_with_locked_and_self() {
@@ -127,7 +126,6 @@ vendor/locked 3.0.0 description of locked package",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_show_with_available() {
@@ -157,7 +155,7 @@ fn test_show_with_direct_shows_nothing_if_no_deps() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_with_direct_shows_only_root_deps() {
@@ -171,7 +169,7 @@ fn test_show_with_direct_shows_only_root_deps() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps() {
@@ -192,7 +190,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "blocked: ShowCommand::configure() at src/command/show_command.rs:98-100 registers an empty set_definition(), so outdated->show fails with an option-does-not-exist error. Additionally, PackageInterfaceHandle exposes no set_release_date setter, so the 'sorting by age' output ('2 years old', '2 weeks old', 'from today') cannot be reproduced even once the definition is ported."]
+#[ignore = "blocked on two counts: (1) same package-categorization gap as the other outdated tests (packages land in the \"available\" bucket so the \"Direct/Transitive dependencies\" grouping is missing); (2) PackageInterfaceHandle exposes no set_release_date setter, so the sorting-by-age output (\"2 years old\", \"2 weeks old\", \"from today\") cannot be reproduced. Neither is an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_sorting_by_age() {
@@ -216,7 +214,7 @@ outdated/major 1.0.0 ~ 2.0.0 from today",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_direct_only_show_direct_deps_with_updated() {
@@ -236,7 +234,7 @@ outdated/major 1.0.0 ~ 2.0.0",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
@@ -250,7 +248,7 @@ fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_major_only() {
@@ -272,7 +270,7 @@ outdated/major 1.0.0 ~ 2.0.0",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_minor_only() {
@@ -295,7 +293,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_patch_only() {
@@ -319,7 +317,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_and_warns() {
@@ -392,7 +390,7 @@ vendor/package 1.1.0 ~ 1.0.0",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_without_warning_for_higher_versions() {
@@ -598,7 +596,7 @@ fn test_show_platform_only_shows_platform_packages() {
     assert_all_platform_packages(output.trim());
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: showing platform packages without a composer.json is unsupported - the package lookup errors with \"Package php not found\" instead of listing platform packages. Logic gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_platform_works_without_composer_json() {
@@ -647,7 +645,7 @@ fn test_show_platform_works_without_composer_json() {
     assert_eq!(0, status_code);
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_outdated_with_zero_major() {
@@ -751,7 +749,7 @@ zerozero/major 0.0.1 ~ 0.0.2",
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_all_shows_all_sections() {
@@ -1030,7 +1028,7 @@ fn test_self_and_package_combination() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: InstallationManager cannot resolve a \"library\" installer in this context so getInstallPath returns None, and the path line prints \"null\" instead of the empty string PHP emits. Installer-resolution gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_self() {
@@ -1109,7 +1107,7 @@ fn test_not_installed_error() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: with --no-dev every installed package is filtered out so nothing is shown (expected \"vendor/package 1.0.0\", got empty). The --no-dev filtering over the installed repository is not yet correct - a logic gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_no_dev_option() {
@@ -1239,7 +1237,6 @@ fn run_not_existing_package_case(package: &str, options: Vec<(&str, PhpMixed)>, 
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_no_options() {
@@ -1250,7 +1247,7 @@ fn test_not_existing_package_with_no_options() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: panics with \"RefCell already borrowed\" at src/repository/handle.rs:124 while resolving --all repositories. Borrow-ownership bug, not an output-format issue."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_all_option() {
@@ -1261,7 +1258,7 @@ fn test_not_existing_package_with_all_option() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: panics with \"RefCell already borrowed\" at src/repository/handle.rs:124 while resolving the locked repository. Borrow-ownership bug, not an output-format issue."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_locked_option() {
@@ -1272,7 +1269,6 @@ fn test_not_existing_package_with_locked_option() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_platform_with_platform_option() {
@@ -1283,7 +1279,6 @@ fn test_not_existing_platform_with_platform_option() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_not_existing_platform_without_platform_option() {
@@ -1373,7 +1368,6 @@ fn test_specific_package_and_tree_just_package() {
     run_specific_package_and_tree_case(vec![pkg], vec![], "vendor/package 1.0.0");
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_specific_package_and_tree_with_one_package_requirement() {
@@ -1398,7 +1392,6 @@ fn test_specific_package_and_tree_with_one_package_requirement() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_specific_package_and_tree_with_platform_requirement() {
@@ -1423,7 +1416,6 @@ fn test_specific_package_and_tree_with_platform_requirement() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
 #[test]
 #[serial]
 fn test_specific_package_and_tree_with_json_format() {
@@ -1443,7 +1435,7 @@ fn test_specific_package_and_tree_with_json_format() {
     );
 }
 
-#[ignore = "ShowCommand::configure() is now ported and the command runs, but this case still fails: most produce show output that does not yet match PHP exactly (rendering gaps), and a few reach an unported path (remote-repository HTTP via curl_version()/curl.rs, or trigger_error at runtime.rs:435). Run with --include-ignored to see the exact panic site."]
+#[ignore = "blocked: the wildcard package-name filter does not exclude non-matching packages (vendor/somepackage is still listed). Filtering logic gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_name_only_prints_no_trailing_whitespace() {

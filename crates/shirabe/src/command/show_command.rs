@@ -659,13 +659,10 @@ impl Command for ShowCommand {
                 if input.borrow().get_option("locked")?.as_bool() == Some(true) {
                     hint.push_str(" in lock file");
                 }
-                if options.contains_key("working-dir") {
+                if let Some(working_dir) = options.get("working-dir").filter(|v| !v.is_null()) {
                     hint.push_str(&format!(
                         " in {}/composer.json",
-                        options
-                            .get("working-dir")
-                            .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                        working_dir.as_string().unwrap_or("")
                     ));
                 }
                 if PlatformRepository::is_platform_package(pf)
@@ -1200,7 +1197,10 @@ impl Command for ShowCommand {
                         if write_description && let Some(c) = package.as_complete() {
                             package_view_data.insert(
                                 "description".to_string(),
-                                PhpMixed::String(c.get_description().unwrap_or_default()),
+                                match c.get_description() {
+                                    Some(d) => PhpMixed::String(d),
+                                    None => PhpMixed::Null,
+                                },
                             );
                         }
                         if write_path {
@@ -2524,12 +2524,13 @@ impl ShowCommand {
         );
         tree.insert(
             "description".to_string(),
-            PhpMixed::String(
-                package
-                    .as_complete()
-                    .map(|c| c.get_description().unwrap_or_default())
-                    .unwrap_or_default(),
-            ),
+            match package.as_complete() {
+                Some(c) => match c.get_description() {
+                    Some(d) => PhpMixed::String(d),
+                    None => PhpMixed::Null,
+                },
+                None => PhpMixed::String(String::new()),
+            },
         );
 
         if !children.is_empty() {
