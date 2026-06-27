@@ -1,9 +1,11 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ArchivableFilesFinderTest.php
 
+use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
 use shirabe::util::Filesystem;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{dirname, file_put_contents, preg_quote};
+use shirabe_external_packages::symfony::process::Process;
+use shirabe_php_shim::{PhpMixed, ZipArchive, dirname, file_put_contents, preg_quote};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -165,13 +167,111 @@ fn test_manual_excludes() {
     );
 }
 
-// getArchivedFiles drives a git pipeline (Process::fromShellCommandline) and reads the produced
-// zip back through PharData + RecursiveIteratorIterator; neither the process helper nor the zip
-// archive reader is ported, so this case cannot run.
-#[ignore = "getArchivedFiles needs a git process pipeline plus PharData/RecursiveIteratorIterator zip reading; not ported"]
+/// ref: ArchivableFilesFinderTest::getArchivedFiles
+///
+/// PHP reads the produced zip via `PharData` + `RecursiveIteratorIterator`, which yields only
+/// leaf files; `ZipArchive` entry enumeration (skipping directory entries) is the faithful
+/// equivalent. Each entry is rebuilt into the `phar://.../archive.zip/archive/...` virtual path
+/// PHP would stringify, then the `archive` prefix is stripped.
+fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
+    let mut process = Process::from_shell_commandline(
+        command,
+        Some(&set_up.sources),
+        None,
+        PhpMixed::Bool(false),
+        Some(60.0),
+    )
+    .unwrap();
+    process.run(None, IndexMap::new()).unwrap();
+
+    let zip_path = format!("{}/archive.zip", set_up.sources);
+    let mut archive = ZipArchive::new();
+    archive.open(&zip_path, 0).unwrap();
+
+    let prefix = format!(
+        "#^phar://{}/archive\\.zip/archive#",
+        preg_quote(&set_up.sources, Some('#'))
+    );
+    let mut files: Vec<String> = vec![];
+    for index in 0..archive.count() {
+        let name = archive.get_name_index(index);
+        if name.ends_with('/') {
+            continue;
+        }
+        let virtual_path = format!("phar://{}/archive.zip/{}", set_up.sources, name);
+        files.push(Preg::replace(
+            &prefix,
+            "",
+            &set_up.fs.normalize_path(&virtual_path),
+        ));
+    }
+
+    let _ = std::fs::remove_file(&zip_path);
+
+    files
+}
+
+// Faithful port, but blocked at runtime by the same look-ahead regex limitation as
+// test_manual_excludes: the finder applies .gitattributes export-ignore rules through
+// BaseExcludeFilter::generate_pattern, which builds `(?=$|/)` patterns the regex crate cannot
+// compile. It additionally requires a `git` executable (PHP guards with skipIfNotExecutable).
+#[ignore = "finder applies .gitattributes rules via BaseExcludeFilter::generate_pattern, whose \
+            (?=$|/) look-ahead regexes the regex crate cannot compile (same blocker as \
+            test_manual_excludes); also requires a git executable"]
 #[test]
 fn test_git_excludes() {
-    todo!()
+    let set_up = set_up();
+
+    file_put_contents(
+        &format!("{}/.gitattributes", set_up.sources),
+        [
+            "",
+            "# gitattributes rules with comments and blank lines",
+            "prefixB.foo export-ignore",
+            "/prefixA.foo export-ignore",
+            "prefixC.* export-ignore",
+            "",
+            "prefixE.foo export-ignore",
+            "# and more",
+            "# comments",
+            "",
+            "/prefixE.foo -export-ignore",
+            "/prefixD.foo export-ignore",
+            "prefixF.* export-ignore",
+            "/*/*/prefixF.foo -export-ignore",
+            "",
+            "refixD.foo export-ignore",
+            "/C export-ignore",
+            "D/prefixA export-ignore",
+            "E export-ignore",
+            "F/ export-ignore",
+            "G/* export-ignore",
+            "H/** export-ignore",
+            "J/ export-ignore",
+            "parameters.yml export-ignore",
+            "\\!important!.txt export-ignore",
+            "\\#* export-ignore",
+        ]
+        .join("\n")
+        .as_bytes(),
+    );
+
+    let finder = ArchivableFilesFinder::new(&set_up.sources, vec![], false).unwrap();
+
+    let expected = get_archived_files(
+        &set_up,
+        "git init && \
+         git config user.email \"you@example.com\" && \
+         git config user.name \"Your Name\" && \
+         git config commit.gpgsign false && \
+         git add .git* && \
+         git commit -m \"ignore rules\" && \
+         git add . && \
+         git commit -m \"init\" && \
+         git archive --format=zip --prefix=archive/ -o archive.zip HEAD",
+    );
+    let expected: Vec<&str> = expected.iter().map(String::as_str).collect();
+    assert_archivable_files(&set_up, finder, &expected);
 }
 
 #[test]
