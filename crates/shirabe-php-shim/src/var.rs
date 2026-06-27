@@ -443,6 +443,11 @@ fn var_export_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('\'');
     for c in s.chars() {
+        // PHP var_export breaks NUL bytes out of the single-quoted literal as `' . "\0" . '`.
+        if c == '\0' {
+            out.push_str("' . \"\\0\" . '");
+            continue;
+        }
         if c == '\'' || c == '\\' {
             out.push('\\');
         }
