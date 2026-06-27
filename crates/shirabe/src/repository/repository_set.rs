@@ -648,6 +648,29 @@ impl RepositorySet {
     }
 }
 
+/// Seam over `RepositorySet` so consumers (e.g. `VersionSelector`) can receive a mockable
+/// repository set in tests. The concrete `RepositorySet` implements it by delegating to its
+/// inherent methods. New consumers may extend this trait additively.
+pub trait RepositorySetInterface: std::fmt::Debug {
+    fn find_packages(
+        &self,
+        name: &str,
+        constraint: Option<AnyConstraint>,
+        flags: i64,
+    ) -> anyhow::Result<Vec<BasePackageHandle>>;
+}
+
+impl RepositorySetInterface for RepositorySet {
+    fn find_packages(
+        &self,
+        name: &str,
+        constraint: Option<AnyConstraint>,
+        flags: i64,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        RepositorySet::find_packages(self, name, constraint, flags)
+    }
+}
+
 #[derive(Debug)]
 pub struct SecurityAdvisoriesResult {
     pub advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,

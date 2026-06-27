@@ -9,6 +9,14 @@ use std::sync::Mutex;
 // None = null (uninitialized), Some(None) = false (not found), Some(Some(v)) = version
 static HHVM_VERSION_CACHE: Mutex<Option<Option<String>>> = Mutex::new(None);
 
+/// Seam over HHVM detection so PlatformRepository can be tested with a mocked version.
+/// PHP mocks the concrete `Composer\Platform\HhvmDetector` directly; the trait is
+/// introduced here to keep the consumer dependent only on trait methods.
+pub trait HhvmDetectorInterface: std::fmt::Debug {
+    fn reset(&self);
+    fn get_version(&mut self) -> Option<String>;
+}
+
 #[derive(Debug)]
 pub struct HhvmDetector {
     executable_finder: Option<ExecutableFinder>,
@@ -25,12 +33,14 @@ impl HhvmDetector {
             process_executor,
         }
     }
+}
 
-    pub fn reset(&self) {
+impl HhvmDetectorInterface for HhvmDetector {
+    fn reset(&self) {
         *HHVM_VERSION_CACHE.lock().unwrap() = None;
     }
 
-    pub fn get_version(&mut self) -> Option<String> {
+    fn get_version(&mut self) -> Option<String> {
         let cached = HHVM_VERSION_CACHE.lock().unwrap().clone();
         if cached.is_some() {
             return cached.flatten();

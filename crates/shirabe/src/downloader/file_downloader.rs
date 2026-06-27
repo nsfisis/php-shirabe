@@ -124,18 +124,19 @@ impl FileDownloader {
         {
             // PHP: writeError('Running cache garbage collection', true, io_interface::VERY_VERBOSE)
             this.io.write_error("Running cache garbage collection");
-            cache.borrow_mut().gc(
-                this.config
-                    .borrow_mut()
-                    .get("cache-files-ttl")
-                    .as_int()
-                    .unwrap_or(0),
-                this.config
-                    .borrow_mut()
-                    .get("cache-files-maxsize")
-                    .as_int()
-                    .unwrap_or(0),
-            );
+            let ttl = this
+                .config
+                .borrow_mut()
+                .get("cache-files-ttl")
+                .as_int()
+                .unwrap_or(0);
+            let max_size = this
+                .config
+                .borrow_mut()
+                .get("cache-files-maxsize")
+                .as_int()
+                .unwrap_or(0);
+            cache.borrow_mut().gc(ttl, max_size);
         }
 
         this

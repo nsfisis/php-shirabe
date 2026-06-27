@@ -241,7 +241,7 @@ impl GitHub {
             Err(te) => {
                 let code = te
                     .downcast_ref::<crate::downloader::TransportException>()
-                    .and_then(|t| t.get_status_code())
+                    .map(|t| t.get_code())
                     .unwrap_or(0);
                 if code == 403 || code == 401 {
                     self.io.write_error3(

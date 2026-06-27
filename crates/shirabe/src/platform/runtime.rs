@@ -8,41 +8,53 @@ use shirabe_php_shim::{
     html_entity_decode, implode, instantiate_class, ltrim, phpversion, strip_tags, trim,
 };
 
+/// Seam over the PHP runtime so PlatformRepository can be tested against mocked
+/// extension/constant/function probes. PHP has no such interface (the test mocks the
+/// concrete `Composer\Platform\Runtime` directly); it is introduced here to keep the
+/// consumer dependent only on trait methods.
+pub trait RuntimeInterface: std::fmt::Debug {
+    fn has_constant(&self, constant_name: &str, class: Option<String>) -> bool;
+    fn get_constant(&self, constant_name: &str, class: Option<String>) -> PhpMixed;
+    /// `callable` carries the PHP callable spec (a function name string or a
+    /// `[class, method]` list), matching PHP `invoke($callable, $arguments)`.
+    fn invoke(&self, callable: PhpMixed, arguments: Vec<PhpMixed>) -> PhpMixed;
+    fn has_class(&self, class: &str) -> bool;
+    fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> Result<PhpMixed>;
+    fn get_extensions(&self) -> Vec<String>;
+    fn get_extension_version(&self, extension: &str) -> String;
+    fn get_extension_info(&self, extension: &str) -> Result<String>;
+}
+
 #[derive(Debug)]
 pub struct Runtime;
 
-impl Runtime {
-    pub fn has_constant(&self, constant_name: &str, class: Option<&str>) -> bool {
+impl RuntimeInterface for Runtime {
+    fn has_constant(&self, constant_name: &str, class: Option<String>) -> bool {
         defined(&ltrim(
-            &format!("{}::{}", class.unwrap_or(""), constant_name),
+            &format!("{}::{}", class.as_deref().unwrap_or(""), constant_name),
             Some(":"),
         ))
     }
 
-    pub fn get_constant(&self, constant_name: &str, class: Option<&str>) -> PhpMixed {
+    fn get_constant(&self, constant_name: &str, class: Option<String>) -> PhpMixed {
         constant(&ltrim(
-            &format!("{}::{}", class.unwrap_or(""), constant_name),
+            &format!("{}::{}", class.as_deref().unwrap_or(""), constant_name),
             Some(":"),
         ))
     }
 
-    pub fn has_function(&self, f: &str) -> bool {
-        function_exists(f)
+    fn invoke(&self, callable: PhpMixed, arguments: Vec<PhpMixed>) -> PhpMixed {
+        // PHP: return $callable(...$arguments);
+        // Dispatching an arbitrary PHP callable needs a PHP runtime; no shim exists.
+        let _ = (callable, arguments);
+        todo!()
     }
 
-    pub fn invoke(
-        &self,
-        callable: Box<dyn Fn(Vec<PhpMixed>) -> PhpMixed>,
-        arguments: Vec<PhpMixed>,
-    ) -> PhpMixed {
-        callable(arguments)
-    }
-
-    pub fn has_class(&self, class: &str) -> bool {
+    fn has_class(&self, class: &str) -> bool {
         class_exists(class)
     }
 
-    pub fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> Result<PhpMixed> {
+    fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> Result<PhpMixed> {
         if arguments.is_empty() {
             Ok(instantiate_class(class, vec![]))
         } else {
@@ -50,19 +62,25 @@ impl Runtime {
         }
     }
 
-    pub fn get_extensions(&self) -> Vec<String> {
+    fn get_extensions(&self) -> Vec<String> {
         get_loaded_extensions()
     }
 
-    pub fn get_extension_version(&self, extension: &str) -> String {
+    fn get_extension_version(&self, extension: &str) -> String {
         let version = phpversion(extension);
         version.unwrap_or_else(|| "0".to_string())
     }
 
-    pub fn get_extension_info(&self, extension: &str) -> Result<String> {
+    fn get_extension_info(&self, extension: &str) -> Result<String> {
         // Depends on \ReflectionExtension::info() and output buffering; no shim equivalent exists.
         let _ = extension;
         todo!()
+    }
+}
+
+impl Runtime {
+    pub fn has_function(&self, f: &str) -> bool {
+        function_exists(f)
     }
 
     pub fn parse_html_extension_info(html: &str) -> String {

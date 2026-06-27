@@ -39,9 +39,11 @@ fn test_no_local_changes() {
     drop(tear_down);
 }
 
-#[ignore = "exercises `install` over the network (downloads composer/class-map-generator from a git \
-            source or smarty/smarty from a dist zip), then mutates the installed package and runs \
-            `status`; the install path needs real network access"]
+#[ignore = "not a partial-mock test: it runs `install` to download composer/class-map-generator (git \
+            source) or smarty/smarty (dist zip), mutates the installed package, then runs `status`. \
+            Porting without network would require fabricating a real git checkout under vendor/, a \
+            `.git` metadata repo, and wiring download-manager routing so GitDownloader::get_local_changes \
+            runs `git status` against it — a full VCS integration fixture, not a SUT seam"]
 #[test]
 fn test_locally_modified_packages() {
     todo!()

@@ -23,6 +23,7 @@ use crate::util::PackageInfo;
 /// Shape of the `--format=json` audit output.
 #[derive(serde::Serialize)]
 struct AuditJsonReport<'a> {
+    #[serde(serialize_with = "serialize_advisories_field")]
     advisories: &'a IndexMap<String, Vec<AnySecurityAdvisory>>,
     #[serde(rename = "ignored-advisories", skip_serializing_if = "Option::is_none")]
     ignored_advisories: Option<&'a IndexMap<String, Vec<AnySecurityAdvisory>>>,
@@ -31,7 +32,44 @@ struct AuditJsonReport<'a> {
         skip_serializing_if = "Option::is_none"
     )]
     unreachable_repositories: Option<&'a Vec<String>>,
+    #[serde(serialize_with = "serialize_abandoned_field")]
     abandoned: IndexMap<String, Option<String>>,
+}
+
+/// PHP `json_encode` emits an empty associative array as `[]`, not `{}`. Mirror that so an empty
+/// map serializes as an empty JSON array.
+fn serialize_php_array<S, V>(map: &IndexMap<String, V>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+    V: serde::Serialize,
+{
+    use serde::ser::SerializeSeq;
+    if map.is_empty() {
+        let seq = serializer.serialize_seq(Some(0))?;
+        seq.end()
+    } else {
+        serializer.collect_map(map.iter())
+    }
+}
+
+fn serialize_advisories_field<S>(
+    map: &&IndexMap<String, Vec<AnySecurityAdvisory>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serialize_php_array(*map, serializer)
+}
+
+fn serialize_abandoned_field<S>(
+    map: &IndexMap<String, Option<String>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serialize_php_array(map, serializer)
 }
 
 /// @internal

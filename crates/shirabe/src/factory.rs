@@ -1270,7 +1270,7 @@ impl Factory {
         guesser: VersionGuesser,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> RootPackageLoader {
-        RootPackageLoader::new(rm, config, Some(parser), Some(guesser), Some(io))
+        RootPackageLoader::new(rm, config, Some(parser), Some(Box::new(guesser)), Some(io))
     }
 
     pub fn create(

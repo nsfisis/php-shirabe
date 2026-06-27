@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Platform/HhvmDetectorTest.php
 
 use shirabe::platform::hhvm_detector::HhvmDetector;
+use shirabe::platform::hhvm_detector::HhvmDetectorInterface;
 use shirabe::util::Platform;
 use shirabe::util::ProcessExecutor;
 use shirabe_external_packages::symfony::process::ExecutableFinder;

@@ -22,13 +22,39 @@ use crate::util::Silencer;
 #[derive(Debug)]
 pub struct Filesystem {
     process_executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
+    /// Test-only seam. Always `None` in production; configured via [`Filesystem::__set_mock`].
+    mock: Option<FilesystemMock>,
+}
+
+/// Test-only seam mirroring the PHP FileDownloaderTest mock of `Filesystem`.
+#[derive(Debug, Default)]
+pub struct FilesystemMock {
+    /// When `Some`, `remove_directory_async` returns it without touching disk and counts the call.
+    pub remove_directory_async_result: Option<bool>,
+    pub remove_directory_async_calls: usize,
+    /// When true, `normalize_path` returns its argument unchanged.
+    pub normalize_path_identity: bool,
 }
 
 impl Filesystem {
     pub fn new(executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>) -> Self {
         Self {
             process_executor: executor,
+            mock: None,
         }
+    }
+
+    /// For testing only: install the [`FilesystemMock`] seam used by FileDownloaderTest.
+    pub fn __set_mock(&mut self, mock: FilesystemMock) {
+        self.mock = Some(mock);
+    }
+
+    /// For testing only: number of `remove_directory_async` calls intercepted by the seam.
+    pub fn __remove_directory_async_calls(&self) -> usize {
+        self.mock
+            .as_ref()
+            .map(|m| m.remove_directory_async_calls)
+            .unwrap_or(0)
     }
 
     pub fn remove(&mut self, file: impl AsRef<Path>) -> anyhow::Result<bool> {
@@ -140,6 +166,13 @@ impl Filesystem {
     /// Uses the process component if proc_open is enabled on the PHP
     /// installation.
     pub async fn remove_directory_async(&mut self, directory: &str) -> anyhow::Result<bool> {
+        if let Some(mock) = self.mock.as_mut()
+            && let Some(result) = mock.remove_directory_async_result
+        {
+            mock.remove_directory_async_calls += 1;
+            return Ok(result);
+        }
+
         let edge_case_result = self.remove_edge_cases(directory, true)?;
         if let Some(r) = edge_case_result {
             return Ok(r);
@@ -702,6 +735,12 @@ impl Filesystem {
     /// Normalize a path. This replaces backslashes with slashes, removes ending
     /// slash and collapses redundant separators and up-level references.
     pub fn normalize_path(&self, path: &str) -> String {
+        if let Some(mock) = &self.mock
+            && mock.normalize_path_identity
+        {
+            return path.to_string();
+        }
+
         let mut parts: Vec<String> = vec![];
         let mut path = strtr(path, "\\", "/");
         let mut prefix = String::new();

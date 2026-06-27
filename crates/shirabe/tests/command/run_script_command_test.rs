@@ -1,11 +1,21 @@
 //! ref: composer/tests/Composer/Test/Command/RunScriptCommandTest.php
 
-use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use serial_test::serial;
 use shirabe_php_shim::PhpMixed;
 
+use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use serial_test::serial;
+
+/// ref: RunScriptCommandTest::testDetectAndPassDevModeToEventAndToDispatching
+///
+/// The `getDevOptions` dataProvider drives four `(dev, noDev)` cases; for each, PHP asserts that the
+/// `ScriptEvent` passed to `hasEventListeners` matches the script name AND its `isDevMode()` equals
+/// the computed dev mode (`dev || !noDev`) -- the latter being the whole point of the test.
 #[test]
-#[ignore = "requires PHPUnit getMockBuilder/onlyMethods partial mock of RunScriptCommand (override requireComposer/initialize/etc) plus expects()/with()/willReturn()/returnValueMap mocks of InputInterface/OutputInterface/EventDispatcher with a callback constraint on ScriptEvent; no mocking infrastructure exists"]
+#[ignore = "PHP asserts the ScriptEvent passed to hasEventListeners has isDevMode() == (dev || !no_dev), \
+            but EventInterface (src/event_dispatcher/event.rs:49) has no as_any/downcast seam, so a \
+            trait object cannot reach the concrete ScriptEvent::is_dev_mode (src/script/event.rs:51). \
+            Reaching it would require adding as_any to EventInterface, i.e. a src change, which is \
+            forbidden here -- so the faithful body is currently inexpressible and is left as todo!()."]
 fn test_detect_and_pass_dev_mode_to_event_and_to_dispatching() {
     todo!()
 }

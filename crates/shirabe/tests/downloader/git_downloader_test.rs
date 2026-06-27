@@ -9,6 +9,8 @@ use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
 use shirabe::downloader::git_downloader::GitDownloader;
 use shirabe::io::IOInterface;
+use shirabe::io::io_interface;
+use shirabe::package::Mirror;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::Git as GitUtil;
 use shirabe::util::ProcessExecutor;
@@ -18,6 +20,7 @@ use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 use crate::config_stub::ConfigStubBuilder;
+use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 
@@ -333,9 +336,11 @@ fn test_download_with_cache() {
     fs.remove_directory(&cache_path).ok();
 }
 
-#[ignore = "getSourceUrls returns a mirror list (['https://github.com/mirrors/composer', \
-            'https://github.com/composer/composer']) that a real CompletePackage cannot reproduce \
-            from a single source_url; no PackageInterface mock with arbitrary getSourceUrls exists"]
+#[ignore = "Source-side blocker: getSourceUrls() must list the mirror ahead of the \
+            source url, which requires a preferred source mirror. A git source mirror is \
+            processed through ComposerMirror::process_git_url, whose github regex lacks PCRE \
+            delimiters and panics when compiled by the php-shim Preg. PHP mocks getSourceUrls \
+            directly and never exercises that path."]
 #[test]
 fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     let working_dir = set_up();
@@ -344,14 +349,106 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     todo!()
 }
 
-#[ignore = "pushUrlProvider configures getSourceUrls to a list a real CompletePackage cannot \
-            reproduce; no PackageInterface mock with arbitrary getSourceUrls exists"]
+#[serial]
 #[test]
 fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
-    let working_dir = set_up();
-    let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    todo!()
+    // ref: pushUrlProvider — (github-protocols, fetch url, push url).
+    let cases: Vec<(Vec<&str>, &str, &str)> = vec![
+        (
+            vec!["ssh"],
+            "git@github.com:composer/composer",
+            "git@github.com:composer/composer.git",
+        ),
+        (
+            vec!["https", "ssh", "git"],
+            "https://github.com/composer/composer",
+            "git@github.com:composer/composer.git",
+        ),
+        (
+            vec!["https"],
+            "https://github.com/composer/composer",
+            "https://github.com/composer/composer.git",
+        ),
+    ];
+
+    for (protocols, url, push_url) in cases {
+        let working_dir = set_up();
+        let _tear_down = TearDown::new(working_dir.path().to_path_buf());
+
+        let package = get_package(
+            "composer/composer",
+            "1.0.0",
+            Some("ref"),
+            Some("https://github.com/composer/composer"),
+        );
+
+        let expected_path = working_dir
+            .path()
+            .join("composerPath")
+            .to_string_lossy()
+            .into_owned();
+
+        let (process, _guard) = get_process_executor_mock(
+            vec![
+                cmd(vec![
+                    "git",
+                    "clone",
+                    "--no-checkout",
+                    "--",
+                    url,
+                    &expected_path,
+                ]),
+                cmd(vec!["git", "remote", "add", "composer", "--", url]),
+                cmd(["git", "fetch", "composer"]),
+                cmd(vec!["git", "remote", "set-url", "origin", "--", url]),
+                cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
+                cmd(vec![
+                    "git", "remote", "set-url", "--push", "origin", "--", push_url,
+                ]),
+                cmd(["git", "branch", "-r"]),
+                cmd(["git", "checkout", "ref", "--"]),
+                cmd(["git", "reset", "--hard", "ref", "--"]),
+            ],
+            true,
+            Default::default(),
+        );
+
+        let mut config = Config::new(false, None);
+        let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut section: IndexMap<String, PhpMixed> = IndexMap::new();
+        section.insert(
+            "github-protocols".to_string(),
+            PhpMixed::List(
+                protocols
+                    .iter()
+                    .map(|p| PhpMixed::String(p.to_string()))
+                    .collect(),
+            ),
+        );
+        top.insert("config".to_string(), PhpMixed::Array(section));
+        config.merge(&top, Config::SOURCE_UNKNOWN);
+
+        let mut downloader = get_downloader_mock(None, Some(config), process, None);
+
+        run(async {
+            downloader
+                .download(package.clone(), &expected_path, None)
+                .await
+                .unwrap();
+            downloader
+                .prepare("install", package.clone(), &expected_path, None)
+                .await
+                .unwrap();
+            downloader
+                .install(package.clone(), &expected_path)
+                .await
+                .unwrap();
+            downloader
+                .cleanup("install", package, &expected_path, None)
+                .await
+                .unwrap();
+        });
+    }
 }
 
 #[serial]
@@ -589,18 +686,95 @@ fn test_update_with_new_repo_url() {
     });
 }
 
-#[ignore = "getSourceUrls returns a multi-URL list a real CompletePackage cannot reproduce; \
-            no PackageInterface mock with arbitrary getSourceUrls exists"]
+#[ignore = "Blocked by a Config bug: Config::get(\"github-protocols\") does not drop the \
+            insecure \"git\" protocol under secure-http. array_search_mixed returns the \
+            matched index as PhpMixed::Int, but config.rs reads it via as_string (which is \
+            Some only for String), so the removal is skipped and get() returns \
+            [https, ssh, git] instead of [https, ssh]. The downloader then attempts a third \
+            git:// fetch (absent from the process mock) and the error message reads \
+            \"via https, ssh, git protocols\", failing the assertion. PHP's new Config() \
+            reduces it to two protocols."]
+#[serial]
 #[test]
 fn test_update_throws_runtime_exception_if_git_command_fails() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    todo!()
+
+    let url = "https://github.com/composer/composer";
+    let package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
+
+    let (process, _guard) = get_process_executor_mock(
+        vec![
+            cmd(["git", "show-ref", "--head", "-d"]),
+            cmd(["git", "status", "--porcelain", "--untracked-files=no"]),
+            // commit not yet in so we try to fetch
+            cmd_full(
+                ["git", "rev-parse", "--quiet", "--verify", "ref^{commit}"],
+                1,
+                "",
+                "",
+            ),
+            // fail first fetch
+            cmd(["git", "remote", "-v"]),
+            cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
+            cmd_full(["git", "fetch", "composer"], 1, "", ""),
+            // fail second fetch
+            cmd(vec![
+                "git",
+                "remote",
+                "set-url",
+                "composer",
+                "--",
+                "git@github.com:composer/composer",
+            ]),
+            cmd_full(["git", "fetch", "composer"], 1, "", ""),
+            cmd(["git", "--version"]),
+        ],
+        true,
+        Default::default(),
+    );
+
+    let mut fs = Filesystem::new(None);
+    fs.ensure_directory_exists(&format!("{}/.git", working_dir.path().to_string_lossy()))
+        .unwrap();
+    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+
+    let config = Config::new(false, None);
+
+    let mut downloader = get_downloader_mock(None, Some(config), process, None);
+
+    let result = run(async {
+        downloader
+            .download(package.clone(), &working_dir_str, Some(package.clone()))
+            .await?;
+        downloader
+            .prepare(
+                "update",
+                package.clone(),
+                &working_dir_str,
+                Some(package.clone()),
+            )
+            .await?;
+        downloader
+            .update(package.clone(), package.clone(), &working_dir_str)
+            .await?;
+        downloader
+            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .await
+    });
+
+    let e = result.expect_err("failing git fetch should throw");
+    assert!(e.to_string().contains(
+        "Failed to clone https://github.com/composer/composer via https, ssh protocols, aborting."
+    ));
+    assert!(e.to_string().contains("git@github.com:composer/composer"));
 }
 
-#[ignore = "getSourceUrls returns a multi-URL list (['/' , github]) a real CompletePackage cannot \
-            reproduce; no PackageInterface mock with arbitrary getSourceUrls exists"]
+#[ignore = "Source-side blocker: getSourceUrls() == ['/', github] requires a source \
+            mirror so the list has two entries. A git source mirror is processed through \
+            ComposerMirror::process_git_url, whose github regex lacks PCRE delimiters and \
+            panics when compiled by the php-shim Preg. PHP mocks getSourceUrls directly and \
+            never exercises that path."]
 #[test]
 fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but_is_able_to_recover()
  {
@@ -610,24 +784,142 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
     todo!()
 }
 
-#[ignore = "getSourceUrls returns a multi-URL list (['/foo/bar', github]) a real CompletePackage \
-            cannot reproduce; no PackageInterface mock with arbitrary getSourceUrls exists"]
+#[serial]
 #[test]
 fn test_downgrade_shows_appropriate_message() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    todo!()
+
+    let url = "https://github.com/composer/composer";
+
+    let old_package = get_package("composer/composer", "1.2.0", Some("ref"), Some("/foo/bar"));
+    old_package.set_source_mirrors(Some(vec![Mirror {
+        url: url.to_string(),
+        preferred: false,
+    }]));
+    let new_package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
+
+    let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
+
+    let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
+    io_mock
+        .borrow_mut()
+        .expects(vec![Expectation::text_regex("{Downgrading .*}")], false)
+        .unwrap();
+    let io = io_mock.clone() as Rc<RefCell<dyn IOInterface>>;
+
+    let mut fs = Filesystem::new(None);
+    fs.ensure_directory_exists(&format!("{}/.git", working_dir.path().to_string_lossy()))
+        .unwrap();
+    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+
+    let mut downloader = get_downloader_mock(Some(io), None, process, None);
+
+    run(async {
+        downloader
+            .download(
+                new_package.clone(),
+                &working_dir_str,
+                Some(old_package.clone()),
+            )
+            .await
+            .unwrap();
+        downloader
+            .prepare(
+                "update",
+                new_package.clone(),
+                &working_dir_str,
+                Some(old_package.clone()),
+            )
+            .await
+            .unwrap();
+        downloader
+            .update(old_package.clone(), new_package.clone(), &working_dir_str)
+            .await
+            .unwrap();
+        downloader
+            .cleanup("update", new_package, &working_dir_str, Some(old_package))
+            .await
+            .unwrap();
+    });
 }
 
-#[ignore = "getSourceUrls returns a multi-URL list (['/foo/bar', github]) a real CompletePackage \
-            cannot reproduce; no PackageInterface mock with arbitrary getSourceUrls exists"]
+#[serial]
 #[test]
 fn test_not_using_downgrading_with_references() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    todo!()
+
+    let url = "https://github.com/composer/composer";
+
+    // dev versions: getVersion() is the (non-normalized) branch name.
+    let old_package = CompletePackageHandle::new(
+        "composer/composer".to_string(),
+        "dev-ref".to_string(),
+        "dev-ref".to_string(),
+    );
+    old_package.__set_source_type(Some("git".to_string()));
+    old_package.set_source_reference(Some("ref".to_string()));
+    old_package.set_source_url(Some("/foo/bar".to_string()));
+    old_package.set_source_mirrors(Some(vec![Mirror {
+        url: url.to_string(),
+        preferred: false,
+    }]));
+    let old_package: PackageInterfaceHandle = old_package.into();
+
+    let new_package = CompletePackageHandle::new(
+        "composer/composer".to_string(),
+        "dev-ref2".to_string(),
+        "dev-ref2".to_string(),
+    );
+    new_package.__set_source_type(Some("git".to_string()));
+    new_package.set_source_reference(Some("ref".to_string()));
+    new_package.set_source_url(Some(url.to_string()));
+    let new_package: PackageInterfaceHandle = new_package.into();
+
+    let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
+
+    let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
+    io_mock
+        .borrow_mut()
+        .expects(vec![Expectation::text_regex("{Upgrading .*}")], false)
+        .unwrap();
+    let io = io_mock.clone() as Rc<RefCell<dyn IOInterface>>;
+
+    let mut fs = Filesystem::new(None);
+    fs.ensure_directory_exists(&format!("{}/.git", working_dir.path().to_string_lossy()))
+        .unwrap();
+    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+
+    let mut downloader = get_downloader_mock(Some(io), None, process, None);
+
+    run(async {
+        downloader
+            .download(
+                new_package.clone(),
+                &working_dir_str,
+                Some(old_package.clone()),
+            )
+            .await
+            .unwrap();
+        downloader
+            .prepare(
+                "update",
+                new_package.clone(),
+                &working_dir_str,
+                Some(old_package.clone()),
+            )
+            .await
+            .unwrap();
+        downloader
+            .update(old_package.clone(), new_package.clone(), &working_dir_str)
+            .await
+            .unwrap();
+        downloader
+            .cleanup("update", new_package, &working_dir_str, Some(old_package))
+            .await
+            .unwrap();
+    });
 }
 
 #[ignore = "PHP mocks Filesystem::removeDirectoryAsync (asserting it is called once with the \

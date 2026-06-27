@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::fs;
 use std::rc::Rc;
 
-use shirabe::cache::Cache;
+use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::filesystem::Filesystem;
@@ -27,8 +27,10 @@ fn set_up() -> SetUp {
         files.push(path);
     }
 
-    // The finder/filesystem/IO mocks and the Cache mock overriding getFinder are not ported.
-    let cache: Cache = todo!();
+    // PHP mocks Cache::getFinder and keeps the real Filesystem; here the CacheMock finder seam plays
+    // that role and the Cache otherwise operates on the real temp directory.
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let cache = Cache::new(io, root.path().to_str().unwrap(), None, None, false);
 
     SetUp { root, files, cache }
 }
@@ -56,25 +58,57 @@ impl Drop for TearDown {
     }
 }
 
-// In PHP these mock Cache::getFinder() to feed the gc() routine a controlled set of
-// files. getFinder is pub(crate) and cannot be overridden from a test, so the
-// finder-driven removal paths cannot be exercised faithfully here.
-#[ignore = "requires mocking Cache::get_finder (pub(crate), PHPUnit MockObject) to feed gc() a controlled Finder iterator; not overridable from a test"]
 #[test]
 fn test_remove_outdated_files() {
-    let SetUp { root, files, cache } = set_up();
+    let SetUp {
+        root,
+        files,
+        mut cache,
+    } = set_up();
     let _tear_down = TearDown::new(root.path().to_path_buf());
-    let _ = (&files, &cache);
-    todo!()
+
+    // The date('until ...') finder yields the outdated entries (files 1..3).
+    let outdated = files[1..].to_vec();
+    cache.__set_mock(CacheMock {
+        finder: Some(GcFinderMock {
+            outdated,
+            by_accessed_time: Vec::new(),
+        }),
+        ..Default::default()
+    });
+
+    cache.gc(600, 1024 * 1024 * 1024);
+
+    for (i, file) in files.iter().enumerate().skip(1) {
+        assert!(!file.exists(), "cached.file{i}.zip should be removed");
+    }
+    assert!(files[0].exists(), "cached.file0.zip should still exist");
 }
 
-#[ignore = "requires mocking Cache::get_finder (pub(crate), PHPUnit MockObject) to feed gc() a controlled Finder iterator; not overridable from a test"]
 #[test]
 fn test_remove_files_when_cache_is_too_large() {
-    let SetUp { root, files, cache } = set_up();
+    let SetUp {
+        root,
+        files,
+        mut cache,
+    } = set_up();
     let _tear_down = TearDown::new(root.path().to_path_buf());
-    let _ = (&files, &cache);
-    todo!()
+
+    // The date filter matches nothing; the size-bound pass walks all files by accessed time.
+    cache.__set_mock(CacheMock {
+        finder: Some(GcFinderMock {
+            outdated: Vec::new(),
+            by_accessed_time: files.clone(),
+        }),
+        ..Default::default()
+    });
+
+    cache.gc(600, 1500);
+
+    for (i, file) in files.iter().enumerate().take(3) {
+        assert!(!file.exists(), "cached.file{i}.zip should be removed");
+    }
+    assert!(files[3].exists(), "cached.file3.zip should still exist");
 }
 
 #[test]

@@ -11,6 +11,7 @@ use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::package::version::VersionGuesser;
+use crate::package::version::VersionGuesserInterface;
 use crate::package::version::VersionParser;
 use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::RepositoryFactory;
@@ -23,7 +24,7 @@ pub struct RootPackageLoader {
     inner: ArrayLoader,
     manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    version_guesser: VersionGuesser,
+    version_guesser: Box<dyn VersionGuesserInterface>,
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
 }
 
@@ -32,19 +33,19 @@ impl RootPackageLoader {
         manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         parser: Option<VersionParser>,
-        version_guesser: Option<VersionGuesser>,
+        version_guesser: Option<Box<dyn VersionGuesserInterface>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Self {
         let inner = ArrayLoader::new(parser, true);
         let version_guesser = version_guesser.unwrap_or_else(|| {
             let mut process_executor = ProcessExecutor::new(io.clone());
             process_executor.enable_async();
-            VersionGuesser::new(
+            Box::new(VersionGuesser::new(
                 config.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(process_executor)),
                 inner.version_parser.clone(),
                 io.clone(),
-            )
+            ))
         });
         Self {
             inner,

@@ -532,6 +532,17 @@ impl DownloadManager {
         Ok(sources)
     }
 
+    /// For testing only: exposes the private `getAvailableSources` for the
+    /// DownloadManagerTest::testGetAvailableSourcesUpdateSticksToSameSource case,
+    /// which reaches it through `ReflectionMethod` in PHP.
+    pub fn __get_available_sources(
+        &self,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Vec<String>> {
+        self.get_available_sources(package, prev_package)
+    }
+
     /// Downloaders expect a /path/to/dir without trailing slash
     ///
     /// If any Installer provides a path with a trailing slash, this can cause bugs so make sure we remove them

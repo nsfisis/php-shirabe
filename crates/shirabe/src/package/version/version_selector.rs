@@ -23,18 +23,18 @@ use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
-use crate::repository::RepositorySet;
+use crate::repository::RepositorySetInterface;
 
 #[derive(Debug)]
 pub struct VersionSelector {
-    repository_set: std::rc::Rc<std::cell::RefCell<RepositorySet>>,
+    repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
     platform_constraints: IndexMap<String, Vec<AnyConstraint>>,
     parser: Option<VersionParser>,
 }
 
 impl VersionSelector {
     pub fn new(
-        repository_set: std::rc::Rc<std::cell::RefCell<RepositorySet>>,
+        repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
         platform_repo: Option<&mut crate::repository::PlatformRepository>,
     ) -> anyhow::Result<Self> {
         let mut platform_constraints: IndexMap<String, Vec<AnyConstraint>> = IndexMap::new();

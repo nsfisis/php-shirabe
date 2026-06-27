@@ -838,3 +838,85 @@ impl Perforce {
             .clone()
     }
 }
+
+/// Seam over `Perforce` so consumers can be exercised with a mock in tests.
+pub trait PerforceInterface: std::fmt::Debug {
+    fn initialize_path(&mut self, path: &str);
+    fn set_stream(&mut self, stream: &str);
+    fn p4_login(&mut self) -> Result<()>;
+    fn check_stream(&mut self) -> bool;
+    fn write_p4_client_spec(&mut self) -> Result<()>;
+    fn connect_client(&mut self) -> Result<()>;
+    fn sync_code_base(&mut self, source_reference: Option<String>) -> Result<()>;
+    fn cleanup_client_spec(&mut self);
+    fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String>;
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String>;
+    fn get_branches(&mut self) -> IndexMap<String, String>;
+    fn get_tags(&mut self) -> IndexMap<String, String>;
+    fn get_user(&self) -> Option<String>;
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> Result<Option<IndexMap<String, PhpMixed>>>;
+}
+
+impl PerforceInterface for Perforce {
+    fn initialize_path(&mut self, path: &str) {
+        Perforce::initialize_path(self, path)
+    }
+
+    fn set_stream(&mut self, stream: &str) {
+        Perforce::set_stream(self, stream)
+    }
+
+    fn p4_login(&mut self) -> Result<()> {
+        Perforce::p4_login(self)
+    }
+
+    fn check_stream(&mut self) -> bool {
+        Perforce::check_stream(self)
+    }
+
+    fn write_p4_client_spec(&mut self) -> Result<()> {
+        Perforce::write_p4_client_spec(self)
+    }
+
+    fn connect_client(&mut self) -> Result<()> {
+        Perforce::connect_client(self)
+    }
+
+    fn sync_code_base(&mut self, source_reference: Option<String>) -> Result<()> {
+        Perforce::sync_code_base(self, source_reference.as_deref())
+    }
+
+    fn cleanup_client_spec(&mut self) {
+        Perforce::cleanup_client_spec(self)
+    }
+
+    fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String> {
+        Perforce::get_commit_logs(self, from_reference, to_reference)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String> {
+        Perforce::get_file_content(self, file, identifier)
+    }
+
+    fn get_branches(&mut self) -> IndexMap<String, String> {
+        Perforce::get_branches(self)
+    }
+
+    fn get_tags(&mut self) -> IndexMap<String, String> {
+        Perforce::get_tags(self)
+    }
+
+    fn get_user(&self) -> Option<String> {
+        Perforce::get_user(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+        Perforce::get_composer_information(self, identifier)
+    }
+}

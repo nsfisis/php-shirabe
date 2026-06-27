@@ -4,16 +4,59 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
+use shirabe::config::Config;
+use shirabe::downloader::TransportException;
 use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
+use shirabe::io::io_interface;
+use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_php_shim::{PHP_EOL, PhpMixed};
 
+use crate::config_stub::ConfigStubBuilder;
+use crate::io_mock::{Expectation, get_io_mock};
+
+// PHP performs a live HTTP get to assert the URL's user:pass is captured via
+// setAuthentication. The credential capture happens in `add_job`, before any
+// network I/O, so COMPOSER_DISABLE_NETWORK short-circuits the actual request
+// (yielding a non-200 TransportException, as PHP's live 404 would) while the
+// setAuthentication side effect still runs and is verified through the IOMock.
 #[test]
-#[ignore = "asserts IOInterface mock ->expects()->method('setAuthentication')->with(...) and performs a live HTTP get; no mock infrastructure exists"]
+#[serial_test::serial]
 fn test_capture_authentication_params_from_url() {
-    todo!()
+    let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
+    io_mock
+        .borrow_mut()
+        .expects(
+            vec![Expectation::auth(
+                "github.com",
+                "user",
+                Some("pass".to_string()),
+            )],
+            false,
+        )
+        .unwrap();
+
+    // The PHP Config mock returns [] for github-domains/gitlab-domains.
+    let config: Rc<RefCell<Config>> = ConfigStubBuilder::new()
+        .with("github-domains", PhpMixed::Array(IndexMap::new()))
+        .with("gitlab-domains", PhpMixed::Array(IndexMap::new()))
+        .build_shared();
+
+    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+
+    Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
+    let mut fs = HttpDownloader::new(io, config, IndexMap::new(), false);
+    Platform::clear_env("COMPOSER_DISABLE_NETWORK");
+
+    if let Err(e) = fs.get(
+        "https://user:pass@github.com/composer/composer/404",
+        IndexMap::new(),
+    ) && let Some(te) = e.downcast_ref::<TransportException>()
+    {
+        assert_ne!(200, te.get_code());
+    }
 }
 
 #[test]

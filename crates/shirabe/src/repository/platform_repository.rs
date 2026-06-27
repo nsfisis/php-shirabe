@@ -23,7 +23,9 @@ use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::platform::HhvmDetector;
+use crate::platform::HhvmDetectorInterface;
 use crate::platform::Runtime;
+use crate::platform::RuntimeInterface;
 use crate::platform::Version;
 use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
@@ -48,8 +50,8 @@ pub struct PlatformRepository {
     pub(crate) version_parser: Option<VersionParser>,
     pub(crate) overrides: IndexMap<String, PlatformOverride>,
     pub(crate) disabled_packages: IndexMap<String, CompletePackageInterfaceHandle>,
-    pub(crate) runtime: Runtime,
-    pub(crate) hhvm_detector: HhvmDetector,
+    pub(crate) runtime: Box<dyn RuntimeInterface>,
+    pub(crate) hhvm_detector: Box<dyn HhvmDetectorInterface>,
 }
 
 impl PlatformRepository {
@@ -65,11 +67,12 @@ impl PlatformRepository {
     pub fn new4(
         packages: Vec<PackageInterfaceHandle>,
         overrides: IndexMap<String, PhpMixed>,
-        runtime: Option<Runtime>,
-        hhvm_detector: Option<HhvmDetector>,
+        runtime: Option<Box<dyn RuntimeInterface>>,
+        hhvm_detector: Option<Box<dyn HhvmDetectorInterface>>,
     ) -> anyhow::Result<Self> {
-        let runtime = runtime.unwrap_or(Runtime);
-        let hhvm_detector = hhvm_detector.unwrap_or_else(|| HhvmDetector::new(None, None));
+        let runtime: Box<dyn RuntimeInterface> = runtime.unwrap_or_else(|| Box::new(Runtime));
+        let hhvm_detector: Box<dyn HhvmDetectorInterface> =
+            hhvm_detector.unwrap_or_else(|| Box::new(HhvmDetector::new(None, None)));
         let mut overrides_map: IndexMap<String, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
             if !is_string(&version) && !matches!(version, PhpMixed::Bool(false)) {
@@ -281,17 +284,10 @@ impl PlatformRepository {
         // IPv6 support might still be available.
         let has_inet6 = self.runtime.has_constant("AF_INET6", None);
         // PHP: Silencer::call([$this->runtime, 'invoke'], 'inet_pton', ['::'])
-        // TODO(phase-c): Composer's Platform\Runtime class is entirely a todo!() stub (invoke,
-        // has_constant, ...), so the inet_pton invocation cannot run. The placeholder callable
-        // returns false; resolving this requires implementing the Runtime wrapper (separate Phase C
-        // work) and a closure that forwards to the inet_pton shim.
         let inet_pton_check = Silencer::call(|| {
             Ok::<PhpMixed, anyhow::Error>(self.runtime.invoke(
-                Box::new(|_args| PhpMixed::Bool(false)),
-                vec![
-                    PhpMixed::String("inet_pton".to_string()),
-                    PhpMixed::String("::".to_string()),
-                ],
+                PhpMixed::String("inet_pton".to_string()),
+                vec![PhpMixed::String("::".to_string())],
             ))
         })
         .unwrap_or(PhpMixed::Bool(false));
@@ -406,10 +402,9 @@ impl PlatformRepository {
                 }
 
                 "curl" => {
-                    let curl_version = self.runtime.invoke(
-                        Box::new(|_args| PhpMixed::Null),
-                        vec![PhpMixed::String("curl_version".to_string())],
-                    );
+                    let curl_version = self
+                        .runtime
+                        .invoke(PhpMixed::String("curl_version".to_string()), vec![]);
                     let curl_version_str = curl_version
                         .as_array()
                         .and_then(|m| m.get("version"))
@@ -819,17 +814,14 @@ impl PlatformRepository {
                     // Add a separate version for the CLDR library version
                     if self.runtime.has_class("ResourceBundle") {
                         let resource_bundle = self.runtime.invoke(
-                            Box::new(|_args| PhpMixed::Null),
+                            PhpMixed::List(vec![
+                                PhpMixed::String("ResourceBundle".to_string()),
+                                PhpMixed::String("create".to_string()),
+                            ]),
                             vec![
-                                PhpMixed::List(vec![
-                                    PhpMixed::String("ResourceBundle".to_string()),
-                                    PhpMixed::String("create".to_string()),
-                                ]),
-                                PhpMixed::List(vec![
-                                    PhpMixed::String("root".to_string()),
-                                    PhpMixed::String("ICUDATA".to_string()),
-                                    PhpMixed::Bool(false),
-                                ]),
+                                PhpMixed::String("root".to_string()),
+                                PhpMixed::String("ICUDATA".to_string()),
+                                PhpMixed::Bool(false),
                             ],
                         );
                         if !matches!(resource_bundle, PhpMixed::Null) {
@@ -853,11 +845,11 @@ impl PlatformRepository {
 
                     if self.runtime.has_class("IntlChar") {
                         let intl_char_versions = self.runtime.invoke(
-                            Box::new(|_args| PhpMixed::Null),
-                            vec![PhpMixed::List(vec![
+                            PhpMixed::List(vec![
                                 PhpMixed::String("IntlChar".to_string()),
                                 PhpMixed::String("getUnicodeVersion".to_string()),
-                            ])],
+                            ]),
+                            vec![],
                         );
                         let sliced =
                             shirabe_php_shim::array_slice_mixed(&intl_char_versions, 0, Some(3));
@@ -1421,11 +1413,11 @@ impl PlatformRepository {
                 "zip" => {
                     if self
                         .runtime
-                        .has_constant("LIBZIP_VERSION", Some("ZipArchive"))
+                        .has_constant("LIBZIP_VERSION", Some("ZipArchive".to_string()))
                     {
                         let libzip = self
                             .runtime
-                            .get_constant("LIBZIP_VERSION", Some("ZipArchive"));
+                            .get_constant("LIBZIP_VERSION", Some("ZipArchive".to_string()));
                         let libzip_str = match &libzip {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,

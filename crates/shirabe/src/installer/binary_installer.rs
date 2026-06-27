@@ -17,6 +17,34 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 
+/// Seam over the BinaryInstaller methods reached through LibraryInstaller, so tests can inject a
+/// recording double. Composer has no PHP `BinaryInstallerInterface`; this exists only to allow the
+/// `LibraryInstaller` collaborator to be mocked the way PHPUnit mocks the concrete class.
+pub trait BinaryInstallerInterface: std::fmt::Debug {
+    fn install_binaries(
+        &mut self,
+        package: PackageInterfaceHandle,
+        install_path: &str,
+        warn_on_overwrite: bool,
+    );
+    fn remove_binaries(&mut self, package: PackageInterfaceHandle);
+}
+
+impl BinaryInstallerInterface for BinaryInstaller {
+    fn install_binaries(
+        &mut self,
+        package: PackageInterfaceHandle,
+        install_path: &str,
+        warn_on_overwrite: bool,
+    ) {
+        BinaryInstaller::install_binaries(self, package, install_path, warn_on_overwrite);
+    }
+
+    fn remove_binaries(&mut self, package: PackageInterfaceHandle) {
+        BinaryInstaller::remove_binaries(self, package);
+    }
+}
+
 /// Utility to handle installation of package "bin"/binaries
 #[derive(Debug)]
 pub struct BinaryInstaller {

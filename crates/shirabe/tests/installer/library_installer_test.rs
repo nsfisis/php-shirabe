@@ -323,8 +323,67 @@ fn test_get_install_path_with_target_dir() {
     tear_down(&mut setup);
 }
 
+/// Records the calls a `BinaryInstaller` double receives, standing in for the PHPUnit mock that
+/// asserts `removeBinaries` is never called and `installBinaries` is called once.
+#[derive(Debug, Default)]
+struct BinaryInstallerCalls {
+    install_binaries: Vec<(shirabe::package::PackageInterfaceHandle, String, bool)>,
+    remove_binaries: Vec<shirabe::package::PackageInterfaceHandle>,
+}
+
+#[derive(Debug)]
+struct RecordingBinaryInstaller {
+    calls: Rc<RefCell<BinaryInstallerCalls>>,
+}
+
+impl shirabe::installer::BinaryInstallerInterface for RecordingBinaryInstaller {
+    fn install_binaries(
+        &mut self,
+        package: shirabe::package::PackageInterfaceHandle,
+        install_path: &str,
+        warn_on_overwrite: bool,
+    ) {
+        self.calls.borrow_mut().install_binaries.push((
+            package,
+            install_path.to_string(),
+            warn_on_overwrite,
+        ));
+    }
+
+    fn remove_binaries(&mut self, package: shirabe::package::PackageInterfaceHandle) {
+        self.calls.borrow_mut().remove_binaries.push(package);
+    }
+}
+
 #[test]
-#[ignore = "requires PHPUnit mock of BinaryInstaller (expects(never)->removeBinaries, expects(once)->installBinaries) injected via LibraryInstaller's binaryInstaller argument"]
 fn test_ensure_binaries_installed() {
-    todo!()
+    let mut setup = set_up();
+    let calls = Rc::new(RefCell::new(BinaryInstallerCalls::default()));
+    let mut library = LibraryInstaller::new(
+        setup.io.clone(),
+        setup.composer.clone(),
+        Some("library".to_string()),
+        None,
+        None,
+    );
+    library.__set_binary_installer(Box::new(RecordingBinaryInstaller {
+        calls: calls.clone(),
+    }));
+    let package = get_package("foo/bar", "1.0.0");
+    let expected_path = library.get_install_path(package.clone()).unwrap();
+
+    library.ensure_binaries_presence(package.clone());
+
+    let recorded = calls.borrow();
+    // PHP asserts removeBinaries is never called.
+    assert!(recorded.remove_binaries.is_empty());
+    // PHP asserts installBinaries is called once with ($package, getInstallPath, false).
+    assert_eq!(recorded.install_binaries.len(), 1);
+    let (recorded_package, recorded_path, warn_on_overwrite) = &recorded.install_binaries[0];
+    assert!(Rc::ptr_eq(recorded_package.as_rc(), package.as_rc()));
+    assert_eq!(recorded_path, &expected_path);
+    assert!(!warn_on_overwrite);
+    drop(recorded);
+
+    tear_down(&mut setup);
 }

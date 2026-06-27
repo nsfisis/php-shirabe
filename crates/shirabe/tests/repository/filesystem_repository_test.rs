@@ -1,11 +1,22 @@
 //! ref: composer/tests/Composer/Test/Repository/FilesystemRepositoryTest.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use indexmap::IndexMap;
+use shirabe::dependency_resolver::operation::OperationInterface;
 use shirabe::installed_versions::InstalledVersions;
+use shirabe::installer::{InstallationManagerInterface, InstallerInterface};
+use shirabe::io::IOInterface;
 use shirabe::json::json_file::JsonFile;
+use shirabe::package::PackageInterfaceHandle;
+use shirabe::repository::InstalledRepositoryInterface;
 use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
+use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
+
+use crate::test_case::get_package;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
 /// materialized as a real temp file whose decoded JSON reproduces the mock return value exactly.
@@ -78,14 +89,114 @@ fn test_unexistent_repository_file() {
     assert_eq!(packages.len(), 0);
 }
 
-#[test]
-#[ignore = "requires mocking InstallationManager::get_install_path; write() takes a concrete InstallationManager with no trait/seam to stub the canned per-package paths the PHP test relies on"]
-fn test_repository_write() {
-    todo!()
+/// Stub for `InstallationManagerInterface` whose `getInstallPath` returns a fixed path, mirroring
+/// the PHPUnit mock built with `disableOriginalConstructor()`. Only `get_install_path` is reached by
+/// `FilesystemRepository::write`; the call counter backs PHP's `expects($this->exactly(2))`.
+#[derive(Debug)]
+struct InstallPathStub {
+    calls: Rc<RefCell<i64>>,
+    fixed_path: String,
+}
+
+impl InstallationManagerInterface for InstallPathStub {
+    fn add_installer(&mut self, _installer: Box<dyn InstallerInterface>) {
+        unimplemented!()
+    }
+    fn remove_installer(&mut self, _installer: &dyn InstallerInterface) {
+        unimplemented!()
+    }
+    fn disable_plugins(&mut self) {
+        unimplemented!()
+    }
+    fn is_package_installed(
+        &mut self,
+        _repo: &dyn InstalledRepositoryInterface,
+        _package: PackageInterfaceHandle,
+    ) -> anyhow::Result<bool> {
+        unimplemented!()
+    }
+    fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) {
+        unimplemented!()
+    }
+    fn execute(
+        &mut self,
+        _repo: &mut dyn InstalledRepositoryInterface,
+        _operations: Vec<Rc<dyn OperationInterface>>,
+        _dev_mode: bool,
+        _run_scripts: bool,
+        _download_only: bool,
+    ) -> anyhow::Result<()> {
+        unimplemented!()
+    }
+    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
+        *self.calls.borrow_mut() += 1;
+        Some(self.fixed_path.clone())
+    }
+    fn set_output_progress(&mut self, _output_progress: bool) {
+        unimplemented!()
+    }
+    fn notify_installs(&mut self, _io: Rc<RefCell<dyn IOInterface>>) {
+        unimplemented!()
+    }
 }
 
 #[test]
-#[ignore = "requires mocking InstallationManager::get_install_path (concrete method, no stub seam) plus missing test helpers get_root_package and configure_links"]
+fn test_repository_write() {
+    // PHP mocks JsonFile::write/read/getPath; here a real JsonFile under a temp repo dir is written
+    // and read back. write() never reads the file (it dumps the in-memory packages), so the mocked
+    // read()/exists() return values are irrelevant to the result.
+    let base = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+    let repo_dir = format!(
+        "{}/shirabe_repo_write_test_{}_{}",
+        base.display(),
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let mut fs = Filesystem::new(None);
+    fs.remove_directory(&repo_dir).ok();
+
+    let json_path = format!("{}/vendor/composer/installed.json", repo_dir);
+    let json = JsonFile::new(json_path.clone(), None, None).unwrap();
+    let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
+
+    let calls = Rc::new(RefCell::new(0i64));
+    let mut im = InstallPathStub {
+        calls: calls.clone(),
+        fixed_path: format!("{}/vendor/woop/woop", repo_dir),
+    };
+
+    repository.set_dev_package_names(vec!["mypkg2".to_string()]);
+    repository
+        .add_package(get_package("mypkg2", "1.2.3"))
+        .unwrap();
+    repository
+        .add_package(get_package("mypkg", "0.1.10"))
+        .unwrap();
+    repository.write(true, &mut im).unwrap();
+
+    // PHP asserts getInstallPath is called exactly twice (once per installed package).
+    assert_eq!(*calls.borrow(), 2);
+
+    let written = std::fs::read_to_string(&json_path).unwrap();
+    let actual: serde_json::Value = serde_json::from_str(&written).unwrap();
+    let expected = serde_json::json!({
+        "packages": [
+            {"name": "mypkg", "type": "library", "version": "0.1.10", "version_normalized": "0.1.10.0", "install-path": "../woop/woop"},
+            {"name": "mypkg2", "type": "library", "version": "1.2.3", "version_normalized": "1.2.3.0", "install-path": "../woop/woop"},
+        ],
+        "dev": true,
+        "dev-package-names": ["mypkg2"],
+    });
+    assert_eq!(actual, expected);
+
+    fs.remove_directory(&repo_dir).ok();
+}
+
+#[test]
+#[ignore = "needs get_root_package + configure_links test helpers (not present in tests/common; project_test_port_link_setters describes them via ArrayLoader::load_packages but this branch lacks them) plus exact byte-match of the generated installed.php fixture under a chdir"]
 fn test_repository_writes_installed_php() {
     todo!()
 }

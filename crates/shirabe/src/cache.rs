@@ -27,6 +27,29 @@ pub struct Cache {
     allowlist: String,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     read_only: bool,
+    /// Test-only seam. Always `None` in production; configured via [`Cache::__set_mock`].
+    mock: Option<CacheMock>,
+}
+
+/// Test-only seam mirroring the PHP CacheTest/FileDownloaderTest mocks of `Cache`.
+#[derive(Debug, Default)]
+pub struct CacheMock {
+    /// Overrides the file lists `gc()` derives from `get_finder()`, mirroring the PHP CacheTest
+    /// which mocks `getFinder` to feed `gc()` a controlled iterator.
+    pub finder: Option<GcFinderMock>,
+    /// When `Some`, `gc_is_necessary` returns it verbatim.
+    pub gc_is_necessary: Option<bool>,
+    /// When `Some`, `gc` records each `(ttl, max_size)` call here and skips its real body.
+    pub gc_calls: Option<Vec<(i64, i64)>>,
+}
+
+/// The controlled file lists used by a mocked `gc()` pass.
+#[derive(Debug, Default)]
+pub struct GcFinderMock {
+    /// Entries yielded by `get_finder().date(...)`, i.e. the outdated files.
+    pub outdated: Vec<std::path::PathBuf>,
+    /// Entries yielded by `get_finder().sort_by_accessed_time().get_iterator()`.
+    pub by_accessed_time: Vec<std::path::PathBuf>,
 }
 
 /// @var bool|null
@@ -55,6 +78,7 @@ impl Cache {
             filesystem,
             read_only,
             enabled: None,
+            mock: None,
         };
 
         if !Self::is_usable(cache_dir) {
@@ -253,6 +277,12 @@ impl Cache {
     }
 
     pub fn gc_is_necessary(&self) -> bool {
+        if let Some(mock) = &self.mock
+            && let Some(necessary) = mock.gc_is_necessary
+        {
+            return necessary;
+        }
+
         let mut cache_collected = CACHE_COLLECTED.lock().unwrap();
         if cache_collected.unwrap_or(false) {
             return false;
@@ -316,26 +346,32 @@ impl Cache {
     }
 
     pub fn gc(&mut self, ttl: i64, max_size: i64) -> bool {
+        if let Some(mock) = self.mock.as_mut()
+            && let Some(calls) = mock.gc_calls.as_mut()
+        {
+            calls.push((ttl, max_size));
+            return true;
+        }
+
         if self.is_enabled() && !self.read_only {
             let expire = Utc::now() - chrono::Duration::seconds(ttl);
-
-            let mut finder = self.get_finder();
-            finder.date(&format!(
+            let expire_str = format!(
                 "until {}",
                 expire.format(date_format_to_strftime("Y-m-d H:i:s"))
-            ));
-            for file in &mut finder {
+            );
+
+            for file in self.gc_outdated_files(&expire_str) {
                 let _ = self.filesystem.borrow_mut().unlink(&file);
             }
 
             let mut total_size = self.filesystem.borrow_mut().size(&self.root).unwrap_or(0);
             if total_size > max_size {
-                let mut iterator = self.get_finder().sort_by_accessed_time().get_iterator();
-                while total_size > max_size && iterator.valid() {
-                    let filepath = iterator.current();
+                for filepath in self.gc_files_by_accessed_time() {
+                    if total_size <= max_size {
+                        break;
+                    }
                     total_size -= self.filesystem.borrow_mut().size(&filepath).unwrap_or(0);
                     let _ = self.filesystem.borrow_mut().unlink(&filepath);
-                    iterator.next();
                 }
             }
 
@@ -345,6 +381,46 @@ impl Cache {
         }
 
         false
+    }
+
+    /// Files matching `get_finder().date(...)`. Honours the [`CacheMock`] seam when set.
+    fn gc_outdated_files(&self, expire_str: &str) -> Vec<std::path::PathBuf> {
+        if let Some(mock) = &self.mock
+            && let Some(finder) = &mock.finder
+        {
+            return finder.outdated.clone();
+        }
+
+        let mut finder = self.get_finder();
+        finder.date(expire_str);
+        finder.into_iter().collect()
+    }
+
+    /// Files from `get_finder().sort_by_accessed_time()`. Honours the [`CacheMock`] seam when set.
+    fn gc_files_by_accessed_time(&self) -> Vec<std::path::PathBuf> {
+        if let Some(mock) = &self.mock
+            && let Some(finder) = &mock.finder
+        {
+            return finder.by_accessed_time.clone();
+        }
+
+        self.get_finder()
+            .sort_by_accessed_time()
+            .get_iterator()
+            .collect()
+    }
+
+    /// For testing only: install the [`CacheMock`] seam used by CacheTest/FileDownloaderTest.
+    pub fn __set_mock(&mut self, mock: CacheMock) {
+        self.mock = Some(mock);
+    }
+
+    /// For testing only: read back the `(ttl, max_size)` calls recorded by the [`CacheMock`] seam.
+    pub fn __gc_calls(&self) -> Vec<(i64, i64)> {
+        self.mock
+            .as_ref()
+            .and_then(|m| m.gc_calls.clone())
+            .unwrap_or_default()
     }
 
     pub fn gc_vcs_cache(&mut self, ttl: i64) -> bool {

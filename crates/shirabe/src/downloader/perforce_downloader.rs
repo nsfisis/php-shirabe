@@ -12,6 +12,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::Filesystem;
 use crate::util::Perforce;
+use crate::util::PerforceInterface;
 use crate::util::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -20,7 +21,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug)]
 pub struct PerforceDownloader {
     inner: VcsDownloaderBase,
-    pub(crate) perforce: Option<Perforce>,
+    pub(crate) perforce: Option<Box<dyn PerforceInterface>>,
 }
 
 impl PerforceDownloader {
@@ -61,20 +62,20 @@ impl PerforceDownloader {
         } else {
             None
         };
-        self.perforce = Some(Perforce::create(
+        self.perforce = Some(Box::new(Perforce::create(
             repo_config.unwrap_or_default(),
             url,
             path,
             self.inner.process.clone(),
             self.inner.io.clone(),
-        ));
+        )));
     }
 
     fn get_repo_config(&self, repository: &VcsRepository) -> IndexMap<String, PhpMixed> {
         repository.get_repo_config().clone()
     }
 
-    pub fn set_perforce(&mut self, perforce: Perforce) {
+    pub fn set_perforce(&mut self, perforce: Box<dyn PerforceInterface>) {
         self.perforce = Some(perforce);
     }
 }
@@ -135,10 +136,7 @@ impl VcsDownloader for PerforceDownloader {
         self.perforce.as_mut().unwrap().p4_login();
         self.perforce.as_mut().unwrap().write_p4_client_spec();
         self.perforce.as_mut().unwrap().connect_client();
-        self.perforce
-            .as_mut()
-            .unwrap()
-            .sync_code_base(label.as_deref());
+        self.perforce.as_mut().unwrap().sync_code_base(label);
         self.perforce.as_mut().unwrap().cleanup_client_spec();
 
         Ok(None)

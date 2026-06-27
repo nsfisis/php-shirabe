@@ -5,14 +5,16 @@ use std::rc::Rc;
 
 use indexmap::IndexMap;
 use serial_test::serial;
+use shirabe::cache::{Cache, CacheMock};
 use shirabe::config::Config;
 use shirabe::downloader::DownloaderInterface;
 use shirabe::downloader::FileDownloader;
 use shirabe::io::IOInterface;
+use shirabe::io::io_interface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
@@ -21,6 +23,7 @@ use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 use crate::http_downloader_mock::get_http_downloader_mock;
+use crate::io_mock::{Expectation, get_io_mock};
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
@@ -193,9 +196,61 @@ fn test_download_with_custom_cache_key() {
 }
 
 #[test]
-#[ignore = "requires a Cache mock with gcIsNecessary/gc expectation tracking; Cache is a concrete struct with no test hook for asserting gc() was called once"]
+#[serial]
+#[ignore = "PHP Config::get('cache-files-ttl') casts the string via (int) (Config.php:396-398), turning '99999999' into 99999999, but shirabe's PhpMixed::as_int returns None for String so Config::get yields 0 and the assertion fails. Faithful port stays failing until the src is fixed."]
 fn test_cache_garbage_collection_is_called() {
-    todo!()
+    let expected_ttl: i64 = 99999999;
+
+    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    config_options.insert(
+        "cache-files-ttl".to_string(),
+        PhpMixed::String("99999999".to_string()),
+    );
+    config_options.insert(
+        "cache-files-maxsize".to_string(),
+        PhpMixed::String("500M".to_string()),
+    );
+    let config = get_config(config_options);
+
+    // The PHP Cache mock forces gcIsNecessary() true and records the single gc() call; the CacheMock
+    // seam plays both roles here.
+    let tmp_dir = TempDir::new().unwrap();
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let mut cache = Cache::new(io, tmp_dir.path().to_str().unwrap(), None, None, false);
+    cache.__set_mock(CacheMock {
+        gc_is_necessary: Some(true),
+        gc_calls: Some(Vec::new()),
+        ..Default::default()
+    });
+    let cache = Rc::new(RefCell::new(cache));
+
+    let (http_downloader, _guard) = get_http_downloader_mock(
+        Vec::new(),
+        false,
+        HttpDownloaderMockHandler {
+            status: 200,
+            body: "file~".to_string(),
+            headers: Vec::new(),
+        },
+    );
+
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let _downloader = FileDownloader::new(
+        io,
+        config,
+        http_downloader,
+        None,
+        Some(cache.clone()),
+        None,
+        None,
+    );
+
+    let gc_calls = cache.borrow().__gc_calls();
+    assert_eq!(gc_calls.len(), 1, "gc should be called exactly once");
+    assert_eq!(
+        gc_calls[0].0, expected_ttl,
+        "gc should receive the configured ttl"
+    );
 }
 
 #[test]
@@ -245,8 +300,86 @@ fn test_download_file_with_invalid_checksum() {
 }
 
 #[test]
-#[ignore = "requires a Filesystem mock of removeDirectoryAsync/normalizePath plus IOMock output expectations; Filesystem is a concrete struct with no async-removal test hook"]
+#[serial]
 fn test_downgrade_shows_appropriate_message() {
-    let _ = Filesystem::new(None);
-    todo!()
+    let old_package = get_package("dummy/pkg", "1.2.0");
+    let new_package = get_package("dummy/pkg", "1.0.0");
+    new_package.set_dist_url(Some("http://example.com/script.js".to_string()));
+
+    let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
+    io_mock
+        .borrow_mut()
+        .expects(
+            vec![
+                Expectation::text_regex("{Downloading .*}"),
+                Expectation::text_regex("{Downgrading .*}"),
+            ],
+            false,
+        )
+        .unwrap();
+
+    let tmp_dir = TempDir::new().unwrap();
+    let path = tmp_dir.path().to_string_lossy().into_owned();
+    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    config_options.insert(
+        "vendor-dir".to_string(),
+        PhpMixed::String(format!("{}/vendor", path)),
+    );
+    let config = get_config(config_options);
+
+    // PHP mocks Filesystem so removeDirectoryAsync is a no-op (resolve(true)) and normalizePath is an
+    // identity; the FilesystemMock seam reproduces both so update()'s remove/install do not disturb
+    // the pre-staged download file.
+    let mut filesystem = Filesystem::new(None);
+    filesystem.__set_mock(FilesystemMock {
+        remove_directory_async_result: Some(true),
+        normalize_path_identity: true,
+        ..Default::default()
+    });
+    let filesystem = Rc::new(RefCell::new(filesystem));
+
+    let (http_downloader, _guard) = get_http_downloader_mock(
+        Vec::new(),
+        false,
+        HttpDownloaderMockHandler {
+            status: 200,
+            body: "file~".to_string(),
+            headers: Vec::new(),
+        },
+    );
+
+    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let mut downloader = FileDownloader::new(
+        io,
+        config,
+        http_downloader.clone(),
+        None,
+        None,
+        Some(filesystem.clone()),
+        None,
+    );
+
+    // make sure the file expected to be downloaded is on disk already
+    let dl_file = downloader.__get_file_name(new_package.clone(), &path);
+    let dir = std::path::Path::new(&dl_file).parent().unwrap();
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(&dl_file, b"").unwrap();
+
+    let mut loop_ = Loop::new(http_downloader, None);
+    let promise = Box::pin(async {
+        downloader
+            .download(new_package.clone(), &path, Some(old_package.clone()), true)
+            .await
+            .map(|_| ())
+    });
+    run(loop_.wait(vec![promise], None)).expect("download should succeed");
+
+    run(downloader.update(old_package.clone(), new_package.clone(), &path))
+        .expect("update should succeed");
+
+    assert_eq!(
+        filesystem.borrow().__remove_directory_async_calls(),
+        1,
+        "removeDirectoryAsync should be called exactly once"
+    );
 }

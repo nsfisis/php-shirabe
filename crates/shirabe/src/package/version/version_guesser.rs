@@ -20,6 +20,19 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 
+/// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
+/// with a test double. PHP has no such interface; this exists only to allow mocking the concrete
+/// `VersionGuesser` (a Phase C seam).
+pub trait VersionGuesserInterface: std::fmt::Debug {
+    fn guess_version(
+        &mut self,
+        package_config: &IndexMap<String, PhpMixed>,
+        path: &str,
+    ) -> Result<Option<VersionData>>;
+
+    fn get_root_version_from_env(&self) -> Result<String>;
+}
+
 /// Try to guess the current version number based on different VCS configuration.
 ///
 /// @phpstan-type Version array{version: string, commit: string|null, pretty_version: string|null}|array{version: string, commit: string|null, pretty_version: string|null, feature_version: string|null, feature_pretty_version: string|null}
@@ -744,6 +757,20 @@ impl VersionGuesser {
         }
 
         Ok(version)
+    }
+}
+
+impl VersionGuesserInterface for VersionGuesser {
+    fn guess_version(
+        &mut self,
+        package_config: &IndexMap<String, PhpMixed>,
+        path: &str,
+    ) -> Result<Option<VersionData>> {
+        VersionGuesser::guess_version(self, package_config, path)
+    }
+
+    fn get_root_version_from_env(&self) -> Result<String> {
+        VersionGuesser::get_root_version_from_env(self)
     }
 }
 

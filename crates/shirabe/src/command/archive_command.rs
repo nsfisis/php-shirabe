@@ -36,6 +36,28 @@ use crate::util::r#loop::Loop;
 #[derive(Debug)]
 pub struct ArchiveCommand {
     base_command_data: BaseCommandData,
+    /// For testing only: partial-mock seam mirroring PHPUnit `onlyMethods(['initialize', 'archive'])`.
+    test_hooks: RefCell<ArchiveCommandTestHooks>,
+}
+
+/// For testing only: records and stubs for the `ArchiveCommand` partial-mock seam.
+#[derive(Debug, Default)]
+pub struct ArchiveCommandTestHooks {
+    skip_initialize: bool,
+    archive_stub_return: Option<i64>,
+    archive_calls: Vec<ArchiveCallRecord>,
+}
+
+/// For testing only: the scalar arguments captured from a stubbed `archive` call.
+#[derive(Debug, Clone)]
+pub struct ArchiveCallRecord {
+    pub package_name: Option<String>,
+    pub version: Option<String>,
+    pub format: String,
+    pub dest: String,
+    pub file_name: Option<String>,
+    pub ignore_filters: bool,
+    pub had_composer: bool,
 }
 
 impl Default for ArchiveCommand {
@@ -50,6 +72,7 @@ impl ArchiveCommand {
     pub fn new() -> Self {
         let command = ArchiveCommand {
             base_command_data: BaseCommandData::new(None),
+            test_hooks: RefCell::new(ArchiveCommandTestHooks::default()),
         };
         command
             .configure()
@@ -188,10 +211,31 @@ impl Command for ArchiveCommand {
         input: Rc<RefCell<dyn InputInterface>>,
         output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
+        if self.test_hooks.borrow().skip_initialize {
+            return Ok(());
+        }
         base_command_initialize(self, input, output)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl ArchiveCommand {
+    /// For testing only: makes `initialize` a no-op (PHPUnit `onlyMethods(['initialize'])`).
+    pub fn __test_skip_initialize(&self) {
+        self.test_hooks.borrow_mut().skip_initialize = true;
+    }
+
+    /// For testing only: stubs `archive` to record its arguments and return `return_value`
+    /// without running (PHPUnit `onlyMethods(['archive'])`).
+    pub fn __test_stub_archive(&self, return_value: i64) {
+        self.test_hooks.borrow_mut().archive_stub_return = Some(return_value);
+    }
+
+    /// For testing only: the arguments captured from stubbed `archive` calls.
+    pub fn __test_archive_calls(&self) -> Vec<ArchiveCallRecord> {
+        self.test_hooks.borrow().archive_calls.clone()
+    }
 }
 
 impl BaseCommand for ArchiveCommand {
@@ -218,6 +262,23 @@ impl ArchiveCommand {
         ignore_filters: bool,
         composer: Option<&PartialComposerHandle>,
     ) -> Result<i64> {
+        let archive_stub_return = self.test_hooks.borrow().archive_stub_return;
+        if let Some(return_value) = archive_stub_return {
+            self.test_hooks
+                .borrow_mut()
+                .archive_calls
+                .push(ArchiveCallRecord {
+                    package_name,
+                    version,
+                    format: format.to_string(),
+                    dest: dest.to_string(),
+                    file_name,
+                    ignore_filters,
+                    had_composer: composer.is_some(),
+                });
+            return Ok(return_value);
+        }
+
         let composer_guard = composer.map(crate::composer::composer_full);
         let mut owned_archive_manager;
         let composer_archive_manager;

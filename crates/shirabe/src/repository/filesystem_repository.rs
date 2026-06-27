@@ -14,7 +14,7 @@ use shirabe_php_shim::{
 
 use crate::config::is_php_integer_key;
 use crate::installed_versions::InstalledVersions;
-use crate::installer::InstallationManager;
+use crate::installer::InstallationManagerInterface;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
@@ -209,7 +209,7 @@ impl FilesystemRepository {
     pub fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &mut InstallationManager,
+        installation_manager: &mut dyn InstallationManagerInterface,
     ) -> Result<()> {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert("packages".to_string(), PhpMixed::List(vec![]));
@@ -239,11 +239,7 @@ impl FilesystemRepository {
             if let Some(path_str) = &path
                 && !path_str.is_empty()
             {
-                let normalized_path = self.filesystem.borrow_mut().normalize_path(&if self
-                    .filesystem
-                    .borrow()
-                    .is_absolute_path(path_str)
-                {
+                let path_to_normalize = if self.filesystem.borrow().is_absolute_path(path_str) {
                     path_str.clone()
                 } else {
                     format!(
@@ -251,7 +247,11 @@ impl FilesystemRepository {
                         Platform::get_cwd(false).unwrap_or_default(),
                         path_str
                     )
-                });
+                };
+                let normalized_path = self
+                    .filesystem
+                    .borrow_mut()
+                    .normalize_path(&path_to_normalize);
                 install_path = Some(self.filesystem.borrow_mut().find_shortest_path(
                     &repo_dir,
                     &normalized_path,
@@ -453,7 +453,7 @@ impl FilesystemRepository {
     /// @param array<string, string> $installPaths
     fn generate_installed_versions(
         &mut self,
-        installation_manager: &InstallationManager,
+        installation_manager: &dyn InstallationManagerInterface,
         install_paths: &IndexMap<String, Option<String>>,
         dev_mode: bool,
         repo_dir: &str,

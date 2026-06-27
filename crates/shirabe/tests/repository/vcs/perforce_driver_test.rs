@@ -8,25 +8,48 @@ use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::PerforceDriver;
+use shirabe::util::HttpDownloader;
 use shirabe::util::filesystem::Filesystem;
+use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::PhpMixed;
 use tempfile::TempDir;
+
+use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 
 const TEST_URL: &str = "TEST_PERFORCE_URL";
 const TEST_DEPOT: &str = "TEST_DEPOT_CONFIG";
 const TEST_BRANCH: &str = "TEST_BRANCH_CONFIG";
 
+// A getMockBuilder('Composer\Util\Perforce') stand-in: the seam trait extracted from the
+// concrete `Perforce` struct, injected via overrideDriverInternalPerforce's Rust equivalent.
+mockall::mock! {
+    #[derive(Debug)]
+    pub Perforce {}
+    impl shirabe::util::PerforceInterface for Perforce {
+        fn initialize_path(&mut self, path: &str);
+        fn set_stream(&mut self, stream: &str);
+        fn p4_login(&mut self) -> anyhow::Result<()>;
+        fn check_stream(&mut self) -> bool;
+        fn write_p4_client_spec(&mut self) -> anyhow::Result<()>;
+        fn connect_client(&mut self) -> anyhow::Result<()>;
+        fn sync_code_base(&mut self, source_reference: Option<String>) -> anyhow::Result<()>;
+        fn cleanup_client_spec(&mut self);
+        fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String>;
+        fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String>;
+        fn get_branches(&mut self) -> IndexMap<String, String>;
+        fn get_tags(&mut self) -> IndexMap<String, String>;
+        fn get_user(&self) -> Option<String>;
+        fn get_composer_information(
+            &mut self,
+            identifier: &str,
+        ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
+    }
+}
+
 struct SetUp {
     test_path: TempDir,
     config: Config,
     repo_config: IndexMap<String, PhpMixed>,
-    // The IOInterface, ProcessExecutor, HttpDownloader and Perforce mocks, the
-    // driver instance and the reflection-based perforce override are not ported.
-    io: (),
-    process: (),
-    http_downloader: (),
-    perforce: (),
-    driver: (),
 }
 
 fn get_test_config(test_path: &std::path::Path) -> Config {
@@ -57,23 +80,32 @@ fn set_up() -> SetUp {
         PhpMixed::String(TEST_BRANCH.to_string()),
     );
 
-    let io = ();
-    let process = ();
-    let http_downloader = ();
-    let perforce = ();
-    // The driver construction and overrideDriverInternalPerforce (reflection) are not ported.
-    let driver = ();
-
     SetUp {
         test_path,
         config,
         repo_config,
-        io,
-        process,
-        http_downloader,
-        perforce,
-        driver,
     }
+}
+
+// ref: setUp builds the driver from a mock IO, an empty ProcessExecutorMock and a mock
+// HttpDownloader. The empty, non-strict process mock lets any p4 query Perforce issues resolve
+// with the default (exit 0) result.
+fn make_driver(
+    config: Config,
+    repo_config: &IndexMap<String, PhpMixed>,
+) -> (PerforceDriver, ProcessExecutorMockGuard) {
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let config = Rc::new(RefCell::new(config));
+    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+        io.clone(),
+        config.clone(),
+        IndexMap::new(),
+        false,
+    )));
+    let (process, guard) = get_process_executor_mock(vec![], false, MockHandler::default());
+    let driver = PerforceDriver::new(repo_config.clone(), io, config, http_downloader, process);
+
+    (driver, guard)
 }
 
 fn tear_down(test_path: &std::path::Path) {
@@ -106,146 +138,127 @@ fn test_supports_returns_false_no_deep_check() {
     assert!(!PerforceDriver::supports(io, config, "existing.url", false).unwrap());
 }
 
-// The remaining cases mock Perforce, the repository config and IO to drive initialization,
-// composer-file detection and cleanup; mocking is not available here.
 #[test]
 fn test_initialize_captures_variables_from_repo_config() {
     let SetUp {
         test_path,
         config,
         repo_config,
-        io,
-        process,
-        http_downloader,
-        perforce,
-        driver,
     } = set_up();
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
-    let _ = (&io, &process, &http_downloader, &perforce, &driver);
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(config));
-    let http_downloader = Rc::new(RefCell::new(shirabe::util::HttpDownloader::new(
-        io.clone(),
-        config.clone(),
-        IndexMap::new(),
-        false,
-    )));
-    // ref: setUp uses getProcessExecutorMock(); the empty, non-strict mock lets Perforce's p4
-    // queries resolve with the default (exit 0) result so initialize() never shells out to p4.
-    let (process, _process_guard) = crate::process_executor_mock::get_process_executor_mock(
-        vec![],
-        false,
-        shirabe::util::process_executor::MockHandler::default(),
-    );
-
-    let mut driver = PerforceDriver::new(repo_config, io, config, http_downloader, process);
+    let (mut driver, _process_guard) = make_driver(config, &repo_config);
     driver.initialize().unwrap();
     assert_eq!(TEST_URL, driver.get_url());
     assert_eq!(TEST_DEPOT, driver.get_depot());
     assert_eq!(TEST_BRANCH, driver.get_branch());
 }
 
-#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to assert p4Login/checkStream/writeP4ClientSpec/connectClient are each called once; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
 fn test_initialize_logs_in_and_connects_client() {
     let SetUp {
         test_path,
         config,
         repo_config,
-        io,
-        process,
-        http_downloader,
-        perforce,
-        driver,
     } = set_up();
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
-    let _ = (
-        &config,
-        &repo_config,
-        &io,
-        &process,
-        &http_downloader,
-        &perforce,
-        &driver,
-    );
-    todo!()
+
+    let (mut driver, _process_guard) = make_driver(config, &repo_config);
+    let mut perforce = MockPerforce::new();
+    perforce.expect_p4_login().times(1).returning(|| Ok(()));
+    perforce.expect_check_stream().times(1).returning(|| false);
+    perforce
+        .expect_write_p4_client_spec()
+        .times(1)
+        .returning(|| Ok(()));
+    perforce
+        .expect_connect_client()
+        .times(1)
+        .returning(|| Ok(()));
+    driver.__override_perforce(Box::new(perforce));
+
+    driver.initialize().unwrap();
 }
 
-#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to stub getComposerInformation; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
 fn test_has_composer_file_returns_false_on_no_composer_file() {
     let SetUp {
         test_path,
         config,
         repo_config,
-        io,
-        process,
-        http_downloader,
-        perforce,
-        driver,
     } = set_up();
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
-    let _ = (
-        &config,
-        &repo_config,
-        &io,
-        &process,
-        &http_downloader,
-        &perforce,
-        &driver,
-    );
-    todo!()
+
+    let identifier = "TEST_IDENTIFIER";
+    let formatted_depot_path = format!("//{}/{}", TEST_DEPOT, identifier);
+
+    let (mut driver, _process_guard) = make_driver(config, &repo_config);
+    let mut perforce = MockPerforce::new();
+    perforce.expect_p4_login().returning(|| Ok(()));
+    perforce.expect_check_stream().returning(|| false);
+    perforce.expect_write_p4_client_spec().returning(|| Ok(()));
+    perforce.expect_connect_client().returning(|| Ok(()));
+    perforce
+        .expect_get_composer_information()
+        .withf(move |id: &str| id == formatted_depot_path)
+        .returning(|_| Ok(Some(IndexMap::new())));
+    driver.__override_perforce(Box::new(perforce));
+
+    driver.initialize().unwrap();
+    let result = driver.has_composer_file(identifier);
+    assert!(!result);
 }
 
-#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to stub getComposerInformation; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
 fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
     let SetUp {
         test_path,
         config,
         repo_config,
-        io,
-        process,
-        http_downloader,
-        perforce,
-        driver,
     } = set_up();
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
-    let _ = (
-        &config,
-        &repo_config,
-        &io,
-        &process,
-        &http_downloader,
-        &perforce,
-        &driver,
-    );
-    todo!()
+
+    let identifier = "TEST_IDENTIFIER";
+    let formatted_depot_path = format!("//{}/{}", TEST_DEPOT, identifier);
+
+    let (mut driver, _process_guard) = make_driver(config, &repo_config);
+    let mut perforce = MockPerforce::new();
+    perforce.expect_p4_login().returning(|| Ok(()));
+    perforce.expect_check_stream().returning(|| false);
+    perforce.expect_write_p4_client_spec().returning(|| Ok(()));
+    perforce.expect_connect_client().returning(|| Ok(()));
+    perforce
+        .expect_get_composer_information()
+        .withf(move |id: &str| id == formatted_depot_path)
+        .returning(|_| {
+            // ref: returnValue(['']) — a non-empty list with one empty-string element.
+            let mut info: IndexMap<String, PhpMixed> = IndexMap::new();
+            info.insert("0".to_string(), PhpMixed::String(String::new()));
+            Ok(Some(info))
+        });
+    driver.__override_perforce(Box::new(perforce));
+
+    driver.initialize().unwrap();
+    let result = driver.has_composer_file(identifier);
+    assert!(result);
 }
 
-#[ignore = "needs a Perforce mock injected via reflection (overrideDriverInternalPerforce) to assert cleanupClientSpec is called once; the perforce field is pub(crate) and no mock infra exists"]
 #[test]
 fn test_cleanup() {
     let SetUp {
         test_path,
         config,
         repo_config,
-        io,
-        process,
-        http_downloader,
-        perforce,
-        driver,
     } = set_up();
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
-    let _ = (
-        &config,
-        &repo_config,
-        &io,
-        &process,
-        &http_downloader,
-        &perforce,
-        &driver,
-    );
-    todo!()
+
+    let (mut driver, _process_guard) = make_driver(config, &repo_config);
+    let mut perforce = MockPerforce::new();
+    perforce
+        .expect_cleanup_client_spec()
+        .times(1)
+        .returning(|| ());
+    driver.__override_perforce(Box::new(perforce));
+
+    driver.cleanup().unwrap();
 }

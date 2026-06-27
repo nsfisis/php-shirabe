@@ -9,6 +9,7 @@ use crate::config::Config;
 use crate::io::IOInterface;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::Perforce;
+use crate::util::PerforceInterface;
 use crate::util::ProcessExecutor;
 use crate::util::http::Response;
 
@@ -17,7 +18,7 @@ pub struct PerforceDriver {
     inner: VcsDriverBase,
     pub(crate) depot: String,
     pub(crate) branch: String,
-    pub(crate) perforce: Option<Perforce>,
+    pub(crate) perforce: Option<Box<dyn PerforceInterface>>,
 }
 
 impl PerforceDriver {
@@ -86,15 +87,21 @@ impl PerforceDriver {
         }
 
         let repo_dir = format!("{}/{}", cache_vcs_dir, self.depot);
-        self.perforce = Some(Perforce::create(
+        self.perforce = Some(Box::new(Perforce::create(
             repo_config.clone(),
             self.inner.url.clone(),
             repo_dir,
             self.inner.process.clone(),
             self.inner.io.clone(),
-        ));
+        )));
 
         Ok(())
+    }
+
+    /// For testing only. Rust equivalent of the reflection-based
+    /// `overrideDriverInternalPerforce` helper in PerforceDriverTest.
+    pub fn __override_perforce(&mut self, perforce: Box<dyn PerforceInterface>) {
+        self.perforce = Some(perforce);
     }
 
     pub fn get_file_content(

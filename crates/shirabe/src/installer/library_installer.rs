@@ -10,6 +10,7 @@ use shirabe_php_shim::{
 use crate::composer::PartialComposerWeakHandle;
 use crate::downloader::DownloadManagerInterface;
 use crate::installer::BinaryInstaller;
+use crate::installer::BinaryInstallerInterface;
 use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
@@ -29,7 +30,7 @@ pub struct LibraryInstaller {
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) r#type: Option<String>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    pub(crate) binary_installer: BinaryInstaller,
+    pub(crate) binary_installer: Box<dyn BinaryInstallerInterface>,
 }
 
 impl LibraryInstaller {
@@ -61,28 +62,31 @@ impl LibraryInstaller {
                 .unwrap_or_default(),
             Some("/"),
         );
-        let binary_installer = binary_installer.unwrap_or_else(|| {
-            let bin_dir = rtrim(
-                &composer_ref
+        let binary_installer: Box<dyn BinaryInstallerInterface> = match binary_installer {
+            Some(binary_installer) => Box::new(binary_installer),
+            None => {
+                let bin_dir = rtrim(
+                    &composer_ref
+                        .get_config()
+                        .borrow_mut()
+                        .get_str("bin-dir")
+                        .unwrap_or_default(),
+                    Some("/"),
+                );
+                let bin_compat = composer_ref
                     .get_config()
                     .borrow_mut()
-                    .get_str("bin-dir")
-                    .unwrap_or_default(),
-                Some("/"),
-            );
-            let bin_compat = composer_ref
-                .get_config()
-                .borrow_mut()
-                .get_str("bin-compat")
-                .unwrap_or_default();
-            BinaryInstaller::new(
-                io.clone(),
-                bin_dir,
-                bin_compat,
-                Some(filesystem.clone()),
-                Some(vendor_dir.clone()),
-            )
-        });
+                    .get_str("bin-compat")
+                    .unwrap_or_default();
+                Box::new(BinaryInstaller::new(
+                    io.clone(),
+                    bin_dir,
+                    bin_compat,
+                    Some(filesystem.clone()),
+                    Some(vendor_dir.clone()),
+                ))
+            }
+        };
 
         Self {
             composer,
@@ -93,6 +97,12 @@ impl LibraryInstaller {
             vendor_dir,
             binary_installer,
         }
+    }
+
+    /// For testing only: swap the binary installer for a recording double, mirroring the
+    /// constructor injection PHPUnit performs with a mocked BinaryInstaller.
+    pub fn __set_binary_installer(&mut self, binary_installer: Box<dyn BinaryInstallerInterface>) {
+        self.binary_installer = binary_installer;
     }
 
     /// Make sure binaries are installed for a given package.
