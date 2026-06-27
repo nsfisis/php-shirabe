@@ -1,8 +1,23 @@
 //! ref: composer/tests/Composer/Test/FactoryTest.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::factory::Factory;
+use shirabe::io::IOInterface;
+use shirabe::io::io_interface;
 use shirabe::util::platform::Platform;
+use shirabe_php_shim::PhpMixed;
+
+#[path = "common/config_stub.rs"]
+mod config_stub;
+#[path = "common/io_mock.rs"]
+#[allow(dead_code)] // io_mock exposes more helpers than this binary uses
+mod io_mock;
+use config_stub::ConfigStubBuilder;
+use io_mock::{Expectation, get_io_mock};
 
 fn tear_down() {
     Platform::clear_env("COMPOSER");
@@ -18,11 +33,26 @@ impl Drop for TearDown {
 
 #[test]
 #[serial]
-#[ignore = "requires PHPUnit-style mocks: an IOInterface mock verifying writeError is called exactly once with the exact warning, plus a Config mock stubbing get('disable-tls')=>true; no such mock/expectation infrastructure (e.g. mockall) exists"]
 fn test_default_values_are_as_expected() {
     let _tear_down = TearDown;
 
-    todo!()
+    let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
+    io_mock
+        .borrow_mut()
+        .expects(
+            vec![Expectation::text(
+                "<warning>You are running Composer with SSL/TLS protection disabled.</warning>",
+            )],
+            false,
+        )
+        .unwrap();
+
+    let config = ConfigStubBuilder::new()
+        .with("disable-tls", PhpMixed::Bool(true))
+        .build_shared();
+
+    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    Factory::create_http_downloader(io, &config, IndexMap::new()).unwrap();
 }
 
 #[test]
