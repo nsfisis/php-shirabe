@@ -1,8 +1,9 @@
 //! ref: composer/tests/Composer/Test/ApplicationTest.php
 
 // These drive the console Application (doRun, command resolution, plugin disabling).
-// The tests needing Application::setAutoExit/setCatchErrors or the initTempComposer
-// helper, or a runtime define() of COMPOSER_DEV_WARNING_TIME, remain unportable.
+// The tests exercising do_run's script-command registration (a todo!() pending the
+// Symfony command-registry model), or a runtime define() of COMPOSER_DEV_WARNING_TIME,
+// remain unportable.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -108,7 +109,7 @@ fn test_process_isolation_works_multiple_times() {
     assert_eq!(0, application.do_run(input2, output2).unwrap());
 }
 
-#[ignore = "Application::set_auto_exit / set_catch_errors and the initTempComposer test helper do not exist"]
+#[ignore = "do_run's script-command registration is a todo!() pending the Symfony command-registry model"]
 #[test]
 fn test_no_plugins_disables_plugins_when_script_commands_exist() {
     let _tear_down = TearDown;
@@ -117,7 +118,7 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
     todo!()
 }
 
-#[ignore = "Application::set_auto_exit / set_catch_errors and the initTempComposer test helper do not exist"]
+#[ignore = "do_run's script-command registration is a todo!() pending the Symfony command-registry model"]
 #[test]
 fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
     let _tear_down = TearDown;

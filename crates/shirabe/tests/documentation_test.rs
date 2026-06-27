@@ -18,8 +18,6 @@ fn get_command_name(command: &Rc<RefCell<dyn Command>>) -> String {
 
 fn provide_command_cases() -> Vec<Rc<RefCell<dyn Command>>> {
     let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
-    // setAutoExit(false) is the default in Shirabe. The setCatchErrors() call is guarded by
-    // method_exists() in PHP and has no Rust equivalent.
     application.set_catch_exceptions(false);
 
     let mut description =
