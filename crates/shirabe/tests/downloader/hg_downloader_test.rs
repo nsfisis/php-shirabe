@@ -9,7 +9,7 @@ use shirabe::downloader::hg_downloader::HgDownloader;
 use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::ProcessExecutor;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -74,13 +74,14 @@ fn get_downloader_mock(
     io: Option<Rc<RefCell<dyn IOInterface>>>,
     config: Option<Config>,
     process: Rc<RefCell<ProcessExecutor>>,
+    filesystem: Option<Rc<RefCell<Filesystem>>>,
 ) -> HgDownloader {
     let io =
         io.unwrap_or_else(|| Rc::new(RefCell::new(IOStub::new())) as Rc<RefCell<dyn IOInterface>>);
     let config = Rc::new(RefCell::new(
         config.unwrap_or_else(|| Config::new(false, None)),
     ));
-    let fs = Rc::new(RefCell::new(Filesystem::new(None)));
+    let fs = filesystem.unwrap_or_else(|| Rc::new(RefCell::new(Filesystem::new(None))));
     HgDownloader::new(io, config, process, fs)
 }
 
@@ -93,7 +94,7 @@ fn test_download_for_package_without_source_reference() {
     let package = get_package(None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
-    let mut downloader = get_downloader_mock(None, None, process);
+    let mut downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(downloader.install(package, "/path"));
     let e = result.expect_err("missing source reference should throw");
@@ -123,7 +124,7 @@ fn test_download() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, None, process);
+    let mut downloader = get_downloader_mock(None, None, process, None);
     run(downloader.install(package, &working_dir_str)).unwrap();
 }
 
@@ -137,7 +138,7 @@ fn test_updatefor_package_without_source_reference() {
     let source_package = get_package(None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
-    let mut downloader = get_downloader_mock(None, None, process);
+    let mut downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(async {
         downloader
@@ -183,7 +184,7 @@ fn test_update() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, None, process);
+    let mut downloader = get_downloader_mock(None, None, process, None);
     run(async {
         downloader
             .prepare(
@@ -205,15 +206,45 @@ fn test_update() {
     });
 }
 
-#[ignore = "PHP mocks Filesystem::removeDirectoryAsync; with a real Filesystem the actual \
-            removeDirectoryAsync drives its own ProcessExecutor for `rm -rf` through the \
-            unported execute_async mock seam"]
 #[test]
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    todo!()
+    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+
+    let mut fs = Filesystem::new(None);
+    fs.ensure_directory_exists(&format!("{}/.hg", working_dir_str))
+        .unwrap();
+
+    let package = get_package(None, None);
+
+    let (process, _guard) =
+        get_process_executor_mock(vec![cmd(vec!["hg", "st"])], true, Default::default());
+
+    let mut filesystem = Filesystem::new(None);
+    filesystem.__set_mock(FilesystemMock {
+        remove_directory_async_result: Some(true),
+        ..Default::default()
+    });
+    let filesystem = Rc::new(RefCell::new(filesystem));
+
+    let mut downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
+    run(async {
+        downloader
+            .prepare("uninstall", package.clone(), &working_dir_str, None)
+            .await
+            .unwrap();
+        downloader
+            .remove(package.clone(), &working_dir_str)
+            .await
+            .unwrap();
+        downloader
+            .cleanup("uninstall", package, &working_dir_str, None)
+            .await
+            .unwrap();
+    });
+
+    assert_eq!(filesystem.borrow().__remove_directory_async_calls(), 1);
 }
 
 #[test]
@@ -223,7 +254,7 @@ fn test_get_installation_source() {
     let _ = &working_dir;
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
-    let downloader = get_downloader_mock(None, None, process);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     assert_eq!("source", downloader.get_installation_source());
 }
