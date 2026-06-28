@@ -255,14 +255,12 @@ fn test_build_phar() {
 
 #[test]
 #[serial]
-#[ignore = "requires network access and a real git clone of seld/jsonlint from GitHub/Packagist"]
 fn test_integration_create_project_command() {
     run_integration("create-project-command.test");
 }
 
 #[test]
 #[serial]
-#[ignore = "requires network access and a real git clone of seld/jsonlint from GitHub"]
 fn test_integration_create_project_shows_full_hash_for_dev_packages() {
     run_integration("create-project-shows-full-hash-for-dev-packages.test");
 }

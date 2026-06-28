@@ -321,7 +321,6 @@ fn test_remove_unused_package() {
     drop(tear_down);
 }
 
-#[ignore = "InstallationManager::execute_batch only awaits prepare(); the install/update/uninstall + cleanup + repo.write promise chain is still a todo!() stub, so package operations do not actually execute"]
 #[test]
 #[serial]
 fn test_remove_package_by_name() {
@@ -492,7 +491,6 @@ fn test_remove_package_by_name_with_dry_run() {
     drop(tear_down);
 }
 
-#[ignore = "InstallationManager::execute_batch only awaits prepare(); the install/update/uninstall + cleanup + repo.write promise chain is still a todo!() stub, so package operations do not actually execute"]
 #[test]
 #[serial]
 fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
@@ -805,7 +803,7 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
     drop(tear_down);
 }
 
-#[ignore = "InstallationManager::execute_batch only awaits prepare(); the install/update/uninstall + cleanup + repo.write promise chain is still a todo!() stub, so package operations do not actually execute"]
+#[ignore = "installed.json records install-path: null instead of the expected \"../root/req\": the InstallationManager that writes the local repo in the --no-install (update && !install) flow has no installers registered (n_installers=0), so get_install_path()->get_installer() fails and yields null. Separate from the execute_batch fix; needs the default installers wired onto that manager."]
 #[test]
 #[serial]
 fn test_package_still_present_error_when_no_install_flag_used() {
@@ -962,7 +960,6 @@ fn run_update_inherited_dependencies_flag_case(
     drop(tear_down);
 }
 
-#[ignore = "InstallationManager::execute_batch only awaits prepare(); the install/update/uninstall + cleanup + repo.write promise chain is still a todo!() stub, so package operations do not actually execute"]
 #[test]
 #[serial]
 fn test_update_inherited_dependencies_flag_is_passed_to_post_remove_installer() {

@@ -87,7 +87,6 @@ fn test_install_command_errors() {
 
 #[test]
 #[serial]
-#[ignore = "InstallationManager::execute_batch only awaits prepare(); the install/update/uninstall + cleanup + repo.write promise chain is still a todo!() stub, so package operations do not actually execute"]
 fn test_install_from_empty_vendor() {
     let composer_json = serde_json::json!({
         "require": { "root/req": "1.*" },
@@ -128,7 +127,6 @@ Generating autoload files",
 
 #[test]
 #[serial]
-#[ignore = "InstallationManager::execute_batch only awaits prepare(); the install/update/uninstall + cleanup + repo.write promise chain is still a todo!() stub, so package operations do not actually execute"]
 fn test_install_from_empty_vendor_no_dev() {
     let composer_json = serde_json::json!({
         "require": { "root/req": "1.*" },
@@ -169,7 +167,6 @@ Generating autoload files",
 
 #[test]
 #[serial]
-#[ignore = "InstallationManager::execute_batch only awaits prepare(); the install/update/uninstall + cleanup + repo.write promise chain is still a todo!() stub, so package operations do not actually execute"]
 fn test_install_new_packages_with_existing_partial_vendor() {
     let composer_json = serde_json::json!({
         "require": {

@@ -616,20 +616,59 @@ impl InstallationManager {
             let _dispatcher = self.event_dispatcher.as_ref();
             let _io = self.io.as_ref();
 
-            let installer = self.get_installer(&package.get_type())?;
-            // TODO(phase-c-promise): PHP chains prepare()->then(install/update/uninstall)->then(cleanup
-            // + repo.write); the single-threaded loop awaits prepare and leaves the rest as phase-b work.
-            installer
-                .prepare(&op_type, package, initial_package)
-                .await?;
+            {
+                let installer = self.get_installer(&package.get_type())?;
+                installer
+                    .prepare(&op_type, package.clone(), initial_package.clone())
+                    .await?;
+            }
 
             // PHP: $promise = $promise->then(fn() => $this->{$type}(...))->then($cleanupPromises[$index])
             //      ->then(fn() => $repo->write($devMode, $this->io)); the chained steps run install/
-            //      update/uninstall, then cleanup, then persist the repository.
-            // TODO(phase-c): this promise chain (install step -> cleanup_promises[index] ->
-            // repo.write) needs the React\Promise model and the cleanup callables wired (see above);
-            // both stay todo!(), so only prepare() is awaited here.
-            let _ = cleanup_promises.get(&index);
+            //      update/uninstall, then cleanup, then persist the repository. The single-threaded
+            //      loop awaits the steps serially instead of composing React promises.
+            let op_result = match op_type.as_str() {
+                "install" => {
+                    let op = operation
+                        .as_install_operation()
+                        .expect("op_type == \"install\" implies InstallOperation");
+                    self.install(repo, op).await
+                }
+                "update" => {
+                    let op = operation
+                        .as_update_operation()
+                        .expect("op_type == \"update\" implies UpdateOperation");
+                    self.update(repo, op).await
+                }
+                "uninstall" => {
+                    let op = operation
+                        .as_uninstall_operation()
+                        .expect("op_type == \"uninstall\" implies UninstallOperation");
+                    self.uninstall(repo, op).await
+                }
+                _ => unreachable!("op_type is one of install/update/uninstall"),
+            };
+
+            // PHP rejects the promise with an "<op> of <name> failed" message before rethrowing.
+            if let Err(e) = op_result {
+                self.io.write_error(&format!(
+                    "    <error>{} of {} failed</error>",
+                    shirabe_php_shim::ucfirst(&op_type),
+                    package.get_pretty_name()
+                ));
+                return Err(e);
+            }
+
+            // TODO(phase-c-promise): cleanup_promises[index] currently resolves to a no-op future
+            // (the real installer.cleanup() chain depends on the Rc/Arc installer rework).
+            if let Some(cleanup) = cleanup_promises.get(&index)
+                && let Some(fut) = cleanup()
+            {
+                fut.await?;
+            }
+
+            // PHP: ->then(fn() => $repo->write($devMode, $this)) persists the repository after each op.
+            repo.write(dev_mode, self);
 
             let event_name_post = match op_type.as_str() {
                 "install" => PackageEvents::POST_PACKAGE_INSTALL,
@@ -672,14 +711,14 @@ impl InstallationManager {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &InstallOperation,
-    ) -> Option<PhpMixed> {
+    ) -> Result<Option<PhpMixed>> {
         let package = operation.get_package();
         let package_type = package.get_type();
-        let installer = self.get_installer(&package_type).ok()?;
-        let promise = installer.install(repo, package.clone()).await.ok()?;
+        let installer = self.get_installer(&package_type)?;
+        let promise = installer.install(repo, package.clone()).await?;
         self.mark_for_notification(package.clone());
 
-        promise
+        Ok(promise)
     }
 
     /// Executes update operation.
@@ -687,7 +726,7 @@ impl InstallationManager {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UpdateOperation,
-    ) -> Option<PhpMixed> {
+    ) -> Result<Option<PhpMixed>> {
         let initial = operation.get_initial_package().clone();
         let target = operation.get_target_package().clone();
 
@@ -695,20 +734,18 @@ impl InstallationManager {
         let target_type = target.get_type();
 
         if initial_type == target_type {
-            let installer = self.get_installer(&initial_type).ok()?;
-            let promise = installer.update(repo, initial, target.clone()).await.ok()?;
+            let installer = self.get_installer(&initial_type)?;
+            let promise = installer.update(repo, initial, target.clone()).await?;
             self.mark_for_notification(target.clone());
-            promise
+            Ok(promise)
         } else {
             // PHP: uninstall initial, then install target via the target-type installer.
             let _ = self
-                .get_installer(&initial_type)
-                .ok()?
+                .get_installer(&initial_type)?
                 .uninstall(repo, initial)
-                .await
-                .ok()?;
-            let installer = self.get_installer(&target_type).ok()?;
-            installer.install(repo, target).await.ok()?
+                .await?;
+            let installer = self.get_installer(&target_type)?;
+            installer.install(repo, target).await
         }
     }
 
@@ -717,12 +754,12 @@ impl InstallationManager {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UninstallOperation,
-    ) -> Option<PhpMixed> {
+    ) -> Result<Option<PhpMixed>> {
         let package = operation.get_package();
         let package_type = package.get_type();
-        let installer = self.get_installer(&package_type).ok()?;
+        let installer = self.get_installer(&package_type)?;
 
-        installer.uninstall(repo, package).await.ok()?
+        installer.uninstall(repo, package).await
     }
 
     /// Executes markAliasInstalled operation.
