@@ -78,7 +78,6 @@ fn run_show_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str, requires: s
 
 use crate::test_case::{create_composer_lock, create_installed_json};
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_default_shows_installed_with_version_and_description() {
@@ -92,7 +91,6 @@ vendor/package 1.0.0 description of installed package",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_with_installed_and_self() {
@@ -155,7 +153,6 @@ fn test_show_with_direct_shows_nothing_if_no_deps() {
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_with_direct_shows_only_root_deps() {
@@ -169,7 +166,6 @@ fn test_show_with_direct_shows_only_root_deps() {
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps() {
@@ -214,7 +210,6 @@ outdated/major 1.0.0 ~ 2.0.0 from today",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_direct_only_show_direct_deps_with_updated() {
@@ -234,7 +229,6 @@ outdated/major 1.0.0 ~ 2.0.0",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
@@ -248,7 +242,6 @@ fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_major_only() {
@@ -270,7 +263,6 @@ outdated/major 1.0.0 ~ 2.0.0",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_minor_only() {
@@ -293,7 +285,6 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_with_patch_only() {
@@ -317,7 +308,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
+#[ignore = "blocked: categorization fixed, but the --latest path still resolves the wrong latest-package version (gets 1.0.0, expects 1.3.0); outdated version-resolution gap, not categorization"]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_and_warns() {
@@ -390,7 +381,7 @@ vendor/package 1.1.0 ~ 1.0.0",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
+#[ignore = "blocked: categorization fixed, but the --latest path resolves the wrong latest version (gets 1.2.0, expects 1.3.0); outdated version-resolution gap, not categorization"]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_without_warning_for_higher_versions() {
@@ -645,7 +636,6 @@ fn test_show_platform_works_without_composer_json() {
     assert_eq!(0, status_code);
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
 #[test]
 #[serial]
 fn test_outdated_with_zero_major() {
@@ -749,7 +739,7 @@ zerozero/major 0.0.1 ~ 0.0.2",
     );
 }
 
-#[ignore = "blocked: package categorization is wrong - installed/locked/platform packages all land in the \"available\" bucket, which renders name+description only. The version column is therefore dropped and the per-section grouping (installed:/locked:/platform: headers, and the outdated command's \"Direct/Transitive dependencies required in composer.json\" split) never appears. Logic gap in doExecute, not an output-format issue."]
+#[ignore = "blocked: categorization fixed, but platform packages do not appear in the --all section grouping (the platform: section is empty); separate gap in platform bucket population"]
 #[test]
 #[serial]
 fn test_show_all_shows_all_sections() {

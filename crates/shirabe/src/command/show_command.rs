@@ -862,7 +862,7 @@ impl Command for ShowCommand {
             input.borrow_mut().set_option("path", PhpMixed::Bool(false));
         }
 
-        for repo in RepositoryUtils::flatten_repositories(repos.clone(), false) {
+        for repo in RepositoryUtils::flatten_repositories(repos.clone(), true) {
             let r#type = if Self::same_repository(&repo, &platform_repo) {
                 "platform"
             } else if locked_repo

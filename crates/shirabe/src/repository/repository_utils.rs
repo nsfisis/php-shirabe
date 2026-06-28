@@ -3,6 +3,7 @@
 use crate::package::Link;
 use crate::repository::CompositeRepository;
 use crate::repository::FilterRepository;
+use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterfaceHandle;
 use indexmap::IndexMap;
 
@@ -57,11 +58,19 @@ impl RepositoryUtils {
             repo
         };
 
+        // PHP `InstalledRepository extends CompositeRepository`, so it must flatten too. The Rust
+        // port embeds the CompositeRepository instead of inheriting it, so the downcast is tried
+        // explicitly here.
         let nested = {
             let r = repo.borrow();
             r.as_any()
                 .downcast_ref::<CompositeRepository>()
                 .map(|composite_repo| composite_repo.get_repositories().clone())
+                .or_else(|| {
+                    r.as_any()
+                        .downcast_ref::<InstalledRepository>()
+                        .map(|installed_repo| installed_repo.get_repositories().clone())
+                })
         };
         if let Some(nested) = nested {
             let mut repos = Vec::new();
