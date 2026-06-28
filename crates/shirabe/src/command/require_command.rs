@@ -1156,11 +1156,20 @@ impl RequireCommand {
                     &composer.get_package().get_minimum_stability(),
                     IndexMap::new(),
                 );
-                let stability_flags_clone = stability_flags.clone();
-                // TODO(phase-c): Locker::update_hash needs the stability-flags rewriter callback;
-                // depends on modeling the closure passed to updateHash.
-                let _ = &stability_flags_clone;
-                todo!("update locker hash with stability flags rewriter");
+                composer.get_locker().borrow_mut().update_hash(
+                    &json.borrow(),
+                    Some(Box::new(move |mut lock_data| {
+                        let section = lock_data
+                            .entry("stability-flags".to_string())
+                            .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
+                        if let Some(section) = section.as_array_mut() {
+                            for (package_name, flag) in &stability_flags {
+                                section.insert(package_name.clone(), PhpMixed::Int(*flag));
+                            }
+                        }
+                        lock_data
+                    })),
+                )?;
             }
         }
 
