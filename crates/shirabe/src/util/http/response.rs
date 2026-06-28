@@ -29,7 +29,7 @@ impl Response {
     pub fn get_status_message(&self) -> Option<String> {
         let mut value = None;
         for header in &self.headers {
-            if Preg::is_match(r"(?i)^HTTP/\S+ \d+", header) {
+            if Preg::is_match(r"{^HTTP/\S+ \d+}i", header) {
                 // In case of redirects, headers contain the headers of all responses
                 // so we can not return directly and need to keep iterating
                 value = Some(header.clone());

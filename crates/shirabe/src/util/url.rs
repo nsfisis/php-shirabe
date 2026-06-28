@@ -18,7 +18,7 @@ impl Url {
         if host == "api.github.com" || host == "github.com" || host == "www.github.com" {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::match3(
-                r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$",
+                r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i",
                 &url,
                 Some(&mut m),
             ) {
@@ -30,7 +30,7 @@ impl Url {
                     r#ref
                 );
             } else if Preg::match3(
-                r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$",
+                r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$}i",
                 &url,
                 Some(&mut m),
             ) {
@@ -42,7 +42,7 @@ impl Url {
                     r#ref
                 );
             } else if Preg::match3(
-                r"(?i)^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$",
+                r"{^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$}i",
                 &url,
                 Some(&mut m),
             ) {
@@ -57,7 +57,7 @@ impl Url {
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::match3(
-                r"(?i)^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$",
+                r"{^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$}i",
                 &url,
                 Some(&mut m),
             ) {
@@ -72,7 +72,7 @@ impl Url {
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::match3(
-                r"(?i)^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$",
+                r"{^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$}i",
                 &url,
                 Some(&mut m),
             ) {
@@ -89,7 +89,7 @@ impl Url {
             true,
         ) {
             url = Preg::replace(
-                r"(?i)(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$",
+                r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i",
                 &format!("$1/{}", r#ref),
                 &url,
             );
@@ -99,7 +99,7 @@ impl Url {
             true,
         ) {
             url = Preg::replace(
-                r"(?i)(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$",
+                r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i",
                 &format!("${{1}}{}", r#ref),
                 &url,
             );

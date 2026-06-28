@@ -59,7 +59,7 @@ impl Hg {
         // Try with the authentication information available
         let mut matches: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
         let matched = Preg::is_match_named(
-            r"(?i)^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?",
+            r"{^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?}mi",
             &url,
             &mut matches,
         );
