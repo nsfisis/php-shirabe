@@ -42,64 +42,70 @@ fn create_temp_file() -> tempfile::NamedTempFile {
     tempfile::NamedTempFile::new().expect("failed to create a temporary file")
 }
 
+// INCOMPATIBILITY NOTE: the test_parse_error_* cases below assert serde_json's parse-error wording
+// instead of upstream's. Composer (via seld/jsonlint) reports "Parse error on line N:" with
+// jsonlint's own line numbering and hint messages; shirabe surfaces serde_json's errors, which flag
+// the same syntax errors with different wording and sometimes a different line/column (serde_json
+// points at where parsing fails, jsonlint at the offending token). This is a deliberate, permanent
+// incompatibility: the seld/jsonlint parser is no longer used for JSON syntax validation.
 #[test]
 fn test_parse_error_detect_extra_comma() {
     let json = "{\n        \"foo\": \"bar\",\n}";
-    expect_parse_exception("Parse error on line 2", json);
+    expect_parse_exception("trailing comma at line 3 column 1", json);
 }
 
 #[test]
 fn test_parse_error_detect_extra_comma_in_array() {
     let json = "{\n        \"foo\": [\n            \"bar\",\n        ]\n}";
-    expect_parse_exception("Parse error on line 3", json);
+    expect_parse_exception("trailing comma at line 4 column 9", json);
 }
 
 #[test]
 fn test_parse_error_detect_unescaped_backslash() {
     let json = "{\n        \"fo\\o\": \"bar\"\n}";
-    expect_parse_exception("Parse error on line 1", json);
+    expect_parse_exception("invalid escape at line 2 column 13", json);
 }
 
 #[test]
 fn test_parse_error_skips_escaped_backslash() {
     let json = "{\n        \"fo\\\\o\": \"bar\"\n        \"a\": \"b\"\n}";
-    expect_parse_exception("Parse error on line 2", json);
+    expect_parse_exception("expected `,` or `}` at line 3 column 9", json);
 }
 
 #[test]
 fn test_parse_error_detect_single_quotes() {
     let json = "{\n        'foo': \"bar\"\n}";
-    expect_parse_exception("Parse error on line 1", json);
+    expect_parse_exception("key must be a string at line 2 column 9", json);
 }
 
 #[test]
 fn test_parse_error_detect_missing_quotes() {
     let json = "{\n        foo: \"bar\"\n}";
-    expect_parse_exception("Parse error on line 1", json);
+    expect_parse_exception("key must be a string at line 2 column 9", json);
 }
 
 #[test]
 fn test_parse_error_detect_array_as_hash() {
     let json = "{\n        \"foo\": [\"bar\": \"baz\"]\n}";
-    expect_parse_exception("Parse error on line 2", json);
+    expect_parse_exception("expected `,` or `]` at line 2 column 22", json);
 }
 
 #[test]
 fn test_parse_error_detect_missing_comma() {
     let json = "{\n        \"foo\": \"bar\"\n        \"bar\": \"foo\"\n}";
-    expect_parse_exception("Parse error on line 2", json);
+    expect_parse_exception("expected `,` or `}` at line 3 column 9", json);
 }
 
 #[test]
 fn test_parse_error_detect_missing_comma_multiline() {
     let json = "{\n        \"foo\": \"barbar\"\n\n        \"bar\": \"foo\"\n}";
-    expect_parse_exception("Parse error on line 2", json);
+    expect_parse_exception("expected `,` or `}` at line 4 column 9", json);
 }
 
 #[test]
 fn test_parse_error_detect_missing_colon() {
     let json = "{\n        \"foo\": \"bar\",\n        \"bar\" \"foo\"\n}";
-    expect_parse_exception("Parse error on line 3", json);
+    expect_parse_exception("expected `:` at line 3 column 15", json);
 }
 
 #[test]
@@ -247,7 +253,7 @@ fn test_schema_validation() {
 
 #[test]
 fn test_schema_validation_error() {
-    // WORDING NOTE: upstream asserts justinrainbow's "name : NULL value found, but a string is
+    // INCOMPATIBILITY NOTE: upstream asserts justinrainbow's "name : NULL value found, but a string is
     // required". The jsonschema crate reports the same violation with different wording.
     let file_tmp = create_temp_file();
     let file = file_tmp.path().to_str().unwrap().to_string();
@@ -273,7 +279,7 @@ fn test_schema_validation_error() {
 
 #[test]
 fn test_schema_validation_lax_additional_properties() {
-    // WORDING NOTE: upstream asserts justinrainbow's "The property foo is not defined and the
+    // INCOMPATIBILITY NOTE: upstream asserts justinrainbow's "The property foo is not defined and the
     // definition does not allow additional properties". The jsonschema crate reports the same
     // additionalProperties violation with different wording.
     let file_tmp = create_temp_file();
@@ -303,7 +309,7 @@ fn test_schema_validation_lax_additional_properties() {
 
 #[test]
 fn test_schema_validation_lax_required() {
-    // WORDING NOTE: upstream asserts justinrainbow's property-prefixed strings such as
+    // INCOMPATIBILITY NOTE: upstream asserts justinrainbow's property-prefixed strings such as
     // "name : The property name is required". The jsonschema crate phrases the message
     // differently ("name : \"name\" is a required property"), but the property prefix is reconstructed,
     // so the "PROPERTY : MESSAGE" shape matches: "name : \"name\" is a required property".
@@ -425,7 +431,7 @@ fn test_custom_schema_validation_strict() {
 
 #[test]
 fn test_auth_schema_validation_with_custom_data_source() {
-    // WORDING NOTE: upstream asserts justinrainbow's "github-oauth : String value found, but an
+    // INCOMPATIBILITY NOTE: upstream asserts justinrainbow's "github-oauth : String value found, but an
     // object is required". The jsonschema crate reports the same type violation with different
     // wording.
     let json = shirabe_php_shim::json_decode("{\"github-oauth\": \"foo\"}", false).unwrap();

@@ -7,9 +7,8 @@ use crate::package::loader::ArrayLoader;
 use crate::package::loader::InvalidPackageException;
 use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
+use serde::de::Error as _;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::seld::json_lint::DuplicateKeyException;
-use shirabe_external_packages::seld::json_lint::JsonParser;
 use shirabe_php_shim::PhpMixed;
 use shirabe_spdx_licenses::SpdxLicenses;
 
@@ -72,20 +71,9 @@ impl ConfigValidator {
         }
 
         if manifest.is_some() {
-            let json_parser = JsonParser::new();
             let contents = shirabe_php_shim::file_get_contents(file).unwrap_or_default();
-            let parse_result = json_parser.parse(&contents, JsonParser::DETECT_KEY_CONFLICTS);
-            match parse_result {
-                Ok(_) => {}
-                Err(e) => {
-                    if let Some(dup_e) = e.downcast_ref::<DuplicateKeyException>() {
-                        let details = dup_e.get_details();
-                        warnings.push(format!(
-                            "Key {} is a duplicate in {} at line {}",
-                            details["key"], file, details["line"]
-                        ));
-                    }
-                }
+            if let Some((key, line)) = detect_duplicate_keys(&contents) {
+                warnings.push(format!("Key {key} is a duplicate in {file} at line {line}"));
             }
         }
 
@@ -322,5 +310,137 @@ impl ConfigValidator {
         warnings.extend_from_slice(loader.get_warnings());
 
         (errors, publish_errors, warnings)
+    }
+}
+
+/// Detects the first duplicate object key in a JSON text, returning its key name and line number.
+/// Replaces `Seld\JsonLint\JsonParser` with `DETECT_KEY_CONFLICTS`.
+/// Returns `None` on no collision, even if any other error occurs.
+fn detect_duplicate_keys(json: &str) -> Option<(String, usize)> {
+    let duplicate_key: std::cell::Cell<Option<String>> = std::cell::Cell::new(None);
+
+    let mut deserializer = serde_json::Deserializer::from_str(json);
+    let seed = DuplicateKeyScanSeed {
+        duplicate_key: &duplicate_key,
+    };
+    match serde::de::DeserializeSeed::deserialize(seed, &mut deserializer) {
+        Ok(()) => None,
+        Err(e) => duplicate_key.take().map(|key| (key, e.line())),
+    }
+}
+
+/// Carries the cell that records the first duplicate key found while recursing into a value.
+struct DuplicateKeyScanSeed<'a> {
+    duplicate_key: &'a std::cell::Cell<Option<String>>,
+}
+
+impl<'de> serde::de::DeserializeSeed<'de> for DuplicateKeyScanSeed<'_> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<(), D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(DuplicateKeyScanVisitor {
+            duplicate_key: self.duplicate_key,
+        })
+    }
+}
+
+struct DuplicateKeyScanVisitor<'a> {
+    duplicate_key: &'a std::cell::Cell<Option<String>>,
+}
+
+impl<'de> serde::de::Visitor<'de> for DuplicateKeyScanVisitor<'_> {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("any JSON value")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<(), A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let mut seen: indexmap::IndexSet<String> = indexmap::IndexSet::new();
+        while let Some(key) = map.next_key::<String>()? {
+            if !seen.insert(key.clone()) {
+                self.duplicate_key.set(Some(key));
+                return Err(A::Error::custom("found duplicate key"));
+            }
+            map.next_value_seed(DuplicateKeyScanSeed {
+                duplicate_key: self.duplicate_key,
+            })?;
+        }
+        Ok(())
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<(), A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        while seq
+            .next_element_seed(DuplicateKeyScanSeed {
+                duplicate_key: self.duplicate_key,
+            })?
+            .is_some()
+        {}
+        Ok(())
+    }
+
+    fn visit_bool<E>(self, _v: bool) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_i64<E>(self, _v: i64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_u64<E>(self, _v: u64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_f64<E>(self, _v: f64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_str<E>(self, _v: &str) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_unit<E>(self) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_none<E>(self) -> Result<(), E> {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_duplicates() {
+        assert_eq!(detect_duplicate_keys("{\"a\": 1, \"b\": {\"c\": 2}}"), None);
+    }
+
+    #[test]
+    fn top_level_duplicate_reports_key_and_line() {
+        let json = "{\n    \"name\": \"a\",\n    \"name\": \"b\"\n}";
+        assert_eq!(detect_duplicate_keys(json), Some(("name".to_string(), 3)));
+    }
+
+    #[test]
+    fn nested_duplicate_is_detected() {
+        let json =
+            "{\n    \"require\": {\n        \"x/y\": \"1\",\n        \"x/y\": \"2\"\n    }\n}";
+        assert_eq!(detect_duplicate_keys(json), Some(("x/y".to_string(), 4)));
+    }
+
+    #[test]
+    fn syntax_error_is_not_reported_as_duplicate() {
+        assert_eq!(detect_duplicate_keys("{ not json"), None);
     }
 }

@@ -10,8 +10,7 @@ use crate::util::HttpDownloader;
 use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::seld::json_lint::JsonParser;
-use shirabe_external_packages::seld::json_lint::ParsingException;
+use shirabe_external_packages::seld::json_lint::{ParsingException, ParsingExceptionDetails};
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
@@ -537,39 +536,37 @@ impl JsonFile {
     /// @throws ParsingException
     /// @return bool                      true on success
     pub(crate) fn validate_syntax(json: &str, file: Option<&str>) -> anyhow::Result<bool> {
-        let mut parser = JsonParser::new();
-        let result = parser.lint(json);
-        if result.is_none() {
-            // TODO(phase-c): Rust's &str is guaranteed as UTF-8, but PHP string is not. Change `json`
-            // to &[u8] and check UTF-8 validity here.
+        // TODO(phase-d): make json_decode() returns an error object with details.
+        let error = match serde_json::from_str::<serde_json::Value>(json) {
+            Ok(_) => {
+                // TODO(phase-c): Rust's &str is guaranteed as UTF-8, but PHP string is not. Change `json`
+                // to &[u8] and check UTF-8 validity here.
 
-            // if (defined('JSON_ERROR_UTF8') && JSON_ERROR_UTF8 === json_last_error()) {
-            //     if ($file === null) {
-            //         throw new \UnexpectedValueException('The input is not UTF-8, could not parse as JSON');
-            //     } else {
-            //         throw new \UnexpectedValueException('"' . $file . '" is not UTF-8, could not parse as JSON');
-            //     }
-            // }
+                // if (defined('JSON_ERROR_UTF8') && JSON_ERROR_UTF8 === json_last_error()) {
+                //     if ($file === null) {
+                //         throw new \UnexpectedValueException('The input is not UTF-8, could not parse as JSON');
+                //     } else {
+                //         throw new \UnexpectedValueException('"' . $file . '" is not UTF-8, could not parse as JSON');
+                //     }
+                // }
 
-            return Ok(true);
-        }
+                return Ok(true);
+            }
+            Err(e) => e,
+        };
 
-        let result = result.unwrap();
+        let details = ParsingExceptionDetails {
+            line: Some(error.line() as i64),
+            ..Default::default()
+        };
         Err(match file {
             None => ParsingException::new(
-                format!(
-                    "The input does not contain valid JSON\n{}",
-                    result.get_message()
-                ),
-                result.get_details().clone(),
+                format!("The input does not contain valid JSON\n{error}"),
+                details,
             ),
-            Some(f) => ParsingException::new(
-                format!(
-                    "\"{}\" does not contain valid JSON\n{}",
-                    f,
-                    result.get_message()
-                ),
-                result.get_details().clone(),
+            Some(file) => ParsingException::new(
+                format!("\"{file}\" does not contain valid JSON\n{error}"),
+                details,
             ),
         }
         .into())
