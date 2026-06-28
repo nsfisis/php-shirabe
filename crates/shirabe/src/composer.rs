@@ -1,8 +1,6 @@
 //! ref: composer/src/Composer/Composer.php
 //! ref: composer/src/Composer/PartialComposer.php
 
-use shirabe_external_packages::composer::pcre::Preg;
-
 use crate::autoload::AutoloadGeneratorInterface;
 use crate::config::Config;
 use crate::downloader::DownloadManagerInterface;
@@ -13,6 +11,7 @@ use crate::package::{LockerInterface, RootPackageInterfaceHandle};
 use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
+use shirabe_external_packages::composer::pcre::Preg;
 
 // TODO: change this information to Shirabe version.
 pub const VERSION: &str = "2.9.7";

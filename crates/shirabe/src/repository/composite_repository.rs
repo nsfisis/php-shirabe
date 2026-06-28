@@ -1,14 +1,13 @@
 //! ref: composer/src/Composer/Repository/CompositeRepository.php
 
-use indexmap::IndexMap;
-use shirabe_semver::constraint::AnyConstraint;
-
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, SearchResult,
 };
+use indexmap::IndexMap;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct CompositeRepository {
@@ -147,7 +146,7 @@ impl RepositoryInterface for CompositeRepository {
             all_names_found.extend(result.names_found);
         }
 
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = indexmap::IndexSet::new();
         let unique_names: Vec<String> = all_names_found
             .into_iter()
             .filter(|s| seen.insert(s.clone()))

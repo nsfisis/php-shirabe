@@ -1,8 +1,9 @@
 //! ref: composer/tests/Composer/Test/Downloader/GitDownloaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
+use crate::io_mock::{Expectation, get_io_mock};
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -17,12 +18,9 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::config_stub::ConfigStubBuilder;
-use crate::io_mock::{Expectation, get_io_mock};
-use crate::io_stub::IOStub;
-use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()

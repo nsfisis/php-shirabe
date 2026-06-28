@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Util/PerforceTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
@@ -10,9 +9,8 @@ use shirabe::util::Perforce;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-
-use crate::io_stub::IOStub;
-use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const TEST_DEPOT: &str = "depot";
 const TEST_BRANCH: &str = "branch";

@@ -1,13 +1,12 @@
 //! ref: composer/src/Composer/Autoload/ClassLoader.php
 
 use indexmap::IndexMap;
-use std::sync::{LazyLock, Mutex};
-
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, defined, file_exists, include_file,
     spl_autoload_register, spl_autoload_unregister, stream_resolve_include_path, strlen, strpos,
     strrpos, strtr, substr,
 };
+use std::sync::{LazyLock, Mutex};
 
 /// @var array<string, self>
 static REGISTERED_LOADERS: LazyLock<Mutex<IndexMap<String, ClassLoader>>> =

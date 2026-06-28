@@ -1,18 +1,5 @@
 //! ref: composer/src/Composer/Repository/PlatformRepository.php
 
-use std::sync::{LazyLock, Mutex};
-
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
-    array_slice_strs, explode, get_class, implode, in_array, is_string, str_replace,
-    str_starts_with, strpos, strtolower, var_export,
-};
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::composer;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageHandle;
@@ -31,6 +18,16 @@ use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use crate::util::Silencer;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
+    array_slice_strs, explode, get_class, implode, in_array, is_string, str_replace,
+    str_starts_with, strpos, strtolower, var_export,
+};
+use shirabe_semver::constraint::SimpleConstraint;
+use std::sync::{LazyLock, Mutex};
 
 static LAST_SEEN_PLATFORM_PHP: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
 
@@ -1809,8 +1806,6 @@ impl PlatformRepository {
 
         self.inner.search(query, mode, r#type)
     }
-
-    // ---- helpers ----
 
     fn is_complete_package(package: PackageInterfaceHandle) -> bool {
         package.as_complete().is_some()

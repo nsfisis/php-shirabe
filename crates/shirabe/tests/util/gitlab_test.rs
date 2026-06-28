@@ -1,18 +1,16 @@
 //! ref: composer/tests/Composer/Test/Util/GitLabTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
+use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
+use crate::io_mock::{Expectation, IOMock, get_io_mock};
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::GitLab;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe_php_shim::PhpMixed;
-
-use crate::config_stub::ConfigStubBuilder;
-use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
-use crate::io_mock::{Expectation, IOMock, get_io_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const USERNAME: &str = "username";
 const PASSWORD: &str = "password";

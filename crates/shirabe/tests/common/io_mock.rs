@@ -1,9 +1,5 @@
 //! ref: composer/tests/Composer/Test/Mock/IOMock.php
 
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::rc::Rc;
-
 use shirabe::config::Config;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::io_interface;
@@ -12,6 +8,9 @@ use shirabe::util::platform::Platform;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::{PHP_EOL, PhpMixed, preg_quote};
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::rc::Rc;
 
 // A single entry of the IO expectation list. PHP models these as associative
 // arrays (`{text, regex?}` / `{ask, reply}` / `{auth: [repo, user, pass]}`); the

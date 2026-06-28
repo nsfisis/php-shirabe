@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -11,8 +9,8 @@ use shirabe::util::Git as GitUtil;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-
-use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // Mirrors VersionGuesserTest::setUp/tearDown: reset GitUtil's cached `version`
 // static so each test re-runs `git --version` against its own mock.

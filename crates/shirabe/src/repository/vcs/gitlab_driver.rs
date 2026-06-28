@@ -1,6 +1,18 @@
 //! ref: composer/src/Composer/Repository/Vcs/GitLabDriver.php
 
+use crate::cache::Cache;
+use crate::config::Config;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::json::JsonEncodeOptions;
+use crate::json::JsonFile;
+use crate::repository::vcs::GitDriver;
+use crate::repository::vcs::VcsDriverBase;
+use crate::util::GitLab;
+use crate::util::HttpDownloader;
+use crate::util::http::Response;
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
@@ -10,19 +22,6 @@ use shirabe_php_shim::{
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array, is_array,
     is_string, ord, strpos, strtolower,
 };
-
-use crate::cache::Cache;
-use crate::config::Config;
-use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::repository::vcs::GitDriver;
-use crate::repository::vcs::VcsDriverBase;
-use crate::util::GitLab;
-use crate::util::HttpDownloader;
-use crate::util::http::Response;
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
 #[derive(Debug)]

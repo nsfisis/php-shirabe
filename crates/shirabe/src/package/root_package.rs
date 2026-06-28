@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Package/RootPackage.php
 
-use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
 use crate::package::CompletePackage;
 use crate::package::CompletePackageInterface;
 use crate::package::DisplayMode;
@@ -12,6 +8,9 @@ use crate::package::Mirror;
 use crate::package::PackageInterface;
 use crate::package::RootPackageInterface;
 use crate::repository::RepositoryInterfaceHandle;
+use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug, Clone)]
 pub struct RootPackage {

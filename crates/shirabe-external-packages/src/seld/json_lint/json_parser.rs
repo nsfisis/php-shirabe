@@ -1,13 +1,10 @@
 //! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/JsonParser.php
 
-use std::collections::HashMap;
-
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
 use super::DuplicateKeyException;
 use super::ParsingException;
 use super::lexer::{Lexer, YylLoc};
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 /// Semantic value held on the parser value stack ($vstack). Most values are JSON values (PhpMixed),
 /// but object members are represented as a `[key, value]` pair while being reduced.
@@ -42,10 +39,10 @@ enum ActionResult {
 
 #[derive(Debug)]
 pub struct JsonParser {
-    productions_: HashMap<i64, (i64, i64)>,
-    terminals_: HashMap<i64, &'static str>,
-    table: Vec<HashMap<i64, TableAction>>,
-    default_actions: HashMap<i64, (i64, i64)>,
+    productions_: IndexMap<i64, (i64, i64)>,
+    terminals_: IndexMap<i64, &'static str>,
+    table: Vec<IndexMap<i64, TableAction>>,
+    default_actions: IndexMap<i64, (i64, i64)>,
 }
 
 /// Per-parse mutable state. PHP keeps `$flags`/`$stack`/`$vstack`/`$lstack` on the parser instance;
@@ -81,7 +78,7 @@ impl JsonParser {
     pub const ALLOW_DUPLICATE_KEYS_TO_ARRAY: u32 = 16;
 
     pub fn new() -> Self {
-        let productions_: HashMap<i64, (i64, i64)> = [
+        let productions_: IndexMap<i64, (i64, i64)> = [
             (1, (3, 1)),
             (2, (5, 1)),
             (3, (7, 1)),
@@ -107,7 +104,7 @@ impl JsonParser {
         .into_iter()
         .collect();
 
-        let terminals_: HashMap<i64, &'static str> = [
+        let terminals_: IndexMap<i64, &'static str> = [
             (2, "error"),
             (4, "STRING"),
             (6, "NUMBER"),
@@ -127,7 +124,7 @@ impl JsonParser {
 
         let table = build_table();
 
-        let default_actions: HashMap<i64, (i64, i64)> = [(16, (2, 6))].into_iter().collect();
+        let default_actions: IndexMap<i64, (i64, i64)> = [(16, (2, 6))].into_iter().collect();
 
         Self {
             productions_,
@@ -790,9 +787,9 @@ fn trim_bytes(input: &[u8]) -> Vec<u8> {
 }
 
 /// Builds the LALR parse `table`. Indexed by state id (0..=31).
-fn build_table() -> Vec<HashMap<i64, TableAction>> {
+fn build_table() -> Vec<IndexMap<i64, TableAction>> {
     use TableAction::{Action, Goto};
-    let mut t: Vec<HashMap<i64, TableAction>> = (0..32).map(|_| HashMap::new()).collect();
+    let mut t: Vec<IndexMap<i64, TableAction>> = (0..32).map(|_| IndexMap::new()).collect();
 
     let mut set = |state: usize, entries: &[(i64, TableAction)]| {
         for (sym, act) in entries {

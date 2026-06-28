@@ -1,7 +1,10 @@
 //! ref: composer/src/Composer/Cache.php
 
-use std::sync::Mutex;
-
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::Silencer;
 use anyhow::Result;
 use chrono::Utc;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -11,12 +14,7 @@ use shirabe_php_shim::{
     file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,
     is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,
 };
-
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::Silencer;
+use std::sync::Mutex;
 
 /// Reads/writes to a filesystem cache
 #[derive(Debug)]

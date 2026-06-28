@@ -12,11 +12,10 @@
 //! See docs/dev/regex-porting.md for more detailed regex porting rules.
 
 use indexmap::IndexMap;
+pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
     PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_SPLIT_OFFSET_CAPTURE, PREG_UNMATCHED_AS_NULL,
 };
-
-pub use shirabe_php_shim::CaptureKey;
 
 #[derive(Debug)]
 pub struct Preg;

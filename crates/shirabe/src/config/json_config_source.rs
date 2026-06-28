@@ -1,5 +1,10 @@
 //! ref: composer/src/Composer/Config/JsonConfigSource.php
 
+use crate::config::ConfigSourceInterface;
+use crate::json::JsonFile;
+use crate::json::JsonManipulator;
+use crate::json::JsonValidationException;
+use crate::util::Filesystem;
 use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -7,12 +12,6 @@ use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents, file_put_contents,
     implode, is_writable,
 };
-
-use crate::config::ConfigSourceInterface;
-use crate::json::JsonFile;
-use crate::json::JsonManipulator;
-use crate::json::JsonValidationException;
-use crate::util::Filesystem;
 
 /// JSON Configuration Source
 #[derive(Debug)]

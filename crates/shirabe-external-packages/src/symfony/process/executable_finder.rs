@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/process/ExecutableFinder.php
 
-use shirabe_php_shim::{self as php, PhpMixed};
+use shirabe_php_shim::PhpMixed;
 
 const CMD_BUILTINS: &[&str] = &[
     "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir", "echo",
@@ -37,25 +37,28 @@ impl ExecutableFinder {
 
     pub fn find(&self, name: &str, default: Option<&str>, extra_dirs: &[String]) -> Option<String> {
         // windows built-in commands that are present in cmd.exe should not be resolved using PATH as they do not exist as exes
-        if php::DIRECTORY_SEPARATOR == "\\"
-            && CMD_BUILTINS.contains(&php::strtolower(name).as_str())
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\"
+            && CMD_BUILTINS.contains(&shirabe_php_shim::strtolower(name).as_str())
         {
             return Some(name.to_string());
         }
 
-        let path = php::getenv("PATH")
-            .or_else(|| php::getenv("Path"))
+        let path = shirabe_php_shim::getenv("PATH")
+            .or_else(|| shirabe_php_shim::getenv("Path"))
             .map(|v| v.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let mut dirs = php::explode(php::PATH_SEPARATOR, &path);
+        let mut dirs = shirabe_php_shim::explode(shirabe_php_shim::PATH_SEPARATOR, &path);
         dirs.extend_from_slice(extra_dirs);
 
         let mut suffixes: Vec<String> = vec![];
-        if php::DIRECTORY_SEPARATOR == "\\" {
-            let path_ext = php::getenv("PATHEXT").map(|v| v.to_string_lossy().into_owned());
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
+            let path_ext =
+                shirabe_php_shim::getenv("PATHEXT").map(|v| v.to_string_lossy().into_owned());
             suffixes = self.suffixes.clone();
             let exts = match path_ext {
-                Some(ref ext) if !ext.is_empty() => php::explode(php::PATH_SEPARATOR, ext),
+                Some(ref ext) if !ext.is_empty() => {
+                    shirabe_php_shim::explode(shirabe_php_shim::PATH_SEPARATOR, ext)
+                }
                 _ => vec![
                     ".exe".to_string(),
                     ".bat".to_string(),
@@ -65,10 +68,13 @@ impl ExecutableFinder {
             };
             suffixes.extend(exts);
         }
-        suffixes = if !php::pathinfo(PhpMixed::String(name.to_string()), php::PATHINFO_EXTENSION)
-            .as_string()
-            .unwrap_or("")
-            .is_empty()
+        suffixes = if !shirabe_php_shim::pathinfo(
+            PhpMixed::String(name.to_string()),
+            shirabe_php_shim::PATHINFO_EXTENSION,
+        )
+        .as_string()
+        .unwrap_or("")
+        .is_empty()
         {
             let mut s = vec![String::new()];
             s.extend(suffixes);
@@ -80,41 +86,49 @@ impl ExecutableFinder {
         for suffix in &suffixes {
             for dir in &dirs {
                 let dir = if dir.is_empty() { "." } else { dir.as_str() };
-                let file = format!("{dir}{}{name}{suffix}", php::DIRECTORY_SEPARATOR);
-                if php::is_file(&file)
-                    && (php::DIRECTORY_SEPARATOR == "\\" || php::is_executable(&file))
+                let file = format!(
+                    "{dir}{}{name}{suffix}",
+                    shirabe_php_shim::DIRECTORY_SEPARATOR
+                );
+                if shirabe_php_shim::is_file(&file)
+                    && (shirabe_php_shim::DIRECTORY_SEPARATOR == "\\"
+                        || shirabe_php_shim::is_executable(&file))
                 {
                     return Some(file);
                 }
 
-                if !php::is_dir(dir)
-                    && php::basename(dir) == format!("{name}{suffix}")
-                    && php::is_executable(dir)
+                if !shirabe_php_shim::is_dir(dir)
+                    && shirabe_php_shim::basename(dir) == format!("{name}{suffix}")
+                    && shirabe_php_shim::is_executable(dir)
                 {
                     return Some(dir.to_string());
                 }
             }
         }
 
-        if php::DIRECTORY_SEPARATOR == "\\"
-            || name.len() != php::strcspn(name, &format!("/{}", php::DIRECTORY_SEPARATOR))
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\"
+            || name.len()
+                != shirabe_php_shim::strcspn(
+                    name,
+                    &format!("/{}", shirabe_php_shim::DIRECTORY_SEPARATOR),
+                )
         {
             return default.map(ToString::to_string);
         }
 
-        let exec_result = php::exec(
-            &format!("command -v -- {}", php::escapeshellarg(name)),
+        let exec_result = shirabe_php_shim::exec(
+            &format!("command -v -- {}", shirabe_php_shim::escapeshellarg(name)),
             None,
             None,
         )
         .unwrap_or_default();
 
-        let executable_path = php::substr(
+        let executable_path = shirabe_php_shim::substr(
             &exec_result,
             0,
-            php::strpos(&exec_result, php::PHP_EOL).map(|i| i as i64),
+            shirabe_php_shim::strpos(&exec_result, shirabe_php_shim::PHP_EOL).map(|i| i as i64),
         );
-        if !executable_path.is_empty() && php::is_executable(&executable_path) {
+        if !executable_path.is_empty() && shirabe_php_shim::is_executable(&executable_path) {
             return Some(executable_path);
         }
 

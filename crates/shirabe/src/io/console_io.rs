@@ -1,7 +1,13 @@
 //! ref: composer/src/Composer/IO/ConsoleIO.php
 
 use crate::config::Config;
+use crate::io::BaseIO;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceMutable;
 use crate::io::io_interface;
+use crate::question::StrictConfirmationQuestion;
+use crate::util::Silencer;
 use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -12,7 +18,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::{
-    self as output_interface, OutputInterface,
+    self, OutputInterface,
 };
 use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
 use shirabe_external_packages::symfony::console::question::Question;
@@ -22,13 +28,6 @@ use shirabe_php_shim::{
     mb_check_encoding, mb_convert_encoding, microtime, str_repeat, strip_tags, strlen,
 };
 use std::cell::RefCell;
-
-use crate::io::BaseIO;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::IOInterfaceMutable;
-use crate::question::StrictConfirmationQuestion;
-use crate::util::Silencer;
 
 /// The Input/Output helper.
 #[derive(Debug)]

@@ -1,16 +1,5 @@
 //! ref: composer/src/Composer/DependencyResolver/Rule.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, array_keys, array_shift, implode,
-};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::dependency_resolver::GenericRule;
 use crate::dependency_resolver::MultiConflictRule;
 use crate::dependency_resolver::Pool;
@@ -23,6 +12,15 @@ use crate::package::version::VersionParser;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_php_shim::{
+    LogicException, PhpMixed, RuntimeException, array_keys, array_shift, implode,
+};
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub enum ReasonData {

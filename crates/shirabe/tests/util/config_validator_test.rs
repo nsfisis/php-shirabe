@@ -1,12 +1,11 @@
 //! ref: composer/tests/Composer/Test/Util/ConfigValidatorTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use shirabe::io::io_interface::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::loader::validating_array_loader::ValidatingArrayLoader;
 use shirabe::util::config_validator::ConfigValidator;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn fixture(name: &str) -> String {
     format!(

@@ -1,19 +1,16 @@
 //! ref: composer/tests/Composer/Test/Installer/BinaryInstallerTest.php
 
-use std::cell::RefCell;
-use std::fs;
-use std::rc::Rc;
-
+use crate::test_case::get_package;
 use base64::Engine;
-use tempfile::TempDir;
-
 use shirabe::installer::BinaryInstaller;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::Filesystem;
 use shirabe::util::ProcessExecutor;
-
-use crate::test_case::get_package;
+use std::cell::RefCell;
+use std::fs;
+use std::rc::Rc;
+use tempfile::TempDir;
 
 /// Mirror of setUp(): builds temp root/vendor/bin dirs plus a mocked IO. PHP uses a
 /// PHPUnit IOInterface mock with no expectations; a NullIO is the closest analogue.

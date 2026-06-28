@@ -158,7 +158,7 @@ impl DebugFormatterHelper {
     }
 
     fn get_border(&self, id: &str) -> String {
-        format!("<bg={}> </>", COLORS[self.started[id].border as usize],)
+        format!("<bg={}> </>", COLORS[self.started[id].border as usize])
     }
 }
 

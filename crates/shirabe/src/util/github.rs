@@ -1,16 +1,15 @@
 //! ref: composer/src/Composer/Util/GitHub.php
 
-use crate::io::io_interface;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
-
 use crate::config::Config;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
 
 #[derive(Debug)]
 pub struct GitHub {

@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/DownloadManagerTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::io_stub::IOStub;
 use indexmap::IndexMap;
 use shirabe::downloader::DownloaderInterface;
 use shirabe::downloader::download_manager::DownloadManager;
@@ -10,8 +8,8 @@ use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 use shirabe_semver::VersionParser;
-
-use crate::io_stub::IOStub;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // PHP mocks `Composer\Downloader\DownloaderInterface` with getMockBuilder.
 mockall::mock! {

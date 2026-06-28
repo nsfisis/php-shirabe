@@ -1,16 +1,5 @@
 //! ref: composer/src/Composer/Command/CheckPlatformReqsCommand.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, array_merge_map, strip_tags};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
@@ -21,6 +10,16 @@ use crate::repository::InstalledRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RootPackageRepository;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{PhpMixed, array_merge_map, strip_tags};
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 struct CheckResult {
     platform_package: String,

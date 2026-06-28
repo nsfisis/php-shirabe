@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/DefaultPolicyTest.php
 
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::dependency_resolver::PolicyInterface;
@@ -12,8 +13,6 @@ use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
 use shirabe::util::platform::Platform;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-
-use crate::test_case::get_package;
 
 #[allow(dead_code)]
 struct Fixtures {

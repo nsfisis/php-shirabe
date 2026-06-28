@@ -1,10 +1,28 @@
 //! ref: composer/src/Composer/Command/UpdateCommand.php
 
 use crate::advisory::Auditor;
+use crate::command::BumpCommand;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
+use crate::installer::Installer;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::package::base_package;
+use crate::package::loader::RootPackageLoader;
+use crate::package::version::VersionParser;
+use crate::package::version::VersionSelector;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::CompositeRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositorySet;
+use crate::util::HttpDownloader;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -20,25 +38,6 @@ use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::command::BumpCommand;
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
-use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
-use crate::installer::Installer;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::package::loader::RootPackageLoader;
-use crate::package::version::VersionParser;
-use crate::package::version::VersionSelector;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::CanonicalPackagesTrait;
-use crate::repository::CompositeRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositorySet;
-use crate::util::HttpDownloader;
 
 #[derive(Debug)]
 pub struct UpdateCommand {

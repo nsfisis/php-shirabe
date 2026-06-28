@@ -1,8 +1,5 @@
 //! ref: composer/src/Composer/Repository/InstalledArrayRepository.php
 
-use indexmap::IndexMap;
-use shirabe_semver::constraint::AnyConstraint;
-
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::AdvisoryProviderInterface;
@@ -12,6 +9,8 @@ use crate::repository::WritableRepositoryInterface;
 use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
+use indexmap::IndexMap;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct InstalledArrayRepository {

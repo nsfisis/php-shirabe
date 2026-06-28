@@ -1,8 +1,8 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/HgDriverTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -12,11 +12,9 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
-use crate::io_stub::IOStub;
-use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
 
 struct SetUp {
     home: TempDir,

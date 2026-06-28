@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Command/ArchiveCommandTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
 use indexmap::IndexMap;
 use shirabe::command::BaseCommand;
 use shirabe::command::archive_command::ArchiveCommand;
@@ -24,8 +22,8 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-
-use crate::config_stub::ConfigStubBuilder;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // PHP mocks `Composer\Package\Archiver\ArchiveManager` with
 // getMockBuilder(...)->disableOriginalConstructor().

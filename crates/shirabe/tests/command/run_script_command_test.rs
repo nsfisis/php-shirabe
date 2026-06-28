@@ -1,9 +1,8 @@
 //! ref: composer/tests/Composer/Test/Command/RunScriptCommandTest.php
 
-use shirabe_php_shim::PhpMixed;
-
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
+use shirabe_php_shim::PhpMixed;
 
 /// ref: RunScriptCommandTest::testDetectAndPassDevModeToEventAndToDispatching
 ///

@@ -1,23 +1,6 @@
 //! ref: composer/src/Composer/Command/BaseCommand.php
 //! ref: composer/vendor/symfony/console/Command/Command.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::Terminal;
-use shirabe_external_packages::symfony::console::command::command::{
-    Command, CommandData, SetDefinitionArg,
-};
-use shirabe_external_packages::symfony::console::helper::Table;
-use shirabe_external_packages::symfony::console::helper::TableSeparator;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
-    count, explode, in_array, is_string,
-};
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::composer::PartialComposerHandle;
@@ -34,6 +17,22 @@ use crate::package::version::VersionParser;
 use crate::plugin::PluginEvents;
 use crate::plugin::PreCommandRunEvent;
 use crate::util::Platform;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::Terminal;
+use shirabe_external_packages::symfony::console::command::command::{
+    Command, CommandData, SetDefinitionArg,
+};
+use shirabe_external_packages::symfony::console::helper::Table;
+use shirabe_external_packages::symfony::console::helper::TableSeparator;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
+    count, explode, in_array, is_string,
+};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub const SUCCESS: i64 = 0;
 pub const FAILURE: i64 = 1;

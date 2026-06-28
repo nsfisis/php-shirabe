@@ -1,7 +1,12 @@
 //! ref: composer/src/Composer/Command/GlobalCommand.php
 
-use std::path::Path;
-
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::console::input::InputArgument;
+use crate::factory::Factory;
+use crate::util::Filesystem;
+use crate::util::Platform;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -12,15 +17,8 @@ use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 use std::cell::RefCell;
+use std::path::Path;
 use std::rc::Rc;
-
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
-use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::factory::Factory;
-use crate::util::Filesystem;
-use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct GlobalCommand {

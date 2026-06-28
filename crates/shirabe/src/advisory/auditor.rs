@@ -1,14 +1,5 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_php_shim::{
-    DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, get_class, sprintf, str_starts_with,
-};
-
 use crate::advisory::AnySecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use crate::io::ConsoleIO;
@@ -19,6 +10,14 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::repository::RepositorySet;
 use crate::util::PackageInfo;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_php_shim::{
+    DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
+    array_keys, array_reduce, get_class, sprintf, str_starts_with,
+};
 
 /// Shape of the `--format=json` audit output.
 #[derive(serde::Serialize)]

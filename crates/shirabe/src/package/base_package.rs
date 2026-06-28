@@ -1,15 +1,13 @@
 //! ref: composer/src/Composer/Package/BasePackage.php
 
-use std::sync::LazyLock;
-
-use indexmap::IndexMap;
-use shirabe_php_shim::preg_quote;
-
 use crate::package::DisplayMode;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterfaceHandle;
+use indexmap::IndexMap;
+use shirabe_php_shim::preg_quote;
+use std::sync::LazyLock;
 
 pub struct SupportedLinkType {
     pub description: &'static str,

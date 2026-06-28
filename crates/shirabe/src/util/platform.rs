@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Platform.php
 
-use std::sync::Mutex;
-
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
@@ -11,9 +11,7 @@ use shirabe_php_shim::{
     posix_isatty, putenv, putenv_clear, realpath, stream_isatty, stripos, strlen, strtoupper,
     substr, usleep,
 };
-
-use crate::util::ProcessExecutor;
-use crate::util::Silencer;
+use std::sync::Mutex;
 
 /// Platform helper for uniform platform-specific tests.
 pub struct Platform;

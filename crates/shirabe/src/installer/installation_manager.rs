@@ -1,14 +1,5 @@
 //! ref: composer/src/Composer/Installer/InstallationManager.php
 
-use crate::io::io_interface;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::seld::signal::SignalHandler;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
-    str_contains, str_replace, strpos, strtolower,
-};
-
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
 use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
@@ -21,10 +12,18 @@ use crate::installer::InstallerInterface;
 use crate::installer::PackageEvents;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::seld::signal::SignalHandler;
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
+    str_contains, str_replace, strpos, strtolower,
+};
 
 /// Package operation manager.
 #[derive(Debug)]

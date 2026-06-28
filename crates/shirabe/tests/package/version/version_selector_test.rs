@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionSelectorTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::io::BufferIO;
@@ -17,13 +15,12 @@ use shirabe::package::version::VersionSelector;
 use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::PlatformRepository;
 use shirabe::repository::RepositorySetInterface;
+use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION};
 use shirabe_semver::constraint::AnyConstraint;
-
-use shirabe_external_packages::symfony::console::output::output_interface;
-
-use crate::test_case::get_package;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 mockall::mock! {
     RepositorySet {}

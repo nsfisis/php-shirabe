@@ -1,5 +1,10 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php
 
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -9,12 +14,6 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
-use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
 
 #[derive(Debug)]
 pub struct OutdatedCommand {

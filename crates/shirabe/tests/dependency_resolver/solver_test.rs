@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/SolverTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
@@ -18,8 +16,8 @@ use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterface
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
-
-use crate::test_case::{get_alias_package, get_package, get_version_constraint};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[allow(dead_code)]
 struct Fixtures {

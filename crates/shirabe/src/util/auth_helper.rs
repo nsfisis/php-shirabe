@@ -1,6 +1,13 @@
 //! ref: composer/src/Composer/Util/AuthHelper.php
 
+use crate::config::Config;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::util::Bitbucket;
+use crate::util::GitHub;
+use crate::util::GitLab;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -9,14 +16,6 @@ use shirabe_php_shim::{
     in_array, is_array, is_string, json_decode, parse_url, str_replace, strpos, strtolower, substr,
     trim,
 };
-
-use crate::config::Config;
-use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::Bitbucket;
-use crate::util::GitHub;
-use crate::util::GitLab;
 
 #[derive(Debug)]
 pub struct AuthHelper {

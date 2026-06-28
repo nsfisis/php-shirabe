@@ -1,21 +1,12 @@
 //! ref: composer/src/Composer/Package/Version/VersionSelector.php
 
-use crate::io::io_interface;
-
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, strtolower, version_compare,
-};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::dumper::ArrayDumper;
@@ -24,6 +15,13 @@ use crate::package::version::VersionParser;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySetInterface;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{
+    PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, strtolower, version_compare,
+};
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct VersionSelector {

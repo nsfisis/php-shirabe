@@ -1,11 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/VcsRepositoryTest.php
 
-use std::cell::RefCell;
-use std::collections::HashSet;
-use std::process::Command;
-use std::rc::Rc;
-
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -16,6 +11,9 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::process::Command;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -175,7 +173,7 @@ fn test_load_versions() {
     let composer_home = set_up.composer_home.path().to_path_buf();
     let git_repo = set_up.git_repo.path().to_path_buf();
 
-    let mut expected: HashSet<String> = [
+    let mut expected: IndexSet<String> = [
         "0.6.0",
         "1.0.0",
         "1.0.x-dev",
@@ -238,7 +236,11 @@ fn test_load_versions() {
 
     for package in &packages {
         let pretty = package.get_pretty_version();
-        assert!(expected.remove(&pretty), "Unexpected version {}", pretty);
+        assert!(
+            expected.shift_remove(&pretty),
+            "Unexpected version {}",
+            pretty
+        );
     }
 
     assert!(

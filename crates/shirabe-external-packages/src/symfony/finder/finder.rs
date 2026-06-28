@@ -9,10 +9,9 @@
 use crate::composer::pcre::{CaptureKey, Preg};
 use crate::symfony::finder::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{file_exists, glob, is_dir, preg_quote, rtrim};
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -448,7 +447,7 @@ impl Finder {
         relative_dir: &str,
         depth: i64,
         max_depth: i64,
-        excluded_dirs: &HashSet<String>,
+        excluded_dirs: &IndexSet<String>,
         excluded_pattern: &Option<String>,
         out: &mut Vec<Entry>,
     ) {
@@ -553,8 +552,8 @@ impl Finder {
 
 /// Reproduces `ExcludeDirectoryFilterIterator`'s constructor split between simple
 /// directory names and `/`-containing path patterns.
-fn build_exclude(directories: &[String]) -> (HashSet<String>, Option<String>) {
-    let mut excluded_dirs = HashSet::new();
+fn build_exclude(directories: &[String]) -> (IndexSet<String>, Option<String>) {
+    let mut excluded_dirs = IndexSet::new();
     let mut patterns: Vec<String> = Vec::new();
 
     for directory in directories {
@@ -579,7 +578,7 @@ fn build_exclude(directories: &[String]) -> (HashSet<String>, Option<String>) {
 /// `ExcludeDirectoryFilterIterator::accept`.
 fn exclude_accept(
     entry: &Entry,
-    excluded_dirs: &HashSet<String>,
+    excluded_dirs: &IndexSet<String>,
     excluded_pattern: &Option<String>,
 ) -> bool {
     if excluded_dirs.contains(&entry.filename) && entry.is_dir {

@@ -1,6 +1,13 @@
 //! ref: composer/src/Composer/Installer/BinaryInstaller.php
 
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::package::PackageInterfaceHandle;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -8,14 +15,6 @@ use shirabe_php_shim::{
     file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir,
     substr, trim, umask,
 };
-
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 
 /// Seam over the BinaryInstaller methods reached through LibraryInstaller, so tests can inject a
 /// recording double. Composer has no PHP `BinaryInstallerInterface`; this exists only to allow the

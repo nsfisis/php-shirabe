@@ -1,8 +1,24 @@
 //! ref: composer/src/Composer/DependencyResolver/PoolBuilder.php
 
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::PoolOptimizer;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
+use crate::event_dispatcher::EventDispatcherInterface;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::package::AliasPackageHandle;
+use crate::package::BasePackageHandle;
+use crate::package::CompleteAliasPackageHandle;
+use crate::package::PackageInterfaceHandle;
+use crate::package::base_package;
+use crate::package::version::StabilityFilter;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterfaceHandle;
+use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
-
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     LogicException, PhpMixed, array_flip_strings, array_map, in_array, microtime, number_format,
@@ -14,24 +30,6 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::PoolOptimizer;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
-use crate::event_dispatcher::EventDispatcherInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::package::AliasPackageHandle;
-use crate::package::BasePackageHandle;
-use crate::package::CompleteAliasPackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::base_package;
-use crate::package::version::StabilityFilter;
-use crate::repository::CanonicalPackagesTrait;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RootPackageRepository;
 
 #[derive(Debug)]
 pub struct PoolBuilder {

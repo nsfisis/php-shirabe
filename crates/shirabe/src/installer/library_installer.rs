@@ -1,12 +1,5 @@
 //! ref: composer/src/Composer/Installer/LibraryInstaller.php
 
-use anyhow::Result;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
-    realpath, rmdir, rtrim, strpos,
-};
-
 use crate::composer::PartialComposerWeakHandle;
 use crate::downloader::DownloadManagerInterface;
 use crate::installer::BinaryInstaller;
@@ -19,6 +12,12 @@ use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
+use anyhow::Result;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{
+    InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
+    realpath, rmdir, rtrim, strpos,
+};
 
 /// Package installation manager.
 #[derive(Debug)]

@@ -1,14 +1,13 @@
 //! ref: composer/src/Composer/Package/Archiver/PharArchiver.php
 
+use crate::package::archiver::ArchivableFilesFilter;
+use crate::package::archiver::ArchivableFilesFinder;
+use crate::package::archiver::ArchiverInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     FilesystemIterator, Phar, PharData, PhpMixed, RuntimeException, bzcompress, file_exists,
     file_put_contents, function_exists, gzcompress, pack, str_repeat, strrpos, unlink,
 };
-
-use crate::package::archiver::ArchivableFilesFilter;
-use crate::package::archiver::ArchivableFilesFinder;
-use crate::package::archiver::ArchiverInterface;
 
 fn formats() -> IndexMap<&'static str, i64> {
     let mut m = IndexMap::new();

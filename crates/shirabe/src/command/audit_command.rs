@@ -1,15 +1,5 @@
 //! ref: composer/src/Composer/Command/AuditCommand.php
 
-use anyhow::Result;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, implode, in_array,
-};
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::BaseCommand;
@@ -21,6 +11,15 @@ use crate::io::IOInterfaceImmutable;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
+use anyhow::Result;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, implode, in_array,
+};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct AuditCommand {

@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/ComposerRepositoryTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -13,9 +11,9 @@ use shirabe::repository::composer_repository::{ComposerRepository, ProviderListi
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 
 // Mirrors PHP's `['url' => .., 'body' => ..]` mock entry (status defaults to 200,
 // options match any executed options).

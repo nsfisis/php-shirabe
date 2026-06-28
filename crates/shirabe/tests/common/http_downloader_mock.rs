@@ -1,9 +1,6 @@
 //! ref: composer/tests/Composer/Test/Mock/HttpDownloaderMock.php
 #![allow(dead_code)]
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -12,6 +9,8 @@ use shirabe::util::http_downloader::{
     HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
 };
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // A single HTTP request expectation as written in the PHP tests: a `url` plus an
 // optional response (`status`/`body`/`headers`). `options` of `None` matches any

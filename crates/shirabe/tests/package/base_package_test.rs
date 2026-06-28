@@ -1,12 +1,11 @@
 //! ref: composer/tests/Composer/Test/Package/BasePackageTest.php
 
+use crate::test_case::get_package;
 use shirabe::package::DisplayMode;
 use shirabe::package::base_package::package_names_to_regexp;
 use shirabe::package::handle::PackageHandle;
 use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle};
 use shirabe_semver::VersionParser;
-
-use crate::test_case::get_package;
 
 fn empty_repository() -> RepositoryInterfaceHandle {
     RepositoryInterfaceHandle::new(ArrayRepository::new(vec![]).unwrap())

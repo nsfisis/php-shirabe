@@ -1,5 +1,13 @@
 //! ref: composer/src/Composer/Command/FundCommand.php
 
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::InputOption;
+use crate::io::IOInterfaceImmutable;
+use crate::json::JsonFile;
+use crate::package::base_package::{self};
+use crate::repository::CompositeRepository;
+use crate::repository::RepositoryInterface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -12,15 +20,6 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputOption;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonFile;
-use crate::package::base_package::{self};
-use crate::repository::CompositeRepository;
-use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct FundCommand {

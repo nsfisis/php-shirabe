@@ -1,14 +1,5 @@
 //! ref: composer/src/Composer/Downloader/GitDownloader.php
 
-use crate::io::io_interface;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
-    preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
-};
-
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::ChangeReportInterface;
@@ -18,12 +9,20 @@ use crate::downloader::VcsDownloader;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Git as GitUtil;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
+    preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
+};
 
 #[derive(Debug)]
 pub struct GitDownloader {

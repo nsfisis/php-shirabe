@@ -4,9 +4,6 @@
 // password hiding, line splitting and argument escaping; the subprocess execution and mocked
 // IO are not ported.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
@@ -19,6 +16,8 @@ use shirabe_external_packages::symfony::console::output::output_interface::{
     OutputInterface, VERBOSITY_DEBUG, VERBOSITY_NORMAL,
 };
 use shirabe_php_shim::{PHP_EOL, trim};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[test]
 fn test_execute_captures_output() {

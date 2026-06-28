@@ -1,17 +1,5 @@
 //! ref: composer/src/Composer/Util/RemoteFilesystem.php
 
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed, RuntimeException,
-    STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
-    array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
-    filter_var_boolean, gethostbyname, http_clear_last_response_headers,
-    http_get_last_response_headers, ini_get, json_decode, parse_url, preg_quote, strpos,
-    strtolower, strtr, substr, trim, zlib_decode,
-};
-
 use crate::config::Config;
 use crate::downloader::MaxFileSizeExceededException;
 use crate::downloader::TransportException;
@@ -24,6 +12,16 @@ use crate::util::StreamContextFactory;
 use crate::util::Url;
 use crate::util::http::ProxyManager;
 use crate::util::http::Response;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{
+    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed, RuntimeException,
+    STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
+    array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
+    filter_var_boolean, gethostbyname, http_clear_last_response_headers,
+    http_get_last_response_headers, ini_get, json_decode, parse_url, preg_quote, strpos,
+    strtolower, strtr, substr, trim, zlib_decode,
+};
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
 #[derive(Debug, Clone)]

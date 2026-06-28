@@ -1,5 +1,12 @@
 //! ref: composer/src/Composer/Downloader/ArchiveDownloader.php
 
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::FileDownloader;
+use crate::io::IOInterfaceImmutable;
+use crate::package::PackageInterfaceHandle;
+use crate::util::Filesystem;
+use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::finder::Finder;
@@ -8,14 +15,6 @@ use shirabe_php_shim::{
     realpath,
 };
 use std::path::{Path, PathBuf};
-
-use crate::dependency_resolver::operation::InstallOperation;
-use crate::downloader::DownloaderInterface;
-use crate::downloader::FileDownloader;
-use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Platform;
 
 pub trait ArchiveDownloader {
     fn inner(&self) -> &FileDownloader;

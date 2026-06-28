@@ -1,13 +1,12 @@
 //! ref: composer/src/Composer/Installer/InstallerEvent.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::Transaction;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::io::IOInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct InstallerEvent {

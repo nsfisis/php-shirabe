@@ -1,16 +1,14 @@
 //! ref: composer/src/Composer/DependencyResolver/Pool.php
 
-use std::fmt;
-
+use crate::advisory::AnySecurityAdvisory;
+use crate::package::BasePackageHandle;
+use crate::package::version::VersionParser;
 use indexmap::IndexMap;
 use shirabe_php_shim::{STR_PAD_LEFT, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-
-use crate::advisory::AnySecurityAdvisory;
-use crate::package::BasePackageHandle;
-use crate::package::version::VersionParser;
+use std::fmt;
 
 /// A package pool contains all packages for dependency resolution
 #[derive(Debug)]

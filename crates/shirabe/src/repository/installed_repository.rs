@@ -1,11 +1,5 @@
 //! ref: composer/src/Composer/Repository/InstalledRepository.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::array_merge_map;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::package::BasePackageHandle;
 use crate::package::Link;
 use crate::package::PackageInterfaceHandle;
@@ -18,6 +12,11 @@ use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, SearchResult,
 };
+use indexmap::IndexMap;
+use shirabe_php_shim::array_merge_map;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 pub enum NeedleInput {
     Single(String),

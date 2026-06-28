@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/InstalledRepositoryTest.php
 
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
@@ -8,8 +9,6 @@ use shirabe::repository::{
     RepositoryInterfaceHandle,
 };
 use shirabe_php_shim::PhpMixed;
-
-use crate::test_case::get_package;
 
 /// PHP `setReplaces`/`setProvides` operate on non-root packages; the public handle API only allows
 /// link setters on root packages, so packages carrying links are built via ArrayLoader.

@@ -1,58 +1,6 @@
 //! ref: composer/src/Composer/Console/Application.php
 //! ref: composer/vendor/symfony/console/Application.php
 
-use crate::io::io_interface;
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
-use shirabe_external_packages::seld::json_lint::ParsingException;
-use shirabe_external_packages::symfony::console::application::Application as BaseApplication;
-use shirabe_external_packages::symfony::console::command::Command as SymfonyCommand;
-use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
-use shirabe_external_packages::symfony::console::command::signalable_command_interface::SignalableCommandInterface;
-use shirabe_external_packages::symfony::console::command_loader::command_loader_interface::CommandLoaderInterface;
-use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
-use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
-use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
-use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
-use shirabe_external_packages::symfony::console::exception::invalid_option_exception::InvalidOptionException;
-use shirabe_external_packages::symfony::console::exception::logic_exception::LogicException as ConsoleLogicException;
-use shirabe_external_packages::symfony::console::exception::missing_input_exception::MissingInputException;
-use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
-use shirabe_external_packages::symfony::console::exception::runtime_exception::RuntimeException as ConsoleRuntimeException;
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::helper::HelperSet;
-use shirabe_external_packages::symfony::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::helper::formatter_helper::{
-    FormatBlockMessages, FormatterHelper,
-};
-use shirabe_external_packages::symfony::console::helper::helper::Helper;
-use shirabe_external_packages::symfony::console::input::InputDefinition;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::input::InputOption;
-use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
-use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
-use shirabe_external_packages::symfony::console::output::output_interface::{
-    self as output_interface, OutputInterface,
-};
-use shirabe_external_packages::symfony::console::signal_registry::signal_registry::SignalRegistry;
-use shirabe_external_packages::symfony::console::style::style_interface::StyleInterface;
-use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
-use shirabe_external_packages::symfony::console::terminal::Terminal;
-use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
-use shirabe_php_shim::{
-    LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
-    RuntimeException, bin2hex, chdir, date_default_timezone_get, date_default_timezone_set,
-    defined, dirname, disk_free_space, extension_loaded, file_exists, file_get_contents,
-    file_put_contents, function_exists, getcwd, getmypid, glob, in_array, ini_set, is_array,
-    is_dir, is_file, is_string, is_subclass_of, json_decode, memory_get_peak_usage,
-    memory_get_usage, microtime, php_uname, posix_getuid, random_bytes, realpath,
-    restore_error_handler, round, str_contains, str_replace, strpos, strtoupper, sys_get_temp_dir,
-    time, unlink,
-};
-
 use crate::command::AboutCommand;
 use crate::command::ArchiveCommand;
 use crate::command::AuditCommand;
@@ -98,12 +46,62 @@ use crate::io::ConsoleIO;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
+use crate::io::io_interface;
 use crate::json::JsonValidationException;
 use crate::util::ErrorHandler;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::Silencer;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::seld::json_lint::ParsingException;
+use shirabe_external_packages::symfony::console::application::Application as BaseApplication;
+use shirabe_external_packages::symfony::console::command::Command as SymfonyCommand;
+use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
+use shirabe_external_packages::symfony::console::command::signalable_command_interface::SignalableCommandInterface;
+use shirabe_external_packages::symfony::console::command_loader::command_loader_interface::CommandLoaderInterface;
+use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
+use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
+use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
+use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
+use shirabe_external_packages::symfony::console::exception::invalid_option_exception::InvalidOptionException;
+use shirabe_external_packages::symfony::console::exception::logic_exception::LogicException as ConsoleLogicException;
+use shirabe_external_packages::symfony::console::exception::missing_input_exception::MissingInputException;
+use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
+use shirabe_external_packages::symfony::console::exception::runtime_exception::RuntimeException as ConsoleRuntimeException;
+use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::helper::HelperSet;
+use shirabe_external_packages::symfony::console::helper::QuestionHelper;
+use shirabe_external_packages::symfony::console::helper::formatter_helper::{
+    FormatBlockMessages, FormatterHelper,
+};
+use shirabe_external_packages::symfony::console::helper::helper::Helper;
+use shirabe_external_packages::symfony::console::input::InputDefinition;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::input::InputOption;
+use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
+use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
+use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
+use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
+use shirabe_external_packages::symfony::console::output::output_interface::{
+    self, OutputInterface,
+};
+use shirabe_external_packages::symfony::console::signal_registry::signal_registry::SignalRegistry;
+use shirabe_external_packages::symfony::console::style::style_interface::StyleInterface;
+use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
+use shirabe_external_packages::symfony::console::terminal::Terminal;
+use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
+use shirabe_php_shim::{
+    LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
+    RuntimeException, bin2hex, chdir, date_default_timezone_get, date_default_timezone_set,
+    defined, dirname, disk_free_space, extension_loaded, file_exists, file_get_contents,
+    file_put_contents, function_exists, getcwd, getmypid, glob, in_array, ini_set, is_array,
+    is_dir, is_file, is_string, is_subclass_of, json_decode, memory_get_peak_usage,
+    memory_get_usage, microtime, php_uname, posix_getuid, random_bytes, realpath,
+    restore_error_handler, round, str_contains, str_replace, strpos, strtoupper, sys_get_temp_dir,
+    time, unlink,
+};
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
 /// flattened into a single struct. Methods that are overridden by subclass and called via
@@ -867,7 +865,7 @@ impl Application {
             merged.extend(ns);
         }
         let merged: Vec<String> = merged.into_iter().filter(|s| !s.is_empty()).collect();
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = indexmap::IndexSet::new();
         let unique: Vec<String> = merged
             .into_iter()
             .filter(|s| seen.insert(s.clone()))
@@ -1044,7 +1042,7 @@ impl Application {
 
             let commands_clone = commands.clone();
             let mut new_commands: Vec<String> = Vec::new();
-            let mut seen = std::collections::HashSet::new();
+            let mut seen = indexmap::IndexSet::new();
             for name_or_alias in commands {
                 if !command_list.contains_key(&name_or_alias) {
                     let loaded = self.command_loader.as_ref().unwrap().get(&name_or_alias);

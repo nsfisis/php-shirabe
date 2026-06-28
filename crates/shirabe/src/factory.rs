@@ -1,18 +1,5 @@
 //! ref: composer/src/Composer/Factory.php
 
-use indexmap::IndexMap;
-
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyleInterface;
-use shirabe_external_packages::symfony::console::output::ConsoleOutput;
-use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
-    UnexpectedValueException, array_replace_recursive, class_exists, dirname, extension_loaded,
-    file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode,
-    mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr, substr, trim,
-};
-
 use crate::autoload::AutoloadGenerator;
 use crate::cache::Cache;
 use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialOrFullComposer};
@@ -64,6 +51,17 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use crate::util::r#loop::Loop;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyleInterface;
+use shirabe_external_packages::symfony::console::output::ConsoleOutput;
+use shirabe_php_shim::{
+    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
+    UnexpectedValueException, array_replace_recursive, class_exists, dirname, extension_loaded,
+    file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode,
+    mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr, substr, trim,
+};
 
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.
 pub enum LocalConfigInput {

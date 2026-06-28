@@ -1,18 +1,11 @@
 //! ref: composer/src/Composer/Repository/Vcs/ForgejoDriver.php
 
-use crate::io::io_interface;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
-};
-
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
@@ -21,6 +14,12 @@ use crate::util::Forgejo;
 use crate::util::ForgejoRepositoryData;
 use crate::util::ForgejoUrl;
 use crate::util::http::Response;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
+};
 
 #[derive(Debug)]
 pub struct ForgejoDriver {

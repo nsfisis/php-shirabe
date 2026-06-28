@@ -1,19 +1,5 @@
 //! ref: composer/src/Composer/EventDispatcher/EventDispatcher.php
 
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::process::ExecutableFinder;
-use shirabe_external_packages::symfony::process::PhpExecutableFinder;
-use shirabe_php_shim::{
-    InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
-    array_search_in_vec, array_splice, class_exists, defined, file_exists, get_class, hash,
-    implode, ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, preg_quote,
-    realpath, spl_autoload_functions, spl_autoload_register, spl_autoload_unregister,
-    spl_object_hash, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos,
-    strtoupper, substr, trim,
-};
-
 use crate::autoload::ClassLoader;
 use crate::composer::PartialComposerHandle;
 use crate::composer::PartialComposerWeakHandle;
@@ -32,6 +18,18 @@ use crate::repository::RepositoryInterface;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_external_packages::symfony::process::PhpExecutableFinder;
+use shirabe_php_shim::{
+    InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
+    array_search_in_vec, array_splice, class_exists, defined, file_exists, get_class, hash,
+    implode, ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, preg_quote,
+    realpath, spl_autoload_functions, spl_autoload_register, spl_autoload_unregister,
+    spl_object_hash, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos,
+    strtoupper, substr, trim,
+};
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
 /// "Class::method"), a `[object|string, method]` pair, or a `\Closure`.
@@ -858,7 +856,7 @@ impl EventDispatcher {
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
-                &format!("> {}: {}::{}", event.get_name(), class_name, method_name,),
+                &format!("> {}: {}::{}", event.get_name(), class_name, method_name),
                 true,
                 crate::io::NORMAL,
             );
@@ -1217,8 +1215,6 @@ impl EventDispatcher {
         self.loader = Some(loader);
         Ok(())
     }
-
-    // ---- helpers ----
 
     fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         self.io.clone()

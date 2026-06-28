@@ -1,11 +1,10 @@
 //! ref: composer/tests/Composer/Test/Package/Loader/ValidatingArrayLoaderTest.php
 
+use crate::test_case;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
 use shirabe_php_shim::PhpMixed;
-
-use crate::test_case;
 
 fn s(v: &str) -> PhpMixed {
     PhpMixed::String(v.to_string())

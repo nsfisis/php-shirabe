@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/FossilDriverTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -10,6 +7,8 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::FossilDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {

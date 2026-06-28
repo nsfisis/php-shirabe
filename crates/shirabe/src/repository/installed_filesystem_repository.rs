@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Repository/InstalledFilesystemRepository.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_semver::constraint::AnyConstraint;
-
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
@@ -16,6 +12,9 @@ use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
 use crate::util::Filesystem;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct InstalledFilesystemRepository {

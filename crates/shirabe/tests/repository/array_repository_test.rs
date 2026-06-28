@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/ArrayRepositoryTest.php
 
+use crate::test_case::{get_alias_package, get_package};
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
@@ -7,8 +8,6 @@ use shirabe::repository::{
     AbandonedInfo, ArrayRepository, RepositoryInterface, SEARCH_FULLTEXT, SearchResult,
 };
 use shirabe_php_shim::PhpMixed;
-
-use crate::test_case::{get_alias_package, get_package};
 
 /// PHP `setType`/`setAbandoned` operate on non-root packages; the public handle API only allows
 /// such setters on root packages, so packages carrying extra config are built via ArrayLoader.

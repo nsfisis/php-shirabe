@@ -1,10 +1,23 @@
 //! ref: composer/src/Composer/Command/ConfigCommand.php
 
+use crate::advisory::Auditor;
+use crate::command::BaseConfigCommand;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::config::Config;
+use crate::config::ConfigSourceInterface;
+use crate::config::JsonConfigSource;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::json::JsonEncodeOptions;
+use crate::json::JsonFile;
+use crate::package::base_package::{self};
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
-
-use crate::console::input::InputOption;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -15,21 +28,6 @@ use shirabe_php_shim::{
     is_bool, is_dir, is_numeric, is_object, is_string, json_encode, str_replace, strpos,
     strtolower, system, touch, var_export,
 };
-
-use crate::advisory::Auditor;
-use crate::command::BaseConfigCommand;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::config::Config;
-use crate::config::ConfigSourceInterface;
-use crate::config::JsonConfigSource;
-use crate::console::input::InputArgument;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::package::base_package::{self};
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::Silencer;
 use shirabe_semver::VersionParser;
 
 #[derive(Debug)]

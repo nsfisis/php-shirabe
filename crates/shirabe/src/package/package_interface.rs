@@ -1,12 +1,11 @@
 //! ref: composer/src/Composer/Package/PackageInterface.php
 
-use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
 use crate::package::Link;
 use crate::package::Mirror;
 use crate::repository::RepositoryInterfaceHandle;
+use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 /// Selects how `get_full_pretty_version` renders the reference.
 ///

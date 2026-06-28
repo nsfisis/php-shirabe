@@ -1,8 +1,8 @@
 //! ref: composer/tests/Composer/Test/Downloader/PerforceDownloaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::io_mock::{Expectation, get_io_mock};
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::get_process_executor_mock;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
@@ -14,11 +14,9 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::io_mock::{Expectation, get_io_mock};
-use crate::io_stub::IOStub;
-use crate::process_executor_mock::get_process_executor_mock;
 
 // A getMockBuilder('Composer\Util\Perforce') stand-in: the seam trait extracted from the
 // concrete `Perforce` struct, mocked so the downloader's workflow can be verified.

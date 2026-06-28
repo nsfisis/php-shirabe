@@ -1,10 +1,12 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php
 
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::util::GitHub;
+use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
-use std::sync::{LazyLock, Mutex};
-
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
@@ -16,11 +18,7 @@ use shirabe_php_shim::{
     explode, implode, in_array, is_array, is_dir, is_numeric, is_string, rtrim, sprintf,
     str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim, usleep,
 };
-
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::GitHub;
-use crate::util::Platform;
+use std::sync::{LazyLock, Mutex};
 
 static EXECUTABLES: LazyLock<Mutex<IndexMap<String, String>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));

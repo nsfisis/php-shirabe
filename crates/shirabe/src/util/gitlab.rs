@@ -1,17 +1,16 @@
 //! ref: composer/src/Composer/Util/GitLab.php
 
-use crate::io::io_interface;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{PhpMixed, RuntimeException, http_build_query, json_decode, time};
-
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{PhpMixed, RuntimeException, http_build_query, json_decode, time};
 
 #[derive(Debug)]
 pub struct GitLab {

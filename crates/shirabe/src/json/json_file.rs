@@ -1,6 +1,12 @@
 //! ref: composer/src/Composer/Json/JsonFile.php
 
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::json::JsonValidationException;
+use crate::util::Filesystem;
+use crate::util::HttpDownloader;
 use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -13,13 +19,6 @@ use shirabe_php_shim::{
     file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, realpath, str_contains,
     str_ends_with, str_repeat, strlen, strpos, usleep,
 };
-
-use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonValidationException;
-use crate::util::Filesystem;
-use crate::util::HttpDownloader;
 
 #[derive(Debug, Clone)]
 pub struct JsonEncodeOptions {

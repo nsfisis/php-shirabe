@@ -1,17 +1,5 @@
 //! ref: composer/src/Composer/Util/HttpDownloader.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-
-use crate::util::Silencer;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, chr,
-    extension_loaded, file_get_contents, function_exists, implode, is_numeric, rawurldecode,
-    stream_context_create, stripos, strpos, substr, ucfirst,
-};
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
@@ -21,10 +9,20 @@ use crate::package::version::VersionParser;
 use crate::util::GetResult;
 use crate::util::Platform;
 use crate::util::RemoteFilesystem;
+use crate::util::Silencer;
 use crate::util::StreamContextFactory;
 use crate::util::Url;
 use crate::util::http::CurlDownloader;
 use crate::util::http::Response;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{
+    InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, chr,
+    extension_loaded, file_get_contents, function_exists, implode, is_numeric, rawurldecode,
+    stream_context_create, stripos, strpos, substr, ucfirst,
+};
+use shirabe_semver::constraint::SimpleConstraint;
 
 /// @phpstan-type Request array{url: non-empty-string, options: mixed[], copyTo: string|null}
 /// @phpstan-type Job array{id: int, status: int, request: Request, sync: bool, origin: string, resolve?: callable, reject?: callable, curl_id?: int, response?: Response, exception?: \Throwable}

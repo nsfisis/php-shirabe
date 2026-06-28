@@ -1,15 +1,13 @@
 //! ref: composer/tests/Composer/Test/Util/RemoteFilesystemTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
+use crate::io_stub::IOStub;
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::RemoteFilesystem;
 use shirabe_php_shim::{PhpMixed, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, strpos};
-
-use crate::config_stub::ConfigStubBuilder;
-use crate::io_stub::IOStub;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
 // get('gitlab-domains') return [], everything else returns null. add_authentication_options

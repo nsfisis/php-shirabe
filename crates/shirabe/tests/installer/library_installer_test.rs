@@ -1,12 +1,7 @@
 //! ref: composer/tests/Composer/Test/Installer/LibraryInstallerTest.php
 
-use std::cell::RefCell;
-use std::fs;
-use std::rc::Rc;
-
+use crate::test_case::get_package;
 use indexmap::IndexMap;
-use tempfile::TempDir;
-
 use shirabe::composer::{
     ComposerHandle, PartialComposerHandle, PartialComposerWeakHandle, PartialOrFullComposer,
 };
@@ -21,8 +16,10 @@ use shirabe::repository::RepositoryInterface;
 use shirabe::repository::WritableRepositoryInterface;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
-
-use crate::test_case::get_package;
+use std::cell::RefCell;
+use std::fs;
+use std::rc::Rc;
+use tempfile::TempDir;
 
 // PHP mocks `Composer\Downloader\DownloadManager` with getMockBuilder and asserts its
 // install/update/remove calls; here the equivalent mock is injected into the Composer via

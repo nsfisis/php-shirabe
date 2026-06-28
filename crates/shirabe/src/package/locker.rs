@@ -1,16 +1,5 @@
 //! ref: composer/src/Composer/Package/Locker.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::seld::json_lint::ParsingException;
-use shirabe_php_shim::{
-    DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
-    array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array, is_int,
-    ksort, realpath, strcmp, strtolower, touch2, trim, usort,
-};
-
 use crate::installer::InstallationManager;
 use crate::io::IOInterface;
 use crate::json::JsonEncodeOptions;
@@ -34,6 +23,15 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::seld::json_lint::ParsingException;
+use shirabe_php_shim::{
+    DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
+    array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array, is_int,
+    ksort, realpath, strcmp, strtolower, touch2, trim, usort,
+};
 
 /// Reads/writes project lockfile (composer.lock).
 #[derive(Debug)]

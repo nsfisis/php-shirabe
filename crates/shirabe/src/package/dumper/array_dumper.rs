@@ -1,11 +1,10 @@
 //! ref: composer/src/Composer/Package/Dumper/ArrayDumper.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
-
 use crate::package::Mirror;
 use crate::package::PackageInterfaceHandle;
 use crate::package::SUPPORTED_LINK_TYPES;
+use indexmap::IndexMap;
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
 
 /// Serializes a Mirror back into the PHP array shape `{url, preferred}`.
 fn mirror_to_php(mirror: Mirror) -> PhpMixed {

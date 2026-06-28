@@ -1,12 +1,10 @@
 //! ref: composer/vendor/composer/semver/src/CompilingMatcher.php
 
-use std::sync::Mutex;
-use std::sync::OnceLock;
-
-use indexmap::IndexMap;
-
 use crate::constraint::AnyConstraint;
 use crate::constraint::SimpleConstraint;
+use indexmap::IndexMap;
+use std::sync::Mutex;
+use std::sync::OnceLock;
 
 static COMPILED_CHECKER_CACHE: OnceLock<
     Mutex<IndexMap<String, Box<dyn Fn(String, bool) -> bool + Send + Sync>>>,

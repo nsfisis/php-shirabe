@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleWatchNode.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::dependency_resolver::Decisions;
 use crate::dependency_resolver::Rule;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct RuleWatchNode {
     pub watch1: i64,

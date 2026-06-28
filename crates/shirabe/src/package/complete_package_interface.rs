@@ -1,9 +1,8 @@
 //! ref: composer/src/Composer/Package/CompletePackageInterface.php
 
+use crate::package::PackageInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-
-use crate::package::PackageInterface;
 
 pub trait CompletePackageInterface: PackageInterface {
     fn get_scripts(&self) -> IndexMap<String, Vec<String>>;

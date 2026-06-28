@@ -1,20 +1,5 @@
 //! ref: composer/src/Composer/Autoload/AutoloadGenerator.php
 
-use indexmap::IndexMap;
-
-use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
-    array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
-    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, preg_quote,
-    random_bytes, realpath, str_contains, str_replace, str_starts_with, strlen, strpos, strtr,
-    substr, substr_count, trim, unlink, var_export,
-};
-use shirabe_semver::constraint::Bound;
-
 use crate::autoload::ClassLoader;
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
@@ -34,6 +19,19 @@ use crate::script::ScriptEvents;
 use crate::util::Filesystem;
 use crate::util::PackageSorter;
 use crate::util::Platform;
+use indexmap::IndexMap;
+use shirabe_class_map_generator::class_map::ClassMap;
+use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
+    array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
+    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, preg_quote,
+    random_bytes, realpath, str_contains, str_replace, str_starts_with, strlen, strpos, strtr,
+    substr, substr_count, trim, unlink, var_export,
+};
+use shirabe_semver::constraint::Bound;
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {

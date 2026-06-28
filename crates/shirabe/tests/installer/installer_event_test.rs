@@ -1,14 +1,13 @@
 //! ref: composer/tests/Composer/Test/Installer/InstallerEventTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::dependency_resolver::Transaction;
 use shirabe::event_dispatcher::EventInterface;
 use shirabe::installer::InstallerEvent;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[test]
 fn test_getter() {

@@ -1,16 +1,14 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::{
     GenericRule, Pool, RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Request, Rule, RuleSet,
 };
 use shirabe::repository::RepositorySet;
 use shirabe_semver::constraint::{MatchAllConstraint, MatchNoneConstraint};
-
-use crate::test_case::get_package;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {

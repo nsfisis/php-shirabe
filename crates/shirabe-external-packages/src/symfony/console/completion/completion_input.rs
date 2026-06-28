@@ -1,10 +1,9 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
 
-use shirabe_php_shim::PhpMixed;
-
 use crate::symfony::console::input::argv_input::ArgvInput;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_option::InputOption;
+use shirabe_php_shim::PhpMixed;
 
 /// An input specialized for shell completion.
 ///

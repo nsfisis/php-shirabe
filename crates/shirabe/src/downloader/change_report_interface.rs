@@ -1,8 +1,7 @@
 //! ref: composer/src/Composer/Downloader/ChangeReportInterface.php
 
-use anyhow::Result;
-
 use crate::package::PackageInterfaceHandle;
+use anyhow::Result;
 
 pub trait ChangeReportInterface {
     fn get_local_changes(

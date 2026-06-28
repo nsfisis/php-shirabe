@@ -317,7 +317,7 @@ impl ArgvInput {
             let option_name = self.inner.definition.negation_to_name(name)?;
             if !matches!(value, PhpMixed::Null) {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: format!("The \"--{}\" option does not accept a value.", name,),
+                    message: format!("The \"--{}\" option does not accept a value.", name),
                     code: 0,
                 })
                 .into());
@@ -333,7 +333,7 @@ impl ArgvInput {
 
         if !matches!(value, PhpMixed::Null) && !option.accept_value() {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: format!("The \"--{}\" option does not accept a value.", name,),
+                message: format!("The \"--{}\" option does not accept a value.", name),
                 code: 0,
             })
             .into());

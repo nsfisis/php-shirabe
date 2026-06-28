@@ -1,13 +1,5 @@
 //! ref: composer/src/Composer/Downloader/VcsDownloader.php
 
-use crate::io::io_interface;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, explode,
-    get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
-};
-
 use crate::config::Config;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::UninstallOperation;
@@ -17,12 +9,19 @@ use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsCapableDownloaderInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, explode,
+    get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
+};
 
 #[derive(Debug)]
 pub struct VcsDownloaderBase {

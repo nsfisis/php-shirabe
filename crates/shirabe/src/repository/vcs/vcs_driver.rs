@@ -1,10 +1,5 @@
 //! ref: composer/src/Composer/Repository/Vcs/VcsDriver.php
 
-use chrono::{DateTime, FixedOffset};
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded};
-
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
@@ -15,6 +10,10 @@ use crate::repository::vcs::VcsDriverInterface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use crate::util::http::Response;
+use chrono::{DateTime, FixedOffset};
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded};
 
 #[derive(Debug)]
 pub struct VcsDriverBase {

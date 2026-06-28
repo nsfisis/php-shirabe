@@ -1,18 +1,5 @@
 //! ref: composer/src/Composer/Downloader/FileDownloader.php
 
-use crate::io::io_interface;
-use anyhow::Result;
-use indexmap::IndexMap;
-use std::sync::{LazyLock, Mutex};
-
-use crate::util::Silencer;
-use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
-    PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, file_exists,
-    filesize, get_class, hash, hash_file, in_array, is_dir, is_executable, parse_url, pathinfo,
-    realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
-};
-
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::dependency_resolver::operation::InstallOperation;
@@ -27,13 +14,24 @@ use crate::exception::IrrecoverableDownloadException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
+use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 use crate::util::Url as UrlUtil;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_php_shim::{
+    DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
+    PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, file_exists,
+    filesize, get_class, hash, hash_file, in_array, is_dir, is_executable, parse_url, pathinfo,
+    realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+};
+use std::sync::{LazyLock, Mutex};
 
 /// @var array<string, int|string>
 /// @private

@@ -10,15 +10,6 @@
 //! is preserved. Per-request TLS/proxy/IP-resolve settings that reqwest only exposes per-Client
 //! are simplified to a single default Client; see the TODOs below.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    PhpMixed, in_array, parse_url, preg_quote, rename, strpos, substr, unlink_silent,
-};
-
 use crate::config::Config;
 use crate::downloader::MaxFileSizeExceededException;
 use crate::downloader::TransportException;
@@ -31,6 +22,12 @@ use crate::util::http::CurlResponse;
 use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{
+    PhpMixed, in_array, parse_url, preg_quote, rename, strpos, substr, unlink_silent,
+};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// resolve callback supplied by `HttpDownloader`. Receives the final `Response` on success.
 pub type ResolveCallback = Box<dyn Fn(Response) + Send + Sync>;

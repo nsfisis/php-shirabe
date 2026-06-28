@@ -1,14 +1,5 @@
 //! ref: composer/src/Composer/Package/Loader/ArrayLoader.php
 
-use anyhow::Result;
-use chrono::Utc;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string, json_encode,
-    ltrim, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
-};
-
 use crate::package::CompleteAliasPackageHandle;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageHandle;
@@ -24,6 +15,14 @@ use crate::package::RootPackageHandle;
 use crate::package::SUPPORTED_LINK_TYPES;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
+use anyhow::Result;
+use chrono::Utc;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{
+    E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string, json_encode,
+    ltrim, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+};
 
 #[derive(Debug)]
 pub struct ArrayLoader {

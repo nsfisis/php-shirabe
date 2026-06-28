@@ -1,17 +1,15 @@
 //! ref: composer/tests/Composer/Test/Installer/SuggestedPackagesReporterTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::installer::SuggestedPackagesReporter;
 use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::{InstalledRepository, LockArrayRepository, RepositoryInterfaceHandle};
-
-use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
-use crate::test_case::get_package;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// ref: SuggestedPackagesReporterTest::setUp.
 ///

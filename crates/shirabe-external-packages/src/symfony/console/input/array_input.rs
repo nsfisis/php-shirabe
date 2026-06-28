@@ -259,7 +259,7 @@ impl ArrayInput {
             if option.is_value_required() {
                 return Err(InvalidOptionException(InvalidArgumentException(
                     shirabe_php_shim::InvalidArgumentException {
-                        message: format!("The \"--{}\" option requires a value.", name,),
+                        message: format!("The \"--{}\" option requires a value.", name),
                         code: 0,
                     },
                 ))

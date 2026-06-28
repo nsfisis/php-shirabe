@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Repository/RepositoryManager.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, json_encode};
-use shirabe_semver::constraint::AnyConstraint;
-
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
@@ -13,6 +9,9 @@ use crate::repository::FilterRepository;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use indexmap::IndexMap;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, json_encode};
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct RepositoryManager {

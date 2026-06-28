@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Util/HttpDownloaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
+use crate::io_mock::{Expectation, get_io_mock};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::TransportException;
@@ -13,9 +12,8 @@ use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_php_shim::{PHP_EOL, PhpMixed};
-
-use crate::config_stub::ConfigStubBuilder;
-use crate::io_mock::{Expectation, get_io_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // PHP performs a live HTTP get to assert the URL's user:pass is captured via
 // setAuthentication. The credential capture happens in `add_job`, before any

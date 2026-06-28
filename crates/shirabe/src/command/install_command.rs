@@ -1,13 +1,5 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php
 
-use anyhow::Result;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::advisory::Auditor;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
@@ -19,6 +11,13 @@ use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::util::HttpDownloader;
+use anyhow::Result;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct InstallCommand {

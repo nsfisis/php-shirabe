@@ -1,6 +1,12 @@
 //! ref: composer/src/Composer/Downloader/DownloadManager.php
 
+use crate::downloader::DownloaderInterface;
+use crate::exception::IrrecoverableDownloadException;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::package::PackageInterfaceHandle;
+use crate::util::Filesystem;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -9,13 +15,6 @@ use shirabe_php_shim::{
     array_reverse, array_shift, dirname, implode, in_array, preg_quote, rtrim, str_replace,
     strtolower, usort,
 };
-
-use crate::downloader::DownloaderInterface;
-use crate::exception::IrrecoverableDownloadException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
 
 /// Downloaders manager.
 #[derive(Debug)]

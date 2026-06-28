@@ -1,24 +1,12 @@
 //! ref: composer/src/Composer/Command/PackageDiscoveryTrait.php
 
-use crate::io::io_interface;
-
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{
-    Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
-    array_slice, asort, explode, file_get_contents, implode, in_array, is_array, is_file,
-    is_numeric, json_decode, levenshtein, strlen, strpos, trim,
-};
-
 use crate::command::BaseCommand;
 use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
@@ -29,6 +17,16 @@ use crate::repository::RepositoryFactory;
 use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{
+    Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
+    array_slice, asort, explode, file_get_contents, implode, in_array, is_array, is_file,
+    is_numeric, json_decode, levenshtein, strlen, strpos, trim,
+};
 
 /// @internal
 pub trait PackageDiscoveryTrait: BaseCommand {

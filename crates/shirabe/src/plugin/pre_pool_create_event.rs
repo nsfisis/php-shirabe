@@ -1,14 +1,12 @@
 //! ref: composer/src/Composer/Plugin/PrePoolCreateEvent.php
 
-use indexmap::IndexMap;
-
-use shirabe_php_shim::PhpMixed;
-
 use crate::dependency_resolver::Request;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct PrePoolCreateEvent {

@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/GitLabDriverTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
+use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -11,9 +10,8 @@ use shirabe::repository::vcs::GitLabDriver;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, extension_loaded};
-
-use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
-use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // Mirrors GitLabDriverTest::setUp's `gitlab-domains` configuration.
 fn make_config() -> Config {

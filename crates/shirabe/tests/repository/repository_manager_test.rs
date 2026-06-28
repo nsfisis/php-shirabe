@@ -4,9 +4,6 @@
 // curl_multi_init, todo!()) with a mocked IO/Config/EventDispatcher and exercise repo
 // creation/prepending/wrapping.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -15,6 +12,8 @@ use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle, Repository
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {

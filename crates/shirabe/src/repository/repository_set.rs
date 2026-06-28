@@ -1,13 +1,5 @@
 //! ref: composer/src/Composer/Repository/RepositorySet.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, RuntimeException, ksort, strtolower};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
-use shirabe_semver::constraint::MultiConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::advisory::AnySecurityAdvisory;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::PoolBuilder;
@@ -28,6 +20,13 @@ use crate::repository::InstalledRepository;
 use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
 use crate::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_php_shim::{LogicException, RuntimeException, ksort, strtolower};
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::MultiConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
 pub struct RootAliasEntry {

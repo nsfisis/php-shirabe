@@ -1,10 +1,9 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolTest.php
 
+use crate::test_case::{get_package, get_version_constraint};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::pool::Pool;
 use shirabe::package::handle::PackageInterfaceHandle;
-
-use crate::test_case::{get_package, get_version_constraint};
 
 // ref: PoolTest::createPool
 fn create_pool(packages: Vec<PackageInterfaceHandle>) -> Pool {

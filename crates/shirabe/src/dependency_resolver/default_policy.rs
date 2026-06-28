@@ -1,16 +1,14 @@
 //! ref: composer/src/Composer/DependencyResolver/DefaultPolicy.php
 
-use std::cell::RefCell;
-
-use indexmap::IndexMap;
-use shirabe_semver::CompilingMatcher;
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::dependency_resolver::PolicyInterface;
 use crate::dependency_resolver::Pool;
 use crate::package::BasePackageHandle;
 use crate::package::STABILITIES;
 use crate::util::Platform;
+use indexmap::IndexMap;
+use shirabe_semver::CompilingMatcher;
+use shirabe_semver::constraint::SimpleConstraint;
+use std::cell::RefCell;
 
 #[derive(Debug)]
 pub struct DefaultPolicy {

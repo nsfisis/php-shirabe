@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/GitBitbucketDriverTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
+use crate::io_stub::IOStub;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -12,10 +11,9 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
-use crate::io_stub::IOStub;
 
 struct SetUp {
     home: TempDir,

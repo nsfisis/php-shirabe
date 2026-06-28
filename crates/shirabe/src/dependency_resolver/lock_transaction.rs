@@ -1,12 +1,11 @@
 //! ref: composer/src/Composer/DependencyResolver/LockTransaction.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-
 use crate::dependency_resolver::Decisions;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Transaction;
 use crate::package::PackageInterfaceHandle;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
 
 #[derive(Debug)]
 pub struct LockTransaction {

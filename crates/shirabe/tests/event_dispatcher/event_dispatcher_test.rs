@@ -1,11 +1,8 @@
 //! ref: composer/tests/Composer/Test/EventDispatcher/EventDispatcherTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
-
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::dependency_resolver::Transaction;
@@ -18,11 +15,10 @@ use shirabe::script::Event as ScriptEvent;
 use shirabe::script::ScriptEvents;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-
 use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PHP_EOL;
-
-use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn tear_down() {
     Platform::clear_env("COMPOSER_SKIP_SCRIPTS");

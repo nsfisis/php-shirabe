@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/Repository/RepositoryFactoryTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -10,6 +7,8 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::RepositoryFactory;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[test]
 fn test_manager_with_all_repository_types() {

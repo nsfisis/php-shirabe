@@ -1,13 +1,12 @@
 //! ref: composer/src/Composer/Package/CompleteAliasPackage.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
 use crate::package::AliasPackage;
 use crate::package::CompletePackageHandle;
 use crate::package::CompletePackageInterface;
 use crate::package::PackageHandle;
 use crate::package::handle::delegate_package_interface_to_inner;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug, Clone)]
 pub struct CompleteAliasPackage {

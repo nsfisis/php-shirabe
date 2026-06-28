@@ -2,8 +2,6 @@
 
 use anyhow::bail;
 
-use shirabe_php_shim as php;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bound {
     version: String,
@@ -43,7 +41,8 @@ impl Bound {
             return Ok(false);
         }
 
-        let compare_result = php::version_compare_2(self.get_version(), other.get_version());
+        let compare_result =
+            shirabe_php_shim::version_compare_2(self.get_version(), other.get_version());
 
         if compare_result != 0 {
             return Ok((if operator == ">" { 1 } else { -1 }) == compare_result);

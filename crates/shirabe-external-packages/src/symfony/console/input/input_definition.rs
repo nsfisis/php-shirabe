@@ -260,14 +260,14 @@ impl InputDefinition {
             && !option.equals(existing)
         {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!("An option named \"{}\" already exists.", option.get_name(),),
+                message: format!("An option named \"{}\" already exists.", option.get_name()),
                 code: 0,
             })
             .into());
         }
         if self.negations.contains_key(option.get_name()) {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!("An option named \"{}\" already exists.", option.get_name(),),
+                message: format!("An option named \"{}\" already exists.", option.get_name()),
                 code: 0,
             })
             .into());

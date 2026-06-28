@@ -1,6 +1,17 @@
 //! ref: composer/src/Composer/Repository/Vcs/GitHubDriver.php
 
+use crate::cache::Cache;
+use crate::config::Config;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::json::JsonEncodeOptions;
+use crate::json::JsonFile;
+use crate::repository::vcs::GitDriver;
+use crate::repository::vcs::VcsDriverBase;
+use crate::util::GitHub;
+use crate::util::http::Response;
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
@@ -10,18 +21,6 @@ use shirabe_php_shim::{
     array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array,
     parse_url_all, strpos, strtolower, substr, trim, urlencode,
 };
-
-use crate::cache::Cache;
-use crate::config::Config;
-use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::repository::vcs::GitDriver;
-use crate::repository::vcs::VcsDriverBase;
-use crate::util::GitHub;
-use crate::util::http::Response;
 
 #[derive(Debug)]
 pub struct GitHubDriver {

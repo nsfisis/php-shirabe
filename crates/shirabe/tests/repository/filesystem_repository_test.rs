@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/FilesystemRepositoryTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::test_case::{get_alias_package, get_package};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::operation::OperationInterface;
 use shirabe::installed_versions::InstalledVersions;
@@ -17,8 +15,8 @@ use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-
-use crate::test_case::{get_alias_package, get_package};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
 /// materialized as a real temp file whose decoded JSON reproduces the mock return value exactly.

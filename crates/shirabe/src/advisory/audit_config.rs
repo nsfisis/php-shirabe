@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/Advisory/AuditConfig.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
-
 use crate::advisory::Auditor;
 use crate::config::Config;
+use indexmap::IndexMap;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug, Clone)]
 pub struct AuditConfig {

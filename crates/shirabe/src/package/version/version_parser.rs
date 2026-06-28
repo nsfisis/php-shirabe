@@ -1,14 +1,12 @@
 //! ref: composer/src/Composer/Package/Version/VersionParser.php
 
+use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use std::sync::{LazyLock, Mutex};
-
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_semver::Semver;
 use shirabe_semver::VersionParser as SemverVersionParser;
 use shirabe_semver::constraint::AnyConstraint;
-
-use crate::repository::PlatformRepository;
+use std::sync::{LazyLock, Mutex};
 
 static CONSTRAINTS: LazyLock<Mutex<IndexMap<String, AnyConstraint>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));

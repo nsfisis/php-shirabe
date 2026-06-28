@@ -5,9 +5,6 @@
 // Symfony command-registry model), or a runtime define() of COMPOSER_DEV_WARNING_TIME,
 // remain unportable.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use shirabe::command::about_command::AboutCommand;
 use shirabe::command::self_update_command::SelfUpdateCommand;
 use shirabe::console::application::ApplicationHandle;
@@ -18,6 +15,8 @@ use shirabe_external_packages::symfony::console::input::input_interface::InputIn
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn set_up() {
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");

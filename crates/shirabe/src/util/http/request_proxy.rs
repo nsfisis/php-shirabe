@@ -1,12 +1,11 @@
 //! ref: composer/src/Composer/Util/Http/RequestProxy.php
 
+use crate::downloader::TransportException;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO, CURLOPT_PROXY_CAPATH,
     CURLOPT_PROXYAUTH, CURLOPT_PROXYUSERPWD, InvalidArgumentException, PhpMixed,
 };
-
-use crate::downloader::TransportException;
 
 // contextOptions = array{http: array{proxy: string, header?: string, request_fulluri?: bool}}
 type ContextOptions = IndexMap<String, IndexMap<String, PhpMixed>>;

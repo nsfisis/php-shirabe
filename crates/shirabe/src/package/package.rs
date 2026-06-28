@@ -1,13 +1,5 @@
 //! ref: composer/src/Composer/Package/Package.php
 
-use std::rc::Rc;
-
-use chrono::{DateTime, Utc};
-use indexmap::{IndexMap, IndexSet};
-
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{E_USER_DEPRECATED, LogicException, PhpMixed, strpos, trigger_error};
-
 use crate::package::BasePackage;
 use crate::package::DisplayMode;
 use crate::package::Link;
@@ -16,6 +8,11 @@ use crate::package::version::VersionParser;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::util::ComposerMirror;
+use chrono::{DateTime, Utc};
+use indexmap::{IndexMap, IndexSet};
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{E_USER_DEPRECATED, LogicException, PhpMixed, strpos, trigger_error};
+use std::rc::Rc;
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]

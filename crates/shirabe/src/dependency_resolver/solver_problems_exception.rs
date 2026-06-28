@@ -1,16 +1,14 @@
 //! ref: composer/src/Composer/DependencyResolver/SolverProblemsException.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use shirabe_php_shim::RuntimeException;
-
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Problem;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::Rule;
 use crate::repository::RepositorySet;
 use crate::util::IniHelper;
+use shirabe_php_shim::RuntimeException;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct SolverProblemsException {

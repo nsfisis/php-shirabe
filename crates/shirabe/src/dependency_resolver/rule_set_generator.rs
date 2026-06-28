@@ -1,11 +1,5 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSetGenerator.php
 
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::rc::Rc;
-
-use indexmap::IndexMap;
-
 use crate::dependency_resolver::GenericRule;
 use crate::dependency_resolver::MultiConflictRule;
 use crate::dependency_resolver::PolicyInterface;
@@ -18,6 +12,10 @@ use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFil
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::PackageInterfaceHandle;
+use indexmap::IndexMap;
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RuleSetGenerator {

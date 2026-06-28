@@ -71,7 +71,7 @@ fn test_list() {
 
     let output = app_tester.get_display();
 
-    assert_eq!("Available binaries:\n- b\n- c\n- a (local)", output.trim(),);
+    assert_eq!("Available binaries:\n- b\n- c\n- a (local)", output.trim());
 
     drop(tear_down);
 }

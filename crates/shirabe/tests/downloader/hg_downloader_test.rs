@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Downloader/HgDownloaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::{cmd, get_process_executor_mock};
 use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
 use shirabe::downloader::hg_downloader::HgDownloader;
@@ -11,10 +10,9 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe_semver::VersionParser;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::io_stub::IOStub;
-use crate::process_executor_mock::{cmd, get_process_executor_mock};
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()

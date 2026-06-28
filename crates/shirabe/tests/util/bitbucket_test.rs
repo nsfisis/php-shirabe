@@ -1,8 +1,9 @@
 //! ref: composer/tests/Composer/Test/Util/BitbucketTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
+use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
+use crate::io_mock::{Expectation, IOMock, get_io_mock};
+use crate::process_executor_mock::get_process_executor_mock;
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
@@ -13,11 +14,8 @@ use shirabe::util::http_downloader::{
 };
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, time};
-
-use crate::config_stub::ConfigStubBuilder;
-use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
-use crate::io_mock::{Expectation, IOMock, get_io_mock};
-use crate::process_executor_mock::get_process_executor_mock;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const USERNAME: &str = "username";
 const PASSWORD: &str = "password";

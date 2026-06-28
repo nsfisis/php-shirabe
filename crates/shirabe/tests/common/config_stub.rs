@@ -8,12 +8,11 @@
 //! real resolution logic instead of intercepting `get`.
 #![allow(dead_code)]
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct ConfigStubBuilder {
     use_environment: bool,

@@ -1,12 +1,5 @@
 //! ref: composer/src/Composer/Repository/PathRepository.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined,
-    file_exists, file_get_contents, glob_with_flags, hash, realpath, serialize,
-};
-
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
@@ -29,6 +22,12 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{
+    DIRECTORY_SEPARATOR, GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined,
+    file_exists, file_get_contents, glob_with_flags, hash, realpath, serialize,
+};
 
 #[derive(Debug)]
 pub struct PathRepository {

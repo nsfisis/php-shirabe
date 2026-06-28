@@ -1,14 +1,12 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleWatchGraph.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use indexmap::IndexMap;
-
 use crate::dependency_resolver::Decisions;
 use crate::dependency_resolver::Rule;
 use crate::dependency_resolver::RuleWatchChain;
 use crate::dependency_resolver::RuleWatchNode;
+use indexmap::IndexMap;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RuleWatchGraph {

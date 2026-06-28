@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ArchiveManagerTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::DownloadManager;
@@ -14,6 +11,8 @@ use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::realpath;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 // ref: ArchiverTestCase::setUp + ArchiveManagerTest::setUp.

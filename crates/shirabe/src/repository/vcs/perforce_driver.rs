@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Repository/Vcs/PerforceDriver.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{BadMethodCallException, PhpMixed, RuntimeException};
-
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::IOInterface;
@@ -12,6 +8,9 @@ use crate::util::Perforce;
 use crate::util::PerforceInterface;
 use crate::util::ProcessExecutor;
 use crate::util::http::Response;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{BadMethodCallException, PhpMixed, RuntimeException};
 
 #[derive(Debug)]
 pub struct PerforceDriver {

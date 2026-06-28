@@ -1,12 +1,11 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/TransactionTest.php
 
+use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::transaction::Transaction;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe_php_shim::PhpMixed;
-
-use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.

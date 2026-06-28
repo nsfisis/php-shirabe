@@ -1,11 +1,10 @@
 //! ref: composer/vendor/symfony/process/Pipes/UnixPipes.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::{self as php, Descriptor, PhpMixed, PhpResource};
-
 use crate::symfony::process::pipes::abstract_pipes::AbstractPipes;
 use crate::symfony::process::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
 use crate::symfony::process::process::Process;
+use indexmap::IndexMap;
+use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
 
 /// UnixPipes implementation uses unix pipes as handles.
 #[derive(Debug)]
@@ -44,7 +43,8 @@ fn descriptor(items: &[&str]) -> Descriptor {
 impl PipesInterface for UnixPipes {
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
         if !self.have_read_support {
-            let nullstream = php::fopen("/dev/null", "c").expect("fopen('/dev/null') failed");
+            let nullstream =
+                shirabe_php_shim::fopen("/dev/null", "c").expect("fopen('/dev/null') failed");
             return vec![
                 descriptor(&["pipe", "r"]),
                 Descriptor::Resource(nullstream.clone()),
@@ -100,7 +100,7 @@ impl PipesInterface for UnixPipes {
 
         // let's have a look if something changed in streams
         if (!r_sel.is_empty() || w.is_some())
-            && php::stream_select(
+            && shirabe_php_shim::stream_select(
                 &mut r_sel,
                 &mut w_sel,
                 &mut e_sel,
@@ -125,7 +125,7 @@ impl PipesInterface for UnixPipes {
         for (fd, pipe) in &r {
             let mut data = String::new();
             loop {
-                let chunk = php::fread(pipe, CHUNK_SIZE).unwrap_or_default();
+                let chunk = shirabe_php_shim::fread(pipe, CHUNK_SIZE).unwrap_or_default();
                 let len = chunk.len() as i64;
                 data.push_str(&chunk);
                 if !(len > 0 && (close || len >= CHUNK_SIZE)) {
@@ -137,8 +137,8 @@ impl PipesInterface for UnixPipes {
                 read.insert(*fd, data);
             }
 
-            if close && php::feof(pipe) {
-                php::fclose(pipe);
+            if close && shirabe_php_shim::feof(pipe) {
+                shirabe_php_shim::fclose(pipe);
                 self.inner.pipes.shift_remove(fd);
             }
         }

@@ -1,11 +1,5 @@
 //! ref: composer/vendor/symfony/console/Command/CompleteCommand.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
-
 use crate::symfony::console::command::command::{Command, CommandData};
 use crate::symfony::console::completion::completion_input::CompletionInput;
 use crate::symfony::console::completion::completion_suggestions::{
@@ -15,6 +9,11 @@ use crate::symfony::console::completion::output::completion_output_interface::Co
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
 /// Responsible for providing the values to the shell completion.
 #[derive(Debug)]

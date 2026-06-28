@@ -1,5 +1,11 @@
 //! ref: composer/src/Composer/Util/StreamContextFactory.php
 
+use crate::composer;
+use crate::downloader::TransportException;
+use crate::repository::PlatformRepository;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::http::ProxyManager;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::ca_bundle::CaBundle;
 use shirabe_php_shim::{
@@ -7,13 +13,6 @@ use shirabe_php_shim::{
     array_replace_recursive, extension_loaded, function_exists, php_uname, stream_context_create,
     stripos, uasort,
 };
-
-use crate::composer;
-use crate::downloader::TransportException;
-use crate::repository::PlatformRepository;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::http::ProxyManager;
 
 pub struct StreamContextFactory;
 

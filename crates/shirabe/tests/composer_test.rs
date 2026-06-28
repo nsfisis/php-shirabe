@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/ComposerTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::composer::Composer;
 use shirabe::config::Config;
@@ -19,6 +16,8 @@ use shirabe::repository::RepositoryManagerInterface;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn null_io() -> Rc<RefCell<dyn IOInterface>> {
     Rc::new(RefCell::new(NullIO::new()))

@@ -1,12 +1,11 @@
 //! ref: composer/src/Composer/Advisory/SecurityAdvisory.php
 
+use crate::advisory::IgnoredSecurityAdvisory;
+use crate::advisory::PartialSecurityAdvisory;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::DATE_RFC3339;
 use shirabe_semver::constraint::AnyConstraint;
-
-use crate::advisory::IgnoredSecurityAdvisory;
-use crate::advisory::PartialSecurityAdvisory;
 
 fn serialize_date_rfc3339<S: serde::Serializer>(
     dt: &DateTime<Utc>,

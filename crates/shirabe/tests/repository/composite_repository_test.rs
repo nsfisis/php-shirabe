@@ -1,12 +1,11 @@
 //! ref: composer/tests/Composer/Test/Repository/CompositeRepositoryTest.php
 
+use crate::test_case::get_package;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::{
     ArrayRepository, CompositeRepository, FindPackageConstraint, RepositoryInterface,
     RepositoryInterfaceHandle, SEARCH_FULLTEXT,
 };
-
-use crate::test_case::get_package;
 
 fn array_repo(packages: Vec<PackageInterfaceHandle>) -> RepositoryInterfaceHandle {
     RepositoryInterfaceHandle::new(ArrayRepository::new(packages).unwrap())

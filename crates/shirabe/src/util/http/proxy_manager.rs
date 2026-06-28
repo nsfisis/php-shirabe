@@ -1,12 +1,11 @@
 //! ref: composer/src/Composer/Util/Http/ProxyManager.php
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
-
 use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
 use crate::util::http::ProxyItem;
 use crate::util::http::RequestProxy;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 static INSTANCE: OnceLock<Mutex<Option<ProxyManager>>> = OnceLock::new();
 

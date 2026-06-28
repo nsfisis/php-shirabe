@@ -1,10 +1,9 @@
 //! ref: composer/tests/Composer/Test/Mock/ProcessExecutorMock.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // A command expectation as written in the PHP tests: either a bare command
 // (`'git command'` / `['git', '--version']`) or the full

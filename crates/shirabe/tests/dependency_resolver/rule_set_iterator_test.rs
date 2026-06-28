@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetIteratorTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::generic_rule::GenericRule;
 use shirabe::dependency_resolver::pool::Pool;
@@ -10,6 +7,8 @@ use shirabe::dependency_resolver::rule::{RULE_LEARNED, RULE_ROOT_REQUIRE, Reason
 use shirabe::dependency_resolver::rule_set::RuleSet;
 use shirabe::dependency_resolver::rule_set_iterator::RuleSetIterator;
 use shirabe_semver::constraint::MatchAllConstraint;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 type Rules = IndexMap<i64, Vec<Rc<RefCell<Rule>>>>;
 

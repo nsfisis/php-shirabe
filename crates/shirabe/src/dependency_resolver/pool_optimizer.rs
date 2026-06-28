@@ -1,7 +1,10 @@
 //! ref: composer/src/Composer/DependencyResolver/PoolOptimizer.php
 
-use std::rc::Rc;
-
+use crate::dependency_resolver::PolicyInterface;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Request;
+use crate::package::BasePackageHandle;
+use crate::package::version::VersionParser;
 use indexmap::IndexMap;
 use shirabe_php_shim::{implode, ksort};
 use shirabe_semver::CompilingMatcher;
@@ -9,12 +12,7 @@ use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-
-use crate::dependency_resolver::PolicyInterface;
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Request;
-use crate::package::BasePackageHandle;
-use crate::package::version::VersionParser;
+use std::rc::Rc;
 
 /// Optimizes a given pool
 #[derive(Debug)]

@@ -1,12 +1,11 @@
 //! ref: composer/tests/Composer/Test/Repository/RepositoryUtilsTest.php
 
+use crate::test_case::{get_alias_package, get_package};
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
 use shirabe::repository::RepositoryUtils;
 use shirabe_php_shim::PhpMixed;
-
-use crate::test_case::{get_alias_package, get_package};
 
 /// PHP `configureLinks` sets link arrays on non-root packages; the public handle API only allows
 /// link setters on root packages, so packages carrying links are built via ArrayLoader.

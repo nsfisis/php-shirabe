@@ -1,13 +1,5 @@
 //! ref: composer/src/Composer/Command/ClearCacheCommand.php
 
-use anyhow::Result;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::realpath;
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::cache::Cache;
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
@@ -16,6 +8,13 @@ use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterfaceImmutable;
+use anyhow::Result;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::realpath;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {

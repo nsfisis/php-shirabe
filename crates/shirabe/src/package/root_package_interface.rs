@@ -1,12 +1,10 @@
 //! ref: composer/src/Composer/Package/RootPackageInterface.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
-use crate::package::PackageInterface;
-
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
+use crate::package::PackageInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 pub trait RootPackageInterface: CompletePackageInterface {
     fn get_aliases(&self) -> &[IndexMap<String, String>];

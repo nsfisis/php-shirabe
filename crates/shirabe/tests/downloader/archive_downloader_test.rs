@@ -6,9 +6,6 @@
 // real Config merged with `vendor-dir`, and real CompletePackage instances with dist
 // url/reference set.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::FileDownloader;
@@ -18,6 +15,8 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {

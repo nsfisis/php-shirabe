@@ -1,7 +1,15 @@
 //! ref: composer/src/Composer/DependencyResolver/Problem.php
 
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::rule::{self, Rule};
+use crate::package::BasePackageHandle;
+use crate::package::Link;
+use crate::package::version::VersionParser;
+use crate::repository::LockArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
@@ -12,16 +20,6 @@ use shirabe_php_shim::{
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::rule::{self, Rule};
-use crate::package::BasePackageHandle;
-use crate::package::Link;
-use crate::package::version::VersionParser;
-use crate::repository::LockArrayRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositorySet;
 
 /// Represents a problem detected while solving dependencies
 #[derive(Debug)]

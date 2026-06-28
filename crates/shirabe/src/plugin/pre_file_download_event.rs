@@ -1,11 +1,10 @@
 //! ref: composer/src/Composer/Plugin/PreFileDownloadEvent.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::util::HttpDownloader;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct PreFileDownloadEvent {

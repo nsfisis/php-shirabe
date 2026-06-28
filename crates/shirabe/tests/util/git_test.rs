@@ -1,8 +1,9 @@
 //! ref: composer/tests/Composer/Test/Util/GitTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
+use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
+use crate::io_stub::IOStub;
+use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
@@ -11,11 +12,8 @@ use shirabe::util::git::Git;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, RuntimeException};
-
-use crate::config_stub::ConfigStubBuilder;
-use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
-use crate::io_stub::IOStub;
-use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // No-op ConfigSourceInterface, equivalent to PHPUnit's
 // `getMockBuilder(Config::class)` auto-stubbing getConfigSource/getAuthConfigSource:

@@ -1,6 +1,18 @@
 //! ref: composer/src/Composer/Repository/Vcs/GitBitbucketDriver.php
 
+use crate::cache::Cache;
+use crate::config::Config;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::json::JsonEncodeOptions;
+use crate::json::JsonFile;
+use crate::repository::vcs::GitDriver;
+use crate::repository::vcs::VcsDriverBase;
+use crate::repository::vcs::VcsDriverInterface;
+use crate::util::Bitbucket;
+use crate::util::http::Response;
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
@@ -10,19 +22,6 @@ use shirabe_php_shim::{
     array_search_mixed, extension_loaded, http_build_query_mixed, implode, in_array, is_array,
     strpos,
 };
-
-use crate::cache::Cache;
-use crate::config::Config;
-use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::repository::vcs::GitDriver;
-use crate::repository::vcs::VcsDriverBase;
-use crate::repository::vcs::VcsDriverInterface;
-use crate::util::Bitbucket;
-use crate::util::http::Response;
 
 #[derive(Debug)]
 pub struct GitBitbucketDriver {

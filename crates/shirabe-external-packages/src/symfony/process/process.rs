@@ -1,10 +1,5 @@
 //! ref: composer/vendor/symfony/process/Process.php
 
-use std::sync::OnceLock;
-
-use indexmap::IndexMap;
-use shirabe_php_shim::{self as php, Descriptor, PhpMixed, PhpResource};
-
 use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::process::exception::logic_exception::LogicException;
 use crate::symfony::process::exception::process_failed_exception::ProcessFailedException;
@@ -16,6 +11,9 @@ use crate::symfony::process::pipes::pipes_interface::PipesInterface;
 use crate::symfony::process::pipes::unix_pipes::UnixPipes;
 use crate::symfony::process::pipes::windows_pipes::WindowsPipes;
 use crate::symfony::process::process_utils::ProcessUtils;
+use indexmap::IndexMap;
+use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
+use std::sync::OnceLock;
 
 /// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output.
 pub type UserCallback = Box<dyn FnMut(&str, &str) -> bool>;
@@ -210,7 +208,7 @@ impl Process {
         input: PhpMixed,
         timeout: Option<f64>,
     ) -> anyhow::Result<Self> {
-        if !php::function_exists("proc_open") {
+        if !shirabe_php_shim::function_exists("proc_open") {
             return Err(LogicException::new(
                 "The Process class relies on proc_open, which is not available on your PHP installation.".to_string(),
             )
@@ -227,7 +225,7 @@ impl Process {
         // exists; its value merely reflects the NTS/ZTS build), so the disjunction is always true and
         // the cwd is defaulted to getcwd() whenever it was null.
         if this.cwd.is_none() {
-            this.cwd = php::getcwd();
+            this.cwd = shirabe_php_shim::getcwd();
         }
         if let Some(env) = env {
             this.set_env(
@@ -239,7 +237,7 @@ impl Process {
 
         this.set_input(input)?;
         this.set_timeout(timeout)?;
-        this.use_file_handles = php::DIRECTORY_SEPARATOR == "\\";
+        this.use_file_handles = shirabe_php_shim::DIRECTORY_SEPARATOR == "\\";
         this.pty = false;
 
         Ok(this)
@@ -260,7 +258,7 @@ impl Process {
     }
 
     pub fn __sleep(&self) -> anyhow::Result<Vec<String>> {
-        Err(php::BadMethodCallException {
+        Err(shirabe_php_shim::BadMethodCallException {
             message: "Cannot serialize Symfony\\Component\\Process\\Process".to_string(),
             code: 0,
         }
@@ -268,7 +266,7 @@ impl Process {
     }
 
     pub fn __wakeup(&self) -> anyhow::Result<()> {
-        Err(php::BadMethodCallException {
+        Err(shirabe_php_shim::BadMethodCallException {
             message: "Cannot unserialize Symfony\\Component\\Process\\Process".to_string(),
             code: 0,
         }
@@ -310,7 +308,7 @@ impl Process {
         }
 
         self.reset_process_data();
-        self.starttime = Some(php::microtime());
+        self.starttime = Some(shirabe_php_shim::microtime());
         self.last_output_time = self.starttime;
         let has_callback = callback.is_some();
         self.callback = Some(self.build_callback(callback));
@@ -336,7 +334,7 @@ impl Process {
                     .collect::<Vec<_>>()
                     .join(" ");
 
-                if php::DIRECTORY_SEPARATOR != "\\" {
+                if shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" {
                     // exec is mandatory to deal with sending a signal to the process
                     cmd = format!("exec {}", cmd);
                 }
@@ -345,7 +343,7 @@ impl Process {
             CommandLine::String(s) => self.replace_placeholders(s, &env)?,
         };
 
-        if php::DIRECTORY_SEPARATOR == "\\" {
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
             commandline = self.prepare_windows_command_line(&commandline, &mut env)?;
         } else if !self.use_file_handles && self.is_sigchild_enabled() {
             // last exit code is output on the fourth pipe and caught to work around --enable-sigchild
@@ -357,7 +355,7 @@ impl Process {
             );
 
             // Workaround for the bug, when PTS functionality is enabled.
-            let _pts_workaround = php::fopen("Process.php", "r");
+            let _pts_workaround = shirabe_php_shim::fopen("Process.php", "r");
         }
 
         let mut env_pairs: Vec<String> = Vec::new();
@@ -368,7 +366,12 @@ impl Process {
             }
         }
 
-        if !self.cwd.as_deref().map(php::is_dir).unwrap_or(false) {
+        if !self
+            .cwd
+            .as_deref()
+            .map(shirabe_php_shim::is_dir)
+            .unwrap_or(false)
+        {
             return Err(RuntimeException::new(format!(
                 "The provided cwd \"{}\" does not exist.",
                 self.cwd.as_deref().unwrap_or("")
@@ -380,7 +383,7 @@ impl Process {
         let options = self.options.clone();
         let process = {
             let pipes = self.process_pipes.as_mut().unwrap().pipes_mut();
-            php::proc_open(
+            shirabe_php_shim::proc_open(
                 &commandline,
                 &descriptors,
                 pipes,
@@ -407,7 +410,7 @@ impl Process {
                 .get(&3)
                 .cloned();
             let pid = pipe3
-                .and_then(|p| php::fgets(&p, None))
+                .and_then(|p| shirabe_php_shim::fgets(&p, None))
                 .map(|s| s.trim().parse::<i64>().unwrap_or(0))
                 .unwrap_or(0);
             self.fallback_status
@@ -459,9 +462,12 @@ impl Process {
         loop {
             self.check_timeout()?;
             let running = self.is_running()
-                && (php::DIRECTORY_SEPARATOR == "\\"
+                && (shirabe_php_shim::DIRECTORY_SEPARATOR == "\\"
                     || self.process_pipes.as_ref().unwrap().are_open());
-            self.read_pipes(running, php::DIRECTORY_SEPARATOR != "\\" || !running);
+            self.read_pipes(
+                running,
+                shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" || !running,
+            );
             if !running {
                 break;
             }
@@ -469,14 +475,14 @@ impl Process {
 
         while self.is_running() {
             self.check_timeout()?;
-            php::usleep(1000);
+            shirabe_php_shim::usleep(1000);
         }
 
         let signaled = self
             .process_information
             .as_ref()
             .and_then(|i| i.get("signaled"))
-            .map(php::php_truthy)
+            .map(shirabe_php_shim::php_truthy)
             .unwrap_or(false);
         let termsig = self
             .process_information
@@ -507,16 +513,15 @@ impl Process {
         let mut ready = false;
         loop {
             self.check_timeout()?;
-            let running = if php::DIRECTORY_SEPARATOR == "\\" {
+            let running = if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
                 self.is_running()
             } else {
                 self.process_pipes.as_ref().unwrap().are_open()
             };
-            let output = self
-                .process_pipes
-                .as_mut()
-                .unwrap()
-                .read_and_write(running, php::DIRECTORY_SEPARATOR != "\\" || !running);
+            let output = self.process_pipes.as_mut().unwrap().read_and_write(
+                running,
+                shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" || !running,
+            );
 
             for (r#type, data) in output {
                 if r#type != 3 {
@@ -544,7 +549,7 @@ impl Process {
                 return Ok(false);
             }
 
-            php::usleep(1000);
+            shirabe_php_shim::usleep(1000);
         }
     }
 
@@ -609,19 +614,23 @@ impl Process {
     pub fn get_output(&mut self) -> anyhow::Result<String> {
         self.read_pipes_for_output("getOutput", false)?;
 
-        Ok(php::stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0).unwrap_or_default())
+        Ok(
+            shirabe_php_shim::stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0)
+                .unwrap_or_default(),
+        )
     }
 
     /// Returns the output incrementally.
     pub fn get_incremental_output(&mut self) -> anyhow::Result<String> {
         self.read_pipes_for_output("getIncrementalOutput", false)?;
 
-        let latest = php::stream_get_contents3(
+        let latest = shirabe_php_shim::stream_get_contents3(
             self.stdout.as_ref().unwrap(),
             -1,
             self.incremental_output_offset,
         );
-        self.incremental_output_offset = php::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
+        self.incremental_output_offset =
+            shirabe_php_shim::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
 
         Ok(latest.unwrap_or_default())
     }
@@ -639,14 +648,14 @@ impl Process {
 
         let mut yields = Vec::new();
         while self.callback.is_some()
-            || (yield_out && !php::feof(self.stdout.as_ref().unwrap()))
-            || (yield_err && !php::feof(self.stderr.as_ref().unwrap()))
+            || (yield_out && !shirabe_php_shim::feof(self.stdout.as_ref().unwrap()))
+            || (yield_err && !shirabe_php_shim::feof(self.stderr.as_ref().unwrap()))
         {
             let mut got_out = false;
             let mut got_err = false;
 
             if yield_out {
-                let out = php::stream_get_contents3(
+                let out = shirabe_php_shim::stream_get_contents3(
                     self.stdout.as_ref().unwrap(),
                     -1,
                     self.incremental_output_offset,
@@ -659,7 +668,7 @@ impl Process {
                         self.clear_output();
                     } else {
                         self.incremental_output_offset =
-                            php::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
+                            shirabe_php_shim::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
                     }
 
                     yields.push((Self::OUT.to_string(), out));
@@ -667,7 +676,7 @@ impl Process {
             }
 
             if yield_err {
-                let err = php::stream_get_contents3(
+                let err = shirabe_php_shim::stream_get_contents3(
                     self.stderr.as_ref().unwrap(),
                     -1,
                     self.incremental_error_output_offset,
@@ -680,7 +689,7 @@ impl Process {
                         self.clear_error_output();
                     } else {
                         self.incremental_error_output_offset =
-                            php::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
+                            shirabe_php_shim::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
                     }
 
                     yields.push((Self::ERR.to_string(), err));
@@ -700,8 +709,8 @@ impl Process {
 
     /// Clears the process output.
     pub fn clear_output(&mut self) -> &mut Self {
-        php::ftruncate(self.stdout.as_ref().unwrap(), 0);
-        php::fseek(self.stdout.as_ref().unwrap(), 0, php::SEEK_SET);
+        shirabe_php_shim::ftruncate(self.stdout.as_ref().unwrap(), 0);
+        shirabe_php_shim::fseek(self.stdout.as_ref().unwrap(), 0, shirabe_php_shim::SEEK_SET);
         self.incremental_output_offset = 0;
 
         self
@@ -711,28 +720,31 @@ impl Process {
     pub fn get_error_output(&mut self) -> anyhow::Result<String> {
         self.read_pipes_for_output("getErrorOutput", false)?;
 
-        Ok(php::stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0).unwrap_or_default())
+        Ok(
+            shirabe_php_shim::stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0)
+                .unwrap_or_default(),
+        )
     }
 
     /// Returns the errorOutput incrementally.
     pub fn get_incremental_error_output(&mut self) -> anyhow::Result<String> {
         self.read_pipes_for_output("getIncrementalErrorOutput", false)?;
 
-        let latest = php::stream_get_contents3(
+        let latest = shirabe_php_shim::stream_get_contents3(
             self.stderr.as_ref().unwrap(),
             -1,
             self.incremental_error_output_offset,
         );
         self.incremental_error_output_offset =
-            php::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
+            shirabe_php_shim::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
 
         Ok(latest.unwrap_or_default())
     }
 
     /// Clears the process error output.
     pub fn clear_error_output(&mut self) -> &mut Self {
-        php::ftruncate(self.stderr.as_ref().unwrap(), 0);
-        php::fseek(self.stderr.as_ref().unwrap(), 0, php::SEEK_SET);
+        shirabe_php_shim::ftruncate(self.stderr.as_ref().unwrap(), 0);
+        shirabe_php_shim::fseek(self.stderr.as_ref().unwrap(), 0, shirabe_php_shim::SEEK_SET);
         self.incremental_error_output_offset = 0;
 
         self
@@ -769,7 +781,7 @@ impl Process {
             .process_information
             .as_ref()
             .and_then(|i| i.get("signaled"))
-            .map(php::php_truthy)
+            .map(shirabe_php_shim::php_truthy)
             .unwrap_or(false))
     }
 
@@ -800,7 +812,7 @@ impl Process {
             .process_information
             .as_ref()
             .and_then(|i| i.get("stopped"))
-            .map(php::php_truthy)
+            .map(shirabe_php_shim::php_truthy)
             .unwrap_or(false))
     }
 
@@ -827,7 +839,7 @@ impl Process {
         self.process_information
             .as_ref()
             .and_then(|i| i.get("running"))
-            .map(php::php_truthy)
+            .map(shirabe_php_shim::php_truthy)
             .unwrap_or(false)
     }
 
@@ -852,14 +864,14 @@ impl Process {
 
     /// Stops the process.
     pub fn stop(&mut self, timeout: f64, signal: Option<i64>) -> Option<i64> {
-        let timeout_micro = php::microtime() + timeout;
+        let timeout_micro = shirabe_php_shim::microtime() + timeout;
         if self.is_running() {
             // given SIGTERM may not be defined and that "proc_terminate" uses the constant value
             // and not the constant itself, we use the same here
             let _ = self.do_signal(15, false);
             loop {
-                php::usleep(1000);
-                if !(self.is_running() && php::microtime() < timeout_micro) {
+                shirabe_php_shim::usleep(1000);
+                if !(self.is_running() && shirabe_php_shim::microtime() < timeout_micro) {
                     break;
                 }
             }
@@ -885,22 +897,30 @@ impl Process {
 
     /// Adds a line to the STDOUT stream.
     pub fn add_output(&mut self, line: &str) {
-        self.last_output_time = Some(php::microtime());
+        self.last_output_time = Some(shirabe_php_shim::microtime());
 
         let stdout = self.stdout.as_ref().unwrap();
-        php::fseek(stdout, 0, php::SEEK_END);
-        php::fwrite(stdout, line, Some(line.len() as i64));
-        php::fseek(stdout, self.incremental_output_offset, php::SEEK_SET);
+        shirabe_php_shim::fseek(stdout, 0, shirabe_php_shim::SEEK_END);
+        shirabe_php_shim::fwrite(stdout, line, Some(line.len() as i64));
+        shirabe_php_shim::fseek(
+            stdout,
+            self.incremental_output_offset,
+            shirabe_php_shim::SEEK_SET,
+        );
     }
 
     /// Adds a line to the STDERR stream.
     pub fn add_error_output(&mut self, line: &str) {
-        self.last_output_time = Some(php::microtime());
+        self.last_output_time = Some(shirabe_php_shim::microtime());
 
         let stderr = self.stderr.as_ref().unwrap();
-        php::fseek(stderr, 0, php::SEEK_END);
-        php::fwrite(stderr, line, Some(line.len() as i64));
-        php::fseek(stderr, self.incremental_error_output_offset, php::SEEK_SET);
+        shirabe_php_shim::fseek(stderr, 0, shirabe_php_shim::SEEK_END);
+        shirabe_php_shim::fwrite(stderr, line, Some(line.len() as i64));
+        shirabe_php_shim::fseek(
+            stderr,
+            self.incremental_error_output_offset,
+            shirabe_php_shim::SEEK_SET,
+        );
     }
 
     /// Gets the last output time in seconds.
@@ -953,7 +973,7 @@ impl Process {
 
     /// Enables or disables the TTY mode.
     pub fn set_tty(&mut self, tty: bool) -> anyhow::Result<&mut Self> {
-        if php::DIRECTORY_SEPARATOR == "\\" && tty {
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" && tty {
             return Err(RuntimeException::new(
                 "TTY mode is not supported on Windows platform.".to_string(),
             )
@@ -994,7 +1014,7 @@ impl Process {
         if self.cwd.is_none() {
             // getcwd() will return false if any one of the parent directories does not have
             // the readable or search mode set, even if the current directory does
-            return php::getcwd().filter(|s| !s.is_empty());
+            return shirabe_php_shim::getcwd().filter(|s| !s.is_empty());
         }
 
         self.cwd.clone()
@@ -1046,7 +1066,7 @@ impl Process {
         }
 
         if let Some(timeout) = self.timeout
-            && timeout < php::microtime() - self.starttime.unwrap_or(0.0)
+            && timeout < shirabe_php_shim::microtime() - self.starttime.unwrap_or(0.0)
         {
             self.stop(0.0, None);
 
@@ -1058,7 +1078,7 @@ impl Process {
         }
 
         if let Some(idle_timeout) = self.idle_timeout
-            && idle_timeout < php::microtime() - self.last_output_time.unwrap_or(0.0)
+            && idle_timeout < shirabe_php_shim::microtime() - self.last_output_time.unwrap_or(0.0)
         {
             self.stop(0.0, None);
 
@@ -1119,7 +1139,7 @@ impl Process {
 
         *IS_TTY_SUPPORTED.get_or_init(|| {
             let mut pipes = IndexMap::new();
-            php::proc_open(
+            shirabe_php_shim::proc_open(
                 "echo 1 >/dev/null",
                 &[
                     descriptor(&["file", "/dev/tty", "r"]),
@@ -1140,12 +1160,12 @@ impl Process {
         static RESULT: OnceLock<bool> = OnceLock::new();
 
         *RESULT.get_or_init(|| {
-            if php::DIRECTORY_SEPARATOR == "\\" {
+            if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
                 return false;
             }
 
             let mut pipes = IndexMap::new();
-            php::proc_open(
+            shirabe_php_shim::proc_open(
                 "echo 1 >/dev/null",
                 &[
                     descriptor(&["pty"]),
@@ -1164,7 +1184,7 @@ impl Process {
     /// Creates the descriptors needed by the proc_open.
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
         // TODO(plugin): $this->input instanceof \Iterator -> rewind() is not modeled.
-        if php::DIRECTORY_SEPARATOR == "\\" {
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
             self.process_pipes = Some(Box::new(WindowsPipes::new(
                 self.input.clone(),
                 !self.output_disabled || self.has_callback,
@@ -1219,17 +1239,19 @@ impl Process {
             return;
         }
 
-        self.process_information = Some(php::proc_get_status(self.process.as_ref().unwrap()));
+        self.process_information = Some(shirabe_php_shim::proc_get_status(
+            self.process.as_ref().unwrap(),
+        ));
         let running = self
             .process_information
             .as_ref()
             .unwrap()
             .get("running")
-            .map(php::php_truthy)
+            .map(shirabe_php_shim::php_truthy)
             .unwrap_or(false);
 
         // In PHP < 8.3, "proc_get_status" only returns the correct exit status on the first call.
-        if php::PHP_VERSION_ID < 80300 {
+        if shirabe_php_shim::PHP_VERSION_ID < 80300 {
             let exitcode = self
                 .process_information
                 .as_ref()
@@ -1253,7 +1275,7 @@ impl Process {
 
         self.read_pipes(
             running && blocking,
-            php::DIRECTORY_SEPARATOR != "\\" || !running,
+            shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" || !running,
         );
 
         if !self.fallback_status.is_empty() && self.is_sigchild_enabled() {
@@ -1278,16 +1300,16 @@ impl Process {
             return *v;
         }
 
-        if !php::function_exists("phpinfo") {
+        if !shirabe_php_shim::function_exists("phpinfo") {
             return *SIGCHILD.get_or_init(|| false);
         }
 
-        php::ob_start();
-        php::phpinfo(php::INFO_GENERAL);
+        shirabe_php_shim::ob_start();
+        shirabe_php_shim::phpinfo(shirabe_php_shim::INFO_GENERAL);
 
         *SIGCHILD.get_or_init(|| {
-            php::str_contains(
-                &php::ob_get_clean().unwrap_or_default(),
+            shirabe_php_shim::str_contains(
+                &shirabe_php_shim::ob_get_clean().unwrap_or_default(),
                 "--enable-sigchild",
             )
         })
@@ -1359,7 +1381,7 @@ impl Process {
             p.close();
         }
         if self.process.is_some() {
-            php::proc_close(self.process.as_ref().unwrap());
+            shirabe_php_shim::proc_close(self.process.as_ref().unwrap());
             self.process = None;
         }
         self.exitcode = self
@@ -1374,7 +1396,7 @@ impl Process {
                 .process_information
                 .as_ref()
                 .and_then(|i| i.get("signaled"))
-                .map(php::php_truthy)
+                .map(shirabe_php_shim::php_truthy)
                 .unwrap_or(false);
             let termsig = self
                 .process_information
@@ -1407,10 +1429,14 @@ impl Process {
         self.fallback_status = IndexMap::new();
         self.process_information = None;
         // php://temp is an in-memory stream; fopen never fails for it.
-        self.stdout =
-            Some(php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
-        self.stderr =
-            Some(php::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
+        self.stdout = Some(
+            shirabe_php_shim::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+")
+                .unwrap(),
+        );
+        self.stderr = Some(
+            shirabe_php_shim::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+")
+                .unwrap(),
+        );
         self.process = None;
         self.latest_signal = None;
         self.status = Self::STATUS_READY.to_string();
@@ -1434,10 +1460,10 @@ impl Process {
             Some(pid) => pid,
         };
 
-        if php::DIRECTORY_SEPARATOR == "\\" {
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
             let mut output: Vec<String> = Vec::new();
             let mut exit_code: i64 = 0;
-            php::exec(
+            shirabe_php_shim::exec(
                 &format!("taskkill /F /T /PID {} 2>&1", pid),
                 Some(&mut output),
                 Some(&mut exit_code),
@@ -1456,12 +1482,12 @@ impl Process {
         } else {
             let ok;
             if !self.is_sigchild_enabled() {
-                ok = php::proc_terminate(self.process.as_ref().unwrap(), signal);
-            } else if php::function_exists("posix_kill") {
-                ok = php::posix_kill(pid, signal);
+                ok = shirabe_php_shim::proc_terminate(self.process.as_ref().unwrap(), signal);
+            } else if shirabe_php_shim::function_exists("posix_kill") {
+                ok = shirabe_php_shim::posix_kill(pid, signal);
             } else {
                 let mut pipes = IndexMap::new();
-                let opened = php::proc_open(
+                let opened = shirabe_php_shim::proc_open(
                     &format!("kill -{} {}", signal, pid),
                     &[
                         Descriptor::Inherit,
@@ -1474,7 +1500,10 @@ impl Process {
                     None,
                 );
                 ok = match opened {
-                    Ok(_) => pipes.get(&2).and_then(|p| php::fgets(p, None)).is_none(),
+                    Ok(_) => pipes
+                        .get(&2)
+                        .and_then(|p| shirabe_php_shim::fgets(p, None))
+                        .is_none(),
                     Err(_) => false,
                 };
             }
@@ -1509,10 +1538,10 @@ impl Process {
         cmd: &str,
         env: &mut IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<String> {
-        let uid = php::uniqid("", true);
+        let uid = shirabe_php_shim::uniqid("", true);
         let mut var_count = 0;
         let mut var_cache: IndexMap<String, String> = IndexMap::new();
-        let cmd = php::preg_replace_callback(
+        let cmd = shirabe_php_shim::preg_replace_callback(
             r#"/"(?:(
                 [^"%!^]*+
                 (?:
@@ -1533,7 +1562,7 @@ impl Process {
                 if value.contains('\0') {
                     value = value.replace('\0', "?");
                 }
-                if php::strpbrk(&value, "\"%!\n").is_none() {
+                if shirabe_php_shim::strpbrk(&value, "\"%!\n").is_none() {
                     return Ok(format!("\"{}\"", value));
                 }
 
@@ -1548,7 +1577,7 @@ impl Process {
                 }
                 value = format!(
                     "\"{}\"",
-                    php::preg_replace(r#"/(\\*)"/"#, "$1$1\\\"", &value)
+                    shirabe_php_shim::preg_replace(r#"/(\\*)"/"#, "$1$1\\\"", &value)
                 );
                 var_count += 1;
                 let var = format!("{}{}", uid, var_count);
@@ -1570,7 +1599,7 @@ impl Process {
                     .map(|spec| {
                         format!(
                             "\"{}\"",
-                            php::preg_replace(r#"{(\\*+)"}"#, "$1$1\\\"", &spec)
+                            shirabe_php_shim::preg_replace(r#"{(\\*+)"}"#, "$1$1\\\"", &spec)
                         )
                     })
             })
@@ -1618,17 +1647,21 @@ impl Process {
             None | Some("") => return "\"\"".to_string(),
             Some(a) => a,
         };
-        if php::DIRECTORY_SEPARATOR != "\\" {
+        if shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" {
             return format!("'{}'", argument.replace('\'', "'\\''"));
         }
         let mut argument = argument.to_string();
         if argument.contains('\0') {
             argument = argument.replace('\0', "?");
         }
-        if !php::preg_match(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#, &argument, &mut Vec::new()) {
+        if !shirabe_php_shim::preg_match(
+            r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#,
+            &argument,
+            &mut Vec::new(),
+        ) {
             return argument;
         }
-        argument = php::preg_replace(r"/(\\+)$/", "$1$1", &argument);
+        argument = shirabe_php_shim::preg_replace(r"/(\\+)$/", "$1$1", &argument);
 
         let mut result = argument;
         for (from, to) in [
@@ -1648,7 +1681,7 @@ impl Process {
         commandline: &str,
         env: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<String> {
-        php::preg_replace_callback(
+        shirabe_php_shim::preg_replace_callback(
             r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#,
             |matches: &[Option<String>]| -> anyhow::Result<String> {
                 let key = matches.get(1).cloned().flatten().unwrap_or_default();
@@ -1671,7 +1704,7 @@ impl Process {
     }
 
     fn get_default_env(&self) -> IndexMap<String, PhpMixed> {
-        let env: IndexMap<String, String> = php::getenv_all()
+        let env: IndexMap<String, String> = shirabe_php_shim::getenv_all()
             .map(|(k, v)| {
                 (
                     k.to_string_lossy().into_owned(),
@@ -1679,7 +1712,7 @@ impl Process {
                 )
             })
             .collect();
-        let server = php::PHP_SERVER.lock().unwrap();
+        let server = shirabe_php_shim::PHP_SERVER.lock().unwrap();
 
         // non-Windows: array_intersect_key($env, $_SERVER) ?: $env
         let mut intersect: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -1697,7 +1730,7 @@ impl Process {
         };
 
         // $_ENV + env_map
-        let mut result: IndexMap<String, PhpMixed> = php::PHP_ENV
+        let mut result: IndexMap<String, PhpMixed> = shirabe_php_shim::PHP_ENV
             .lock()
             .unwrap()
             .get_all()
@@ -1739,7 +1772,7 @@ impl Drop for Process {
         if self
             .options
             .get("create_new_console")
-            .map(php::php_truthy)
+            .map(shirabe_php_shim::php_truthy)
             .unwrap_or(false)
         {
             if let Some(p) = self.process_pipes.as_mut() {

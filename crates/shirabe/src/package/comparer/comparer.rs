@@ -1,9 +1,8 @@
 //! ref: composer/src/Composer/Package/Comparer/Comparer.php
 
+use crate::util::Platform;
 use indexmap::IndexMap;
 use std::path::Path;
-
-use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct Comparer {

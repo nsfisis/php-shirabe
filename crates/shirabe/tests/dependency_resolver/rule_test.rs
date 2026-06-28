@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleTest.php
 
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::{
     GenericRule, Pool, RULE_PACKAGE_REQUIRES, RULE_ROOT_REQUIRE, ReasonData, Request, Rule, RuleSet,
@@ -8,8 +9,6 @@ use shirabe::package::Link;
 use shirabe::repository::RepositorySet;
 use shirabe_php_shim::{PHP_VERSION_ID, hash_raw, unpack};
 use shirabe_semver::constraint::MatchAllConstraint;
-
-use crate::test_case::get_package;
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {

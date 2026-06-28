@@ -1,8 +1,7 @@
 //! ref: composer/vendor/symfony/process/ProcessUtils.php
 
-use shirabe_php_shim::{self as php, PhpMixed};
-
 use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
+use shirabe_php_shim::PhpMixed;
 
 /// ProcessUtils is a bunch of utility methods.
 #[derive(Debug)]
@@ -12,10 +11,10 @@ impl ProcessUtils {
     /// Validates and normalizes a Process input.
     pub fn validate_input(caller: &str, input: PhpMixed) -> anyhow::Result<PhpMixed> {
         if !input.is_null() {
-            if php::is_string(&input) {
+            if shirabe_php_shim::is_string(&input) {
                 return Ok(input);
             }
-            if php::is_scalar(&input) {
+            if shirabe_php_shim::is_scalar(&input) {
                 let s = match &input {
                     PhpMixed::Bool(b) => {
                         if *b {

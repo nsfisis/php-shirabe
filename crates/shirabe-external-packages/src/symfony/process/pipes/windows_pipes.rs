@@ -1,10 +1,9 @@
 //! ref: composer/vendor/symfony/process/Pipes/WindowsPipes.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
-
 use crate::symfony::process::pipes::abstract_pipes::AbstractPipes;
 use crate::symfony::process::pipes::pipes_interface::PipesInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
 
 /// WindowsPipes implementation uses temporary files as handles.
 #[derive(Debug)]

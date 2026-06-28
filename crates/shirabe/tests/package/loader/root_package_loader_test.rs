@@ -4,9 +4,7 @@
 // ProcessExecutor / VersionGuesser or require constraints whose parsing goes through a
 // look-around regex the regex crate cannot compile.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -23,8 +21,8 @@ use shirabe::util::Git as GitUtil;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-
-use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn null_io() -> Rc<RefCell<dyn IOInterface>> {
     Rc::new(RefCell::new(NullIO::new()))

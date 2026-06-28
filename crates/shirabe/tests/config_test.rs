@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/ConfigTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::advisory::Auditor;
@@ -11,6 +8,8 @@ use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::Platform;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[path = "common/io_mock.rs"]
 #[allow(dead_code)] // io_mock exposes more helpers than this binary uses

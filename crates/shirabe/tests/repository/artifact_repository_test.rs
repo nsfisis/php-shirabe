@@ -1,12 +1,11 @@
 //! ref: composer/tests/Composer/Test/Repository/ArtifactRepositoryTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
 use shirabe_php_shim::{PhpMixed, extension_loaded};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Returns true when the test should be skipped because the zip extension is
 /// unavailable, mirroring PHP's markTestSkipped in setUp.

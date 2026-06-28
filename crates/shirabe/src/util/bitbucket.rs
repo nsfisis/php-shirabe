@@ -1,16 +1,15 @@
 //! ref: composer/src/Composer/Util/Bitbucket.php
 
-use crate::io::io_interface;
-use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, PhpMixed, time};
-
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use indexmap::IndexMap;
+use shirabe_php_shim::{LogicException, PhpMixed, time};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
     err.downcast_ref::<TransportException>().map(|te| te.code)

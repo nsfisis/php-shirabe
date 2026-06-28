@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/FilterRepositoryTest.php
 
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::package::base_package::STABILITIES;
 use shirabe::repository::{
@@ -7,8 +8,6 @@ use shirabe::repository::{
     RepositoryInterfaceHandle,
 };
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
-
-use crate::test_case::get_package;
 
 fn set_up() -> RepositoryInterfaceHandle {
     let repo = ArrayRepository::new(vec![

@@ -1,15 +1,5 @@
 //! ref: composer/src/Composer/Repository/ArrayRepository.php
 
-use std::cell::RefCell;
-use std::rc::Weak;
-
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{implode, preg_quote, strtolower};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::package::AliasPackageHandle;
 use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackageHandle;
@@ -21,6 +11,14 @@ use crate::repository::{
     AbandonedInfo, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
 };
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{implode, preg_quote, strtolower};
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
+use std::cell::RefCell;
+use std::rc::Weak;
 
 /// A repository implementation that simply stores packages in an array
 #[derive(Debug)]

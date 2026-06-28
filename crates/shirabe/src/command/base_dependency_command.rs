@@ -1,14 +1,5 @@
 //! ref: composer/src/Composer/Command/BaseDependencyCommand.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::Bound;
-
 use crate::command::BaseCommand;
 use crate::io::IOInterfaceImmutable;
 use crate::package::Package;
@@ -22,6 +13,14 @@ use crate::repository::RootPackageRepository;
 use crate::repository::{DependentsEntry, InstalledRepository, NeedleInput};
 use crate::repository::{FindPackageConstraint, RepositoryInterface};
 use crate::util::PackageInfo;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::Bound;
 
 pub const ARGUMENT_PACKAGE: &str = "package";
 pub const ARGUMENT_CONSTRAINT: &str = "version";

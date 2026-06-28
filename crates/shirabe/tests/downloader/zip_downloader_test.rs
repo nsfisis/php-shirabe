@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/ZipDownloaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::io_stub::IOStub;
 use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::downloader::ArchiveDownloader;
@@ -14,9 +12,9 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::{ZipArchive, ZipArchiveMock};
 use shirabe_semver::VersionParser;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::io_stub::IOStub;
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()

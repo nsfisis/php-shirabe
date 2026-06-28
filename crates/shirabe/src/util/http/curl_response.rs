@@ -1,9 +1,8 @@
 //! ref: composer/src/Composer/Util/Http/CurlResponse.php
 
+use super::Response;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-
-use super::Response;
 
 #[derive(Debug)]
 pub struct CurlResponse {

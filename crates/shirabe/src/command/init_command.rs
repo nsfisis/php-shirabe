@@ -1,6 +1,22 @@
 //! ref: composer/src/Composer/Command/InitCommand.php
 
+use crate::command::PackageDiscoveryTrait;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::InputOption;
+use crate::factory::Factory;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::json::JsonFile;
+use crate::json::JsonValidationException;
+use crate::package::base_package::{self};
+use crate::repository::CompositeRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::PlatformRepositoryHandle;
+use crate::repository::RepositoryFactory;
+use crate::util::Filesystem;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -18,23 +34,6 @@ use shirabe_php_shim::{
 use shirabe_spdx_licenses::SpdxLicenses;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::command::PackageDiscoveryTrait;
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputOption;
-use crate::factory::Factory;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonFile;
-use crate::json::JsonValidationException;
-use crate::package::base_package::{self};
-use crate::repository::CompositeRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::PlatformRepositoryHandle;
-use crate::repository::RepositoryFactory;
-use crate::util::Filesystem;
-use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 
 #[derive(Debug)]
 pub struct InitCommand {

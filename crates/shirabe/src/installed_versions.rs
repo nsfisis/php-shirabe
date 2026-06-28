@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/InstalledVersions.php
 
-use std::sync::Mutex;
-
+use crate::autoload::ClassLoader;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -9,8 +8,7 @@ use shirabe_php_shim::{
     implode, is_file, method_exists, php_dir, require_php_file, strtr_array, substr,
 };
 use shirabe_semver::VersionParser;
-
-use crate::autoload::ClassLoader;
+use std::sync::Mutex;
 
 /// This class is copied in every Composer installed project and available to all
 ///

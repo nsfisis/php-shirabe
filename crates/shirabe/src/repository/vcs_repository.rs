@@ -1,17 +1,11 @@
 //! ref: composer/src/Composer/Repository/VcsRepository.php
 
-use crate::io::io_interface;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, in_array, str_replace, strpos};
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::loader::ArrayLoader;
@@ -32,6 +26,11 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, in_array, str_replace, strpos};
+use shirabe_semver::constraint::SimpleConstraint;
 
 // TODO(phase-c): the driver registration should be refactored later.
 #[derive(Debug)]

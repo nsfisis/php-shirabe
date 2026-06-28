@@ -1,20 +1,9 @@
 //! ref: composer/src/Composer/Util/Git.php
 
-use crate::io::io_interface;
-use anyhow::Result;
-use indexmap::IndexMap;
-use std::sync::Mutex;
-
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map, clearstatcache,
-    explode, implode, in_array, is_callable, is_dir, preg_quote, rawurldecode, rawurlencode,
-    str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
-};
-
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::util::Bitbucket;
 use crate::util::Filesystem;
 use crate::util::GitHub;
@@ -24,6 +13,15 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use crate::util::{AuthHelper, StoreAuth};
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{
+    InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map, clearstatcache,
+    explode, implode, in_array, is_callable, is_dir, preg_quote, rawurldecode, rawurlencode,
+    str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
+};
+use std::sync::Mutex;
 
 #[derive(Debug)]
 pub struct Git {

@@ -1,14 +1,5 @@
 //! ref: composer/src/Composer/Package/Version/VersionGuesser.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
-    function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,
-    strnatcasecmp, strpos, substr, trim, usort,
-};
-
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::io::NullIO;
@@ -19,6 +10,14 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{
+    PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
+    function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,
+    strnatcasecmp, strpos, substr, trim, usort,
+};
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
 /// with a test double. PHP has no such interface; this exists only to allow mocking the concrete

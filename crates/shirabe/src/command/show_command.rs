@@ -1,25 +1,5 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{
-    DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, date, date_format_to_strftime, extension_loaded, in_array, realpath, strtolower,
-    version_compare,
-};
-use shirabe_semver::Semver;
-use shirabe_spdx_licenses::SpdxLicenses;
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use shirabe_semver::constraint::AnyConstraint;
-
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
@@ -52,6 +32,24 @@ use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{
+    DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
+    array_search, date, date_format_to_strftime, extension_loaded, in_array, realpath, strtolower,
+    version_compare,
+};
+use shirabe_semver::Semver;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_spdx_licenses::SpdxLicenses;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ShowCommand {

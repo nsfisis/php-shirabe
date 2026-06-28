@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/Downloader/XzDownloaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::DownloaderInterface;
@@ -17,6 +14,8 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)

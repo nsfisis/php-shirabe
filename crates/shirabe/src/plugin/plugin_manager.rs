@@ -4,15 +4,6 @@
 //! and is not implemented in Phase A. The structure is mirrored verbatim so
 //! future plugin support can fill in the runtime hooks.
 
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, array_key_exists,
-    get_class_obj, implode, ksort, trigger_error, trim, var_export_str, version_compare,
-};
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::composer::PartialComposerHandle;
 use crate::composer::{ComposerHandle, ComposerWeakHandle};
 use crate::factory::DisablePlugins;
@@ -31,6 +22,13 @@ use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryUtils;
 use crate::util::PackageSorter;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, array_key_exists,
+    get_class_obj, implode, ksort, trigger_error, trim, var_export_str, version_compare,
+};
+use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct PluginManager {

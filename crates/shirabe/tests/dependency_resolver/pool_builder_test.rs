@@ -1,9 +1,5 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolBuilderTest.php
 
-use std::cell::RefCell;
-use std::path::PathBuf;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
@@ -26,6 +22,9 @@ use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::PREG_SPLIT_DELIM_CAPTURE;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 /// Maps the PHP `$loadPackage` closure: pops the optional `id` from the data, loads the
 /// package and records it in `package_ids` keyed by that id (erroring on duplicates).

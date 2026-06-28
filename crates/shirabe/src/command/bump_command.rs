@@ -1,7 +1,20 @@
 //! ref: composer/src/Composer/Command/BumpCommand.php
 
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::factory::Factory;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::json::JsonFile;
+use crate::json::JsonManipulator;
 use crate::package::base_package;
+use crate::package::version::VersionBumper;
+use crate::repository::PlatformRepository;
+use crate::util::Filesystem;
+use crate::util::Silencer;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -10,20 +23,6 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::factory::Factory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonFile;
-use crate::json::JsonManipulator;
-use crate::package::version::VersionBumper;
-use crate::repository::PlatformRepository;
-use crate::util::Filesystem;
-use crate::util::Silencer;
 
 #[derive(Debug)]
 pub struct BumpCommand {
@@ -180,7 +179,7 @@ impl BumpCommand {
             let unique_lower: Vec<String> = packages_filter
                 .iter()
                 .map(|s| strtolower(s))
-                .collect::<std::collections::HashSet<_>>()
+                .collect::<indexmap::IndexSet<_>>()
                 .into_iter()
                 .collect();
             let pattern = base_package::package_names_to_regexp(&unique_lower, "{^(?:%s)$}iD");

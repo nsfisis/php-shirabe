@@ -1,15 +1,13 @@
 //! ref: composer/vendor/composer/semver/src/Intervals.php
 
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-
 use crate::constraint::AnyConstraint;
 use crate::constraint::MatchAllConstraint;
 use crate::constraint::MatchNoneConstraint;
 use crate::constraint::MultiConstraint;
 use crate::constraint::SimpleConstraint;
 use crate::interval::{DevConstraintSet, Interval};
-use shirabe_php_shim as php;
+use indexmap::IndexMap;
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Debug, Clone)]
 pub struct IntervalCollection {
@@ -17,10 +15,10 @@ pub struct IntervalCollection {
     pub branches: DevConstraintSet,
 }
 
-static INTERVALS_CACHE: OnceLock<Mutex<HashMap<String, IntervalCollection>>> = OnceLock::new();
+static INTERVALS_CACHE: OnceLock<Mutex<IndexMap<String, IntervalCollection>>> = OnceLock::new();
 
-fn intervals_cache() -> &'static Mutex<HashMap<String, IntervalCollection>> {
-    INTERVALS_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+fn intervals_cache() -> &'static Mutex<IndexMap<String, IntervalCollection>> {
+    INTERVALS_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
 fn op_sort_order(op: &str) -> i64 {
@@ -38,7 +36,7 @@ pub struct Intervals;
 
 impl Intervals {
     pub fn clear() {
-        *intervals_cache().lock().unwrap() = HashMap::new();
+        *intervals_cache().lock().unwrap() = IndexMap::new();
     }
 
     pub fn is_subset_of(
@@ -418,7 +416,7 @@ impl Intervals {
             branches
         };
 
-        branches.names = php::array_unique(&branches.names);
+        branches.names = shirabe_php_shim::array_unique(&branches.names);
 
         if numeric_groups.len() == 1 {
             return Ok(IntervalCollection {
@@ -445,7 +443,7 @@ impl Intervals {
         }
 
         borders.sort_by(|a, b| {
-            let order = php::version_compare_2(&a.0, &b.0);
+            let order = shirabe_php_shim::version_compare_2(&a.0, &b.0);
             if order == 0 {
                 let diff = op_sort_order(&a.1) - op_sort_order(&b.1);
                 diff.cmp(&0)
@@ -479,7 +477,7 @@ impl Intervals {
             } else if start.is_some() && active_intervals < activation_threshold {
                 let start_c = start.take().unwrap();
                 // filter out invalid intervals like > x - <= x, or >= x - < x
-                if php::version_compare(start_c.get_version(), version, "=")
+                if shirabe_php_shim::version_compare(start_c.get_version(), version, "=")
                     && ((start_c.get_operator() == ">" && operator == "<=")
                         || (start_c.get_operator() == ">=" && operator == "<"))
                 {

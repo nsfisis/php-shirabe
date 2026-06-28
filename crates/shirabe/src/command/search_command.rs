@@ -1,15 +1,5 @@
 //! ref: composer/src/Composer/Command/SearchCommand.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote};
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputArgument;
@@ -22,6 +12,15 @@ use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::repository_interface::{self, RepositoryInterface};
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct SearchCommand {

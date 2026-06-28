@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/process/PhpExecutableFinder.php
 
 use super::executable_finder::ExecutableFinder;
-use shirabe_php_shim::{self as php};
 
 #[derive(Debug)]
 pub struct PhpExecutableFinder {
@@ -23,16 +22,16 @@ impl PhpExecutableFinder {
 
     /// Finds The PHP executable.
     pub fn find(&self, include_args: bool) -> Option<String> {
-        if let Some(php) = php::getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
+        if let Some(php) = shirabe_php_shim::getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
             let mut php = php.to_string_lossy().into_owned();
-            if !php::is_executable(&php) {
+            if !shirabe_php_shim::is_executable(&php) {
                 match self.executable_finder.find(&php, None, &[]) {
                     Some(found) => php = found,
                     None => return None,
                 }
             }
 
-            if php::is_dir(&php) {
+            if shirabe_php_shim::is_dir(&php) {
                 return None;
             }
 

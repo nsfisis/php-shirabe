@@ -1,5 +1,16 @@
 //! ref: composer/src/Composer/Command/LicensesCommand.php
 
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::InputOption;
+use crate::io::IOInterfaceImmutable;
+use crate::json::JsonFile;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryUtils;
+use crate::util::PackageInfo;
+use crate::util::PackageSorter;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -12,18 +23,6 @@ use shirabe_external_packages::symfony::console::style::SymfonyStyle;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputOption;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonFile;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryUtils;
-use crate::util::PackageInfo;
-use crate::util::PackageSorter;
 
 #[derive(Debug)]
 pub struct LicensesCommand {

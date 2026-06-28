@@ -1,12 +1,5 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php
 
-use anyhow::Result;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
@@ -20,6 +13,12 @@ use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::util::ConfigValidator;
 use crate::util::Filesystem;
+use anyhow::Result;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ValidateCommand {

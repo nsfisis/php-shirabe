@@ -1,13 +1,12 @@
 //! ref: composer/tests/Composer/Test/CacheTest.php
 
-use std::cell::RefCell;
-use std::fs;
-use std::rc::Rc;
-
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::filesystem::Filesystem;
+use std::cell::RefCell;
+use std::fs;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {

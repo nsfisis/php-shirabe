@@ -3,13 +3,12 @@
 //! No weak handles are provided: an alias package never aliases another alias package, so the
 //! `alias_of` references are acyclic.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::package::{
     AliasPackage, CompleteAliasPackage, CompletePackage, CompletePackageInterface, Package,
     PackageInterface, RootAliasPackage, RootPackage, RootPackageInterface,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Any package type.
 #[derive(Debug, Clone)]

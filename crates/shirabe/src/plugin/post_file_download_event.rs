@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/Plugin/PostFileDownloadEvent.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct PostFileDownloadEvent {

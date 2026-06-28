@@ -1,15 +1,8 @@
 //! ref: composer/src/Composer/Repository/ArtifactRepository.php
 
-use crate::io::io_interface;
-use std::path::Path;
-
-use indexmap::IndexMap;
-use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,
-};
-
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
@@ -24,7 +17,12 @@ use crate::repository::{
 use crate::util::Platform;
 use crate::util::Tar;
 use crate::util::Zip;
+use indexmap::IndexMap;
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,
+};
 use shirabe_semver::constraint::AnyConstraint;
+use std::path::Path;
 
 pub struct ArtifactRepository {
     inner: ArrayRepository,

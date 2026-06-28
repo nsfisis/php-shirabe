@@ -1,17 +1,15 @@
 //! Shared handle over `RepositoryInterface`.
 
-use std::cell::{Ref, RefCell, RefMut};
-use std::rc::{Rc, Weak};
-
-use indexmap::IndexMap;
-use shirabe_semver::constraint::AnyConstraint;
-
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, LockArrayRepository, PlatformRepository,
     ProviderInfo, RepositoryInterface, SearchResult,
 };
+use indexmap::IndexMap;
+use shirabe_semver::constraint::AnyConstraint;
+use std::cell::{Ref, RefCell, RefMut};
+use std::rc::{Rc, Weak};
 
 /// Shared reference to a repository. Corresponds to PHP `RepositoryInterface`.
 #[derive(Debug, Clone)]

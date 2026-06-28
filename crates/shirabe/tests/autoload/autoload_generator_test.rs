@@ -1,12 +1,8 @@
 //! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::config_stub::ConfigStubBuilder;
 use indexmap::IndexMap;
 use serial_test::serial;
-use tempfile::TempDir;
-
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
@@ -23,8 +19,9 @@ use shirabe::util::r#loop::Loop;
 use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
-
-use crate::config_stub::ConfigStubBuilder;
+use std::cell::RefCell;
+use std::rc::Rc;
+use tempfile::TempDir;
 
 /// The mock `InstallationManager::getInstallPath` used throughout the test: metapackages return
 /// null, every other package returns `vendorDir/<name>(/<targetDir>)`. Registered as an installer

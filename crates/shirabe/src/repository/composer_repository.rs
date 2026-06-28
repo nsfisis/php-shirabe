@@ -1,19 +1,5 @@
 //! ref: composer/src/Composer/Repository/ComposerRepository.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_metadata_minifier::MetadataMinifier;
-use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
-    UnexpectedValueException, extension_loaded, hash, http_build_query, in_array, json_decode,
-    parse_url_all, realpath, strtolower, strtr, urlencode, var_export,
-};
-
-use shirabe_semver::CompilingMatcher;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
 use crate::cache::Cache;
 use crate::config::Config;
@@ -46,6 +32,18 @@ use crate::util::HttpDownloader;
 use crate::util::Url;
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_metadata_minifier::MetadataMinifier;
+use shirabe_php_shim::{
+    InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
+    UnexpectedValueException, extension_loaded, hash, http_build_query, in_array, json_decode,
+    parse_url_all, realpath, strtolower, strtr, urlencode, var_export,
+};
+use shirabe_semver::CompilingMatcher;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub enum RootData {

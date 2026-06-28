@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/Package/LockerTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::installer::InstallationManager;
@@ -17,6 +14,8 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{LogicException, PhpMixed, hash};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
 
 fn null_io() -> Rc<RefCell<dyn IOInterface>> {

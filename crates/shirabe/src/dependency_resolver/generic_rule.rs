@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/GenericRule.php
 
+use super::rule::ReasonData;
 use crate::dependency_resolver::{Rule, RuleBase};
 use anyhow::Result;
 use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw, unpack};
-
-use super::rule::ReasonData;
 
 #[derive(Debug)]
 pub struct GenericRule {

@@ -1,16 +1,14 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSet.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use indexmap::IndexMap;
-use shirabe_php_shim::OutOfBoundsException;
-
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::Rule;
 use crate::dependency_resolver::RuleSetIterator;
 use crate::repository::RepositorySet;
+use indexmap::IndexMap;
+use shirabe_php_shim::OutOfBoundsException;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RuleSet {

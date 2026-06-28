@@ -1,5 +1,10 @@
 //! ref: composer/src/Composer/Util/Perforce.php
 
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -10,12 +15,6 @@ use shirabe_php_shim::{
     file_get_contents, fopen, fwrite, gethostname, json_decode, str_replace_array, strcmp, strlen,
     strpos, strrpos, substr, time, trim,
 };
-
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
 
 /// @phpstan-type RepoConfig array{unique_perforce_client_name?: string, depot?: string, branch?: string, p4user?: string, p4password?: string}
 #[derive(Debug)]

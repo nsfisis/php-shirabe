@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/Script/EventTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
@@ -12,6 +9,8 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};
 use shirabe::script::{Event, OriginatingEvent};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn create_composer_instance() -> ComposerHandle {
     let composer =

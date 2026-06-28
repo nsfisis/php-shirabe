@@ -1,5 +1,8 @@
 //! ref: composer/src/Composer/Filter/PlatformRequirementFilter/IgnoreListPlatformRequirementFilter.php
 
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::package::base_package::{self};
+use crate::repository::PlatformRepository;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_semver::Interval;
 use shirabe_semver::Intervals;
@@ -7,10 +10,6 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::package::base_package::{self};
-use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
 pub struct IgnoreListPlatformRequirementFilter {

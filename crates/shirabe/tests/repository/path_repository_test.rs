@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/PathRepositoryTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
@@ -13,8 +11,8 @@ use shirabe::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PhpMixed, file_get_contents, hash, realpath, serialize,
 };
-
-use crate::test_case::get_package;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn fixtures_dir() -> String {
     format!(

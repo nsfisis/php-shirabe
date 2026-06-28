@@ -1,7 +1,11 @@
 //! ref: composer/src/Composer/Package/Loader/ValidatingArrayLoader.php
 
+use crate::package::loader::InvalidPackageException;
+use crate::package::loader::LoaderInterface;
+use crate::package::version::VersionParser;
+use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, filter_var_email,
@@ -13,12 +17,6 @@ use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_spdx_licenses::SpdxLicenses;
-
-use crate::package::loader::InvalidPackageException;
-use crate::package::loader::LoaderInterface;
-use crate::package::version::VersionParser;
-use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
-use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
 pub struct ValidatingArrayLoader {

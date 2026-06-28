@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Package/Loader/RootPackageLoader.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, strtolower};
-
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -18,6 +14,9 @@ use crate::repository::RepositoryFactory;
 use crate::repository::RepositoryManager;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, strtolower};
 
 #[derive(Debug)]
 pub struct RootPackageLoader {

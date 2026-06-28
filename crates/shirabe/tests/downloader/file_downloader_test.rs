@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Downloader/FileDownloaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::http_downloader_mock::get_http_downloader_mock;
+use crate::io_mock::{Expectation, get_io_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::cache::{Cache, CacheMock};
@@ -15,16 +14,15 @@ use shirabe::io::null_io::NullIO;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
+use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
 };
 use shirabe_semver::VersionParser;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::http_downloader_mock::get_http_downloader_mock;
-use crate::io_mock::{Expectation, get_io_mock};
-use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {

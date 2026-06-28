@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSetIterator.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::dependency_resolver::Rule;
 use indexmap::IndexMap;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Implements PHP \Iterator over a grouped rule set.
 #[derive(Debug)]

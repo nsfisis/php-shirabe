@@ -1,10 +1,5 @@
 //! ref: composer/src/Composer/Package/AliasPackage.php
 
-use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, in_array};
-use shirabe_semver::constraint::SimpleConstraint;
-
 use crate::package::BasePackage;
 use crate::package::Link;
 use crate::package::Mirror;
@@ -12,6 +7,10 @@ use crate::package::PackageHandle;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::RepositoryInterfaceHandle;
+use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
+use shirabe_php_shim::{PhpMixed, in_array};
+use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
 pub struct AliasPackage {

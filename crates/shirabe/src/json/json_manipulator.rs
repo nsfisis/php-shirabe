@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Json/JsonManipulator.php
 
+use crate::json::JsonFile;
+use crate::json::json_grammar::{self, ValueKind};
+use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
@@ -9,10 +11,6 @@ use shirabe_php_shim::{
     preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp, strpos, substr,
     trim, uksort,
 };
-
-use crate::json::JsonFile;
-use crate::json::json_grammar::{self, ValueKind};
-use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
 pub struct JsonManipulator {

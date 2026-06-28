@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/PerforceDriverTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -12,9 +10,9 @@ use shirabe::util::HttpDownloader;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tempfile::TempDir;
-
-use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 
 const TEST_URL: &str = "TEST_PERFORCE_URL";
 const TEST_DEPOT: &str = "TEST_DEPOT_CONFIG";

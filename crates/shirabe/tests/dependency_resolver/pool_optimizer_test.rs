@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php
 
-use std::path::PathBuf;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
 use shirabe::dependency_resolver::pool::Pool;
@@ -17,6 +14,8 @@ use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::PREG_SPLIT_DELIM_CAPTURE;
 use shirabe_php_shim::PhpMixed;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 fn load_package(package_data: &PhpMixed) -> BasePackageHandle {
     let loader = ArrayLoader::new(None, false);

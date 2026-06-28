@@ -1,10 +1,9 @@
 //! ref: composer/vendor/composer/semver/src/Semver.php
 
-use std::sync::OnceLock;
-
 use crate::comparator::Comparator;
 use crate::constraint::SimpleConstraint;
 use crate::version_parser::VersionParser;
+use std::sync::OnceLock;
 
 pub struct Semver;
 

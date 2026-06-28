@@ -1,5 +1,14 @@
 //! ref: composer/src/Composer/Command/RepositoryCommand.php
 
+use crate::command::BaseConfigCommand;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::config::Config;
+use crate::config::ConfigSourceInterface;
+use crate::config::JsonConfigSource;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::io::IOInterfaceImmutable;
+use crate::json::JsonFile;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -11,16 +20,6 @@ use shirabe_php_shim::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::command::BaseConfigCommand;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::config::Config;
-use crate::config::ConfigSourceInterface;
-use crate::config::JsonConfigSource;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonFile;
 
 #[derive(Debug)]
 pub struct RepositoryCommand {

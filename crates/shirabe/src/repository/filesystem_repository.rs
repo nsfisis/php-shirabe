@@ -1,17 +1,5 @@
 //! ref: composer/src/Composer/Repository/FilesystemRepository.php
 
-use std::any::Any;
-
-use crate::util::Silencer;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_flip, dirname, r#eval, file_get_contents, get_class_err, get_debug_type, in_array,
-    is_array, is_null, is_string, ksort, realpath, str_repeat, trim, usort, var_export,
-};
-
 use crate::config::is_php_integer_key;
 use crate::installed_versions::InstalledVersions;
 use crate::installer::InstallationManagerInterface;
@@ -29,7 +17,17 @@ use crate::repository::WritableArrayRepository;
 use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
 use crate::util::Filesystem;
 use crate::util::Platform;
+use crate::util::Silencer;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::{
+    Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
+    array_flip, dirname, r#eval, file_get_contents, get_class_err, get_debug_type, in_array,
+    is_array, is_null, is_string, ksort, realpath, str_repeat, trim, usort, var_export,
+};
 use shirabe_semver::constraint::AnyConstraint;
+use std::any::Any;
 
 /// Filesystem repository.
 #[derive(Debug)]

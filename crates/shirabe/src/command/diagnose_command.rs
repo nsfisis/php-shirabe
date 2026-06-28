@@ -1,25 +1,5 @@
 //! ref: composer/src/Composer/Command/DiagnoseCommand.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
-use shirabe_php_shim::{
-    INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT,
-    PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, defined,
-    disk_free_space, extension_loaded, file_exists, filter_var_boolean, function_exists,
-    get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
-    is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, str_contains, str_replace,
-    str_starts_with, strpos, strstr, strtolower, trim, version_compare,
-};
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
@@ -52,6 +32,24 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_php_shim::{
+    INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT,
+    PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, defined,
+    disk_free_space, extension_loaded, file_exists, filter_var_boolean, function_exists,
+    get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
+    is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, str_contains, str_replace,
+    str_starts_with, strpos, strstr, strtolower, trim, version_compare,
+};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {

@@ -1,13 +1,5 @@
 //! ref: composer/src/Composer/Command/DumpAutoloadCommand.php
 
-use anyhow::Result;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
@@ -15,6 +7,13 @@ use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
+use anyhow::Result;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct DumpAutoloadCommand {

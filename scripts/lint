@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+
+require 'pathname'
+
+LINTERS = {
+  cargo_workspace_dependencies: [],
+  contiguous_use_block: [],
+  no_decorative_section_comment: %w[
+    crates/shirabe-semver/src/version_parser.rs
+  ],
+  no_format_trailing_comma: %w[
+    crates/shirabe/src/package/loader/root_package_loader.rs
+    crates/shirabe-spdx-licenses/src/spdx_licenses.rs
+  ],
+  no_mod_rs: [],
+  no_std_collections_maps: [],
+  no_use_as_alias: [],
+  sorted_dependencies: [],
+}
+
+root_dir = Pathname.new(__dir__).join('..').expand_path
+
+results = LINTERS.map do |linter, excludes|
+  require_relative "linters/#{linter}"
+  puts "===== #{linter} ====="
+  ok = send(linter, root_dir, excludes)
+  puts "Passed." if ok
+  puts
+  ok
+end
+exit(results.all? ? 0 : 1)

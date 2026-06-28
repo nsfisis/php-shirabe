@@ -1,10 +1,5 @@
 //! ref: composer/src/Composer/Downloader/SvnDownloader.php
 
-use crate::io::io_interface;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
-
 use crate::config::Config;
 use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
@@ -13,11 +8,15 @@ use crate::downloader::VcsDownloader;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
 #[derive(Debug)]
 pub struct SvnDownloader {

@@ -1,9 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Constraint.php
 
-use anyhow::bail;
-use shirabe_php_shim as php;
-
 use crate::constraint::Bound;
+use anyhow::bail;
 
 /// Corresponds to PHP's `Constraint`.
 #[derive(Debug, Clone)]
@@ -120,24 +118,33 @@ impl SimpleConstraint {
             return Ok(false);
         }
 
-        Ok(php::version_compare(a, b, operator))
+        Ok(shirabe_php_shim::version_compare(a, b, operator))
     }
 
     pub fn compile_constraint(&self, other_operator: i64) -> String {
         if self.version.starts_with("dev-") {
             if Self::OP_EQ == self.operator {
                 if Self::OP_EQ == other_operator {
-                    return format!("$b && $v === {}", php::var_export_str(&self.version, true));
+                    return format!(
+                        "$b && $v === {}",
+                        shirabe_php_shim::var_export_str(&self.version, true)
+                    );
                 }
                 if Self::OP_NE == other_operator {
-                    return format!("!$b || $v !== {}", php::var_export_str(&self.version, true));
+                    return format!(
+                        "!$b || $v !== {}",
+                        shirabe_php_shim::var_export_str(&self.version, true)
+                    );
                 }
                 return "false".to_string();
             }
 
             if Self::OP_NE == self.operator {
                 if Self::OP_EQ == other_operator {
-                    return format!("!$b || $v !== {}", php::var_export_str(&self.version, true));
+                    return format!(
+                        "!$b || $v !== {}",
+                        shirabe_php_shim::var_export_str(&self.version, true)
+                    );
                 }
                 if Self::OP_NE == other_operator {
                     return "true".to_string();
@@ -152,18 +159,18 @@ impl SimpleConstraint {
             if Self::OP_EQ == other_operator {
                 return format!(
                     "\\version_compare($v, {}, '==')",
-                    php::var_export_str(&self.version, true)
+                    shirabe_php_shim::var_export_str(&self.version, true)
                 );
             }
             if Self::OP_NE == other_operator {
                 return format!(
                     "$b || \\version_compare($v, {}, '!=')",
-                    php::var_export_str(&self.version, true)
+                    shirabe_php_shim::var_export_str(&self.version, true)
                 );
             }
             return format!(
                 "!$b && \\version_compare({}, $v, '{}')",
-                php::var_export_str(&self.version, true),
+                shirabe_php_shim::var_export_str(&self.version, true),
                 Self::trans_op_int(other_operator)
             );
         }
@@ -172,7 +179,7 @@ impl SimpleConstraint {
             if Self::OP_EQ == other_operator {
                 return format!(
                     "$b || (!$b && \\version_compare($v, {}, '!='))",
-                    php::var_export_str(&self.version, true)
+                    shirabe_php_shim::var_export_str(&self.version, true)
                 );
             }
             if Self::OP_NE == other_operator {
@@ -195,14 +202,14 @@ impl SimpleConstraint {
 
         let code_comparison = format!(
             "\\version_compare($v, {}, '{}')",
-            php::var_export_str(&self.version, true),
+            shirabe_php_shim::var_export_str(&self.version, true),
             Self::trans_op_int(self.operator)
         );
 
         if self.operator == Self::OP_LE && other_operator == Self::OP_GT {
             return format!(
                 "!$b && \\version_compare($v, {}, '!=') && {}",
-                php::var_export_str(&self.version, true),
+                shirabe_php_shim::var_export_str(&self.version, true),
                 code_comparison
             );
         }
@@ -210,7 +217,7 @@ impl SimpleConstraint {
         if self.operator == Self::OP_GE && other_operator == Self::OP_LT {
             return format!(
                 "!$b && \\version_compare($v, {}, '!=') && {}",
-                php::var_export_str(&self.version, true),
+                shirabe_php_shim::var_export_str(&self.version, true),
                 code_comparison
             );
         }
@@ -273,7 +280,7 @@ impl SimpleConstraint {
         {
             return !(Self::trans_op_int(provider.operator) == provider_no_equal_op
                 && Self::trans_op_int(self.operator) != no_equal_op
-                && php::version_compare(&provider.version, &self.version, "=="));
+                && shirabe_php_shim::version_compare(&provider.version, &self.version, "=="));
         }
 
         false

@@ -1,8 +1,6 @@
 //! ref: composer/tests/Composer/Test/Installer/InstallationManagerTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use crate::test_case::get_package;
 use shirabe::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
 };
@@ -16,8 +14,8 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-
-use crate::test_case::get_package;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()

@@ -1,12 +1,5 @@
 //! ref: composer/src/Composer/DependencyResolver/Transaction.php
 
-use indexmap::IndexMap;
-use indexmap::IndexSet;
-use shirabe_php_shim::{
-    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
-    uasort_map,
-};
-
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
 use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
@@ -17,6 +10,12 @@ use crate::package::AliasPackageHandle;
 use crate::package::Link;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::PlatformRepository;
+use indexmap::IndexMap;
+use indexmap::IndexSet;
+use shirabe_php_shim::{
+    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
+    uasort_map,
+};
 
 /// @internal
 #[derive(Debug, Clone)]
