@@ -10,7 +10,6 @@ use shirabe_php_shim::PhpMixed;
 
 #[test]
 #[serial]
-#[ignore = "todo!() at crates/shirabe/src/command/audit_command.rs:285 (AuditCommand::get_packages non-locked branch: installed-repo conversion unported)"]
 fn test_successful_response_code_when_no_packages_are_required() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -91,7 +90,6 @@ fn test_audit_package_with_no_security_vulnerabilities() {
 
 #[test]
 #[serial]
-#[ignore = "todo!() at crates/shirabe/src/command/audit_command.rs:285 (AuditCommand::get_packages non-locked branch: installed-repo conversion unported)"]
 fn test_audit_package_with_no_dev_option_passed() {
     let tear_down = init_temp_composer(None, None, None, true);
     let dev_package: Vec<PackageInterfaceHandle> = vec![get_package("dummy/pkg", "1.0.0")];

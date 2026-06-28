@@ -9,6 +9,8 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::repository::CanonicalPackagesTrait;
+use crate::repository::InstalledRepository;
+use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -268,11 +270,27 @@ impl AuditCommand {
             return locked_repo.borrow_mut().get_canonical_packages();
         }
 
-        let _root_pkg = composer.get_package();
-        // TODO(phase-c): InstalledRepository::new expects Vec<Box<dyn RepositoryInterface>>, but
-        // get_local_repository returns &dyn InstalledRepositoryInterface. Conversion requires
-        // either cloning into a Box or restructuring InstalledRepository constructor.
-        let _ = RepositoryUtils::filter_required_packages;
-        todo!("audit get_packages non-locked branch needs installed-repo conversion")
+        let root_pkg = composer.get_package();
+        let local_repo = composer
+            .get_repository_manager()
+            .borrow()
+            .get_local_repository();
+        let mut installed_repo = InstalledRepository::new(vec![local_repo]);
+
+        if input
+            .borrow()
+            .get_option("no-dev")?
+            .as_bool()
+            .unwrap_or(false)
+        {
+            return Ok(RepositoryUtils::filter_required_packages(
+                &installed_repo.get_packages()?,
+                root_pkg.clone().into(),
+                false,
+                vec![],
+            ));
+        }
+
+        installed_repo.get_packages()
     }
 }
