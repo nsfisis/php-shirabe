@@ -4,6 +4,7 @@ use crate::symfony::console::helper::debug_formatter_helper::DebugFormatterHelpe
 use crate::symfony::console::helper::helper::Helper;
 use crate::symfony::console::helper::helper_interface::HelperInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
+use crate::symfony::console::output::ConsoleOutputInterface;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use crate::symfony::process::exception::process_failed_exception::ProcessFailedException;
 use crate::symfony::process::process::Process;
@@ -50,11 +51,15 @@ impl ProcessHelper {
         // component being absent; in this port the component is always available.
 
         // PHP: `if ($output instanceof ConsoleOutputInterface) { $output =
-        // $output->getErrorOutput(); }`. Downcasting a shared `dyn
-        // OutputInterface` to `dyn ConsoleOutputInterface` is unresolved;
-        // deferred to Phase C.
-        let output: Rc<RefCell<dyn OutputInterface>> =
-            todo!("$output instanceof ConsoleOutputInterface redirect to error output");
+        // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
+        // implementor that also implements ConsoleOutputInterface, so the check
+        // reduces to a downcast to the concrete type.
+        let output: Rc<RefCell<dyn OutputInterface>> = {
+            let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
+                .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
+                .map(|console| console.get_error_output());
+            redirected.unwrap_or(output)
+        };
 
         let formatter: Rc<RefCell<DebugFormatterHelper>> = self
             .get_helper_set()
@@ -220,15 +225,18 @@ impl ProcessHelper {
         &self,
         output: Rc<RefCell<dyn OutputInterface>>,
         process: &Process,
-        // TODO: remove allow(unused_mut) once todo!() is resolved.
-        #[allow(unused_mut)] mut callback: Option<Box<dyn FnMut(&str, &str)>>,
+        mut callback: Option<Box<dyn FnMut(&str, &str)>>,
     ) -> Box<dyn FnMut(&str, &str)> {
         // PHP: `if ($output instanceof ConsoleOutputInterface) { $output =
-        // $output->getErrorOutput(); }`. Downcasting a shared `dyn
-        // OutputInterface` to `dyn ConsoleOutputInterface` is unresolved;
-        // deferred to Phase C.
-        let output: Rc<RefCell<dyn OutputInterface>> =
-            todo!("$output instanceof ConsoleOutputInterface redirect to error output");
+        // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
+        // implementor that also implements ConsoleOutputInterface, so the check
+        // reduces to a downcast to the concrete type.
+        let output: Rc<RefCell<dyn OutputInterface>> = {
+            let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
+                .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
+                .map(|console| console.get_error_output());
+            redirected.unwrap_or(output)
+        };
 
         let formatter: Rc<RefCell<DebugFormatterHelper>> = self
             .get_helper_set()

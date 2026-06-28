@@ -3,6 +3,8 @@
 use crate::symfony::console::cursor::Cursor;
 use crate::symfony::console::exception::logic_exception::LogicException;
 use crate::symfony::console::helper::helper::Helper;
+use crate::symfony::console::output::ConsoleOutputInterface;
+use crate::symfony::console::output::ConsoleSectionOutput;
 use crate::symfony::console::output::OutputInterface;
 use crate::symfony::console::output::output_interface;
 use crate::symfony::console::terminal::Terminal;
@@ -67,10 +69,15 @@ impl ProgressBar {
         max: i64,
         min_seconds_between_redraws: f64,
     ) -> Self {
-        let output = if todo!("$output instanceof ConsoleOutputInterface") {
-            todo!("$output = $output->getErrorOutput();")
-        } else {
-            output
+        // PHP: `if ($output instanceof ConsoleOutputInterface) { $output =
+        // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
+        // implementor that also implements ConsoleOutputInterface, so the check
+        // reduces to a downcast to the concrete type.
+        let output: Rc<RefCell<dyn OutputInterface>> = {
+            let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
+                .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
+                .map(|console| console.get_error_output());
+            redirected.unwrap_or(output)
         };
 
         let mut this = Self {
@@ -502,12 +509,18 @@ impl ProgressBar {
 
         if self.overwrite {
             if let Some(previous_message) = self.previous_message.clone() {
-                if todo!("$this->output instanceof ConsoleSectionOutput") {
+                // PHP: `$this->output instanceof ConsoleSectionOutput`. Downcast the
+                // shared output handle to the concrete section type.
+                let output_ref = self.output.borrow();
+                if let Some(section) = shirabe_php_shim::AsAny::as_any(&*output_ref)
+                    .downcast_ref::<ConsoleSectionOutput>()
+                {
                     let message_lines = shirabe_php_shim::explode("\n", &previous_message);
                     let mut line_count = message_lines.len() as i64;
                     for message_line in &message_lines {
+                        let formatter = section.get_formatter();
                         let message_line_length = Helper::width(&Helper::remove_decoration(
-                            todo!("$this->output->getFormatter()"),
+                            &mut *formatter.borrow_mut(),
                             message_line,
                         ));
                         if message_line_length > self.terminal.get_width() {
@@ -516,8 +529,9 @@ impl ProgressBar {
                                 .floor() as i64;
                         }
                     }
-                    todo!("$this->output->clear($lineCount); (ConsoleSectionOutput)");
+                    section.clear(Some(line_count));
                 } else {
+                    drop(output_ref);
                     let line_count = shirabe_php_shim::substr_count(&previous_message, "\n");
                     for _i in 0..line_count {
                         self.cursor.move_to_column(1);
@@ -584,7 +598,7 @@ impl ProgressBar {
             Box::new(
                 |bar: &ProgressBar, output: &Rc<RefCell<dyn OutputInterface>>| {
                     let complete_bars = bar.get_bar_offset();
-                    let display = shirabe_php_shim::str_repeat(
+                    let mut display = shirabe_php_shim::str_repeat(
                         &bar.get_bar_character(),
                         complete_bars as usize,
                     );
@@ -592,7 +606,7 @@ impl ProgressBar {
                         let empty_bars = bar.get_bar_width() as f64
                             - complete_bars
                             - Helper::length(&Helper::remove_decoration(
-                                todo!("$output->getFormatter()"),
+                                &mut *output.borrow().get_formatter().borrow_mut(),
                                 &bar.get_progress_character(),
                             )) as f64;
                         display.push_str(&format!(
@@ -603,7 +617,6 @@ impl ProgressBar {
                                 empty_bars as usize
                             )
                         ));
-                        let _ = output;
                     }
 
                     Ok(Ok(shirabe_php_shim::PhpMixed::String(display)))
@@ -762,7 +775,7 @@ impl ProgressBar {
             .iter()
             .map(|sub_line| {
                 Helper::width(&Helper::remove_decoration(
-                    todo!("$this->output->getFormatter()"),
+                    &mut *self.output.borrow().get_formatter().borrow_mut(),
                     &shirabe_php_shim::rtrim(sub_line, Some("\r")),
                 ))
             })
