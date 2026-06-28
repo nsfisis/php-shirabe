@@ -96,14 +96,14 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
         if display_mode == DisplayMode::SourceRefIfDev
             && (!self.is_dev()
-                || (!["hg", "git"].contains(&self.get_source_type().unwrap_or_default())
+                || (!["hg", "git"].contains(&self.get_source_type().unwrap_or_default().as_str())
                     && (self.get_source_type().unwrap_or_default() != ""
                         || self.get_dist_reference().unwrap_or_default() == "")))
         {
             return self.get_pretty_version().to_string();
         }
 
-        let reference: Option<&str> = match display_mode {
+        let reference: Option<String> = match display_mode {
             DisplayMode::SourceRefIfDev => {
                 if self.get_source_reference().unwrap_or_default() != "" {
                     self.get_source_reference()
@@ -120,7 +120,7 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
             Some(r) => r,
         };
 
-        if truncate && reference.len() == 40 && self.get_source_type() != Some("svn") {
+        if truncate && reference.len() == 40 && self.get_source_type().as_deref() != Some("svn") {
             return format!("{} {}", self.get_pretty_version(), &reference[..7]);
         }
 

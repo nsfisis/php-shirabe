@@ -84,17 +84,17 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     ///
     /// @return ?string source/dist
     /// @phpstan-return 'source'|'dist'|null
-    fn get_installation_source(&self) -> Option<&str>;
+    fn get_installation_source(&self) -> Option<String>;
 
     /// Returns the repository type of this package, e.g. git, svn
     ///
     /// @return ?string The repository type
-    fn get_source_type(&self) -> Option<&str>;
+    fn get_source_type(&self) -> Option<String>;
 
     /// Returns the repository url of this package, e.g. git://github.com/naderman/composer.git
     ///
     /// @return ?string The repository url
-    fn get_source_url(&self) -> Option<&str>;
+    fn get_source_url(&self) -> Option<String>;
 
     /// Returns the repository urls of this package including mirrors, e.g. git://github.com/naderman/composer.git
     ///
@@ -104,7 +104,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Returns the repository reference of this package, e.g. master, 1.0.0 or a commit hash for git
     ///
     /// @return ?string The repository reference
-    fn get_source_reference(&self) -> Option<&str>;
+    fn get_source_reference(&self) -> Option<String>;
 
     /// Returns the source mirrors of this package
     ///
@@ -117,12 +117,12 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Returns the type of the distribution archive of this version, e.g. zip, tarball
     ///
     /// @return ?string The repository type
-    fn get_dist_type(&self) -> Option<&str>;
+    fn get_dist_type(&self) -> Option<String>;
 
     /// Returns the url of the distribution archive of this version
     ///
     /// @return ?non-empty-string
-    fn get_dist_url(&self) -> Option<&str>;
+    fn get_dist_url(&self) -> Option<String>;
 
     /// Returns the urls of the distribution archive of this version, including mirrors
     ///
@@ -130,12 +130,12 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_dist_urls(&self) -> Vec<String>;
 
     /// Returns the reference of the distribution archive of this version, e.g. master, 1.0.0 or a commit hash for git
-    fn get_dist_reference(&self) -> Option<&str>;
+    fn get_dist_reference(&self) -> Option<String>;
 
     /// Returns the sha1 checksum for the distribution archive of this version
     ///
     /// Can be an empty string which should be treated as null
-    fn get_dist_sha1_checksum(&self) -> Option<&str>;
+    fn get_dist_sha1_checksum(&self) -> Option<String>;
 
     /// Returns the dist mirrors of this package
     ///
@@ -269,7 +269,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_unique_name(&self) -> String;
 
     /// Returns the package notification url
-    fn get_notification_url(&self) -> Option<&str>;
+    fn get_notification_url(&self) -> Option<String>;
 
     // PHP: __toString — implemented via std::fmt::Display supertrait
 
@@ -299,7 +299,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn set_dist_reference(&mut self, reference: Option<String>);
 
     /// Set dist and source references and update dist URL for ones that contain a reference
-    fn set_source_dist_references(&mut self, reference: &str);
+    fn set_source_dist_references(&mut self, reference: String);
 
     fn as_alias_package(&self) -> Option<&crate::package::AliasPackage> {
         None

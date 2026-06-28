@@ -84,16 +84,16 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.set_keywords(keywords);
     }
 
-    fn get_description(&self) -> Option<&str> {
-        todo!("CompleteAliasPackage::get_description cannot return &str across the aliasOf handle")
+    fn get_description(&self) -> Option<String> {
+        self.alias_of.get_description()
     }
 
     fn set_description(&mut self, description: String) {
         self.alias_of.set_description(description);
     }
 
-    fn get_homepage(&self) -> Option<&str> {
-        todo!("CompleteAliasPackage::get_homepage cannot return &str across the aliasOf handle")
+    fn get_homepage(&self) -> Option<String> {
+        self.alias_of.get_homepage()
     }
 
     fn set_homepage(&mut self, homepage: String) {
@@ -128,18 +128,16 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.is_abandoned()
     }
 
-    fn get_replacement_package(&self) -> Option<&str> {
-        todo!(
-            "CompleteAliasPackage::get_replacement_package cannot return &str across the aliasOf handle"
-        )
+    fn get_replacement_package(&self) -> Option<String> {
+        self.alias_of.get_replacement_package()
     }
 
     fn set_abandoned(&mut self, abandoned: PhpMixed) {
         self.alias_of.set_abandoned(abandoned);
     }
 
-    fn get_archive_name(&self) -> Option<&str> {
-        todo!("CompleteAliasPackage::get_archive_name cannot return &str across the aliasOf handle")
+    fn get_archive_name(&self) -> Option<String> {
+        self.alias_of.get_archive_name()
     }
 
     fn set_archive_name(&mut self, name: String) {

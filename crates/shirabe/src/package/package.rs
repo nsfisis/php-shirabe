@@ -169,32 +169,32 @@ impl Package {
         self.installation_source = r#type;
     }
 
-    pub fn get_installation_source(&self) -> Option<&str> {
-        self.installation_source.as_deref()
+    pub fn get_installation_source(&self) -> Option<String> {
+        self.installation_source.clone()
     }
 
     pub fn set_source_type(&mut self, r#type: Option<String>) {
         self.source_type = r#type;
     }
 
-    pub fn get_source_type(&self) -> Option<&str> {
-        self.source_type.as_deref()
+    pub fn get_source_type(&self) -> Option<String> {
+        self.source_type.clone()
     }
 
     pub fn set_source_url(&mut self, url: Option<String>) {
         self.source_url = url;
     }
 
-    pub fn get_source_url(&self) -> Option<&str> {
-        self.source_url.as_deref()
+    pub fn get_source_url(&self) -> Option<String> {
+        self.source_url.clone()
     }
 
     pub fn set_source_reference(&mut self, reference: Option<String>) {
         self.source_reference = reference;
     }
 
-    pub fn get_source_reference(&self) -> Option<&str> {
-        self.source_reference.as_deref()
+    pub fn get_source_reference(&self) -> Option<String> {
+        self.source_reference.clone()
     }
 
     pub fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
@@ -222,8 +222,8 @@ impl Package {
         };
     }
 
-    pub fn get_dist_type(&self) -> Option<&str> {
-        self.dist_type.as_deref()
+    pub fn get_dist_type(&self) -> Option<String> {
+        self.dist_type.clone()
     }
 
     pub fn set_dist_url(&mut self, url: Option<String>) {
@@ -233,24 +233,24 @@ impl Package {
         };
     }
 
-    pub fn get_dist_url(&self) -> Option<&str> {
-        self.dist_url.as_deref()
+    pub fn get_dist_url(&self) -> Option<String> {
+        self.dist_url.clone()
     }
 
     pub fn set_dist_reference(&mut self, reference: Option<String>) {
         self.dist_reference = reference;
     }
 
-    pub fn get_dist_reference(&self) -> Option<&str> {
-        self.dist_reference.as_deref()
+    pub fn get_dist_reference(&self) -> Option<String> {
+        self.dist_reference.clone()
     }
 
     pub fn set_dist_sha1_checksum(&mut self, sha1checksum: Option<String>) {
         self.dist_sha1_checksum = sha1checksum;
     }
 
-    pub fn get_dist_sha1_checksum(&self) -> Option<&str> {
-        self.dist_sha1_checksum.as_deref()
+    pub fn get_dist_sha1_checksum(&self) -> Option<String> {
+        self.dist_sha1_checksum.clone()
     }
 
     pub fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
@@ -400,8 +400,8 @@ impl Package {
         self.notification_url = Some(notification_url);
     }
 
-    pub fn get_notification_url(&self) -> Option<&str> {
-        self.notification_url.as_deref()
+    pub fn get_notification_url(&self) -> Option<String> {
+        self.notification_url.clone()
     }
 
     pub fn set_is_default_branch(&mut self, default_branch: bool) {
@@ -420,14 +420,14 @@ impl Package {
         if self.get_dist_url().is_some()
             && Preg::is_match(
                 "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i",
-                self.get_dist_url().unwrap_or(""),
+                &self.get_dist_url().unwrap_or_default(),
             )
         {
             self.set_dist_reference(Some(reference.clone()));
             self.set_dist_url(Some(Preg::replace(
                 "{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i",
                 &reference,
-                self.get_dist_url().unwrap_or(""),
+                &self.get_dist_url().unwrap_or_default(),
             )));
         } else if self.get_dist_reference().is_some() {
             // update the dist reference if there was one, but if none was provided ignore it
@@ -623,20 +623,20 @@ impl PackageInterface for Package {
     fn set_installation_source(&mut self, r#type: Option<String>) {
         self.installation_source = r#type;
     }
-    fn get_installation_source(&self) -> Option<&str> {
-        self.installation_source.as_deref()
+    fn get_installation_source(&self) -> Option<String> {
+        self.installation_source.clone()
     }
-    fn get_source_type(&self) -> Option<&str> {
-        self.source_type.as_deref()
+    fn get_source_type(&self) -> Option<String> {
+        self.source_type.clone()
     }
-    fn get_source_url(&self) -> Option<&str> {
-        self.source_url.as_deref()
+    fn get_source_url(&self) -> Option<String> {
+        self.source_url.clone()
     }
     fn get_source_urls(&self) -> Vec<String> {
         Package::get_source_urls(self)
     }
-    fn get_source_reference(&self) -> Option<&str> {
-        self.source_reference.as_deref()
+    fn get_source_reference(&self) -> Option<String> {
+        self.source_reference.clone()
     }
     fn get_source_mirrors(&self) -> Option<Vec<Mirror>> {
         self.source_mirrors.clone()
@@ -644,20 +644,20 @@ impl PackageInterface for Package {
     fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
         self.source_mirrors = mirrors;
     }
-    fn get_dist_type(&self) -> Option<&str> {
-        self.dist_type.as_deref()
+    fn get_dist_type(&self) -> Option<String> {
+        self.dist_type.clone()
     }
-    fn get_dist_url(&self) -> Option<&str> {
-        self.dist_url.as_deref()
+    fn get_dist_url(&self) -> Option<String> {
+        self.dist_url.clone()
     }
     fn get_dist_urls(&self) -> Vec<String> {
         Package::get_dist_urls(self)
     }
-    fn get_dist_reference(&self) -> Option<&str> {
-        self.dist_reference.as_deref()
+    fn get_dist_reference(&self) -> Option<String> {
+        self.dist_reference.clone()
     }
-    fn get_dist_sha1_checksum(&self) -> Option<&str> {
-        self.dist_sha1_checksum.as_deref()
+    fn get_dist_sha1_checksum(&self) -> Option<String> {
+        self.dist_sha1_checksum.clone()
     }
     fn get_dist_mirrors(&self) -> Option<Vec<Mirror>> {
         self.dist_mirrors.clone()
@@ -735,8 +735,8 @@ impl PackageInterface for Package {
     fn get_unique_name(&self) -> String {
         format!("{}-{}", self.get_name(), self.get_version())
     }
-    fn get_notification_url(&self) -> Option<&str> {
-        self.notification_url.as_deref()
+    fn get_notification_url(&self) -> Option<String> {
+        self.notification_url.clone()
     }
     fn get_pretty_string(&self) -> String {
         format!("{} {}", self.get_pretty_name(), self.get_pretty_version())
@@ -771,7 +771,7 @@ impl PackageInterface for Package {
     fn set_dist_reference(&mut self, reference: Option<String>) {
         self.dist_reference = reference;
     }
-    fn set_source_dist_references(&mut self, reference: &str) {
-        Package::set_source_dist_references(self, reference.to_string());
+    fn set_source_dist_references(&mut self, reference: String) {
+        Package::set_source_dist_references(self, reference);
     }
 }

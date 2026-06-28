@@ -202,7 +202,7 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_keywords(keywords);
     }
 
-    fn get_description(&self) -> Option<&str> {
+    fn get_description(&self) -> Option<String> {
         self.inner.get_description()
     }
 
@@ -210,7 +210,7 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_description(description);
     }
 
-    fn get_homepage(&self) -> Option<&str> {
+    fn get_homepage(&self) -> Option<String> {
         self.inner.get_homepage()
     }
 
@@ -246,7 +246,7 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.is_abandoned()
     }
 
-    fn get_replacement_package(&self) -> Option<&str> {
+    fn get_replacement_package(&self) -> Option<String> {
         self.inner.get_replacement_package()
     }
 
@@ -254,7 +254,7 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_abandoned(abandoned);
     }
 
-    fn get_archive_name(&self) -> Option<&str> {
+    fn get_archive_name(&self) -> Option<String> {
         self.inner.get_archive_name()
     }
 

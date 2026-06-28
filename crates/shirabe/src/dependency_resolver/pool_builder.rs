@@ -604,7 +604,7 @@ impl PoolBuilder {
             if !request.is_locked_package(package.clone())
                 && !request.is_fixed_package(package.clone())
             {
-                package.set_source_dist_references(reference);
+                package.set_source_dist_references(reference.clone());
             }
         }
 

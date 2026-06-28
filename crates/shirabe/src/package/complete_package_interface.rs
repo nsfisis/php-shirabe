@@ -22,11 +22,11 @@ pub trait CompletePackageInterface: PackageInterface {
 
     fn set_keywords(&mut self, keywords: Vec<String>);
 
-    fn get_description(&self) -> Option<&str>;
+    fn get_description(&self) -> Option<String>;
 
     fn set_description(&mut self, description: String);
 
-    fn get_homepage(&self) -> Option<&str>;
+    fn get_homepage(&self) -> Option<String>;
 
     fn set_homepage(&mut self, homepage: String);
 
@@ -44,11 +44,11 @@ pub trait CompletePackageInterface: PackageInterface {
 
     fn is_abandoned(&self) -> bool;
 
-    fn get_replacement_package(&self) -> Option<&str>;
+    fn get_replacement_package(&self) -> Option<String>;
 
     fn set_abandoned(&mut self, abandoned: PhpMixed);
 
-    fn get_archive_name(&self) -> Option<&str>;
+    fn get_archive_name(&self) -> Option<String>;
 
     fn set_archive_name(&mut self, name: String);
 

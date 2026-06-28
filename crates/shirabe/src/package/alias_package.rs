@@ -285,24 +285,24 @@ impl PackageInterface for AliasPackage {
         self.alias_of.set_installation_source(r#type);
     }
 
-    fn get_installation_source(&self) -> Option<&str> {
-        todo!("AliasPackage::get_installation_source cannot return &str across the aliasOf handle")
+    fn get_installation_source(&self) -> Option<String> {
+        self.alias_of.get_installation_source()
     }
 
-    fn get_source_type(&self) -> Option<&str> {
-        todo!("AliasPackage::get_source_type cannot return &str across the aliasOf handle")
+    fn get_source_type(&self) -> Option<String> {
+        self.alias_of.get_source_type()
     }
 
-    fn get_source_url(&self) -> Option<&str> {
-        todo!("AliasPackage::get_source_url cannot return &str across the aliasOf handle")
+    fn get_source_url(&self) -> Option<String> {
+        self.alias_of.get_source_url()
     }
 
     fn get_source_urls(&self) -> Vec<String> {
         self.alias_of.get_source_urls()
     }
 
-    fn get_source_reference(&self) -> Option<&str> {
-        todo!("AliasPackage::get_source_reference cannot return &str across the aliasOf handle")
+    fn get_source_reference(&self) -> Option<String> {
+        self.alias_of.get_source_reference()
     }
 
     fn set_source_reference(&mut self, reference: Option<String>) {
@@ -317,28 +317,28 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_source_mirrors()
     }
 
-    fn get_dist_type(&self) -> Option<&str> {
-        todo!("AliasPackage::get_dist_type cannot return &str across the aliasOf handle")
+    fn get_dist_type(&self) -> Option<String> {
+        self.alias_of.get_dist_type()
     }
 
-    fn get_dist_url(&self) -> Option<&str> {
-        todo!("AliasPackage::get_dist_url cannot return &str across the aliasOf handle")
+    fn get_dist_url(&self) -> Option<String> {
+        self.alias_of.get_dist_url()
     }
 
     fn get_dist_urls(&self) -> Vec<String> {
         self.alias_of.get_dist_urls()
     }
 
-    fn get_dist_reference(&self) -> Option<&str> {
-        todo!("AliasPackage::get_dist_reference cannot return &str across the aliasOf handle")
+    fn get_dist_reference(&self) -> Option<String> {
+        self.alias_of.get_dist_reference()
     }
 
     fn set_dist_reference(&mut self, reference: Option<String>) {
         self.alias_of.set_dist_reference(reference);
     }
 
-    fn get_dist_sha1_checksum(&self) -> Option<&str> {
-        todo!("AliasPackage::get_dist_sha1_checksum cannot return &str across the aliasOf handle")
+    fn get_dist_sha1_checksum(&self) -> Option<String> {
+        self.alias_of.get_dist_sha1_checksum()
     }
 
     fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
@@ -385,8 +385,8 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_suggests()
     }
 
-    fn get_notification_url(&self) -> Option<&str> {
-        todo!("AliasPackage::get_notification_url cannot return &str across the aliasOf handle")
+    fn get_notification_url(&self) -> Option<String> {
+        self.alias_of.get_notification_url()
     }
 
     fn is_default_branch(&self) -> bool {
@@ -405,7 +405,7 @@ impl PackageInterface for AliasPackage {
         self.alias_of.set_dist_type(r#type);
     }
 
-    fn set_source_dist_references(&mut self, reference: &str) {
+    fn set_source_dist_references(&mut self, reference: String) {
         self.alias_of.set_source_dist_references(reference);
     }
 

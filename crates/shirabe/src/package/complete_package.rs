@@ -94,16 +94,16 @@ impl CompletePackageInterface for CompletePackage {
         self.description = Some(description);
     }
 
-    fn get_description(&self) -> Option<&str> {
-        self.description.as_deref()
+    fn get_description(&self) -> Option<String> {
+        self.description.clone()
     }
 
     fn set_homepage(&mut self, homepage: String) {
         self.homepage = Some(homepage);
     }
 
-    fn get_homepage(&self) -> Option<&str> {
-        self.homepage.as_deref()
+    fn get_homepage(&self) -> Option<String> {
+        self.homepage.clone()
     }
 
     fn set_support(&mut self, support: IndexMap<String, String>) {
@@ -134,9 +134,9 @@ impl CompletePackageInterface for CompletePackage {
         self.abandoned = abandoned;
     }
 
-    fn get_replacement_package(&self) -> Option<&str> {
+    fn get_replacement_package(&self) -> Option<String> {
         match &self.abandoned {
-            PhpMixed::String(s) => Some(s.as_str()),
+            PhpMixed::String(s) => Some(s.clone()),
             _ => None,
         }
     }
@@ -145,8 +145,8 @@ impl CompletePackageInterface for CompletePackage {
         self.archive_name = Some(name);
     }
 
-    fn get_archive_name(&self) -> Option<&str> {
-        self.archive_name.as_deref()
+    fn get_archive_name(&self) -> Option<String> {
+        self.archive_name.clone()
     }
 
     fn set_archive_excludes(&mut self, excludes: Vec<String>) {
@@ -188,7 +188,7 @@ impl PackageInterface for CompletePackage {
     }
 
     fn get_type(&self) -> String {
-        PackageInterface::get_type(&self.inner)
+        self.inner.get_type()
     }
 
     fn get_target_dir(&self) -> Option<String> {
@@ -203,15 +203,15 @@ impl PackageInterface for CompletePackage {
         self.inner.set_installation_source(r#type);
     }
 
-    fn get_installation_source(&self) -> Option<&str> {
+    fn get_installation_source(&self) -> Option<String> {
         self.inner.get_installation_source()
     }
 
-    fn get_source_type(&self) -> Option<&str> {
+    fn get_source_type(&self) -> Option<String> {
         self.inner.get_source_type()
     }
 
-    fn get_source_url(&self) -> Option<&str> {
+    fn get_source_url(&self) -> Option<String> {
         self.inner.get_source_url()
     }
 
@@ -219,7 +219,7 @@ impl PackageInterface for CompletePackage {
         self.inner.get_source_urls()
     }
 
-    fn get_source_reference(&self) -> Option<&str> {
+    fn get_source_reference(&self) -> Option<String> {
         self.inner.get_source_reference()
     }
 
@@ -231,11 +231,11 @@ impl PackageInterface for CompletePackage {
         self.inner.set_source_mirrors(mirrors);
     }
 
-    fn get_dist_type(&self) -> Option<&str> {
+    fn get_dist_type(&self) -> Option<String> {
         self.inner.get_dist_type()
     }
 
-    fn get_dist_url(&self) -> Option<&str> {
+    fn get_dist_url(&self) -> Option<String> {
         self.inner.get_dist_url()
     }
 
@@ -243,11 +243,11 @@ impl PackageInterface for CompletePackage {
         self.inner.get_dist_urls()
     }
 
-    fn get_dist_reference(&self) -> Option<&str> {
+    fn get_dist_reference(&self) -> Option<String> {
         self.inner.get_dist_reference()
     }
 
-    fn get_dist_sha1_checksum(&self) -> Option<&str> {
+    fn get_dist_sha1_checksum(&self) -> Option<String> {
         self.inner.get_dist_sha1_checksum()
     }
 
@@ -268,7 +268,7 @@ impl PackageInterface for CompletePackage {
     }
 
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
-        PackageInterface::get_full_pretty_version(&self.inner, truncate, display_mode)
+        self.inner.get_full_pretty_version(truncate, display_mode)
     }
 
     fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
@@ -338,7 +338,7 @@ impl PackageInterface for CompletePackage {
         self.inner.get_unique_name()
     }
 
-    fn get_notification_url(&self) -> Option<&str> {
+    fn get_notification_url(&self) -> Option<String> {
         self.inner.get_notification_url()
     }
 
@@ -378,8 +378,8 @@ impl PackageInterface for CompletePackage {
         self.inner.set_dist_reference(reference);
     }
 
-    fn set_source_dist_references(&mut self, reference: &str) {
-        PackageInterface::set_source_dist_references(&mut self.inner, reference);
+    fn set_source_dist_references(&mut self, reference: String) {
+        self.inner.set_source_dist_references(reference);
     }
 }
 

@@ -213,19 +213,19 @@ macro_rules! delegate_package_interface_to_inner {
             fn set_installation_source(&mut self, r#type: Option<String>) {
                 self.$field.set_installation_source(r#type);
             }
-            fn get_installation_source(&self) -> Option<&str> {
+            fn get_installation_source(&self) -> Option<String> {
                 self.$field.get_installation_source()
             }
-            fn get_source_type(&self) -> Option<&str> {
+            fn get_source_type(&self) -> Option<String> {
                 self.$field.get_source_type()
             }
-            fn get_source_url(&self) -> Option<&str> {
+            fn get_source_url(&self) -> Option<String> {
                 self.$field.get_source_url()
             }
             fn get_source_urls(&self) -> Vec<String> {
                 self.$field.get_source_urls()
             }
-            fn get_source_reference(&self) -> Option<&str> {
+            fn get_source_reference(&self) -> Option<String> {
                 self.$field.get_source_reference()
             }
             fn get_source_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
@@ -234,19 +234,19 @@ macro_rules! delegate_package_interface_to_inner {
             fn set_source_mirrors(&mut self, mirrors: Option<Vec<crate::package::Mirror>>) {
                 self.$field.set_source_mirrors(mirrors);
             }
-            fn get_dist_type(&self) -> Option<&str> {
+            fn get_dist_type(&self) -> Option<String> {
                 self.$field.get_dist_type()
             }
-            fn get_dist_url(&self) -> Option<&str> {
+            fn get_dist_url(&self) -> Option<String> {
                 self.$field.get_dist_url()
             }
             fn get_dist_urls(&self) -> Vec<String> {
                 self.$field.get_dist_urls()
             }
-            fn get_dist_reference(&self) -> Option<&str> {
+            fn get_dist_reference(&self) -> Option<String> {
                 self.$field.get_dist_reference()
             }
-            fn get_dist_sha1_checksum(&self) -> Option<&str> {
+            fn get_dist_sha1_checksum(&self) -> Option<String> {
                 self.$field.get_dist_sha1_checksum()
             }
             fn get_dist_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
@@ -321,7 +321,7 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_unique_name(&self) -> String {
                 self.$field.get_unique_name()
             }
-            fn get_notification_url(&self) -> Option<&str> {
+            fn get_notification_url(&self) -> Option<String> {
                 self.$field.get_notification_url()
             }
             fn get_pretty_string(&self) -> String {
@@ -356,7 +356,7 @@ macro_rules! delegate_package_interface_to_inner {
             fn set_dist_reference(&mut self, reference: Option<String>) {
                 self.$field.set_dist_reference(reference);
             }
-            fn set_source_dist_references(&mut self, reference: &str) {
+            fn set_source_dist_references(&mut self, reference: String) {
                 self.$field.set_source_dist_references(reference);
             }
         }
@@ -432,23 +432,14 @@ macro_rules! impl_package_interface_handle {
                     .borrow()
                     .as_package_interface()
                     .get_installation_source()
-                    .map(str::to_string)
             }
 
             pub fn get_source_type(&self) -> Option<String> {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_source_type()
-                    .map(str::to_string)
+                self.0.borrow().as_package_interface().get_source_type()
             }
 
             pub fn get_source_url(&self) -> Option<String> {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_source_url()
-                    .map(str::to_string)
+                self.0.borrow().as_package_interface().get_source_url()
             }
 
             pub fn get_source_urls(&self) -> Vec<String> {
@@ -460,7 +451,6 @@ macro_rules! impl_package_interface_handle {
                     .borrow()
                     .as_package_interface()
                     .get_source_reference()
-                    .map(str::to_string)
             }
 
             pub fn get_source_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
@@ -475,19 +465,11 @@ macro_rules! impl_package_interface_handle {
             }
 
             pub fn get_dist_type(&self) -> Option<String> {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_dist_type()
-                    .map(str::to_string)
+                self.0.borrow().as_package_interface().get_dist_type()
             }
 
             pub fn get_dist_url(&self) -> Option<String> {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_dist_url()
-                    .map(str::to_string)
+                self.0.borrow().as_package_interface().get_dist_url()
             }
 
             pub fn get_dist_urls(&self) -> Vec<String> {
@@ -495,11 +477,7 @@ macro_rules! impl_package_interface_handle {
             }
 
             pub fn get_dist_reference(&self) -> Option<String> {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_dist_reference()
-                    .map(str::to_string)
+                self.0.borrow().as_package_interface().get_dist_reference()
             }
 
             pub fn get_dist_sha1_checksum(&self) -> Option<String> {
@@ -507,7 +485,6 @@ macro_rules! impl_package_interface_handle {
                     .borrow()
                     .as_package_interface()
                     .get_dist_sha1_checksum()
-                    .map(str::to_string)
             }
 
             pub fn get_dist_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
@@ -641,7 +618,6 @@ macro_rules! impl_package_interface_handle {
                     .borrow()
                     .as_package_interface()
                     .get_notification_url()
-                    .map(str::to_string)
             }
 
             pub fn get_pretty_string(&self) -> String {
@@ -706,7 +682,7 @@ macro_rules! impl_package_interface_handle {
                     .set_dist_reference(reference);
             }
 
-            pub fn set_source_dist_references(&self, reference: &str) {
+            pub fn set_source_dist_references(&self, reference: String) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
@@ -794,7 +770,6 @@ macro_rules! impl_complete_package_interface_handle {
                     .as_complete_package_interface()
                     .expect("CompletePackage handle invariant")
                     .get_description()
-                    .map(str::to_string)
             }
 
             pub fn set_description(&self, description: String) {
@@ -811,7 +786,6 @@ macro_rules! impl_complete_package_interface_handle {
                     .as_complete_package_interface()
                     .expect("CompletePackage handle invariant")
                     .get_homepage()
-                    .map(str::to_string)
             }
 
             pub fn set_homepage(&self, homepage: String) {
@@ -889,7 +863,6 @@ macro_rules! impl_complete_package_interface_handle {
                     .as_complete_package_interface()
                     .expect("CompletePackage handle invariant")
                     .get_replacement_package()
-                    .map(str::to_string)
             }
 
             pub fn set_abandoned(&self, abandoned: shirabe_php_shim::PhpMixed) {
@@ -906,7 +879,6 @@ macro_rules! impl_complete_package_interface_handle {
                     .as_complete_package_interface()
                     .expect("CompletePackage handle invariant")
                     .get_archive_name()
-                    .map(str::to_string)
             }
 
             pub fn set_archive_name(&self, name: String) {

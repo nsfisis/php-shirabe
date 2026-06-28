@@ -137,103 +137,103 @@ impl RootPackageInterface for RootPackage {
 
 impl CompletePackageInterface for RootPackage {
     fn get_scripts(&self) -> IndexMap<String, Vec<String>> {
-        CompletePackageInterface::get_scripts(&self.inner)
+        self.inner.get_scripts()
     }
 
     fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>) {
-        CompletePackageInterface::set_scripts(&mut self.inner, scripts)
+        self.inner.set_scripts(scripts)
     }
 
     fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
-        CompletePackageInterface::get_repositories(&self.inner)
+        self.inner.get_repositories()
     }
 
     fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
-        CompletePackageInterface::set_repositories(&mut self.inner, repositories)
+        self.inner.set_repositories(repositories)
     }
 
     fn get_license(&self) -> Vec<String> {
-        CompletePackageInterface::get_license(&self.inner)
+        self.inner.get_license()
     }
 
     fn set_license(&mut self, license: Vec<String>) {
-        CompletePackageInterface::set_license(&mut self.inner, license)
+        self.inner.set_license(license)
     }
 
     fn get_keywords(&self) -> Vec<String> {
-        CompletePackageInterface::get_keywords(&self.inner)
+        self.inner.get_keywords()
     }
 
     fn set_keywords(&mut self, keywords: Vec<String>) {
-        CompletePackageInterface::set_keywords(&mut self.inner, keywords)
+        self.inner.set_keywords(keywords)
     }
 
-    fn get_description(&self) -> Option<&str> {
-        CompletePackageInterface::get_description(&self.inner)
+    fn get_description(&self) -> Option<String> {
+        self.inner.get_description()
     }
 
     fn set_description(&mut self, description: String) {
-        CompletePackageInterface::set_description(&mut self.inner, description)
+        self.inner.set_description(description)
     }
 
-    fn get_homepage(&self) -> Option<&str> {
-        CompletePackageInterface::get_homepage(&self.inner)
+    fn get_homepage(&self) -> Option<String> {
+        self.inner.get_homepage()
     }
 
     fn set_homepage(&mut self, homepage: String) {
-        CompletePackageInterface::set_homepage(&mut self.inner, homepage)
+        self.inner.set_homepage(homepage)
     }
 
     fn get_authors(&self) -> Vec<IndexMap<String, String>> {
-        CompletePackageInterface::get_authors(&self.inner)
+        self.inner.get_authors()
     }
 
     fn set_authors(&mut self, authors: Vec<IndexMap<String, String>>) {
-        CompletePackageInterface::set_authors(&mut self.inner, authors)
+        self.inner.set_authors(authors)
     }
 
     fn get_support(&self) -> IndexMap<String, String> {
-        CompletePackageInterface::get_support(&self.inner)
+        self.inner.get_support()
     }
 
     fn set_support(&mut self, support: IndexMap<String, String>) {
-        CompletePackageInterface::set_support(&mut self.inner, support)
+        self.inner.set_support(support)
     }
 
     fn get_funding(&self) -> Vec<IndexMap<String, PhpMixed>> {
-        CompletePackageInterface::get_funding(&self.inner)
+        self.inner.get_funding()
     }
 
     fn set_funding(&mut self, funding: Vec<IndexMap<String, PhpMixed>>) {
-        CompletePackageInterface::set_funding(&mut self.inner, funding)
+        self.inner.set_funding(funding)
     }
 
     fn is_abandoned(&self) -> bool {
-        CompletePackageInterface::is_abandoned(&self.inner)
+        self.inner.is_abandoned()
     }
 
-    fn get_replacement_package(&self) -> Option<&str> {
-        CompletePackageInterface::get_replacement_package(&self.inner)
+    fn get_replacement_package(&self) -> Option<String> {
+        self.inner.get_replacement_package()
     }
 
     fn set_abandoned(&mut self, abandoned: PhpMixed) {
-        CompletePackageInterface::set_abandoned(&mut self.inner, abandoned)
+        self.inner.set_abandoned(abandoned)
     }
 
-    fn get_archive_name(&self) -> Option<&str> {
-        CompletePackageInterface::get_archive_name(&self.inner)
+    fn get_archive_name(&self) -> Option<String> {
+        self.inner.get_archive_name()
     }
 
     fn set_archive_name(&mut self, name: String) {
-        CompletePackageInterface::set_archive_name(&mut self.inner, name)
+        self.inner.set_archive_name(name)
     }
 
     fn get_archive_excludes(&self) -> Vec<String> {
-        CompletePackageInterface::get_archive_excludes(&self.inner)
+        self.inner.get_archive_excludes()
     }
 
     fn set_archive_excludes(&mut self, excludes: Vec<String>) {
-        CompletePackageInterface::set_archive_excludes(&mut self.inner, excludes)
+        self.inner.set_archive_excludes(excludes)
     }
 
     fn as_package_interface(&self) -> &dyn PackageInterface {
@@ -278,19 +278,19 @@ impl PackageInterface for RootPackage {
     fn set_installation_source(&mut self, r#type: Option<String>) {
         self.inner.set_installation_source(r#type);
     }
-    fn get_installation_source(&self) -> Option<&str> {
+    fn get_installation_source(&self) -> Option<String> {
         self.inner.get_installation_source()
     }
-    fn get_source_type(&self) -> Option<&str> {
+    fn get_source_type(&self) -> Option<String> {
         self.inner.get_source_type()
     }
-    fn get_source_url(&self) -> Option<&str> {
+    fn get_source_url(&self) -> Option<String> {
         self.inner.get_source_url()
     }
     fn get_source_urls(&self) -> Vec<String> {
         self.inner.get_source_urls()
     }
-    fn get_source_reference(&self) -> Option<&str> {
+    fn get_source_reference(&self) -> Option<String> {
         self.inner.get_source_reference()
     }
     fn get_source_mirrors(&self) -> Option<Vec<Mirror>> {
@@ -299,19 +299,19 @@ impl PackageInterface for RootPackage {
     fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
         self.inner.set_source_mirrors(mirrors);
     }
-    fn get_dist_type(&self) -> Option<&str> {
+    fn get_dist_type(&self) -> Option<String> {
         self.inner.get_dist_type()
     }
-    fn get_dist_url(&self) -> Option<&str> {
+    fn get_dist_url(&self) -> Option<String> {
         self.inner.get_dist_url()
     }
     fn get_dist_urls(&self) -> Vec<String> {
         self.inner.get_dist_urls()
     }
-    fn get_dist_reference(&self) -> Option<&str> {
+    fn get_dist_reference(&self) -> Option<String> {
         self.inner.get_dist_reference()
     }
-    fn get_dist_sha1_checksum(&self) -> Option<&str> {
+    fn get_dist_sha1_checksum(&self) -> Option<String> {
         self.inner.get_dist_sha1_checksum()
     }
     fn get_dist_mirrors(&self) -> Option<Vec<Mirror>> {
@@ -377,7 +377,7 @@ impl PackageInterface for RootPackage {
     fn get_unique_name(&self) -> String {
         self.inner.get_unique_name()
     }
-    fn get_notification_url(&self) -> Option<&str> {
+    fn get_notification_url(&self) -> Option<String> {
         self.inner.get_notification_url()
     }
     fn get_pretty_string(&self) -> String {
@@ -407,7 +407,7 @@ impl PackageInterface for RootPackage {
     fn set_dist_reference(&mut self, reference: Option<String>) {
         self.inner.set_dist_reference(reference);
     }
-    fn set_source_dist_references(&mut self, reference: &str) {
+    fn set_source_dist_references(&mut self, reference: String) {
         self.inner.set_source_dist_references(reference);
     }
 }
