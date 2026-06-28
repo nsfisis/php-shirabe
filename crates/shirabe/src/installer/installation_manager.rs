@@ -40,6 +40,19 @@ pub struct InstallationManager {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     output_progress: bool,
+    /// For testing only: present iff this manager behaves like
+    /// `Composer\Test\Mock\InstallationManagerMock`, recording operations instead of executing
+    /// them. `None` in production.
+    mock: Option<InstallationManagerMockState>,
+}
+
+/// For testing only: recorded operations for the `InstallationManagerMock` behavior.
+#[derive(Debug, Default)]
+struct InstallationManagerMockState {
+    installed: Vec<PackageInterfaceHandle>,
+    updated: Vec<(PackageInterfaceHandle, PackageInterfaceHandle)>,
+    uninstalled: Vec<PackageInterfaceHandle>,
+    trace: Vec<String>,
 }
 
 impl InstallationManager {
@@ -56,7 +69,53 @@ impl InstallationManager {
             io,
             event_dispatcher,
             output_progress: false,
+            mock: None,
         }
+    }
+
+    /// For testing only: builds a manager that records operations instead of executing them,
+    /// mirroring `Composer\Test\Mock\InstallationManagerMock`.
+    pub fn __new_mock(
+        loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    ) -> Self {
+        Self {
+            mock: Some(InstallationManagerMockState::default()),
+            ..Self::new(loop_, io, event_dispatcher)
+        }
+    }
+
+    /// For testing only: the trace of stringified operations recorded by the mock.
+    pub fn __get_trace(&self) -> Vec<String> {
+        self.mock
+            .as_ref()
+            .map(|m| m.trace.clone())
+            .unwrap_or_default()
+    }
+
+    /// For testing only: packages passed to install (and markAliasInstalled) operations.
+    pub fn __get_installed_packages(&self) -> Vec<PackageInterfaceHandle> {
+        self.mock
+            .as_ref()
+            .map(|m| m.installed.clone())
+            .unwrap_or_default()
+    }
+
+    /// For testing only: (initial, target) package pairs passed to update operations.
+    pub fn __get_updated_packages(&self) -> Vec<(PackageInterfaceHandle, PackageInterfaceHandle)> {
+        self.mock
+            .as_ref()
+            .map(|m| m.updated.clone())
+            .unwrap_or_default()
+    }
+
+    /// For testing only: packages passed to uninstall (and markAliasUninstalled) operations.
+    pub fn __get_uninstalled_packages(&self) -> Vec<PackageInterfaceHandle> {
+        self.mock
+            .as_ref()
+            .map(|m| m.uninstalled.clone())
+            .unwrap_or_default()
     }
 
     pub fn reset(&mut self) {
@@ -126,6 +185,11 @@ impl InstallationManager {
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> Result<bool> {
+        // For testing only (ref InstallationManagerMock::isPackageInstalled).
+        if self.mock.is_some() {
+            return Ok(repo.has_package(package));
+        }
+
         if let Some(alias) = package.as_alias() {
             let alias_of: PackageInterfaceHandle = alias.get_alias_of().into();
             return Ok(
@@ -165,6 +229,70 @@ impl InstallationManager {
         run_scripts: bool,
         download_only: bool,
     ) -> Result<()> {
+        // For testing only: the mock records each operation and mutates the repo directly,
+        // skipping the download step (ref InstallationManagerMock::execute). The alias operations'
+        // repo mutation is inlined (rather than calling mark_alias_*) so `self.mock` can stay
+        // borrowed across the loop without also borrowing `&self`.
+        if let Some(mock) = self.mock.as_mut() {
+            let _ = (dev_mode, run_scripts, download_only);
+            for operation in operations {
+                let trace = shirabe_php_shim::strip_tags(&operation.to_string());
+                match operation.get_operation_type().as_str() {
+                    "install" => {
+                        let op = operation.as_install_operation().expect("install operation");
+                        let package = op.get_package();
+                        mock.installed.push(package.clone());
+                        mock.trace.push(trace);
+                        repo.add_package(PackageInterfaceHandle::dup(&package));
+                    }
+                    "update" => {
+                        let op = operation.as_update_operation().expect("update operation");
+                        let initial = op.get_initial_package().clone();
+                        let target = op.get_target_package().clone();
+                        mock.updated.push((initial.clone(), target.clone()));
+                        mock.trace.push(trace);
+                        repo.remove_package(initial);
+                        if !repo.has_package(target.clone()) {
+                            repo.add_package(PackageInterfaceHandle::dup(&target));
+                        }
+                    }
+                    "uninstall" => {
+                        let op = operation
+                            .as_uninstall_operation()
+                            .expect("uninstall operation");
+                        let package = op.get_package();
+                        mock.uninstalled.push(package.clone());
+                        mock.trace.push(trace);
+                        repo.remove_package(package);
+                    }
+                    "markAliasInstalled" => {
+                        let op = operation
+                            .as_any()
+                            .downcast_ref::<MarkAliasInstalledOperation>()
+                            .expect("markAliasInstalled operation");
+                        let package = op.get_package();
+                        mock.installed.push(package.clone().into());
+                        mock.trace.push(trace);
+                        if !repo.has_package(package.clone().into()) {
+                            repo.add_package(PackageInterfaceHandle::dup(&package.into()));
+                        }
+                    }
+                    "markAliasUninstalled" => {
+                        let op = operation
+                            .as_any()
+                            .downcast_ref::<MarkAliasUninstalledOperation>()
+                            .expect("markAliasUninstalled operation");
+                        let package = op.get_package();
+                        mock.uninstalled.push(package.clone().into());
+                        mock.trace.push(trace);
+                        repo.remove_package(package.into());
+                    }
+                    other => panic!("unknown operation type: {}", other),
+                }
+            }
+            return Ok(());
+        }
+
         // @var array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
         let mut cleanup_promises: IndexMap<
             i64,
@@ -623,6 +751,11 @@ impl InstallationManager {
 
     /// Returns the installation path of a package
     pub fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+        // For testing only (ref InstallationManagerMock::getInstallPath).
+        if self.mock.is_some() {
+            return Some(format!("vendor/{}", package.get_name()));
+        }
+
         let installer = self.get_installer(&package.get_type()).ok()?;
 
         installer.get_install_path(package)
@@ -633,6 +766,11 @@ impl InstallationManager {
     }
 
     pub fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+        // For testing only (ref InstallationManagerMock::notifyInstalls is a noop).
+        if self.mock.is_some() {
+            return;
+        }
+
         // TODO(phase-c-promise): PHP collects every http_downloader.add() promise and runs them via
         // Loop::wait; the single-threaded sync bridge block_on's each notification serially instead.
         let result: Result<()> = (|| -> Result<()> {
@@ -792,6 +930,12 @@ impl InstallationManager {
 // plugins may swap in a replacement. The interface captures the methods reached through Composer's
 // accessor and through the `&mut dyn InstallationManagerInterface` references fed from it.
 pub trait InstallationManagerInterface: std::fmt::Debug {
+    /// For testing only: lets a test recover the concrete manager (e.g. the recording mock) from a
+    /// trait object returned by `Composer::get_installation_manager`.
+    fn as_any(&self) -> &dyn std::any::Any {
+        unimplemented!("as_any is only implemented for the concrete InstallationManager")
+    }
+
     fn add_installer(&mut self, installer: Box<dyn InstallerInterface>);
     fn remove_installer(&mut self, installer: &dyn InstallerInterface);
     fn disable_plugins(&mut self);
@@ -815,6 +959,10 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
 }
 
 impl InstallationManagerInterface for InstallationManager {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn add_installer(&mut self, installer: Box<dyn InstallerInterface>) {
         self.add_installer(installer);
     }

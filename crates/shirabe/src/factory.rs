@@ -85,7 +85,12 @@ impl DisablePlugins {
 }
 
 /// Creates a configured instance of composer.
-pub struct Factory;
+#[derive(Default)]
+pub struct Factory {
+    /// For testing only: when true, the overridable `create_*`/`add_*` hooks behave like
+    /// `Composer\Test\Mock\FactoryMock`. `false` in production.
+    mock: bool,
+}
 
 impl Factory {
     fn get_home_dir() -> anyhow::Result<String> {
@@ -501,7 +506,11 @@ impl Factory {
         }
 
         // Load config and override with local config/auth config
-        let mut config = Self::create_config(Some(io.clone()), Some(&cwd))?;
+        let mut config = if self.mock {
+            Self::__create_config_mock(Some(&cwd))?
+        } else {
+            Self::create_config(Some(io.clone()), Some(&cwd))?
+        };
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
             && realpath(&config.get_str("home")?) == realpath(&dirname(&local_config_source));
         config.merge(&local_config_data, &local_config_source);
@@ -653,12 +662,22 @@ impl Factory {
 
                     // load package
                     let parser = VersionParser::new();
-                    let guesser = VersionGuesser::new(
-                        config.clone(),
-                        process.clone(),
-                        parser.clone(),
-                        Some(io.clone()),
-                    );
+                    // FactoryMock::loadRootPackage swaps in a VersionGuesserMock (guessVersion returns null).
+                    let guesser = if self.mock {
+                        VersionGuesser::__new_mock(
+                            config.clone(),
+                            process.clone(),
+                            parser.clone(),
+                            Some(io.clone()),
+                        )
+                    } else {
+                        VersionGuesser::new(
+                            config.clone(),
+                            process.clone(),
+                            parser.clone(),
+                            Some(io.clone()),
+                        )
+                    };
                     let mut loader = self.load_root_package(
                         rm.clone(),
                         config.clone(),
@@ -890,7 +909,7 @@ impl Factory {
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
     ) -> Option<PartialComposerHandle> {
-        let factory = Self;
+        let factory = Self::default();
 
         let config = Self::create_config(Some(io.clone()), None).ok()?;
         factory.create_global_composer(io, &config, disable_plugins, disable_scripts, true)
@@ -904,6 +923,15 @@ impl Factory {
         root_package: RootPackageInterfaceHandle,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
+        // FactoryMock::addLocalRepository installs a bare InstalledArrayRepository instead.
+        if self.mock {
+            rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
+                crate::repository::InstalledArrayRepository::new()
+                    .expect("InstalledArrayRepository::new should not fail"),
+            ));
+            return;
+        }
+
         let fs = process
             .map(|p| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(p.clone())))));
 
@@ -1210,6 +1238,10 @@ impl Factory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> InstallationManager {
+        // FactoryMock::createInstallationManager returns a recording InstallationManagerMock.
+        if self.mock {
+            return InstallationManager::__new_mock(r#loop, io, event_dispatcher);
+        }
         InstallationManager::new(r#loop, io, event_dispatcher)
     }
 
@@ -1220,6 +1252,11 @@ impl Factory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
+        // FactoryMock::createDefaultInstallers is a noop (no installers registered).
+        if self.mock {
+            return;
+        }
+
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
             process.map(std::rc::Rc::clone),
         )));
@@ -1307,7 +1344,7 @@ impl Factory {
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
     ) -> anyhow::Result<ComposerHandle> {
-        let factory = Self;
+        let factory = Self::default();
 
         // for BC reasons, if a config is passed in either as array or a path that is not the default composer.json path
         // we disable local plugins as they really should not be loaded from CWD
@@ -1336,6 +1373,73 @@ impl Factory {
                 code: 0,
             })
         })
+    }
+
+    /// For testing only: equivalent of `Composer\Test\Mock\FactoryMock::create`. Builds the Composer
+    /// the same way as `create`, but with the FactoryMock overrides enabled (see the `self.mock`
+    /// branches in `create_composer`/`add_local_repository`/`create_installation_manager`/
+    /// `create_default_installers`).
+    pub fn __create_mock(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: Option<LocalConfigInput>,
+        disable_plugins: DisablePlugins,
+        disable_scripts: bool,
+    ) -> anyhow::Result<ComposerHandle> {
+        let factory = Self { mock: true };
+
+        let default_composer_file = Self::get_composer_file()?;
+        let config_is_default = matches!(
+            config.as_ref(),
+            Some(LocalConfigInput::Path(p)) if *p == default_composer_file
+        );
+        let disable_plugins = if config.is_some()
+            && !config_is_default
+            && matches!(disable_plugins, DisablePlugins::None)
+        {
+            DisablePlugins::Local
+        } else {
+            disable_plugins
+        };
+
+        let composer =
+            factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
+        composer.as_full().ok_or_else(|| {
+            anyhow::anyhow!(RuntimeException {
+                message: "Composer expected with fullLoad=true".to_string(),
+                code: 0,
+            })
+        })
+    }
+
+    /// For testing only: equivalent of `FactoryMock::createConfig`. Builds a `Config` with a unique
+    /// temp home and packagist disabled, without loading the global config/auth files.
+    fn __create_config_mock(cwd: Option<&str>) -> anyhow::Result<Config> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+
+        let mut config = Config::new(true, cwd.map(|s| s.to_string()));
+
+        let home = std::env::temp_dir().join(format!(
+            "shirabe-test-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::create_dir_all(&home);
+
+        let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+        config_section.insert(
+            "home".to_string(),
+            PhpMixed::String(home.to_string_lossy().into_owned()),
+        );
+        let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
+        repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
+
+        let mut merge: IndexMap<String, PhpMixed> = IndexMap::new();
+        merge.insert("config".to_string(), PhpMixed::Array(config_section));
+        merge.insert("repositories".to_string(), PhpMixed::Array(repositories));
+        config.merge(&merge, Config::SOURCE_UNKNOWN);
+
+        Ok(config)
     }
 
     /// If you are calling this in a plugin, you probably should instead use `$composer->getLoop()->getHttpDownloader()`

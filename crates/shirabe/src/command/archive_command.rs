@@ -288,7 +288,7 @@ impl ArchiveCommand {
                 composer_archive_manager_ref = composer_archive_manager.borrow_mut();
                 &mut *composer_archive_manager_ref
             } else {
-                let factory = Factory;
+                let factory = Factory::default();
                 let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
                 let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
                     Factory::create_http_downloader(io.clone(), config, indexmap::IndexMap::new())?,

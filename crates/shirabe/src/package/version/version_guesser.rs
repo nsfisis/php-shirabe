@@ -49,6 +49,10 @@ pub struct VersionGuesser {
 
     /// @var IOInterface|null
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+
+    /// For testing only: when true, `guess_version` always returns `None`, mirroring
+    /// `Composer\Test\Mock\VersionGuesserMock`. `false` in production.
+    mock: bool,
 }
 
 /// PHP: @phpstan-type Version array{version, commit, pretty_version, feature_version?, feature_pretty_version?}
@@ -73,6 +77,21 @@ impl VersionGuesser {
             process,
             version_parser,
             io,
+            mock: false,
+        }
+    }
+
+    /// For testing only: builds a guesser whose `guess_version` always returns `None`, mirroring
+    /// `Composer\Test\Mock\VersionGuesserMock`.
+    pub fn __new_mock(
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+        version_parser: VersionParser,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    ) -> Self {
+        Self {
+            mock: true,
+            ..Self::new(config, process, version_parser, io)
         }
     }
 
@@ -85,6 +104,11 @@ impl VersionGuesser {
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
     ) -> Result<Option<VersionData>> {
+        // For testing only (ref VersionGuesserMock::guessVersion returns null).
+        if self.mock {
+            return Ok(None);
+        }
+
         if !function_exists("proc_open") {
             return Ok(None);
         }

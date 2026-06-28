@@ -19,6 +19,9 @@ use shirabe_semver::constraint::AnyConstraint;
 #[derive(Debug)]
 pub struct InstalledFilesystemRepository {
     inner: FilesystemRepository,
+    /// For testing only: when true, `reload` and `write` are no-ops, mirroring
+    /// `Composer\Test\Mock\InstalledFilesystemRepositoryMock`. `false` in production.
+    mock: bool,
 }
 
 impl InstalledFilesystemRepository {
@@ -35,6 +38,21 @@ impl InstalledFilesystemRepository {
                 root_package,
                 filesystem,
             )?,
+            mock: false,
+        })
+    }
+
+    /// For testing only: builds a repository whose `reload`/`write` are no-ops, mirroring
+    /// `Composer\Test\Mock\InstalledFilesystemRepositoryMock`.
+    pub fn __new_mock(
+        repository_file: JsonFile,
+        dump_versions: bool,
+        root_package: Option<RootPackageInterfaceHandle>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
+    ) -> Result<Self> {
+        Ok(Self {
+            mock: true,
+            ..Self::new(repository_file, dump_versions, root_package, filesystem)?
         })
     }
 
@@ -59,6 +77,10 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
         dev_mode: bool,
         installation_manager: &mut crate::installer::InstallationManager,
     ) -> anyhow::Result<()> {
+        // For testing only (ref InstalledFilesystemRepositoryMock::write is a noop).
+        if self.mock {
+            return Ok(());
+        }
         self.inner.write(dev_mode, installation_manager)
     }
 
@@ -75,6 +97,10 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
     }
 
     fn reload(&mut self) -> anyhow::Result<()> {
+        // For testing only (ref InstalledFilesystemRepositoryMock::reload is a noop).
+        if self.mock {
+            return Ok(());
+        }
         self.inner.reload()
     }
 
