@@ -11,6 +11,7 @@ use shirabe::advisory::PartialSecurityAdvisory;
 use shirabe::advisory::SecurityAdvisory;
 use shirabe::downloader::TransportException;
 use shirabe::io::BufferIO;
+use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::package::BasePackageHandle;
 use shirabe::package::PackageInterfaceHandle;
@@ -28,6 +29,8 @@ use shirabe_php_shim::date_create;
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn constraint(operator: &str, version: &str) -> shirabe_semver::constraint::AnyConstraint {
     SimpleConstraint::new(operator.to_string(), version.to_string(), None).into()
@@ -591,12 +594,13 @@ Found 2 abandoned packages:
 
     for case in cases {
         let repo_set = get_repo_set();
-        let mut io =
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap();
+        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
+            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        ));
         let auditor = Auditor;
         let result = auditor
             .audit(
-                &mut io,
+                &io,
                 &repo_set,
                 case.packages.clone(),
                 case.format,
@@ -609,7 +613,16 @@ Found 2 abandoned packages:
             )
             .unwrap();
         assert_eq!(case.expected, result);
-        assert_eq!(case.output, io.get_output().replace('\r', "").trim());
+        assert_eq!(
+            case.output,
+            io.borrow()
+                .as_any()
+                .downcast_ref::<BufferIO>()
+                .unwrap()
+                .get_output()
+                .replace('\r', "")
+                .trim()
+        );
     }
 }
 
@@ -811,23 +824,21 @@ fn test_audit_with_ignore() {
         let repo_set = get_repo_set();
         let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
         let auditor = Auditor;
-        let result = {
-            let mut io_guard = io_mock.borrow_mut();
-            auditor
-                .audit(
-                    &mut *io_guard,
-                    &repo_set,
-                    case.packages.clone(),
-                    Auditor::FORMAT_PLAIN,
-                    false,
-                    case.ignored_ids.clone(),
-                    Auditor::ABANDONED_FAIL,
-                    IndexMap::new(),
-                    false,
-                    IndexMap::new(),
-                )
-                .unwrap()
-        };
+        let io_dyn: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+        let result = auditor
+            .audit(
+                &io_dyn,
+                &repo_set,
+                case.packages.clone(),
+                Auditor::FORMAT_PLAIN,
+                false,
+                case.ignored_ids.clone(),
+                Auditor::ABANDONED_FAIL,
+                IndexMap::new(),
+                false,
+                IndexMap::new(),
+            )
+            .unwrap();
         io_mock
             .borrow_mut()
             .expects(case.expected_output.clone(), true)
@@ -913,11 +924,12 @@ fn test_audit_with_ignore_unreachable() {
     // Without the ignoreUnreachable flag the TransportException propagates.
     {
         let repo_set = make_repo_set();
-        let mut io =
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap();
+        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
+            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        ));
         let err = auditor
             .audit(
-                &mut io,
+                &io,
                 &repo_set,
                 packages.clone(),
                 Auditor::FORMAT_PLAIN,
@@ -935,11 +947,12 @@ fn test_audit_with_ignore_unreachable() {
     // With the ignoreUnreachable flag the advisories from reachable repos are reported.
     {
         let repo_set = make_repo_set();
-        let mut io =
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap();
+        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
+            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        ));
         let result = auditor
             .audit(
-                &mut io,
+                &io,
                 &repo_set,
                 packages.clone(),
                 Auditor::FORMAT_PLAIN,
@@ -953,7 +966,12 @@ fn test_audit_with_ignore_unreachable() {
             .unwrap();
         assert_eq!(Auditor::STATUS_VULNERABLE, result);
 
-        let output = io.get_output();
+        let output = io
+            .borrow()
+            .as_any()
+            .downcast_ref::<BufferIO>()
+            .unwrap()
+            .get_output();
         assert!(output.contains("The following repositories were unreachable:"));
         assert!(output.contains("HTTP/1.1 404 Not Found"));
         assert!(output.contains("First repo advisory"));
@@ -965,11 +983,12 @@ fn test_audit_with_ignore_unreachable() {
     // With JSON format the unreachable repositories and advisories are both included.
     {
         let repo_set = make_repo_set();
-        let mut io =
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap();
+        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
+            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        ));
         let result = auditor
             .audit(
-                &mut io,
+                &io,
                 &repo_set,
                 packages.clone(),
                 Auditor::FORMAT_JSON,
@@ -983,7 +1002,14 @@ fn test_audit_with_ignore_unreachable() {
             .unwrap();
         assert_eq!(Auditor::STATUS_VULNERABLE, result);
 
-        let json: serde_json::Value = serde_json::from_str(&io.get_output()).unwrap();
+        let json: serde_json::Value = serde_json::from_str(
+            &io.borrow()
+                .as_any()
+                .downcast_ref::<BufferIO>()
+                .unwrap()
+                .get_output(),
+        )
+        .unwrap();
         let unreachable = json
             .get("unreachable-repositories")
             .and_then(|v| v.as_array())
@@ -1056,23 +1082,21 @@ fn test_audit_with_ignore_severity() {
         let repo_set = get_repo_set();
         let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
         let auditor = Auditor;
-        let result = {
-            let mut io_guard = io_mock.borrow_mut();
-            auditor
-                .audit(
-                    &mut *io_guard,
-                    &repo_set,
-                    case.packages.clone(),
-                    Auditor::FORMAT_PLAIN,
-                    false,
-                    IndexMap::new(),
-                    Auditor::ABANDONED_IGNORE,
-                    case.ignored_severities.clone(),
-                    false,
-                    IndexMap::new(),
-                )
-                .unwrap()
-        };
+        let io_dyn: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+        let result = auditor
+            .audit(
+                &io_dyn,
+                &repo_set,
+                case.packages.clone(),
+                Auditor::FORMAT_PLAIN,
+                false,
+                IndexMap::new(),
+                Auditor::ABANDONED_IGNORE,
+                case.ignored_severities.clone(),
+                false,
+                IndexMap::new(),
+            )
+            .unwrap();
         io_mock
             .borrow_mut()
             .expects(case.expected_output.clone(), true)

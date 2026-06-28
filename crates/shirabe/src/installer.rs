@@ -517,7 +517,7 @@ impl Installer {
                 }
 
                 let audit_result = auditor.audit(
-                    &mut *self.io.borrow_mut(),
+                    &self.io,
                     &repo_set,
                     packages,
                     &audit_config.audit_format,

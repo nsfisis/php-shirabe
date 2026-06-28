@@ -60,7 +60,6 @@ fn test_error_auditing_lock_file_when_it_is_missing() {
 
 #[test]
 #[serial]
-#[ignore = "'RefCell already mutably borrowed' panic at crates/shirabe/src/io/io_interface.rs:215 (write_error3) in the locked-audit advisory-fetch path; not in target file"]
 fn test_audit_package_with_no_security_vulnerabilities() {
     let tear_down = init_temp_composer(None, None, None, true);
     let packages: Vec<PackageInterfaceHandle> = vec![get_package("dummy/pkg", "1.0.0")];

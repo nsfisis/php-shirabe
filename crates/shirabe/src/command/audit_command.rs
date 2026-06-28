@@ -202,7 +202,7 @@ impl Command for AuditCommand {
         let audit_format = self.get_audit_format(input, "format")?;
         Ok(auditor
             .audit(
-                &mut *self.get_io().borrow_mut(),
+                &self.get_io(),
                 &repo_set,
                 packages,
                 &audit_format,

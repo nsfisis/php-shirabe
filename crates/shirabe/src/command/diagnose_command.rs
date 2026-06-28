@@ -996,9 +996,11 @@ impl DiagnoseCommand {
             )?);
         repo_set.add_repository(composer_repo_as_repo)?;
 
-        let mut io = BufferIO::new(String::new(), 0, None)?;
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+            std::cell::RefCell::new(BufferIO::new(String::new(), 0, None)?),
+        );
         let result = match auditor.audit(
-            &mut io,
+            &io,
             &repo_set,
             packages,
             Auditor::FORMAT_TABLE,
@@ -1022,7 +1024,11 @@ impl DiagnoseCommand {
             return Ok(PhpMixed::String(format!(
                 "<highlight>Audit found some issues:</>{}{}",
                 PHP_EOL,
-                io.get_output()
+                io.borrow()
+                    .as_any()
+                    .downcast_ref::<BufferIO>()
+                    .unwrap()
+                    .get_output()
             )));
         }
 

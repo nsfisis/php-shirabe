@@ -4,6 +4,7 @@ use crate::advisory::AnySecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::package::PackageInterfaceHandle;
@@ -17,6 +18,8 @@ use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
     array_keys, array_reduce, get_class, sprintf, str_starts_with,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Shape of the `--format=json` audit output.
 #[derive(serde::Serialize)]
@@ -112,7 +115,7 @@ impl Auditor {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn audit(
         &self,
-        io: &mut dyn IOInterface,
+        io: &Rc<RefCell<dyn IOInterface>>,
         repo_set: &RepositorySet,
         packages: Vec<PackageInterfaceHandle>,
         format: &str,
@@ -425,13 +428,14 @@ impl Auditor {
     /// @param self::FORMAT_* $format The format that will be used to output audit results.
     fn output_advisories(
         &self,
-        io: &mut dyn IOInterface,
+        io: &Rc<RefCell<dyn IOInterface>>,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
         format: &str,
     ) -> anyhow::Result<()> {
         match format {
             Self::FORMAT_TABLE => {
-                let io_as_console = io.as_any().downcast_ref::<ConsoleIO>();
+                let io_ref = io.borrow();
+                let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>();
                 if io_as_console.is_none() {
                     return Err(InvalidArgumentException {
                         message: format!(
@@ -524,7 +528,7 @@ impl Auditor {
     /// @param array<string, array<SecurityAdvisory>> $advisories
     fn output_advisories_plain(
         &self,
-        io: &mut dyn IOInterface,
+        io: &Rc<RefCell<dyn IOInterface>>,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
     ) -> anyhow::Result<()> {
         let mut error: Vec<String> = vec![];
@@ -571,7 +575,7 @@ impl Auditor {
     /// @param self::FORMAT_PLAIN|self::FORMAT_TABLE $format
     fn output_abandoned_packages(
         &self,
-        io: &mut dyn IOInterface,
+        io: &Rc<RefCell<dyn IOInterface>>,
         packages: &[CompletePackageInterfaceHandle],
         format: &str,
     ) -> anyhow::Result<()> {
@@ -602,7 +606,8 @@ impl Auditor {
             return Ok(());
         }
 
-        let io_as_console = io.as_any().downcast_ref::<ConsoleIO>();
+        let io_ref = io.borrow();
+        let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>();
         if io_as_console.is_none() {
             return Err(InvalidArgumentException {
                 message: format!(
