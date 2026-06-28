@@ -179,9 +179,7 @@ impl SyncHelper {
         promise: Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + '_>>>,
     ) -> Result<()> {
         if let Some(promise) = promise {
-            tokio::runtime::Runtime::new()
-                .unwrap()
-                .block_on(r#loop.borrow_mut().wait(vec![promise], None))?;
+            crate::util::sync_executor::block_on(r#loop.borrow_mut().wait(vec![promise], None))?;
         }
         Ok(())
     }

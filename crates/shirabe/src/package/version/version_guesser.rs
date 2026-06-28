@@ -10,6 +10,7 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
+use crate::util::sync_executor;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -543,7 +544,7 @@ impl VersionGuesser {
                         },
                         &scm_cmdline,
                     );
-                    let mut process = tokio::runtime::Runtime::new().unwrap().block_on(
+                    let mut process = sync_executor::block_on(
                         self.process
                             .borrow_mut()
                             .execute_async(&cmd_line, Some(path)),

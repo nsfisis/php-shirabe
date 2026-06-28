@@ -1,9 +1,10 @@
 //! ref: composer/src/Composer/Util/Http/CurlDownloader.php
 //!
 //! reqwest-based re-implementation. The libcurl multi-handle event loop of the PHP original is
-//! replaced by reqwest + a tokio runtime: `download()` queues a job, and `tick()` drives one job
-//! to completion by `block_on`-ing the HTTP request (mirroring the existing sync bridge used
-//! elsewhere in the codebase, e.g. file_downloader.rs / installation_manager.rs).
+//! replaced by a blocking reqwest client: `download()` queues a job, and `tick()` drives one job to
+//! completion with a synchronous HTTP request. A blocking client is used (rather than the async
+//! client + a per-downloader tokio runtime) so the request never starts a tokio runtime from within
+//! another one when invoked through the codebase's sync bridges (see util/sync_executor.rs).
 //!
 //! The PHP control flow (insecure-URL check, redirect following, transport/status retries,
 //! authenticated-retry detection, max_file_size enforcement, atomic rename of the `~` temp file)
@@ -66,9 +67,7 @@ pub struct CurlDownloader {
     /// Connection pool / cookie / TLS-session sharing — reqwest::Client handles this internally,
     /// replacing the PHP multiHandle + shareHandle. Redirects are disabled because we follow them
     /// manually (to control auth-header re-attachment), matching CURLOPT_FOLLOWLOCATION = false.
-    client: reqwest::Client,
-    /// tokio runtime used to `block_on` the async reqwest calls from the sync `tick()`.
-    runtime: tokio::runtime::Runtime,
+    client: reqwest::blocking::Client,
     jobs: IndexMap<i64, CurlJob>,
     next_id: i64,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -95,11 +94,11 @@ impl CurlDownloader {
         //   - cookie_store(true)        ~ CURL_LOCK_DATA_COOKIE
         //   - redirect(none)            ~ CURLOPT_FOLLOWLOCATION = false (we follow manually)
         // The libcurl version-specific multiplexing / accept-encoding workarounds are not needed.
-        // TODO: a brand-new tokio runtime + reqwest client is created per CurlDownloader; that is
-        // acceptable here (one HttpDownloader owns one CurlDownloader) but not pooled across them.
+        // TODO: a brand-new reqwest client is created per CurlDownloader; that is acceptable here
+        // (one HttpDownloader owns one CurlDownloader) but not pooled across them.
         // TODO: cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
         // (.cookie_store(true)); omitted as it is not required for package downloads.
-        let client = reqwest::Client::builder()
+        let client = reqwest::blocking::Client::builder()
             .pool_max_idle_per_host(8)
             .redirect(reqwest::redirect::Policy::none())
             .build()
@@ -107,14 +106,10 @@ impl CurlDownloader {
             // cannot proceed, mirroring PHP aborting when curl is missing.
             .expect("failed to build reqwest client for CurlDownloader");
 
-        let runtime = tokio::runtime::Runtime::new()
-            .expect("failed to build tokio runtime for CurlDownloader");
-
         let auth_helper = AuthHelper::new(io.clone(), config.clone());
 
         Self {
             client,
-            runtime,
             jobs: IndexMap::new(),
             next_id: 1,
             io,
@@ -282,7 +277,7 @@ impl CurlDownloader {
         }
 
         // Drive every queued job to completion. The PHP multi-handle progressed all easy handles
-        // a little per tick(); here each tick() fully resolves one job (block_on per request),
+        // a little per tick(); here each tick() fully resolves one job (one blocking request),
         // which is observationally equivalent for the sync wait_id() loop that calls tick().
         let ids: Vec<i64> = self.jobs.keys().copied().collect();
         for id in ids {
@@ -531,7 +526,7 @@ impl CurlDownloader {
         }
     }
 
-    /// Performs one HTTP request via reqwest (`block_on`), enforcing max_file_size and streaming the
+    /// Performs one blocking HTTP request via reqwest, enforcing max_file_size and streaming the
     /// body to the `~` temp file when in file mode. Replaces PHP's curl_setopt block + curl I/O.
     fn send_once(
         &self,
@@ -570,76 +565,74 @@ impl CurlDownloader {
         let reqwest_method =
             reqwest::Method::from_bytes(method.as_bytes()).unwrap_or(reqwest::Method::GET);
 
-        self.runtime.block_on(async {
-            let mut builder = self.client.request(reqwest_method, url);
-            for header in &headers {
-                if let Some((name, value)) = header.split_once(':') {
-                    // Skip the Connection header reqwest manages itself.
-                    let name = name.trim();
-                    if name.eq_ignore_ascii_case("connection") {
-                        continue;
-                    }
-                    builder = builder.header(name, value.trim());
+        let mut builder = self.client.request(reqwest_method, url);
+        for header in &headers {
+            if let Some((name, value)) = header.split_once(':') {
+                // Skip the Connection header reqwest manages itself.
+                let name = name.trim();
+                if name.eq_ignore_ascii_case("connection") {
+                    continue;
                 }
+                builder = builder.header(name, value.trim());
             }
-            builder = builder.timeout(std::time::Duration::from_secs(timeout_secs as u64));
-            if let Some(body) = body {
-                builder = builder.body(body);
-            }
+        }
+        builder = builder.timeout(std::time::Duration::from_secs(timeout_secs as u64));
+        if let Some(body) = body {
+            builder = builder.body(body);
+        }
 
-            let resp = builder.send().await.map_err(|e| TransportError {
-                message: e.to_string(),
-                retryable: e.is_timeout() || e.is_connect() || e.is_request(),
-                is_connect: e.is_connect(),
-                was_timeout: e.is_timeout(),
-                is_max_file_size: false,
-            })?;
+        let resp = builder.send().map_err(|e| TransportError {
+            message: e.to_string(),
+            retryable: e.is_timeout() || e.is_connect() || e.is_request(),
+            is_connect: e.is_connect(),
+            was_timeout: e.is_timeout(),
+            is_max_file_size: false,
+        })?;
 
-            let status = resp.status().as_u16() as i64;
-            let status_line = format!(
-                "HTTP/{} {}",
-                match resp.version() {
-                    reqwest::Version::HTTP_09 => "0.9",
-                    reqwest::Version::HTTP_10 => "1.0",
-                    reqwest::Version::HTTP_11 => "1.1",
-                    reqwest::Version::HTTP_2 => "2",
-                    reqwest::Version::HTTP_3 => "3",
-                    _ => "1.1",
-                },
-                resp.status()
-            );
-            // Header lines start with the status line so Response::get_status_message can find it.
-            let mut headers_out: Vec<String> = vec![status_line];
-            for (k, v) in resp.headers().iter() {
-                headers_out.push(format!("{}: {}", k, v.to_str().unwrap_or("")));
-            }
+        let status = resp.status().as_u16() as i64;
+        let status_line = format!(
+            "HTTP/{} {}",
+            match resp.version() {
+                reqwest::Version::HTTP_09 => "0.9",
+                reqwest::Version::HTTP_10 => "1.0",
+                reqwest::Version::HTTP_11 => "1.1",
+                reqwest::Version::HTTP_2 => "2",
+                reqwest::Version::HTTP_3 => "3",
+                _ => "1.1",
+            },
+            resp.status()
+        );
+        // Header lines start with the status line so Response::get_status_message can find it.
+        let mut headers_out: Vec<String> = vec![status_line];
+        for (k, v) in resp.headers().iter() {
+            headers_out.push(format!("{}: {}", k, v.to_str().unwrap_or("")));
+        }
 
-            let body = Self::read_body_with_limit(resp, max_file_size, filename)
-                .await
-                .map_err(|(message, is_max_file_size)| TransportError {
-                    message,
-                    retryable: false,
-                    is_connect: false,
-                    was_timeout: false,
-                    is_max_file_size,
-                })?;
+        let body = Self::read_body_with_limit(resp, max_file_size, filename).map_err(
+            |(message, is_max_file_size)| TransportError {
+                message,
+                retryable: false,
+                is_connect: false,
+                was_timeout: false,
+                is_max_file_size,
+            },
+        )?;
 
-            Ok(RawResponse {
-                status,
-                headers: headers_out,
-                body,
-            })
+        Ok(RawResponse {
+            status,
+            headers: headers_out,
+            body,
         })
     }
 
     /// Reads the body, enforcing max_file_size, writing to the `~` temp file when in file mode.
     /// The `bool` in the error is `true` when the failure is a max_file_size violation.
-    async fn read_body_with_limit(
-        resp: reqwest::Response,
+    fn read_body_with_limit(
+        resp: reqwest::blocking::Response,
         max_file_size: Option<u64>,
         filename: Option<&str>,
     ) -> Result<Body, (String, bool)> {
-        use std::io::Write;
+        use std::io::{Read, Write};
 
         let mut stream = resp;
         let mut written: u64 = 0;
@@ -654,13 +647,15 @@ impl CurlDownloader {
             None => Sink::Memory(Vec::new()),
         };
 
+        let mut buffer = [0u8; 16 * 1024];
         loop {
-            let chunk = match stream.chunk().await {
-                Ok(Some(c)) => c,
-                Ok(None) => break,
+            let n = match stream.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => n,
                 Err(e) => return Err((e.to_string(), false)),
             };
-            written += chunk.len() as u64;
+            let chunk = &buffer[..n];
+            written += n as u64;
             if let Some(max) = max_file_size
                 && written > max
             {
@@ -673,8 +668,8 @@ impl CurlDownloader {
                 ));
             }
             match &mut sink {
-                Sink::File(f) => f.write_all(&chunk).map_err(|e| (e.to_string(), false))?,
-                Sink::Memory(buf) => buf.extend_from_slice(&chunk),
+                Sink::File(f) => f.write_all(chunk).map_err(|e| (e.to_string(), false))?,
+                Sink::Memory(buf) => buf.extend_from_slice(chunk),
             }
         }
 

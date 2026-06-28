@@ -23,6 +23,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use crate::util::Url as UrlUtil;
+use crate::util::sync_executor;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -629,21 +630,17 @@ impl ChangeReportInterface for FileDownloader {
                     .remove_directory(format!("{}_compare", target_dir))?;
             }
 
-            tokio::runtime::Runtime::new()
-                .unwrap()
-                .block_on(self.download(
-                    package.clone(),
-                    &format!("{}_compare", target_dir),
-                    None,
-                    false,
-                ))?;
-            tokio::runtime::Runtime::new()
-                .unwrap()
-                .block_on(self.install(
-                    package.clone(),
-                    &format!("{}_compare", target_dir),
-                    false,
-                ))?;
+            sync_executor::block_on(self.download(
+                package.clone(),
+                &format!("{}_compare", target_dir),
+                None,
+                false,
+            ))?;
+            sync_executor::block_on(self.install(
+                package.clone(),
+                &format!("{}_compare", target_dir),
+                false,
+            ))?;
 
             let mut comparer = Comparer::new();
             comparer.set_source(format!("{}_compare", target_dir));

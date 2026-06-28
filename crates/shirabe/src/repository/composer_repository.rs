@@ -32,6 +32,7 @@ use crate::util::HttpDownloader;
 use crate::util::Url;
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
+use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_metadata_minifier::MetadataMinifier;
@@ -964,9 +965,8 @@ impl ComposerRepository {
                     continue;
                 }
 
-                let spec = tokio::runtime::Runtime::new()
-                    .unwrap()
-                    .block_on(self.start_cached_async_download(&name, Some(&name)))?;
+                let spec =
+                    sync_executor::block_on(self.start_cached_async_download(&name, Some(&name)))?;
 
                 // [$response] = $spec;
                 let response = spec
@@ -1726,9 +1726,8 @@ impl ComposerRepository {
             }
 
             let version_parser = self.version_parser.clone();
-            let spec = tokio::runtime::Runtime::new()
-                .unwrap()
-                .block_on(self.start_cached_async_download(&name, Some(&real_name)))?;
+            let spec =
+                sync_executor::block_on(self.start_cached_async_download(&name, Some(&real_name)))?;
 
             // [$response, $packagesSource] = $spec;
             let spec_list = spec.as_list().cloned().unwrap_or_default();

@@ -17,6 +17,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
+use crate::util::sync_executor;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::seld::signal::SignalHandler;
@@ -231,17 +232,15 @@ impl InstallationManager {
             }
 
             for batch_to_execute in batches {
-                tokio::runtime::Runtime::new().unwrap().block_on(
-                    self.download_and_execute_batch(
-                        repo,
-                        batch_to_execute,
-                        &mut cleanup_promises,
-                        dev_mode,
-                        run_scripts,
-                        download_only,
-                        all_operations.clone(),
-                    ),
-                )?;
+                sync_executor::block_on(self.download_and_execute_batch(
+                    repo,
+                    batch_to_execute,
+                    &mut cleanup_promises,
+                    dev_mode,
+                    run_scripts,
+                    download_only,
+                    all_operations.clone(),
+                ))?;
             }
 
             Ok(())
@@ -253,9 +252,7 @@ impl InstallationManager {
         match result {
             Ok(()) => {}
             Err(e) => {
-                tokio::runtime::Runtime::new()
-                    .unwrap()
-                    .block_on(self.run_cleanup(&cleanup_promises));
+                sync_executor::block_on(self.run_cleanup(&cleanup_promises));
                 return Err(e);
             }
         }
@@ -672,7 +669,7 @@ impl InstallationManager {
                             PhpMixed::Array(http.into_iter().collect()),
                         );
 
-                        tokio::runtime::Runtime::new().unwrap().block_on(
+                        sync_executor::block_on(
                             self.loop_
                                 .borrow()
                                 .get_http_downloader()
@@ -734,7 +731,7 @@ impl InstallationManager {
                     PhpMixed::Array(http.into_iter().collect()),
                 );
 
-                tokio::runtime::Runtime::new().unwrap().block_on(
+                sync_executor::block_on(
                     self.loop_
                         .borrow()
                         .get_http_downloader()

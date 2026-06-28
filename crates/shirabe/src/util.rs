@@ -25,6 +25,7 @@ pub mod remote_filesystem;
 pub mod silencer;
 pub mod stream_context_factory;
 pub mod svn;
+pub mod sync_executor;
 pub mod sync_helper;
 pub mod tar;
 pub mod tls_helper;
