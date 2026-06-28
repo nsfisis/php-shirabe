@@ -32,15 +32,9 @@ fn run<F: std::future::Future>(future: F) -> F::Output {
         .block_on(future)
 }
 
+/// ref: setUp markTestSkipped on Windows / 32bit, expressed as a compile-time
+/// cfg gate on the test function below.
 fn set_up() -> TempDir {
-    if Platform::is_windows() {
-        // markTestSkipped('Skip test on Windows')
-        todo!()
-    }
-    if std::mem::size_of::<usize>() == 4 {
-        // markTestSkipped('Skip test on 32bit')
-        todo!()
-    }
     TempDir::new().unwrap()
 }
 
@@ -77,6 +71,7 @@ fn get_config(config_options: IndexMap<String, PhpMixed>, use_environment: bool)
     config
 }
 
+#[cfg(all(not(windows), target_pointer_width = "64"))]
 #[ignore]
 #[test]
 fn test_error_messages() {
