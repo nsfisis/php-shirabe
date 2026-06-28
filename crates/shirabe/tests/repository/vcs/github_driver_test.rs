@@ -62,59 +62,43 @@ impl Drop for TearDown {
     }
 }
 
-// No-op ConfigSourceInterface, equivalent to PHPUnit's
-// `getMockBuilder(ConfigSourceInterface::class)->getMock()` whose methods all do
-// nothing. Used by testPrivateRepository to satisfy the OAuth token-storing path.
-#[derive(Debug)]
-struct NullConfigSource;
+// PHP mocks `Composer\Config\ConfigSourceInterface` with getMockBuilder and sets
+// no expectations (a passive mock whose methods all do nothing). Used by
+// testPrivateRepository to satisfy the OAuth token-storing path.
+mockall::mock! {
+    #[derive(Debug)]
+    pub ConfigSource {}
+    impl ConfigSourceInterface for ConfigSource {
+        fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+        fn insert_repository(&mut self, name: &str, config: PhpMixed, reference_name: &str, offset: i64) -> anyhow::Result<()>;
+        fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()>;
+        fn remove_repository(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_property(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()>;
+        fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()>;
+        fn get_name(&self) -> String;
+    }
+}
 
-impl ConfigSourceInterface for NullConfigSource {
-    fn add_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _append: bool,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn insert_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _reference_name: &str,
-        _offset: i64,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn set_repository_url(&mut self, _name: &str, _url: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn remove_repository(&mut self, _name: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn add_config_setting(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn remove_config_setting(&mut self, _name: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn add_property(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn remove_property(&mut self, _name: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()> {
-        let _ = (r#type, name, value);
-        Ok(())
-    }
-    fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()> {
-        let _ = (r#type, name);
-        Ok(())
-    }
-    fn get_name(&self) -> String {
-        String::new()
-    }
+// A passive ConfigSource mock: every method is stubbed to do nothing, mirroring
+// PHPUnit's `getMockBuilder(...)->getMock()` whose stubbed methods return null.
+fn null_config_source() -> MockConfigSource {
+    let mut m = MockConfigSource::new();
+    m.expect_add_repository().returning(|_, _, _| Ok(()));
+    m.expect_insert_repository().returning(|_, _, _, _| Ok(()));
+    m.expect_set_repository_url().returning(|_, _| Ok(()));
+    m.expect_remove_repository().returning(|_| Ok(()));
+    m.expect_add_config_setting().returning(|_, _| Ok(()));
+    m.expect_remove_config_setting().returning(|_| Ok(()));
+    m.expect_add_property().returning(|_, _| Ok(()));
+    m.expect_remove_property().returning(|_| Ok(()));
+    m.expect_add_link().returning(|_, _, _| Ok(()));
+    m.expect_remove_link().returning(|_, _| Ok(()));
+    m.expect_get_name().returning(String::new);
+    m
 }
 
 // Mirrors PHP's $httpDownloader->expects([...], true): an `['url' => .., 'body' => ..]`
@@ -208,10 +192,10 @@ fn test_private_repository() {
 
     config
         .borrow_mut()
-        .set_config_source(Box::new(NullConfigSource));
+        .set_config_source(Box::new(null_config_source()));
     config
         .borrow_mut()
-        .set_auth_config_source(Box::new(NullConfigSource));
+        .set_auth_config_source(Box::new(null_config_source()));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));

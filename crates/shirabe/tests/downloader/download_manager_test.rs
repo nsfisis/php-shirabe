@@ -11,7 +11,6 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 use shirabe_semver::VersionParser;
 
-use crate::downloader_stub::DownloaderStub;
 use crate::io_stub::IOStub;
 
 // PHP mocks `Composer\Downloader\DownloaderInterface` with getMockBuilder.
@@ -95,7 +94,7 @@ fn make_package(name: &str, is_dev: bool) -> PackageInterfaceHandle {
 
 /// ref: DownloadManagerTest::createDownloaderMock
 fn create_downloader_mock() -> Rc<RefCell<dyn DownloaderInterface>> {
-    Rc::new(RefCell::new(DownloaderStub::new())) as Rc<RefCell<dyn DownloaderInterface>>
+    as_dyn(MockDownloader::new())
 }
 
 /// A `createDownloaderMock()` whose `getInstallationSource()` reports the given

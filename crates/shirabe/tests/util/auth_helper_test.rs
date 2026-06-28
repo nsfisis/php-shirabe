@@ -399,59 +399,23 @@ fn test_is_public_bit_bucket_download_with_non_bitbucket_public_url() {
     );
 }
 
-// Records addConfigSetting calls and serves a configurable getName, mirroring the
-// PHPUnit mock of ConfigSourceInterface used by the storeAuth tests.
-#[derive(Debug)]
-struct ConfigSourceMock {
-    name: String,
-    added: Rc<RefCell<Vec<(String, PhpMixed)>>>,
-}
-
-impl ConfigSourceInterface for ConfigSourceMock {
-    fn add_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _append: bool,
-    ) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn insert_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _reference_name: &str,
-        _offset: i64,
-    ) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn set_repository_url(&mut self, _name: &str, _url: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_repository(&mut self, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
-        self.added.borrow_mut().push((name.to_string(), value));
-        Ok(())
-    }
-    fn remove_config_setting(&mut self, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn add_property(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_property(&mut self, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn add_link(&mut self, _type: &str, _name: &str, _value: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_link(&mut self, _type: &str, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn get_name(&self) -> String {
-        self.name.clone()
+// Mirrors the PHPUnit mock of ConfigSourceInterface used by the storeAuth tests.
+// Methods left without an expectation panic if called.
+mockall::mock! {
+    #[derive(Debug)]
+    pub ConfigSource {}
+    impl ConfigSourceInterface for ConfigSource {
+        fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+        fn insert_repository(&mut self, name: &str, config: PhpMixed, reference_name: &str, offset: i64) -> anyhow::Result<()>;
+        fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()>;
+        fn remove_repository(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_property(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()>;
+        fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()>;
+        fn get_name(&self) -> String;
     }
 }
 
@@ -474,25 +438,23 @@ fn test_store_auth_automatically() {
     let origin = "github.com";
     expects_authentication(&f.io, origin, "my_username", "my_password");
 
-    let added = Rc::new(RefCell::new(Vec::new()));
+    let mut source = MockConfigSource::new();
+    source
+        .expect_get_name()
+        .returning(|| "https://api.gitlab.com/source".to_string());
+    let expected = expected_auth_setting("my_username", "my_password");
+    source
+        .expect_add_config_setting()
+        .times(1)
+        .withf(move |name, value| name == "http-basic.github.com" && *value == expected)
+        .returning(|_, _| Ok(()));
     f.config
         .borrow_mut()
-        .set_auth_config_source(Box::new(ConfigSourceMock {
-            name: "https://api.gitlab.com/source".to_string(),
-            added: added.clone(),
-        }));
+        .set_auth_config_source(Box::new(source));
 
     f.auth_helper
         .store_auth(origin, StoreAuth::Bool(true))
         .unwrap();
-
-    assert_eq!(
-        *added.borrow(),
-        vec![(
-            "http-basic.github.com".to_string(),
-            expected_auth_setting("my_username", "my_password"),
-        )]
-    );
 }
 
 #[test]
@@ -515,23 +477,22 @@ fn test_store_auth_with_prompt_yes_answer() {
         )
         .unwrap();
 
-    let added = Rc::new(RefCell::new(Vec::new()));
+    let mut source = MockConfigSource::new();
+    source
+        .expect_get_name()
+        .times(1)
+        .returning(move || config_source_name.to_string());
+    let expected = expected_auth_setting("my_username", "my_password");
+    source
+        .expect_add_config_setting()
+        .times(1)
+        .withf(move |name, value| name == "http-basic.github.com" && *value == expected)
+        .returning(|_, _| Ok(()));
     f.config
         .borrow_mut()
-        .set_auth_config_source(Box::new(ConfigSourceMock {
-            name: config_source_name.to_string(),
-            added: added.clone(),
-        }));
+        .set_auth_config_source(Box::new(source));
 
     f.auth_helper.store_auth(origin, StoreAuth::Prompt).unwrap();
-
-    assert_eq!(
-        *added.borrow(),
-        vec![(
-            "http-basic.github.com".to_string(),
-            expected_auth_setting("my_username", "my_password"),
-        )]
-    );
 }
 
 #[test]
@@ -553,17 +514,17 @@ fn test_store_auth_with_prompt_no_answer() {
         )
         .unwrap();
 
-    let added = Rc::new(RefCell::new(Vec::new()));
+    let mut source = MockConfigSource::new();
+    source
+        .expect_get_name()
+        .times(1)
+        .returning(move || config_source_name.to_string());
+    source.expect_add_config_setting().times(0);
     f.config
         .borrow_mut()
-        .set_auth_config_source(Box::new(ConfigSourceMock {
-            name: config_source_name.to_string(),
-            added: added.clone(),
-        }));
+        .set_auth_config_source(Box::new(source));
 
     f.auth_helper.store_auth(origin, StoreAuth::Prompt).unwrap();
-
-    assert!(added.borrow().is_empty());
 }
 
 #[test]

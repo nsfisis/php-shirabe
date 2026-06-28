@@ -1,5 +1,3 @@
-#[path = "../common/downloader_stub.rs"]
-mod downloader_stub;
 #[path = "../common/io_mock.rs"]
 mod io_mock;
 #[path = "../common/test_case.rs"]

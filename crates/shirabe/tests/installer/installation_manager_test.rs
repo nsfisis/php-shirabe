@@ -43,48 +43,38 @@ fn set_up() -> SetUp {
     SetUp { loop_, io }
 }
 
-/// Records of the calls a `CountingInstaller` received, shared so the test can inspect them
-/// after the installer has been moved into the InstallationManager. This reproduces PHPUnit's
-/// `expects($this->exactly(n))->method(...)->with(...)` assertions with explicit counters.
-#[derive(Debug, Default)]
-struct InstallerCalls {
-    supports_args: Vec<String>,
-    install: Vec<PackageInterfaceHandle>,
-    uninstall: Vec<PackageInterfaceHandle>,
-    update: Vec<(PackageInterfaceHandle, PackageInterfaceHandle)>,
-}
-
-/// Configurable `InstallerInterface` stub, equivalent to
-/// `getMockBuilder(InstallerInterface::class)->getMock()`. `supports` returns true only when the
-/// requested type equals `supported_type` (PHP uses a returnCallback comparing `$arg === 'vendor'`),
-/// and every method records its arguments into the shared `calls`.
-#[derive(Debug)]
-struct CountingInstaller {
-    supported_type: String,
-    calls: Rc<RefCell<InstallerCalls>>,
-}
-
-impl CountingInstaller {
-    fn new(supported_type: &str) -> (Self, Rc<RefCell<InstallerCalls>>) {
-        let calls = Rc::new(RefCell::new(InstallerCalls::default()));
-        (
-            Self {
-                supported_type: supported_type.to_string(),
-                calls: calls.clone(),
-            },
-            calls,
-        )
+// Equivalent to `getMockBuilder(InstallerInterface::class)->getMock()`. mockall cannot generate an
+// `#[async_trait]` impl for the async methods that take `&mut dyn InstalledRepositoryInterface`
+// (the object lifetime async_trait inserts clashes with mockall's generated lifetimes), so the
+// expectations live on inherent methods and a thin hand-written InstallerInterface impl forwards to
+// them, dropping the unused `repo` argument exactly as the PHPUnit mock ignores it. The methods not
+// configured by any test (is_installed/download/prepare/cleanup/get_install_path, and the defaulted
+// as_binary_presence_interface/as_plugin_installer_mut) return the same defaults as an unconfigured
+// PHPUnit mock.
+mockall::mock! {
+    #[derive(Debug)]
+    pub Installer {
+        fn supports(&self, package_type: &str) -> bool;
+        fn install(
+            &mut self,
+            package: PackageInterfaceHandle,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+        fn update(
+            &mut self,
+            initial: PackageInterfaceHandle,
+            target: PackageInterfaceHandle,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+        fn uninstall(
+            &mut self,
+            package: PackageInterfaceHandle,
+        ) -> anyhow::Result<Option<PhpMixed>>;
     }
 }
 
 #[async_trait::async_trait(?Send)]
-impl InstallerInterface for CountingInstaller {
+impl InstallerInterface for MockInstaller {
     fn supports(&self, package_type: &str) -> bool {
-        self.calls
-            .borrow_mut()
-            .supports_args
-            .push(package_type.to_string());
-        package_type == self.supported_type
+        MockInstaller::supports(self, package_type)
     }
 
     fn is_installed(
@@ -117,8 +107,7 @@ impl InstallerInterface for CountingInstaller {
         _repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.calls.borrow_mut().install.push(package);
-        Ok(None)
+        MockInstaller::install(self, package)
     }
 
     async fn update(
@@ -127,8 +116,7 @@ impl InstallerInterface for CountingInstaller {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.calls.borrow_mut().update.push((initial, target));
-        Ok(None)
+        MockInstaller::update(self, initial, target)
     }
 
     async fn uninstall(
@@ -136,8 +124,7 @@ impl InstallerInterface for CountingInstaller {
         _repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.calls.borrow_mut().uninstall.push(package);
-        Ok(None)
+        MockInstaller::uninstall(self, package)
     }
 
     async fn cleanup(
@@ -283,7 +270,13 @@ fn same_handle(a: &PackageInterfaceHandle, b: &PackageInterfaceHandle) -> bool {
 #[test]
 fn test_add_get_installer() {
     let set_up = set_up();
-    let (installer, calls) = CountingInstaller::new("vendor");
+    let mut installer = MockInstaller::new();
+    // PHP expects supports() to be called exactly twice (once for the cached 'vendor' lookup,
+    // once for the failing 'unregistered' lookup), returning true only for 'vendor'.
+    installer
+        .expect_supports()
+        .times(2)
+        .returning(|arg| arg == "vendor");
 
     let mut manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
@@ -292,10 +285,6 @@ fn test_add_get_installer() {
     assert!(manager.get_installer("vendor").is_ok());
 
     assert!(manager.get_installer("unregistered").is_err());
-
-    // PHP expects supports() to be called exactly twice (once for the cached 'vendor' lookup,
-    // once for the failing 'unregistered' lookup).
-    assert_eq!(calls.borrow().supports_args.len(), 2);
 }
 
 #[ignore = "removeInstaller compares installers by object identity, but add_installer moves the Box<dyn InstallerInterface> into the manager, leaving no &dyn reference to pass back to remove_installer; faithful reproduction needs a shared-ownership installer registry"]
@@ -313,87 +302,131 @@ fn test_execute() {
 #[test]
 fn test_install() {
     let set_up = set_up();
-    let (installer, calls) = CountingInstaller::new("library");
+    let package = get_package("test/pkg", "1.0.0");
+
+    let mut installer = MockInstaller::new();
+    installer
+        .expect_supports()
+        .times(1)
+        .withf(|package_type| package_type == "library")
+        .returning(|_| true);
+    let expected = package.clone();
+    installer
+        .expect_install()
+        .times(1)
+        .withf_st(move |package| same_handle(package, &expected))
+        .returning(|_| Ok(None));
+
     let mut manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
     manager.add_installer(Box::new(installer));
 
-    let package = get_package("test/pkg", "1.0.0");
     let operation = InstallOperation::new(package.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    // install() returns the (empty) installer promise; the call is observed via the recorded args.
     run(manager.install(&mut repository, &operation));
-
-    assert_eq!(calls.borrow().supports_args, vec!["library".to_string()]);
-    assert_eq!(calls.borrow().install.len(), 1);
-    assert!(same_handle(&calls.borrow().install[0], &package));
 }
 
 #[test]
 fn test_update_with_equal_types() {
     let set_up = set_up();
-    let (installer, calls) = CountingInstaller::new("library");
+    let initial = get_package("test/initial", "1.0.0");
+    let target = get_package("test/target", "1.0.1");
+
+    let mut installer = MockInstaller::new();
+    installer
+        .expect_supports()
+        .times(1)
+        .withf(|package_type| package_type == "library")
+        .returning(|_| true);
+    let expected_initial = initial.clone();
+    let expected_target = target.clone();
+    installer
+        .expect_update()
+        .times(1)
+        .withf_st(move |initial, target| {
+            same_handle(initial, &expected_initial) && same_handle(target, &expected_target)
+        })
+        .returning(|_, _| Ok(None));
+
     let mut manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
     manager.add_installer(Box::new(installer));
 
-    let initial = get_package("test/initial", "1.0.0");
-    let target = get_package("test/target", "1.0.1");
     let operation = UpdateOperation::new(initial.clone(), target.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     run(manager.update(&mut repository, &operation));
-
-    assert_eq!(calls.borrow().supports_args, vec!["library".to_string()]);
-    assert_eq!(calls.borrow().update.len(), 1);
-    assert!(same_handle(&calls.borrow().update[0].0, &initial));
-    assert!(same_handle(&calls.borrow().update[0].1, &target));
 }
 
 #[test]
 fn test_update_with_not_equal_types() {
     let set_up = set_up();
-    let (lib_installer, lib_calls) = CountingInstaller::new("library");
-    let (bundle_installer, bundle_calls) = CountingInstaller::new("bundles");
+    let initial = typed_package("test/initial", "1.0.0", "library");
+    let target = typed_package("test/target", "1.0.1", "bundles");
+
+    let mut lib_installer = MockInstaller::new();
+    lib_installer
+        .expect_supports()
+        .times(1)
+        .withf(|package_type| package_type == "library")
+        .returning(|_| true);
+    let expected_initial = initial.clone();
+    lib_installer
+        .expect_uninstall()
+        .times(1)
+        .withf_st(move |package| same_handle(package, &expected_initial))
+        .returning(|_| Ok(None));
+
+    let mut bundle_installer = MockInstaller::new();
+    bundle_installer
+        .expect_supports()
+        .times(2)
+        .returning(|arg| arg == "bundles");
+    let expected_target = target.clone();
+    bundle_installer
+        .expect_install()
+        .times(1)
+        .withf_st(move |package| same_handle(package, &expected_target))
+        .returning(|_| Ok(None));
+
     let mut manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
     manager.add_installer(Box::new(lib_installer));
     manager.add_installer(Box::new(bundle_installer));
 
-    let initial = typed_package("test/initial", "1.0.0", "library");
-    let target = typed_package("test/target", "1.0.1", "bundles");
     let operation = UpdateOperation::new(initial.clone(), target.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     run(manager.update(&mut repository, &operation));
-
-    // The lib installer uninstalls the initial package once.
-    assert_eq!(lib_calls.borrow().uninstall.len(), 1);
-    assert!(same_handle(&lib_calls.borrow().uninstall[0], &initial));
-
-    // The bundle installer installs the target package once.
-    assert_eq!(bundle_calls.borrow().install.len(), 1);
-    assert!(same_handle(&bundle_calls.borrow().install[0], &target));
 }
 
 #[test]
 fn test_uninstall() {
     let set_up = set_up();
-    let (installer, calls) = CountingInstaller::new("library");
+    let package = get_package("test/pkg", "1.0.0");
+
+    let mut installer = MockInstaller::new();
+    installer
+        .expect_supports()
+        .times(1)
+        .withf(|package_type| package_type == "library")
+        .returning(|_| true);
+    let expected = package.clone();
+    installer
+        .expect_uninstall()
+        .times(1)
+        .withf_st(move |package| same_handle(package, &expected))
+        .returning(|_| Ok(None));
+
     let mut manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
     manager.add_installer(Box::new(installer));
 
-    let package = get_package("test/pkg", "1.0.0");
     let operation = UninstallOperation::new(package.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     run(manager.uninstall(&mut repository, &operation));
-
-    assert_eq!(calls.borrow().supports_args, vec!["library".to_string()]);
-    assert_eq!(calls.borrow().uninstall.len(), 1);
-    assert!(same_handle(&calls.borrow().uninstall[0], &package));
 }
 
 #[test]

@@ -22,61 +22,40 @@ const TOKEN: &str = "gitlabtoken";
 const REFRESHTOKEN: &str = "gitlabrefreshtoken";
 
 // Mirrors GitLabTest::getAuthJsonMock: a JsonConfigSource whose getName() returns
-// "auth.json" and whose addConfigSetting is a no-op (the PHP mock never stubs it).
-#[derive(Debug)]
-struct AuthJsonMock;
+// "auth.json" (atLeastOnce) and whose addConfigSetting is a no-op (the PHP mock
+// never stubs it). Methods left without an expectation panic if called.
+mockall::mock! {
+    #[derive(Debug)]
+    pub AuthJson {}
+    impl ConfigSourceInterface for AuthJson {
+        fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+        fn insert_repository(&mut self, name: &str, config: PhpMixed, reference_name: &str, offset: i64) -> anyhow::Result<()>;
+        fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()>;
+        fn remove_repository(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_property(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()>;
+        fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()>;
+        fn get_name(&self) -> String;
+    }
+}
 
-impl ConfigSourceInterface for AuthJsonMock {
-    fn add_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _append: bool,
-    ) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn insert_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _reference_name: &str,
-        _offset: i64,
-    ) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn set_repository_url(&mut self, _name: &str, _url: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_repository(&mut self, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn add_config_setting(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn remove_config_setting(&mut self, _name: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn add_property(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_property(&mut self, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn add_link(&mut self, _type: &str, _name: &str, _value: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_link(&mut self, _type: &str, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn get_name(&self) -> String {
-        "auth.json".to_string()
-    }
+fn get_auth_json_mock() -> Box<MockAuthJson> {
+    let mut mock = MockAuthJson::new();
+    mock.expect_get_name()
+        .times(1..)
+        .returning(|| "auth.json".to_string());
+    mock.expect_add_config_setting().returning(|_, _| Ok(()));
+    mock.expect_remove_config_setting().returning(|_| Ok(()));
+    Box::new(mock)
 }
 
 fn set_up(io_mock: &Rc<RefCell<IOMock>>, config: &Rc<RefCell<Config>>) {
     config
         .borrow_mut()
-        .set_auth_config_source(Box::new(AuthJsonMock));
+        .set_auth_config_source(get_auth_json_mock());
     let _ = io_mock;
 }
 

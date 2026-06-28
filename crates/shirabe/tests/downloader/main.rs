@@ -1,7 +1,5 @@
 #[path = "../common/config_stub.rs"]
 mod config_stub;
-#[path = "../common/downloader_stub.rs"]
-mod downloader_stub;
 #[path = "../common/http_downloader_mock.rs"]
 mod http_downloader_mock;
 #[path = "../common/io_mock.rs"]

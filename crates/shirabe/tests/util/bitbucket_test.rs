@@ -27,70 +27,35 @@ const MESSAGE: &str = "mymessage";
 const ORIGIN: &str = "bitbucket.org";
 const TOKEN: &str = "bitbuckettoken";
 
-// Records add/removeConfigSetting calls and serves a configurable getName, mirroring
-// the PHPUnit mock of ConfigSourceInterface used throughout BitbucketTest.
-#[derive(Debug, Clone, Default)]
-struct ConfigSourceCalls {
-    added: Vec<(String, PhpMixed)>,
-    removed: Vec<String>,
+// Mirrors the PHPUnit mock of ConfigSourceInterface used throughout BitbucketTest.
+// Methods left without an expectation panic if called.
+mockall::mock! {
+    #[derive(Debug)]
+    pub ConfigSource {}
+    impl ConfigSourceInterface for ConfigSource {
+        fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+        fn insert_repository(&mut self, name: &str, config: PhpMixed, reference_name: &str, offset: i64) -> anyhow::Result<()>;
+        fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()>;
+        fn remove_repository(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+        fn remove_property(&mut self, name: &str) -> anyhow::Result<()>;
+        fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()>;
+        fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()>;
+        fn get_name(&self) -> String;
+    }
 }
 
-#[derive(Debug)]
-struct ConfigSourceMock {
-    name: String,
-    calls: Rc<RefCell<ConfigSourceCalls>>,
-}
-
-impl ConfigSourceInterface for ConfigSourceMock {
-    fn add_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _append: bool,
-    ) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn insert_repository(
-        &mut self,
-        _name: &str,
-        _config: PhpMixed,
-        _reference_name: &str,
-        _offset: i64,
-    ) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn set_repository_url(&mut self, _name: &str, _url: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_repository(&mut self, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
-        self.calls
-            .borrow_mut()
-            .added
-            .push((name.to_string(), value));
-        Ok(())
-    }
-    fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()> {
-        self.calls.borrow_mut().removed.push(name.to_string());
-        Ok(())
-    }
-    fn add_property(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_property(&mut self, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn add_link(&mut self, _type: &str, _name: &str, _value: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn remove_link(&mut self, _type: &str, _name: &str) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn get_name(&self) -> String {
-        self.name.clone()
-    }
+// A bare auth config source placeholder: getAuthConfigSource() is consulted (e.g. while
+// printing instructions), but no add/removeConfigSetting expectations are asserted.
+fn placeholder_auth_config_source() -> Box<MockConfigSource> {
+    let mut mock = MockConfigSource::new();
+    mock.expect_get_name()
+        .returning(|| "auth-config-source".to_string());
+    mock.expect_add_config_setting().returning(|_, _| Ok(()));
+    mock.expect_remove_config_setting().returning(|_| Ok(()));
+    Box::new(mock)
 }
 
 // Mirrors BitbucketTest::setUp: a DEBUG-verbosity IOMock, a mocked HttpDownloader, a
@@ -160,34 +125,50 @@ fn access_token_body() -> String {
     )
 }
 
-// Installs recording config/auth config sources and returns their shared call logs,
-// mirroring BitbucketTest::setExpectationsForStoringAccessToken.
-struct StoreAccessTokenMocks {
-    config_source: Rc<RefCell<ConfigSourceCalls>>,
-    auth_config_source: Rc<RefCell<ConfigSourceCalls>>,
-}
-
+// Installs config/auth config source mocks with the access-token storing expectations,
+// mirroring BitbucketTest::setExpectationsForStoringAccessToken. Verification happens
+// when the mocks are dropped together with the Config.
 fn set_expectations_for_storing_access_token(
     config: &Rc<RefCell<Config>>,
-) -> StoreAccessTokenMocks {
-    let config_source = Rc::new(RefCell::new(ConfigSourceCalls::default()));
-    let auth_config_source = Rc::new(RefCell::new(ConfigSourceCalls::default()));
+    time: i64,
+    remove_basic_auth: bool,
+) {
+    let mut config_source = MockConfigSource::new();
+    config_source
+        .expect_get_name()
+        .returning(|| "config-source".to_string());
+    let removed_key = format!("bitbucket-oauth.{}", ORIGIN);
+    config_source
+        .expect_remove_config_setting()
+        .times(1)
+        .withf(move |name| name == removed_key)
+        .returning(|_| Ok(()));
     config
         .borrow_mut()
-        .set_config_source(Box::new(ConfigSourceMock {
-            name: "config-source".to_string(),
-            calls: config_source.clone(),
-        }));
-    config
-        .borrow_mut()
-        .set_auth_config_source(Box::new(ConfigSourceMock {
-            name: "auth-config-source".to_string(),
-            calls: auth_config_source.clone(),
-        }));
-    StoreAccessTokenMocks {
-        config_source,
-        auth_config_source,
+        .set_config_source(Box::new(config_source));
+
+    let mut auth_config_source = MockConfigSource::new();
+    auth_config_source
+        .expect_get_name()
+        .returning(|| "auth-config-source".to_string());
+    let added_key = format!("bitbucket-oauth.{}", ORIGIN);
+    let expected_value = expected_stored_token(time);
+    auth_config_source
+        .expect_add_config_setting()
+        .times(1)
+        .withf(move |name, value| name == added_key && *value == expected_value)
+        .returning(|_, _| Ok(()));
+    if remove_basic_auth {
+        let basic_key = format!("http-basic.{}", ORIGIN);
+        auth_config_source
+            .expect_remove_config_setting()
+            .times(1)
+            .withf(move |name| name == basic_key)
+            .returning(|_| Ok(()));
     }
+    config
+        .borrow_mut()
+        .set_auth_config_source(Box::new(auth_config_source));
 }
 
 fn expected_stored_token(time: i64) -> PhpMixed {
@@ -209,26 +190,6 @@ fn expected_stored_token(time: i64) -> PhpMixed {
         PhpMixed::Int(time + 3600),
     );
     PhpMixed::Array(consumer)
-}
-
-fn assert_stored_access_token(mocks: &StoreAccessTokenMocks, time: i64, remove_basic_auth: bool) {
-    assert_eq!(
-        mocks.config_source.borrow().removed,
-        vec![format!("bitbucket-oauth.{}", ORIGIN)],
-    );
-    assert_eq!(
-        mocks.auth_config_source.borrow().added,
-        vec![(
-            format!("bitbucket-oauth.{}", ORIGIN),
-            expected_stored_token(time)
-        )],
-    );
-    if remove_basic_auth {
-        assert_eq!(
-            mocks.auth_config_source.borrow().removed,
-            vec![format!("http-basic.{}", ORIGIN)],
-        );
-    }
 }
 
 #[test]
@@ -256,7 +217,7 @@ fn test_request_access_token_with_valid_oauth_consumer() {
         )
         .unwrap();
 
-    let mocks = set_expectations_for_storing_access_token(&f.config);
+    set_expectations_for_storing_access_token(&f.config, f.time, false);
 
     assert_eq!(
         f.bitbucket
@@ -264,8 +225,6 @@ fn test_request_access_token_with_valid_oauth_consumer() {
             .unwrap(),
         TOKEN
     );
-
-    assert_stored_access_token(&mocks, f.time, false);
 }
 
 #[test]
@@ -357,7 +316,7 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
         )
         .unwrap();
 
-    let mocks = set_expectations_for_storing_access_token(&f.config);
+    set_expectations_for_storing_access_token(&f.config, f.time, false);
 
     assert_eq!(
         f.bitbucket
@@ -365,8 +324,6 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
             .unwrap(),
         TOKEN
     );
-
-    assert_stored_access_token(&mocks, f.time, false);
 }
 
 #[test]
@@ -505,15 +462,13 @@ fn test_username_password_authentication_flow() {
         )
         .unwrap();
 
-    let mocks = set_expectations_for_storing_access_token(&f.config);
+    set_expectations_for_storing_access_token(&f.config, f.time, true);
 
     assert!(
         f.bitbucket
             .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
             .unwrap()
     );
-
-    assert_stored_access_token(&mocks, f.time, true);
 }
 
 #[test]
@@ -522,13 +477,9 @@ fn test_authorize_oauth_interactively_with_empty_username() {
     let mut f = set_up_with_config_and_http(config, vec![]);
 
     // getAuthConfigSource() is consulted while printing the instructions.
-    let auth_calls = Rc::new(RefCell::new(ConfigSourceCalls::default()));
     f.config
         .borrow_mut()
-        .set_auth_config_source(Box::new(ConfigSourceMock {
-            name: "auth-config-source".to_string(),
-            calls: auth_calls,
-        }));
+        .set_auth_config_source(placeholder_auth_config_source());
 
     f.io.borrow_mut()
         .expects(vec![Expectation::ask("Consumer Key (hidden): ", "")], false)
@@ -546,13 +497,9 @@ fn test_authorize_oauth_interactively_with_empty_password() {
     let config = ConfigStubBuilder::new().build_shared();
     let mut f = set_up_with_config_and_http(config, vec![]);
 
-    let auth_calls = Rc::new(RefCell::new(ConfigSourceCalls::default()));
     f.config
         .borrow_mut()
-        .set_auth_config_source(Box::new(ConfigSourceMock {
-            name: "auth-config-source".to_string(),
-            calls: auth_calls,
-        }));
+        .set_auth_config_source(placeholder_auth_config_source());
 
     f.io.borrow_mut()
         .expects(
@@ -579,13 +526,9 @@ fn test_authorize_oauth_interactively_with_request_access_token_failure() {
     // A 400 status makes the mocked HttpDownloader raise a TransportException(400).
     let mut f = set_up_with_config_and_http(config, vec![expect_full(url, None, 400, "", vec![])]);
 
-    let auth_calls = Rc::new(RefCell::new(ConfigSourceCalls::default()));
     f.config
         .borrow_mut()
-        .set_auth_config_source(Box::new(ConfigSourceMock {
-            name: "auth-config-source".to_string(),
-            calls: auth_calls,
-        }));
+        .set_auth_config_source(placeholder_auth_config_source());
 
     f.io.borrow_mut()
         .expects(

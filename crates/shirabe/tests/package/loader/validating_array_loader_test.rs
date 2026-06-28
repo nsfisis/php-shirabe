@@ -1,8 +1,5 @@
 //! ref: composer/tests/Composer/Test/Package/Loader/ValidatingArrayLoaderTest.php
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
@@ -49,40 +46,29 @@ fn config(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
     m
 }
 
-type Calls = Rc<RefCell<Vec<IndexMap<String, PhpMixed>>>>;
-
-/// Mock LoaderInterface recording every `load` invocation, mirroring PHPUnit's
-/// `expects($this->once())->method('load')->with(...)`.
-#[derive(Debug)]
-struct MockLoader {
-    calls: Calls,
-}
-
-impl MockLoader {
-    fn new() -> (Self, Calls) {
-        let calls: Calls = Rc::new(RefCell::new(Vec::new()));
-        (
-            MockLoader {
-                calls: calls.clone(),
-            },
-            calls,
-        )
+// PHP mocks `Composer\Package\Loader\LoaderInterface` with getMockBuilder.
+mockall::mock! {
+    #[derive(Debug)]
+    Loader {}
+    impl LoaderInterface for Loader {
+        fn load(
+            &self,
+            config: IndexMap<String, PhpMixed>,
+            class: Option<String>,
+        ) -> anyhow::Result<PackageInterfaceHandle>;
+        fn as_any(&self) -> &dyn std::any::Any;
     }
 }
 
-impl LoaderInterface for MockLoader {
-    fn load(
-        &self,
-        config: IndexMap<String, PhpMixed>,
-        _class: Option<String>,
-    ) -> anyhow::Result<PackageInterfaceHandle> {
-        self.calls.borrow_mut().push(config);
-        Ok(test_case::get_package("mock/mock", "1.0.0"))
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
+/// Build a mock inner loader whose `load` returns a dummy package, mirroring
+/// PHPUnit's `getMockBuilder(LoaderInterface::class)->getMock()` with no
+/// configured expectations.
+fn mock_loader() -> MockLoader {
+    let mut loader = MockLoader::new();
+    loader
+        .expect_load()
+        .returning(|_, _| Ok(test_case::get_package("mock/mock", "1.0.0")));
+    loader
 }
 
 fn invalid_naming_error(name: &str) -> Vec<String> {
@@ -369,7 +355,7 @@ fn success_provider() -> Vec<IndexMap<String, PhpMixed>> {
 #[test]
 fn test_load_success() {
     for cfg in success_provider() {
-        let (internal_loader, _calls) = MockLoader::new();
+        let internal_loader = mock_loader();
         let mut loader = ValidatingArrayLoader::new(
             Box::new(internal_loader),
             true,
@@ -796,7 +782,7 @@ fn error_provider() -> Vec<(IndexMap<String, PhpMixed>, Vec<String>)> {
 #[test]
 fn test_load_failure_throws_exception() {
     for (cfg, mut expected_errors) in error_provider() {
-        let (internal_loader, _calls) = MockLoader::new();
+        let internal_loader = mock_loader();
         let mut loader = ValidatingArrayLoader::new(
             Box::new(internal_loader),
             true,
@@ -978,7 +964,7 @@ fn warning_provider() -> Vec<(
 #[test]
 fn test_load_warnings() {
     for (cfg, mut expected_warnings, _must_check, _expected_array) in warning_provider() {
-        let (internal_loader, _calls) = MockLoader::new();
+        let internal_loader = mock_loader();
         let mut loader = ValidatingArrayLoader::new(
             Box::new(internal_loader),
             true,
@@ -1003,8 +989,15 @@ fn test_load_skips_warning_data_when_ignoring_errors() {
         if !must_check {
             continue;
         }
-        let (internal_loader, calls) = MockLoader::new();
         let expected = expected_array.unwrap_or_else(|| config(vec![("name", s("a/b"))]));
+
+        // The inner loader is called exactly once with the (post-validation) config.
+        let mut internal_loader = MockLoader::new();
+        internal_loader
+            .expect_load()
+            .times(1)
+            .withf(move |cfg, _class| *cfg == expected)
+            .returning(|_, _| Ok(test_case::get_package("mock/mock", "1.0.0")));
 
         let mut loader = ValidatingArrayLoader::new(
             Box::new(internal_loader),
@@ -1016,10 +1009,5 @@ fn test_load_skips_warning_data_when_ignoring_errors() {
         loader
             .load(cfg, "Composer\\Package\\CompletePackage")
             .unwrap();
-
-        // The mock recorded exactly the (post-validation) config passed to the inner loader.
-        let recorded = calls.borrow();
-        assert_eq!(recorded.len(), 1);
-        assert_eq!(recorded[0], expected);
     }
 }

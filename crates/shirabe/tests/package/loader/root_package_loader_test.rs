@@ -4,7 +4,7 @@
 // ProcessExecutor / VersionGuesser or require constraints whose parsing goes through a
 // look-around regex the regex crate cannot compile.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
@@ -87,25 +87,17 @@ impl Drop for GitVersionGuard {
 }
 
 // A test double for the concrete VersionGuesser, supplied through the VersionGuesserInterface seam.
-#[derive(Debug)]
-struct VersionGuesserMock {
-    version_data: VersionData,
-    guess_version_calls: Rc<Cell<u32>>,
-}
+mockall::mock! {
+    #[derive(Debug)]
+    pub VersionGuesser {}
+    impl VersionGuesserInterface for VersionGuesser {
+        fn guess_version(
+            &mut self,
+            package_config: &IndexMap<String, PhpMixed>,
+            path: &str,
+        ) -> anyhow::Result<Option<VersionData>>;
 
-impl VersionGuesserInterface for VersionGuesserMock {
-    fn guess_version(
-        &mut self,
-        _package_config: &IndexMap<String, PhpMixed>,
-        _path: &str,
-    ) -> anyhow::Result<Option<VersionData>> {
-        self.guess_version_calls
-            .set(self.guess_version_calls.get() + 1);
-        Ok(Some(self.version_data.clone()))
-    }
-
-    fn get_root_version_from_env(&self) -> anyhow::Result<String> {
-        unreachable!("COMPOSER_ROOT_VERSION is not set in this test")
+        fn get_root_version_from_env(&self) -> anyhow::Result<String>;
     }
 }
 
@@ -253,17 +245,19 @@ fn test_pretty_version_for_root_package_in_version_branch() {
     let config = make_config();
     let manager = make_manager(&io, &config);
 
-    let guess_version_calls = Rc::new(Cell::new(0u32));
-    let version_guesser = VersionGuesserMock {
-        version_data: VersionData {
-            version: Some("3.0.9999999.9999999-dev".to_string()),
-            commit: Some("aabbccddee".to_string()),
-            pretty_version: Some("3.0-dev".to_string()),
-            feature_version: None,
-            feature_pretty_version: None,
-        },
-        guess_version_calls: guess_version_calls.clone(),
-    };
+    let mut version_guesser = MockVersionGuesser::new();
+    version_guesser
+        .expect_guess_version()
+        .times(1..)
+        .returning(|_, _| {
+            Ok(Some(VersionData {
+                version: Some("3.0.9999999.9999999-dev".to_string()),
+                commit: Some("aabbccddee".to_string()),
+                pretty_version: Some("3.0-dev".to_string()),
+                feature_version: None,
+                feature_pretty_version: None,
+            }))
+        });
 
     let mut loader = RootPackageLoader::new(
         manager,
@@ -277,7 +271,6 @@ fn test_pretty_version_for_root_package_in_version_branch() {
         .load(IndexMap::new(), "Composer\\Package\\RootPackage", None)
         .unwrap();
 
-    assert!(guess_version_calls.get() >= 1);
     assert_eq!("3.0-dev", package.as_root().unwrap().get_pretty_version());
 }
 

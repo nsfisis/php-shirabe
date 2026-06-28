@@ -11,18 +11,86 @@ use shirabe::composer::{
     ComposerHandle, PartialComposerHandle, PartialComposerWeakHandle, PartialOrFullComposer,
 };
 use shirabe::config::Config;
-use shirabe::downloader::DownloadManager;
-use shirabe::installer::{InstallerInterface, LibraryInstaller};
+use shirabe::downloader::{DownloadManagerInterface, DownloaderInterface};
+use shirabe::installer::{BinaryInstallerInterface, InstallerInterface, LibraryInstaller};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
+use shirabe::package::PackageInterfaceHandle;
 use shirabe::repository::InstalledArrayRepository;
 use shirabe::repository::RepositoryInterface;
 use shirabe::repository::WritableRepositoryInterface;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
 
-use crate::downloader_stub::{DownloaderCall, DownloaderStub};
 use crate::test_case::get_package;
+
+// PHP mocks `Composer\Downloader\DownloadManager` with getMockBuilder and asserts its
+// install/update/remove calls; here the equivalent mock is injected into the Composer via
+// setDownloadManager.
+mockall::mock! {
+    #[derive(Debug)]
+    pub DownloadManager {}
+    #[async_trait::async_trait(?Send)]
+    impl DownloadManagerInterface for DownloadManager {
+        fn set_prefer_source(&mut self, prefer_source: bool);
+        fn set_prefer_dist(&mut self, prefer_dist: bool);
+        fn get_downloader_for_package(
+            &self,
+            package: PackageInterfaceHandle,
+        ) -> anyhow::Result<Option<Rc<RefCell<dyn DownloaderInterface>>>>;
+        async fn download(
+            &self,
+            package: PackageInterfaceHandle,
+            target_dir: &str,
+            prev_package: Option<PackageInterfaceHandle>,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+        async fn prepare(
+            &self,
+            r#type: &str,
+            package: PackageInterfaceHandle,
+            target_dir: &str,
+            prev_package: Option<PackageInterfaceHandle>,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+        async fn install(
+            &self,
+            package: PackageInterfaceHandle,
+            target_dir: &str,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+        async fn update(
+            &self,
+            initial: PackageInterfaceHandle,
+            target: PackageInterfaceHandle,
+            target_dir: &str,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+        async fn remove(
+            &self,
+            package: PackageInterfaceHandle,
+            target_dir: &str,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+        async fn cleanup(
+            &self,
+            r#type: &str,
+            package: PackageInterfaceHandle,
+            target_dir: &str,
+            prev_package: Option<PackageInterfaceHandle>,
+        ) -> anyhow::Result<Option<PhpMixed>>;
+    }
+}
+
+// PHP mocks `Composer\Installer\BinaryInstaller`; the Rust seam is `BinaryInstallerInterface`.
+mockall::mock! {
+    #[derive(Debug)]
+    pub BinaryInstaller {}
+    impl BinaryInstallerInterface for BinaryInstaller {
+        fn install_binaries(
+            &mut self,
+            package: PackageInterfaceHandle,
+            install_path: &str,
+            warn_on_overwrite: bool,
+        );
+        fn remove_binaries(&mut self, package: PackageInterfaceHandle);
+    }
+}
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
@@ -31,10 +99,10 @@ fn run<F: std::future::Future>(future: F) -> F::Output {
         .block_on(future)
 }
 
-/// Mirror of setUp(): builds the Composer/Config over temp root/vendor/bin dirs
-/// plus a real DownloadManager and a NullIO. The `_composer_rc` keeps the inner
-/// Rc alive for the duration of the test since LibraryInstaller only holds a weak
-/// handle.
+/// Mirror of setUp(): builds the Composer/Config over temp root/vendor/bin dirs plus a NullIO and a
+/// DownloadManager mock. `composer_full` keeps the inner Rc alive for the duration of the test since
+/// LibraryInstaller only holds a weak handle, and lets tests swap in a configured DownloadManager
+/// mock before constructing the installer.
 struct SetUp {
     root: TempDir,
     vendor_dir: String,
@@ -42,10 +110,16 @@ struct SetUp {
     io: Rc<RefCell<dyn IOInterface>>,
     composer: PartialComposerWeakHandle,
     fs: Filesystem,
-    /// Recorded downloader operations forwarded by the LibraryInstaller, mirroring the
-    /// PHP DownloadManager mock's expectations on install/update/remove.
-    downloader_calls: Rc<RefCell<Vec<DownloaderCall>>>,
-    _composer_rc: ComposerHandle,
+    composer_full: ComposerHandle,
+}
+
+/// Replaces the Composer's DownloadManager with the given mock. Must be called before
+/// `LibraryInstaller::new`, which captures the manager at construction time.
+fn set_download_manager(setup: &SetUp, dm: MockDownloadManager) {
+    setup
+        .composer_full
+        .borrow_mut()
+        .set_download_manager(Rc::new(RefCell::new(dm)));
 }
 
 fn set_up() -> SetUp {
@@ -77,16 +151,15 @@ fn set_up() -> SetUp {
 
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
 
-    let mut dm = DownloadManager::new(io.clone(), false, None);
-    let downloader = DownloaderStub::new();
-    let downloader_calls = downloader.calls();
-    dm.set_downloader("fake", Rc::new(RefCell::new(downloader)));
-    let dm_rc = Rc::new(RefCell::new(dm));
-
     let composer_rc = Rc::new(RefCell::new(PartialOrFullComposer::new_full()));
     let composer = ComposerHandle::from_rc_unchecked(composer_rc.clone());
     composer.borrow_mut().set_config(config_rc);
-    composer.borrow_mut().set_download_manager(dm_rc);
+    // Default unconfigured mock so LibraryInstaller::new can resolve a DownloadManager even in
+    // tests that exercise no downloader call; tests that assert calls install their own via
+    // set_download_manager.
+    composer
+        .borrow_mut()
+        .set_download_manager(Rc::new(RefCell::new(MockDownloadManager::new())));
 
     let weak = PartialComposerHandle::from_rc(composer_rc).downgrade();
 
@@ -97,19 +170,8 @@ fn set_up() -> SetUp {
         io,
         composer: weak,
         fs,
-        downloader_calls,
-        _composer_rc: composer,
+        composer_full: composer,
     }
-}
-
-/// Builds a `dist`-installable test package backed by the `fake` downloader stub, so the
-/// real DownloadManager dispatches install/update/remove to the recording stub instead of
-/// erroring on a package with no installation source.
-fn get_installable_package(name: &str, version: &str) -> shirabe::package::PackageInterfaceHandle {
-    let package = get_package(name, version);
-    package.set_installation_source(Some("dist".to_string()));
-    package.set_dist_type(Some("fake".to_string()));
-    package
 }
 
 fn tear_down(setup: &mut SetUp) {
@@ -167,24 +229,29 @@ fn test_is_installed() {
 #[test]
 fn test_install() {
     let mut setup = set_up();
-    let mut library =
-        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
-    let package = get_installable_package("some/package", "1.0.0");
+    let package = get_package("some/package", "1.0.0");
 
     // PHP asserts the DownloadManager mock's install() is called once with
-    // ($package, vendorDir/some/package); here the recording downloader stub
-    // captures the forwarded call instead.
+    // ($package, vendorDir/some/package).
+    let mut dm = MockDownloadManager::new();
+    let expected_package = package.clone();
+    let expected_path = format!("{}/some/package", setup.vendor_dir);
+    dm.expect_install()
+        .times(1)
+        .withf_st(move |package, target_dir| {
+            Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
+                && target_dir == expected_path.as_str()
+        })
+        .returning(|_, _| Ok(None));
+    set_download_manager(&setup, dm);
+
+    let mut library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+
     let mut repository = InstalledArrayRepository::new().unwrap();
 
     run(library.install(&mut repository, package.clone())).unwrap();
 
-    assert_eq!(
-        vec![DownloaderCall::Install {
-            package: "some/package".to_string(),
-            path: format!("{}/some/package", setup.vendor_dir),
-        }],
-        *setup.downloader_calls.borrow()
-    );
     // PHP asserts repository->addPackage was called once with $package.
     assert!(repository.has_package(package));
 
@@ -204,8 +271,8 @@ fn test_install() {
 fn test_update() {
     let mut setup = set_up();
 
-    let initial = get_installable_package("vendor/package1", "1.0.0");
-    let target = get_installable_package("vendor/package1", "2.0.0");
+    let initial = get_package("vendor/package1", "1.0.0");
+    let target = get_package("vendor/package1", "2.0.0");
 
     initial.__set_target_dir(Some("oldtarget".to_string()));
     target.__set_target_dir(Some("newtarget".to_string()));
@@ -216,6 +283,22 @@ fn test_update() {
     let old_target_dir = format!("{}/vendor/package1/oldtarget", setup.vendor_dir);
     let new_target_dir = format!("{}/vendor/package1/newtarget", setup.vendor_dir);
     fs::create_dir_all(&old_target_dir).unwrap();
+
+    // PHP asserts the DownloadManager mock's update() is called once with
+    // ($initial, $target, vendorDir/vendor/package1/newtarget).
+    let mut dm = MockDownloadManager::new();
+    let expected_initial = initial.clone();
+    let expected_target = target.clone();
+    let expected_path = new_target_dir.clone();
+    dm.expect_update()
+        .times(1)
+        .withf_st(move |initial, target, target_dir| {
+            Rc::ptr_eq(initial.as_rc(), expected_initial.as_rc())
+                && Rc::ptr_eq(target.as_rc(), expected_target.as_rc())
+                && target_dir == expected_path.as_str()
+        })
+        .returning(|_, _, _| Ok(None));
+    set_download_manager(&setup, dm);
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     repository.add_package(initial.clone()).unwrap();
@@ -232,14 +315,6 @@ fn test_update() {
     );
     assert!(!std::path::Path::new(&old_target_dir).exists());
 
-    assert_eq!(
-        vec![DownloaderCall::Update {
-            initial: "vendor/package1".to_string(),
-            target: "vendor/package1".to_string(),
-            path: new_target_dir.clone(),
-        }],
-        *setup.downloader_calls.borrow()
-    );
     assert!(!repository.has_package(initial.clone()));
     assert!(repository.has_package(target.clone()));
 
@@ -261,9 +336,24 @@ fn test_update() {
 #[test]
 fn test_uninstall() {
     let mut setup = set_up();
+    let package = get_package("vendor/pkg", "1.0.0");
+
+    // PHP asserts the DownloadManager mock's remove() is called once with
+    // ($package, vendorDir/vendor/pkg).
+    let mut dm = MockDownloadManager::new();
+    let expected_package = package.clone();
+    let expected_path = format!("{}/vendor/pkg", setup.vendor_dir);
+    dm.expect_remove()
+        .times(1)
+        .withf_st(move |package, target_dir| {
+            Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
+                && target_dir == expected_path.as_str()
+        })
+        .returning(|_, _| Ok(None));
+    set_download_manager(&setup, dm);
+
     let mut library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
-    let package = get_installable_package("vendor/pkg", "1.0.0");
 
     // PHP mocks hasPackage to return (true, false) over two calls; a real repository
     // seeded with the package reproduces this naturally: present, then absent after
@@ -273,13 +363,6 @@ fn test_uninstall() {
 
     run(library.uninstall(&mut repository, package.clone())).unwrap();
 
-    assert_eq!(
-        vec![DownloaderCall::Remove {
-            package: "vendor/pkg".to_string(),
-            path: format!("{}/vendor/pkg", setup.vendor_dir),
-        }],
-        *setup.downloader_calls.borrow()
-    );
     assert!(!repository.has_package(package.clone()));
 
     // Uninstalling again, with the package no longer installed, fails.
@@ -323,42 +406,9 @@ fn test_get_install_path_with_target_dir() {
     tear_down(&mut setup);
 }
 
-/// Records the calls a `BinaryInstaller` double receives, standing in for the PHPUnit mock that
-/// asserts `removeBinaries` is never called and `installBinaries` is called once.
-#[derive(Debug, Default)]
-struct BinaryInstallerCalls {
-    install_binaries: Vec<(shirabe::package::PackageInterfaceHandle, String, bool)>,
-    remove_binaries: Vec<shirabe::package::PackageInterfaceHandle>,
-}
-
-#[derive(Debug)]
-struct RecordingBinaryInstaller {
-    calls: Rc<RefCell<BinaryInstallerCalls>>,
-}
-
-impl shirabe::installer::BinaryInstallerInterface for RecordingBinaryInstaller {
-    fn install_binaries(
-        &mut self,
-        package: shirabe::package::PackageInterfaceHandle,
-        install_path: &str,
-        warn_on_overwrite: bool,
-    ) {
-        self.calls.borrow_mut().install_binaries.push((
-            package,
-            install_path.to_string(),
-            warn_on_overwrite,
-        ));
-    }
-
-    fn remove_binaries(&mut self, package: shirabe::package::PackageInterfaceHandle) {
-        self.calls.borrow_mut().remove_binaries.push(package);
-    }
-}
-
 #[test]
 fn test_ensure_binaries_installed() {
     let mut setup = set_up();
-    let calls = Rc::new(RefCell::new(BinaryInstallerCalls::default()));
     let mut library = LibraryInstaller::new(
         setup.io.clone(),
         setup.composer.clone(),
@@ -366,26 +416,27 @@ fn test_ensure_binaries_installed() {
         None,
         None,
     );
-    library.__set_binary_installer(std::rc::Rc::new(std::cell::RefCell::new(
-        RecordingBinaryInstaller {
-            calls: calls.clone(),
-        },
-    )));
     let package = get_package("foo/bar", "1.0.0");
     let expected_path = library.get_install_path(package.clone()).unwrap();
 
-    library.ensure_binaries_presence(package.clone());
-
-    let recorded = calls.borrow();
+    let mut binary_installer = MockBinaryInstaller::new();
     // PHP asserts removeBinaries is never called.
-    assert!(recorded.remove_binaries.is_empty());
+    binary_installer.expect_remove_binaries().times(0);
     // PHP asserts installBinaries is called once with ($package, getInstallPath, false).
-    assert_eq!(recorded.install_binaries.len(), 1);
-    let (recorded_package, recorded_path, warn_on_overwrite) = &recorded.install_binaries[0];
-    assert!(Rc::ptr_eq(recorded_package.as_rc(), package.as_rc()));
-    assert_eq!(recorded_path, &expected_path);
-    assert!(!warn_on_overwrite);
-    drop(recorded);
+    let expected_package = package.clone();
+    let expected_install_path = expected_path.clone();
+    binary_installer
+        .expect_install_binaries()
+        .times(1)
+        .withf_st(move |package, install_path, warn_on_overwrite| {
+            Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
+                && install_path == expected_install_path.as_str()
+                && !*warn_on_overwrite
+        })
+        .returning(|_, _, _| ());
+    library.__set_binary_installer(Rc::new(RefCell::new(binary_installer)));
+
+    library.ensure_binaries_presence(package.clone());
 
     tear_down(&mut setup);
 }
