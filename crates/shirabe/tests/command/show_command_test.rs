@@ -739,7 +739,7 @@ zerozero/major 0.0.1 ~ 0.0.2",
     );
 }
 
-#[ignore = "blocked: categorization fixed, but platform packages do not appear in the --all section grouping (the platform: section is empty); separate gap in platform bucket population"]
+#[ignore = "blocked: categorization fixed, but the platform: section is empty because PlatformRepository::get_packages routes to ArrayRepository::initialize (empty) instead of PlatformRepository::initialize, which reads platform constants via the still-todo!() shim runtime::constant()"]
 #[test]
 #[serial]
 fn test_show_all_shows_all_sections() {
