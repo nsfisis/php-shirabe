@@ -48,6 +48,78 @@ impl ArrayRepository {
         self.packages.borrow().as_ref().unwrap().to_vec()
     }
 
+    // The RepositoryInterface findPackage/findPackages only need shared access to the package list;
+    // the `&mut self` on the trait methods is an artifact of the shared interface signature. These
+    // `&self` variants let callers that already hold a shared borrow (e.g. wrapper repositories
+    // initializing from a `&self` context) reuse the same logic.
+    pub(crate) fn find_package_internal(
+        &self,
+        name: &str,
+        constraint: FindPackageConstraint,
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
+        let name = strtolower(name);
+
+        let constraint: AnyConstraint = match constraint {
+            FindPackageConstraint::Constraint(c) => c,
+            FindPackageConstraint::String(s) => {
+                let version_parser = VersionParser::new();
+                version_parser.parse_constraints(&s).unwrap().clone()
+            }
+        };
+
+        for package in self.get_packages_internal() {
+            if name == package.get_name() {
+                let pkg_constraint = SimpleConstraint::new(
+                    "==".to_string(),
+                    package.get_version().to_string(),
+                    None,
+                );
+                if constraint.matches(&pkg_constraint.into()) {
+                    return Ok(Some(package));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub(crate) fn find_packages_internal(
+        &self,
+        name: &str,
+        constraint: Option<FindPackageConstraint>,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        // normalize name
+        let name = strtolower(name);
+        let mut packages = vec![];
+
+        let constraint: Option<AnyConstraint> = match constraint {
+            None => None,
+            Some(FindPackageConstraint::Constraint(c)) => Some(c),
+            Some(FindPackageConstraint::String(s)) => {
+                let version_parser = VersionParser::new();
+                Some(version_parser.parse_constraints(&s).unwrap().clone())
+            }
+        };
+
+        for package in self.get_packages_internal() {
+            if name == package.get_name()
+                && (constraint.is_none()
+                    || constraint.as_ref().unwrap().matches(
+                        &SimpleConstraint::new(
+                            "==".to_string(),
+                            package.get_version().to_string(),
+                            None,
+                        )
+                        .into(),
+                    ))
+            {
+                packages.push(package);
+            }
+        }
+
+        Ok(packages)
+    }
+
     /// @param array<PackageInterface> $packages
     pub fn new(packages: Vec<PackageInterfaceHandle>) -> Result<Self> {
         let this = Self {
@@ -243,30 +315,7 @@ impl RepositoryInterface for ArrayRepository {
         name: &str,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
-        let name = strtolower(name);
-
-        let constraint: AnyConstraint = match constraint {
-            FindPackageConstraint::Constraint(c) => c,
-            FindPackageConstraint::String(s) => {
-                let version_parser = VersionParser::new();
-                version_parser.parse_constraints(&s).unwrap().clone()
-            }
-        };
-
-        for package in self.get_packages_internal() {
-            if name == package.get_name() {
-                let pkg_constraint = SimpleConstraint::new(
-                    "==".to_string(),
-                    package.get_version().to_string(),
-                    None,
-                );
-                if constraint.matches(&pkg_constraint.into()) {
-                    return Ok(Some(package));
-                }
-            }
-        }
-
-        Ok(None)
+        self.find_package_internal(name, constraint)
     }
 
     fn find_packages(
@@ -274,36 +323,7 @@ impl RepositoryInterface for ArrayRepository {
         name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
-        // normalize name
-        let name = strtolower(name);
-        let mut packages = vec![];
-
-        let constraint: Option<AnyConstraint> = match constraint {
-            None => None,
-            Some(FindPackageConstraint::Constraint(c)) => Some(c),
-            Some(FindPackageConstraint::String(s)) => {
-                let version_parser = VersionParser::new();
-                Some(version_parser.parse_constraints(&s).unwrap().clone())
-            }
-        };
-
-        for package in self.get_packages_internal() {
-            if name == package.get_name()
-                && (constraint.is_none()
-                    || constraint.as_ref().unwrap().matches(
-                        &SimpleConstraint::new(
-                            "==".to_string(),
-                            package.get_version().to_string(),
-                            None,
-                        )
-                        .into(),
-                    ))
-            {
-                packages.push(package);
-            }
-        }
-
-        Ok(packages)
+        self.find_packages_internal(name, constraint)
     }
 
     fn search(

@@ -11,12 +11,18 @@ use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
+use crate::package::BasePackageHandle;
+use crate::package::PackageInterfaceHandle;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
 use crate::repository::ArrayRepository;
 use crate::repository::ConfigurableRepositoryInterface;
+use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::repository::{
+    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+};
 use crate::util::Filesystem;
 use crate::util::Git as GitUtil;
 use crate::util::HttpDownloader;
@@ -28,7 +34,7 @@ use crate::util::Url;
 pub struct PathRepository {
     inner: ArrayRepository,
     loader: ArrayLoader,
-    version_guesser: VersionGuesser,
+    version_guesser: std::cell::RefCell<VersionGuesser>,
     url: String,
     repo_config: IndexMap<String, PhpMixed>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -92,7 +98,7 @@ impl PathRepository {
         Ok(Self {
             inner: ArrayRepository::new(vec![])?,
             loader: ArrayLoader::new(None, true),
-            version_guesser,
+            version_guesser: std::cell::RefCell::new(version_guesser),
             url,
             repo_config,
             process,
@@ -139,7 +145,18 @@ impl PathRepository {
         Ok(self.inner.has_package(package))
     }
 
-    pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
+    // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to glob
+    // the configured url and load each path package. Without virtual dispatch we trigger that load
+    // here before delegating to the inner repository; ArrayRepository's own lazy check then sees the
+    // populated array and skips re-initializing it.
+    fn ensure_initialized(&self) -> anyhow::Result<()> {
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
 
         let url_matches = self.get_url_matches()?;
@@ -260,7 +277,9 @@ impl PathRepository {
                 if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
                     package.insert(
                         "version".to_string(),
-                        PhpMixed::String(self.version_guesser.get_root_version_from_env()?),
+                        PhpMixed::String(
+                            self.version_guesser.borrow().get_root_version_from_env()?,
+                        ),
                     );
                 }
             }
@@ -294,7 +313,10 @@ impl PathRepository {
             }
 
             if !package.contains_key("version") {
-                let version_data = self.version_guesser.guess_version(&package, &path)?;
+                let version_data = self
+                    .version_guesser
+                    .borrow_mut()
+                    .guess_version(&package, &path)?;
                 if let Some(version_data) = version_data {
                     if let Some(pretty_version) = version_data
                         .pretty_version
@@ -369,5 +391,92 @@ impl PathRepository {
                     .to_string()
             })
             .collect())
+    }
+}
+
+impl RepositoryInterface for PathRepository {
+    // The structural methods are inherited from ArrayRepository in PHP, where the lazy package load
+    // is driven by the overridden initialize(). Here each one first ensures that load has happened
+    // (see ensure_initialized), then delegates to the inner ArrayRepository.
+    fn count(&self) -> anyhow::Result<usize> {
+        self.ensure_initialized()?;
+        self.inner.count()
+    }
+
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+        // TODO(phase-d): hasPackage returns bool and cannot surface an initialization error; a
+        // failed load leaves the inner repository with whatever packages were added before the
+        // failure.
+        let _ = self.ensure_initialized();
+        self.inner.has_package(package)
+    }
+
+    fn find_package(
+        &mut self,
+        name: &str,
+        constraint: FindPackageConstraint,
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_package(name, constraint)
+    }
+
+    fn find_packages(
+        &mut self,
+        name: &str,
+        constraint: Option<FindPackageConstraint>,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_packages(name, constraint)
+    }
+
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.get_packages()
+    }
+
+    fn load_packages(
+        &mut self,
+        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+    ) -> anyhow::Result<LoadPackagesResult> {
+        self.ensure_initialized()?;
+        self.inner.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
+    }
+
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        self.ensure_initialized()?;
+        self.inner.search(query, mode, r#type)
+    }
+
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        self.ensure_initialized()?;
+        self.inner.get_providers(package_name)
+    }
+
+    fn get_repo_name(&self) -> String {
+        PathRepository::get_repo_name(self)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }

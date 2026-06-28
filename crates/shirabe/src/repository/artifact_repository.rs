@@ -11,13 +11,20 @@ use shirabe_php_shim::{
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
+use crate::package::BasePackageHandle;
+use crate::package::PackageInterfaceHandle;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
 use crate::repository::ArrayRepository;
 use crate::repository::ConfigurableRepositoryInterface;
+use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::repository::{
+    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+};
 use crate::util::Platform;
 use crate::util::Tar;
 use crate::util::Zip;
+use shirabe_semver::constraint::AnyConstraint;
 
 pub struct ArtifactRepository {
     inner: ArrayRepository,
@@ -73,13 +80,24 @@ impl ArtifactRepository {
         self.inner.get_packages()
     }
 
-    fn initialize(&mut self) -> anyhow::Result<()> {
+    fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
         let lookup = self.lookup.clone();
         self.scan_directory(&lookup)
     }
 
-    fn scan_directory(&mut self, path: &str) -> anyhow::Result<()> {
+    // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to scan
+    // the lookup directory. Without virtual dispatch we trigger that scan here before delegating to
+    // the inner repository; ArrayRepository's own lazy check then sees the populated array and skips
+    // re-initializing it.
+    fn ensure_initialized(&self) -> anyhow::Result<()> {
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
+        Ok(())
+    }
+
+    fn scan_directory(&self, path: &str) -> anyhow::Result<()> {
         let entries = std::fs::read_dir(path)?;
         for entry in entries {
             let entry = entry?;
@@ -224,5 +242,92 @@ impl ArtifactRepository {
 impl ConfigurableRepositoryInterface for ArtifactRepository {
     fn get_repo_config(&self) -> IndexMap<String, PhpMixed> {
         self.repo_config.clone()
+    }
+}
+
+impl RepositoryInterface for ArtifactRepository {
+    // The structural methods are inherited from ArrayRepository in PHP, where the lazy directory
+    // scan is driven by the overridden initialize(). Here each one first ensures that scan has
+    // happened (see ensure_initialized), then delegates to the inner ArrayRepository.
+    fn count(&self) -> anyhow::Result<usize> {
+        self.ensure_initialized()?;
+        self.inner.count()
+    }
+
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+        // TODO(phase-d): hasPackage returns bool and cannot surface an initialization error; a
+        // failed scan leaves the inner repository with whatever packages were added before the
+        // failure.
+        let _ = self.ensure_initialized();
+        self.inner.has_package(package)
+    }
+
+    fn find_package(
+        &mut self,
+        name: &str,
+        constraint: FindPackageConstraint,
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_package(name, constraint)
+    }
+
+    fn find_packages(
+        &mut self,
+        name: &str,
+        constraint: Option<FindPackageConstraint>,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_packages(name, constraint)
+    }
+
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.get_packages()
+    }
+
+    fn load_packages(
+        &mut self,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+    ) -> anyhow::Result<LoadPackagesResult> {
+        self.ensure_initialized()?;
+        self.inner.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
+    }
+
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        self.ensure_initialized()?;
+        self.inner.search(query, mode, r#type)
+    }
+
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        self.ensure_initialized()?;
+        self.inner.get_providers(package_name)
+    }
+
+    fn get_repo_name(&self) -> String {
+        ArtifactRepository::get_repo_name(self)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }

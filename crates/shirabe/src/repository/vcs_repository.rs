@@ -12,6 +12,8 @@ use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::package::BasePackageHandle;
+use crate::package::PackageInterfaceHandle;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::InvalidPackageException;
 use crate::package::loader::LoaderInterface;
@@ -21,8 +23,10 @@ use crate::repository::ArrayRepository;
 use crate::repository::ConfigurableRepositoryInterface;
 use crate::repository::InvalidRepositoryException;
 use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::repository::vcs::VcsDriverInterface;
 use crate::repository::vcs::VcsDriverKind;
+use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
 use crate::repository::{VersionCacheInterface, VersionCacheResult};
 use crate::util::HttpDownloader;
 use crate::util::Platform;
@@ -36,7 +40,10 @@ pub struct VcsRepository {
     /// @var string
     pub(crate) url: String,
     /// @var ?string
-    pub(crate) package_name: Option<String>,
+    ///
+    /// Interior mutability: set lazily by the (now `&self`) `initialize`, mirroring how PHP's
+    /// inherited ArrayRepository methods drive the overridden `initialize()` on first access.
+    pub(crate) package_name: std::cell::RefCell<Option<String>>,
     /// @var bool
     pub(crate) is_verbose: bool,
     /// @var bool
@@ -46,11 +53,11 @@ pub struct VcsRepository {
     /// @var Config
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var VersionParser
-    pub(crate) version_parser: Option<VersionParser>,
+    pub(crate) version_parser: std::cell::RefCell<Option<VersionParser>>,
     /// @var string
     pub(crate) r#type: String,
     /// @var ?LoaderInterface
-    pub(crate) loader: Option<Box<dyn LoaderInterface>>,
+    pub(crate) loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
     /// @var array<string, mixed>
     pub(crate) repo_config: IndexMap<String, PhpMixed>,
     /// @var HttpDownloader
@@ -58,20 +65,24 @@ pub struct VcsRepository {
     /// @var ProcessExecutor
     pub(crate) process_executor: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var bool
-    pub(crate) branch_error_occurred: bool,
+    pub(crate) branch_error_occurred: std::cell::Cell<bool>,
     /// @var array<string, class-string<VcsDriverInterface>>
     drivers: IndexMap<String, VcsDriverKind>,
     /// @var ?VcsDriverInterface
-    driver: Option<Box<dyn VcsDriverInterface>>,
+    ///
+    /// Interior mutability: memoized by `ensure_driver` (PHP `getDriver`), which is reached from
+    /// the `&self` RepositoryInterface methods (`count`, `has_package`, `get_repo_name`).
+    driver: std::cell::RefCell<Option<Box<dyn VcsDriverInterface>>>,
     /// Kind of the resolved `driver`, used by `get_repo_name` to recover the driver type
     /// (PHP `array_search(get_class($driver), $this->drivers)`).
-    driver_kind: Option<VcsDriverKind>,
+    driver_kind: std::cell::Cell<Option<VcsDriverKind>>,
     /// @var ?VersionCacheInterface
     version_cache: Option<Box<dyn VersionCacheInterface>>,
     /// @var list<string>
-    empty_references: Vec<String>,
+    empty_references: std::cell::RefCell<Vec<String>>,
     /// @var array<'tags'|'branches', array<string, TransportException>>
-    version_transport_exceptions: IndexMap<String, IndexMap<String, TransportException>>,
+    version_transport_exceptions:
+        std::cell::RefCell<IndexMap<String, IndexMap<String, TransportException>>>,
     /// @var ?EventDispatcher (preserved for plugin events)
     _dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
 }
@@ -134,33 +145,34 @@ impl VcsRepository {
         Ok(Self {
             inner,
             url,
-            package_name: None,
+            package_name: std::cell::RefCell::new(None),
             is_verbose,
             is_very_verbose,
             io,
             config,
-            version_parser: None,
+            version_parser: std::cell::RefCell::new(None),
             r#type,
-            loader: None,
+            loader: std::cell::RefCell::new(None),
             repo_config,
             http_downloader,
             process_executor,
-            branch_error_occurred: false,
+            branch_error_occurred: std::cell::Cell::new(false),
             drivers,
-            driver: None,
-            driver_kind: None,
+            driver: std::cell::RefCell::new(None),
+            driver_kind: std::cell::Cell::new(None),
             version_cache,
-            empty_references: vec![],
-            version_transport_exceptions: IndexMap::new(),
+            empty_references: std::cell::RefCell::new(vec![]),
+            version_transport_exceptions: std::cell::RefCell::new(IndexMap::new()),
             _dispatcher: dispatcher,
         })
     }
 
-    pub fn get_repo_name(&mut self) -> String {
+    pub fn get_repo_name(&self) -> String {
         // Ensure the driver is resolved so `driver_kind` is populated.
-        let _ = self.get_driver().expect("driver should be available");
+        self.ensure_driver();
+        assert!(self.driver.borrow().is_some(), "driver should be available");
         // PHP: array_search(get_class($driver), $this->drivers), falling back to the class name.
-        let driver_type = match self.driver_kind {
+        let driver_type = match self.driver_kind.get() {
             Some(kind) => self
                 .drivers
                 .iter()
@@ -182,12 +194,16 @@ impl VcsRepository {
     }
 
     pub fn set_loader(&mut self, loader: Box<dyn LoaderInterface>) {
-        self.loader = Some(loader);
+        *self.loader.borrow_mut() = Some(loader);
     }
 
-    pub fn get_driver(&mut self) -> Option<&mut Box<dyn VcsDriverInterface>> {
-        if self.driver.is_some() {
-            return self.driver.as_mut();
+    /// PHP `getDriver()` lazily instantiates and memoizes the matching VCS driver. Because Rust's
+    /// `RefCell` cannot hand out a `&mut` reference that outlives the borrow, this is split from the
+    /// reference-returning shape into a resolver: it populates `self.driver`/`self.driver_kind` once,
+    /// and callers borrow `self.driver` as needed afterwards.
+    pub fn ensure_driver(&self) {
+        if self.driver.borrow().is_some() {
+            return;
         }
 
         if let Some(kind) = self.drivers.get(&self.r#type).copied() {
@@ -199,9 +215,9 @@ impl VcsRepository {
                 self.process_executor.clone(),
             );
             let _ = driver.initialize();
-            self.driver = Some(driver);
-            self.driver_kind = Some(kind);
-            return self.driver.as_mut();
+            *self.driver.borrow_mut() = Some(driver);
+            self.driver_kind.set(Some(kind));
+            return;
         }
 
         let kinds: Vec<VcsDriverKind> = self.drivers.values().copied().collect();
@@ -219,9 +235,9 @@ impl VcsRepository {
                     self.process_executor.clone(),
                 );
                 let _ = driver.initialize();
-                self.driver = Some(driver);
-                self.driver_kind = Some(*kind);
-                return self.driver.as_mut();
+                *self.driver.borrow_mut() = Some(driver);
+                self.driver_kind.set(Some(*kind));
+                return;
             }
         }
 
@@ -238,29 +254,27 @@ impl VcsRepository {
                     self.process_executor.clone(),
                 );
                 let _ = driver.initialize();
-                self.driver = Some(driver);
-                self.driver_kind = Some(*kind);
-                return self.driver.as_mut();
+                *self.driver.borrow_mut() = Some(driver);
+                self.driver_kind.set(Some(*kind));
+                return;
             }
         }
-
-        None
     }
 
     pub fn had_invalid_branches(&self) -> bool {
-        self.branch_error_occurred
+        self.branch_error_occurred.get()
     }
 
     /// @return list<string>
-    pub fn get_empty_references(&self) -> &Vec<String> {
-        &self.empty_references
+    pub fn get_empty_references(&self) -> Vec<String> {
+        self.empty_references.borrow().clone()
     }
 
     /// @return array<'tags'|'branches', array<string, TransportException>>
     pub fn get_version_transport_exceptions(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, TransportException>> {
-        &self.version_transport_exceptions
+    ) -> IndexMap<String, IndexMap<String, TransportException>> {
+        self.version_transport_exceptions.borrow().clone()
     }
 
     /// For testing only: drives `initialize` (which shells out to the VCS driver to discover
@@ -273,49 +287,65 @@ impl VcsRepository {
         self.inner.get_packages()
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
+    // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to drive
+    // the VCS driver and load each tag/branch package. Without virtual dispatch we trigger that load
+    // here before delegating to the inner repository; ArrayRepository's own lazy check then sees the
+    // populated array and skips re-initializing it.
+    fn ensure_initialized(&self) -> anyhow::Result<()> {
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
+        Ok(())
+    }
+
+    pub fn initialize(&self) -> Result<()> {
         self.inner.initialize();
 
         let is_verbose = self.is_verbose;
         let is_very_verbose = self.is_very_verbose;
 
         let driver_url = self.url.clone();
-        let driver = self.get_driver();
-        if driver.is_none() {
+        self.ensure_driver();
+        if self.driver.borrow().is_none() {
             return Err(InvalidArgumentException {
                 message: format!("No driver found to handle VCS repository {}", driver_url),
                 code: 0,
             }
             .into());
         }
-        self.version_parser = Some(VersionParser::new());
-        if self.loader.is_none() {
-            self.loader = Some(Box::new(ArrayLoader::new(
-                self.version_parser.clone(),
-                false,
-            )));
+        *self.version_parser.borrow_mut() = Some(VersionParser::new());
+        if self.loader.borrow().is_none() {
+            let version_parser = self.version_parser.borrow().clone();
+            *self.loader.borrow_mut() = Some(Box::new(ArrayLoader::new(version_parser, false)));
         }
 
         let mut has_root_identifier_composer_json = false;
-        let root_identifier_result = self.driver.as_mut().unwrap().get_root_identifier();
+        let root_identifier_result = self
+            .driver
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .get_root_identifier();
         if let Ok(root_identifier) = root_identifier_result {
-            match self
+            let has_composer_file = self
                 .driver
+                .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .has_composer_file(&root_identifier)
-            {
+                .has_composer_file(&root_identifier);
+            match has_composer_file {
                 Ok(b) => {
                     has_root_identifier_composer_json = b;
                     if has_root_identifier_composer_json {
-                        match self
+                        let composer_information = self
                             .driver
+                            .borrow_mut()
                             .as_mut()
                             .unwrap()
-                            .get_composer_information(&root_identifier)
-                        {
+                            .get_composer_information(&root_identifier);
+                        match composer_information {
                             Ok(Some(data)) => {
-                                self.package_name = data
+                                *self.package_name.borrow_mut() = data
                                     .get("name")
                                     .and_then(|v| v.as_string())
                                     .filter(|s| !s.is_empty())
@@ -354,12 +384,13 @@ impl VcsRepository {
             }
         }
 
-        let driver = self.driver.as_mut().unwrap();
-        for (tag, identifier) in driver.get_tags()? {
+        let tags = self.driver.borrow_mut().as_mut().unwrap().get_tags()?;
+        for (tag, identifier) in tags {
             let mut tag = tag;
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
                 self.package_name
+                    .borrow()
                     .clone()
                     .unwrap_or_else(|| self.url.clone()),
                 tag
@@ -381,7 +412,7 @@ impl VcsRepository {
                     continue;
                 }
                 CachedPackageResult::Missing => {
-                    self.empty_references.push(identifier.clone());
+                    self.empty_references.borrow_mut().push(identifier.clone());
                     continue;
                 }
                 CachedPackageResult::None => {}
@@ -407,8 +438,12 @@ impl VcsRepository {
             }
 
             let result: Result<()> = (|| -> Result<()> {
-                let driver = self.driver.as_mut().unwrap();
-                let data_opt = driver.get_composer_information(&identifier)?;
+                let data_opt = self
+                    .driver
+                    .borrow_mut()
+                    .as_mut()
+                    .unwrap()
+                    .get_composer_information(&identifier)?;
                 if data_opt.is_none() {
                     if is_very_verbose {
                         self.io.write_error(&format!(
@@ -416,14 +451,14 @@ impl VcsRepository {
                             tag
                         ));
                     }
-                    self.empty_references.push(identifier.clone());
+                    self.empty_references.borrow_mut().push(identifier.clone());
                     return Ok(());
                 }
                 let mut data = data_opt.unwrap();
 
                 // manually versioned package
                 if data.contains_key("version") {
-                    let normalized = self.version_parser.as_ref().unwrap().normalize(
+                    let normalized = self.version_parser.borrow().as_ref().unwrap().normalize(
                         data.get("version")
                             .and_then(|v| v.as_string())
                             .unwrap_or(""),
@@ -493,6 +528,7 @@ impl VcsRepository {
 
                 let tag_package_name = self
                     .package_name
+                    .borrow()
                     .clone()
                     .filter(|s| !s.is_empty())
                     .unwrap_or_else(|| {
@@ -501,7 +537,7 @@ impl VcsRepository {
                             .unwrap_or("")
                             .to_string()
                     });
-                if let Some(existing_package) = self.inner.find_package(
+                if let Some(existing_package) = self.inner.find_package_internal(
                     &tag_package_name,
                     crate::repository::FindPackageConstraint::Constraint(
                         SimpleConstraint::new(
@@ -526,20 +562,29 @@ impl VcsRepository {
                         .write_error(&format!("Importing tag {} ({})", tag, version_normalized));
                 }
 
-                let driver = self.driver.as_ref().unwrap();
-                let processed = self.pre_process(&**driver, data, &identifier)?;
-                let loaded = self.loader.as_ref().unwrap().load(processed, None)?;
+                let processed = {
+                    let driver_ref = self.driver.borrow();
+                    let driver = driver_ref.as_ref().unwrap();
+                    self.pre_process(&**driver, data, &identifier)?
+                };
+                let loaded = self
+                    .loader
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .load(processed, None)?;
                 self.inner.add_package(loaded)?;
                 Ok(())
             })();
             if let Err(e) = result {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
                     self.version_transport_exceptions
+                        .borrow_mut()
                         .entry("tags".to_string())
                         .or_default()
                         .insert(tag.clone(), te.clone());
                     if te.get_code() == 404 {
-                        self.empty_references.push(identifier.clone());
+                        self.empty_references.borrow_mut().push(identifier.clone());
                     }
                     if self.should_rethrow_transport_exception(te) {
                         return Err(e);
@@ -568,9 +613,14 @@ impl VcsRepository {
                 .overwrite_error4("", false, None, io_interface::NORMAL);
         }
 
-        let mut branches = self.driver.as_mut().unwrap().get_branches()?;
+        let mut branches = self.driver.borrow_mut().as_mut().unwrap().get_branches()?;
         // make sure the root identifier branch gets loaded first
-        let root_identifier = self.driver.as_mut().unwrap().get_root_identifier()?;
+        let root_identifier = self
+            .driver
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .get_root_identifier()?;
         if has_root_identifier_composer_json && branches.contains_key(&root_identifier) {
             let mut new_branches: IndexMap<String, String> = IndexMap::new();
             new_branches.insert(
@@ -589,6 +639,7 @@ impl VcsRepository {
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
                 self.package_name
+                    .borrow()
                     .clone()
                     .unwrap_or_else(|| self.url.clone()),
                 branch
@@ -632,7 +683,13 @@ impl VcsRepository {
                 );
             }
 
-            let is_default_branch = self.driver.as_mut().unwrap().get_root_identifier()? == branch;
+            let is_default_branch = self
+                .driver
+                .borrow_mut()
+                .as_mut()
+                .unwrap()
+                .get_root_identifier()?
+                == branch;
             let cached_package = self.get_cached_package_version(
                 &version,
                 &identifier,
@@ -646,7 +703,7 @@ impl VcsRepository {
                     continue;
                 }
                 CachedPackageResult::Missing => {
-                    self.empty_references.push(identifier.clone());
+                    self.empty_references.borrow_mut().push(identifier.clone());
                     continue;
                 }
                 CachedPackageResult::None => {}
@@ -655,6 +712,7 @@ impl VcsRepository {
             let result: Result<()> = (|| -> Result<()> {
                 let data_opt = self
                     .driver
+                    .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .get_composer_information(&identifier)?;
@@ -665,7 +723,7 @@ impl VcsRepository {
                             branch
                         ));
                     }
-                    self.empty_references.push(identifier.clone());
+                    self.empty_references.borrow_mut().push(identifier.clone());
                     return Ok(());
                 }
                 let mut data = data_opt.unwrap();
@@ -678,7 +736,14 @@ impl VcsRepository {
                 );
 
                 data.shift_remove("default-branch");
-                if self.driver.as_mut().unwrap().get_root_identifier()? == branch {
+                if self
+                    .driver
+                    .borrow_mut()
+                    .as_mut()
+                    .unwrap()
+                    .get_root_identifier()?
+                    == branch
+                {
                     data.insert("default-branch".to_string(), PhpMixed::Bool(true));
                 }
 
@@ -692,10 +757,14 @@ impl VcsRepository {
                     ));
                 }
 
-                let driver = self.driver.as_ref().unwrap();
-                let package_data = self.pre_process(&**driver, data, &identifier)?;
+                let package_data = {
+                    let driver_ref = self.driver.borrow();
+                    let driver = driver_ref.as_ref().unwrap();
+                    self.pre_process(&**driver, data, &identifier)?
+                };
                 let package = self
                     .loader
+                    .borrow()
                     .as_ref()
                     .unwrap()
                     .load(package_data.clone(), None)?;
@@ -705,8 +774,8 @@ impl VcsRepository {
                 // stored in `self.loader` and this downcast is always None. Production never calls
                 // setLoader so the default ArrayLoader matches upstream, but the InvalidPackageException
                 // path stays dead until the trait is reworked.
-                let loader_as_validating = self
-                    .loader
+                let loader_ref = self.loader.borrow();
+                let loader_as_validating = loader_ref
                     .as_ref()
                     .and_then(|l| l.as_any().downcast_ref::<ValidatingArrayLoader>());
                 if let Some(validating) = loader_as_validating
@@ -719,17 +788,19 @@ impl VcsRepository {
                     )
                     .into());
                 }
+                drop(loader_ref);
                 self.inner.add_package(package)?;
                 Ok(())
             })();
             if let Err(e) = result {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
                     self.version_transport_exceptions
+                        .borrow_mut()
                         .entry("branches".to_string())
                         .or_default()
                         .insert(branch.clone(), te.clone());
                     if te.get_code() == 404 {
-                        self.empty_references.push(identifier.clone());
+                        self.empty_references.borrow_mut().push(identifier.clone());
                     }
                     if self.should_rethrow_transport_exception(te) {
                         return Err(e);
@@ -745,21 +816,21 @@ impl VcsRepository {
                 if !is_very_verbose {
                     self.io.write_error("");
                 }
-                self.branch_error_occurred = true;
+                self.branch_error_occurred.set(true);
                 self.io
                     .write_error(&format!("<error>Skipped branch {}, {}</error>", branch, e));
                 self.io.write_error("");
                 continue;
             }
         }
-        self.driver.as_mut().unwrap().cleanup()?;
+        self.driver.borrow_mut().as_mut().unwrap().cleanup()?;
 
         if !is_very_verbose {
             self.io
                 .overwrite_error4("", false, None, io_interface::NORMAL);
         }
 
-        if self.inner.get_packages()?.is_empty() {
+        if self.inner.get_packages_internal().is_empty() {
             return Err(InvalidRepositoryException::new(format!(
                 "No valid composer.json was found in any branch or tag of {}, could not load a package from it.",
                 self.url
@@ -787,6 +858,7 @@ impl VcsRepository {
             .map(String::from);
         let name_value = self
             .package_name
+            .borrow()
             .clone()
             .filter(|s| !s.is_empty())
             .or(data_package_name);
@@ -853,6 +925,7 @@ impl VcsRepository {
     fn validate_branch(&self, branch: &str) -> Option<String> {
         let result = self
             .version_parser
+            .borrow()
             .as_ref()
             .unwrap()
             .normalize_branch(branch);
@@ -860,6 +933,7 @@ impl VcsRepository {
             // validate that the branch name has no weird characters conflicting with constraints
             if self
                 .version_parser
+                .borrow()
                 .as_ref()
                 .unwrap()
                 .parse_constraints(&normalized_branch)
@@ -875,6 +949,7 @@ impl VcsRepository {
     /// @return string|false
     fn validate_tag(&self, version: &str) -> Option<String> {
         self.version_parser
+            .borrow()
             .as_ref()
             .unwrap()
             .normalize(version, None)
@@ -883,7 +958,7 @@ impl VcsRepository {
 
     /// @return \Composer\Package\CompletePackage|\Composer\Package\CompleteAliasPackage|null|false null if no cache present, false if the absence of a version was cached
     fn get_cached_package_version(
-        &mut self,
+        &self,
         version: &str,
         identifier: &str,
         is_verbose: bool,
@@ -914,6 +989,7 @@ impl VcsRepository {
             let msg = format!(
                 "Found cached composer.json of <info>{}</info> (<comment>{}</comment>)",
                 self.package_name
+                    .borrow()
                     .clone()
                     .unwrap_or_else(|| self.url.clone()),
                 version
@@ -940,7 +1016,7 @@ impl VcsRepository {
                 .and_then(|v| v.as_string())
                 .unwrap_or("")
                 .to_string();
-            if let Some(existing_package) = self.inner.find_package(
+            if let Some(existing_package) = self.inner.find_package_internal(
                 &name,
                 crate::repository::FindPackageConstraint::Constraint(
                     SimpleConstraint::new("=".to_string(), version_normalized.to_string(), None)
@@ -958,7 +1034,7 @@ impl VcsRepository {
         }
 
         if let VersionCacheResult::Package(data) = cached_package {
-            let loaded = self.loader.as_ref().unwrap().load(data, None)?;
+            let loaded = self.loader.borrow().as_ref().unwrap().load(data, None)?;
             return Ok(CachedPackageResult::Package(loaded));
         }
 
@@ -975,6 +1051,93 @@ impl VcsRepository {
             ]),
             true,
         ) || e.get_code() >= 500
+    }
+}
+
+impl RepositoryInterface for VcsRepository {
+    // The structural methods are inherited from ArrayRepository in PHP, where the lazy package load
+    // is driven by the overridden initialize(). Here each one first ensures that load has happened
+    // (see ensure_initialized), then delegates to the inner ArrayRepository.
+    fn count(&self) -> anyhow::Result<usize> {
+        self.ensure_initialized()?;
+        self.inner.count()
+    }
+
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+        // TODO(phase-d): hasPackage returns bool and cannot surface an initialization error; a
+        // failed load leaves the inner repository with whatever packages were added before the
+        // failure.
+        let _ = self.ensure_initialized();
+        self.inner.has_package(package)
+    }
+
+    fn find_package(
+        &mut self,
+        name: &str,
+        constraint: FindPackageConstraint,
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_package(name, constraint)
+    }
+
+    fn find_packages(
+        &mut self,
+        name: &str,
+        constraint: Option<FindPackageConstraint>,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_packages(name, constraint)
+    }
+
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.get_packages()
+    }
+
+    fn load_packages(
+        &mut self,
+        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+    ) -> anyhow::Result<LoadPackagesResult> {
+        self.ensure_initialized()?;
+        self.inner.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
+    }
+
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        self.ensure_initialized()?;
+        self.inner.search(query, mode, r#type)
+    }
+
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        self.ensure_initialized()?;
+        self.inner.get_providers(package_name)
+    }
+
+    fn get_repo_name(&self) -> String {
+        VcsRepository::get_repo_name(self)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }
 
