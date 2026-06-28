@@ -165,6 +165,31 @@ impl RepositoryManager {
             "Composer\\Repository\\PackageRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::PackageRepository::new(config),
             )),
+            "Composer\\Repository\\VcsRepository" => Ok(RepositoryInterfaceHandle::new(
+                crate::repository::VcsRepository::new(
+                    config,
+                    self.io.clone(),
+                    self.config.clone(),
+                    self.http_downloader.clone(),
+                    self.event_dispatcher.clone(),
+                    Some(self.process.clone()),
+                    None,
+                    None,
+                )?,
+            )),
+            "Composer\\Repository\\ArtifactRepository" => Ok(RepositoryInterfaceHandle::new(
+                crate::repository::ArtifactRepository::new(config, self.io.clone())?,
+            )),
+            "Composer\\Repository\\PathRepository" => Ok(RepositoryInterfaceHandle::new(
+                crate::repository::PathRepository::new(
+                    config,
+                    self.io.clone(),
+                    self.config.clone(),
+                    Some(self.http_downloader.clone()),
+                    self.event_dispatcher.clone(),
+                    Some(self.process.clone()),
+                )?,
+            )),
             other => todo!(
                 "Phase B: dynamic class instantiation by class name: {}",
                 other
