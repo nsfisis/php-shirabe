@@ -66,6 +66,8 @@ pub enum PhpMixed {
     Array(IndexMap<String, PhpMixed>),
     // TODO: consolidate Object to Array.
     Object(IndexMap<String, PhpMixed>),
+    // Resources, arbitrary objects and callables are intentionally excluded. Do not add these
+    // things to this type.
 }
 
 impl serde::Serialize for PhpMixed {
