@@ -21,7 +21,7 @@ impl PhpExecutableFinder {
     }
 
     /// Finds The PHP executable.
-    pub fn find(&self, include_args: bool) -> Option<String> {
+    pub fn find(&self, _include_args: bool) -> Option<String> {
         if let Some(php) = shirabe_php_shim::getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
             let mut php = php.to_string_lossy().into_owned();
             if !shirabe_php_shim::is_executable(&php) {
@@ -38,29 +38,33 @@ impl PhpExecutableFinder {
             return Some(php);
         }
 
-        let args = self.find_arguments();
-        let _args = if include_args && !args.is_empty() {
-            format!(" {}", args.join(" "))
-        } else {
-            String::new()
-        };
+        // The original `\PHP_BINARY && \PHP_SAPI` branch describes the running PHP interpreter.
+        // These constants cannot be obtained in Rust, the branch is skipped here.
 
-        // PHP_BINARY return the current sapi executable
-        //
-        // Everything from here on depends on runtime constants describing the *running* PHP
-        // interpreter (\PHP_BINARY truthiness, \PHP_SAPI, \PHP_BINDIR). The shim does not model a
-        // current PHP runtime, so the remaining fallbacks (the \PHP_SAPI sapi check, \PHP_PATH,
-        // \PHP_PEAR_PHP_BIN, \PHP_BINDIR probing and the final php lookup seeded with \PHP_BINDIR)
-        // cannot be ported faithfully here.
-        // TODO(php-runtime): port once the shim exposes \PHP_SAPI and \PHP_BINDIR.
-        todo!()
+        if let Some(php) = shirabe_php_shim::getenv("PHP_PATH").filter(|v| !v.is_empty()) {
+            let php = php.to_string_lossy().into_owned();
+            if !shirabe_php_shim::is_executable(&php) || shirabe_php_shim::is_dir(&php) {
+                return None;
+            }
+
+            return Some(php);
+        }
+
+        if let Some(php) = shirabe_php_shim::getenv("PHP_PEAR_PHP_BIN").filter(|v| !v.is_empty()) {
+            let php = php.to_string_lossy().into_owned();
+            if shirabe_php_shim::is_executable(&php) && !shirabe_php_shim::is_dir(&php) {
+                return Some(php);
+            }
+        }
+
+        // Even if `\PHP_BINDIR` is unavailable, searching `$PATH` should be performed.
+        self.executable_finder.find("php", None, &[])
     }
 
     /// Finds the PHP executable arguments.
     pub fn find_arguments(&self) -> Vec<String> {
-        let _arguments: Vec<String> = vec![];
-        // TODO(php-runtime): \PHP_SAPI is the SAPI name of the running PHP interpreter; the shim
-        // does not model a current PHP runtime, so the 'phpdbg' check cannot be ported faithfully.
-        todo!()
+        // If PHP_SAPI is not "phpdbg", returns an empty array. In Rust, PHP_SAPI is always "cli",
+        // so always returns an empty array.
+        vec![]
     }
 }
