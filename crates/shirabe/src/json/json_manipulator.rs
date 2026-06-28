@@ -8,8 +8,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array, is_array, is_int, is_numeric, json_decode,
-    preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp, strpos, substr,
-    trim, uksort,
+    php_truthy, preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp,
+    strpos, substr, trim, uksort,
 };
 
 #[derive(Debug)]
@@ -702,9 +702,7 @@ impl JsonManipulator {
         let node_end = self.contents[node.value_end..].to_string();
         let mut children = self.contents[node.value_pos..node.value_end].to_string();
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, false)?.is_null()
-            || json_decode(&children, false)?.as_bool() == Some(false)
-        {
+        if !php_truthy(&json_decode(&children, false)?) {
             return Ok(false);
         }
 
@@ -854,9 +852,7 @@ impl JsonManipulator {
         let children = self.contents[node.value_pos..node.value_end].to_string();
 
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, true)?.is_null()
-            || json_decode(&children, true)?.as_bool() == Some(false)
-        {
+        if !php_truthy(&json_decode(&children, true)?) {
             return Ok(false);
         }
 
