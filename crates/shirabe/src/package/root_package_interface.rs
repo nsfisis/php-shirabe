@@ -7,17 +7,17 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 pub trait RootPackageInterface: CompletePackageInterface {
-    fn get_aliases(&self) -> &[IndexMap<String, String>];
+    fn get_aliases(&self) -> Vec<IndexMap<String, String>>;
 
-    fn get_minimum_stability(&self) -> &str;
+    fn get_minimum_stability(&self) -> String;
 
-    fn get_stability_flags(&self) -> &IndexMap<String, i64>;
+    fn get_stability_flags(&self) -> IndexMap<String, i64>;
 
-    fn get_references(&self) -> &IndexMap<String, String>;
+    fn get_references(&self) -> IndexMap<String, String>;
 
     fn get_prefer_stable(&self) -> bool;
 
-    fn get_config(&self) -> &IndexMap<String, PhpMixed>;
+    fn get_config(&self) -> IndexMap<String, PhpMixed>;
 
     fn set_requires(&mut self, requires: IndexMap<String, Link>);
 

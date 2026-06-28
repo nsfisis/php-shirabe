@@ -49,16 +49,16 @@ impl RootPackageInterface for RootPackage {
         self.minimum_stability = minimum_stability;
     }
 
-    fn get_minimum_stability(&self) -> &str {
-        &self.minimum_stability
+    fn get_minimum_stability(&self) -> String {
+        self.minimum_stability.clone()
     }
 
     fn set_stability_flags(&mut self, stability_flags: IndexMap<String, i64>) {
         self.stability_flags = stability_flags;
     }
 
-    fn get_stability_flags(&self) -> &IndexMap<String, i64> {
-        &self.stability_flags
+    fn get_stability_flags(&self) -> IndexMap<String, i64> {
+        self.stability_flags.clone()
     }
 
     fn set_prefer_stable(&mut self, prefer_stable: bool) {
@@ -73,24 +73,24 @@ impl RootPackageInterface for RootPackage {
         self.config = config;
     }
 
-    fn get_config(&self) -> &IndexMap<String, PhpMixed> {
-        &self.config
+    fn get_config(&self) -> IndexMap<String, PhpMixed> {
+        self.config.clone()
     }
 
     fn set_references(&mut self, references: IndexMap<String, String>) {
         self.references = references;
     }
 
-    fn get_references(&self) -> &IndexMap<String, String> {
-        &self.references
+    fn get_references(&self) -> IndexMap<String, String> {
+        self.references.clone()
     }
 
     fn set_aliases(&mut self, aliases: Vec<IndexMap<String, String>>) {
         self.aliases = aliases;
     }
 
-    fn get_aliases(&self) -> &[IndexMap<String, String>] {
-        &self.aliases
+    fn get_aliases(&self) -> Vec<IndexMap<String, String>> {
+        self.aliases.clone()
     }
 
     fn set_requires(&mut self, requires: IndexMap<String, Link>) {

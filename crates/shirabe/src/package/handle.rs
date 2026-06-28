@@ -916,7 +916,6 @@ macro_rules! impl_root_package_interface_handle {
                     .as_root_package_interface()
                     .expect("RootPackage handle invariant")
                     .get_aliases()
-                    .to_vec()
             }
 
             pub fn get_minimum_stability(&self) -> String {
@@ -925,7 +924,6 @@ macro_rules! impl_root_package_interface_handle {
                     .as_root_package_interface()
                     .expect("RootPackage handle invariant")
                     .get_minimum_stability()
-                    .to_string()
             }
 
             pub fn get_stability_flags(&self) -> indexmap::IndexMap<String, i64> {
@@ -934,7 +932,6 @@ macro_rules! impl_root_package_interface_handle {
                     .as_root_package_interface()
                     .expect("RootPackage handle invariant")
                     .get_stability_flags()
-                    .clone()
             }
 
             pub fn get_references(&self) -> indexmap::IndexMap<String, String> {
@@ -943,7 +940,6 @@ macro_rules! impl_root_package_interface_handle {
                     .as_root_package_interface()
                     .expect("RootPackage handle invariant")
                     .get_references()
-                    .clone()
             }
 
             pub fn get_prefer_stable(&self) -> bool {
@@ -960,7 +956,6 @@ macro_rules! impl_root_package_interface_handle {
                     .as_root_package_interface()
                     .expect("RootPackage handle invariant")
                     .get_config()
-                    .clone()
             }
 
             pub fn set_requires(&self, requires: indexmap::IndexMap<String, crate::package::Link>) {

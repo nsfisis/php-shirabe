@@ -53,32 +53,28 @@ impl std::fmt::Display for RootAliasPackage {
 }
 
 impl RootPackageInterface for RootAliasPackage {
-    fn get_aliases(&self) -> &[IndexMap<String, String>] {
-        todo!("RootAliasPackage::get_aliases cannot return a borrow across the aliasOf handle")
+    fn get_aliases(&self) -> Vec<IndexMap<String, String>> {
+        self.alias_of.get_aliases()
     }
 
-    fn get_minimum_stability(&self) -> &str {
-        todo!(
-            "RootAliasPackage::get_minimum_stability cannot return &str across the aliasOf handle"
-        )
+    fn get_minimum_stability(&self) -> String {
+        self.alias_of.get_minimum_stability()
     }
 
-    fn get_stability_flags(&self) -> &IndexMap<String, i64> {
-        todo!(
-            "RootAliasPackage::get_stability_flags cannot return a borrow across the aliasOf handle"
-        )
+    fn get_stability_flags(&self) -> IndexMap<String, i64> {
+        self.alias_of.get_stability_flags()
     }
 
-    fn get_references(&self) -> &IndexMap<String, String> {
-        todo!("RootAliasPackage::get_references cannot return a borrow across the aliasOf handle")
+    fn get_references(&self) -> IndexMap<String, String> {
+        self.alias_of.get_references()
     }
 
     fn get_prefer_stable(&self) -> bool {
         self.alias_of.get_prefer_stable()
     }
 
-    fn get_config(&self) -> &IndexMap<String, PhpMixed> {
-        todo!("RootAliasPackage::get_config cannot return a borrow across the aliasOf handle")
+    fn get_config(&self) -> IndexMap<String, PhpMixed> {
+        self.alias_of.get_config()
     }
 
     fn set_requires(&mut self, requires: IndexMap<String, Link>) {
