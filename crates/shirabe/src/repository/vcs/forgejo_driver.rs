@@ -537,7 +537,7 @@ impl ForgejoDriver {
                     m.insert("url".to_string(), PhpMixed::String(url.to_string()));
                     m
                 },
-                todo!("clone io for GitDriver setup"),
+                self.inner.io.clone(),
                 self.inner.config.clone(),
                 self.inner.http_downloader.clone(),
                 self.inner.process.clone(),
@@ -639,7 +639,7 @@ impl ForgejoDriver {
                         };
 
                         let mut forgejo = Forgejo::new(
-                            todo!("clone io for Forgejo OAuth"),
+                            self.inner.io.clone(),
                             self.inner.config.clone(),
                             self.inner.http_downloader.clone(),
                         );
