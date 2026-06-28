@@ -3,7 +3,6 @@
 use crate::json::JsonFile;
 use crate::package::PackageInterfaceHandle;
 use crate::package::loader::LoaderInterface;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, TypeError};
 use std::path::Path;
@@ -22,7 +21,7 @@ impl JsonLoader {
         Self { loader }
     }
 
-    pub fn load(&self, json: JsonLoaderInput) -> Result<PackageInterfaceHandle> {
+    pub fn load(&self, json: JsonLoaderInput) -> anyhow::Result<PackageInterfaceHandle> {
         let config = match json {
             JsonLoaderInput::File(mut json_file) => json_file.read()?,
             JsonLoaderInput::String(ref s) if Path::new(s).exists() => {

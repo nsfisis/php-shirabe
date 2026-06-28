@@ -20,7 +20,6 @@ use crate::repository::InstalledRepository;
 use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
 use crate::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, RuntimeException, ksort, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
@@ -161,7 +160,7 @@ impl RepositorySet {
     /// repository the search for that package ends, and following repos will not be consulted.
     ///
     /// @param RepositoryInterface $repo A package repository
-    pub fn add_repository(&mut self, repo: RepositoryInterfaceHandle) -> Result<()> {
+    pub fn add_repository(&mut self, repo: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         if self.locked {
             return Err(RuntimeException {
                 message: "Pool has already been created from this repository set, it cannot be modified anymore.".to_string(),
@@ -276,7 +275,7 @@ impl RepositorySet {
         package_names: Vec<String>,
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
-    ) -> Result<SecurityAdvisoriesResult> {
+    ) -> anyhow::Result<SecurityAdvisoriesResult> {
         let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
         for name in &package_names {
             map.insert(name.clone(), MatchAllConstraint::new(None).into());
@@ -303,7 +302,7 @@ impl RepositorySet {
         packages: Vec<PackageInterfaceHandle>,
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
-    ) -> Result<SecurityAdvisoriesResult> {
+    ) -> anyhow::Result<SecurityAdvisoriesResult> {
         let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
         for package in packages {
             // ignore root alias versions as they are not actual package versions and should not matter when it comes to vulnerabilities
@@ -363,10 +362,10 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
         unreachable_repos: &mut Vec<String>,
-    ) -> Result<IndexMap<String, Vec<AnySecurityAdvisory>>> {
+    ) -> anyhow::Result<IndexMap<String, Vec<AnySecurityAdvisory>>> {
         let mut repo_advisories: Vec<IndexMap<String, Vec<AnySecurityAdvisory>>> = vec![];
         for repository in &self.repositories {
-            let attempt: Result<()> = (|| -> Result<()> {
+            let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let mut repo_ref = repository.borrow_mut();
                 let Some(advisory_repo) = repo_ref.as_advisory_provider_mut() else {
                     return Ok(());
@@ -455,7 +454,7 @@ impl RepositorySet {
         ignored_types: Vec<String>,
         allowed_types: Option<Vec<String>>,
         security_advisory_pool_filter: Option<SecurityAdvisoryPoolFilter>,
-    ) -> Result<Pool> {
+    ) -> anyhow::Result<Pool> {
         let root_aliases = self
             .root_aliases
             .iter()
@@ -511,7 +510,7 @@ impl RepositorySet {
     }
 
     /// Create a pool for dependency resolution from the packages in this repository set.
-    pub fn create_pool_with_all_packages(&mut self) -> Result<Pool> {
+    pub fn create_pool_with_all_packages(&mut self) -> anyhow::Result<Pool> {
         for repo in &self.repositories {
             let is_installed = {
                 let repo_ref = repo.borrow();
@@ -581,7 +580,7 @@ impl RepositorySet {
         &mut self,
         package_name: &str,
         locked_repo: Option<LockArrayRepositoryHandle>,
-    ) -> Result<Pool> {
+    ) -> anyhow::Result<Pool> {
         // TODO unify this with above in some simpler version without "request"?
         self.create_pool_for_packages(vec![package_name.to_string()], locked_repo)
     }
@@ -591,7 +590,7 @@ impl RepositorySet {
         &mut self,
         package_names: Vec<String>,
         locked_repo: Option<LockArrayRepositoryHandle>,
-    ) -> Result<Pool> {
+    ) -> anyhow::Result<Pool> {
         let mut request = Request::new(locked_repo);
 
         let mut allowed_packages: Vec<String> = vec![];

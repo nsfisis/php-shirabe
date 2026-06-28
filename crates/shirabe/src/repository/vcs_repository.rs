@@ -26,7 +26,6 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, in_array, str_replace, strpos};
@@ -103,7 +102,7 @@ impl VcsRepository {
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         drivers: Option<IndexMap<String, VcsDriverKind>>,
         version_cache: Option<Box<dyn VersionCacheInterface>>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let inner = ArrayRepository::new(vec![])?;
         let drivers = drivers.unwrap_or_else(|| {
             let mut m: IndexMap<String, VcsDriverKind> = IndexMap::new();
@@ -297,7 +296,7 @@ impl VcsRepository {
         Ok(())
     }
 
-    pub fn initialize(&self) -> Result<()> {
+    pub fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
 
         let is_verbose = self.is_verbose;
@@ -436,7 +435,7 @@ impl VcsRepository {
                     .overwrite_error4(&msg, false, None, io_interface::NORMAL);
             }
 
-            let result: Result<()> = (|| -> Result<()> {
+            let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let data_opt = self
                     .driver
                     .borrow_mut()
@@ -708,7 +707,7 @@ impl VcsRepository {
                 CachedPackageResult::None => {}
             }
 
-            let result: Result<()> = (|| -> Result<()> {
+            let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let data_opt = self
                     .driver
                     .borrow_mut()
@@ -847,7 +846,7 @@ impl VcsRepository {
         driver: &dyn VcsDriverInterface,
         mut data: IndexMap<String, PhpMixed>,
         identifier: &str,
-    ) -> Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         // keep the name of the main identifier for all packages
         // this ensures that a package can be renamed in one place and that all old tags
         // will still be installable using that new name without requiring re-tagging
@@ -963,7 +962,7 @@ impl VcsRepository {
         is_verbose: bool,
         is_very_verbose: bool,
         is_default_branch: bool,
-    ) -> Result<CachedPackageResult> {
+    ) -> anyhow::Result<CachedPackageResult> {
         if self.version_cache.is_none() {
             return Ok(CachedPackageResult::None);
         }

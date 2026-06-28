@@ -11,7 +11,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
@@ -38,7 +37,7 @@ impl FossilDownloader {
         command: Vec<String>,
         cwd: Option<String>,
         output: &mut String,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         if self
             .inner
             .process
@@ -91,7 +90,7 @@ impl VcsDownloader for FossilDownloader {
         _path: &str,
         _url: &str,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
 
@@ -100,7 +99,7 @@ impl VcsDownloader for FossilDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             url,
             Some(self.inner.io.clone()),
@@ -161,7 +160,7 @@ impl VcsDownloader for FossilDownloader {
         target: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             url,
             Some(self.inner.io.clone()),
@@ -212,7 +211,7 @@ impl VcsDownloader for FossilDownloader {
         _from_reference: &str,
         to_reference: &str,
         path: &str,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         let mut output = String::new();
         self.execute(
             vec![
@@ -262,7 +261,7 @@ impl ChangeReportInterface for FossilDownloader {
         &mut self,
         _package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         if !self.has_metadata_repository(path) {
             return Ok(None);
         }
@@ -314,7 +313,7 @@ impl DownloaderInterface for FossilDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::download(self, package, path, prev_package).await
     }
 
@@ -324,7 +323,7 @@ impl DownloaderInterface for FossilDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
@@ -333,7 +332,7 @@ impl DownloaderInterface for FossilDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
     }
 
@@ -342,7 +341,7 @@ impl DownloaderInterface for FossilDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
@@ -351,7 +350,7 @@ impl DownloaderInterface for FossilDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
     }
 
@@ -361,7 +360,7 @@ impl DownloaderInterface for FossilDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

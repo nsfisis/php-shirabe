@@ -14,7 +14,6 @@ use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;

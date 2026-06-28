@@ -20,7 +20,6 @@ use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::filesystem::Filesystem as SymfonyFilesystem;
 use shirabe_php_shim::{
@@ -83,7 +82,7 @@ impl PathDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
             message: format!(
                 "The package {} has no dist url configured, cannot install.",
@@ -126,7 +125,7 @@ impl PathDownloader {
     fn compute_allowed_strategies(
         &self,
         transport_options: &IndexMap<String, PhpMixed>,
-    ) -> Result<(i64, Vec<i64>)> {
+    ) -> anyhow::Result<(i64, Vec<i64>)> {
         // When symlink transport option is null, both symlink and mirror are allowed
         let mut current_strategy = Self::STRATEGY_SYMLINK;
         let mut allowed_strategies = vec![Self::STRATEGY_SYMLINK, Self::STRATEGY_MIRROR];
@@ -242,7 +241,7 @@ impl DownloaderInterface for PathDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
             message: format!(
@@ -304,7 +303,7 @@ impl DownloaderInterface for PathDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
             .prepare(r#type, package, path, prev_package)
             .await
@@ -315,7 +314,7 @@ impl DownloaderInterface for PathDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
             message: format!(
@@ -368,7 +367,7 @@ impl DownloaderInterface for PathDownloader {
 
         let mut is_fallback = false;
         if Self::STRATEGY_SYMLINK == current_strategy {
-            let symlink_result: Result<anyhow::Result<()>> =
+            let symlink_result: anyhow::Result<anyhow::Result<()>> =
                 (|| {
                     if Platform::is_windows() {
                         // Implement symlinks as NTFS junctions on Windows
@@ -489,7 +488,7 @@ impl DownloaderInterface for PathDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
     }
 
@@ -498,7 +497,7 @@ impl DownloaderInterface for PathDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
         // realpath() may resolve Windows junctions to the source path, so we'll check for a junction
         // first to prevent a false positive when checking if the dist and install paths are the same.
@@ -590,7 +589,7 @@ impl DownloaderInterface for PathDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
             .cleanup(r#type, package, path, prev_package)
             .await

@@ -7,7 +7,6 @@ pub use config_source_interface::*;
 pub use json_config_source::*;
 
 use crate::io::io_interface;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -573,7 +572,7 @@ impl Config {
     }
 
     /// Typed convenience accessor for keys whose `get()` value is always a string.
-    pub fn get_str(&self, key: &str) -> Result<String> {
+    pub fn get_str(&self, key: &str) -> anyhow::Result<String> {
         Ok(self
             .get_with_flags(key, 0)?
             .as_string()
@@ -581,7 +580,7 @@ impl Config {
             .to_string())
     }
 
-    pub fn get_with_flags(&self, key: &str, flags: i64) -> Result<PhpMixed> {
+    pub fn get_with_flags(&self, key: &str, flags: i64) -> anyhow::Result<PhpMixed> {
         match key {
             // strings/paths with env var and {$refs} support
             "vendor-dir" | "bin-dir" | "process-timeout" | "data-dir" | "cache-dir"
@@ -972,7 +971,7 @@ impl Config {
     }
 
     /// @return array<string, mixed[]>
-    pub fn all(&mut self, flags: i64) -> Result<IndexMap<String, PhpMixed>> {
+    pub fn all(&mut self, flags: i64) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         let mut all: IndexMap<String, PhpMixed> = IndexMap::new();
         all.insert(
             "repositories".to_string(),
@@ -1040,7 +1039,7 @@ impl Config {
     /// @param  int          $flags Options (see class constants)
     ///
     /// @return string|mixed
-    fn process(&self, value: PhpMixed, flags: i64) -> Result<PhpMixed> {
+    fn process(&self, value: PhpMixed, flags: i64) -> anyhow::Result<PhpMixed> {
         if !is_string(&value) {
             return Ok(value);
         }
@@ -1115,7 +1114,7 @@ impl Config {
         url: &str,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         repo_options: &IndexMap<String, PhpMixed>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs
         if !filter_var_url(url) && !Preg::is_match(r"{^https?://}", url) {
             return Ok(());

@@ -2,7 +2,6 @@
 
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
@@ -24,7 +23,7 @@ impl Platform {
     /// getcwd() equivalent which always returns a string
     ///
     /// @throws \RuntimeException
-    pub fn get_cwd(allow_empty: bool) -> Result<String> {
+    pub fn get_cwd(allow_empty: bool) -> anyhow::Result<String> {
         let mut cwd = getcwd();
 
         // fallback to realpath('') just in case this works but odds are it would break as well if we are in a case where getcwd fails
@@ -144,7 +143,7 @@ impl Platform {
 
     /// @throws \RuntimeException If the user home could not reliably be determined
     /// @return string            The formal user home as detected from environment parameters
-    pub fn get_user_directory() -> Result<String> {
+    pub fn get_user_directory() -> anyhow::Result<String> {
         if let Some(home) = Self::get_env("HOME") {
             return Ok(home);
         }
@@ -378,7 +377,7 @@ impl Platform {
             if php_os_family() == "Linux" {
                 let mut process = ProcessExecutor::new(None);
                 let mut output = String::new();
-                let result: Result<()> = (|| {
+                let result: anyhow::Result<()> = (|| {
                     if process.execute_args(&["lsmod".to_string()], &mut output, None) == 0
                         && shirabe_php_shim::str_contains(&output, "vboxguest")
                     {

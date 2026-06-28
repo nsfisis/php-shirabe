@@ -5,6 +5,7 @@ require 'pathname'
 LINTERS = {
   cargo_workspace_dependencies: [],
   contiguous_use_block: [],
+  no_banned_use: [],
   no_decorative_section_comment: %w[
     crates/shirabe-semver/src/version_parser.rs
   ],

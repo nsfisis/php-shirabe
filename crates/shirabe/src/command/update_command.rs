@@ -23,7 +23,6 @@ use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use crate::util::HttpDownloader;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -602,7 +601,7 @@ impl UpdateCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         composer: &PartialComposerHandle,
         packages: Vec<String>,
-    ) -> Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<String>> {
         if !input.borrow().is_interactive() {
             return Err(InvalidArgumentException {
                 message: "--interactive cannot be used in non-interactive terminals.".to_string(),
@@ -747,7 +746,10 @@ impl UpdateCommand {
         .into())
     }
 
-    fn create_version_selector(&self, composer: &PartialComposerHandle) -> Result<VersionSelector> {
+    fn create_version_selector(
+        &self,
+        composer: &PartialComposerHandle,
+    ) -> anyhow::Result<VersionSelector> {
         let composer = crate::composer::composer_full(composer);
         let root_aliases: Vec<crate::repository::RootAliasInput> = composer
             .get_package()

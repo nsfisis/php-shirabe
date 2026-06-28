@@ -11,7 +11,6 @@ use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
-use anyhow::Result;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]
@@ -49,7 +48,7 @@ impl PluginInstaller {
         e: anyhow::Error,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         self.inner.io.write_error(&format!(
             "Plugin initialization failed ({}), uninstalling plugin",
             e
@@ -83,7 +82,7 @@ impl InstallerInterface for PluginInstaller {
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if (r#type == "install" || r#type == "update")
             && !self
                 .get_plugin_manager()
@@ -110,7 +109,7 @@ impl InstallerInterface for PluginInstaller {
         &mut self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let extra = package.get_extra();
         let class = extra.get("class").cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
@@ -130,7 +129,7 @@ impl InstallerInterface for PluginInstaller {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.install(repo, package).await?;
 
         // TODO(plugin): register package in plugin manager after install, rollback on failure
@@ -145,7 +144,7 @@ impl InstallerInterface for PluginInstaller {
         repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.update(repo, initial, target).await?;
 
         // TODO(plugin): deactivate initial and register target in plugin manager after update, rollback on failure
@@ -160,7 +159,7 @@ impl InstallerInterface for PluginInstaller {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         // TODO(plugin): uninstall package from plugin manager
         self.get_plugin_manager()
             .borrow_mut()
@@ -174,7 +173,7 @@ impl InstallerInterface for PluginInstaller {
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.cleanup(r#type, package, prev_package).await
     }
 

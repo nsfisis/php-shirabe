@@ -7,7 +7,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
@@ -27,7 +26,7 @@ pub trait ArchiveDownloader {
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn prepare(
         &mut self,
@@ -35,7 +34,7 @@ pub trait ArchiveDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed_mut()
             .shift_remove(&package.get_name());
         self.inner_mut()
@@ -49,7 +48,7 @@ pub trait ArchiveDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed_mut().insert(package.get_name(), true);
         self.inner_mut()
             .cleanup(r#type, package, path, prev_package)
@@ -65,7 +64,7 @@ pub trait ArchiveDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
             self.inner().io.write_error(&format!(
                 "  - {}{}",
@@ -221,7 +220,7 @@ fn install_cleanup(
     package: PackageInterfaceHandle,
     path: &str,
     temporary_dir: &str,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // remove cache if the file was corrupted
     inner.clear_last_cache_write(package.clone());
 
@@ -265,7 +264,7 @@ fn rename_recursively(
     package: PackageInterfaceHandle,
     from: &Path,
     to: &Path,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let content_dir = get_folder_content(from);
 
     // move files back out of the temp dir

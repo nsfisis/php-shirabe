@@ -32,7 +32,6 @@ use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;

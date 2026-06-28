@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Util/NoProxyPattern.php
 
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
@@ -49,7 +48,7 @@ impl NoProxyPattern {
     }
 
     /// Returns true if a URL matches the NO_PROXY pattern
-    pub fn test(&mut self, url: &str) -> Result<bool> {
+    pub fn test(&mut self, url: &str) -> anyhow::Result<bool> {
         if self.noproxy {
             return Ok(true);
         }
@@ -72,7 +71,7 @@ impl NoProxyPattern {
     /// Returns false is the url cannot be parsed, otherwise a data object
     ///
     /// @return bool|stdClass
-    pub(crate) fn get_url_data(&self, url: &str) -> Result<Option<UrlData>> {
+    pub(crate) fn get_url_data(&self, url: &str) -> anyhow::Result<Option<UrlData>> {
         let host = parse_url(url, PHP_URL_HOST);
         if empty(&host) {
             return Ok(None);
@@ -110,7 +109,12 @@ impl NoProxyPattern {
     }
 
     /// Returns true if the url is matched by a rule
-    pub(crate) fn r#match(&mut self, index: i64, host_name: &str, url: &UrlData) -> Result<bool> {
+    pub(crate) fn r#match(
+        &mut self,
+        index: i64,
+        host_name: &str,
+        url: &UrlData,
+    ) -> anyhow::Result<bool> {
         let rule = match self.get_rule(index, host_name)? {
             Some(r) => r,
             None => {
@@ -146,7 +150,7 @@ impl NoProxyPattern {
     }
 
     /// Returns true if the target ip is in the network range
-    pub(crate) fn match_range(&self, network: &IpData, target: &IpData) -> Result<bool> {
+    pub(crate) fn match_range(&self, network: &IpData, target: &IpData) -> anyhow::Result<bool> {
         let net = unpack("C*", &network.ip);
         let mask = unpack("C*", network.netmask.as_deref().unwrap_or_default());
         let ip = unpack("C*", &target.ip);
@@ -212,7 +216,7 @@ impl NoProxyPattern {
     /// Finds or creates rule data for a hostname
     ///
     /// @return null|stdClass Null if the hostname is invalid
-    fn get_rule(&mut self, index: i64, host_name: &str) -> Result<Option<UrlData>> {
+    fn get_rule(&mut self, index: i64, host_name: &str) -> anyhow::Result<Option<UrlData>> {
         if array_key_exists(&index.to_string(), &{
             let mut m: IndexMap<String, ()> = IndexMap::new();
             for k in self.rules.keys() {
@@ -248,7 +252,7 @@ impl NoProxyPattern {
         host: &str,
         ipdata: &mut Option<IpData>,
         allow_prefix: bool,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         *ipdata = None;
         let mut netmask: Option<Vec<u8>> = None;
         let mut prefix: Option<i64> = None;
@@ -345,7 +349,7 @@ impl NoProxyPattern {
         range_ip: &[u8],
         size: i64,
         prefix: i64,
-    ) -> Result<(Vec<u8>, Vec<u8>)> {
+    ) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
         let netmask = self.ip_get_mask(prefix, size);
 
         // Get the network from the address and mask
@@ -435,7 +439,7 @@ impl NoProxyPattern {
     /// Splits the hostname into host and port components
     ///
     /// @return mixed[] host, port, if there was error
-    fn split_host_port(&self, host_name: &str) -> Result<(String, i64, bool)> {
+    fn split_host_port(&self, host_name: &str) -> anyhow::Result<(String, i64, bool)> {
         // host, port, err
         let error = (String::new(), 0_i64, true);
         let mut port: i64 = 0;

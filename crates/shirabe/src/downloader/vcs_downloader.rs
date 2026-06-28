@@ -16,7 +16,6 @@ use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, explode,
@@ -89,7 +88,7 @@ pub trait VcsDownloader:
         path: &str,
         url: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Downloads specific package into specific folder.
     async fn do_install(
@@ -97,7 +96,7 @@ pub trait VcsDownloader:
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Updates specific package in specific folder from initial to target version.
     async fn do_update(
@@ -106,7 +105,7 @@ pub trait VcsDownloader:
         target: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Fetches the commit logs between two commits
     fn get_commit_logs(
@@ -114,7 +113,7 @@ pub trait VcsDownloader:
         from_reference: &str,
         to_reference: &str,
         path: &str,
-    ) -> Result<String>;
+    ) -> anyhow::Result<String>;
 
     /// Checks if VCS metadata repository has been initialized
     /// repository example: .git|.svn|.hg
@@ -129,7 +128,7 @@ pub trait VcsDownloader:
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -144,7 +143,7 @@ pub trait VcsDownloader:
         let mut urls = self.prepare_urls(package.get_source_urls());
 
         while let Some(url) = array_shift(&mut urls) {
-            let attempt: Result<Option<PhpMixed>> = self
+            let attempt: anyhow::Result<Option<PhpMixed>> = self
                 .do_download(package.clone(), path, &url, prev_package.clone())
                 .await;
             match attempt {
@@ -186,7 +185,7 @@ pub trait VcsDownloader:
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update" {
             self.clean_changes(prev_package.clone().unwrap(), path, true)
                 .await?;
@@ -207,7 +206,7 @@ pub trait VcsDownloader:
         _package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update"
             && prev_package
                 .clone()
@@ -229,7 +228,7 @@ pub trait VcsDownloader:
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -249,7 +248,7 @@ pub trait VcsDownloader:
 
         let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
-            let attempt: Result<Option<PhpMixed>> =
+            let attempt: anyhow::Result<Option<PhpMixed>> =
                 self.do_install(package.clone(), path, &url).await;
             match attempt {
                 Ok(_) => break,
@@ -289,7 +288,7 @@ pub trait VcsDownloader:
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -314,7 +313,7 @@ pub trait VcsDownloader:
 
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
-            let attempt: Result<Option<PhpMixed>> = self
+            let attempt: anyhow::Result<Option<PhpMixed>> = self
                 .do_update(initial.clone(), target.clone(), path, &url)
                 .await;
             match attempt {
@@ -390,7 +389,7 @@ pub trait VcsDownloader:
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.io().write_error3(
             &format!("  - {}", UninstallOperation::format(package, false)),
             true,
@@ -441,7 +440,7 @@ pub trait VcsDownloader:
         package: PackageInterfaceHandle,
         path: &str,
         _update: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
         if self.get_local_changes(package, path)?.is_some() {
             return Err(RuntimeException {
@@ -455,7 +454,7 @@ pub trait VcsDownloader:
     }
 
     /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)
-    fn reapply_changes(&mut self, _path: &str) -> Result<()> {
+    fn reapply_changes(&mut self, _path: &str) -> anyhow::Result<()> {
         Ok(())
     }
 

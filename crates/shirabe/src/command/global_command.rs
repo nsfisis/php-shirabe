@@ -7,7 +7,6 @@ use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::util::Filesystem;
 use crate::util::Platform;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::ArgvInput;
@@ -48,7 +47,7 @@ impl GlobalCommand {
     // Mirrors PHP's `method_exists($input, '__toString')` guard followed by
     // `$input->__toString()`. `InputInterface` does not declare `__toString`, so the
     // concrete stringable input types are matched explicitly.
-    fn input_to_string(input: &dyn InputInterface) -> Result<String> {
+    fn input_to_string(input: &dyn InputInterface) -> anyhow::Result<String> {
         let input_any = input.as_any();
         if let Some(argv_input) = input_any.downcast_ref::<ArgvInput>() {
             Ok(argv_input.to_string())
@@ -71,7 +70,7 @@ impl GlobalCommand {
         &self,
         input: Rc<RefCell<dyn InputInterface>>,
         quiet: bool,
-    ) -> Result<StringInput> {
+    ) -> anyhow::Result<StringInput> {
         if Platform::get_env("COMPOSER").is_some() {
             Platform::clear_env("COMPOSER");
         }

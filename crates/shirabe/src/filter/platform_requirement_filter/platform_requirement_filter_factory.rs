@@ -6,7 +6,6 @@ use crate::filter::platform_requirement_filter::{
     ignore_nothing_platform_requirement_filter::IgnoreNothingPlatformRequirementFilter,
     platform_requirement_filter_interface::PlatformRequirementFilterInterface,
 };
-use anyhow::Result;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 use std::rc::Rc;
 
@@ -15,7 +14,7 @@ pub struct PlatformRequirementFilterFactory;
 impl PlatformRequirementFilterFactory {
     pub fn from_bool_or_list(
         bool_or_list: PhpMixed,
-    ) -> Result<Rc<dyn PlatformRequirementFilterInterface>> {
+    ) -> anyhow::Result<Rc<dyn PlatformRequirementFilterInterface>> {
         match bool_or_list {
             PhpMixed::Bool(b) => {
                 if b {

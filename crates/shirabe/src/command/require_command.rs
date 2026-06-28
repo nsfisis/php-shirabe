@@ -29,7 +29,6 @@ use crate::repository::RepositorySet;
 use crate::util::Filesystem;
 use crate::util::PackageSorter;
 use crate::util::Silencer;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::seld::signal::SignalHandler;
@@ -163,7 +162,7 @@ impl Command for RequireCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         *self.file.borrow_mut() = Factory::get_composer_file()?;
 
         if input
@@ -748,7 +747,7 @@ impl RequireCommand {
         requirements: &IndexMap<String, String>,
         require_key: &str,
         _remove_key: &str,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         // Update packages
         self.reset_composer()?;
         let composer_handle = self.require_composer(None, None)?;
@@ -1053,7 +1052,7 @@ impl RequireCommand {
         sort_packages: bool,
         dry_run: bool,
         fixed: bool,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer);
         let locker_is_locked = composer.get_locker().borrow_mut().is_locked();

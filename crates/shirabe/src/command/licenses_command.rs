@@ -11,7 +11,6 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryUtils;
 use crate::util::PackageInfo;
 use crate::util::PackageSorter;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;

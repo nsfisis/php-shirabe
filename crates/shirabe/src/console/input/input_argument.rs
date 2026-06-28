@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Console/Input/InputArgument.php
 
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::input::InputArgument as BaseInputArgument;
 use shirabe_php_shim::PhpMixed;
 
@@ -20,7 +19,7 @@ impl InputArgument {
         description: &str,
         default: Option<PhpMixed>,
         // TODO(cli-completion): suggested_values closure / list dropped along with completion support
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let inner = BaseInputArgument::new(
             name.to_string(),
             mode,

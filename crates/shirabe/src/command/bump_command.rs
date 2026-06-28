@@ -15,7 +15,6 @@ use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
 use crate::util::Silencer;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -57,7 +56,7 @@ impl BumpCommand {
         dry_run: bool,
         packages_filter: Vec<String>,
         dev_only_flag_hint: String,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let composer_json_path = Factory::get_composer_file()?;
 
         if !Filesystem::is_readable(&composer_json_path) {
@@ -298,7 +297,7 @@ impl BumpCommand {
         &self,
         json: &JsonFile,
         updates: &indexmap::IndexMap<&str, indexmap::IndexMap<String, String>>,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         let contents = match file_get_contents(json.get_path()) {
             Some(c) => c,
             None => {

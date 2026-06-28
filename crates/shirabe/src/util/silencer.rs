@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Util/Silencer.php
 
-use anyhow::Result;
 use shirabe_php_shim::{
     E_DEPRECATED, E_NOTICE, E_USER_DEPRECATED, E_USER_NOTICE, E_USER_WARNING, E_WARNING,
     error_reporting,
@@ -36,9 +35,9 @@ impl Silencer {
         }
     }
 
-    pub fn call<F, T>(callable: F) -> Result<T>
+    pub fn call<F, T>(callable: F) -> anyhow::Result<T>
     where
-        F: FnOnce() -> Result<T>,
+        F: FnOnce() -> anyhow::Result<T>,
     {
         Self::suppress(None);
         match callable() {

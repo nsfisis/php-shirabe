@@ -7,7 +7,6 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;

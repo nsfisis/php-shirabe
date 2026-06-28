@@ -10,7 +10,6 @@ use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -112,7 +111,7 @@ impl Command for SuggestsCommand {
         &self,
         input: Rc<RefCell<dyn InputInterface>>,
         _output: Rc<RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer);
 

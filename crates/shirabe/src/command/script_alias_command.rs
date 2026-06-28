@@ -6,7 +6,6 @@ use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::util::Platform;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -25,7 +24,11 @@ pub struct ScriptAliasCommand {
 }
 
 impl ScriptAliasCommand {
-    pub fn new(script: String, description: Option<String>, aliases: Vec<String>) -> Result<Self> {
+    pub fn new(
+        script: String,
+        description: Option<String>,
+        aliases: Vec<String>,
+    ) -> anyhow::Result<Self> {
         let description = description
             .unwrap_or_else(|| format!("Runs the {} script as defined in composer.json", script));
 

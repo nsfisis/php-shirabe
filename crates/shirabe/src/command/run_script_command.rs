@@ -10,7 +10,6 @@ use crate::script::Event as ScriptEvent;
 use crate::script::ScriptEvents;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -58,7 +57,7 @@ impl RunScriptCommand {
         command
     }
 
-    fn list_scripts(&self, output: Rc<RefCell<dyn OutputInterface>>) -> Result<i64> {
+    fn list_scripts(&self, output: Rc<RefCell<dyn OutputInterface>>) -> anyhow::Result<i64> {
         let scripts = self.get_scripts()?;
         if scripts.is_empty() {
             return Ok(0);
@@ -81,7 +80,7 @@ impl RunScriptCommand {
         Ok(0)
     }
 
-    fn get_scripts(&self) -> Result<Vec<(String, String)>> {
+    fn get_scripts(&self) -> anyhow::Result<Vec<(String, String)>> {
         let composer = self.require_composer(None, None)?;
         let scripts = crate::composer::composer_full(&composer)
             .get_package()

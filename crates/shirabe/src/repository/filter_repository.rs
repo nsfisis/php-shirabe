@@ -8,7 +8,6 @@ use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, SearchResult,
 };
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
@@ -26,7 +25,7 @@ impl FilterRepository {
     pub fn new(
         repo: RepositoryInterfaceHandle,
         options: IndexMap<String, PhpMixed>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let mut only: Option<String> = None;
         let mut exclude: Option<String> = None;
         let mut canonical = true;

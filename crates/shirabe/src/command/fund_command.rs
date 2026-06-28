@@ -8,7 +8,6 @@ use crate::json::JsonFile;
 use crate::package::base_package::{self};
 use crate::repository::CompositeRepository;
 use crate::repository::RepositoryInterface;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -46,7 +45,7 @@ impl FundCommand {
     fn insert_funding_data(
         fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>,
         package: &crate::package::CompletePackageInterfaceHandle,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let pretty_name = package.get_pretty_name();
         let (vendor, package_name) = pretty_name
             .split_once('/')

@@ -17,7 +17,6 @@ use crate::package::version::VersionParser;
 use crate::plugin::PluginEvents;
 use crate::plugin::PreCommandRunEvent;
 use crate::util::Platform;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::Terminal;
 use shirabe_external_packages::symfony::console::command::command::{
@@ -139,7 +138,7 @@ pub trait BaseCommand: Command {
         &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Result<PartialComposerHandle>;
+    ) -> anyhow::Result<PartialComposerHandle>;
 
     /// Retrieves the default Composer\Composer instance or null
     fn try_composer(
@@ -151,7 +150,7 @@ pub trait BaseCommand: Command {
     fn set_composer(&self, composer: PartialComposerHandle);
 
     /// Removes the cached composer instance
-    fn reset_composer(&self) -> Result<()>;
+    fn reset_composer(&self) -> anyhow::Result<()>;
 
     fn get_io(&self) -> Rc<RefCell<dyn IOInterface>>;
 
@@ -165,7 +164,7 @@ pub trait BaseCommand: Command {
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
-    ) -> Result<PartialComposerHandle>;
+    ) -> anyhow::Result<PartialComposerHandle>;
 
     /// Returns preferSource and preferDist values based on the configuration.
     fn get_preferred_install_options(
@@ -173,17 +172,20 @@ pub trait BaseCommand: Command {
         config: &Config,
         input: Rc<RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
-    ) -> Result<(bool, bool)>;
+    ) -> anyhow::Result<(bool, bool)>;
 
     fn get_platform_requirement_filter(
         &self,
         input: Rc<RefCell<dyn InputInterface>>,
-    ) -> Result<Rc<dyn PlatformRequirementFilterInterface>>;
+    ) -> anyhow::Result<Rc<dyn PlatformRequirementFilterInterface>>;
 
     /// @param array<string> $requirements
     ///
     /// @return array<string, string>
-    fn format_requirements(&self, requirements: Vec<String>) -> Result<IndexMap<String, String>>;
+    fn format_requirements(
+        &self,
+        requirements: Vec<String>,
+    ) -> anyhow::Result<IndexMap<String, String>>;
 
     /// @param array<string> $requirements
     ///
@@ -191,7 +193,7 @@ pub trait BaseCommand: Command {
     fn normalize_requirements(
         &self,
         requirements: Vec<String>,
-    ) -> Result<Vec<IndexMap<String, String>>>;
+    ) -> anyhow::Result<Vec<IndexMap<String, String>>>;
 
     /// @param array<TableSeparator|mixed[]> $table
     fn render_table(&self, table: Vec<PhpMixed>, output: Rc<RefCell<dyn OutputInterface>>);
@@ -205,14 +207,14 @@ pub trait BaseCommand: Command {
         &self,
         input: Rc<RefCell<dyn InputInterface>>,
         opt_name: &str,
-    ) -> Result<String>;
+    ) -> anyhow::Result<String>;
 
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
         &self,
         config: &mut Config,
         input: Rc<RefCell<dyn InputInterface>>,
-    ) -> Result<AuditConfig>;
+    ) -> anyhow::Result<AuditConfig>;
 }
 
 /// Forwards every Composer-specific `BaseCommand` method that no command overrides to an
@@ -253,7 +255,7 @@ impl BaseCommand for BaseCommandData {
         &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Result<PartialComposerHandle> {
+    ) -> anyhow::Result<PartialComposerHandle> {
         if self.composer.borrow().is_none() {
             let application = self.get_application();
             let Some(application) = application else {
@@ -311,7 +313,7 @@ impl BaseCommand for BaseCommandData {
         *self.composer.borrow_mut() = Some(composer);
     }
 
-    fn reset_composer(&self) -> Result<()> {
+    fn reset_composer(&self) -> anyhow::Result<()> {
         *self.composer.borrow_mut() = None;
         if let Some(application) = self.get_application() {
             let mut app_ref = application.borrow_mut();
@@ -360,7 +362,7 @@ impl BaseCommand for BaseCommandData {
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
-    ) -> Result<PartialComposerHandle> {
+    ) -> anyhow::Result<PartialComposerHandle> {
         let disable_plugins = disable_plugins
             || input
                 .borrow()
@@ -388,7 +390,7 @@ impl BaseCommand for BaseCommandData {
         config: &Config,
         input: Rc<RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
-    ) -> Result<(bool, bool)> {
+    ) -> anyhow::Result<(bool, bool)> {
         let mut prefer_source = false;
         let mut prefer_dist = false;
 
@@ -510,7 +512,7 @@ impl BaseCommand for BaseCommandData {
     fn get_platform_requirement_filter(
         &self,
         input: Rc<RefCell<dyn InputInterface>>,
-    ) -> Result<Rc<dyn PlatformRequirementFilterInterface>> {
+    ) -> anyhow::Result<Rc<dyn PlatformRequirementFilterInterface>> {
         if !input.borrow().has_option("ignore-platform-reqs")
             || !input.borrow().has_option("ignore-platform-req")
         {
@@ -540,7 +542,10 @@ impl BaseCommand for BaseCommandData {
         Ok(PlatformRequirementFilterFactory::ignore_nothing())
     }
 
-    fn format_requirements(&self, requirements: Vec<String>) -> Result<IndexMap<String, String>> {
+    fn format_requirements(
+        &self,
+        requirements: Vec<String>,
+    ) -> anyhow::Result<IndexMap<String, String>> {
         let mut requires: IndexMap<String, String> = IndexMap::new();
         let requirements = self.normalize_requirements(requirements)?;
         for requirement in requirements {
@@ -567,7 +572,7 @@ impl BaseCommand for BaseCommandData {
     fn normalize_requirements(
         &self,
         requirements: Vec<String>,
-    ) -> Result<Vec<IndexMap<String, String>>> {
+    ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         let parser: VersionParser = VersionParser::new();
 
         parser.parse_name_version_pairs(requirements)
@@ -602,7 +607,7 @@ impl BaseCommand for BaseCommandData {
         &self,
         input: Rc<RefCell<dyn InputInterface>>,
         opt_name: &str,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         if !input.borrow().has_option(opt_name) {
             return Err(LogicException {
                 message: format!(
@@ -638,7 +643,7 @@ impl BaseCommand for BaseCommandData {
         &self,
         config: &mut Config,
         input: Rc<RefCell<dyn InputInterface>>,
-    ) -> Result<AuditConfig> {
+    ) -> anyhow::Result<AuditConfig> {
         // Handle both --audit and --no-audit flags
         let audit = if input.borrow().has_option("audit") {
             input
@@ -700,7 +705,7 @@ pub fn base_command_initialize(
     cmd: &dyn BaseCommand,
     input: Rc<RefCell<dyn InputInterface>>,
     _output: Rc<RefCell<dyn OutputInterface>>,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // initialize a plugin-enabled Composer instance, either local or global
     // PHP also ORs in $this->getApplication()->getDisablePluginsByDefault() /
     // getDisableScriptsByDefault().

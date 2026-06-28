@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Platform/Runtime.php
 
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -19,10 +18,10 @@ pub trait RuntimeInterface: std::fmt::Debug {
     /// `[class, method]` list), matching PHP `invoke($callable, $arguments)`.
     fn invoke(&self, callable: PhpMixed, arguments: Vec<PhpMixed>) -> PhpMixed;
     fn has_class(&self, class: &str) -> bool;
-    fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> Result<PhpMixed>;
+    fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> anyhow::Result<PhpMixed>;
     fn get_extensions(&self) -> Vec<String>;
     fn get_extension_version(&self, extension: &str) -> String;
-    fn get_extension_info(&self, extension: &str) -> Result<String>;
+    fn get_extension_info(&self, extension: &str) -> anyhow::Result<String>;
 }
 
 #[derive(Debug)]
@@ -54,7 +53,7 @@ impl RuntimeInterface for Runtime {
         class_exists(class)
     }
 
-    fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> Result<PhpMixed> {
+    fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> anyhow::Result<PhpMixed> {
         if arguments.is_empty() {
             Ok(instantiate_class(class, vec![]))
         } else {
@@ -71,7 +70,7 @@ impl RuntimeInterface for Runtime {
         version.unwrap_or_else(|| "0".to_string())
     }
 
-    fn get_extension_info(&self, extension: &str) -> Result<String> {
+    fn get_extension_info(&self, extension: &str) -> anyhow::Result<String> {
         // Depends on \ReflectionExtension::info() and output buffering; no shim equivalent exists.
         let _ = extension;
         todo!()

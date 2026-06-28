@@ -5,7 +5,6 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;

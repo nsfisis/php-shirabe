@@ -3,7 +3,6 @@
 use crate::advisory::AnySecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use crate::package::version::VersionParser;
-use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -14,7 +13,7 @@ use shirabe_semver::constraint::SimpleConstraint;
 fn serialize_constraint<S: serde::Serializer>(
     c: &AnyConstraint,
     serializer: S,
-) -> Result<S::Ok, S::Error> {
+) -> anyhow::Result<S::Ok, S::Error> {
     serializer.serialize_str(&c.get_pretty_string())
 }
 
@@ -32,7 +31,7 @@ impl PartialSecurityAdvisory {
         package_name: &str,
         data: &IndexMap<String, PhpMixed>,
         parser: &VersionParser,
-    ) -> Result<AnySecurityAdvisory> {
+    ) -> anyhow::Result<AnySecurityAdvisory> {
         let affected_versions_str = data["affectedVersions"].as_string().unwrap_or("");
 
         let constraint: AnyConstraint = match parser.parse_constraints(affected_versions_str) {

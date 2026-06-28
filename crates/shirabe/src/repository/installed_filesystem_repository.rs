@@ -12,7 +12,6 @@ use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
 use crate::util::Filesystem;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -30,7 +29,7 @@ impl InstalledFilesystemRepository {
         dump_versions: bool,
         root_package: Option<RootPackageInterfaceHandle>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         Ok(Self {
             inner: FilesystemRepository::new(
                 repository_file,
@@ -49,7 +48,7 @@ impl InstalledFilesystemRepository {
         dump_versions: bool,
         root_package: Option<RootPackageInterfaceHandle>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         Ok(Self {
             mock: true,
             ..Self::new(repository_file, dump_versions, root_package, filesystem)?

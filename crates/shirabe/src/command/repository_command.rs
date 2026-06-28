@@ -9,7 +9,6 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;

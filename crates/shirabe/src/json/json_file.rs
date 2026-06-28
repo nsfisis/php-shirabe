@@ -8,7 +8,6 @@ use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Silencer;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::JsonParser;
@@ -114,7 +113,7 @@ impl JsonFile {
         path: String,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         if http_downloader.is_none() && Preg::is_match(r"{^https?://}i", &path) {
             return Err(InvalidArgumentException {
                 message: "http urls require a HttpDownloader instance to be passed".to_string(),
@@ -144,8 +143,8 @@ impl JsonFile {
     /// @throws ParsingException
     /// @throws \RuntimeException
     /// @return mixed
-    pub fn read(&mut self) -> Result<PhpMixed> {
-        let json: Option<String> = match (|| -> Result<Option<String>> {
+    pub fn read(&mut self) -> anyhow::Result<PhpMixed> {
+        let json: Option<String> = match (|| -> anyhow::Result<Option<String>> {
             if let Some(http_downloader) = &self.http_downloader {
                 Ok(http_downloader
                     .borrow_mut()
@@ -213,11 +212,15 @@ impl JsonFile {
         Self::parse_json(Some(&json), Some(&self.path))
     }
 
-    pub fn write(&self, hash: PhpMixed) -> Result<()> {
+    pub fn write(&self, hash: PhpMixed) -> anyhow::Result<()> {
         self.write_with_options(hash, JsonEncodeOptions::default())
     }
 
-    pub fn write_with_options(&self, hash: PhpMixed, options: JsonEncodeOptions) -> Result<()> {
+    pub fn write_with_options(
+        &self,
+        hash: PhpMixed,
+        options: JsonEncodeOptions,
+    ) -> anyhow::Result<()> {
         if self.path == "php://memory" {
             file_put_contents(
                 &self.path,
@@ -252,7 +255,7 @@ impl JsonFile {
         let mut retries = 3;
         while retries > 0 {
             retries -= 1;
-            let attempt: Result<()> = (|| -> Result<()> {
+            let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 self.file_put_contents_if_modified(
                     &self.path,
                     &format!(
@@ -282,7 +285,11 @@ impl JsonFile {
     /// Modify file properties only if content modified
     ///
     /// @return int|false
-    fn file_put_contents_if_modified(&self, path: &str, content: &str) -> Result<Option<i64>> {
+    fn file_put_contents_if_modified(
+        &self,
+        path: &str,
+        content: &str,
+    ) -> anyhow::Result<Option<i64>> {
         // PHP: @file_get_contents($path)
         let current_content = Silencer::call(|| Ok(file_get_contents(path)))
             .ok()
@@ -303,7 +310,7 @@ impl JsonFile {
     /// @return true                    true on success
     ///
     /// @phpstan-param self::*_SCHEMA $schema
-    pub fn validate_schema(&self, schema: i64, schema_file: Option<&str>) -> Result<bool> {
+    pub fn validate_schema(&self, schema: i64, schema_file: Option<&str>) -> anyhow::Result<bool> {
         if !Filesystem::is_readable(&self.path) {
             return Err(RuntimeException {
                 message: format!("The file \"{}\" is not readable.", self.path),
@@ -335,7 +342,7 @@ impl JsonFile {
         data: &PhpMixed,
         schema: i64,
         schema_file: Option<&str>,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         let mut is_composer_schema_file = false;
         let schema_file = match schema_file {
             Some(f) => f.into(),
@@ -486,7 +493,7 @@ impl JsonFile {
     ///
     /// @throws ParsingException
     /// @return mixed
-    pub fn parse_json(json: Option<&str>, file: Option<&str>) -> Result<PhpMixed> {
+    pub fn parse_json(json: Option<&str>, file: Option<&str>) -> anyhow::Result<PhpMixed> {
         let json = match json {
             None => return Ok(PhpMixed::Null),
             Some(j) => j,
@@ -529,7 +536,7 @@ impl JsonFile {
     /// @throws \UnexpectedValueException
     /// @throws ParsingException
     /// @return bool                      true on success
-    pub(crate) fn validate_syntax(json: &str, file: Option<&str>) -> Result<bool> {
+    pub(crate) fn validate_syntax(json: &str, file: Option<&str>) -> anyhow::Result<bool> {
         let mut parser = JsonParser::new();
         let result = parser.lint(json);
         if result.is_none() {
@@ -585,7 +592,7 @@ impl jsonschema::Retrieve for FileRetriever {
     fn retrieve(
         &self,
         uri: &jsonschema::Uri<String>,
-    ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> anyhow::Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
         match uri.scheme().as_str() {
             "file" => {
                 let file = std::fs::File::open(uri.path().as_str())?;

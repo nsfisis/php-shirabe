@@ -11,7 +11,6 @@ use crate::repository::RepositoryFactory;
 use crate::repository::RootPackageRepository;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
@@ -106,7 +105,9 @@ impl HomeCommand {
         }
     }
 
-    fn initialize_repos(&self) -> Result<Vec<crate::repository::RepositoryInterfaceHandle>> {
+    fn initialize_repos(
+        &self,
+    ) -> anyhow::Result<Vec<crate::repository::RepositoryInterfaceHandle>> {
         let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {

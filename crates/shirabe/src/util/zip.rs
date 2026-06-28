@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Util/Zip.php
 
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, ZipArchive, dirname, extension_loaded, implode, stream_get_contents,
@@ -9,7 +8,7 @@ use shirabe_php_shim::{
 pub struct Zip;
 
 impl Zip {
-    pub fn get_composer_json(path_to_zip: &str) -> Result<Option<String>> {
+    pub fn get_composer_json(path_to_zip: &str) -> anyhow::Result<Option<String>> {
         if !extension_loaded("zip") {
             return Err(RuntimeException {
                 message: "The Zip Util requires PHP's zip extension".to_string(),
@@ -43,7 +42,7 @@ impl Zip {
         Ok(content)
     }
 
-    fn locate_file(zip: &ZipArchive, filename: &str) -> Result<i64> {
+    fn locate_file(zip: &ZipArchive, filename: &str) -> anyhow::Result<i64> {
         // return root composer.json if it is there and is a file
         if let Some(index) = zip.locate_name(filename)
             && zip.get_from_index(index).is_some()

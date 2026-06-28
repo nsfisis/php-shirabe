@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/IO/BufferIO.php
 
 use crate::io::ConsoleIO;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
@@ -24,7 +23,7 @@ impl BufferIO {
         input: String,
         verbosity: i64,
         formatter: Option<std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let mut input_obj = StringInput::new(&input)?;
         input_obj.set_interactive(false);
 
@@ -112,7 +111,7 @@ impl BufferIO {
         output
     }
 
-    pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> Result<()> {
+    pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> anyhow::Result<()> {
         let stream = self.create_stream(inputs)?;
 
         let mut input = self.inner.input.borrow_mut();
@@ -130,7 +129,7 @@ impl BufferIO {
         Ok(())
     }
 
-    fn create_stream(&self, inputs: Vec<String>) -> Result<PhpResource> {
+    fn create_stream(&self, inputs: Vec<String>) -> anyhow::Result<PhpResource> {
         let stream = match fopen("php://memory", "r+") {
             Ok(stream) => stream,
             Err(_) => {

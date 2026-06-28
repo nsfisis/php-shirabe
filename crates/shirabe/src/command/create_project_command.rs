@@ -32,7 +32,6 @@ use crate::script::ScriptEvents;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
@@ -302,7 +301,7 @@ impl CreateProjectCommand {
         platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         secure_http: bool,
         add_repository: bool,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let old_cwd = Platform::get_cwd(false)?;
 
         let repositories: Option<Vec<String>> = match repositories {
@@ -648,7 +647,7 @@ impl CreateProjectCommand {
         disable_scripts: bool,
         no_progress: bool,
         secure_http: bool,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         let parser: VersionParser = VersionParser::new();
         let requirements = parser.parse_name_version_pairs(vec![package_name.to_string()])?;
         let name = strtolower(

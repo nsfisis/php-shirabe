@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/InstalledVersions.php
 
 use crate::autoload::ClassLoader;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     OutOfBoundsException, PhpMixed, array_flip, array_keys, array_merge, call_user_func_array,
@@ -143,7 +142,7 @@ impl InstalledVersions {
         parser: &VersionParser,
         package_name: &str,
         constraint: Option<&str>,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         let constraint = parser.parse_constraints(constraint.unwrap_or(""))?;
         let provided = parser.parse_constraints(&Self::get_version_ranges(package_name)?)?;
 
@@ -157,7 +156,7 @@ impl InstalledVersions {
     ///
     /// @param  string $packageName
     /// @return string Version constraint usable with composer/semver
-    pub fn get_version_ranges(package_name: &str) -> Result<String> {
+    pub fn get_version_ranges(package_name: &str) -> anyhow::Result<String> {
         for installed in Self::get_installed() {
             let Some(versions) = installed.get("versions").and_then(|v| v.as_array()) else {
                 continue;
@@ -226,7 +225,7 @@ impl InstalledVersions {
 
     /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as version, use satisfies or getVersionRanges if you need to know if a given version is present
-    pub fn get_version(package_name: &str) -> Result<Option<String>> {
+    pub fn get_version(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
             let Some(versions) = installed.get("versions").and_then(|v| v.as_array()) else {
                 continue;
@@ -254,7 +253,7 @@ impl InstalledVersions {
 
     /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as version, use satisfies or getVersionRanges if you need to know if a given version is present
-    pub fn get_pretty_version(package_name: &str) -> Result<Option<String>> {
+    pub fn get_pretty_version(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
             let Some(versions) = installed.get("versions").and_then(|v| v.as_array()) else {
                 continue;
@@ -282,7 +281,7 @@ impl InstalledVersions {
 
     /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as reference
-    pub fn get_reference(package_name: &str) -> Result<Option<String>> {
+    pub fn get_reference(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
             let Some(versions) = installed.get("versions").and_then(|v| v.as_array()) else {
                 continue;
@@ -310,7 +309,7 @@ impl InstalledVersions {
 
     /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as install path. Packages of type metapackages also have a null install path.
-    pub fn get_install_path(package_name: &str) -> Result<Option<String>> {
+    pub fn get_install_path(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
             let Some(versions) = installed.get("versions").and_then(|v| v.as_array()) else {
                 continue;

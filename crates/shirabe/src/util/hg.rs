@@ -5,7 +5,6 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::rawurlencode;
 use std::sync::OnceLock;
@@ -37,7 +36,7 @@ impl Hg {
         command_callable: impl Fn(String) -> Vec<String>,
         url: String,
         cwd: Option<String>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         self.config.borrow_mut().prohibit_url_by_config(
             &url,
             Some(self.io.clone()),
@@ -126,7 +125,7 @@ impl Hg {
         self.throw_exception(&format!("Failed to clone {}, \n\n{}", url, error), &url)
     }
 
-    fn throw_exception(&self, message: &str, url: &str) -> Result<()> {
+    fn throw_exception(&self, message: &str, url: &str) -> anyhow::Result<()> {
         if Self::get_version(&self.process).is_none() {
             anyhow::bail!(
                 "{}",

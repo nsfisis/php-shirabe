@@ -24,7 +24,6 @@ use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use crate::util::Url as UrlUtil;
 use crate::util::sync_executor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
@@ -162,7 +161,7 @@ impl DownloaderInterface for FileDownloader {
         path: &str,
         _prev_package: Option<PackageInterfaceHandle>,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_dist_url().is_none() {
             return Err(InvalidArgumentException {
                 message: "The given package is missing url information".to_string(),
@@ -439,7 +438,7 @@ impl DownloaderInterface for FileDownloader {
         _package: PackageInterfaceHandle,
         _path: &str,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(Some(PhpMixed::Null))
     }
 
@@ -450,7 +449,7 @@ impl DownloaderInterface for FileDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let file_name = self.get_file_name(package.clone(), path);
         if file_exists(&file_name) {
             self.filesystem.borrow_mut().unlink(&file_name)?;
@@ -504,7 +503,7 @@ impl DownloaderInterface for FileDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
             self.io.write_error(&format!(
                 "  - {}",
@@ -561,7 +560,7 @@ impl DownloaderInterface for FileDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error(&format!(
             "  - {}{}",
             UpdateOperation::format(initial.clone(), target.clone(), false),
@@ -579,7 +578,7 @@ impl DownloaderInterface for FileDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
             self.io.write_error(&format!(
                 "  - {}",
@@ -610,7 +609,7 @@ impl ChangeReportInterface for FileDownloader {
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         let prev_io = std::mem::replace(
             &mut self.io,
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
@@ -623,7 +622,7 @@ impl ChangeReportInterface for FileDownloader {
         // PHP attaches an onRejected handler to capture the error and drives the promise via
         // httpDownloader->wait() / process->wait(); the single-threaded sync bridge block_on's the
         // download/install futures, so a rejection surfaces directly as the Err captured below.
-        let result: Result<String> = (|| -> Result<String> {
+        let result: anyhow::Result<String> = (|| -> anyhow::Result<String> {
             if is_dir(format!("{}_compare", target_dir)) {
                 self.filesystem
                     .borrow_mut()
@@ -773,12 +772,20 @@ impl FileDownloader {
     }
 
     /// For testing only: invoke the crate-private `process_url`.
-    pub fn __process_url(&self, package: PackageInterfaceHandle, url: &str) -> Result<String> {
+    pub fn __process_url(
+        &self,
+        package: PackageInterfaceHandle,
+        url: &str,
+    ) -> anyhow::Result<String> {
         self.process_url(package, url)
     }
 
     /// Process the download url
-    pub(crate) fn process_url(&self, package: PackageInterfaceHandle, url: &str) -> Result<String> {
+    pub(crate) fn process_url(
+        &self,
+        package: PackageInterfaceHandle,
+        url: &str,
+    ) -> anyhow::Result<String> {
         if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
             return Err(RuntimeException {
                 message: "You must enable the openssl extension to download files via https"

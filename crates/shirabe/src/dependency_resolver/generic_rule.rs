@@ -2,7 +2,6 @@
 
 use super::rule::ReasonData;
 use crate::dependency_resolver::{Rule, RuleBase};
-use anyhow::Result;
 use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw, unpack};
 
 #[derive(Debug)]
@@ -30,7 +29,7 @@ impl GenericRule {
         &self.literals
     }
 
-    pub fn get_hash(&self) -> Result<i64> {
+    pub fn get_hash(&self) -> anyhow::Result<i64> {
         let joined = self
             .literals
             .iter()

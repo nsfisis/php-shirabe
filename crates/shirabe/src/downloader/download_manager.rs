@@ -7,7 +7,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
@@ -97,7 +96,7 @@ impl DownloadManager {
     pub fn get_downloader(
         &self,
         r#type: &str,
-    ) -> Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
         if !self.downloaders.contains_key(&r#type) {
             return Err(InvalidArgumentException {
@@ -123,7 +122,7 @@ impl DownloadManager {
     pub fn get_downloader_for_package(
         &self,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>> {
+    ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>> {
         let installation_source = package.get_installation_source();
 
         if "metapackage" == package.get_type() {
@@ -190,7 +189,7 @@ impl DownloadManager {
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         self.filesystem
             .borrow_mut()
@@ -278,7 +277,7 @@ impl DownloadManager {
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
@@ -302,7 +301,7 @@ impl DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader.borrow_mut().install2(package, &target_dir).await;
@@ -324,7 +323,7 @@ impl DownloadManager {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         let downloader = self.get_downloader_for_package(target.clone())?;
         let initial_downloader = self.get_downloader_for_package(initial.clone())?;
@@ -404,7 +403,7 @@ impl DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader.borrow_mut().remove2(package, &target_dir).await;
@@ -426,7 +425,7 @@ impl DownloadManager {
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
@@ -472,7 +471,7 @@ impl DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<String>> {
         let source_type = package.get_source_type();
         let dist_type = package.get_dist_type();
 
@@ -538,7 +537,7 @@ impl DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<String>> {
         self.get_available_sources(package, prev_package)
     }
 
@@ -564,43 +563,43 @@ pub trait DownloadManagerInterface: std::fmt::Debug {
     fn get_downloader_for_package(
         &self,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
+    ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
     async fn download(
         &self,
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
     async fn prepare(
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
     async fn install(
         &self,
         package: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
     async fn update(
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
     async fn cleanup(
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 }
 
 #[async_trait::async_trait(?Send)]
@@ -616,7 +615,7 @@ impl DownloadManagerInterface for DownloadManager {
     fn get_downloader_for_package(
         &self,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>> {
+    ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>> {
         self.get_downloader_for_package(package)
     }
 
@@ -625,7 +624,7 @@ impl DownloadManagerInterface for DownloadManager {
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.download(package, target_dir, prev_package).await
     }
 
@@ -635,7 +634,7 @@ impl DownloadManagerInterface for DownloadManager {
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.prepare(r#type, package, target_dir, prev_package)
             .await
     }
@@ -644,7 +643,7 @@ impl DownloadManagerInterface for DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.install(package, target_dir).await
     }
 
@@ -653,7 +652,7 @@ impl DownloadManagerInterface for DownloadManager {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.update(initial, target, target_dir).await
     }
 
@@ -661,7 +660,7 @@ impl DownloadManagerInterface for DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         target_dir: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.remove(package, target_dir).await
     }
 
@@ -671,7 +670,7 @@ impl DownloadManagerInterface for DownloadManager {
         package: PackageInterfaceHandle,
         target_dir: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup(r#type, package, target_dir, prev_package)
             .await
     }

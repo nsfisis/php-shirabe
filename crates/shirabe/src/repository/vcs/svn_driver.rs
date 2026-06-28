@@ -11,7 +11,6 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::Url;
-use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -68,7 +67,7 @@ impl SvnDriver {
         }
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self) -> anyhow::Result<()> {
         let normalized = Self::normalize_url(&self.inner.url);
         self.inner.url = normalized.trim_end_matches('/').to_string();
         self.base_url = self.inner.url.clone();
@@ -164,7 +163,7 @@ impl SvnDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if !self.inner.info_cache.contains_key(identifier) {
             if self.should_cache(identifier)
                 && let Some(mut res) = self
@@ -255,7 +254,11 @@ impl SvnDriver {
         Ok(cached)
     }
 
-    pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Result<Option<String>> {
+    pub fn get_file_content(
+        &mut self,
+        file: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Option<String>> {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
         let (path, rev) = if let Some(m) =
@@ -292,7 +295,10 @@ impl SvnDriver {
         Ok(Some(output))
     }
 
-    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
+    pub fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
         let (path, rev) = if let Some(m) =
@@ -329,7 +335,7 @@ impl SvnDriver {
         Ok(None)
     }
 
-    pub fn get_tags(&mut self) -> Result<&IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<&IndexMap<String, String>> {
         if self.tags.is_none() {
             let mut tags: IndexMap<String, String> = IndexMap::new();
 
@@ -373,7 +379,7 @@ impl SvnDriver {
         Ok(self.tags.as_ref().unwrap())
     }
 
-    pub fn get_branches(&mut self) -> Result<&IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<&IndexMap<String, String>> {
         if self.branches.is_none() {
             let mut branches: IndexMap<String, String> = IndexMap::new();
 
@@ -464,7 +470,7 @@ impl SvnDriver {
         _config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         deep: bool,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         let url = Self::normalize_url(url);
         if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url) {
             return Ok(true);
@@ -527,7 +533,7 @@ impl SvnDriver {
     /// @param  non-empty-list<string> $command The svn command to run.
     /// @param  string            $url     The SVN URL.
     /// @throws \RuntimeException
-    pub(crate) fn execute(&mut self, command: Vec<String>, url: &str) -> Result<String> {
+    pub(crate) fn execute(&mut self, command: Vec<String>, url: &str) -> anyhow::Result<String> {
         if self.util.is_none() {
             self.util = Some(SvnUtil::new(
                 self.base_url.clone(),

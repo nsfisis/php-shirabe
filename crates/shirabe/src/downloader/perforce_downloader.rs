@@ -14,7 +14,6 @@ use crate::util::Filesystem;
 use crate::util::Perforce;
 use crate::util::PerforceInterface;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -111,7 +110,7 @@ impl VcsDownloader for PerforceDownloader {
         _path: &str,
         _url: &str,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
 
@@ -120,7 +119,7 @@ impl VcsDownloader for PerforceDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let source_ref = package.get_source_reference().map(|s| s.to_string());
         let label = self.get_label_from_source_reference(source_ref.clone().unwrap_or_default());
 
@@ -148,7 +147,7 @@ impl VcsDownloader for PerforceDownloader {
         target: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.do_install(target, path, url).await
     }
 
@@ -157,7 +156,7 @@ impl VcsDownloader for PerforceDownloader {
         from_reference: &str,
         to_reference: &str,
         _path: &str,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         Ok(self
             .perforce
             .as_mut()
@@ -176,7 +175,7 @@ impl ChangeReportInterface for PerforceDownloader {
         &mut self,
         _package: PackageInterfaceHandle,
         _path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         self.inner
             .io
             .write_error("Perforce driver does not check for local changes before overriding");
@@ -215,7 +214,7 @@ impl DownloaderInterface for PerforceDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::download(self, package, path, prev_package).await
     }
 
@@ -225,7 +224,7 @@ impl DownloaderInterface for PerforceDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
@@ -234,7 +233,7 @@ impl DownloaderInterface for PerforceDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
     }
 
@@ -243,7 +242,7 @@ impl DownloaderInterface for PerforceDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
@@ -252,7 +251,7 @@ impl DownloaderInterface for PerforceDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
     }
 
@@ -262,7 +261,7 @@ impl DownloaderInterface for PerforceDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

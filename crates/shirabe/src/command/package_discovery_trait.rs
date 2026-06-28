@@ -17,7 +17,6 @@ use crate::repository::RepositoryFactory;
 use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -104,7 +103,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 &input
                     .borrow()
                     .get_option("stability")
-                    .expect("get_minimum_stability returns String, not Result; stability option is guaranteed present by the has_option guard above")
+                    .expect("get_minimum_stability returns String, not anyhow::Result; stability option is guaranteed present by the has_option guard above")
                     .as_string()
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "stable".to_string()),
@@ -139,7 +138,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         preferred_stability: &str,
         use_best_version_constraint: bool,
         fixed: bool,
-    ) -> Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<String>> {
         if !requires.is_empty() {
             let requires_norm = self.normalize_requirements(requires.clone())?;
             let mut result: Vec<String> = vec![];
@@ -462,7 +461,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         platform_repo: Option<&PlatformRepositoryHandle>,
         preferred_stability: &str,
         fixed: bool,
-    ) -> Result<(String, String)> {
+    ) -> anyhow::Result<(String, String)> {
         // handle ignore-platform-reqs flag if present
         let platform_requirement_filter = if input.borrow().has_option("ignore-platform-reqs")
             && input.borrow().has_option("ignore-platform-req")
@@ -751,8 +750,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
     }
 
     /// @return array<string>
-    fn find_similar(&self, package: &str) -> Result<Vec<String>> {
-        let results: Vec<SearchResult> = match (|| -> Result<Vec<SearchResult>> {
+    fn find_similar(&self, package: &str) -> anyhow::Result<Vec<String>> {
+        let results: Vec<SearchResult> = match (|| -> anyhow::Result<Vec<SearchResult>> {
             if self.get_repos_mut().is_none() {
                 return Err(LogicException {
                     message: "findSimilar was called before $this->repos was initialized"

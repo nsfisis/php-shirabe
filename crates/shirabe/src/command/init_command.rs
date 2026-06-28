@@ -17,7 +17,6 @@ use crate::repository::RepositoryFactory;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -918,7 +917,10 @@ impl BaseCommand for InitCommand {
 
 impl InitCommand {
     /// @return array{name: string, email: string|null}
-    fn parse_author_string(&self, author: &str) -> Result<IndexMap<String, Option<String>>> {
+    fn parse_author_string(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
             r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
@@ -960,7 +962,10 @@ impl InitCommand {
     }
 
     /// @return array<int, array{name: string, email?: string}>
-    pub(crate) fn format_authors(&self, author: &str) -> Result<Vec<IndexMap<String, PhpMixed>>> {
+    pub(crate) fn format_authors(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
         let parsed = self.parse_author_string(author)?;
         let mut author_map: IndexMap<String, PhpMixed> = IndexMap::new();
         let name = parsed.get("name").cloned().unwrap_or(None);
@@ -1072,12 +1077,18 @@ impl InitCommand {
     }
 
     /// For testing only: invoke the private `parse_author_string`.
-    pub fn __parse_author_string(&self, author: &str) -> Result<IndexMap<String, Option<String>>> {
+    pub fn __parse_author_string(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
         self.parse_author_string(author)
     }
 
     /// For testing only: invoke the crate-private `format_authors`.
-    pub fn __format_authors(&self, author: &str) -> Result<Vec<IndexMap<String, PhpMixed>>> {
+    pub fn __format_authors(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
         self.format_authors(author)
     }
 

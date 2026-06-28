@@ -12,7 +12,6 @@ use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::GitHub;
 use crate::util::http::Response;
-use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -69,7 +68,7 @@ impl GitHubDriver {
         }
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self) -> anyhow::Result<()> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match3(
             r"#^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#",
@@ -177,7 +176,7 @@ impl GitHubDriver {
         )
     }
 
-    pub fn get_root_identifier(&mut self) -> Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_root_identifier();
         }
@@ -255,7 +254,7 @@ impl GitHubDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
         }
@@ -713,7 +712,11 @@ impl GitHubDriver {
         result_mixed
     }
 
-    pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Result<Option<String>> {
+    pub fn get_file_content(
+        &mut self,
+        file: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Option<String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_file_content(file, identifier);
         }
@@ -791,7 +794,10 @@ impl GitHubDriver {
         Ok(Some(content))
     }
 
-    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
+    pub fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
         }
@@ -825,7 +831,7 @@ impl GitHubDriver {
         Ok(Some(date))
     }
 
-    pub fn get_tags(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_tags();
         }
@@ -875,7 +881,7 @@ impl GitHubDriver {
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    pub fn get_branches(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_branches();
         }
@@ -979,7 +985,7 @@ impl GitHubDriver {
     /// Gives back the loaded <github-api>/repos/<owner>/<repo> result
     ///
     /// @return mixed[]|null
-    pub fn get_repo_data(&mut self) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         self.fetch_root_identifier()?;
 
         Ok(self.repo_data.clone())
@@ -1004,7 +1010,7 @@ impl GitHubDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> Result<Response, TransportException> {
+    ) -> anyhow::Result<Response, TransportException> {
         let response_result = self.inner.get_contents(url);
         match response_result {
             Ok(r) => Ok(r),
@@ -1145,7 +1151,7 @@ impl GitHubDriver {
     /// Fetch root identifier from GitHub
     ///
     /// @throws TransportException
-    pub(crate) fn fetch_root_identifier(&mut self) -> Result<()> {
+    pub(crate) fn fetch_root_identifier(&mut self) -> anyhow::Result<()> {
         if self.repo_data.is_some() {
             return Ok(());
         }
@@ -1220,7 +1226,7 @@ impl GitHubDriver {
     pub(crate) fn attempt_clone_fallback(
         &mut self,
         e: Option<&TransportException>,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         if !self.allow_git_fallback {
             return Err(RuntimeException {
                 message: format!(
@@ -1257,7 +1263,7 @@ impl GitHubDriver {
         }
     }
 
-    pub(crate) fn setup_git_driver(&mut self, url: &str) -> Result<()> {
+    pub(crate) fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
         if !self.allow_git_fallback {
             return Err(RuntimeException {
                 message: "Fallback to git driver disabled".to_string(),

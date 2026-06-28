@@ -5,7 +5,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::GitHub;
 use crate::util::Platform;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
@@ -170,7 +169,12 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline
-    pub fn execute<'o, C, O>(&mut self, command: C, output: O, cwd: Option<&str>) -> Result<i64>
+    pub fn execute<'o, C, O>(
+        &mut self,
+        command: C,
+        output: O,
+        cwd: Option<&str>,
+    ) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
         O: IntoExecOutput<'o>,
@@ -201,7 +205,7 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline in TTY mode
-    pub fn execute_tty<C>(&mut self, command: C, cwd: Option<&str>) -> Result<i64>
+    pub fn execute_tty<C>(&mut self, command: C, cwd: Option<&str>) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
     {
@@ -220,7 +224,7 @@ impl ProcessExecutor {
         env: Option<IndexMap<String, String>>,
         tty: bool,
         output: O,
-    ) -> Result<Option<i64>>
+    ) -> anyhow::Result<Option<i64>>
     where
         O: IntoExecOutput<'o>,
     {
@@ -302,7 +306,7 @@ impl ProcessExecutor {
             }),
         );
 
-        let result: Result<()> = (|| -> Result<()> {
+        let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             match output.to_callback() {
                 Ok(callback) => {
                     process.run(Some(callback), IndexMap::new())?;
@@ -324,7 +328,7 @@ impl ProcessExecutor {
             self.error_output = process.get_error_output()?;
             Ok(())
         })();
-        let final_result: Result<()> = match result {
+        let final_result: anyhow::Result<()> = match result {
             Ok(()) => Ok(()),
             Err(e) => {
                 if let Some(pse) = e.downcast_ref::<ProcessSignaledException>() {
@@ -352,7 +356,7 @@ impl ProcessExecutor {
         cwd: Option<&str>,
         tty: bool,
         output: O,
-    ) -> Result<i64>
+    ) -> anyhow::Result<i64>
     where
         O: IntoExecOutput<'o>,
     {
@@ -409,7 +413,7 @@ impl ProcessExecutor {
         command: PhpMixed,
         cwd: Option<&str>,
         output: O,
-    ) -> Result<i64>
+    ) -> anyhow::Result<i64>
     where
         O: IntoExecOutput<'o>,
     {
@@ -574,7 +578,11 @@ impl ProcessExecutor {
     }
 
     /// starts a process on the commandline in async mode
-    pub async fn execute_async<C>(&mut self, command: C, cwd: Option<&str>) -> Result<Process>
+    pub async fn execute_async<C>(
+        &mut self,
+        command: C,
+        cwd: Option<&str>,
+    ) -> anyhow::Result<Process>
     where
         C: IntoExecCommand,
     {
@@ -677,7 +685,7 @@ impl ProcessExecutor {
 
         self.output_command_run(&command, cwd.as_deref(), true);
 
-        let process_result: Result<Process> = if is_string(&command) {
+        let process_result: anyhow::Result<Process> = if is_string(&command) {
             Process::from_shell_commandline(
                 command.as_string().unwrap_or(""),
                 cwd.as_deref(),
@@ -760,11 +768,11 @@ impl ProcessExecutor {
     }
 
     /// @param  ?int $index job id
-    pub fn wait(&mut self) -> Result<()> {
+    pub fn wait(&mut self) -> anyhow::Result<()> {
         self.wait_id(None)
     }
 
-    pub fn wait_id(&mut self, index: Option<i64>) -> Result<()> {
+    pub fn wait_id(&mut self, index: Option<i64>) -> anyhow::Result<()> {
         loop {
             if 0 == self.count_active_jobs(index)? {
                 return Ok(());
@@ -780,7 +788,7 @@ impl ProcessExecutor {
     }
 
     /// @internal
-    pub fn count_active_jobs(&mut self, index: Option<i64>) -> Result<i64> {
+    pub fn count_active_jobs(&mut self, index: Option<i64>) -> anyhow::Result<i64> {
         // tick
         let ids: Vec<i64> = self.jobs.keys().copied().collect();
         for id in &ids {
@@ -1152,7 +1160,7 @@ pub trait IntoExecOutput<'a>: Sized {
     /// `Ok(callback)` for a user-supplied output handler (passed straight to `Process::run`),
     /// `Err(self)` for the capture/forward cases (a default handler is used and `self` is returned
     /// so the captured output can still be written back).
-    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self>;
+    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self>;
 
     /// Assigns the captured output back to the by-reference target, mirroring PHP's
     /// `$output = $process->getOutput()`. Only meaningful when [`capture_output`](Self::capture_output)
@@ -1167,7 +1175,7 @@ impl<'a> IntoExecOutput<'a> for () {
         true
     }
 
-    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
         Err(self)
     }
 
@@ -1181,7 +1189,7 @@ impl<'a> IntoExecOutput<'a> for ProcessForwardOutput {
         false
     }
 
-    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
         Err(self)
     }
 
@@ -1195,7 +1203,7 @@ impl<'a> IntoExecOutput<'a> for &'a mut PhpMixed {
         true
     }
 
-    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
         Err(self)
     }
 
@@ -1211,7 +1219,7 @@ impl<'a> IntoExecOutput<'a> for &'a mut String {
         true
     }
 
-    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
         Err(self)
     }
 
@@ -1228,7 +1236,7 @@ impl<'a> IntoExecOutput<'a> for Box<dyn FnMut(&str, &str) -> bool> {
         false
     }
 
-    fn to_callback(self) -> Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
         Ok(self)
     }
 

@@ -12,7 +12,6 @@ use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
@@ -146,7 +145,7 @@ impl LibraryInstaller {
     pub(crate) async fn install_code(
         &mut self,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let download_path = self.get_install_path(package.clone()).unwrap();
 
         self.get_download_manager()
@@ -161,7 +160,7 @@ impl LibraryInstaller {
         &mut self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let initial_download_path = self.get_install_path(initial.clone()).unwrap();
         let target_download_path = self.get_install_path(target.clone()).unwrap();
         if target_download_path != initial_download_path {
@@ -191,7 +190,7 @@ impl LibraryInstaller {
     pub(crate) async fn remove_code(
         &mut self,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let download_path = self.get_package_base_path(package.clone());
 
         self.get_download_manager()
@@ -271,7 +270,7 @@ impl InstallerInterface for LibraryInstaller {
         &mut self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
         let download_path = self.get_install_path(package.clone()).unwrap();
 
@@ -286,7 +285,7 @@ impl InstallerInterface for LibraryInstaller {
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
         let download_path = self.get_install_path(package.clone()).unwrap();
 
@@ -301,7 +300,7 @@ impl InstallerInterface for LibraryInstaller {
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
         let download_path = self.get_install_path(package.clone()).unwrap();
 
@@ -315,7 +314,7 @@ impl InstallerInterface for LibraryInstaller {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
         let download_path = self.get_install_path(package.clone()).unwrap();
 
@@ -344,7 +343,7 @@ impl InstallerInterface for LibraryInstaller {
         repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(initial.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
@@ -376,7 +375,7 @@ impl InstallerInterface for LibraryInstaller {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(package.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),

@@ -18,7 +18,6 @@ use crate::repository::InstalledRepositoryInterface;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
 use crate::util::sync_executor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_php_shim::{
@@ -156,7 +155,7 @@ impl InstallationManager {
     }
 
     /// Returns installer for a specific package type.
-    pub fn get_installer(&mut self, r#type: &str) -> Result<&mut dyn InstallerInterface> {
+    pub fn get_installer(&mut self, r#type: &str) -> anyhow::Result<&mut dyn InstallerInterface> {
         let r#type = strtolower(r#type);
 
         if let Some(&index) = self.cache.get(&r#type) {
@@ -184,7 +183,7 @@ impl InstallationManager {
         &mut self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         // For testing only (ref InstallationManagerMock::isPackageInstalled).
         if self.mock.is_some() {
             return Ok(repo.has_package(package));
@@ -228,7 +227,7 @@ impl InstallationManager {
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         // For testing only: the mock records each operation and mutates the repo directly,
         // skipping the download step (ref InstallationManagerMock::execute). The alias operations'
         // repo mutation is inlined (rather than calling mark_alias_*) so `self.mock` can stay
@@ -297,8 +296,9 @@ impl InstallationManager {
         let mut cleanup_promises: IndexMap<
             i64,
             Box<
-                dyn Fn()
-                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+                dyn Fn() -> Option<
+                    std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+                >,
             >,
         > = IndexMap::new();
 
@@ -318,7 +318,7 @@ impl InstallationManager {
 
         let all_operations: Vec<std::rc::Rc<dyn OperationInterface>> = operations.clone();
 
-        let result: Result<()> = (|| -> Result<()> {
+        let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
             let mut batches: Vec<IndexMap<i64, std::rc::Rc<dyn OperationInterface>>> = vec![];
@@ -405,15 +405,16 @@ impl InstallationManager {
         cleanup_promises: &mut IndexMap<
             i64,
             Box<
-                dyn Fn()
-                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+                dyn Fn() -> Option<
+                    std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+                >,
             >,
         >,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
         all_operations: Vec<std::rc::Rc<dyn OperationInterface>>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         for (index, operation) in &operations {
             let op_type = operation.get_operation_type();
 
@@ -449,8 +450,9 @@ impl InstallationManager {
             let _ = installer;
             let op_type_clone = op_type.clone();
             let cleanup: Box<
-                dyn Fn()
-                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+                dyn Fn() -> Option<
+                    std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+                >,
             > = Box::new(move || {
                 // avoid calling cleanup if the download was not even initialized for a package
                 // as without installation source configured nothing will work
@@ -458,7 +460,7 @@ impl InstallationManager {
                 let _ = &op_type_clone;
                 // TODO(phase-c-promise): build the real installer.cleanup() future once the installer
                 // can be shared into a 'static cleanup closure (Stage 2 Rc/Arc).
-                let fut: std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>> =
+                let fut: std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>> =
                     Box::pin(async { Ok(()) });
                 Some(fut)
             });
@@ -533,14 +535,15 @@ impl InstallationManager {
         cleanup_promises: &IndexMap<
             i64,
             Box<
-                dyn Fn()
-                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+                dyn Fn() -> Option<
+                    std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+                >,
             >,
         >,
         dev_mode: bool,
         run_scripts: bool,
         all_operations: &[std::rc::Rc<dyn OperationInterface>],
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let mut post_exec_callbacks: Vec<Box<dyn Fn()>> = vec![];
 
         for (index, operation) in operations {
@@ -711,7 +714,7 @@ impl InstallationManager {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &InstallOperation,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
         let package_type = package.get_type();
         let installer = self.get_installer(&package_type)?;
@@ -726,7 +729,7 @@ impl InstallationManager {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UpdateOperation,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let initial = operation.get_initial_package().clone();
         let target = operation.get_target_package().clone();
 
@@ -754,7 +757,7 @@ impl InstallationManager {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UninstallOperation,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
         let package_type = package.get_type();
         let installer = self.get_installer(&package_type)?;
@@ -810,7 +813,7 @@ impl InstallationManager {
 
         // TODO(phase-c-promise): PHP collects every http_downloader.add() promise and runs them via
         // Loop::wait; the single-threaded sync bridge block_on's each notification serially instead.
-        let result: Result<()> = (|| -> Result<()> {
+        let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             for (repo_url, packages) in &self.notifiable_packages {
                 // non-batch API, deprecated
                 if str_contains(repo_url, "%package%") {
@@ -937,13 +940,15 @@ impl InstallationManager {
         cleanup_promises: &IndexMap<
             i64,
             Box<
-                dyn Fn()
-                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+                dyn Fn() -> Option<
+                    std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+                >,
             >,
         >,
     ) {
-        let mut promises: Vec<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>> =
-            vec![];
+        let mut promises: Vec<
+            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+        > = vec![];
 
         self.loop_.borrow().abort_jobs();
 
@@ -980,7 +985,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         &mut self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<bool>;
+    ) -> anyhow::Result<bool>;
     fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
     fn execute(
         &mut self,
@@ -989,7 +994,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
-    ) -> Result<()>;
+    ) -> anyhow::Result<()>;
     fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
     fn set_output_progress(&mut self, output_progress: bool);
     fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
@@ -1016,7 +1021,7 @@ impl InstallationManagerInterface for InstallationManager {
         &mut self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         self.is_package_installed(repo, package)
     }
 
@@ -1031,7 +1036,7 @@ impl InstallationManagerInterface for InstallationManager {
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         self.execute(repo, operations, dev_mode, run_scripts, download_only)
     }
 

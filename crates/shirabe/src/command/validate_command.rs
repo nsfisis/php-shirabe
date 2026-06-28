@@ -13,7 +13,6 @@ use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::util::ConfigValidator;
 use crate::util::Filesystem;
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;

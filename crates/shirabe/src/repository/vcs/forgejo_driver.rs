@@ -14,7 +14,6 @@ use crate::util::Forgejo;
 use crate::util::ForgejoRepositoryData;
 use crate::util::ForgejoUrl;
 use crate::util::http::Response;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -49,7 +48,7 @@ impl ForgejoDriver {
         }
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self) -> anyhow::Result<()> {
         let forgejo_url = ForgejoUrl::create(&self.inner.url)?;
         self.inner.origin_url = forgejo_url.origin_url.clone();
 
@@ -90,7 +89,11 @@ impl ForgejoDriver {
         Ok(())
     }
 
-    pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Result<Option<String>> {
+    pub fn get_file_content(
+        &mut self,
+        file: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Option<String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_file_content(file, identifier);
         }
@@ -177,7 +180,7 @@ impl ForgejoDriver {
     pub fn get_change_date(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
         }
@@ -214,7 +217,7 @@ impl ForgejoDriver {
         Ok(Some(date))
     }
 
-    pub fn get_root_identifier(&mut self) -> Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_root_identifier();
         }
@@ -227,7 +230,7 @@ impl ForgejoDriver {
             .clone())
     }
 
-    pub fn get_branches(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_branches();
         }
@@ -270,7 +273,7 @@ impl ForgejoDriver {
         Ok(self.branches.clone().unwrap_or_default())
     }
 
-    pub fn get_tags(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_tags();
         }
@@ -330,7 +333,7 @@ impl ForgejoDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
         }
@@ -526,7 +529,7 @@ impl ForgejoDriver {
         Ok(true)
     }
 
-    fn setup_git_driver(&mut self, url: &str) -> Result<()> {
+    fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
         let mut git_driver = GitDriver {
             inner: VcsDriverBase::new(
                 {
@@ -549,7 +552,7 @@ impl ForgejoDriver {
         Ok(())
     }
 
-    fn fetch_repository_data(&mut self) -> Result<()> {
+    fn fetch_repository_data(&mut self) -> anyhow::Result<()> {
         if self.repository_data.is_some() {
             return Ok(());
         }

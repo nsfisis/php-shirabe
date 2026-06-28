@@ -12,7 +12,6 @@ use crate::package::version::VersionParser;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, array_keys, array_shift, implode,
@@ -97,7 +96,7 @@ impl Rule {
         }
     }
 
-    pub fn get_hash(&self) -> Result<PhpMixed> {
+    pub fn get_hash(&self) -> anyhow::Result<PhpMixed> {
         match self {
             Rule::Generic(r) => Ok(PhpMixed::Int(r.get_hash()?)),
             Rule::MultiConflict(r) => Ok(PhpMixed::Int(r.get_hash()?)),
@@ -170,7 +169,7 @@ impl Rule {
         (self.bitfield() & (255 << BITFIELD_TYPE)) >> BITFIELD_TYPE
     }
 
-    pub fn disable(&mut self) -> Result<()> {
+    pub fn disable(&mut self) -> anyhow::Result<()> {
         if let Rule::MultiConflict(_) = self {
             return Err(RuntimeException {
                 message: "Disabling multi conflict rules is not possible. Please contact composer at https://github.com/composer/composer to let us debug what lead to this situation.".to_string(),
@@ -278,7 +277,7 @@ impl Rule {
     }
 
     /// @internal
-    pub fn get_source_package(&self, pool: &Pool) -> Result<BasePackageHandle> {
+    pub fn get_source_package(&self, pool: &Pool) -> anyhow::Result<BasePackageHandle> {
         let literals = self.get_literals();
 
         match self.get_reason() {

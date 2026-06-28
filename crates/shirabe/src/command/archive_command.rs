@@ -22,7 +22,6 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -260,7 +259,7 @@ impl ArchiveCommand {
         file_name: Option<String>,
         ignore_filters: bool,
         composer: Option<&PartialComposerHandle>,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let archive_stub_return = self.test_hooks.borrow().archive_stub_return;
         if let Some(return_value) = archive_stub_return {
             self.test_hooks
@@ -352,7 +351,7 @@ impl ArchiveCommand {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         package_name: &str,
         version: Option<&str>,
-    ) -> Result<Option<crate::package::CompletePackageInterfaceHandle>> {
+    ) -> anyhow::Result<Option<crate::package::CompletePackageInterfaceHandle>> {
         io.write_error("<info>Searching for the specified package.</info>");
 
         let mut version = version.map(|v| v.to_string());

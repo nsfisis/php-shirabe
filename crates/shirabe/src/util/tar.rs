@@ -1,13 +1,12 @@
 //! ref: composer/src/Composer/Util/Tar.php
 
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PharData, RuntimeException};
 
 pub struct Tar;
 
 impl Tar {
-    pub fn get_composer_json(path_to_archive: &str) -> Result<Option<String>> {
+    pub fn get_composer_json(path_to_archive: &str) -> anyhow::Result<Option<String>> {
         let phar = PharData::new(path_to_archive.to_string());
 
         if !phar.valid() {
@@ -17,7 +16,7 @@ impl Tar {
         Ok(Some(Self::extract_composer_json_from_folder(&phar)?))
     }
 
-    fn extract_composer_json_from_folder(phar: &PharData) -> Result<String> {
+    fn extract_composer_json_from_folder(phar: &PharData) -> anyhow::Result<String> {
         if let Some(file) = phar.get("composer.json") {
             return Ok(file.get_content());
         }

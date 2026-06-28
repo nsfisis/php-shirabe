@@ -10,7 +10,6 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::repository::RepositorySet;
 use crate::util::PackageInfo;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
@@ -37,7 +36,10 @@ struct AuditJsonReport<'a> {
 
 /// PHP `json_encode` emits an empty associative array as `[]`, not `{}`. Mirror that so an empty
 /// map serializes as an empty JSON array.
-fn serialize_php_array<S, V>(map: &IndexMap<String, V>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_php_array<S, V>(
+    map: &IndexMap<String, V>,
+    serializer: S,
+) -> anyhow::Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
     V: serde::Serialize,
@@ -54,7 +56,7 @@ where
 fn serialize_advisories_field<S>(
     map: &&IndexMap<String, Vec<AnySecurityAdvisory>>,
     serializer: S,
-) -> Result<S::Ok, S::Error>
+) -> anyhow::Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -64,7 +66,7 @@ where
 fn serialize_abandoned_field<S>(
     map: &IndexMap<String, Option<String>>,
     serializer: S,
-) -> Result<S::Ok, S::Error>
+) -> anyhow::Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -120,7 +122,7 @@ impl Auditor {
         ignored_severities: IndexMap<String, Option<String>>,
         ignore_unreachable: bool,
         ignore_abandoned: IndexMap<String, Option<String>>,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let result = repo_set.get_matching_security_advisories(
             packages.clone(),
             format == Self::FORMAT_SUMMARY,
@@ -426,7 +428,7 @@ impl Auditor {
         io: &mut dyn IOInterface,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
         format: &str,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         match format {
             Self::FORMAT_TABLE => {
                 let io_as_console = io.as_any().downcast_ref::<ConsoleIO>();
@@ -463,7 +465,7 @@ impl Auditor {
         &self,
         io: &ConsoleIO,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
                 let mut headers: Vec<String> = vec![
@@ -524,7 +526,7 @@ impl Auditor {
         &self,
         io: &mut dyn IOInterface,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let mut error: Vec<String> = vec![];
         let mut first_advisory = true;
         for package_advisories in advisories.values() {
@@ -572,7 +574,7 @@ impl Auditor {
         io: &mut dyn IOInterface,
         packages: &[CompletePackageInterfaceHandle],
         format: &str,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         io.write_error(&format!(
             "<error>Found {} abandoned package{}:</error>",
             packages.len() as i64,

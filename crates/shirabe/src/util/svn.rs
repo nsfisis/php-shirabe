@@ -6,7 +6,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -92,7 +91,7 @@ impl Svn {
         cwd: Option<&str>,
         path: Option<&str>,
         verbose: bool,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         // Ensure we are allowed to use this URL by config
         self.config.borrow_mut().prohibit_url_by_config(
             url,
@@ -119,7 +118,7 @@ impl Svn {
         path: &str,
         cwd: Option<&str>,
         verbose: bool,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         // A local command has no remote url
         self.execute_with_auth_retry(command, cwd, "", Some(path), verbose)
             .map(|o| o.unwrap_or_default())
@@ -133,7 +132,7 @@ impl Svn {
         url: &str,
         path: Option<&str>,
         verbose: bool,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         // Regenerate the command at each try, to use the newly user-provided credentials
         let command = self.get_command(svn_command.clone(), url, path);
 
@@ -212,7 +211,7 @@ impl Svn {
     /// Repositories requests credentials, let's put them in.
     ///
     /// @throws \RuntimeException
-    pub(crate) fn do_auth_dance(&mut self) -> Result<&mut Self> {
+    pub(crate) fn do_auth_dance(&mut self) -> anyhow::Result<&mut Self> {
         // cannot ask for credentials in non interactive mode
         if !self.io.is_interactive() {
             return Err(RuntimeException {
@@ -314,7 +313,7 @@ impl Svn {
     /// Get the password for the svn command. Can be empty.
     ///
     /// @throws \LogicException
-    pub(crate) fn get_password(&self) -> Result<String> {
+    pub(crate) fn get_password(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
             return Err(LogicException {
                 message: "No svn auth detected.".to_string(),
@@ -329,7 +328,7 @@ impl Svn {
     /// Get the username for the svn command.
     ///
     /// @throws \LogicException
-    pub(crate) fn get_username(&self) -> Result<String> {
+    pub(crate) fn get_username(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
             return Err(LogicException {
                 message: "No svn auth detected.".to_string(),

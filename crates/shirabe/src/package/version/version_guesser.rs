@@ -11,7 +11,6 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -28,9 +27,9 @@ pub trait VersionGuesserInterface: std::fmt::Debug {
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
-    ) -> Result<Option<VersionData>>;
+    ) -> anyhow::Result<Option<VersionData>>;
 
-    fn get_root_version_from_env(&self) -> Result<String>;
+    fn get_root_version_from_env(&self) -> anyhow::Result<String>;
 }
 
 /// Try to guess the current version number based on different VCS configuration.
@@ -103,7 +102,7 @@ impl VersionGuesser {
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
-    ) -> Result<Option<VersionData>> {
+    ) -> anyhow::Result<Option<VersionData>> {
         // For testing only (ref VersionGuesserMock::guessVersion returns null).
         if self.mock {
             return Ok(None);
@@ -207,7 +206,7 @@ impl VersionGuesser {
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
-    ) -> Result<VersionData> {
+    ) -> anyhow::Result<VersionData> {
         GitUtil::clean_env(&self.process);
         let mut commit: Option<String> = None;
         let mut version: Option<String> = None;
@@ -365,7 +364,7 @@ impl VersionGuesser {
     }
 
     /// @return array{version: string, pretty_version: string}|null
-    fn version_from_git_tags(&mut self, path: &str) -> Result<Option<(String, String)>> {
+    fn version_from_git_tags(&mut self, path: &str) -> anyhow::Result<Option<(String, String)>> {
         // try to fetch current version from git tags
         let mut output = String::new();
         if 0 == self.process.borrow_mut().execute_args(
@@ -394,7 +393,7 @@ impl VersionGuesser {
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
-    ) -> Result<Option<VersionData>> {
+    ) -> anyhow::Result<Option<VersionData>> {
         // try to fetch current version from hg branch
         let mut output = String::new();
         if 0 == self.process.borrow_mut().execute_args(
@@ -492,7 +491,7 @@ impl VersionGuesser {
         mut branches: Vec<String>,
         scm_cmdline: Vec<String>,
         path: &str,
-    ) -> Result<FeatureVersionResult> {
+    ) -> anyhow::Result<FeatureVersionResult> {
         let mut pretty_version: Option<String> = version.clone();
         let mut version = version;
 
@@ -546,7 +545,7 @@ impl VersionGuesser {
             // PHP runs every candidate diff in parallel and cancels the siblings once a zero-length
             // diff is found; the single-threaded sync bridge block_on's each diff serially and stops
             // at the first zero-length match.
-            let result: Result<()> = (|| -> Result<()> {
+            let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let mut last_index: i64 = -1;
                 for (index, candidate) in branches.iter().enumerate() {
                     let index = index as i64;
@@ -635,7 +634,7 @@ impl VersionGuesser {
     }
 
     /// @return array{version: string|null, commit: '', pretty_version: string|null}
-    fn guess_fossil_version(&mut self, path: &str) -> Result<VersionData> {
+    fn guess_fossil_version(&mut self, path: &str) -> anyhow::Result<VersionData> {
         let mut version: Option<String> = None;
         let mut pretty_version: Option<String> = None;
 
@@ -687,7 +686,7 @@ impl VersionGuesser {
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
-    ) -> Result<Option<VersionData>> {
+    ) -> anyhow::Result<Option<VersionData>> {
         SvnUtil::clean_env();
 
         // try to fetch current version from svn
@@ -760,7 +759,7 @@ impl VersionGuesser {
         Ok(None)
     }
 
-    pub fn get_root_version_from_env(&self) -> Result<String> {
+    pub fn get_root_version_from_env(&self) -> anyhow::Result<String> {
         let version = Platform::get_env("COMPOSER_ROOT_VERSION");
         let version = match version {
             Some(v) if !v.is_empty() => v,
@@ -789,11 +788,11 @@ impl VersionGuesserInterface for VersionGuesser {
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
         path: &str,
-    ) -> Result<Option<VersionData>> {
+    ) -> anyhow::Result<Option<VersionData>> {
         VersionGuesser::guess_version(self, package_config, path)
     }
 
-    fn get_root_version_from_env(&self) -> Result<String> {
+    fn get_root_version_from_env(&self) -> anyhow::Result<String> {
         VersionGuesser::get_root_version_from_env(self)
     }
 }

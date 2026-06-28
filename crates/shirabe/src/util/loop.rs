@@ -2,7 +2,6 @@
 
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::helper::ProgressBar;
 
 #[derive(Debug)]
@@ -40,9 +39,11 @@ impl Loop {
 
     pub async fn wait<'p>(
         &mut self,
-        promises: Vec<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + 'p>>>,
+        promises: Vec<
+            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + 'p>>,
+        >,
         _progress: Option<&mut ProgressBar>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let mut uncaught: Option<anyhow::Error> = None;
 
         // TODO(phase-c-promise): the asynchronous worker classes (HttpDownloader / ProcessExecutor)

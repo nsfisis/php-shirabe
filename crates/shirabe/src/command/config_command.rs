@@ -16,7 +16,6 @@ use crate::package::base_package::{self};
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;

@@ -8,7 +8,6 @@ use crate::io::io_interface;
 use crate::util::Bitbucket;
 use crate::util::GitHub;
 use crate::util::GitLab;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
@@ -54,7 +53,7 @@ impl AuthHelper {
     }
 
     /// @param 'prompt'|bool $storeAuth
-    pub fn store_auth(&self, origin: &str, store_auth: StoreAuth) -> Result<()> {
+    pub fn store_auth(&self, origin: &str, store_auth: StoreAuth) -> anyhow::Result<()> {
         let mut store: Option<()> = None;
         let mut config = self.config.borrow_mut();
         let config_source = config.get_auth_config_source_mut();
@@ -123,7 +122,7 @@ impl AuthHelper {
         headers: Vec<String>,
         retry_count: i64,
         response_body: Option<&str>,
-    ) -> Result<PromptAuthResult> {
+    ) -> anyhow::Result<PromptAuthResult> {
         let mut store_auth: StoreAuth = StoreAuth::Bool(false);
 
         let github_domains = self.config.borrow_mut().get("github-domains");
@@ -450,7 +449,7 @@ impl AuthHelper {
         mut options: IndexMap<String, PhpMixed>,
         origin: &str,
         url: &str,
-    ) -> Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         if !options.contains_key("http") {
             options.insert("http".to_string(), PhpMixed::Array(IndexMap::new()));
         }

@@ -13,7 +13,6 @@ use crate::util::HttpDownloader;
 use crate::util::IniHelper;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, class_exists, implode,
@@ -72,7 +71,7 @@ impl ArchiveDownloader for RarDownloader {
         _package: PackageInterfaceHandle,
         file: &str,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let mut process_error: Option<String> = None;
 
         if !Platform::is_windows() {
@@ -167,7 +166,7 @@ impl ChangeReportInterface for RarDownloader {
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         self.inner.get_local_changes(package, path)
     }
 }
@@ -190,7 +189,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
             .download(package, path, prev_package, output)
             .await
@@ -202,7 +201,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
@@ -211,7 +210,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
     }
 
@@ -220,7 +219,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
     }
 
@@ -229,7 +228,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
     }
 
@@ -239,7 +238,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

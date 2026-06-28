@@ -5,7 +5,6 @@ use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_semver::Intervals;
@@ -19,7 +18,7 @@ impl VersionBumper {
         &self,
         constraint: &AnyConstraint,
         package: PackageInterfaceHandle,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         let parser = VersionParser::new();
         let pretty_constraint = constraint.get_pretty_string();
         if pretty_constraint.starts_with("dev-") {

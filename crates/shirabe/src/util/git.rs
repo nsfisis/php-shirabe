@@ -13,7 +13,6 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use crate::util::{AuthHelper, StoreAuth};
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -56,7 +55,7 @@ impl Git {
         output: &str,
         path: &str,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         if str_contains(output, "fatal: detected dubious ownership") {
             let msg = format!(
                 "The repository at \"{}\" does not have the correct ownership and git refuses to use it:{}{}{}",
@@ -106,7 +105,7 @@ impl Git {
         cwd: Option<&str>,
         initial_clone: bool,
         command_output: Option<&mut PhpMixed>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let mut callables: Vec<Box<dyn Fn(&str) -> Vec<String>>> = vec![];
         for cmd in commands {
             let cmd_clone = cmd.clone();
@@ -138,7 +137,7 @@ impl Git {
         cwd: Option<&str>,
         initial_clone: bool,
         command_output: Option<&mut PhpMixed>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         self.run_command(command_callable, url, cwd, initial_clone, command_output)
     }
 
@@ -152,7 +151,7 @@ impl Git {
         cwd: Option<&str>,
         initial_clone: bool,
         mut command_output: Option<&mut PhpMixed>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let command_callables = command_callable;
         let mut last_command: PhpMixed = PhpMixed::String(String::new());
 
@@ -786,7 +785,7 @@ impl Git {
         Ok(())
     }
 
-    pub fn sync_mirror(&mut self, url: &str, dir: &str) -> Result<bool> {
+    pub fn sync_mirror(&mut self, url: &str, dir: &str) -> anyhow::Result<bool> {
         let composer_disable_network = Platform::get_env("COMPOSER_DISABLE_NETWORK");
         if composer_disable_network
             .as_ref()
@@ -821,7 +820,7 @@ impl Git {
             && trim(&output, None) == "."
         {
             // PHP try/finally
-            let try_result: Result<()> = (|| -> Result<()> {
+            let try_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let commands = vec![
                     vec![
                         "git".to_string(),
@@ -917,7 +916,7 @@ impl Git {
         dir: &str,
         r#ref: &str,
         pretty_version: Option<&str>,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
             if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref)
                 && let Some(pretty_version) = pretty_version
@@ -1048,7 +1047,7 @@ impl Git {
         Preg::replace(r"{^commit [a-f0-9]{40}\n?}m", "", output)
     }
 
-    fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> Result<bool> {
+    fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> anyhow::Result<bool> {
         let mut output = String::new();
         if is_dir(dir)
             && self.process.borrow_mut().execute_args(
@@ -1121,7 +1120,7 @@ impl Git {
             return None;
         }
 
-        let result: Result<Option<String>> = (|| -> Result<Option<String>> {
+        let result: anyhow::Result<Option<String>> = (|| -> anyhow::Result<Option<String>> {
             let mut output_mixed = PhpMixed::Null;
             if is_local_path_repository {
                 let mut output = String::new();
@@ -1262,7 +1261,7 @@ impl Git {
     /// @param non-empty-string $message
     ///
     /// @return never
-    fn throw_exception(&mut self, message: &str, url: &str) -> Result<()> {
+    fn throw_exception(&mut self, message: &str, url: &str) -> anyhow::Result<()> {
         // git might delete a directory when it fails and php will not know
         clearstatcache();
 

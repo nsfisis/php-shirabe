@@ -18,7 +18,6 @@ use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo,
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
@@ -55,7 +54,7 @@ impl FilesystemRepository {
         dump_versions: bool,
         root_package: Option<RootPackageInterfaceHandle>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         if dump_versions && root_package.is_none() {
@@ -88,7 +87,7 @@ impl FilesystemRepository {
         self.inner.get_repo_name()
     }
 
-    fn ensure_initialized(&mut self) -> Result<()> {
+    fn ensure_initialized(&mut self) -> anyhow::Result<()> {
         if !self.inner.is_initialized() {
             self.initialize()?;
         }
@@ -96,14 +95,14 @@ impl FilesystemRepository {
     }
 
     /// Initializes repository (reads file, or remote address).
-    pub(crate) fn initialize(&mut self) -> Result<()> {
+    pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
 
         if !self.file.exists() {
             return Ok(());
         }
 
-        let packages: PhpMixed = match (|| -> Result<PhpMixed> {
+        let packages: PhpMixed = match (|| -> anyhow::Result<PhpMixed> {
             let data = self.file.read()?;
             let packages_value = if let PhpMixed::Array(ref m) = data {
                 if m.contains_key("packages") {
@@ -177,20 +176,20 @@ impl FilesystemRepository {
         Ok(())
     }
 
-    pub fn reload(&mut self) -> Result<()> {
+    pub fn reload(&mut self) -> anyhow::Result<()> {
         self.inner.reset_packages();
         self.initialize()
     }
 
-    pub fn add_package(&mut self, package: PackageInterfaceHandle) -> Result<()> {
+    pub fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         self.inner.add_package(package)
     }
 
-    pub fn remove_package(&mut self, package: PackageInterfaceHandle) -> Result<()> {
+    pub fn remove_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         self.inner.remove_package(package)
     }
 
-    pub fn get_canonical_packages(&mut self) -> Result<Vec<PackageInterfaceHandle>> {
+    pub fn get_canonical_packages(&mut self) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
         self.ensure_initialized()?;
         Ok(self.inner.get_canonical_packages())
     }
@@ -208,7 +207,7 @@ impl FilesystemRepository {
         &mut self,
         dev_mode: bool,
         installation_manager: &mut dyn InstallationManagerInterface,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert("packages".to_string(), PhpMixed::List(vec![]));
         data.insert("dev".to_string(), PhpMixed::Bool(dev_mode));
@@ -455,7 +454,7 @@ impl FilesystemRepository {
         install_paths: &IndexMap<String, Option<String>>,
         dev_mode: bool,
         repo_dir: &str,
-    ) -> Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         let dev_packages = array_flip(&PhpMixed::List(
             self.inner
                 .dev_package_names
@@ -757,7 +756,7 @@ impl FilesystemRepository {
 }
 
 impl RepositoryInterface for FilesystemRepository {
-    fn count(&self) -> Result<usize> {
+    fn count(&self) -> anyhow::Result<usize> {
         self.inner.count()
     }
 
@@ -769,7 +768,7 @@ impl RepositoryInterface for FilesystemRepository {
         &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Result<Option<BasePackageHandle>> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
         self.inner.find_package(name, constraint)
     }
@@ -778,12 +777,12 @@ impl RepositoryInterface for FilesystemRepository {
         &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Result<Vec<BasePackageHandle>> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&mut self) -> Result<Vec<BasePackageHandle>> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
         self.inner.get_packages()
     }
@@ -794,7 +793,7 @@ impl RepositoryInterface for FilesystemRepository {
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> Result<LoadPackagesResult> {
+    ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
             package_name_map,
@@ -809,12 +808,15 @@ impl RepositoryInterface for FilesystemRepository {
         query: String,
         mode: i64,
         r#type: Option<String>,
-    ) -> Result<Vec<SearchResult>> {
+    ) -> anyhow::Result<Vec<SearchResult>> {
         self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
     }
 
-    fn get_providers(&mut self, package_name: String) -> Result<IndexMap<String, ProviderInfo>> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }

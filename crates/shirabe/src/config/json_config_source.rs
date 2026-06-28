@@ -6,7 +6,6 @@ use crate::json::JsonManipulator;
 use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::Silencer;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents, file_put_contents,
@@ -27,9 +26,9 @@ impl JsonConfigSource {
 
     fn manipulate_json(
         &mut self,
-        clean: impl FnOnce(&mut JsonManipulator) -> Result<bool>,
-        fallback: impl FnOnce(&mut PhpMixed) -> Result<()>,
-    ) -> Result<()> {
+        clean: impl FnOnce(&mut JsonManipulator) -> anyhow::Result<bool>,
+        fallback: impl FnOnce(&mut PhpMixed) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
         let contents;
         if self.file.borrow().exists() {
             if !is_writable(self.file.borrow().get_path()) {
@@ -295,7 +294,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         self.file.borrow().get_path().to_string()
     }
 
-    fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> Result<()> {
+    fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()> {
         let config_cloned = config.clone();
         self.manipulate_json(
             move |m| m.add_repository(name, config_cloned, append),
@@ -368,7 +367,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         config: PhpMixed,
         reference_name: &str,
         offset: i64,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let config_cloned = config.clone();
         self.manipulate_json(
             move |m| m.insert_repository(name, config_cloned, reference_name, offset),
@@ -435,7 +434,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn set_repository_url(&mut self, name: &str, url: &str) -> Result<()> {
+    fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.set_repository_url(name, url),
             move |cfg| {
@@ -476,7 +475,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_repository(&mut self, name: &str) -> Result<()> {
+    fn remove_repository(&mut self, name: &str) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_repository(name),
             move |cfg| {
@@ -507,7 +506,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> Result<()> {
+    fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
         let auth_config = self.auth_config;
         let value_cloned = value.clone();
         self.manipulate_json(
@@ -546,7 +545,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_config_setting(&mut self, name: &str) -> Result<()> {
+    fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()> {
         let auth_config = self.auth_config;
         self.manipulate_json(
             // override manipulator method for auth config files
@@ -582,7 +581,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn add_property(&mut self, name: &str, value: PhpMixed) -> Result<()> {
+    fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
         let value_cloned = value.clone();
         self.manipulate_json(
             move |m| m.add_property(name, value_cloned),
@@ -625,7 +624,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_property(&mut self, name: &str) -> Result<()> {
+    fn remove_property(&mut self, name: &str) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_property(name),
             move |cfg| {
@@ -662,7 +661,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> Result<()> {
+    fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.add_link(r#type, name, value, false),
             move |cfg| {
@@ -675,7 +674,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_link(&mut self, r#type: &str, name: &str) -> Result<()> {
+    fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_sub_node(r#type, name),
             move |cfg| {

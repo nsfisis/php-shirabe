@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/MultiConflictRule.php
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
-use anyhow::Result;
 use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw};
 
 #[derive(Debug)]
@@ -11,7 +10,11 @@ pub struct MultiConflictRule {
 }
 
 impl MultiConflictRule {
-    pub fn new(mut literals: Vec<i64>, reason: i64, reason_data: ReasonData) -> Result<Self> {
+    pub fn new(
+        mut literals: Vec<i64>,
+        reason: i64,
+        reason_data: ReasonData,
+    ) -> anyhow::Result<Self> {
         if literals.len() < 3 {
             return Err(RuntimeException {
                 message: "multi conflict rule requires at least 3 literals".to_string(),
@@ -41,7 +44,7 @@ impl MultiConflictRule {
         &self.literals
     }
 
-    pub fn get_hash(&self) -> Result<i64> {
+    pub fn get_hash(&self) -> anyhow::Result<i64> {
         let joined = self
             .literals
             .iter()

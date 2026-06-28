@@ -23,7 +23,6 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::ParsingException;
@@ -84,7 +83,7 @@ impl Locker {
     }
 
     /// Returns the md5 hash of the sorted content of the composer file.
-    pub fn get_content_hash(composer_file_contents: &str) -> Result<String> {
+    pub fn get_content_hash(composer_file_contents: &str) -> anyhow::Result<String> {
         let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
         let content_map: IndexMap<String, PhpMixed> = match &content {
             PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -151,7 +150,7 @@ impl Locker {
     }
 
     /// Checks whether the lock file is still up to date with the current hash
-    pub fn is_fresh(&mut self) -> Result<bool> {
+    pub fn is_fresh(&mut self) -> anyhow::Result<bool> {
         let lock = self.lock_file.read()?;
         let lock_map: IndexMap<String, PhpMixed> = match lock {
             PhpMixed::Array(m) => m.into_iter().collect(),
@@ -182,7 +181,7 @@ impl Locker {
     pub fn get_locked_repository(
         &mut self,
         with_dev_reqs: bool,
-    ) -> Result<LockArrayRepositoryHandle> {
+    ) -> anyhow::Result<LockArrayRepositoryHandle> {
         let lock_data = self.get_lock_data()?;
         let packages: LockArrayRepositoryHandle =
             LockArrayRepositoryHandle::new(LockArrayRepository::new(vec![])?);
@@ -281,7 +280,7 @@ impl Locker {
     }
 
     /// @return string[] Names of dependencies installed through require-dev
-    pub fn get_dev_package_names(&mut self) -> Result<Vec<String>> {
+    pub fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>> {
         let mut names: Vec<String> = vec![];
         let lock_data = self.get_lock_data()?;
         if let Some(PhpMixed::List(list)) = lock_data.get("packages-dev") {
@@ -298,7 +297,7 @@ impl Locker {
     }
 
     /// Returns the platform requirements stored in the lock file
-    pub fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> Result<Vec<Link>> {
+    pub fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> anyhow::Result<Vec<Link>> {
         let lock_data = self.get_lock_data()?;
         let mut requirements: IndexMap<String, Link> = IndexMap::new();
 
@@ -341,7 +340,7 @@ impl Locker {
     }
 
     /// @return key-of<BasePackage::STABILITIES>
-    pub fn get_minimum_stability(&mut self) -> Result<String> {
+    pub fn get_minimum_stability(&mut self) -> anyhow::Result<String> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -352,7 +351,7 @@ impl Locker {
     }
 
     /// @return array<string, string>
-    pub fn get_stability_flags(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -368,7 +367,7 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    pub fn get_prefer_stable(&mut self) -> Result<Option<bool>> {
+    pub fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>> {
         let lock_data = self.get_lock_data()?;
 
         // return null if not set to allow caller logic to choose the
@@ -376,14 +375,14 @@ impl Locker {
         Ok(lock_data.get("prefer-stable").and_then(|v| v.as_bool()))
     }
 
-    pub fn get_prefer_lowest(&mut self) -> Result<Option<bool>> {
+    pub fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data.get("prefer-lowest").and_then(|v| v.as_bool()))
     }
 
     /// @return array<string, string>
-    pub fn get_platform_overrides(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -400,7 +399,7 @@ impl Locker {
     }
 
     /// @return string[][]
-    pub fn get_aliases(&mut self) -> Result<Vec<IndexMap<String, String>>> {
+    pub fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -425,7 +424,7 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    pub fn get_plugin_api(&mut self) -> Result<String> {
+    pub fn get_plugin_api(&mut self) -> anyhow::Result<String> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -436,7 +435,7 @@ impl Locker {
     }
 
     /// @return array<string, mixed>
-    pub fn get_lock_data(&mut self) -> Result<IndexMap<String, PhpMixed>> {
+    pub fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         if let Some(cache) = self.lock_data_cache.borrow().clone() {
             return Ok(cache);
         }
@@ -473,7 +472,7 @@ impl Locker {
         prefer_lowest: bool,
         platform_overrides: IndexMap<String, PhpMixed>,
         write: bool,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         // keep old default branch names normalized to DEFAULT_BRANCH_ALIAS for BC as that is how Composer 1 outputs the lock file
         // when loading the lock file the version is anyway ignored in Composer 2, so it has no adverse effect
         let aliases: Vec<IndexMap<String, PhpMixed>> = array_map(
@@ -635,7 +634,7 @@ impl Locker {
         Ok(false)
     }
 
-    fn is_locked_result(&mut self) -> Result<bool> {
+    fn is_locked_result(&mut self) -> anyhow::Result<bool> {
         Ok(self.is_locked())
     }
 
@@ -646,7 +645,7 @@ impl Locker {
         data_processor: Option<
             Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
         >,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let contents = file_get_contents(composer_json.get_path());
         let contents = match contents {
             Some(s) => s,
@@ -719,7 +718,7 @@ impl Locker {
     }
 
     /// @param PackageInterface[] $packages
-    fn lock_packages(&mut self, packages: &[PackageInterfaceHandle]) -> Result<PhpMixed> {
+    fn lock_packages(&mut self, packages: &[PackageInterfaceHandle]) -> anyhow::Result<PhpMixed> {
         let mut locked: Vec<IndexMap<String, PhpMixed>> = vec![];
 
         for package in packages {
@@ -791,7 +790,10 @@ impl Locker {
     }
 
     /// Returns the packages's datetime for its source reference.
-    fn get_package_time(&mut self, package: PackageInterfaceHandle) -> Result<Option<String>> {
+    fn get_package_time(
+        &mut self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<String>> {
         if !function_exists("proc_open") {
             return Ok(None);
         }
@@ -895,7 +897,7 @@ impl Locker {
         &mut self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
-    ) -> Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<String>> {
         let mut missing_requirement_info: Vec<String> = vec![];
         let mut missing_requirements = false;
         let mut sets: Vec<SetEntry> = vec![SetEntry {
@@ -1006,18 +1008,21 @@ impl Locker {
 pub trait LockerInterface: std::fmt::Debug {
     fn get_json_file(&self) -> &JsonFile;
     fn is_locked(&mut self) -> bool;
-    fn is_fresh(&mut self) -> Result<bool>;
-    fn get_locked_repository(&mut self, with_dev_reqs: bool) -> Result<LockArrayRepositoryHandle>;
-    fn get_dev_package_names(&mut self) -> Result<Vec<String>>;
-    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> Result<Vec<Link>>;
-    fn get_minimum_stability(&mut self) -> Result<String>;
-    fn get_stability_flags(&mut self) -> Result<IndexMap<String, String>>;
-    fn get_prefer_stable(&mut self) -> Result<Option<bool>>;
-    fn get_prefer_lowest(&mut self) -> Result<Option<bool>>;
-    fn get_platform_overrides(&mut self) -> Result<IndexMap<String, String>>;
-    fn get_aliases(&mut self) -> Result<Vec<IndexMap<String, String>>>;
-    fn get_plugin_api(&mut self) -> Result<String>;
-    fn get_lock_data(&mut self) -> Result<IndexMap<String, PhpMixed>>;
+    fn is_fresh(&mut self) -> anyhow::Result<bool>;
+    fn get_locked_repository(
+        &mut self,
+        with_dev_reqs: bool,
+    ) -> anyhow::Result<LockArrayRepositoryHandle>;
+    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>>;
+    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> anyhow::Result<Vec<Link>>;
+    fn get_minimum_stability(&mut self) -> anyhow::Result<String>;
+    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, String>>;
+    fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>>;
+    fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>>;
+    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>>;
+    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>>;
+    fn get_plugin_api(&mut self) -> anyhow::Result<String>;
+    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<String, PhpMixed>>;
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn set_lock_data(
         &mut self,
@@ -1032,19 +1037,19 @@ pub trait LockerInterface: std::fmt::Debug {
         prefer_lowest: bool,
         platform_overrides: IndexMap<String, PhpMixed>,
         write: bool,
-    ) -> Result<bool>;
+    ) -> anyhow::Result<bool>;
     fn update_hash(
         &mut self,
         composer_json: &JsonFile,
         data_processor: Option<
             Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
         >,
-    ) -> Result<()>;
+    ) -> anyhow::Result<()>;
     fn get_missing_requirement_info(
         &mut self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
-    ) -> Result<Vec<String>>;
+    ) -> anyhow::Result<Vec<String>>;
 }
 
 impl LockerInterface for Locker {
@@ -1056,51 +1061,54 @@ impl LockerInterface for Locker {
         self.is_locked()
     }
 
-    fn is_fresh(&mut self) -> Result<bool> {
+    fn is_fresh(&mut self) -> anyhow::Result<bool> {
         self.is_fresh()
     }
 
-    fn get_locked_repository(&mut self, with_dev_reqs: bool) -> Result<LockArrayRepositoryHandle> {
+    fn get_locked_repository(
+        &mut self,
+        with_dev_reqs: bool,
+    ) -> anyhow::Result<LockArrayRepositoryHandle> {
         self.get_locked_repository(with_dev_reqs)
     }
 
-    fn get_dev_package_names(&mut self) -> Result<Vec<String>> {
+    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>> {
         self.get_dev_package_names()
     }
 
-    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> Result<Vec<Link>> {
+    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> anyhow::Result<Vec<Link>> {
         self.get_platform_requirements(with_dev_reqs)
     }
 
-    fn get_minimum_stability(&mut self) -> Result<String> {
+    fn get_minimum_stability(&mut self) -> anyhow::Result<String> {
         self.get_minimum_stability()
     }
 
-    fn get_stability_flags(&mut self) -> Result<IndexMap<String, String>> {
+    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         self.get_stability_flags()
     }
 
-    fn get_prefer_stable(&mut self) -> Result<Option<bool>> {
+    fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>> {
         self.get_prefer_stable()
     }
 
-    fn get_prefer_lowest(&mut self) -> Result<Option<bool>> {
+    fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>> {
         self.get_prefer_lowest()
     }
 
-    fn get_platform_overrides(&mut self) -> Result<IndexMap<String, String>> {
+    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         self.get_platform_overrides()
     }
 
-    fn get_aliases(&mut self) -> Result<Vec<IndexMap<String, String>>> {
+    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         self.get_aliases()
     }
 
-    fn get_plugin_api(&mut self) -> Result<String> {
+    fn get_plugin_api(&mut self) -> anyhow::Result<String> {
         self.get_plugin_api()
     }
 
-    fn get_lock_data(&mut self) -> Result<IndexMap<String, PhpMixed>> {
+    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         self.get_lock_data()
     }
 
@@ -1118,7 +1126,7 @@ impl LockerInterface for Locker {
         prefer_lowest: bool,
         platform_overrides: IndexMap<String, PhpMixed>,
         write: bool,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         self.set_lock_data(
             packages,
             dev_packages,
@@ -1140,7 +1148,7 @@ impl LockerInterface for Locker {
         data_processor: Option<
             Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
         >,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         self.update_hash(composer_json, data_processor)
     }
 
@@ -1148,7 +1156,7 @@ impl LockerInterface for Locker {
         &mut self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
-    ) -> Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<String>> {
         self.get_missing_requirement_info(package, include_dev)
     }
 }

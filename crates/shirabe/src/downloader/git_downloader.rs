@@ -16,7 +16,6 @@ use crate::util::Git as GitUtil;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -63,7 +62,7 @@ impl GitDownloader {
         &self,
         _package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
@@ -258,7 +257,7 @@ impl GitDownloader {
         path: &str,
         reference: &str,
         pretty_version: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         let force: Vec<String> = if self
             .has_discarded_changes
             .get(path)
@@ -546,7 +545,7 @@ impl GitDownloader {
 
     /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
-    pub(crate) async fn discard_changes(&mut self, path: &str) -> Result<Option<PhpMixed>> {
+    pub(crate) async fn discard_changes(&mut self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -582,7 +581,7 @@ impl GitDownloader {
 
     /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
-    pub(crate) async fn stash_changes(&mut self, path: &str) -> Result<Option<PhpMixed>> {
+    pub(crate) async fn stash_changes(&mut self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -608,7 +607,7 @@ impl GitDownloader {
     }
 
     /// @throws \RuntimeException
-    pub(crate) fn view_diff(&mut self, path: &str) -> Result<()> {
+    pub(crate) fn view_diff(&mut self, path: &str) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -671,7 +670,11 @@ impl GitDownloader {
 
     /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
     /// local changes.
-    fn fail_on_local_changes(&mut self, package: PackageInterfaceHandle, path: &str) -> Result<()> {
+    fn fail_on_local_changes(
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path)?.is_some() {
             return Err(RuntimeException {
                 message: format!("Source directory {} has uncommitted changes.", path),
@@ -689,7 +692,7 @@ impl DvcsDownloaderInterface for GitDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: String,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         GitDownloader::get_unpushed_changes(self, package, &path)
     }
 }
@@ -699,7 +702,7 @@ impl ChangeReportInterface for GitDownloader {
         &mut self,
         _package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         GitUtil::clean_env(&self.inner.process);
         if !self.has_metadata_repository(path) {
             return Ok(None);
@@ -777,7 +780,7 @@ impl VcsDownloader for GitDownloader {
         path: &str,
         url: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         // Do not create an extra local cache when repository is already local
         if Filesystem::is_local_path(url) {
             return Ok(None);
@@ -847,7 +850,7 @@ impl VcsDownloader for GitDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         let cache_path = format!(
@@ -999,7 +1002,7 @@ impl VcsDownloader for GitDownloader {
         target: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
@@ -1159,7 +1162,7 @@ impl VcsDownloader for GitDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         update: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
 
@@ -1318,7 +1321,7 @@ impl VcsDownloader for GitDownloader {
         Ok(None)
     }
 
-    fn reapply_changes(&mut self, path: &str) -> Result<()> {
+    fn reapply_changes(&mut self, path: &str) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         if self
             .has_stashed_changes
@@ -1359,7 +1362,7 @@ impl VcsDownloader for GitDownloader {
         from_reference: &str,
         to_reference: &str,
         path: &str,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         let path = self.normalize_path(path);
         let mut args = vec![
             "--format=%h - %an: %s".to_string(),

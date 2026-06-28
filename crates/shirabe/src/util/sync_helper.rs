@@ -4,7 +4,6 @@ use crate::downloader::DownloadManagerInterface;
 use crate::downloader::DownloaderInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::r#loop::Loop;
-use anyhow::Result;
 use shirabe_php_shim::PhpMixed;
 
 pub enum DownloaderOrManager<'a> {
@@ -18,7 +17,7 @@ impl<'a> DownloaderOrManager<'a> {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().download3(package, path, prev_package).await,
             Self::Manager(d) => d.borrow().download(package, path, prev_package).await,
@@ -31,7 +30,7 @@ impl<'a> DownloaderOrManager<'a> {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => {
                 d.borrow_mut()
@@ -50,7 +49,7 @@ impl<'a> DownloaderOrManager<'a> {
         &self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().install2(package, path).await,
             Self::Manager(d) => d.borrow().install(package, path).await,
@@ -62,7 +61,7 @@ impl<'a> DownloaderOrManager<'a> {
         package: PackageInterfaceHandle,
         prev_package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().update(package, prev_package, path).await,
             Self::Manager(d) => d.borrow().update(package, prev_package, path).await,
@@ -75,7 +74,7 @@ impl<'a> DownloaderOrManager<'a> {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => {
                 d.borrow_mut()
@@ -100,14 +99,14 @@ impl SyncHelper {
         path: String,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let r#type = if prev_package.is_some() {
             "update"
         } else {
             "install"
         };
 
-        let result: Result<()> = (|| -> Result<()> {
+        let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             Self::r#await(
                 r#loop,
                 Some(Box::pin(async {
@@ -176,8 +175,10 @@ impl SyncHelper {
 
     pub fn r#await(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
-        promise: Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + '_>>>,
-    ) -> Result<()> {
+        promise: Option<
+            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
+        >,
+    ) -> anyhow::Result<()> {
         if let Some(promise) = promise {
             crate::util::sync_executor::block_on(r#loop.borrow_mut().wait(vec![promise], None))?;
         }

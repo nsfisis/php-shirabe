@@ -12,7 +12,6 @@ use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PATHINFO_FILENAME, PHP_URL_PATH, PhpMixed, RuntimeException,
@@ -87,7 +86,7 @@ impl ArchiveDownloader for GzipDownloader {
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let filename = pathinfo(
             parse_url(
                 &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
@@ -153,7 +152,7 @@ impl ChangeReportInterface for GzipDownloader {
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         self.inner.get_local_changes(package, path)
     }
 }
@@ -176,7 +175,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
             .download(package, path, prev_package, output)
             .await
@@ -188,7 +187,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
@@ -197,7 +196,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
     }
 
@@ -206,7 +205,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
     }
 
@@ -215,7 +214,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
     }
 
@@ -225,7 +224,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

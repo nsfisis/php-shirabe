@@ -14,7 +14,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;

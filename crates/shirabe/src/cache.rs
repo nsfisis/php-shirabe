@@ -5,7 +5,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
-use anyhow::Result;
 use chrono::Utc;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
@@ -138,7 +137,7 @@ impl Cache {
         None
     }
 
-    pub fn write(&mut self, file: &str, contents: &str) -> Result<bool> {
+    pub fn write(&mut self, file: &str, contents: &str) -> anyhow::Result<bool> {
         let was_enabled = self.enabled == Some(true);
 
         if self.is_enabled() && !self.read_only {
@@ -241,7 +240,7 @@ impl Cache {
     }
 
     /// Copy a file out of the cache
-    pub fn copy_to(&mut self, file: &str, target: &str) -> Result<bool> {
+    pub fn copy_to(&mut self, file: &str, target: &str) -> anyhow::Result<bool> {
         if self.is_enabled() {
             let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);

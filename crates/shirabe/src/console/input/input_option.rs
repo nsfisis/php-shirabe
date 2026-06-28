@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Console/Input/InputOption.php
 
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::input::InputOption as BaseInputOption;
 use shirabe_php_shim::PhpMixed;
 
@@ -23,7 +22,7 @@ impl InputOption {
         description: &str,
         default: Option<PhpMixed>,
         // TODO(cli-completion): suggested_values closure / list dropped along with completion support
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let shortcut = shortcut.unwrap_or(PhpMixed::Null);
         let default_mixed = default.unwrap_or(PhpMixed::Null);
         let inner =

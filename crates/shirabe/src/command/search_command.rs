@@ -12,7 +12,6 @@ use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::repository_interface::{self, RepositoryInterface};
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;

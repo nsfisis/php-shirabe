@@ -12,7 +12,6 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 
@@ -65,7 +64,7 @@ impl VcsDownloader for HgDownloader {
         _path: &str,
         _url: &str,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if HgUtils::get_version(&self.inner.process).is_none() {
             return Err(RuntimeException {
                 message: "hg was not found in your PATH, skipping source download".to_string(),
@@ -82,7 +81,7 @@ impl VcsDownloader for HgDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),
             self.inner.config.clone(),
@@ -137,7 +136,7 @@ impl VcsDownloader for HgDownloader {
         target: PackageInterfaceHandle,
         path: &str,
         url: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),
             self.inner.config.clone(),
@@ -187,7 +186,7 @@ impl VcsDownloader for HgDownloader {
         from_reference: &str,
         to_reference: &str,
         path: &str,
-    ) -> Result<String> {
+    ) -> anyhow::Result<String> {
         let command = vec![
             "hg".to_string(),
             "log".to_string(),
@@ -228,7 +227,7 @@ impl ChangeReportInterface for HgDownloader {
         &mut self,
         _package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         if !std::path::Path::new(&format!("{}/.hg", path)).is_dir() {
             return Ok(None);
         }
@@ -280,7 +279,7 @@ impl DownloaderInterface for HgDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::download(self, package, path, prev_package).await
     }
 
@@ -290,7 +289,7 @@ impl DownloaderInterface for HgDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
@@ -299,7 +298,7 @@ impl DownloaderInterface for HgDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
     }
 
@@ -308,7 +307,7 @@ impl DownloaderInterface for HgDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
@@ -317,7 +316,7 @@ impl DownloaderInterface for HgDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
     }
 
@@ -327,7 +326,7 @@ impl DownloaderInterface for HgDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

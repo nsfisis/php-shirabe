@@ -5,7 +5,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
@@ -351,7 +350,7 @@ impl Perforce {
         result
     }
 
-    pub fn is_logged_in(&mut self) -> Result<bool> {
+    pub fn is_logged_in(&mut self) -> anyhow::Result<bool> {
         let command = self.generate_p4_command(vec!["login".to_string(), "-s".to_string()], false);
         let exit_code = self.execute_command(PhpMixed::List(
             command.into_iter().map(PhpMixed::String).collect(),
@@ -381,7 +380,7 @@ impl Perforce {
         Ok(true)
     }
 
-    pub fn connect_client(&mut self) -> Result<()> {
+    pub fn connect_client(&mut self) -> anyhow::Result<()> {
         let p4_create_client_command =
             self.generate_p4_command(vec!["client".to_string(), "-i".to_string()], true);
 
@@ -398,7 +397,7 @@ impl Perforce {
         Ok(())
     }
 
-    pub fn sync_code_base(&mut self, source_reference: Option<&str>) -> Result<()> {
+    pub fn sync_code_base(&mut self, source_reference: Option<&str>) -> anyhow::Result<()> {
         let prev_dir = Platform::get_cwd(false)?;
         chdir(&self.path);
         let mut p4_sync_command =
@@ -503,7 +502,7 @@ impl Perforce {
         }
     }
 
-    pub fn write_p4_client_spec(&mut self) -> Result<()> {
+    pub fn write_p4_client_spec(&mut self) -> anyhow::Result<()> {
         let client_spec = self.get_p4_client_spec();
         let spec = match fopen(&client_spec, "w") {
             Ok(spec) => spec,
@@ -542,7 +541,7 @@ impl Perforce {
         }
     }
 
-    pub fn windows_login(&mut self, password: Option<&str>) -> Result<i64> {
+    pub fn windows_login(&mut self, password: Option<&str>) -> anyhow::Result<i64> {
         let command = self.generate_p4_command(vec!["login".to_string(), "-a".to_string()], true);
 
         let mut process = Process::new(
@@ -558,7 +557,7 @@ impl Perforce {
         process.run(None, indexmap::IndexMap::new())
     }
 
-    pub fn p4_login(&mut self) -> Result<()> {
+    pub fn p4_login(&mut self) -> anyhow::Result<()> {
         self.query_p4_user();
         if !self.is_logged_in()? {
             let password = self.query_p4_password();
@@ -597,7 +596,7 @@ impl Perforce {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         let composer_file_content = self.get_file_content("composer.json", identifier);
 
         let composer_file_content = match composer_file_content {
@@ -842,11 +841,11 @@ impl Perforce {
 pub trait PerforceInterface: std::fmt::Debug {
     fn initialize_path(&mut self, path: &str);
     fn set_stream(&mut self, stream: &str);
-    fn p4_login(&mut self) -> Result<()>;
+    fn p4_login(&mut self) -> anyhow::Result<()>;
     fn check_stream(&mut self) -> bool;
-    fn write_p4_client_spec(&mut self) -> Result<()>;
-    fn connect_client(&mut self) -> Result<()>;
-    fn sync_code_base(&mut self, source_reference: Option<String>) -> Result<()>;
+    fn write_p4_client_spec(&mut self) -> anyhow::Result<()>;
+    fn connect_client(&mut self) -> anyhow::Result<()>;
+    fn sync_code_base(&mut self, source_reference: Option<String>) -> anyhow::Result<()>;
     fn cleanup_client_spec(&mut self);
     fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String>;
     fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String>;
@@ -856,7 +855,7 @@ pub trait PerforceInterface: std::fmt::Debug {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>>;
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
 }
 
 impl PerforceInterface for Perforce {
@@ -868,7 +867,7 @@ impl PerforceInterface for Perforce {
         Perforce::set_stream(self, stream)
     }
 
-    fn p4_login(&mut self) -> Result<()> {
+    fn p4_login(&mut self) -> anyhow::Result<()> {
         Perforce::p4_login(self)
     }
 
@@ -876,15 +875,15 @@ impl PerforceInterface for Perforce {
         Perforce::check_stream(self)
     }
 
-    fn write_p4_client_spec(&mut self) -> Result<()> {
+    fn write_p4_client_spec(&mut self) -> anyhow::Result<()> {
         Perforce::write_p4_client_spec(self)
     }
 
-    fn connect_client(&mut self) -> Result<()> {
+    fn connect_client(&mut self) -> anyhow::Result<()> {
         Perforce::connect_client(self)
     }
 
-    fn sync_code_base(&mut self, source_reference: Option<String>) -> Result<()> {
+    fn sync_code_base(&mut self, source_reference: Option<String>) -> anyhow::Result<()> {
         Perforce::sync_code_base(self, source_reference.as_deref())
     }
 
@@ -915,7 +914,7 @@ impl PerforceInterface for Perforce {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         Perforce::get_composer_information(self, identifier)
     }
 }

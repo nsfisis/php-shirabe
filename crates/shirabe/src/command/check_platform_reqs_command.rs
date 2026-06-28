@@ -10,7 +10,6 @@ use crate::repository::InstalledRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RootPackageRepository;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;

@@ -15,7 +15,6 @@ use crate::package::RootPackageHandle;
 use crate::package::SUPPORTED_LINK_TYPES;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
-use anyhow::Result;
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -152,7 +151,7 @@ impl LoaderInterface for ArrayLoader {
         &self,
         mut config: IndexMap<String, PhpMixed>,
         class: Option<String>,
-    ) -> Result<PackageInterfaceHandle> {
+    ) -> anyhow::Result<PackageInterfaceHandle> {
         let class = class.unwrap_or_else(|| "Composer\\Package\\CompletePackage".to_string());
 
         if class != "Composer\\Package\\CompletePackage"
@@ -199,7 +198,7 @@ impl ArrayLoader {
     pub fn load_packages(
         &self,
         versions: Vec<IndexMap<String, PhpMixed>>,
-    ) -> Result<Vec<PackageInterfaceHandle>> {
+    ) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
         let mut packages: Vec<PackageInterfaceHandle> = vec![];
         let mut link_cache: IndexMap<
             String,
@@ -222,7 +221,7 @@ impl ArrayLoader {
         &self,
         config: &IndexMap<String, PhpMixed>,
         class: &str,
-    ) -> Result<CompleteOrRootPackage> {
+    ) -> anyhow::Result<CompleteOrRootPackage> {
         if !config.contains_key("name") {
             return Err(UnexpectedValueException {
                 message: format!(
@@ -312,7 +311,7 @@ impl ArrayLoader {
         &self,
         mut package: CompleteOrRootPackage,
         config: &mut IndexMap<String, PhpMixed>,
-    ) -> Result<PackageInterfaceHandle> {
+    ) -> anyhow::Result<PackageInterfaceHandle> {
         package
             .package_mut()
             .set_type(if let Some(t) = config.get("type") {
@@ -704,7 +703,7 @@ impl ArrayLoader {
         >,
         package: &mut CompleteOrRootPackage,
         config: &IndexMap<String, PhpMixed>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let name = package.get_name().to_string();
         let pretty_version = package.get_pretty_version().to_string();
 
@@ -786,7 +785,7 @@ impl ArrayLoader {
         source_version: &str,
         description: &str,
         links: IndexMap<String, PhpMixed>,
-    ) -> Result<IndexMap<String, Link>> {
+    ) -> anyhow::Result<IndexMap<String, Link>> {
         let mut res: IndexMap<String, Link> = IndexMap::new();
         for (target, constraint) in links {
             if !is_string(&constraint) {
@@ -818,7 +817,7 @@ impl ArrayLoader {
         description: &str,
         target: &str,
         pretty_constraint: &str,
-    ) -> Result<Link> {
+    ) -> anyhow::Result<Link> {
         // PHP: if (!\is_string($prettyConstraint)) — always true in Rust signature, kept for parity
         let _ = pretty_constraint;
 
@@ -856,7 +855,10 @@ impl ArrayLoader {
     /// @param mixed[] $config the entire package config
     ///
     /// @return string|null normalized version of the branch alias or null if there is none
-    pub fn get_branch_alias(&self, config: &IndexMap<String, PhpMixed>) -> Result<Option<String>> {
+    pub fn get_branch_alias(
+        &self,
+        config: &IndexMap<String, PhpMixed>,
+    ) -> anyhow::Result<Option<String>> {
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
             return Err(UnexpectedValueException {
                 message: "no/invalid version defined".to_string(),

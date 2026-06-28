@@ -7,7 +7,6 @@ use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -19,7 +18,7 @@ pub struct WritableArrayRepository {
 }
 
 impl WritableArrayRepository {
-    pub fn new(packages: Vec<crate::package::PackageInterfaceHandle>) -> Result<Self> {
+    pub fn new(packages: Vec<crate::package::PackageInterfaceHandle>) -> anyhow::Result<Self> {
         Ok(Self {
             inner: ArrayRepository::new(packages)?,
             dev_package_names: Vec::new(),
@@ -44,7 +43,7 @@ impl WritableArrayRepository {
         &mut self,
         dev_mode: bool,
         _installation_manager: &InstallationManager,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         self.dev_mode = Some(dev_mode);
         Ok(())
     }
@@ -61,7 +60,10 @@ impl WritableArrayRepository {
         self.inner.is_initialized()
     }
 
-    pub fn add_package(&mut self, package: crate::package::PackageInterfaceHandle) -> Result<()> {
+    pub fn add_package(
+        &mut self,
+        package: crate::package::PackageInterfaceHandle,
+    ) -> anyhow::Result<()> {
         self.inner.add_package(package)
     }
 
@@ -72,12 +74,12 @@ impl WritableArrayRepository {
     pub fn remove_package(
         &mut self,
         package: crate::package::PackageInterfaceHandle,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         self.inner.remove_package(package);
         Ok(())
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
         Ok(())
     }
@@ -134,7 +136,7 @@ impl RepositoryInterface for WritableArrayRepository {
         &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Result<Option<BasePackageHandle>> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.inner.find_package(name, constraint)
     }
 
@@ -142,11 +144,11 @@ impl RepositoryInterface for WritableArrayRepository {
         &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Result<Vec<BasePackageHandle>> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&mut self) -> Result<Vec<BasePackageHandle>> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.get_packages()
     }
 
@@ -156,7 +158,7 @@ impl RepositoryInterface for WritableArrayRepository {
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> Result<LoadPackagesResult> {
+    ) -> anyhow::Result<LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,
@@ -170,11 +172,14 @@ impl RepositoryInterface for WritableArrayRepository {
         query: String,
         mode: i64,
         r#type: Option<String>,
-    ) -> Result<Vec<SearchResult>> {
+    ) -> anyhow::Result<Vec<SearchResult>> {
         self.inner.search(query, mode, r#type)
     }
 
-    fn get_providers(&mut self, package_name: String) -> Result<IndexMap<String, ProviderInfo>> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
 

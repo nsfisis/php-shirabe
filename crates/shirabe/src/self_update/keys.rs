@@ -1,13 +1,12 @@
 //! ref: composer/src/Composer/SelfUpdate/Keys.php
 
-use anyhow::Result;
 use regex::Regex;
 use shirabe_php_shim::hash;
 
 pub struct Keys;
 
 impl Keys {
-    pub fn fingerprint(path: &str) -> Result<String> {
+    pub fn fingerprint(path: &str) -> anyhow::Result<String> {
         let content = std::fs::read_to_string(path)?;
         let re = Regex::new(r"\s").unwrap();
         let cleaned = re.replace_all(&content, "");

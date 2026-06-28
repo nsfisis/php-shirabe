@@ -13,7 +13,6 @@ use crate::repository::vcs::VcsDriverBase;
 use crate::util::GitLab;
 use crate::util::HttpDownloader;
 use crate::util::http::Response;
-use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -80,7 +79,7 @@ impl GitLabDriver {
     /// Extracts information from the repository url.
     ///
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self) -> anyhow::Result<()> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match3(Self::URL_REGEX, &self.inner.url, Some(&mut match_)) {
             return Err(InvalidArgumentException {
@@ -262,7 +261,7 @@ impl GitLabDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
         }
@@ -416,7 +415,11 @@ impl GitLabDriver {
             .unwrap_or(None))
     }
 
-    pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Result<Option<String>> {
+    pub fn get_file_content(
+        &mut self,
+        file: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Option<String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_file_content(file, identifier);
         }
@@ -451,7 +454,10 @@ impl GitLabDriver {
         Ok(content)
     }
 
-    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
+    pub fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
         }
@@ -546,7 +552,7 @@ impl GitLabDriver {
         result
     }
 
-    pub fn get_root_identifier(&mut self) -> Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_root_identifier();
         }
@@ -560,7 +566,7 @@ impl GitLabDriver {
             .to_string())
     }
 
-    pub fn get_branches(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_branches();
         }
@@ -572,7 +578,7 @@ impl GitLabDriver {
         Ok(self.branches.clone().unwrap_or_default())
     }
 
-    pub fn get_tags(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_tags();
         }
@@ -621,7 +627,10 @@ impl GitLabDriver {
     }
 
     /// @return string[] where keys are named references like tags or branches and the value a sha
-    pub(crate) fn get_references(&mut self, r#type: &str) -> Result<IndexMap<String, String>> {
+    pub(crate) fn get_references(
+        &mut self,
+        r#type: &str,
+    ) -> anyhow::Result<IndexMap<String, String>> {
         let per_page = 100;
         let mut resource: Option<String> = Some(format!(
             "{}/repository/{}?per_page={}",
@@ -684,7 +693,7 @@ impl GitLabDriver {
         Ok(references)
     }
 
-    pub(crate) fn fetch_project(&mut self) -> Result<()> {
+    pub(crate) fn fetch_project(&mut self) -> anyhow::Result<()> {
         if self.project.is_some() {
             return Ok(());
         }
@@ -718,7 +727,7 @@ impl GitLabDriver {
     ///
     /// @return true
     /// @throws \RuntimeException
-    pub(crate) fn attempt_clone_fallback(&mut self) -> Result<bool> {
+    pub(crate) fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         let url = if !self.is_private {
             self.generate_public_url()
         } else {
@@ -768,7 +777,7 @@ impl GitLabDriver {
         )
     }
 
-    pub(crate) fn setup_git_driver(&mut self, url: &str) -> Result<()> {
+    pub(crate) fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
         let mut git_driver = GitDriver::new(
@@ -787,7 +796,7 @@ impl GitLabDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> Result<Response, TransportException> {
+    ) -> anyhow::Result<Response, TransportException> {
         let response_result = self.inner.get_contents(url);
         match response_result {
             Ok(response) => {
@@ -1027,7 +1036,7 @@ impl GitLabDriver {
     /// Gives back the loaded <gitlab-api>/projects/<owner>/<repo> result
     ///
     /// @return mixed[]|null
-    pub fn get_repo_data(&mut self) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         self.fetch_project()?;
 
         Ok(self.project.clone())

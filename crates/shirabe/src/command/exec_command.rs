@@ -6,7 +6,6 @@ use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
@@ -36,7 +35,7 @@ impl ExecCommand {
         command
     }
 
-    fn get_binaries(&self, for_display: bool) -> Result<Vec<String>> {
+    fn get_binaries(&self, for_display: bool) -> anyhow::Result<Vec<String>> {
         let composer = self.require_composer(None, None)?;
         let composer_ref = crate::composer::composer_full(&composer);
         let bin_dir = composer_ref

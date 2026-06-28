@@ -9,7 +9,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
-use anyhow::Result;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug)]
@@ -41,7 +40,7 @@ impl InstallerInterface for MetapackageInstaller {
         &mut self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
 
@@ -50,7 +49,7 @@ impl InstallerInterface for MetapackageInstaller {
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
 
@@ -59,7 +58,7 @@ impl InstallerInterface for MetapackageInstaller {
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
 
@@ -67,7 +66,7 @@ impl InstallerInterface for MetapackageInstaller {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error3(
             &format!("  - {}", InstallOperation::format(package.clone(), false)),
             true,
@@ -84,7 +83,7 @@ impl InstallerInterface for MetapackageInstaller {
         repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(initial.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
@@ -112,7 +111,7 @@ impl InstallerInterface for MetapackageInstaller {
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(package.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),

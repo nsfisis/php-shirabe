@@ -32,7 +32,6 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
@@ -347,7 +346,7 @@ impl Command for DiagnoseCommand {
         } else {
             vec!["http", "https"]
         };
-        let proxy_check_result: Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
+        let proxy_check_result: anyhow::Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
             for proto in &protos {
                 let proxy = proxy_manager
                     .lock()

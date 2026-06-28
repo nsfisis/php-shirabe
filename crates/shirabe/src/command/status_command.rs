@@ -12,7 +12,6 @@ use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -49,7 +48,7 @@ impl StatusCommand {
     fn do_execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer);
         let io = self.get_io().clone();

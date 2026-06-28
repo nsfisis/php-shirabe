@@ -13,7 +13,6 @@ use crate::repository::vcs::VcsDriverBase;
 use crate::repository::vcs::VcsDriverInterface;
 use crate::util::Bitbucket;
 use crate::util::http::Response;
-use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -84,7 +83,7 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self) -> anyhow::Result<()> {
         let mut m: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
         if !Preg::is_match3(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i",
@@ -150,7 +149,7 @@ impl GitBitbucketDriver {
     /// sets some parameters which are used in other methods
     ///
     /// @phpstan-impure
-    fn get_repo_data(&mut self) -> Result<bool> {
+    fn get_repo_data(&mut self) -> anyhow::Result<bool> {
         let resource = format!(
             "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
             self.owner.clone(),
@@ -246,7 +245,7 @@ impl GitBitbucketDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_composer_information(identifier);
         }
@@ -416,7 +415,11 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Result<Option<String>> {
+    pub fn get_file_content(
+        &mut self,
+        file: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Option<String>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_file_content(file, identifier);
         }
@@ -444,7 +447,10 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
+    pub fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_change_date(identifier);
         }
@@ -476,7 +482,7 @@ impl GitBitbucketDriver {
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
             // TODO(phase-c): PHP getSource is infallible (: array), but the Rust trait made it
-            // Result, so the fallback's Result is flattened here. The faithful fix is making the
+            // anyhow::Result, so the fallback's anyhow::Result is flattened here. The faithful fix is making the
             // VcsDriverInterface get_source/get_dist infallible across all implementations.
             return fallback.get_source(identifier).unwrap_or_default();
         }
@@ -514,7 +520,7 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn get_tags(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_tags();
         }
@@ -593,7 +599,7 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn get_branches(&mut self) -> Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_branches();
         }
@@ -680,7 +686,7 @@ impl GitBitbucketDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> Result<Response> {
+    ) -> anyhow::Result<Response> {
         match self.inner.get_contents(url) {
             Ok(r) => Ok(r),
             Err(e) => {
@@ -741,7 +747,7 @@ impl GitBitbucketDriver {
     ///
     /// @return true
     /// @throws \RuntimeException
-    fn attempt_clone_fallback(&mut self) -> Result<bool> {
+    fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         match self.setup_fallback_driver(&self.generate_ssh_url()) {
             Ok(()) => Ok(true),
             Err(e) => {
@@ -759,7 +765,7 @@ impl GitBitbucketDriver {
         }
     }
 
-    fn setup_fallback_driver(&mut self, url: &str) -> Result<()> {
+    fn setup_fallback_driver(&mut self, url: &str) -> anyhow::Result<()> {
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
         let mut driver = GitDriver::new(
@@ -796,7 +802,7 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn get_root_identifier(&mut self) -> Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_root_identifier();
         }

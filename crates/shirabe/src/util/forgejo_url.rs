@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Util/ForgejoUrl.php
 
-use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::InvalidArgumentException;
 
@@ -25,7 +24,7 @@ impl ForgejoUrl {
         }
     }
 
-    pub fn create(repo_url: &str) -> Result<Self> {
+    pub fn create(repo_url: &str) -> anyhow::Result<Self> {
         match Self::try_from(Some(repo_url)) {
             Some(url) => Ok(url),
             None => Err(InvalidArgumentException {

@@ -11,7 +11,6 @@ use crate::repository::{
     AbandonedInfo, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
 };
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{implode, preg_quote, strtolower};
@@ -119,7 +118,7 @@ impl ArrayRepository {
     }
 
     /// @param array<PackageInterface> $packages
-    pub fn new(packages: Vec<PackageInterfaceHandle>) -> Result<Self> {
+    pub fn new(packages: Vec<PackageInterfaceHandle>) -> anyhow::Result<Self> {
         let this = Self {
             packages: RefCell::new(None),
             package_map: RefCell::new(None),
@@ -132,7 +131,7 @@ impl ArrayRepository {
     }
 
     /// Adds a new package to the repository
-    pub fn add_package(&self, package: PackageInterfaceHandle) -> Result<()> {
+    pub fn add_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         if self.packages.borrow().is_none() {
             self.initialize();
         }

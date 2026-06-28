@@ -12,7 +12,6 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Phar, PhpMixed};
 
@@ -69,7 +68,7 @@ impl ArchiveDownloader for PharDownloader {
         _package: PackageInterfaceHandle,
         file: &str,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         // Can throw an UnexpectedValueException
         let archive = Phar::new(file.to_string());
         archive.extract_to(path, None, true);
@@ -87,7 +86,7 @@ impl ChangeReportInterface for PharDownloader {
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         self.inner.get_local_changes(package, path)
     }
 }
@@ -110,7 +109,7 @@ impl DownloaderInterface for PharDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
             .download(package, path, prev_package, output)
             .await
@@ -122,7 +121,7 @@ impl DownloaderInterface for PharDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
@@ -131,7 +130,7 @@ impl DownloaderInterface for PharDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
     }
 
@@ -140,7 +139,7 @@ impl DownloaderInterface for PharDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
     }
 
@@ -149,7 +148,7 @@ impl DownloaderInterface for PharDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
     }
 
@@ -159,7 +158,7 @@ impl DownloaderInterface for PharDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

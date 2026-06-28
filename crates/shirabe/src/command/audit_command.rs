@@ -11,7 +11,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
-use anyhow::Result;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
@@ -243,7 +242,7 @@ impl AuditCommand {
         &self,
         composer: &PartialComposerHandle,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> Result<Vec<crate::package::PackageInterfaceHandle>> {
+    ) -> anyhow::Result<Vec<crate::package::PackageInterfaceHandle>> {
         let composer = crate::composer::composer_full(composer);
         if input
             .borrow()

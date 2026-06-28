@@ -7,7 +7,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
 use crate::util::Platform;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::process::ExecutableFinder;
@@ -63,7 +62,7 @@ impl ZipDownloader {
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         static WARNED_7ZIP_LINUX: Mutex<bool> = Mutex::new(false);
 
         let is_last_chance = !HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
@@ -191,7 +190,7 @@ impl ZipDownloader {
         path: &str,
         package: PackageInterfaceHandle,
         executable: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if is_last_chance {
             return Err(process_error);
         }
@@ -277,10 +276,10 @@ impl ZipDownloader {
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let mut zip_archive = self.zip_archive_object.take().unwrap_or_default();
 
-        let result: Result<Option<PhpMixed>> = (|| {
+        let result: anyhow::Result<Option<PhpMixed>> = (|| {
             let retval = if !file_exists(file) || filesize(file).is_none_or(|s| s == 0) {
                 Err(-1i64)
             } else {
@@ -436,7 +435,7 @@ impl ArchiveDownloader for ZipDownloader {
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.extract_with_system_unzip(package, file, path).await
     }
 }
@@ -446,7 +445,7 @@ impl ChangeReportInterface for ZipDownloader {
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<String>> {
+    ) -> anyhow::Result<Option<String>> {
         self.inner.get_local_changes(package, path)
     }
 }
@@ -469,7 +468,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         {
             let mut unzip_commands = UNZIP_COMMANDS.lock().unwrap();
             if unzip_commands.is_none() {
@@ -608,7 +607,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
@@ -617,7 +616,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
     }
 
@@ -626,7 +625,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
     }
 
@@ -635,7 +634,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
     }
 
@@ -645,7 +644,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

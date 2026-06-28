@@ -14,7 +14,6 @@ use crate::util::StreamContextFactory;
 use crate::util::Url;
 use crate::util::http::CurlDownloader;
 use crate::util::http::Response;
-use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -215,7 +214,11 @@ impl HttpDownloader {
     }
 
     /// Download a file synchronously
-    pub fn get(&mut self, url: &str, options: IndexMap<String, PhpMixed>) -> Result<Response> {
+    pub fn get(
+        &mut self,
+        url: &str,
+        options: IndexMap<String, PhpMixed>,
+    ) -> anyhow::Result<Response> {
         if self.mock.is_some() {
             return self.mock_get(url, &options);
         }
@@ -246,7 +249,7 @@ impl HttpDownloader {
         &mut self,
         url: &str,
         options: IndexMap<String, PhpMixed>,
-    ) -> Result<Response> {
+    ) -> anyhow::Result<Response> {
         if self.mock.is_some() {
             return self.mock_get(url, &options);
         }
@@ -276,7 +279,7 @@ impl HttpDownloader {
         url: &str,
         to: &str,
         options: IndexMap<String, PhpMixed>,
-    ) -> Result<Response> {
+    ) -> anyhow::Result<Response> {
         if self.mock.is_some() {
             return self.mock_get(url, &options);
         }
@@ -306,7 +309,7 @@ impl HttpDownloader {
         url: &str,
         to: &str,
         options: IndexMap<String, PhpMixed>,
-    ) -> Result<Response> {
+    ) -> anyhow::Result<Response> {
         if self.mock.is_some() {
             return self.mock_get(url, &options);
         }
@@ -345,7 +348,7 @@ impl HttpDownloader {
     /// Queues a job and starts it if there is capacity. Mirrors PHP `addJob`: for non-curl (rfs)
     /// jobs the work runs synchronously here (PHP runs it in the Promise resolver during
     /// construction); for curl jobs the work is driven later by `start_job` / `count_active_jobs`.
-    fn add_job(&mut self, mut request: Request, sync: bool) -> Result<JobHandle> {
+    fn add_job(&mut self, mut request: Request, sync: bool) -> anyhow::Result<JobHandle> {
         request.options = array_replace_recursive(self.options.clone(), request.options);
 
         let id = self.id_gen;
@@ -593,11 +596,11 @@ impl HttpDownloader {
     /// Wait for current async download jobs to complete
     ///
     /// @param int|null $index For internal use only, the job id
-    pub fn wait(&mut self) -> Result<()> {
+    pub fn wait(&mut self) -> anyhow::Result<()> {
         self.wait_id(None)
     }
 
-    fn wait_id(&mut self, index: Option<i64>) -> Result<()> {
+    fn wait_id(&mut self, index: Option<i64>) -> anyhow::Result<()> {
         loop {
             let job_count = self.count_active_jobs(index)?;
             if job_count == 0 {
@@ -613,7 +616,7 @@ impl HttpDownloader {
     }
 
     /// @internal
-    pub fn count_active_jobs(&mut self, index: Option<i64>) -> Result<i64> {
+    pub fn count_active_jobs(&mut self, index: Option<i64>) -> anyhow::Result<i64> {
         if self.running_jobs < self.max_jobs {
             let queued_ids: Vec<i64> = self
                 .jobs
@@ -676,7 +679,7 @@ impl HttpDownloader {
     }
 
     /// @param  int $index Job id
-    fn get_response(&mut self, index: i64) -> Result<Response> {
+    fn get_response(&mut self, index: i64) -> anyhow::Result<Response> {
         if !self.jobs.contains_key(&index) {
             return Err(LogicException {
                 message: "Invalid request id".to_string(),
@@ -712,7 +715,7 @@ impl HttpDownloader {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         url: &str,
         data: &IndexMap<String, PhpMixed>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let clean_message = |msg: &str| -> anyhow::Result<String> {
             if !io.is_decorated() {
                 return Ok(Preg::replace(
@@ -949,7 +952,7 @@ impl HttpDownloader {
         &mut self,
         file_url: &str,
         options: &IndexMap<String, PhpMixed>,
-    ) -> Result<Response> {
+    ) -> anyhow::Result<Response> {
         if file_url.is_empty() {
             return Err(LogicException {
                 message: "url cannot be an empty string".to_string(),
@@ -1019,7 +1022,7 @@ impl HttpDownloader {
         status: i64,
         headers: Vec<String>,
         body: String,
-    ) -> Result<Response> {
+    ) -> anyhow::Result<Response> {
         if status < 400 {
             return Ok(Response::new(
                 url.to_string(),
