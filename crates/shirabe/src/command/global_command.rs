@@ -53,10 +53,8 @@ impl GlobalCommand {
             Ok(argv_input.to_string())
         } else if let Some(array_input) = input_any.downcast_ref::<ArrayInput>() {
             Ok(array_input.to_string())
-        } else if input_any.is::<StringInput>() {
-            // StringInput's stringification is not exposed by shirabe-external-packages
-            // (its inner ArgvInput is pub(crate) and it defines no public __toString).
-            todo!("StringInput::__toString is not accessible from the shirabe crate")
+        } else if let Some(string_input) = input_any.downcast_ref::<StringInput>() {
+            Ok(string_input.to_string())
         } else {
             Err(LogicException {
                 message: "Expected an Input instance that is stringable".to_string(),
