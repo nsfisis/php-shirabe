@@ -63,12 +63,12 @@ impl DumpCompletionCommand {
 
     pub fn complete_impl(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
         if input.must_suggest_argument_values_for("shell") {
-            suggestions.suggest_values(
-                self.get_supported_shells()
-                    .into_iter()
-                    .map(StringOrSuggestion::String)
-                    .collect(),
-            );
+            // TODO(phase-d): PHP's complete() lets a DirectoryIterator failure propagate, but the
+            // Command::complete trait is infallible; on error the suggestions are skipped instead.
+            if let Ok(shells) = self.get_supported_shells() {
+                suggestions
+                    .suggest_values(shells.into_iter().map(StringOrSuggestion::String).collect());
+            }
         }
     }
 
@@ -98,14 +98,14 @@ impl DumpCompletionCommand {
         todo!()
     }
 
-    fn get_supported_shells(&self) -> Vec<String> {
+    fn get_supported_shells(&self) -> anyhow::Result<Vec<String>> {
         let mut shells = vec![];
 
         // foreach (new \DirectoryIterator(__DIR__.'/../Resources/') as $file)
         for file in shirabe_php_shim::directory_iterator(&format!(
             "{}/../Resources/",
             shirabe_php_shim::dir()
-        )) {
+        ))? {
             if shirabe_php_shim::str_starts_with(&file.get_basename(), "completion.")
                 && file.is_file()
             {
@@ -113,7 +113,7 @@ impl DumpCompletionCommand {
             }
         }
 
-        shells
+        Ok(shells)
     }
 }
 
@@ -209,7 +209,7 @@ impl Command for DumpCompletionCommand {
             shell
         );
         if !shirabe_php_shim::file_exists(&completion_file) {
-            let supported_shells = self.get_supported_shells();
+            let supported_shells = self.get_supported_shells()?;
 
             // TODO: PHP does `$output instanceof ConsoleOutputInterface ? $output->getErrorOutput()
             // : $output`. There is no way to test trait membership through `&dyn OutputInterface`

@@ -38,20 +38,29 @@ impl FilesystemIterator {
     pub const CURRENT_AS_FILEINFO: i64 = 0;
 }
 
-#[derive(Debug)]
-pub struct DirectoryIteratorEntry;
+#[derive(Debug, Clone)]
+pub struct DirectoryIteratorEntry {
+    path: std::path::PathBuf,
+}
+
 impl DirectoryIteratorEntry {
-    // TODO(phase-d): DirectoryIterator is a unit struct carrying no entry data; giving it real
-    // behavior requires the same field redesign as RecursiveIteratorFileInfo. It has no callers, so
-    // it is left unimplemented.
+    // SplFileInfo::getBasename(): the trailing name component.
     pub fn get_basename(&self) -> String {
-        todo!()
+        basename(&self.path.to_string_lossy())
     }
+    // SplFileInfo::isFile() follows symlinks.
     pub fn is_file(&self) -> bool {
-        todo!()
+        std::fs::metadata(&self.path)
+            .map(|m| m.is_file())
+            .unwrap_or(false)
     }
+    // SplFileInfo::getExtension(): substring after the basename's last '.'.
     pub fn get_extension(&self) -> String {
-        todo!()
+        let base = self.get_basename();
+        match base.rfind('.') {
+            Some(index) => base[index + 1..].to_string(),
+            None => String::new(),
+        }
     }
 }
 
@@ -232,10 +241,30 @@ fn rii_walk(
     }
 }
 
-pub fn directory_iterator(_path: &str) -> Vec<DirectoryIteratorEntry> {
-    // TODO(phase-d): see DirectoryIteratorEntry; the entry type carries no data yet and there are no
-    // callers.
-    todo!()
+pub fn directory_iterator(
+    path: &str,
+) -> Result<Vec<DirectoryIteratorEntry>, UnexpectedValueException> {
+    let base = std::path::Path::new(path);
+    let rd = std::fs::read_dir(base).map_err(|_| UnexpectedValueException {
+        message: format!(
+            "DirectoryIterator::__construct({}): Failed to open directory",
+            path
+        ),
+        code: 0,
+    })?;
+    // PHP's DirectoryIterator yields the "." and ".." entries before the real ones.
+    let mut entries = vec![
+        DirectoryIteratorEntry {
+            path: base.join("."),
+        },
+        DirectoryIteratorEntry {
+            path: base.join(".."),
+        },
+    ];
+    for entry in rd.flatten() {
+        entries.push(DirectoryIteratorEntry { path: entry.path() });
+    }
+    Ok(entries)
 }
 
 /// PHP `fopen()`. Returns a stream resource, or an error mirroring PHP's `false`-on-failure
@@ -1427,5 +1456,35 @@ mod tests {
     #[test]
     fn fopen_missing_file_is_err() {
         assert!(fopen("/nonexistent/shirabe/test/path", "r").is_err());
+    }
+
+    #[test]
+    fn directory_iterator_lists_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("completion.bash"), b"").unwrap();
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+
+        let entries = directory_iterator(dir.path().to_str().unwrap()).unwrap();
+        let basenames: Vec<String> = entries.iter().map(|e| e.get_basename()).collect();
+        // PHP's DirectoryIterator includes the "." and ".." entries.
+        assert!(basenames.contains(&".".to_string()));
+        assert!(basenames.contains(&"..".to_string()));
+        assert!(basenames.contains(&"completion.bash".to_string()));
+        assert!(basenames.contains(&"sub".to_string()));
+
+        let file = entries
+            .iter()
+            .find(|e| e.get_basename() == "completion.bash")
+            .unwrap();
+        assert!(file.is_file());
+        assert_eq!(file.get_extension(), "bash");
+
+        let sub = entries.iter().find(|e| e.get_basename() == "sub").unwrap();
+        assert!(!sub.is_file());
+    }
+
+    #[test]
+    fn directory_iterator_missing_dir_is_err() {
+        assert!(directory_iterator("/nonexistent/shirabe/test/dir").is_err());
     }
 }
