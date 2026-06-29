@@ -131,7 +131,7 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_ssh() {
         "https://github.com/acme/repo",
         None,
         true,
-        None,
+        (),
     )
     .unwrap();
 }
@@ -157,7 +157,7 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_https() {
         "https://github.com/acme/repo",
         None,
         true,
-        None,
+        (),
     )
     .unwrap();
 }
@@ -188,7 +188,7 @@ fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive
         "https://github.com/acme/repo",
         None,
         true,
-        None,
+        (),
     );
 
     let err = result.expect_err("expected a RuntimeException");
@@ -232,7 +232,7 @@ fn run_command_private_github_with_authentication(
 
     let mut git = build_git(io, config, process);
 
-    git.__run_command(vec![command_callable], git_url, None, true, None)
+    git.__run_command(vec![command_callable], git_url, None, true, ())
         .unwrap();
 }
 
@@ -317,7 +317,7 @@ fn run_command_private_bitbucket_with_authentication(
 
     let mut git = build_git(io, config, process);
 
-    git.__run_command(vec![command_callable], git_url, None, true, None)
+    git.__run_command(vec![command_callable], git_url, None, true, ())
         .unwrap();
 }
 
@@ -481,7 +481,7 @@ fn run_command_private_bitbucket_interactive_with_oauth(
     let mut git = build_git(io, config, process);
     git.set_http_downloader(downloader);
 
-    git.__run_command(vec![command_callable], git_url, None, true, None)
+    git.__run_command(vec![command_callable], git_url, None, true, ())
         .unwrap();
 }
 

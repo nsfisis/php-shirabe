@@ -455,7 +455,7 @@ impl GitDriver {
             url,
             Some(&sys_get_temp_dir()),
             false,
-            None,
+            (),
         ) {
             Ok(_) => Ok(true),
             Err(e) => {

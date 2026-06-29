@@ -17,8 +17,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map, clearstatcache,
-    explode, implode, in_array, is_callable, is_dir, preg_quote, rawurldecode, rawurlencode,
-    str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
+    explode, implode, in_array, is_dir, preg_quote, rawurldecode, rawurlencode, str_contains,
+    str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use std::sync::Mutex;
 
@@ -104,7 +104,7 @@ impl Git {
         url: &str,
         cwd: Option<&str>,
         initial_clone: bool,
-        command_output: Option<&mut PhpMixed>,
+        command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
         let mut callables: Vec<Box<dyn Fn(&str) -> Vec<String>>> = vec![];
         for cmd in commands {
@@ -136,7 +136,7 @@ impl Git {
         url: &str,
         cwd: Option<&str>,
         initial_clone: bool,
-        command_output: Option<&mut PhpMixed>,
+        command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
         self.run_command(command_callable, url, cwd, initial_clone, command_output)
     }
@@ -150,7 +150,7 @@ impl Git {
         url: &str,
         cwd: Option<&str>,
         initial_clone: bool,
-        mut command_output: Option<&mut PhpMixed>,
+        mut command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
         let command_callables = command_callable;
         let mut last_command: PhpMixed = PhpMixed::String(String::new());
@@ -174,12 +174,9 @@ impl Git {
         let run_commands_inline = |url_arg: &str,
                                    this_process: &mut ProcessExecutor,
                                    last_cmd: &mut PhpMixed,
-                                   command_output: Option<&mut PhpMixed>|
+                                   output: &mut dyn RunCommandOutput|
          -> i64 {
-            let collect_outputs = !command_output
-                .as_ref()
-                .map(|v| is_callable(v))
-                .unwrap_or(false);
+            let collect_outputs = output.collect_outputs();
             let mut outputs: Vec<String> = vec![];
 
             let mut status: i64 = 0;
@@ -187,23 +184,32 @@ impl Git {
                 let cmd = callable(url_arg);
                 *last_cmd =
                     PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect());
-                let mut local_output = String::new();
                 let exec_cwd = if initial_clone && counter == 0 {
                     None
                 } else {
                     cwd_string.clone()
                 };
-                status = this_process.execute_args(&cmd, &mut local_output, exec_cwd.as_deref());
                 if collect_outputs {
+                    let mut local_output = String::new();
+                    status =
+                        this_process.execute_args(&cmd, &mut local_output, exec_cwd.as_deref());
                     outputs.push(local_output);
+                } else {
+                    status = this_process
+                        .execute(
+                            &cmd[..],
+                            output.make_handler().unwrap(),
+                            exec_cwd.as_deref(),
+                        )
+                        .unwrap_or(1);
                 }
                 if status != 0 {
                     break;
                 }
             }
 
-            if collect_outputs && let Some(out) = command_output {
-                *out = PhpMixed::String(implode("", &outputs));
+            if collect_outputs {
+                output.write_back(implode("", &outputs));
             }
 
             status
@@ -280,7 +286,7 @@ impl Git {
                     &proto_url,
                     &mut self.process.borrow_mut(),
                     &mut last_command,
-                    command_output.as_deref_mut(),
+                    &mut command_output,
                 ) == 0
                 {
                     return Ok(());
@@ -343,7 +349,7 @@ impl Git {
                 url,
                 &mut self.process.borrow_mut(),
                 &mut last_command,
-                command_output.as_deref_mut(),
+                &mut command_output,
             )
         {
             let mut error_msg = self.process.borrow().get_error_output().to_string();
@@ -406,7 +412,7 @@ impl Git {
                         &auth_url,
                         &mut self.process.borrow_mut(),
                         &mut last_command,
-                        command_output.as_deref_mut(),
+                        &mut command_output,
                     ) == 0
                     {
                         return Ok(());
@@ -488,7 +494,7 @@ impl Git {
                         &auth_url,
                         &mut self.process.borrow_mut(),
                         &mut last_command,
-                        command_output.as_deref_mut(),
+                        &mut command_output,
                     ) == 0
                     {
                         return Ok(());
@@ -535,7 +541,7 @@ impl Git {
                         &auth_url,
                         &mut self.process.borrow_mut(),
                         &mut last_command,
-                        command_output.as_deref_mut(),
+                        &mut command_output,
                     ) == 0
                     {
                         return Ok(());
@@ -554,7 +560,7 @@ impl Git {
                     &ssh_url,
                     &mut self.process.borrow_mut(),
                     &mut last_command,
-                    command_output.as_deref_mut(),
+                    &mut command_output,
                 ) == 0
                 {
                     return Ok(());
@@ -641,7 +647,7 @@ impl Git {
                         &auth_url,
                         &mut self.process.borrow_mut(),
                         &mut last_command,
-                        command_output.as_deref_mut(),
+                        &mut command_output,
                     ) == 0
                     {
                         return Ok(());
@@ -734,7 +740,7 @@ impl Git {
                         &auth_url,
                         &mut self.process.borrow_mut(),
                         &mut last_command,
-                        command_output,
+                        &mut command_output,
                     ) == 0
                     {
                         self.io.borrow_mut().set_authentication(
@@ -840,7 +846,7 @@ impl Git {
                     vec!["git".to_string(), "gc".to_string(), "--auto".to_string()],
                 ];
 
-                self.run_commands(commands, url, Some(dir), false, None)?;
+                self.run_commands(commands, url, Some(dir), false, ())?;
 
                 Ok(())
             })();
@@ -857,7 +863,7 @@ impl Git {
                 url,
                 Some(dir),
                 false,
-                None,
+                (),
             );
 
             if let Err(e) = try_result {
@@ -889,7 +895,7 @@ impl Git {
             url,
             Some(dir),
             true,
-            None,
+            (),
         )?;
 
         self.run_commands(
@@ -904,7 +910,7 @@ impl Git {
             url,
             Some(dir),
             false,
-            None,
+            (),
         )?;
 
         Ok(true)
@@ -1161,7 +1167,7 @@ impl Git {
                     ],
                 ];
 
-                self.run_commands(commands, url, Some(dir), false, Some(&mut output_mixed))?;
+                self.run_commands(commands, url, Some(dir), false, &mut output_mixed)?;
             }
 
             let lines = self
@@ -1367,4 +1373,95 @@ impl Git {
 
         str_replace_array(credentials, &masked_credentials, error)
     }
+}
+
+/// Models the `mixed &$commandOutput` parameter of `Git::runCommand` (cf.
+/// `composer/src/Composer/Util/Git.php`). In PHP the behaviour is selected by
+/// `is_callable($commandOutput)`; here each behaviour is a distinct implementing type, mirroring
+/// `ProcessExecutor`'s [`IntoExecOutput`](crate::util::process_executor::IntoExecOutput):
+///
+/// | PHP call site | meaning | implementor | `collect_outputs` |
+/// |---|---|---|---|
+/// | `runCommands($c, ...)` (no `$commandOutput`) | accumulate then discard | `()` | `true` |
+/// | `runCommands($c, ..., $var)` by-ref | accumulate and assign back | `&mut PhpMixed` | `true` |
+/// | `runCommands($c, ..., $callable)` | drive the child through the handler | [`GitRunCommandOutputHandler`] | `false` |
+pub trait RunCommandOutput {
+    /// PHP: `$collectOutputs = !is_callable($commandOutput)`.
+    fn collect_outputs(&self) -> bool;
+
+    /// In callable mode, builds the per-command output handler passed to
+    /// `ProcessExecutor::execute`. `None` in the accumulate/discard modes.
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> bool>>;
+
+    /// PHP: `$commandOutput = implode('', $outputs);` — only meaningful in the accumulate-and-assign
+    /// mode; a no-op for the discard and callable variants.
+    fn write_back(&mut self, value: String);
+}
+
+/// `runCommands(..., $commandOutput)` where the caller never reads `$commandOutput` (PHP default
+/// `null`): outputs are accumulated per command but thrown away.
+impl RunCommandOutput for () {
+    fn collect_outputs(&self) -> bool {
+        true
+    }
+
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> bool>> {
+        None
+    }
+
+    fn write_back(&mut self, _value: String) {}
+}
+
+/// `runCommands(..., $var)` by-ref: outputs are accumulated and assigned back as a
+/// [`PhpMixed::String`].
+impl RunCommandOutput for &mut PhpMixed {
+    fn collect_outputs(&self) -> bool {
+        true
+    }
+
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> bool>> {
+        None
+    }
+
+    fn write_back(&mut self, value: String) {
+        **self = PhpMixed::String(value);
+    }
+}
+
+/// `runCommands(..., $callable)`: the callable is used as the output handler for every command.
+/// PHP passes the same `$commandOutput` callable to each `process->execute` call, so the handler
+/// state is shared across all commands and protocol/auth retries; we mirror that by holding the
+/// handler in an [`Rc`](std::rc::Rc)/[`RefCell`](std::cell::RefCell) and producing a fresh
+/// forwarding box per command.
+pub struct GitRunCommandOutputHandler {
+    handler: std::rc::Rc<std::cell::RefCell<dyn FnMut(&str, &str) -> bool>>,
+}
+
+impl std::fmt::Debug for GitRunCommandOutputHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GitRunCommandOutputHandler").finish()
+    }
+}
+
+impl GitRunCommandOutputHandler {
+    pub fn new(handler: impl FnMut(&str, &str) -> bool + 'static) -> Self {
+        Self {
+            handler: std::rc::Rc::new(std::cell::RefCell::new(handler)),
+        }
+    }
+}
+
+impl RunCommandOutput for GitRunCommandOutputHandler {
+    fn collect_outputs(&self) -> bool {
+        false
+    }
+
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> bool>> {
+        let handler = self.handler.clone();
+        Some(Box::new(move |r#type: &str, buffer: &str| {
+            (handler.borrow_mut())(r#type, buffer)
+        }))
+    }
+
+    fn write_back(&mut self, _value: String) {}
 }

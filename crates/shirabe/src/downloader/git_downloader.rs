@@ -974,7 +974,7 @@ impl VcsDownloader for GitDownloader {
         self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
         self.git_util
-            .run_commands(commands, url, Some(&path), true, None)?;
+            .run_commands(commands, url, Some(&path), true, ())?;
 
         let source_url = package.get_source_url();
         if Some(url) != source_url.as_deref() && source_url.is_some() {
@@ -1092,7 +1092,7 @@ impl VcsDownloader for GitDownloader {
             ];
 
             self.git_util
-                .run_commands(commands, url, Some(&path), false, None)?;
+                .run_commands(commands, url, Some(&path), false, ())?;
         }
 
         let command = vec![
@@ -1104,7 +1104,7 @@ impl VcsDownloader for GitDownloader {
             "%sanitizedUrl%".to_string(),
         ];
         self.git_util
-            .run_commands(vec![command], url, Some(&path), false, None)?;
+            .run_commands(vec![command], url, Some(&path), false, ())?;
 
         let pretty_version = target.get_pretty_version();
         if let Some(new_ref) =
