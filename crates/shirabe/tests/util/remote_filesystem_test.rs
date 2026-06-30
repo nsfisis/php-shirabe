@@ -4,8 +4,11 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
-use shirabe::util::RemoteFilesystem;
-use shirabe_php_shim::{PhpMixed, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, strpos};
+use shirabe::util::{GetResult, RemoteFilesystem};
+use shirabe_php_shim::{
+    PHP_URL_HOST, PhpMixed, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, file_get_contents,
+    parse_url, strpos, unlink,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -204,16 +207,62 @@ fn test_callback_get_passes_through404() {
     .unwrap();
 }
 
-#[test]
-#[ignore = "real get_contents bottoms out at curl_multi_init (todo!()) in StreamContextFactory; no network/stream layer is modeled"]
-fn test_get_contents() {
-    todo!()
+// Mirrors PHP's `(string)` cast of getContents()'s string|true|false result.
+fn get_result_to_string(res: &GetResult) -> String {
+    match res {
+        GetResult::Content(s) => s.clone(),
+        GetResult::True => "1".to_string(),
+        GetResult::False => String::new(),
+    }
+}
+
+// Mirrors PHP's `__FILE__`: the path to this test source file.
+fn this_file() -> String {
+    format!(
+        "{}/tests/util/remote_filesystem_test.rs",
+        env!("CARGO_MANIFEST_DIR")
+    )
 }
 
 #[test]
-#[ignore = "real copy bottoms out at curl_multi_init (todo!()) in StreamContextFactory; no network/stream layer is modeled"]
+#[ignore = "get_remote_contents has no stream/file layer (TODO(phase-c)) and returns None, so getContents raises a TransportException instead of reading the file:// URL"]
+fn test_get_contents() {
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
+
+    let res = fs
+        .get_contents(
+            "http://example.org",
+            &format!("file://{}", this_file()),
+            false,
+            IndexMap::new(),
+        )
+        .unwrap();
+    assert!(strpos(&get_result_to_string(&res), "testGetContents").is_some());
+}
+
+#[test]
+#[ignore = "get_remote_contents has no stream/file layer (TODO(phase-c)) and returns None, so copy raises a TransportException instead of reading the file:// URL"]
 fn test_copy() {
-    todo!()
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
+
+    let file = tempfile::NamedTempFile::new().unwrap();
+    let file = file.path().to_str().unwrap().to_string();
+    assert!(matches!(
+        fs.copy(
+            "http://example.org",
+            &format!("file://{}", this_file()),
+            &file,
+            false,
+            IndexMap::new()
+        )
+        .unwrap(),
+        GetResult::True
+    ));
+    assert!(std::path::Path::new(&file).exists());
+    assert!(strpos(&file_get_contents(&file).unwrap_or_default(), "testCopy").is_some());
+    unlink(&file);
 }
 
 #[test]
@@ -234,8 +283,27 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
     todo!()
 }
 
+// Mirrors RemoteFilesystemTest::provideBitbucketPublicDownloadUrls.
+fn provide_bitbucket_public_download_urls() -> Vec<(&'static str, &'static str)> {
+    vec![(
+        "https://bitbucket.org/seldaek/composer-live-test-repo/raw/master/composer-unit-test-download-me.txt",
+        "1234",
+    )]
+}
+
 #[test]
-#[ignore = "real getContents network download reaches curl_multi_init (todo!()); no network layer is modeled"]
+#[ignore = "performs a real network download; get_remote_contents has no stream layer (TODO(phase-c)) and returns None, so getContents raises a TransportException"]
 fn test_bit_bucket_public_download() {
-    todo!()
+    for (url, contents) in provide_bitbucket_public_download_urls() {
+        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+        let mut rfs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
+        let hostname = parse_url(url, PHP_URL_HOST);
+        let hostname = hostname.as_string().unwrap_or("");
+
+        let result = rfs
+            .get_contents(hostname, url, false, IndexMap::new())
+            .unwrap();
+
+        assert_eq!(contents, get_result_to_string(&result));
+    }
 }
