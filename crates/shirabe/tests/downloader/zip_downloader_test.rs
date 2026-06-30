@@ -1,16 +1,19 @@
 //! ref: composer/tests/Composer/Test/Downloader/ZipDownloaderTest.php
 
 use crate::io_stub::IOStub;
+use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::downloader::ArchiveDownloader;
+use shirabe::downloader::DownloaderInterface;
 use shirabe::downloader::zip_downloader::ZipDownloader;
 use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::{ZipArchive, ZipArchiveMock};
+use shirabe::util::r#loop::Loop;
+use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock};
 use shirabe_semver::VersionParser;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -109,15 +112,85 @@ fn make_downloader(set_up: &SetUp) -> ZipDownloader {
 // crate). The PHP tests below mock Process/ProcessExecutor::executeAsync, which is not reproducible
 // here, so they remain ignored.
 //
-// testErrorMessages drives a real HttpDownloader + Loop (curl_multi_init todo!()), also out of reach.
+// testErrorMessages drives a real HttpDownloader + Loop, but RemoteFilesystem::get_remote_contents
+// is a phase-c stub returning None, so the file:// dist download fails before the ZipArchive path.
 
-#[ignore = "drives a real HttpDownloader + Loop (download/install), which reaches curl_multi_init todo!()"]
+#[ignore = "drives a real HttpDownloader whose RemoteFilesystem::get_remote_contents is a phase-c stub returning None, so the file:// dist download fails with a \"could not be downloaded\" TransportException before reaching the ZipArchive \"is not a zip archive\" path"]
 #[test]
+#[serial]
 fn test_error_messages() {
-    let set_up = set_up();
-    let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
-    let _ = (&set_up.io, &set_up.config, &set_up.http_downloader);
-    todo!()
+    // class_exists('ZipArchive') is always true in the shim, so the zip-extension-missing skip never
+    // applies here.
+    let test_dir = TempDir::new().unwrap();
+    let _tear_down = TearDown::new(test_dir.path().to_path_buf());
+
+    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+
+    // $this->config->method('get')->with('vendor-dir')->willReturn($this->testDir)
+    let mut config = Config::new(false, None);
+    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    config_options.insert(
+        "vendor-dir".to_string(),
+        PhpMixed::String(test_dir.path().to_string_lossy().into_owned()),
+    );
+    let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
+    merged.insert("config".to_string(), PhpMixed::Array(config_options));
+    config.merge(&merged, "test");
+    let config = Rc::new(RefCell::new(config));
+
+    // new HttpDownloader($this->io, $dlConfig): a real downloader (not the extract-path mock).
+    let dl_config = Rc::new(RefCell::new(Config::new(false, None)));
+    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+        io.clone(),
+        dl_config,
+        IndexMap::new(),
+        false,
+    )));
+
+    // $distUrl = 'file://'.__FILE__: an existing, non-zip file referenced by a file:// URL.
+    let dist_url = format!("file://{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
+    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
+    let package: PackageInterfaceHandle =
+        CompletePackageHandle::new("test/pkg".to_string(), norm_version, "1.0.0".to_string())
+            .into();
+    package.set_dist_url(Some(dist_url));
+
+    let filesystem = Rc::new(RefCell::new(Filesystem::new(None)));
+    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let mut downloader = ZipDownloader::new(
+        io,
+        config,
+        http_downloader.clone(),
+        None,
+        None,
+        filesystem,
+        process,
+    );
+
+    let path = std::env::temp_dir()
+        .join("composer-zip-test")
+        .to_string_lossy()
+        .into_owned();
+
+    let result: anyhow::Result<()> = (|| {
+        let mut loop_ = Loop::new(http_downloader.clone(), None);
+        let promise = Box::pin(async {
+            DownloaderInterface::download(&mut downloader, package.clone(), &path, None, true)
+                .await
+                .map(|_| ())
+        });
+        run(loop_.wait(vec![promise], None))?;
+        run(DownloaderInterface::install(
+            &mut downloader,
+            package.clone(),
+            &path,
+            true,
+        ))
+        .map(|_| ())
+    })();
+
+    let e = result.expect_err("Download of invalid zip files should throw an exception");
+    assert!(e.to_string().contains("is not a zip archive"), "got: {e}");
 }
 
 #[test]
