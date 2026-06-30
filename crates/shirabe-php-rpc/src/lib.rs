@@ -107,3 +107,86 @@ fn parse_serialized_string(payload: &[u8]) -> Option<String> {
     let bytes = after.strip_prefix(b"\"")?.get(..len)?;
     Some(String::from_utf8_lossy(bytes).into_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_string_scalar() {
+        assert_eq!(
+            parse_serialized_string(b"s:5:\"8.5.7\";").as_deref(),
+            Some("8.5.7"),
+        );
+    }
+
+    #[test]
+    fn parses_empty_string() {
+        assert_eq!(parse_serialized_string(b"s:0:\"\";").as_deref(), Some(""));
+    }
+
+    #[test]
+    fn parses_string_with_embedded_quote() {
+        assert_eq!(
+            parse_serialized_string(b"s:3:\"a\"b\";").as_deref(),
+            Some("a\"b"),
+        );
+    }
+
+    #[test]
+    fn rejects_non_string_scalars() {
+        assert_eq!(parse_serialized_string(b"i:42;"), None);
+        assert_eq!(parse_serialized_string(b"N;"), None);
+        assert_eq!(parse_serialized_string(b"b:1;"), None);
+    }
+
+    #[test]
+    fn rejects_truncated_string() {
+        assert_eq!(parse_serialized_string(b"s:5:\"ab\";"), None);
+    }
+
+    #[test]
+    fn rejects_non_numeric_length() {
+        assert_eq!(parse_serialized_string(b"s:x:\"ab\";"), None);
+    }
+
+    #[test]
+    fn frame_roundtrip() {
+        let (mut a, mut b) = UnixStream::pair().unwrap();
+        write_frame(&mut a, b"get_php_version").unwrap();
+        assert_eq!(read_frame(&mut b).unwrap(), b"get_php_version");
+    }
+
+    #[test]
+    fn frame_roundtrip_empty_payload() {
+        let (mut a, mut b) = UnixStream::pair().unwrap();
+        write_frame(&mut a, b"").unwrap();
+        assert_eq!(read_frame(&mut b).unwrap(), b"");
+    }
+
+    #[test]
+    fn queries_real_php_when_available() {
+        if PhpExecutableFinder::new().find(false).is_none() {
+            // No PHP in this environment; the worker cannot start.
+            return;
+        }
+
+        let version = get_php_version();
+        assert!(!version.is_empty(), "expected a PHP version");
+        assert!(
+            version
+                .split('.')
+                .next()
+                .and_then(|n| n.parse::<u32>().ok())
+                .is_some(),
+            "version should start with a number: {version}",
+        );
+
+        let binary = get_php_binary();
+        assert!(!binary.is_empty(), "expected a PHP binary path");
+        assert!(
+            std::path::Path::new(&binary).exists(),
+            "binary should exist: {binary}",
+        );
+    }
+}
