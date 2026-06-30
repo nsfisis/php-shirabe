@@ -93,14 +93,13 @@ use shirabe_external_packages::symfony::console::style::symfony_style::SymfonySt
 use shirabe_external_packages::symfony::console::terminal::Terminal;
 use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
 use shirabe_php_shim::{
-    LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
-    RuntimeException, bin2hex, chdir, date_default_timezone_get, date_default_timezone_set,
-    defined, dirname, disk_free_space, extension_loaded, file_exists, file_get_contents,
-    file_put_contents, function_exists, getcwd, getmypid, glob, in_array, ini_set, is_array,
-    is_dir, is_file, is_string, is_subclass_of, json_decode, memory_get_peak_usage,
-    memory_get_usage, microtime, php_uname, posix_getuid, random_bytes, realpath,
-    restore_error_handler, round, str_contains, str_replace, strpos, strtoupper, sys_get_temp_dir,
-    time, unlink,
+    LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
+    bin2hex, chdir, date_default_timezone_get, date_default_timezone_set, defined, dirname,
+    disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    function_exists, getcwd, getmypid, glob, in_array, ini_set, is_array, is_dir, is_file,
+    is_string, is_subclass_of, json_decode, memory_get_peak_usage, memory_get_usage, microtime,
+    php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains,
+    str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
@@ -2492,7 +2491,8 @@ impl ApplicationHandle {
             {
                 io.write_error(&format!(
                     "<info>PHP</info> version <comment>{}</comment> ({})",
-                    PHP_VERSION, PHP_BINARY,
+                    shirabe_php_rpc::get_php_version(),
+                    shirabe_php_rpc::get_php_binary(),
                 ));
                 io.write_error(
                     "Run the \"diagnose\" command to get more detailed diagnostics output.",

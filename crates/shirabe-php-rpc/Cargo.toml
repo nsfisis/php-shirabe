@@ -1,0 +1,11 @@
+[package]
+name = "shirabe-php-rpc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shirabe-external-packages.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -2011,6 +2011,7 @@ dependencies = [
  "shirabe-class-map-generator",
  "shirabe-external-packages",
  "shirabe-metadata-minifier",
+ "shirabe-php-rpc",
  "shirabe-php-shim",
  "shirabe-semver",
  "shirabe-spdx-licenses",
@@ -2047,6 +2048,14 @@ version = "0.0.1"
 dependencies = [
  "indexmap",
  "shirabe-php-shim",
+]
+
+[[package]]
+name = "shirabe-php-rpc"
+version = "0.0.1"
+dependencies = [
+ "shirabe-external-packages",
+ "tempfile",
 ]
 
 [[package]]
