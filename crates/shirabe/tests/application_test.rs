@@ -5,6 +5,12 @@
 // Symfony command-registry model), or a runtime define() of COMPOSER_DEV_WARNING_TIME,
 // remain unportable.
 
+#[path = "common/test_case.rs"]
+mod test_case;
+
+use serial_test::serial;
+use test_case::init_temp_composer;
+
 use shirabe::command::about_command::AboutCommand;
 use shirabe::command::self_update_command::SelfUpdateCommand;
 use shirabe::console::application::ApplicationHandle;
@@ -108,20 +114,113 @@ fn test_process_isolation_works_multiple_times() {
     assert_eq!(0, application.do_run(input2, output2).unwrap());
 }
 
-#[ignore = "do_run's script-command registration is a todo!() pending the Symfony command-registry model"]
+#[ignore = "Application::do_run registers the composer.json script as a command, a path that ends at a todo!() \
+            (application.rs:2461, 'plugin: register reflection-instantiated command on Application::add'). With a \
+            'scripts' key present, do_run panics there before getComposer is reached"]
 #[test]
+#[serial]
 fn test_no_plugins_disables_plugins_when_script_commands_exist() {
     let _tear_down = TearDown;
     set_up();
 
-    todo!()
+    // PHP also calls setAutoExit(false)/setCatchErrors(false); both are Symfony base-Application
+    // methods the external-package stub does not model, and neither affects the do_run path
+    // exercised here (they only matter for run()/error catching), so only set_catch_exceptions
+    // is mirrored.
+    let _init = init_temp_composer(
+        Some(&serde_json::json!({
+            "scripts": {
+                "my-script": "echo hello",
+            },
+        })),
+        None,
+        None,
+        true,
+    );
+
+    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    application.set_catch_exceptions(false);
+
+    // Run list command with --no-plugins, this triggers script command registration which previously
+    // created a Composer instance with plugins enabled regardless of the --no-plugins flag
+    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
+        ArrayInput::new(
+            vec![
+                (PhpMixed::from("command"), PhpMixed::from("list")),
+                (PhpMixed::from("--no-plugins"), PhpMixed::from(true)),
+            ],
+            None,
+        )
+        .unwrap(),
+    ));
+    let output: Rc<RefCell<dyn OutputInterface>> =
+        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    application.do_run(input, output).unwrap();
+
+    let composer = application.__get_composer(false, None, None).unwrap();
+    assert!(
+        composer.is_some(),
+        "Composer instance should have been created during script command registration"
+    );
+    let composer = composer.unwrap();
+    let composer = shirabe::composer::composer_full(&composer);
+    assert!(
+        composer
+            .get_plugin_manager()
+            .borrow()
+            .are_plugins_disabled("local"),
+        "Plugins should be disabled when --no-plugins is used"
+    );
+    assert!(
+        composer
+            .get_plugin_manager()
+            .borrow()
+            .are_plugins_disabled("global"),
+        "Global plugins should be disabled when --no-plugins is used"
+    );
 }
 
-#[ignore = "do_run's script-command registration is a todo!() pending the Symfony command-registry model"]
+#[ignore = "Application::do_run registers composer.json scripts as commands; that path ends at a todo!() \
+            (application.rs:2461, 'plugin: register reflection-instantiated command on Application::add'). With a \
+            'scripts' key present, do_run panics there before the script command executes"]
 #[test]
+#[serial]
 fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
     let _tear_down = TearDown;
     set_up();
 
-    todo!()
+    // PHP also calls setAutoExit(false)/setCatchErrors(false); both are Symfony base-Application
+    // methods the external-package stub does not model, and neither affects the do_run path
+    // exercised here (they only matter for run()/error catching), so only set_catch_exceptions
+    // is mirrored.
+    let _init = init_temp_composer(
+        Some(&serde_json::json!({
+            "scripts": {
+                "check": "echo hello",
+            },
+        })),
+        None,
+        None,
+        true,
+    );
+
+    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    application.set_catch_exceptions(false);
+
+    let app_output = Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
+        ArrayInput::new(
+            vec![(PhpMixed::from("command"), PhpMixed::from("check"))],
+            None,
+        )
+        .unwrap(),
+    ));
+    let output_trait: Rc<RefCell<dyn OutputInterface>> = app_output.clone();
+    let exit_code = application.do_run(input, output_trait).unwrap();
+
+    assert_eq!(0, exit_code, "Script command should have run successfully");
+    assert!(
+        app_output.borrow().fetch().contains("hello"),
+        "The \"check\" script should have been executed instead of the check-platform-reqs command"
+    );
 }

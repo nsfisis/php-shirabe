@@ -2582,6 +2582,20 @@ impl ApplicationHandle {
     pub fn __base_application(&self) -> std::rc::Rc<std::cell::RefCell<dyn BaseApplication>> {
         self.0.clone()
     }
+
+    /// For testing only: exposes the inner Application's `get_composer`, mirroring the public PHP
+    /// `$application->getComposer($required, $disablePlugins, $disableScripts)` so tests can inspect
+    /// the Composer instance created during do_run.
+    pub fn __get_composer(
+        &self,
+        required: bool,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> anyhow::Result<Option<PartialComposerHandle>> {
+        self.0
+            .borrow_mut()
+            .get_composer(required, disable_plugins, disable_scripts)
+    }
 }
 
 impl ApplicationHandle {
