@@ -7,6 +7,7 @@ use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::event_dispatcher::EventDispatcher;
+use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::installer::{InstallationManager, InstallerInterface};
 use shirabe::io::{BufferIO, IOInterface};
 use shirabe::package::handle::{AliasPackageHandle, PackageHandle, RootPackageHandle};
@@ -18,6 +19,7 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PhpMixed;
+use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -141,6 +143,27 @@ fn null_path(s: &str) -> String {
     s.to_string()
 }
 
+/// Builds an InstallationManager whose single installer routes `getInstallPath` through
+/// `InstallPathStubInstaller`. The PHP loop mock has its constructor disabled and is never
+/// exercised here, so a mock HttpDownloader (no real curl backend) stands in for the loop.
+fn make_installation_manager(
+    vendor_dir: &str,
+    io: Rc<RefCell<dyn IOInterface>>,
+) -> InstallationManager {
+    let config_for_downloader = Rc::new(RefCell::new(Config::new(false, None)));
+    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(
+        io.clone(),
+        config_for_downloader,
+    )));
+    let loop_ = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
+
+    let mut im = InstallationManager::new(loop_, io, None);
+    im.add_installer(Box::new(InstallPathStubInstaller {
+        vendor_dir: vendor_dir.to_string(),
+    }));
+    im
+}
+
 fn set_up() -> SetUp {
     let temp_dir = TempDir::new().unwrap();
     let working_dir = temp_dir.path().to_str().unwrap().to_string();
@@ -154,20 +177,8 @@ fn set_up() -> SetUp {
         BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
     ));
 
-    // The PHP loop mock has its constructor disabled and is never exercised here, so a mock
-    // HttpDownloader (no real curl backend) stands in for the InstallationManager's loop.
     let dispatcher_io: Rc<RefCell<dyn IOInterface>> = io.clone();
-    let config_for_downloader = Rc::new(RefCell::new(Config::new(false, None)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(
-        dispatcher_io.clone(),
-        config_for_downloader,
-    )));
-    let loop_ = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
-
-    let mut im = InstallationManager::new(loop_, dispatcher_io.clone(), None);
-    im.add_installer(Box::new(InstallPathStubInstaller {
-        vendor_dir: vendor_dir.clone(),
-    }));
+    let im = make_installation_manager(&vendor_dir, dispatcher_io.clone());
 
     let repository = InstalledArrayRepository::new().unwrap();
 
@@ -251,6 +262,15 @@ fn assert_file_content_equals(expected: &str, actual: &str) {
         .unwrap_or_else(|e| panic!("read {}: {}", actual, e))
         .replace('\r', "");
     assert_eq!(exp, act, "{} equals {}", expected, actual);
+}
+
+/// ref: PHPUnit `assertStringEqualsFile`
+#[track_caller]
+fn assert_str_equals_file(expected: &str, actual_path: &str) {
+    let act = std::fs::read_to_string(actual_path)
+        .unwrap_or_else(|e| panic!("read {}: {}", actual_path, e))
+        .replace('\r', "");
+    assert_eq!(expected, act, "content of {}", actual_path);
 }
 
 fn match_all() -> AnyConstraint {
@@ -1721,12 +1741,8 @@ fn test_exclude_from_classmap() {
 // - testIncludePathsArePrependedInAutoloadFile / testIncludePathsInRootPackage /
 //   testUseGlobalIncludePath: assert PHP's get_include_path() after `require autoload.php`.
 // - testPreAndPostEventsAreDispatchedDuringAutoloadDump: EventDispatcher::dispatchScript spy.
-// - testVendorDirExcludedFromWorkingDir / testUpLevelRelativePaths: chdir into a nested working dir
-//   with a custom getInstallPath using a different vendor dir.
 // - testAutoloadRulesInPackageThatDoesNotExistOnDisk: exercises buildPackageMap/parseAutoloads
 //   directly plus a CompletePackage; multi-dump with mutation.
-// - testGeneratesPlatformCheck: data-provider over many platform-requirement scenarios.
-// - testAbsoluteSymlinkWith*: create real filesystem symlinks.
 
 #[test]
 #[ignore = "require autoload.php + function_exists() assertions are unportable (composer_require todo!())"]
@@ -1765,15 +1781,196 @@ fn test_use_global_include_path() {
 }
 
 #[test]
-#[ignore = "needs nested working dir + custom getInstallPath vendor dir"]
+#[serial]
 fn test_vendor_dir_excluded_from_working_dir() {
-    todo!()
+    let mut s = set_up();
+    let working_dir = format!("{}/working-dir", s.vendor_dir);
+    let vendor_dir = format!("{}/../vendor", working_dir);
+
+    s.ensure_dir(&working_dir);
+    std::env::set_current_dir(&working_dir).unwrap();
+
+    let package = new_root_pkg("root/a");
+    package.set_autoload(autoload(vec![
+        ("psr-0", str_map(&[("Foo", pstr("src"))])),
+        ("psr-4", str_map(&[("Acme\\Foo\\", pstr("src-psr4"))])),
+        ("classmap", str_list(&["classmap"])),
+        ("files", str_list(&["test.php"])),
+    ]));
+    package.set_requires(requires(vec![("b/b", link("a", "b/b", match_all(), None))]));
+
+    let vendor_package = new_pkg("b/b");
+    vendor_package.__set_autoload(autoload(vec![
+        ("psr-0", str_map(&[("Bar", pstr("lib"))])),
+        ("psr-4", str_map(&[("Acme\\Bar\\", pstr("lib-psr4"))])),
+        ("classmap", str_list(&["classmaps"])),
+        ("files", str_list(&["bootstrap.php"])),
+    ]));
+
+    s.set_canonical_packages(vec![vendor_package.into()]);
+
+    let mut im = make_installation_manager(&vendor_dir, s.io.clone());
+
+    s.ensure_dir(&format!("{}/src/Foo", working_dir));
+    s.ensure_dir(&format!("{}/classmap", working_dir));
+    s.ensure_dir(&format!("{}/composer", vendor_dir));
+    s.ensure_dir(&format!("{}/b/b/lib/Bar", vendor_dir));
+    s.ensure_dir(&format!("{}/b/b/classmaps", vendor_dir));
+    s.put(
+        &format!("{}/src/Foo/Bar.php", working_dir),
+        "<?php namespace Foo; class Bar {}",
+    );
+    s.put(
+        &format!("{}/classmap/classes.php", working_dir),
+        "<?php namespace Foo; class Foo {}",
+    );
+    s.put(&format!("{}/test.php", working_dir), "<?php class Foo {}");
+    s.put(
+        &format!("{}/b/b/lib/Bar/Foo.php", vendor_dir),
+        "<?php namespace Bar; class Foo {}",
+    );
+    s.put(
+        &format!("{}/b/b/classmaps/classes.php", vendor_dir),
+        "<?php namespace Bar; class Bar {}",
+    );
+    s.put(
+        &format!("{}/b/b/bootstrap.php", vendor_dir),
+        "<?php class Bar {}",
+    );
+
+    s.vendor_dir = vendor_dir.clone();
+    let config = s.config();
+    s.generator
+        .dump(
+            &config,
+            &mut s.repository,
+            package.into(),
+            &mut im,
+            "composer",
+            true,
+            Some("_13".to_string()),
+            None,
+            false,
+        )
+        .unwrap();
+
+    let expected_namespace = "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir).'/working-dir';\n\nreturn array(\n    'Foo' => array($baseDir . '/src'),\n    'Bar' => array($vendorDir . '/b/b/lib'),\n);\n";
+
+    let expected_psr4 = "<?php\n\n// autoload_psr4.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir).'/working-dir';\n\nreturn array(\n    'Acme\\\\Foo\\\\' => array($baseDir . '/src-psr4'),\n    'Acme\\\\Bar\\\\' => array($vendorDir . '/b/b/lib-psr4'),\n);\n";
+
+    let expected_classmap = "<?php\n\n// autoload_classmap.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir).'/working-dir';\n\nreturn array(\n    'Bar\\\\Bar' => $vendorDir . '/b/b/classmaps/classes.php',\n    'Bar\\\\Foo' => $vendorDir . '/b/b/lib/Bar/Foo.php',\n    'Composer\\\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',\n    'Foo\\\\Bar' => $baseDir . '/src/Foo/Bar.php',\n    'Foo\\\\Foo' => $baseDir . '/classmap/classes.php',\n);\n";
+
+    assert_str_equals_file(
+        expected_namespace,
+        &format!("{}/composer/autoload_namespaces.php", vendor_dir),
+    );
+    assert_str_equals_file(
+        expected_psr4,
+        &format!("{}/composer/autoload_psr4.php", vendor_dir),
+    );
+    assert_str_equals_file(
+        expected_classmap,
+        &format!("{}/composer/autoload_classmap.php", vendor_dir),
+    );
+    let files = std::fs::read_to_string(format!("{}/composer/autoload_files.php", vendor_dir))
+        .unwrap()
+        .replace('\r', "");
+    assert!(files.contains("$vendorDir . '/b/b/bootstrap.php',\n"));
+    assert!(files.contains("$baseDir . '/test.php',\n"));
 }
 
 #[test]
-#[ignore = "needs nested working dir chdir + up-level relative path fixtures"]
+#[serial]
+#[ignore = "classmap generation does not apply exclude-from-classmap rules that use up-level (../) relative paths or wildcards, so excluded classes (Boo/Boo2/Boo3/Boo4) still appear"]
 fn test_up_level_relative_paths() {
-    todo!()
+    let mut s = set_up();
+    let working_dir = format!("{}/working-dir", s.working_dir);
+    std::fs::create_dir_all(&working_dir).unwrap();
+    std::env::set_current_dir(&working_dir).unwrap();
+
+    let package = new_root_pkg("root/a");
+    package.set_autoload(autoload(vec![
+        ("psr-0", str_map(&[("Foo", pstr("../path/../src"))])),
+        (
+            "psr-4",
+            str_map(&[("Acme\\Foo\\", pstr("../path/../src-psr4"))]),
+        ),
+        (
+            "classmap",
+            str_list(&[
+                "../classmap",
+                "../classmap2/subdir",
+                "classmap3",
+                "classmap4",
+            ]),
+        ),
+        ("files", str_list(&["../test.php"])),
+        (
+            "exclude-from-classmap",
+            str_list(&[
+                "./../classmap/excluded",
+                "../classmap2",
+                "classmap3/classes.php",
+                "classmap4/*/classes.php",
+            ]),
+        ),
+    ]));
+
+    s.ensure_dir(&format!("{}/src/Foo", s.working_dir));
+    s.ensure_dir(&format!("{}/classmap/excluded", s.working_dir));
+    s.ensure_dir(&format!("{}/classmap2/subdir", s.working_dir));
+    s.ensure_dir(&format!("{}/working-dir/classmap3", s.working_dir));
+    s.ensure_dir(&format!("{}/working-dir/classmap4/foo/", s.working_dir));
+    s.put(
+        &format!("{}/src/Foo/Bar.php", s.working_dir),
+        "<?php namespace Foo; class Bar {}",
+    );
+    s.put(
+        &format!("{}/classmap/classes.php", s.working_dir),
+        "<?php namespace Foo; class Foo {}",
+    );
+    s.put(
+        &format!("{}/classmap/excluded/classes.php", s.working_dir),
+        "<?php namespace Foo; class Boo {}",
+    );
+    s.put(
+        &format!("{}/classmap2/subdir/classes.php", s.working_dir),
+        "<?php namespace Foo; class Boo2 {}",
+    );
+    s.put(
+        &format!("{}/working-dir/classmap3/classes.php", s.working_dir),
+        "<?php namespace Foo; class Boo3 {}",
+    );
+    s.put(
+        &format!("{}/working-dir/classmap4/foo/classes.php", s.working_dir),
+        "<?php namespace Foo; class Boo4 {}",
+    );
+    s.put(&format!("{}/test.php", s.working_dir), "<?php class Foo {}");
+
+    dump(&mut s, package.into(), true, "_14").unwrap();
+
+    let expected_namespace = "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir).'/working-dir';\n\nreturn array(\n    'Foo' => array($baseDir . '/../src'),\n);\n";
+
+    let expected_psr4 = "<?php\n\n// autoload_psr4.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir).'/working-dir';\n\nreturn array(\n    'Acme\\\\Foo\\\\' => array($baseDir . '/../src-psr4'),\n);\n";
+
+    let expected_classmap = "<?php\n\n// autoload_classmap.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir).'/working-dir';\n\nreturn array(\n    'Composer\\\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',\n    'Foo\\\\Bar' => $baseDir . '/../src/Foo/Bar.php',\n    'Foo\\\\Foo' => $baseDir . '/../classmap/classes.php',\n);\n";
+
+    assert_str_equals_file(
+        expected_namespace,
+        &format!("{}/composer/autoload_namespaces.php", s.vendor_dir),
+    );
+    assert_str_equals_file(
+        expected_psr4,
+        &format!("{}/composer/autoload_psr4.php", s.vendor_dir),
+    );
+    assert_str_equals_file(
+        expected_classmap,
+        &format!("{}/composer/autoload_classmap.php", s.vendor_dir),
+    );
+    let files = std::fs::read_to_string(format!("{}/composer/autoload_files.php", s.vendor_dir))
+        .unwrap()
+        .replace('\r', "");
+    assert!(files.contains("$baseDir . '/../test.php',\n"));
 }
 
 #[test]
@@ -1782,20 +1979,304 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     todo!()
 }
 
+/// ref: AutoloadGeneratorTest::platformCheckProvider — builds the link map for a requires/provides/
+/// replaces entry. Each tuple is `(key, target, constraint)` mirroring `new Link('a', target, parse)`.
+fn platform_links(vp: &VersionParser, entries: &[(&str, &str, &str)]) -> IndexMap<String, Link> {
+    requires(
+        entries
+            .iter()
+            .map(|(key, target, c)| {
+                (
+                    *key,
+                    link("a", target, vp.parse_constraints(c).unwrap(), None),
+                )
+            })
+            .collect(),
+    )
+}
+
 #[test]
-#[ignore = "data-provider over platform-requirement scenarios"]
+#[serial]
+#[ignore = "get_platform_check: an extension whose provider/replacer constraint does NOT satisfy the requirement (ext-pdo 7.1.* vs ^7.2) is still skipped, so platform_check.php is not generated where Composer generates it"]
 fn test_generates_platform_check() {
-    todo!()
+    let vp = VersionParser;
+
+    // ref: AutoloadGeneratorTest::platformCheckProvider (all 13 scenarios).
+    struct Scenario {
+        name: &'static str,
+        requires: Vec<(&'static str, &'static str, &'static str)>,
+        expected_fixture: Option<&'static str>,
+        provides: Vec<(&'static str, &'static str, &'static str)>,
+        replaces: Vec<(&'static str, &'static str, &'static str)>,
+        ignore_platform_reqs: PhpMixed,
+    }
+
+    let scenarios = vec![
+        Scenario {
+            name: "Typical project requirements",
+            requires: vec![
+                ("php", "php", "^7.2"),
+                ("ext-xml", "ext-xml", "*"),
+                ("ext-json", "ext-json", "*"),
+            ],
+            expected_fixture: Some("typical"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "No PHP lower bound",
+            requires: vec![("php", "php", "< 8")],
+            expected_fixture: None,
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "No PHP upper bound",
+            requires: vec![("php", "php", ">= 7.2")],
+            expected_fixture: Some("no_php_upper_bound"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "Specific PHP release version",
+            requires: vec![("php", "php", "^7.2.8")],
+            expected_fixture: Some("specific_php_release"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "Specific 64-bit PHP version",
+            requires: vec![("php-64bit", "php-64bit", "^7.2.8")],
+            expected_fixture: Some("specific_php_64bit_required"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "64-bit PHP required",
+            requires: vec![("php-64bit", "php-64bit", "*")],
+            expected_fixture: Some("php_64bit_required"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "No PHP required",
+            requires: vec![("ext-xml", "ext-xml", "*"), ("ext-json", "ext-json", "*")],
+            expected_fixture: Some("no_php_required"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "Ignoring all platform requirements skips check completely",
+            requires: vec![
+                ("php", "php", "^7.2"),
+                ("ext-xml", "ext-xml", "*"),
+                ("ext-json", "ext-json", "*"),
+            ],
+            expected_fixture: None,
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(true),
+        },
+        Scenario {
+            name: "Ignored platform requirements are not checked for",
+            requires: vec![
+                ("php", "php", "^7.2.8"),
+                ("ext-xml", "ext-xml", "*"),
+                ("ext-json", "ext-json", "*"),
+                ("ext-pdo", "ext-pdo", "*"),
+            ],
+            expected_fixture: Some("no_php_required"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: str_list(&["php", "ext-pdo"]),
+        },
+        Scenario {
+            name: "Via wildcard ignored platform requirements are not checked for",
+            requires: vec![
+                ("php", "php", "^7.2.8"),
+                ("ext-xml", "ext-xml", "*"),
+                ("ext-json", "ext-json", "*"),
+                ("ext-fileinfo", "ext-fileinfo", "*"),
+                ("ext-filesystem", "ext-filesystem", "*"),
+                ("ext-filter", "ext-filter", "*"),
+            ],
+            expected_fixture: Some("no_php_required"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: str_list(&["php", "ext-fil*"]),
+        },
+        Scenario {
+            name: "No extensions required",
+            requires: vec![("php", "php", "^7.2")],
+            expected_fixture: Some("no_extensions_required"),
+            provides: vec![],
+            replaces: vec![],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+        Scenario {
+            name: "Replaced/provided extensions are not checked for + checking case insensitivity",
+            requires: vec![
+                ("ext-xml", "ext-xml", "^7.2"),
+                ("ext-pdo", "ext-Pdo", "^7.2"),
+                ("ext-bcmath", "ext-bcMath", "^7.2"),
+            ],
+            expected_fixture: Some("replaced_provided_exts"),
+            // constraint does not satisfy all the ^7.2 requirement so we do not accept ext-pdo as being replaced;
+            // valid replace of bcmath so no need to check for it
+            replaces: vec![
+                ("ext-pdo", "ext-PDO", "7.1.*"),
+                ("ext-bcmath", "ext-BCMath", "^7.1"),
+            ],
+            // valid provide of ext-xml so no need to check for it
+            provides: vec![("ext-xml", "ext-XML", "*")],
+            ignore_platform_reqs: PhpMixed::Bool(false),
+        },
+    ];
+
+    for scenario in scenarios {
+        let mut s = set_up();
+        let package = new_root_pkg("root/a");
+        package.set_requires(platform_links(&vp, &scenario.requires));
+
+        if !scenario.provides.is_empty() {
+            package.set_provides(platform_links(&vp, &scenario.provides));
+        }
+
+        if !scenario.replaces.is_empty() {
+            package.set_replaces(platform_links(&vp, &scenario.replaces));
+        }
+
+        s.generator.set_platform_requirement_filter(
+            PlatformRequirementFilterFactory::from_bool_or_list(
+                scenario.ignore_platform_reqs.clone(),
+            )
+            .unwrap(),
+        );
+        dump(&mut s, package.into(), true, "_1").unwrap();
+
+        let platform_check = format!("{}/composer/platform_check.php", s.vendor_dir);
+        let autoload_real =
+            std::fs::read_to_string(format!("{}/composer/autoload_real.php", s.vendor_dir))
+                .unwrap()
+                .replace('\r', "");
+        match scenario.expected_fixture {
+            None => {
+                assert!(
+                    !std::path::Path::new(&platform_check).exists(),
+                    "[{}] platform_check.php should not exist",
+                    scenario.name
+                );
+                assert!(
+                    !autoload_real.contains("require __DIR__ . '/platform_check.php';"),
+                    "[{}] autoload_real.php should not require platform_check.php",
+                    scenario.name
+                );
+            }
+            Some(fixture) => {
+                assert_file_content_equals(
+                    fixtures_dir()
+                        .join("platform")
+                        .join(format!("{}.php", fixture))
+                        .to_str()
+                        .unwrap(),
+                    &platform_check,
+                );
+                assert!(
+                    autoload_real.contains("require __DIR__ . '/platform_check.php';"),
+                    "[{}] autoload_real.php should require platform_check.php",
+                    scenario.name
+                );
+            }
+        }
+    }
 }
 
 #[test]
-#[ignore = "creates real filesystem symlinks"]
+#[serial]
+#[ignore = "psr-4 compliance warning is emitted for files reached through an absolute symlink; Composer does not warn here"]
 fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
-    todo!()
+    let mut s = set_up();
+    let package = new_root_pkg("test/package");
+
+    // Create a directory structure with PSR-4 autoloading
+    s.ensure_dir(&format!(
+        "{}/tools-real/vendor/phpunit/phpunit/src/Framework/Exception",
+        s.working_dir
+    ));
+    s.put(
+        &format!(
+            "{}/tools-real/vendor/phpunit/phpunit/src/Framework/Exception/Exception.php",
+            s.working_dir
+        ),
+        "<?php namespace PHPUnit\\Framework; class Exception extends \\Exception {}",
+    );
+
+    // Create an absolute symlink
+    let target = format!("{}/tools-real", s.working_dir);
+    let r#link = format!("{}/tools", s.working_dir);
+    assert!(shirabe_php_shim::symlink(&target, &r#link));
+
+    package.set_autoload(autoload(vec![
+        ("psr-4", str_map(&[("MyTools\\", pstr("tools/"))])),
+        ("exclude-from-classmap", str_list(&["**/vendor/"])),
+    ]));
+
+    dump(&mut s, package.into(), true, "_9").unwrap();
+
+    let output = s.io.borrow().get_output();
+
+    // Should not contain PSR-4 violation warnings
+    assert!(!output.contains("does not comply with psr-4 autoloading standard"));
 }
 
 #[test]
-#[ignore = "creates real filesystem symlinks"]
+#[serial]
+#[ignore = "exclude-from-classmap '**/vendor/' is not applied to paths reached through an absolute symlink, so PHPUnit\\Framework\\Exception is not excluded"]
 fn test_absolute_symlink_with_classmap_exclude_from_classmap() {
-    todo!()
+    let mut s = set_up();
+    let package = new_root_pkg("test/package");
+
+    // Create a directory structure with files
+    s.ensure_dir(&format!(
+        "{}/tools-real/vendor/phpunit/phpunit/src/Framework",
+        s.working_dir
+    ));
+    s.put(
+        &format!(
+            "{}/tools-real/vendor/phpunit/phpunit/src/Framework/Exception.php",
+            s.working_dir
+        ),
+        "<?php namespace PHPUnit\\Framework; class Exception extends \\Exception {}",
+    );
+    s.put(
+        &format!("{}/tools-real/MyClass.php", s.working_dir),
+        "<?php class MyClass {}",
+    );
+
+    // Create an absolute symlink
+    let target = format!("{}/tools-real", s.working_dir);
+    let r#link = format!("{}/tools", s.working_dir);
+    assert!(shirabe_php_shim::symlink(&target, &r#link));
+
+    package.set_autoload(autoload(vec![
+        ("classmap", str_list(&["tools/"])),
+        ("exclude-from-classmap", str_list(&["**/vendor/"])),
+    ]));
+
+    let class_map = dump(&mut s, package.into(), false, "_9").unwrap();
+
+    // Check that MyClass is included but vendor files are excluded
+    assert!(class_map.get_map().contains_key("MyClass"));
+    assert!(
+        !class_map
+            .get_map()
+            .contains_key("PHPUnit\\Framework\\Exception")
+    );
 }
