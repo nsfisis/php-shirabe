@@ -122,6 +122,13 @@ impl PlatformRepository {
         &self.disabled_packages
     }
 
+    fn ensure_initialized(&mut self) -> anyhow::Result<()> {
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
 
@@ -1804,6 +1811,7 @@ impl PlatformRepository {
             return Ok(Vec::new());
         }
 
+        self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
     }
 
@@ -1860,6 +1868,7 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         name: &str,
         constraint: crate::repository::FindPackageConstraint,
     ) -> anyhow::Result<Option<crate::package::BasePackageHandle>> {
+        self.ensure_initialized()?;
         self.inner.find_package(name, constraint)
     }
 
@@ -1868,10 +1877,12 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         name: &str,
         constraint: Option<crate::repository::FindPackageConstraint>,
     ) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+        self.ensure_initialized()?;
         self.inner.find_packages(name, constraint)
     }
 
     fn get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+        self.ensure_initialized()?;
         self.inner.get_packages()
     }
 
@@ -1882,6 +1893,7 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, crate::package::PackageInterfaceHandle>>,
     ) -> anyhow::Result<crate::repository::LoadPackagesResult> {
+        self.ensure_initialized()?;
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,
@@ -1896,13 +1908,14 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         mode: i64,
         r#type: Option<String>,
     ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
-        self.inner.search(query, mode, r#type)
+        PlatformRepository::search(self, query, mode, r#type)
     }
 
     fn get_providers(
         &mut self,
         package_name: String,
     ) -> anyhow::Result<IndexMap<String, crate::repository::ProviderInfo>> {
+        self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
 
