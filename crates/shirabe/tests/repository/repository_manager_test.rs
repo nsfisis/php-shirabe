@@ -8,7 +8,9 @@ use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
-use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle, RepositoryManager};
+use shirabe::repository::{
+    ArrayRepository, FilterRepository, PathRepository, RepositoryInterfaceHandle, RepositoryManager,
+};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
@@ -210,9 +212,34 @@ fn test_invalid_repo_creation_throws() {
 }
 
 #[test]
-#[ignore = "PathRepository does not implement RepositoryInterface (only ConfigurableRepositoryInterface), so it cannot live inside a RepositoryInterfaceHandle nor be recovered via as_any().downcast_ref::<PathRepository>(); the assertInstanceOf(PathRepository) check is unportable"]
 fn test_filter_repo_wrapping() {
     let SetUp { tmpdir } = set_up();
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
-    todo!()
+
+    let io = null_io();
+    let config = Rc::new(RefCell::new(Config::new(false, None)));
+    let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
+
+    rm.set_repository_class("path", "Composer\\Repository\\PathRepository");
+    let repo = rm
+        .create_repository(
+            "path",
+            str_config(&[
+                ("type", PhpMixed::String("path".to_string())),
+                (
+                    "url",
+                    PhpMixed::String(format!("{}/tests/repository", env!("CARGO_MANIFEST_DIR"))),
+                ),
+                (
+                    "only",
+                    PhpMixed::List(vec![PhpMixed::String("foo/bar".to_string())]),
+                ),
+            ]),
+            None,
+        )
+        .unwrap();
+
+    assert!(repo.is::<FilterRepository>());
+    let filter = repo.downcast_rc::<FilterRepository>().unwrap();
+    assert!(filter.borrow().get_repository().is::<PathRepository>());
 }
