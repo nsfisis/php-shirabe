@@ -3,8 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, class_exists, constant, defined, function_exists, get_loaded_extensions,
-    html_entity_decode, implode, instantiate_class, ltrim, phpversion, strip_tags, trim,
+    PhpMixed, class_exists, function_exists, get_loaded_extensions, html_entity_decode, implode,
+    instantiate_class, ltrim, phpversion, strip_tags, trim,
 };
 
 /// Seam over the PHP runtime so PlatformRepository can be tested against mocked
@@ -29,14 +29,14 @@ pub struct Runtime;
 
 impl RuntimeInterface for Runtime {
     fn has_constant(&self, constant_name: &str, class: Option<String>) -> bool {
-        defined(&ltrim(
+        shirabe_php_rpc::has_constant(&ltrim(
             &format!("{}::{}", class.as_deref().unwrap_or(""), constant_name),
             Some(":"),
         ))
     }
 
     fn get_constant(&self, constant_name: &str, class: Option<String>) -> PhpMixed {
-        constant(&ltrim(
+        shirabe_php_rpc::get_constant(&ltrim(
             &format!("{}::{}", class.as_deref().unwrap_or(""), constant_name),
             Some(":"),
         ))

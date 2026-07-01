@@ -7,8 +7,8 @@ if ($client === false) {
     exit(1);
 }
 $dispatch = [
-    'get_php_version' => static fn() => PHP_VERSION,
-    'get_php_binary'  => static fn() => PHP_BINARY,
+    'defined'  => static fn($name) => defined($name),
+    'constant' => static fn($name) => defined($name) ? constant($name) : null,
 ];
 $read_exact = static function ($conn, int $len): ?string {
     $buf = '';
@@ -31,7 +31,13 @@ while (true) {
     if ($name === null) {
         break;
     }
-    $result = isset($dispatch[$name]) ? ($dispatch[$name])() : null;
+    $sep = strpos($name, "\0");
+    $arg = null;
+    if ($sep !== false) {
+        $arg = substr($name, $sep + 1);
+        $name = substr($name, 0, $sep);
+    }
+    $result = isset($dispatch[$name]) ? ($dispatch[$name])($arg) : null;
     $payload = serialize($result);
     fwrite($client, pack('P', strlen($payload)) . $payload);
 }
