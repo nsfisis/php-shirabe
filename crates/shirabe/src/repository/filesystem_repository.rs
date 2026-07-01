@@ -26,7 +26,6 @@ use shirabe_php_shim::{
     is_array, is_null, is_string, ksort, realpath, str_repeat, trim, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
-use std::any::Any;
 
 /// Filesystem repository.
 #[derive(Debug)]
@@ -825,7 +824,7 @@ impl RepositoryInterface for FilesystemRepository {
         self.inner.get_repo_name()
     }
 
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 

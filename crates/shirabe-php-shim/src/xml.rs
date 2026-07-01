@@ -5,7 +5,6 @@
 //! handles over that graph.
 
 use std::cell::RefCell;
-use std::io::Write;
 use std::rc::{Rc, Weak};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -120,7 +119,7 @@ impl DOMDocument {
         self.0.borrow_mut().format_output = value;
     }
 
-    pub fn save_xml<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    pub fn save_xml<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let doc = self.0.borrow();
         writeln!(
             writer,
@@ -250,7 +249,7 @@ fn collect_by_tag(
     }
 }
 
-fn serialize_node<W: Write>(
+fn serialize_node<W: std::io::Write>(
     node: &Rc<RefCell<NodeInner>>,
     depth: usize,
     format: bool,
@@ -305,14 +304,14 @@ fn serialize_node<W: Write>(
     Ok(())
 }
 
-fn write_indent<W: Write>(out: &mut W, depth: usize) -> std::io::Result<()> {
+fn write_indent<W: std::io::Write>(out: &mut W, depth: usize) -> std::io::Result<()> {
     for _ in 0..depth {
         out.write_all(b"  ")?;
     }
     Ok(())
 }
 
-fn escape_text<W: Write>(s: &str, out: &mut W) -> std::io::Result<()> {
+fn escape_text<W: std::io::Write>(s: &str, out: &mut W) -> std::io::Result<()> {
     let mut buf = [0u8; 4];
     for c in s.chars() {
         match c {
@@ -326,7 +325,7 @@ fn escape_text<W: Write>(s: &str, out: &mut W) -> std::io::Result<()> {
     Ok(())
 }
 
-fn escape_attribute<W: Write>(s: &str, out: &mut W) -> std::io::Result<()> {
+fn escape_attribute<W: std::io::Write>(s: &str, out: &mut W) -> std::io::Result<()> {
     let mut buf = [0u8; 4];
     for c in s.chars() {
         match c {

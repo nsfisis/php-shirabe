@@ -1,7 +1,5 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchiverInterface.php
 
-use std::any::Any;
-
 pub trait ArchiverInterface {
     fn archive(
         &self,
@@ -15,5 +13,5 @@ pub trait ArchiverInterface {
     fn supports(&self, format: String, source_type: Option<String>) -> bool;
 
     /// PHP `$archiver instanceof X` checks; allow downcasting from `dyn ArchiverInterface`.
-    fn as_any(&self) -> &dyn Any;
+    fn as_any(&self) -> &dyn std::any::Any;
 }

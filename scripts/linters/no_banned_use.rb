@@ -1,5 +1,9 @@
 BANNED_USE_PATHS = %w[
   anyhow::Result
+  std::any::Any
+  std::io::Read
+  std::io::Write
+  std::process::Command
 ].freeze
 
 def no_banned_use(root_dir, excludes = [])
@@ -14,7 +18,8 @@ def no_banned_use(root_dir, excludes = [])
   return true if errors.empty?
 
   puts 'Found banned `use` imports.'
-  puts 'These items must always be referenced by their fully-qualified path:'
+  puts 'These items must always be referenced by their fully-qualified path.'
+  puts 'For imports to use trait methods, use `as _` (e.g., `use std::io::Write as _;`).'
   errors.each do |err|
     puts "  #{err}"
   end
@@ -63,7 +68,10 @@ def expand_use_tree(tree)
   brace = tree.index('{')
 
   if brace.nil?
-    return [strip_use_alias(tree)].reject(&:empty?)
+    stripped = strip_use_alias(tree)
+    return [] if stripped.nil?
+
+    return [stripped].reject(&:empty?)
   end
 
   prefix = tree[0...brace].sub(/::\s*\z/, '').strip
@@ -83,6 +91,8 @@ def expand_use_tree(tree)
 end
 
 def strip_use_alias(segment)
+  return nil if segment =~ /\s+as\s+_\s*\z/
+
   segment.sub(/\s+as\s+\S+\s*\z/, '').strip
 end
 

@@ -1,7 +1,7 @@
 //! Rust-to-PHP RPC over a Unix domain socket. See `docs/dev/php-rpc.md`.
 
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
-use std::io::{Read, Write};
+use std::io::{Read as _, Write as _};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};

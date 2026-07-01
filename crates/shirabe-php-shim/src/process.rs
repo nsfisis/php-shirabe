@@ -52,7 +52,7 @@ pub fn shell_exec(command: &str) -> Option<String> {
 }
 
 pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
-    use std::io::Write;
+    use std::io::Write as _;
     let result = std::process::Command::new("/bin/sh")
         .arg("-c")
         .arg(command)

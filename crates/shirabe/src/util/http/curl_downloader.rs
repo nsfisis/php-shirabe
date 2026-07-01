@@ -632,7 +632,7 @@ impl CurlDownloader {
         max_file_size: Option<u64>,
         filename: Option<&str>,
     ) -> Result<Body, (String, bool)> {
-        use std::io::{Read, Write};
+        use std::io::{Read as _, Write as _};
 
         let mut stream = resp;
         let mut written: u64 = 0;

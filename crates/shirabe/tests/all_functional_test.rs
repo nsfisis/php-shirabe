@@ -12,7 +12,6 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{CaptureKey, PREG_SPLIT_DELIM_CAPTURE, PhpMixed, intval};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
 ///
@@ -213,7 +212,7 @@ fn run_integration(test_filename: &str) {
     let run = &test_data["RUN"];
     let command_line = format!("'{}' --no-ansi {} 2>&1", bin, run);
 
-    let proc = Command::new("sh")
+    let proc = std::process::Command::new("sh")
         .arg("-c")
         .arg(&command_line)
         .current_dir(&test_dir)

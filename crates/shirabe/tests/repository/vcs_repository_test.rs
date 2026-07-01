@@ -12,7 +12,6 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
-use std::process::Command;
 use std::rc::Rc;
 use tempfile::TempDir;
 
@@ -31,7 +30,7 @@ fn set_up() -> Option<SetUp> {
     let path = git_repo.path();
 
     let exec = |args: &[&str]| {
-        let status = Command::new("git")
+        let status = std::process::Command::new("git")
             .args(args)
             .current_dir(path)
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
@@ -129,7 +128,7 @@ fn composer(version: Option<&str>) -> PhpMixed {
 }
 
 fn which_git() -> Option<()> {
-    Command::new("git")
+    std::process::Command::new("git")
         .arg("--version")
         .output()
         .ok()

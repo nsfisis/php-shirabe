@@ -1,5 +1,6 @@
 use crate::{PhpMixed, PhpResource, StreamBacking};
 use indexmap::IndexMap;
+use std::io::{Read as _, Write as _};
 
 pub const STREAM_NOTIFY_FAILURE: i64 = 9;
 pub const STREAM_NOTIFY_FILE_SIZE_IS: i64 = 5;
@@ -30,7 +31,6 @@ pub fn stream_get_contents_with_max(
 // Reads from the stream's current position: all remaining bytes, or up to `max_length` when given
 // (a negative max means "until end").
 fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Option<String> {
-    use std::io::Read;
     match stream {
         PhpResource::Stdin => {
             let mut buf = Vec::new();
@@ -139,7 +139,6 @@ pub fn stream_get_wrappers() -> Vec<String> {
 /// PHP `stream_copy_to_stream()`: copy the remaining bytes of `source` into `dest`, returning the
 /// number of bytes copied (or `None` for `false`-on-failure).
 pub fn stream_copy_to_stream(source: &PhpResource, dest: &PhpResource) -> Option<i64> {
-    use std::io::{Read, Write};
     let mut buf = Vec::new();
     match source {
         PhpResource::Stdin => {

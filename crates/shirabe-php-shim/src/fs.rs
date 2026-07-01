@@ -4,6 +4,7 @@ use crate::StreamBacking;
 use crate::StreamState;
 use crate::UnexpectedValueException;
 use indexmap::IndexMap;
+use std::io::{Read as _, Write as _};
 
 pub const PHP_EOL: &str = "\n";
 
@@ -329,7 +330,6 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
 /// PHP `fwrite()`. `length` caps the number of bytes written (`None` = whole string).
 /// Returns the byte count written, or `None` for PHP's `false`-on-failure.
 pub fn fwrite(stream: &PhpResource, data: &str, length: Option<i64>) -> Option<i64> {
-    use std::io::Write;
     let bytes = data.as_bytes();
     let bytes = match length {
         Some(l) if l >= 0 => &bytes[..(l as usize).min(bytes.len())],
@@ -360,7 +360,6 @@ pub fn fwrite(stream: &PhpResource, data: &str, length: Option<i64>) -> Option<i
 /// TODO(phase-e): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
 /// binary reads (filesAreEqual / binary copy).
 pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
-    use std::io::Read;
     let cap = length.max(0) as usize;
     match stream {
         PhpResource::Stdin => {
@@ -482,7 +481,6 @@ fn fgets_read_line<R: std::io::Read + ?Sized>(
 /// PHP `fgetc()`: reads a single byte, or `None` at end-of-stream.
 /// TODO(phase-e): byte-string semantics — should return Vec<u8>.
 pub fn fgetc(stream: &PhpResource) -> Option<String> {
-    use std::io::Read;
     let mut byte = [0u8; 1];
     match stream {
         PhpResource::Stdin => {
@@ -638,7 +636,6 @@ fn build_stat_map(size: u64, file_meta: Option<&std::fs::Metadata>) -> IndexMap<
 
 /// PHP `fflush()`.
 pub fn fflush(stream: &PhpResource) -> bool {
-    use std::io::Write;
     match stream {
         PhpResource::Stdin => true,
         PhpResource::Stdout => std::io::stdout().flush().is_ok(),
@@ -848,7 +845,6 @@ pub fn file_put_contents(_path: &str, _data: &[u8]) -> Option<i64> {
 }
 
 pub fn file_put_contents3(_filename: &str, _data: &str, _flags: i64) -> Option<i64> {
-    use std::io::Write;
     // TODO(phase-d): the LOCK_EX and FILE_USE_INCLUDE_PATH flags are ignored; only FILE_APPEND is
     // honored.
     let append = _flags & FILE_APPEND != 0;
