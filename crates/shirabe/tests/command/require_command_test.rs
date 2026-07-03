@@ -17,7 +17,6 @@ fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
 
 #[test]
 #[serial]
-#[ignore = "shirabe_php_shim::phpversion(extension) is a todo!() (per-extension version strings not modeled); reached while checking the ext-foobar platform requirement during version selection"]
 fn test_require_throws_if_none_matches() {
     let composer_json = serde_json::json!({
         "repositories": {
@@ -59,7 +58,10 @@ fn test_require_throws_if_none_matches() {
 
 #[test]
 #[serial]
-#[ignore = "Phase-C re-entrancy: EventDispatcher::make_autoloader calls Composer borrow_mut while the Composer is already borrowed up the installer-event-dispatch stack, panicking with \"RefCell already borrowed\" (composer.rs:507)"]
+#[ignore = "the prior RefCell re-entrancy panic is fixed; now fails on the pre-operations-exec \
+            listener dispatch with \"Subscriber ?::? for event pre-operations-exec is not \
+            callable\" (event_dispatcher.rs TODO(plugin): is_callable/invoke for non-string \
+            callables is unimplemented)"]
 fn test_require_warns_if_resolved_to_feature_branch() {
     let composer_json = serde_json::json!({
         "repositories": {
@@ -264,7 +266,10 @@ Using version 1.1.0 for required/pkg",
 
 #[test]
 #[serial]
-#[ignore = "Phase-C re-entrancy: EventDispatcher::make_autoloader calls Composer borrow_mut while the Composer is already borrowed up the installer-event-dispatch stack, panicking with \"RefCell already borrowed\" (composer.rs:507)"]
+#[ignore = "the prior RefCell re-entrancy panic is fixed; now fails on the pre-operations-exec \
+            listener dispatch with \"Subscriber ?::? for event pre-operations-exec is not \
+            callable\" (event_dispatcher.rs TODO(plugin): is_callable/invoke for non-string \
+            callables is unimplemented)"]
 fn test_require() {
     for (label, composer_json, command, expected) in provide_require() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
@@ -335,7 +340,10 @@ fn provide_inconsistent_require_keys() -> Vec<(bool, bool, &'static str)> {
 
 #[test]
 #[serial]
-#[ignore = "update/solver pipeline incomplete: the require run fails with \"Fixed package __root__ 1.0.0+no-version-set was not added to solver pool.\" (the root package is not seeded into the solver pool)"]
+#[ignore = "the solver-pool root-package issue is fixed; now panics in shirabe_php_shim::preg \
+            (\"look-around, including look-ahead and look-behind, is not supported\") because \
+            the dev-branch pattern `^dev-(?!main$|master$|trunk$|latest$)` uses a lookahead the \
+            `regex` crate cannot express (see docs/dev/regex-porting.md)"]
 fn test_inconsistent_require_keys() {
     for (is_dev, is_interactive, expected_warning) in provide_inconsistent_require_keys() {
         let current_key = if is_dev { "require" } else { "require-dev" };

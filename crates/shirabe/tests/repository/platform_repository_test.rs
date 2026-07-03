@@ -55,17 +55,7 @@ fn constant_key(constant_name: &str, class: Option<&str>) -> String {
         .to_string()
 }
 
-// All five tests below are fully ported but kept `#[ignore]`: every code path through
-// `PlatformRepository::initialize()` reaches `XdebugHandler::get_skipped_version()`,
-// which is an unrelated `todo!()` stub in `shirabe-external-packages`, so the tests
-// panic before any assertion (Phase D: visible failure is acceptable, and the category
-// brief permits leaving confidently-panicking tests ignored). The seam/mocks are in
-// place so they will execute once that stub lands.
-
 #[test]
-#[ignore = "seam + HhvmDetector mock ported; execution panics at the unrelated \
-            XdebugHandler::get_skipped_version() todo!() during initialize(), and the \
-            default (real) Runtime also relies on PHP-runtime shim todo!()s"]
 fn test_hhvm_package() {
     let mut hhvm_detector = MockHhvmDetector::new();
     hhvm_detector
@@ -145,8 +135,6 @@ fn php_flavor_test_cases() -> Vec<(
 }
 
 #[test]
-#[ignore = "seam + Runtime mock ported (hasConstant/getConstant/invoke/getExtensions); \
-            execution panics at the unrelated XdebugHandler::get_skipped_version() todo!()"]
 fn test_php_version() {
     for (constants, packages, functions) in php_flavor_test_cases() {
         let constants_has = constants.clone();
@@ -209,8 +197,6 @@ fn test_php_version() {
 }
 
 #[test]
-#[ignore = "seam + Runtime mock ported (invoke once + getConstant callback); \
-            execution panics at the unrelated XdebugHandler::get_skipped_version() todo!()"]
 fn test_inet_pton_regression() {
     let mut runtime = MockRuntime::new();
     // PHP: ->expects(self::once())->method('invoke')->with('inet_pton', ['::'])->willReturn(false).
@@ -1627,10 +1613,10 @@ fn assert_package_links(
 }
 
 #[test]
-#[ignore = "all 59 provideLibraryTestCases datasets ported faithfully; execution still \
-            panics at the unrelated XdebugHandler::get_skipped_version() todo!() (and a few \
-            cases additionally rely on the ResourceBundle/Imagick stub paths), so it stays \
-            ignored"]
+#[ignore = "all 59 provideLibraryTestCases datasets ported faithfully; several cases rely on \
+            ResourceBundle/Imagick-derived extension info (e.g. lib-icu-cldr) that is not yet \
+            modeled, so the generated package set diverges from PHP's (confirmed: fails with \
+            an extension mismatch, not a panic), and it stays ignored"]
 fn test_library_information() {
     let extension_version = "100.200.300";
 
@@ -1803,8 +1789,6 @@ fn test_library_information() {
 }
 
 #[test]
-#[ignore = "seam + Runtime mock ported (getConstant/getExtensions map); execution panics \
-            at the unrelated XdebugHandler::get_skipped_version() todo!()"]
 fn test_composer_platform_version() {
     let constants: IndexMap<String, PhpMixed> = IndexMap::from([
         (

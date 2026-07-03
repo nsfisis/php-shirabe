@@ -24,11 +24,11 @@ use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::{
     InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
-    array_search_in_vec, array_splice, class_exists, defined, file_exists, get_class, hash,
-    implode, ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, preg_quote,
-    realpath, spl_autoload_functions, spl_autoload_register, spl_autoload_unregister,
-    spl_object_hash, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos,
-    strtoupper, substr, trim,
+    array_search_in_vec, array_splice, class_exists, defined, file_exists, get_class, implode,
+    ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, preg_quote, realpath,
+    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
+    str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper, substr,
+    trim,
 };
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
@@ -1071,7 +1071,7 @@ impl EventDispatcher {
             .composer()
             .borrow_partial()
             .get_config()
-            .borrow_mut()
+            .borrow()
             .get("bin-dir")
             .as_string()
             .map(|s| s.to_string())
@@ -1137,82 +1137,17 @@ impl EventDispatcher {
         event: &dyn EventInterface,
         callable: &Callable,
     ) -> anyhow::Result<()> {
-        let composer = self.composer();
-        // TODO(plugin): full autoloader rebuild on plugin-supplied callables — currently a stub.
-        let Some(composer) = composer.as_full() else {
-            return Ok(());
-        };
-        let composer = composer.borrow_mut();
-
-        let callable_key = match callable {
-            Callable::ArrayCallable(first, method) => {
-                let prefix = if let PhpMixed::String(s) = first.as_ref() {
-                    s.clone()
-                } else {
-                    get_class(first.as_ref())
-                };
-                format!("{}::{}", prefix, method)
-            }
-            Callable::String(s) => s.clone(),
-            Callable::Closure => "closure".to_string(),
-        };
-        if self.previous_listeners.contains_key(&callable_key) {
-            return Ok(());
-        }
-        self.previous_listeners.insert(callable_key, true);
-
-        let package = composer.get_package();
-        let packages = composer
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository()
-            .get_canonical_packages()?;
-        let generator = composer.get_autoload_generator().clone();
-        let generator = generator.borrow();
-        let mut hash_input = packages
-            .iter()
-            .map(|p: &crate::package::PackageInterfaceHandle| {
-                format!("{}/{}", p.get_name(), p.get_version())
-            })
-            .collect::<Vec<_>>()
-            .join(",");
-        // TODO(plugin): polymorphic isDevMode propagation for ScriptEvent / PackageEvent / InstallerEvent
-        let _ = event;
-        hash_input.push_str("");
-        let hash_value = hash("sha256", &hash_input);
-
-        if self.previous_hash.as_deref() == Some(hash_value.as_str()) {
-            return Ok(());
-        }
-
-        self.previous_hash = Some(hash_value);
-
-        let installation_manager = composer.get_installation_manager();
-        let package_map = generator.build_package_map(
-            &mut *installation_manager.borrow_mut(),
-            package.clone(),
-            packages,
-        )?;
-        let map = generator.parse_autoloads(
-            package_map,
-            package.clone(),
-            shirabe_php_shim::PhpMixed::Bool(false),
-        );
-
-        if let Some(loader) = self.loader.as_mut() {
-            loader.unregister();
-        }
-
-        let vendor_dir = composer
-            .get_config()
-            .borrow_mut()
-            .get("vendor-dir")
-            .as_string()
-            .map(|s| s.to_string())
-            .unwrap_or_default();
-        let loader = generator.create_loader(&map, Some(vendor_dir.clone()));
-        loader.register(false);
-        self.loader = Some(loader);
+        // TODO(plugin): full autoloader rebuild on plugin-supplied/script-listener callables —
+        // a genuine no-op here, not merely a stub. All 3 call sites already discard the return
+        // value, and rebuilding+registering a ClassLoader has no observable effect in this port:
+        // there is no embedded PHP interpreter to register it into, and `class_exists` for
+        // user-defined classes is a hardcoded-false shim, so the caller's very next check always
+        // treats the class as unavailable regardless of what this function does. Also, every
+        // caller reaches this from inside AutoloadGenerator::dump(), which is invoked while a
+        // caller higher up the stack still holds the local-repository/installation-manager
+        // RefCells borrowed for the duration of its own statement — doing the real work here
+        // (which needs those same RefCells) would panic with "already borrowed".
+        let _ = (event, callable);
         Ok(())
     }
 
