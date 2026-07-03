@@ -1446,7 +1446,7 @@ impl Installer {
             temporary_constraints,
         );
         repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-            RootPackageRepository::new(RootPackageInterfaceHandle::dup(&self.fixed_root_package)),
+            RootPackageRepository::new(self.fixed_root_package.clone()),
         ))?;
         repository_set.add_repository(platform_repo.clone().into())?;
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
