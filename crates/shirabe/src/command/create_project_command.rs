@@ -458,6 +458,23 @@ impl CreateProjectCommand {
                 .borrow_mut()
                 .set_output_progress(!no_progress);
 
+            let optimize_autoloader = config
+                .borrow()
+                .get("optimize-autoloader")
+                .as_bool()
+                .unwrap_or(false);
+            let class_map_authoritative = config
+                .borrow()
+                .get("classmap-authoritative")
+                .as_bool()
+                .unwrap_or(false);
+            let apcu_autoloader = config
+                .borrow()
+                .get("apcu-autoloader")
+                .as_bool()
+                .unwrap_or(false);
+            let audit_config = self.create_audit_config(&mut config.borrow_mut(), input.clone())?;
+
             let mut installer = Installer::create(io.clone(), &composer_handle);
             installer
                 .set_prefer_source(prefer_source)
@@ -471,31 +488,10 @@ impl CreateProjectCommand {
                         .unwrap()
                         .clone(),
                 )
-                .set_optimize_autoloader(
-                    config
-                        .borrow_mut()
-                        .get("optimize-autoloader")
-                        .as_bool()
-                        .unwrap_or(false),
-                )
-                .set_class_map_authoritative(
-                    config
-                        .borrow_mut()
-                        .get("classmap-authoritative")
-                        .as_bool()
-                        .unwrap_or(false),
-                )
-                .set_apcu_autoloader(
-                    config
-                        .borrow_mut()
-                        .get("apcu-autoloader")
-                        .as_bool()
-                        .unwrap_or(false),
-                    None,
-                )
-                .set_audit_config(
-                    self.create_audit_config(&mut config.borrow_mut(), input.clone())?,
-                );
+                .set_optimize_autoloader(optimize_autoloader)
+                .set_class_map_authoritative(class_map_authoritative)
+                .set_apcu_autoloader(apcu_autoloader, None)
+                .set_audit_config(audit_config);
 
             if !composer.get_locker().borrow_mut().is_locked() {
                 installer.set_update(true);
