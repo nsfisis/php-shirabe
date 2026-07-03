@@ -3,8 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, class_exists, function_exists, get_loaded_extensions, html_entity_decode, implode,
-    instantiate_class, ltrim, phpversion, strip_tags, trim,
+    PhpMixed, class_exists, function_exists, html_entity_decode, implode, instantiate_class, ltrim,
+    strip_tags, trim,
 };
 
 /// Seam over the PHP runtime so PlatformRepository can be tested against mocked
@@ -44,9 +44,21 @@ impl RuntimeInterface for Runtime {
 
     fn invoke(&self, callable: PhpMixed, arguments: Vec<PhpMixed>) -> PhpMixed {
         // PHP: return $callable(...$arguments);
-        // Dispatching an arbitrary PHP callable needs a PHP runtime; no shim exists.
-        let _ = (callable, arguments);
-        todo!()
+        // Only the specific dynamic callables PlatformRepository actually reaches are
+        // wired through php-rpc; arbitrary PHP callables are still unsupported.
+        match (&callable, arguments.as_slice()) {
+            (PhpMixed::String(name), [PhpMixed::String(arg)]) if name == "inet_pton" => {
+                shirabe_php_rpc::inet_pton(arg)
+            }
+            (PhpMixed::String(name), []) if name == "curl_version" => {
+                let mut version = IndexMap::new();
+                if let Some(v) = shirabe_php_rpc::curl_version() {
+                    version.insert("version".to_string(), PhpMixed::String(v));
+                }
+                PhpMixed::Array(version)
+            }
+            _ => todo!(),
+        }
     }
 
     fn has_class(&self, class: &str) -> bool {
@@ -62,18 +74,15 @@ impl RuntimeInterface for Runtime {
     }
 
     fn get_extensions(&self) -> Vec<String> {
-        get_loaded_extensions()
+        shirabe_php_rpc::get_loaded_extensions()
     }
 
     fn get_extension_version(&self, extension: &str) -> String {
-        let version = phpversion(extension);
-        version.unwrap_or_else(|| "0".to_string())
+        shirabe_php_rpc::phpversion(extension).unwrap_or_else(|| "0".to_string())
     }
 
     fn get_extension_info(&self, extension: &str) -> anyhow::Result<String> {
-        // Depends on \ReflectionExtension::info() and output buffering; no shim equivalent exists.
-        let _ = extension;
-        todo!()
+        Ok(shirabe_php_rpc::get_extension_info(extension))
     }
 }
 

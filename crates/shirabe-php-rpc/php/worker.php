@@ -9,6 +9,19 @@ if ($client === false) {
 $dispatch = [
     'defined'  => static fn($name) => defined($name),
     'constant' => static fn($name) => defined($name) ? constant($name) : null,
+    'inet_pton' => static fn($arg) => @inet_pton($arg),
+    'curl_version' => static fn($arg) => function_exists('curl_version') ? (curl_version()['version'] ?? null) : null,
+    'phpversion' => static fn($name) => phpversion($name),
+    'get_loaded_extensions' => static fn($arg) => implode(',', get_loaded_extensions()),
+    'extension_info' => static function ($name) {
+        if (!extension_loaded($name)) {
+            return '';
+        }
+        $re = new ReflectionExtension($name);
+        ob_start();
+        $re->info();
+        return (string) ob_get_clean();
+    },
 ];
 $read_exact = static function ($conn, int $len): ?string {
     $buf = '';

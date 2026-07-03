@@ -33,6 +33,46 @@ pub fn get_constant(name: &str) -> PhpMixed {
     call("constant", name).unwrap_or(PhpMixed::Null)
 }
 
+/// PHP `inet_pton($address)`.
+pub fn inet_pton(address: &str) -> PhpMixed {
+    call("inet_pton", address).unwrap_or(PhpMixed::Bool(false))
+}
+
+/// PHP `curl_version()['version']`.
+pub fn curl_version() -> Option<String> {
+    match call("curl_version", "") {
+        Some(PhpMixed::String(s)) => Some(s),
+        _ => None,
+    }
+}
+
+/// PHP `(new \ReflectionExtension($name))->info()` output.
+pub fn get_extension_info(name: &str) -> String {
+    match call("extension_info", name) {
+        Some(PhpMixed::String(s)) => s,
+        _ => String::new(),
+    }
+}
+
+/// PHP `phpversion($extension)`.
+pub fn phpversion(extension: &str) -> Option<String> {
+    match call("phpversion", extension) {
+        Some(PhpMixed::String(s)) => Some(s),
+        _ => None,
+    }
+}
+
+/// PHP `get_loaded_extensions()`.
+///
+/// Extension names are joined with `,` on the PHP side and split back here; real
+/// extension names never contain a comma.
+pub fn get_loaded_extensions() -> Vec<String> {
+    match call("get_loaded_extensions", "") {
+        Some(PhpMixed::String(s)) if !s.is_empty() => s.split(',').map(|s| s.to_string()).collect(),
+        _ => Vec::new(),
+    }
+}
+
 const GLUE_SCRIPT: &str = include_str!("../php/worker.php");
 
 struct Worker {
