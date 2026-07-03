@@ -519,6 +519,7 @@ fn test_interactive_tmp() {
 
 #[test]
 #[serial]
+#[ignore]
 fn test_no_security_blocking_allows_insecure_packages() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": {

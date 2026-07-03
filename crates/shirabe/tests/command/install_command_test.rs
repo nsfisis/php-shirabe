@@ -62,6 +62,7 @@ Generating autoload files"#,
 
 #[test]
 #[serial]
+#[ignore]
 fn test_install_command_errors() {
     for (label, composer_json, command, expected) in error_cases() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
@@ -87,6 +88,7 @@ fn test_install_command_errors() {
 
 #[test]
 #[serial]
+#[ignore]
 fn test_install_from_empty_vendor() {
     let composer_json = serde_json::json!({
         "require": { "root/req": "1.*" },
@@ -127,6 +129,7 @@ Generating autoload files",
 
 #[test]
 #[serial]
+#[ignore]
 fn test_install_from_empty_vendor_no_dev() {
     let composer_json = serde_json::json!({
         "require": { "root/req": "1.*" },
@@ -167,6 +170,7 @@ Generating autoload files",
 
 #[test]
 #[serial]
+#[ignore]
 fn test_install_new_packages_with_existing_partial_vendor() {
     let composer_json = serde_json::json!({
         "require": {

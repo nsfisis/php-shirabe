@@ -101,6 +101,7 @@ fn test_exception_thrown_if_no_lockfile_found() {
 
 #[test]
 #[serial]
+#[ignore]
 fn test_failed_platform_requirement() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({

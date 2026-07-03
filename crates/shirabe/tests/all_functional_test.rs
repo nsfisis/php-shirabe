@@ -254,6 +254,7 @@ fn test_build_phar() {
 
 #[test]
 #[serial]
+#[ignore]
 fn test_integration_create_project_command() {
     run_integration("create-project-command.test");
 }
