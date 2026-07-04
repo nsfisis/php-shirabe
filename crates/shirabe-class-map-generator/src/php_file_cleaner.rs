@@ -2,7 +2,6 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::preg_quote;
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -99,12 +98,25 @@ impl PhpFileCleaner {
 
                 if char == '<' && self.peek('<') {
                     let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
+                    // Regex pattern compatibility:
+                    // PHP matches `<<<`, an optional quote, the identifier, then requires the
+                    // closing quote to be the exact same character via `\1`. The `regex` crate has
+                    // no backreferences, so the three quote states (none, `'`, `"`) are expanded
+                    // into separate alternatives, each capturing the identifier in its own group.
                     if self.r#match(
-                        r#"{<<<[ \t]*+(['\"]?)([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*+)\1(?:\r\n|\n|\r)}A"#,
+                        r#"{<<<[ \t]*(?:"([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)"|'([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)'|([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))(?:\r\n|\n|\r)}A"#,
                         Some(&mut r#match),
                     ) {
                         self.index += r#match.get(&CaptureKey::ByIndex(0)).map(|s| s.len()).unwrap_or(0);
-                        let delimiter = r#match.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                        let delimiter = [1, 2, 3]
+                            .iter()
+                            .find_map(|i| {
+                                r#match
+                                    .get(&CaptureKey::ByIndex(*i))
+                                    .filter(|s| !s.is_empty())
+                                    .cloned()
+                            })
+                            .unwrap_or_default();
                         self.skip_heredoc(&delimiter);
                         clean.push_str("null");
                         continue;
@@ -229,10 +241,6 @@ impl PhpFileCleaner {
     fn skip_heredoc(&mut self, delimiter: &str) {
         let first_delimiter_char = delimiter.chars().next().unwrap();
         let delimiter_length = delimiter.len();
-        let delimiter_pattern = format!(
-            "{{{}(?![a-zA-Z0-9_\\x80-\\xff])}}A",
-            preg_quote(delimiter, None)
-        );
 
         while self.index < self.len {
             let c = self.contents.as_bytes()[self.index] as char;
@@ -245,12 +253,22 @@ impl PhpFileCleaner {
                 }
                 _ if c == first_delimiter_char => {
                     let end = self.index + delimiter_length;
-                    if end <= self.len
-                        && &self.contents[self.index..end] == delimiter
-                        && self.r#match(&delimiter_pattern, None)
-                    {
-                        self.index += delimiter_length;
-                        return;
+                    if end <= self.len && &self.contents[self.index..end] == delimiter {
+                        // Regex pattern compatibility:
+                        // PHP follows the delimiter with a negative lookahead
+                        // `(?![a-zA-Z0-9_\x80-\xff])` to ensure it isn't a prefix of a longer
+                        // identifier. The `regex` crate has no look-around, so the boundary is
+                        // checked directly on the next byte instead.
+                        let next_is_identifier_byte = self
+                            .contents
+                            .as_bytes()
+                            .get(end)
+                            .map(|&b| b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80)
+                            .unwrap_or(false);
+                        if !next_is_identifier_byte {
+                            self.index += delimiter_length;
+                            return;
+                        }
                     }
                 }
                 _ => {}
