@@ -10,6 +10,7 @@ use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::InstallerInterface;
 use crate::installer::PackageEvents;
+use crate::io::ConsoleIO;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
@@ -415,6 +416,18 @@ impl InstallationManager {
         download_only: bool,
         all_operations: Vec<std::rc::Rc<dyn OperationInterface>>,
     ) -> anyhow::Result<()> {
+        // PHP: waitOnPromises() shows a ProgressBar while the concurrent downloads resolve.
+        // TODO(phase-c-promise): see the identical note in execute_batch — the single-threaded
+        // port downloads serially in this same loop, so only a 0% -> 100% jump is rendered after
+        // the loop instead of PHP's timing-driven intermediate snapshots.
+        let download_promise_count = operations
+            .values()
+            .filter(|op| {
+                let t = op.get_operation_type();
+                t == "update" || t == "install"
+            })
+            .count() as i64;
+
         for (index, operation) in &operations {
             let op_type = operation.get_operation_type();
 
@@ -471,6 +484,29 @@ impl InstallationManager {
                 // Loop::wait; the single-threaded loop awaits each serially instead.
                 let installer = self.get_installer(&package.get_type())?;
                 installer.download(package, initial_package).await?;
+            }
+        }
+
+        if self.output_progress
+            && Platform::get_env("CI").is_none()
+            && !self.io.is_debug()
+            && download_promise_count > 1
+        {
+            let bar = {
+                let io_ref = self.io.borrow();
+                io_ref
+                    .as_any()
+                    .downcast_ref::<ConsoleIO>()
+                    .map(|console_io| console_io.get_progress_bar(download_promise_count))
+            };
+            if let Some(mut bar) = bar {
+                bar.start(Some(download_promise_count))?;
+                bar.set_progress(download_promise_count)?;
+                bar.finish()?;
+                bar.clear()?;
+                if !self.io.is_decorated() {
+                    self.io.write_error("");
+                }
             }
         }
 
@@ -545,6 +581,23 @@ impl InstallationManager {
         all_operations: &[std::rc::Rc<dyn OperationInterface>],
     ) -> anyhow::Result<()> {
         let mut post_exec_callbacks: Vec<Box<dyn Fn()>> = vec![];
+
+        // PHP: waitOnPromises() shows a ProgressBar while React\Promise\all($promises) resolves,
+        // driven by Loop::wait's active-job polling as concurrent downloads/installs finish over
+        // real wall-clock time, interleaved with nothing else since the "- Installing ..." lines
+        // are all written up front while the promises are being constructed.
+        // TODO(phase-c-promise): the single-threaded port runs prepare/install/cleanup serially
+        // in this same loop that also writes the "- Installing ..." lines, so there is no way to
+        // draw a step-by-step bar without garbling it into the middle of that output (the bar's
+        // line-overwrite state and the plain `write_error` lines fight over the same terminal
+        // line). Rendering a single 0% -> 100% jump after the loop keeps output well-formed at
+        // the cost of the intermediate snapshots real Composer shows.
+        let promise_count = operations
+            .values()
+            .filter(|op| {
+                ["update", "install", "uninstall"].contains(&op.get_operation_type().as_str())
+            })
+            .count() as i64;
 
         for (index, operation) in operations {
             let op_type = operation.get_operation_type();
@@ -690,6 +743,30 @@ impl InstallationManager {
                 post_exec_callbacks.push(Box::new(|| {
                     // dispatcher.dispatch_package_event(event_name_post, dev_mode, repo, all_operations, operation);
                 }));
+            }
+        }
+
+        if self.output_progress
+            && Platform::get_env("CI").is_none()
+            && !self.io.is_debug()
+            && promise_count > 1
+        {
+            let bar = {
+                let io_ref = self.io.borrow();
+                io_ref
+                    .as_any()
+                    .downcast_ref::<ConsoleIO>()
+                    .map(|console_io| console_io.get_progress_bar(promise_count))
+            };
+            if let Some(mut bar) = bar {
+                bar.start(Some(promise_count))?;
+                bar.set_progress(promise_count)?;
+                bar.finish()?;
+                bar.clear()?;
+                // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
+                if !self.io.is_decorated() {
+                    self.io.write_error("");
+                }
             }
         }
 
