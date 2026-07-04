@@ -1,3 +1,6 @@
+use indexmap::IndexMap;
+use std::sync::{LazyLock, Mutex};
+
 pub const PREG_PATTERN_ORDER: i64 = 1;
 pub const PREG_SET_ORDER: i64 = 2;
 pub const PREG_OFFSET_CAPTURE: i64 = 256;
@@ -439,7 +442,28 @@ fn translate_pcre_literals(inner: &str) -> String {
     out
 }
 
+// PHP's PCRE engine keeps a per-process cache of compiled patterns (pcre.cache_size, default 4096),
+// so repeated preg_* calls with the same pattern string are effectively free. The `regex` crate has
+// no such cache, and callers like the classmap generator re-issue the same pattern string for every
+// file (or even every scanned token), so compilation must be memoized here to match PHP's amortized
+// cost.
+static PATTERN_CACHE: LazyLock<Mutex<IndexMap<String, (regex::Regex, bool)>>> =
+    LazyLock::new(|| Mutex::new(IndexMap::new()));
+
 fn compile_php_pattern(pattern: &str) -> anyhow::Result<(regex::Regex, bool)> {
+    if let Some(cached) = PATTERN_CACHE.lock().unwrap().get(pattern) {
+        return Ok(cached.clone());
+    }
+
+    let compiled = compile_php_pattern_uncached(pattern)?;
+    PATTERN_CACHE
+        .lock()
+        .unwrap()
+        .insert(pattern.to_string(), compiled.clone());
+    Ok(compiled)
+}
+
+fn compile_php_pattern_uncached(pattern: &str) -> anyhow::Result<(regex::Regex, bool)> {
     let delimiter = pattern
         .chars()
         .next()
