@@ -127,8 +127,11 @@ impl Cache {
             let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                self.io
-                    .write_error(&format!("Reading {} from cache", full_path));
+                self.io.write_error3(
+                    &format!("Reading {} from cache", full_path),
+                    true,
+                    crate::io::DEBUG,
+                );
 
                 return file_get_contents(&full_path);
             }
@@ -143,8 +146,11 @@ impl Cache {
         if self.is_enabled() && !self.read_only {
             let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
 
-            self.io
-                .write_error(&format!("Writing {}{} into cache", self.root, file));
+            self.io.write_error3(
+                &format!("Writing {}{} into cache", self.root, file),
+                true,
+                crate::io::DEBUG,
+            );
 
             let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)));
             let dest = format!("{}{}", self.root, file);
@@ -169,10 +175,14 @@ impl Cache {
                         return self.write(&file, contents);
                     }
 
-                    self.io.write_error(&format!(
-                        "<warning>Failed to write into cache: {}</warning>",
-                        e.message,
-                    ));
+                    self.io.write_error3(
+                        &format!(
+                            "<warning>Failed to write into cache: {}</warning>",
+                            e.message
+                        ),
+                        true,
+                        crate::io::DEBUG,
+                    );
                     let mut m = indexmap::IndexMap::new();
                     if Preg::match3(
                         r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}",
@@ -263,8 +273,11 @@ impl Cache {
                     }
                 }
 
-                self.io
-                    .write_error(&format!("Reading {} from cache", full_path));
+                self.io.write_error3(
+                    &format!("Reading {} from cache", full_path),
+                    true,
+                    crate::io::DEBUG,
+                );
 
                 return self.filesystem.borrow_mut().copy(&full_path, target);
             }
