@@ -12,7 +12,7 @@ impl Version {
 
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::match3(
-            r"^(?P<version>[0-9.]+)(?P<patch>[a-z]{0,2})(?P<suffix>(?:-?(?:dev|pre|alpha|beta|rc|fips)[\d]*)*)(?:-\w+)?(?: \(.+?\))?$",
+            r"/^(?P<version>[0-9.]+)(?P<patch>[a-z]{0,2})(?P<suffix>(?:-?(?:dev|pre|alpha|beta|rc|fips)[\d]*)*)(?:-\w+)?(?: \(.+?\))?$/",
             openssl_version,
             Some(&mut matches),
         ) {
@@ -56,7 +56,7 @@ impl Version {
     pub fn parse_libjpeg(libjpeg_version: &str) -> Option<String> {
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::match3(
-            r"^(?P<major>\d+)(?P<minor>[a-z]*)$",
+            r"/^(?P<major>\d+)(?P<minor>[a-z]*)$/",
             libjpeg_version,
             Some(&mut matches),
         ) {
@@ -81,7 +81,7 @@ impl Version {
     pub fn parse_zoneinfo_version(zoneinfo_version: &str) -> Option<String> {
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::match3(
-            r"^(?P<year>\d{4})(?P<revision>[a-z]*)$",
+            r"/^(?P<year>\d{4})(?P<revision>[a-z]*)$/",
             zoneinfo_version,
             Some(&mut matches),
         ) {

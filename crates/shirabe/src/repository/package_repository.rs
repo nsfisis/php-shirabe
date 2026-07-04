@@ -82,7 +82,7 @@ impl PackageRepository {
 
     pub fn get_repo_name(&self) -> String {
         use crate::repository::RepositoryInterface;
-        Preg::replace(r"^array ", "package ", &self.inner.get_repo_name())
+        Preg::replace(r"{^array }", "package ", &self.inner.get_repo_name())
     }
 
     // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to load

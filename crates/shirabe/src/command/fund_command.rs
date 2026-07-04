@@ -63,7 +63,7 @@ impl FundCommand {
                 .unwrap_or("");
             if r#type == "github"
                 && let Some(matches) =
-                    Preg::is_match_with_indexed_captures(r"^https://github.com/([^/]+)$", &url)
+                    Preg::is_match_with_indexed_captures(r"{^https://github.com/([^/]+)$}", &url)
                 && let Some(sponsor) = matches.into_iter().nth(1)
             {
                 url = format!("https://github.com/sponsors/{}", sponsor);
