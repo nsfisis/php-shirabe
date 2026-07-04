@@ -202,9 +202,9 @@ impl Command for SearchCommand {
 
         let tokens_arg = input.borrow().get_argument("tokens")?;
         let token_strings: Vec<String> = tokens_arg
-            .as_array()
-            .map(|arr| {
-                arr.values()
+            .as_list()
+            .map(|list| {
+                list.iter()
                     .filter_map(|v| v.as_string().map(|s| s.to_string()))
                     .collect()
             })
