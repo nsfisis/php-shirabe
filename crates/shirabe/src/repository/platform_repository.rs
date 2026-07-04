@@ -1600,7 +1600,7 @@ impl PlatformRepository {
         extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
         package.inner.set_extra(extra);
         let package = CompletePackageHandle::from_complete_package(package);
-        self.add_package(package.clone().into())?;
+        self.inner.add_package(package.clone().into())?;
 
         if package.get_name() == "php" {
             let parts = explode(".", &package.get_version());
