@@ -488,7 +488,7 @@ impl InstallationManager {
         }
 
         if self.output_progress
-            && Platform::get_env("CI").is_none()
+            && !Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0")
             && !self.io.is_debug()
             && download_promise_count > 1
         {
@@ -747,7 +747,7 @@ impl InstallationManager {
         }
 
         if self.output_progress
-            && Platform::get_env("CI").is_none()
+            && !Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0")
             && !self.io.is_debug()
             && promise_count > 1
         {

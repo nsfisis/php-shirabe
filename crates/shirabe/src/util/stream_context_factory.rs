@@ -203,7 +203,7 @@ impl StreamContextFactory {
                     .as_deref()
                     .map(|v| format!("; Platform-PHP {}", v))
                     .unwrap_or_default(),
-                ci = if Platform::get_env("CI").is_some() {
+                ci = if Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0") {
                     "; CI"
                 } else {
                     ""
