@@ -474,14 +474,13 @@ pub fn r#eval(_code: &str) -> PhpMixed {
 }
 
 pub fn memory_get_usage() -> i64 {
-    // TODO(phase-d): PHP reports memory tracked by its own allocator (emalloc); Rust has no
-    // equivalent accounting, and process RSS would not match PHP's semantics.
-    todo!()
+    // TODO(phase-d): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
+    0
 }
 
 pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
-    // TODO(phase-d): see memory_get_usage; PHP's peak emalloc figure has no Rust equivalent.
-    todo!()
+    // TODO(phase-d): return PHP's actual emalloc-tracked peak memory usage instead of a stub 0.
+    0
 }
 
 pub fn call_user_func<T>(_callback: &str, _args: &[PhpMixed]) -> T
