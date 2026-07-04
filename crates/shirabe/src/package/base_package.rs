@@ -130,11 +130,6 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
             .get(self.get_stability())
             .unwrap_or(&STABILITY_STABLE)
     }
-
-    fn php_clone(&mut self) {
-        self.take_repository();
-        *self.id_mut() = -1;
-    }
 }
 
 pub fn package_name_to_regexp(allow_pattern: &str) -> String {

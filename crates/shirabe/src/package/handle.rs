@@ -4,8 +4,8 @@
 //! `alias_of` references are acyclic.
 
 use crate::package::{
-    AliasPackage, CompleteAliasPackage, CompletePackage, CompletePackageInterface, Package,
-    PackageInterface, RootAliasPackage, RootPackage, RootPackageInterface,
+    AliasPackage, BasePackage, CompleteAliasPackage, CompletePackage, CompletePackageInterface,
+    Package, PackageInterface, RootAliasPackage, RootPackage, RootPackageInterface,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -152,16 +152,44 @@ impl AnyPackage {
     /// clone for most types (scalars/arrays are copied, nested object
     /// references — including `aliasOf` on alias variants — are shared),
     /// except for RootAliasPackage where PHP's `__clone` hook explicitly
-    /// reseats `aliasOf` to a fresh clone.
+    /// reseats `aliasOf` to a fresh clone. PHP's `BasePackage::__clone()`
+    /// additionally resets `repository` to null and `id` to -1 on every
+    /// variant; that reset is inlined below via `take_repository()`/`id_mut()`.
     pub fn dup(&self) -> Self {
         match self {
-            Self::Package(p) => Self::Package(p.clone()),
-            Self::CompletePackage(p) => Self::CompletePackage(p.clone()),
-            Self::RootPackage(p) => Self::RootPackage(p.clone()),
-            Self::AliasPackage(p) => Self::AliasPackage(p.clone()),
-            Self::CompleteAliasPackage(p) => Self::CompleteAliasPackage(p.clone()),
+            Self::Package(p) => {
+                let mut p = p.clone();
+                p.take_repository();
+                *p.id_mut() = -1;
+                Self::Package(p)
+            }
+            Self::CompletePackage(p) => {
+                let mut p = p.clone();
+                p.inner.take_repository();
+                *p.inner.id_mut() = -1;
+                Self::CompletePackage(p)
+            }
+            Self::RootPackage(p) => {
+                let mut p = p.clone();
+                p.inner.inner.take_repository();
+                *p.inner.inner.id_mut() = -1;
+                Self::RootPackage(p)
+            }
+            Self::AliasPackage(p) => {
+                let mut p = p.clone();
+                p.take_repository();
+                *p.id_mut() = -1;
+                Self::AliasPackage(p)
+            }
+            Self::CompleteAliasPackage(p) => {
+                let mut p = p.clone();
+                p.inner.take_repository();
+                *p.inner.id_mut() = -1;
+                Self::CompleteAliasPackage(p)
+            }
             Self::RootAliasPackage(p) => {
                 // PHP's RootAliasPackage overrides `__clone()`:
+                //   parent::__clone();
                 //   $this->aliasOf = clone $this->aliasOf;
                 let new_alias_of_inner = p.alias_of.0.borrow().dup();
                 let new_alias_of_rc = Rc::new(RefCell::new(new_alias_of_inner));
@@ -173,6 +201,8 @@ impl AnyPackage {
                 cloned.alias_of = new_root;
                 cloned.inner.alias_of = new_complete;
                 cloned.inner.inner.alias_of = new_pkg;
+                cloned.inner.inner.take_repository();
+                *cloned.inner.inner.id_mut() = -1;
                 Self::RootAliasPackage(cloned)
             }
         }
