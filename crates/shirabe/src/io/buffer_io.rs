@@ -273,6 +273,10 @@ impl crate::io::IOInterface for BufferIO {
     fn as_base_io_mut(&mut self) -> Option<&mut dyn crate::io::BaseIO> {
         Some(self)
     }
+
+    fn enable_debugging(&mut self, start_time: f64) {
+        self.inner.enable_debugging(start_time)
+    }
 }
 
 impl crate::io::BaseIO for BufferIO {

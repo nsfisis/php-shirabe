@@ -155,6 +155,11 @@ pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
     fn as_base_io_mut(&mut self) -> Option<&mut dyn crate::io::BaseIO> {
         None
     }
+
+    // PHP: only `ConsoleIO::enableDebugging` exists; the interface itself does not declare it.
+    fn enable_debugging(&mut self, _start_time: f64) {
+        panic!("enable_debugging is only supported by ConsoleIO/BufferIO");
+    }
 }
 
 // Shared-ownership handle for a PHP IO instance (reference semantics). It

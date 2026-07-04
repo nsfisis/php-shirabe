@@ -2475,12 +2475,7 @@ impl ApplicationHandle {
                 .has_parameter_option(PhpMixed::from(vec!["--profile"]), false)
             {
                 start_time = Some(microtime());
-                // PHP: $this->io->enableDebugging($startTime).
-                // TODO(phase-c): enableDebugging exists only on ConsoleIO, not on IOInterface,
-                // and self.io is still the NullIO because the ConsoleIO construction above is
-                // deferred (Symfony HelperSet/Helper modelling). Once self.io is the real
-                // ConsoleIO this becomes a concrete-type call on it.
-                let _ = start_time.unwrap();
+                io.borrow_mut().enable_debugging(start_time.unwrap());
             }
 
             let result = self.base_do_run(input.clone(), output.clone())?;
