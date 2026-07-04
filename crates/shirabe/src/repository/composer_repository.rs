@@ -396,7 +396,7 @@ impl ComposerRepository {
                 let flat: Vec<IndexMap<String, PhpMixed>> =
                     partial.into_values().flatten().collect();
                 return self
-                    .create_packages_flat(flat, Some("packages.json inline packages".to_string()));
+                    .create_packages(flat, Some("packages.json inline packages".to_string()));
             }
 
             return Err(LogicException {
@@ -1564,7 +1564,7 @@ impl ComposerRepository {
         // load acceptable packages in the providers
         let versions_to_load_vec: Vec<IndexMap<String, PhpMixed>> =
             versions_to_load.values().cloned().collect();
-        let loaded_packages = self.create_packages_flat(versions_to_load_vec, packages_source)?;
+        let loaded_packages = self.create_packages(versions_to_load_vec, packages_source)?;
         let uids: Vec<String> = versions_to_load.keys().cloned().collect();
         let self_handle = self.self_handle();
 
@@ -1600,7 +1600,7 @@ impl ComposerRepository {
             "root file ({})",
             Url::sanitize(self.get_packages_json_url())
         );
-        for package in self.create_packages_flat(repo_data, Some(source))? {
+        for package in self.create_packages(repo_data, Some(source))? {
             self.add_package(package);
         }
         Ok(())
@@ -1842,7 +1842,7 @@ impl ComposerRepository {
             }
 
             let loaded_packages: Vec<BasePackageHandle> =
-                ComposerRepository::create_packages_static(versions_to_load, packages_source)?;
+                self.create_packages(versions_to_load, packages_source)?;
             let self_handle = self.self_handle();
             for package in loaded_packages.into_iter() {
                 if let Some(h) = self_handle.as_ref() {
@@ -2571,7 +2571,7 @@ impl ComposerRepository {
         Ok(packages)
     }
 
-    fn create_packages_flat(
+    fn create_packages(
         &mut self,
         packages: Vec<IndexMap<String, PhpMixed>>,
         source: Option<String>,
@@ -2643,17 +2643,6 @@ impl ComposerRepository {
             }
             .into()
         })
-    }
-
-    fn create_packages_static(
-        packages: Vec<IndexMap<String, PhpMixed>>,
-        _source: Option<String>,
-    ) -> anyhow::Result<Vec<BasePackageHandle>> {
-        if packages.is_empty() {
-            return Ok(vec![]);
-        }
-        let loader = ArrayLoader::new(Some(VersionParser::new()), true);
-        Ok(loader.load_packages(packages)?.into_iter().collect())
     }
 
     fn fetch_file(
