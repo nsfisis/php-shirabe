@@ -16,9 +16,11 @@ The crate supports exactly one interaction pattern, and nothing else:
 - Rust to PHP only. PHP never calls back into Rust.
 - Exactly one argument, and it must be a string.
 - Scalar return values only (string / int / float / bool / null).
-- Every failure is ignored: a PHP exception, serialization/deserialization
-  failure, a missing PHP function, a crashed child, etc. None are handled.
-  If anything goes wrong, behavior is undefined.
+- Every failure `panic!`s: a PHP exception (not currently possible — the glue script never lets
+  one escape), a serialization/deserialization failure, a missing PHP function, a crashed child,
+  etc. None are handled as recoverable errors. This is not the final design — a future revision
+  will replace these panics with proper `Result` propagation — but panicking beats silently
+  returning a plausible-looking default.
 - Windows is unsupported and `panic!`s for now.
 
 ## Locating PHP

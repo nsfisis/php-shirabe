@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 pub fn get_php_version() -> String {
     match get_constant("PHP_VERSION") {
         PhpMixed::String(s) => s,
-        _ => String::new(),
+        other => panic!("PHP RPC: PHP_VERSION constant did not resolve to a string: {other:?}"),
     }
 }
 
@@ -19,46 +19,51 @@ pub fn get_php_version() -> String {
 pub fn get_php_binary() -> String {
     match get_constant("PHP_BINARY") {
         PhpMixed::String(s) => s,
-        _ => String::new(),
+        other => panic!("PHP RPC: PHP_BINARY constant did not resolve to a string: {other:?}"),
     }
 }
 
 /// PHP `defined($name)`.
 pub fn has_constant(name: &str) -> bool {
-    matches!(call("defined", name), Some(PhpMixed::Bool(true)))
+    match call("defined", name) {
+        PhpMixed::Bool(b) => b,
+        other => panic!("PHP RPC: `defined` did not return a bool: {other:?}"),
+    }
 }
 
 /// PHP `constant($name)`.
 pub fn get_constant(name: &str) -> PhpMixed {
-    call("constant", name).unwrap_or(PhpMixed::Null)
+    call("constant", name)
 }
 
 /// PHP `inet_pton($address)`.
 pub fn inet_pton(address: &str) -> PhpMixed {
-    call("inet_pton", address).unwrap_or(PhpMixed::Bool(false))
+    call("inet_pton", address)
 }
 
 /// PHP `curl_version()['version']`.
 pub fn curl_version() -> Option<String> {
     match call("curl_version", "") {
-        Some(PhpMixed::String(s)) => Some(s),
-        _ => None,
+        PhpMixed::String(s) => Some(s),
+        PhpMixed::Null => None,
+        other => panic!("PHP RPC: `curl_version` returned an unexpected value: {other:?}"),
     }
 }
 
 /// PHP `(new \ReflectionExtension($name))->info()` output.
 pub fn get_extension_info(name: &str) -> String {
     match call("extension_info", name) {
-        Some(PhpMixed::String(s)) => s,
-        _ => String::new(),
+        PhpMixed::String(s) => s,
+        other => panic!("PHP RPC: `extension_info` did not return a string: {other:?}"),
     }
 }
 
 /// PHP `phpversion($extension)`.
 pub fn phpversion(extension: &str) -> Option<String> {
     match call("phpversion", extension) {
-        Some(PhpMixed::String(s)) => Some(s),
-        _ => None,
+        PhpMixed::String(s) => Some(s),
+        PhpMixed::Bool(false) => None,
+        other => panic!("PHP RPC: `phpversion` returned an unexpected value: {other:?}"),
     }
 }
 
@@ -68,8 +73,9 @@ pub fn phpversion(extension: &str) -> Option<String> {
 /// extension names never contain a comma.
 pub fn get_loaded_extensions() -> Vec<String> {
     match call("get_loaded_extensions", "") {
-        Some(PhpMixed::String(s)) if !s.is_empty() => s.split(',').map(|s| s.to_string()).collect(),
-        _ => Vec::new(),
+        PhpMixed::String(s) if s.is_empty() => Vec::new(),
+        PhpMixed::String(s) => s.split(',').map(|s| s.to_string()).collect(),
+        other => panic!("PHP RPC: `get_loaded_extensions` did not return a string: {other:?}"),
     }
 }
 
@@ -84,40 +90,53 @@ struct Worker {
 }
 
 impl Worker {
-    fn request(&mut self, name: &str, arg: &str) -> Option<Vec<u8>> {
+    fn request(&mut self, name: &str, arg: &str) -> anyhow::Result<Vec<u8>> {
         let mut payload = name.as_bytes().to_vec();
         payload.push(0);
         payload.extend_from_slice(arg.as_bytes());
-        write_frame(&mut self.stream, &payload).ok()?;
-        read_frame(&mut self.stream).ok()
+        write_frame(&mut self.stream, &payload)?;
+        Ok(read_frame(&mut self.stream)?)
     }
 }
 
-static WORKER: LazyLock<Mutex<Option<Worker>>> = LazyLock::new(|| Mutex::new(spawn_worker()));
+// TODO(phase-d): every failure here panics rather than propagating a `Result`; this is an interim
+// step until PHP RPC gets proper error handling (see docs/dev/php-rpc.md).
+static WORKER: LazyLock<Mutex<Worker>> = LazyLock::new(|| {
+    Mutex::new(
+        spawn_worker().unwrap_or_else(|e| panic!("PHP RPC: failed to spawn PHP worker: {e:#}")),
+    )
+});
 
-fn call(name: &str, arg: &str) -> Option<PhpMixed> {
-    let mut guard = WORKER.lock().ok()?;
-    let payload = guard.as_mut()?.request(name, arg)?;
-    parse_serialized_scalar(&payload)
+fn call(name: &str, arg: &str) -> PhpMixed {
+    let mut guard = WORKER
+        .lock()
+        .unwrap_or_else(|e| panic!("PHP RPC: worker mutex poisoned: {e}"));
+    let payload = guard
+        .request(name, arg)
+        .unwrap_or_else(|e| panic!("PHP RPC: request `{name}` failed: {e:#}"));
+    parse_serialized_scalar(&payload).unwrap_or_else(|| {
+        panic!("PHP RPC: request `{name}` returned an unparseable payload: {payload:?}")
+    })
 }
 
-fn spawn_worker() -> Option<Worker> {
-    let php = PhpExecutableFinder::new().find(false)?;
+fn spawn_worker() -> anyhow::Result<Worker> {
+    let php = PhpExecutableFinder::new()
+        .find(false)
+        .ok_or_else(|| anyhow::anyhow!("no PHP executable found"))?;
 
-    let tempdir = tempfile::tempdir().ok()?;
+    let tempdir = tempfile::tempdir()?;
     let socket_path = tempdir.path().join("rpc.sock");
     let script_path = tempdir.path().join("worker.php");
-    std::fs::write(&script_path, GLUE_SCRIPT).ok()?;
+    std::fs::write(&script_path, GLUE_SCRIPT)?;
 
     // Bind before spawning so the socket exists when the child connects.
-    let listener = UnixListener::bind(&socket_path).ok()?;
-    listener.set_nonblocking(true).ok()?;
+    let listener = UnixListener::bind(&socket_path)?;
+    listener.set_nonblocking(true)?;
 
     let child = std::process::Command::new(&php)
         .arg(&script_path)
         .arg(&socket_path)
-        .spawn()
-        .ok()?;
+        .spawn()?;
 
     // Poll for the child's connection with a bounded deadline so a child that never connects does
     // not hang the caller.
@@ -127,16 +146,16 @@ fn spawn_worker() -> Option<Worker> {
             Ok((stream, _)) => break stream,
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 if Instant::now() >= deadline {
-                    return None;
+                    anyhow::bail!("timed out waiting for the PHP worker to connect");
                 }
                 std::thread::sleep(Duration::from_millis(5));
             }
-            Err(_) => return None,
+            Err(e) => return Err(e.into()),
         }
     };
-    stream.set_nonblocking(false).ok()?;
+    stream.set_nonblocking(false)?;
 
-    Some(Worker {
+    Ok(Worker {
         stream,
         _child: child,
         _tempdir: tempdir,
