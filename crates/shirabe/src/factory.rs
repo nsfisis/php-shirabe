@@ -116,7 +116,7 @@ impl Factory {
 
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
             return Ok(format!(
-                "{}/Composer",
+                "{}/Shirabe",
                 trim(&strtr(&appdata, "\\", "/"), Some("/"))
             ));
         }
@@ -131,12 +131,12 @@ impl Factory {
                 xdg_config = format!("{}/.config", user_dir);
             }
 
-            dirs.push(format!("{}/composer", xdg_config));
+            dirs.push(format!("{}/shirabe", xdg_config));
         }
 
-        dirs.push(format!("{}/.composer", user_dir));
+        dirs.push(format!("{}/.shirabe", user_dir));
 
-        // select first dir which exists of: $XDG_CONFIG_HOME/composer or ~/.composer
+        // select first dir which exists of: $XDG_CONFIG_HOME/shirabe or ~/.shirabe
         for dir in &dirs {
             let dir_copy = dir.clone();
             let exists =
@@ -146,7 +146,7 @@ impl Factory {
             }
         }
 
-        // if none exists, we default to first defined one (XDG one if system uses it, or ~/.composer otherwise)
+        // if none exists, we default to first defined one (XDG one if system uses it, or ~/.shirabe otherwise)
         Ok(dirs[0].clone())
     }
 
@@ -164,7 +164,7 @@ impl Factory {
         if Platform::is_windows() {
             let mut cache_dir = Platform::get_env("LOCALAPPDATA").unwrap_or_default();
             if !cache_dir.is_empty() {
-                cache_dir = format!("{}/Composer", cache_dir);
+                cache_dir = format!("{}/Shirabe", cache_dir);
             } else {
                 cache_dir = format!("{}/cache", home);
             }
@@ -176,17 +176,17 @@ impl Factory {
         if PHP_OS == "Darwin" {
             // Migrate existing cache dir in old location if present
             if is_dir(format!("{}/cache", home))
-                && !is_dir(format!("{}/Library/Caches/composer", user_dir))
+                && !is_dir(format!("{}/Library/Caches/shirabe", user_dir))
             {
                 let from = format!("{}/cache", home);
-                let to = format!("{}/Library/Caches/composer", user_dir);
+                let to = format!("{}/Library/Caches/shirabe", user_dir);
                 let _ = Silencer::call(|| Ok::<bool, anyhow::Error>(rename(&from, &to)));
             }
 
-            return Ok(format!("{}/Library/Caches/composer", user_dir));
+            return Ok(format!("{}/Library/Caches/shirabe", user_dir));
         }
 
-        if home == format!("{}/.composer", user_dir).as_str() && is_dir(format!("{}/cache", home)) {
+        if home == format!("{}/.shirabe", user_dir).as_str() && is_dir(format!("{}/cache", home)) {
             return Ok(format!("{}/cache", home));
         }
 
@@ -198,7 +198,7 @@ impl Factory {
                 xdg_cache
             };
 
-            return Ok(format!("{}/composer", xdg_cache));
+            return Ok(format!("{}/shirabe", xdg_cache));
         }
 
         Ok(format!("{}/cache", home))
@@ -215,7 +215,7 @@ impl Factory {
         }
 
         let user_dir = Self::get_user_dir()?;
-        if home != format!("{}/.composer", user_dir) && Self::use_xdg() {
+        if home != format!("{}/.shirabe", user_dir) && Self::use_xdg() {
             let xdg_data = Platform::get_env("XDG_DATA_HOME").unwrap_or_default();
             let xdg_data = if xdg_data.is_empty() {
                 format!("{}/.local/share", user_dir)
@@ -223,7 +223,7 @@ impl Factory {
                 xdg_data
             };
 
-            return Ok(format!("{}/composer", xdg_data));
+            return Ok(format!("{}/shirabe", xdg_data));
         }
 
         Ok(home.to_string())
