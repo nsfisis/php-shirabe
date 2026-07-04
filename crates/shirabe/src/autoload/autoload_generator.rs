@@ -341,11 +341,11 @@ impl AutoloadGenerator {
         let mut excluded: Vec<String> = vec![];
         if let Some(ex) = autoloads
             .get("exclude-from-classmap")
-            .and_then(|v| v.as_list())
+            .and_then(|v| v.as_array())
             && !ex.is_empty()
         {
             excluded = ex
-                .iter()
+                .values()
                 .filter_map(|v| v.as_string().map(|s| s.to_string()))
                 .collect();
         }
@@ -885,15 +885,15 @@ impl AutoloadGenerator {
             }
         }
 
-        if let Some(classmap) = autoloads.get("classmap").and_then(|v| v.as_list()) {
+        if let Some(classmap) = autoloads.get("classmap").and_then(|v| v.as_array()) {
             let mut excluded: Vec<String> = vec![];
             if let Some(ex) = autoloads
                 .get("exclude-from-classmap")
-                .and_then(|v| v.as_list())
+                .and_then(|v| v.as_array())
                 && !ex.is_empty()
             {
                 excluded = ex
-                    .iter()
+                    .values()
                     .filter_map(|v| v.as_string().map(|s| s.to_string()))
                     .collect();
             }
@@ -905,7 +905,7 @@ impl AutoloadGenerator {
             ]);
             class_map_generator.avoid_duplicate_scans(None);
 
-            for dir in classmap {
+            for dir in classmap.values() {
                 let dir_str = dir.as_string().unwrap_or("");
                 let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     class_map_generator.scan_paths(
