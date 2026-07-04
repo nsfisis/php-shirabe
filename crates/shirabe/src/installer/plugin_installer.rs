@@ -58,8 +58,16 @@ impl PluginInstaller {
     }
 
     fn get_plugin_manager(&self) -> std::rc::Rc<std::cell::RefCell<PluginManager>> {
-        // TODO(plugin): PartialComposer does not expose PluginManager; revisit when wiring plugin support
-        todo!("PartialComposer.get_plugin_manager")
+        // PHP asserts that $this->composer is instance of fully-loaded Composer, and throws a
+        // LogicException if not. In Rust, just panic!.
+        self.inner
+            .composer
+            .upgrade()
+            .expect("Composer handle dropped")
+            .as_full()
+            .expect("PluginInstaller should be initialized with a fully loaded Composer instance.")
+            .borrow()
+            .get_plugin_manager()
     }
 }
 
