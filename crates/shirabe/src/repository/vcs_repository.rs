@@ -767,11 +767,6 @@ impl VcsRepository {
                     .unwrap()
                     .load(package_data.clone(), None)?;
                 // PHP: `$this->loader instanceof ValidatingArrayLoader`.
-                // TODO(phase-c): ValidatingArrayLoader does not implement LoaderInterface yet (its
-                // `load` needs `&mut self`, requiring a LoaderInterface redesign), so it can never be
-                // stored in `self.loader` and this downcast is always None. Production never calls
-                // setLoader so the default ArrayLoader matches upstream, but the InvalidPackageException
-                // path stays dead until the trait is reworked.
                 let loader_ref = self.loader.borrow();
                 let loader_as_validating = loader_ref
                     .as_ref()
@@ -780,8 +775,8 @@ impl VcsRepository {
                     && !validating.get_warnings().is_empty()
                 {
                     return Err(InvalidPackageException::new(
-                        validating.get_errors().to_vec(),
-                        validating.get_warnings().to_vec(),
+                        validating.get_errors(),
+                        validating.get_warnings(),
                         package_data,
                     )
                     .into());

@@ -4,6 +4,7 @@ use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::loader::ArrayLoader;
+use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::package::version::VersionParser;
 use crate::repository::ArrayRepository;
@@ -53,15 +54,17 @@ impl PackageRepository {
     pub fn initialize(&self) -> anyhow::Result<Result<(), InvalidRepositoryException>> {
         self.inner.initialize();
 
-        let mut loader =
+        let loader =
             ValidatingArrayLoader::new(Box::new(ArrayLoader::new(None, true)), true, None, 0);
         for package in &self.config {
             let config_map: IndexMap<String, PhpMixed> = match package {
                 PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                 _ => IndexMap::new(),
             };
-            let package_loaded = match loader.load(config_map, "Composer\\Package\\CompletePackage")
-            {
+            let package_loaded = match loader.load(
+                config_map,
+                Some("Composer\\Package\\CompletePackage".to_string()),
+            ) {
                 Ok(p) => p,
                 Err(e) => {
                     let msg = format!(

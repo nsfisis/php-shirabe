@@ -5,6 +5,7 @@ use crate::json::JsonFile;
 use crate::json::JsonValidationException;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::InvalidPackageException;
+use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
 use serde::de::Error as _;
@@ -282,7 +283,7 @@ impl ConfigValidator {
             }
         }
 
-        let mut loader = ValidatingArrayLoader::new(
+        let loader = ValidatingArrayLoader::new(
             Box::new(ArrayLoader::new(None, true)),
             true,
             None,
@@ -298,7 +299,10 @@ impl ConfigValidator {
                 PhpMixed::String("dummy/dummy".to_string()),
             );
         }
-        match loader.load(manifest_for_load, "Composer\\Package\\CompletePackage") {
+        match loader.load(
+            manifest_for_load,
+            Some("Composer\\Package\\CompletePackage".to_string()),
+        ) {
             Ok(_) => {}
             Err(e) => {
                 if let Some(invalid_e) = e.downcast_ref::<InvalidPackageException>() {
@@ -307,7 +311,7 @@ impl ConfigValidator {
             }
         }
 
-        warnings.extend_from_slice(loader.get_warnings());
+        warnings.extend(loader.get_warnings());
 
         (errors, publish_errors, warnings)
     }
