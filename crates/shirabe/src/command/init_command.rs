@@ -1112,24 +1112,46 @@ impl InitCommand {
     }
 
     fn update_dependencies(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
-        // PHP: try { $this->getApplication()->find('update')->run(new ArrayInput([]), $output); }
-        //      catch (\Exception $e) { $this->getIO()->writeError('Could not update dependencies...'); }
-        // TODO(phase-c): needs the shared shirabe Application handle and the typed command registry
-        // (deferred with the Application shared-ownership work). Until then this is a no-op.
-        let _ = ArrayInput::new(vec![], None);
-        let _ = output;
+        let result = (|| -> anyhow::Result<i64> {
+            let application = self
+                .get_application()
+                .expect("a Composer command's application is always set");
+            let update_command = application.borrow_mut().find("update")?;
+            self.reset_composer()?;
+            let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
+            let command = update_command.borrow();
+            command.run(input, output)
+        })();
+
+        if result.is_err() {
+            self.get_io().borrow().write_error(
+                "Could not update dependencies. Run `composer update` to see more information.",
+            );
+        }
     }
 
     fn run_dump_autoload_command(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        // PHP: try { $this->getApplication()->find('dump-autoload')->run(new ArrayInput([]), $output); }
-        //      catch (\Exception $e) { $this->getIO()->writeError('Could not run dump-autoload.'); }
-        // TODO(phase-c): same deferral as update_dependencies — needs the shared shirabe
-        // Application handle and the typed command registry.
-        let _ = ArrayInput::new(vec![], None);
-        let _ = output;
+        let result = (|| -> anyhow::Result<i64> {
+            let application = self
+                .get_application()
+                .expect("a Composer command's application is always set");
+            let command = application.borrow_mut().find("dump-autoload")?;
+            self.reset_composer()?;
+            let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
+            let command = command.borrow();
+            command.run(input, output)
+        })();
+
+        if result.is_err() {
+            self.get_io()
+                .borrow()
+                .write_error("Could not run dump-autoload.");
+        }
     }
 
     /// @param array<string, string|array<string>> $options
