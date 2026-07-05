@@ -372,10 +372,9 @@ impl BaseCommand for BaseCommandData {
                 .borrow()
                 .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
 
-        // PHP: if ($app instanceof Application && $app->getDisablePluginsByDefault()) $disablePlugins = true;
-        //      (same for getDisableScriptsByDefault()).
-        // TODO(phase-c): these application-default overrides need a shared Application handle
-        // (deferred), so only the passed/flag values apply.
+        let (disable_plugins, disable_scripts) =
+            apply_application_defaults(self.get_application(), disable_plugins, disable_scripts);
+
         let disable_plugins_kind = if disable_plugins {
             crate::factory::DisablePlugins::All
         } else {
@@ -697,6 +696,29 @@ impl BaseCommand for BaseCommandData {
     }
 }
 
+/// PHP: `$application instanceof Application && $application->getDisablePluginsByDefault()`
+/// (same for `getDisableScriptsByDefault()`), ORed into the caller's flags.
+fn apply_application_defaults(
+    application: Option<
+        Rc<RefCell<dyn shirabe_external_packages::symfony::console::application::Application>>,
+    >,
+    mut disable_plugins: bool,
+    mut disable_scripts: bool,
+) -> (bool, bool) {
+    if let Some(application) = application {
+        let app_ref = application.borrow();
+        let app_dyn: &dyn shirabe_external_packages::symfony::console::application::Application =
+            &*app_ref;
+        let app = app_dyn
+            .as_any()
+            .downcast_ref::<Application>()
+            .expect("a Composer command's application is a shirabe Application");
+        disable_plugins = disable_plugins || app.get_disable_plugins_by_default();
+        disable_scripts = disable_scripts || app.get_disable_scripts_by_default();
+    }
+    (disable_plugins, disable_scripts)
+}
+
 /// \Composer\Command\BaseCommand::initialize — runs for every Composer command after the
 /// input is bound. Shared via a free function because Rust has no inheritance; each command's
 /// `Command::initialize` forwards here so the leaf's `is_self_update_command()` override (and
@@ -707,16 +729,14 @@ pub fn base_command_initialize(
     _output: Rc<RefCell<dyn OutputInterface>>,
 ) -> anyhow::Result<()> {
     // initialize a plugin-enabled Composer instance, either local or global
-    // PHP also ORs in $this->getApplication()->getDisablePluginsByDefault() /
-    // getDisableScriptsByDefault().
-    // TODO(phase-c): the application-default OR-terms need a shared Application handle
-    // (deferred), so only the input flags are honoured here.
-    let mut disable_plugins = input
+    let disable_plugins = input
         .borrow()
         .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
-    let mut disable_scripts = input
+    let disable_scripts = input
         .borrow()
         .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
+    let (mut disable_plugins, mut disable_scripts) =
+        apply_application_defaults(cmd.get_application(), disable_plugins, disable_scripts);
 
     if cmd.is_self_update_command() {
         disable_plugins = true;
