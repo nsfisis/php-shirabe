@@ -155,11 +155,11 @@ impl Problem {
             }
             rule::RULE_PACKAGE_SAME_NAME
             | rule::RULE_PACKAGE_ALIAS
-            | rule::RULE_PACKAGE_INVERSE_ALIAS => {
-                // TODO(phase-c): PHP returns (string) $rule->getReasonData(), but the alias rules'
-                // reason_data is still a placeholder pending the RuleSetGenerator reason_data wiring.
-                format!("{:?}", rule.get_reason_data())
-            }
+            | rule::RULE_PACKAGE_INVERSE_ALIAS => match rule.get_reason_data() {
+                rule::ReasonData::String(s) => s.clone(),
+                rule::ReasonData::BasePackage(p) => p.to_string(),
+                _ => unreachable!(),
+            },
             rule::RULE_LEARNED => implode(
                 "-",
                 &rule
@@ -790,29 +790,68 @@ impl Problem {
             }
 
             if pool.is_security_removed_package_version(package_name, constraint) {
-                // TODO(phase-c): get_matching_security_advisories needs Vec<PackageInterfaceHandle>
-                // and SecurityAdvisory.inner.advisory_id is on the private inner field.
-                // Convert packages to PackageInterfaceHandle and adjust SecurityAdvisory accessor first.
-                let _ = repository_set;
-                let advisories_list: Vec<String> = pool
-                    .get_security_advisory_identifiers_for_package_version(package_name, constraint)
-                    .into_iter()
-                    .map(|advisory_id: String| {
-                        if str_starts_with(&advisory_id, "PKSA-") {
-                            return format!(
-                                "<href={}>{}</>",
-                                OutputFormatter::escape(&format!(
-                                    "https://packagist.org/security-advisories/{}",
+                let advisories = repository_set.get_matching_security_advisories(
+                    packages.clone(),
+                    false,
+                    true,
+                )?;
+                let advisories_list: Vec<String> = match advisories.advisories.get(package_name) {
+                    Some(list) if !list.is_empty() => list
+                        .iter()
+                        .map(|advisory| {
+                            let advisory_id = advisory.advisory_id();
+                            let link = advisory
+                                .as_security_advisory()
+                                .and_then(|a| a.link.as_deref());
+                            if let Some(link) = link
+                                && !link.is_empty()
+                            {
+                                return format!(
+                                    "<href={}>{}</>",
+                                    OutputFormatter::escape(link)
+                                        .expect("OutputFormatter::escape does not fail"),
                                     advisory_id
-                                ))
-                                .expect("OutputFormatter::escape does not fail"),
-                                advisory_id
-                            );
-                        }
+                                );
+                            }
 
-                        advisory_id
-                    })
-                    .collect();
+                            if str_starts_with(advisory_id, "PKSA-") {
+                                return format!(
+                                    "<href={}>{}</>",
+                                    OutputFormatter::escape(&format!(
+                                        "https://packagist.org/security-advisories/{}",
+                                        advisory_id
+                                    ))
+                                    .expect("OutputFormatter::escape does not fail"),
+                                    advisory_id
+                                );
+                            }
+
+                            advisory_id.to_string()
+                        })
+                        .collect(),
+                    _ => pool
+                        .get_security_advisory_identifiers_for_package_version(
+                            package_name,
+                            constraint,
+                        )
+                        .into_iter()
+                        .map(|advisory_id: String| {
+                            if str_starts_with(&advisory_id, "PKSA-") {
+                                return format!(
+                                    "<href={}>{}</>",
+                                    OutputFormatter::escape(&format!(
+                                        "https://packagist.org/security-advisories/{}",
+                                        advisory_id
+                                    ))
+                                    .expect("OutputFormatter::escape does not fail"),
+                                    advisory_id
+                                );
+                            }
+
+                            advisory_id
+                        })
+                        .collect(),
+                };
 
                 return Ok((
                     format!(
