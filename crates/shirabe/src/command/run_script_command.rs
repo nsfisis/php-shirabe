@@ -12,6 +12,8 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
+use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
@@ -92,15 +94,16 @@ impl RunScriptCommand {
 
         let mut result: Vec<(String, String)> = vec![];
         for (name, _script) in scripts {
-            // PHP: $cmd = $this->getApplication()->find($name); $description = $cmd->getDescription();
-            // TODO(phase-c): Application::find returns PhpMixed (the Symfony command registry is a
-            // todo!() stub) and get_application() is itself deferred, so the resolved command's
-            // getDescription() cannot be read; the description stays empty until the typed command
-            // registry is modelled.
-            // get_application() is deferred (returns the Symfony `dyn Application` back-reference,
-            // not the shirabe Application with find()); the description stays empty until the
-            // shared Application handle and typed command registry are modelled.
-            let description = String::new();
+            let mut description = String::new();
+            if let Some(application) = self.get_application() {
+                match application.borrow_mut().find(&name) {
+                    Ok(cmd) => description = cmd.borrow().get_description(),
+                    Err(e)
+                        if e.downcast_ref::<CommandNotFoundException>().is_some()
+                            || e.downcast_ref::<NamespaceNotFoundException>().is_some() => {}
+                    Err(e) => return Err(e),
+                }
+            }
             result.push((name, description));
         }
 
