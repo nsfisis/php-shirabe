@@ -31,7 +31,7 @@ fn chdir_unique_tmp_directory() -> TempDir {
 
 #[test]
 #[serial]
-#[ignore = "GlobalCommand::run proxies to Application::run via todo!() at crates/shirabe/src/command/global_command.rs:190 (pending shared Application handle)"]
+#[ignore = "runs a composer.json script, which Application::do_run registers as a reflection-instantiated command; that registration path is todo!() at crates/shirabe/src/console/application.rs:2461 (plugin: register reflection-instantiated command on Application::add)"]
 fn test_global() {
     let _env_guard = EnvGuard;
 
@@ -120,7 +120,6 @@ fn test_cannot_create_home() {
 
 #[test]
 #[serial]
-#[ignore = "GlobalCommand::run proxies to Application::run via todo!() at crates/shirabe/src/command/global_command.rs:190 (pending shared Application handle)"]
 fn test_global_show() {
     let _env_guard = EnvGuard;
 
@@ -171,7 +170,6 @@ fn test_global_show() {
 
 #[test]
 #[serial]
-#[ignore = "GlobalCommand::run proxies to Application::run via todo!() at crates/shirabe/src/command/global_command.rs:190 (pending shared Application handle)"]
 fn test_global_show_without_packages() {
     let _env_guard = EnvGuard;
 
@@ -203,7 +201,7 @@ fn test_global_show_without_packages() {
 
 #[test]
 #[serial]
-#[ignore = "GlobalCommand::run proxies to Application::run via todo!() at crates/shirabe/src/command/global_command.rs:190 (pending shared Application handle)"]
+#[ignore = "installs a package via the global command's require sub-dispatch, which panics inside the event dispatcher: \"Subscriber ?::? for event pre-operations-exec is not callable\""]
 fn test_global_require() {
     let _env_guard = EnvGuard;
 
@@ -262,7 +260,6 @@ fn test_global_require() {
 
 #[test]
 #[serial]
-#[ignore = "GlobalCommand::run proxies to Application::run via todo!() at crates/shirabe/src/command/global_command.rs:190 (pending shared Application handle)"]
 fn test_global_update() {
     let _env_guard = EnvGuard;
 
@@ -313,7 +310,6 @@ fn test_global_update() {
 
 #[test]
 #[serial]
-#[ignore = "GlobalCommand::run proxies to Application::run via todo!() at crates/shirabe/src/command/global_command.rs:190 (pending shared Application handle)"]
 fn test_global_changes_directory() {
     let _env_guard = EnvGuard;
 

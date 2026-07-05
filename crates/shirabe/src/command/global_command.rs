@@ -3,6 +3,7 @@
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::console::Application;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::util::Filesystem;
@@ -106,8 +107,7 @@ impl GlobalCommand {
             &Self::input_to_string(&*input.borrow())?,
             1,
         );
-        // TODO(phase-c): getApplication()->resetComposer() needs the shared shirabe Application
-        // handle (deferred with the Application shared-ownership work).
+        self.reset_composer()?;
 
         StringInput::new(&new_input_str)
     }
@@ -171,10 +171,21 @@ impl Command for GlobalCommand {
         }
 
         let sub_input = self.prepare_subcommand_input(input, false)?;
-        // TODO(phase-c): proxying to Application::run needs the shared shirabe Application handle
-        // (deferred with the Application shared-ownership work and command registration).
-        let _ = (sub_input, output);
-        todo!("global command proxy run pending shared Application handle")
+        let sub_input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(sub_input));
+
+        let application = {
+            let application = self
+                .get_application()
+                .expect("a proxy command is always attached to its application");
+            let application = application.borrow();
+            application
+                .as_any()
+                .downcast_ref::<Application>()
+                .expect("shirabe always installs its own Application")
+                .shared()
+        };
+
+        Ok(application.run(Some(sub_input), Some(output))? as i64)
     }
 
     fn initialize(
