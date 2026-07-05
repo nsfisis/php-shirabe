@@ -17,10 +17,10 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed, RuntimeException,
     STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
-    array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
-    filter_var_boolean, gethostbyname, http_clear_last_response_headers,
-    http_get_last_response_headers, ini_get, json_decode, parse_url, preg_quote, strpos,
-    strtolower, strtr, substr, trim, zlib_decode,
+    array_replace_recursive, base64_encode, explode, extension_loaded, file_get_contents,
+    file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
+    http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode,
+    parse_url, preg_quote, strpos, strtolower, strtr, substr, trim, zlib_decode,
 };
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
@@ -699,7 +699,7 @@ impl RemoteFilesystem {
     fn get_remote_contents(
         &self,
         _origin_url: &str,
-        _file_url: &str,
+        file_url: &str,
         _context: &PhpMixed,
         response_headers: &mut Vec<String>,
         max_file_size: Option<i64>,
@@ -711,9 +711,17 @@ impl RemoteFilesystem {
         }
 
         let mut caught_e: Option<anyhow::Error> = None;
-        // TODO(phase-c): wrap PHP's `file_get_contents` with stream context and error capture;
-        // depends on the unmodeled PHP stream-context layer.
-        let outer: Result<Option<String>, anyhow::Error> = Ok(None);
+        let outer: Result<Option<String>, anyhow::Error> = if self.scheme == "file" {
+            Ok(match max_file_size {
+                Some(max) => file_get_contents5(file_url, false, PhpMixed::Null, 0, Some(max)),
+                None => file_get_contents(file_url),
+            })
+        } else {
+            // TODO(phase-c): wrap PHP's `file_get_contents` with stream context and error capture
+            // for http(s) and other network schemes; depends on the unmodeled PHP stream-context
+            // layer.
+            Ok(None)
+        };
         match outer {
             Ok(v) => result = v,
             Err(e) => caught_e = Some(e),

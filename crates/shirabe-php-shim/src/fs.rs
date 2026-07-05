@@ -881,7 +881,9 @@ pub fn file_get_contents5(
 ) -> Option<String> {
     // TODO(phase-d): the stream $context and FILE_USE_INCLUDE_PATH are ignored; only $offset and
     // $length are applied (to the file read from the local filesystem).
-    let bytes = std::fs::read(_path).ok()?;
+    // PHP supports the file:// stream wrapper; strip it to read the local file.
+    let path = _path.strip_prefix("file://").unwrap_or(_path);
+    let bytes = std::fs::read(path).ok()?;
     let len = bytes.len() as i64;
     let start = if _offset < 0 {
         (len + _offset).max(0)

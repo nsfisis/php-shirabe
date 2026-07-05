@@ -225,7 +225,6 @@ fn this_file() -> String {
 }
 
 #[test]
-#[ignore = "get_remote_contents has no stream/file layer (TODO(phase-c)) and returns None, so getContents raises a TransportException instead of reading the file:// URL"]
 fn test_get_contents() {
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
@@ -242,7 +241,6 @@ fn test_get_contents() {
 }
 
 #[test]
-#[ignore = "get_remote_contents has no stream/file layer (TODO(phase-c)) and returns None, so copy raises a TransportException instead of reading the file:// URL"]
 fn test_copy() {
     let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
