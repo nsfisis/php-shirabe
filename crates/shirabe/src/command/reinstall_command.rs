@@ -7,6 +7,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::io::IOInterfaceImmutable;
 use crate::package::base_package;
@@ -242,22 +243,36 @@ impl Command for ReinstallCommand {
             indexmap::IndexMap::new(),
         );
 
-        // PHP: $installationManager->execute($localRepo, $uninstallOperations, $devMode);
-        //      $installationManager->execute($localRepo, $installOperations, $devMode);
-        // TODO(phase-c): two blockers. (1) execute() wants `&mut dyn InstalledRepositoryInterface`,
-        // but local_repo is a RepositoryInterfaceHandle that exposes no raw &mut
-        // InstalledRepositoryInterface view (only per-method helpers). (2) InstallationManager::
-        // execute is itself deferred (its operation/promise machinery stays todo!() — see
-        // installation_manager.rs).
-        let _ = (
-            uninstall_operations,
-            install_operations,
-            dev_mode,
-            local_repo.clone(),
-            &installation_manager,
-        );
-        // installation_manager.execute(local_repo_mut, uninstall_ops_boxed, dev_mode, true, false);
-        // installation_manager.execute(local_repo_mut, install_ops_boxed, dev_mode, true, false);
+        let uninstall_operations: Vec<Rc<dyn OperationInterface>> = uninstall_operations
+            .into_iter()
+            .map(|op| Rc::new(op) as Rc<dyn OperationInterface>)
+            .collect();
+        {
+            let mut local_repo_ref = local_repo.borrow_mut();
+            let repo = local_repo_ref
+                .as_installed_repository_interface_mut()
+                .expect("local repository must be an InstalledRepositoryInterface");
+            installation_manager.borrow_mut().execute(
+                repo,
+                uninstall_operations,
+                dev_mode,
+                true,
+                false,
+            )?;
+        }
+        {
+            let mut local_repo_ref = local_repo.borrow_mut();
+            let repo = local_repo_ref
+                .as_installed_repository_interface_mut()
+                .expect("local repository must be an InstalledRepositoryInterface");
+            installation_manager.borrow_mut().execute(
+                repo,
+                install_operations.clone(),
+                dev_mode,
+                true,
+                false,
+            )?;
+        }
 
         if !input
             .borrow()
@@ -302,28 +317,31 @@ impl Command for ReinstallCommand {
                     .as_bool()
                     .unwrap_or(false);
 
-            // PHP: $generator = $composer->getAutoloadGenerator(); $generator->setClassMapAuthoritative(...);
-            //      $generator->setApcu(...); $generator->setPlatformRequirementFilter(...);
-            //      $generator->dump($config, $localRepo, $package, $installationManager, 'composer', $optimize);
-            // TODO(phase-c): AutoloadGenerator::dump (and the setters) take &mut self and dump wants
-            // `local_repo: &mut dyn InstalledRepositoryInterface`, which the RepositoryInterfaceHandle
-            // does not expose as a raw &mut view (the same handle blocker as execute above). Wiring
-            // this needs that accessor plus completing the dump call's remaining arguments.
-            let _ = (
-                authoritative,
-                apcu,
-                apcu_prefix.clone(),
-                self.get_platform_requirement_filter(input)?,
+            let autoload_generator = composer.get_autoload_generator();
+            autoload_generator
+                .borrow_mut()
+                .set_class_map_authoritative(authoritative);
+            autoload_generator.borrow_mut().set_apcu(apcu, apcu_prefix);
+            autoload_generator
+                .borrow_mut()
+                .set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
+
+            let locker = composer.get_locker();
+            let mut local_repo_ref = local_repo.borrow_mut();
+            let repo = local_repo_ref
+                .as_installed_repository_interface_mut()
+                .expect("local repository must be an InstalledRepositoryInterface");
+            autoload_generator.borrow_mut().dump(
+                &config.borrow(),
+                repo,
+                package.clone(),
+                &mut *installation_manager.borrow_mut(),
+                "composer",
                 optimize,
-                &*config.borrow(),
-                local_repo,
-                package,
-                installation_manager,
-            );
-            // composer.get_autoload_generator_mut().set_class_map_authoritative(authoritative);
-            // composer.get_autoload_generator_mut().set_apcu(apcu, apcu_prefix.clone());
-            // composer.get_autoload_generator_mut().set_platform_requirement_filter(...);
-            // composer.get_autoload_generator_mut().dump(...);
+                None,
+                Some(&mut *locker.borrow_mut()),
+                false,
+            )?;
         }
 
         event_dispatcher.borrow_mut().dispatch_script(
