@@ -481,10 +481,7 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
-            // TODO(phase-c): PHP getSource is infallible (: array), but the Rust trait made it
-            // anyhow::Result, so the fallback's anyhow::Result is flattened here. The faithful fix is making the
-            // VcsDriverInterface get_source/get_dist infallible across all implementations.
-            return fallback.get_source(identifier).unwrap_or_default();
+            return fallback.get_source(identifier);
         }
 
         let mut m: IndexMap<String, String> = IndexMap::new();
@@ -500,8 +497,7 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
-            // TODO(phase-c): see get_source above — the trait's over-fallibility is flattened here.
-            return fallback.get_dist(identifier).ok().flatten();
+            return fallback.get_dist(identifier);
         }
 
         let url = format!(
@@ -751,15 +747,14 @@ impl GitBitbucketDriver {
         match self.setup_fallback_driver(&self.generate_ssh_url()) {
             Ok(()) => Ok(true),
             Err(e) => {
-                // TODO(phase-c): PHP catches \RuntimeException (and all its subclasses), letting
-                // other exceptions propagate without this cleanup. Modeling that precisely needs the
-                // PHP exception hierarchy, which is intentionally not reproduced (see CLAUDE.md).
-                self.fallback_driver = None;
+                if e.downcast_ref::<RuntimeException>().is_some() {
+                    self.fallback_driver = None;
 
-                self.inner.io.write_error(&format!(
-                    "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>",
-                    self.generate_ssh_url()
-                ));
+                    self.inner.io.write_error(&format!(
+                        "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>",
+                        self.generate_ssh_url()
+                    ));
+                }
                 Err(e)
             }
         }
@@ -913,12 +908,12 @@ impl crate::repository::vcs::VcsDriverInterface for GitBitbucketDriver {
         GitBitbucketDriver::get_tags(self)
     }
 
-    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
-        Ok(GitBitbucketDriver::get_dist(self, identifier))
+    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+        GitBitbucketDriver::get_dist(self, identifier)
     }
 
-    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
-        Ok(GitBitbucketDriver::get_source(self, identifier))
+    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+        GitBitbucketDriver::get_source(self, identifier)
     }
 
     fn get_url(&self) -> String {

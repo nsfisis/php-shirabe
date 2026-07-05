@@ -29,9 +29,9 @@ pub trait VcsDriverInterface: std::fmt::Debug {
 
     fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>>;
 
-    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>>;
+    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>>;
 
-    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>>;
+    fn get_source(&self, identifier: &str) -> IndexMap<String, String>;
 
     fn get_url(&self) -> String;
 

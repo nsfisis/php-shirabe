@@ -1156,19 +1156,19 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
         GitLabDriver::get_tags(self)
     }
 
-    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
-        Ok(GitLabDriver::get_dist(self, identifier).map(|m| {
+    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+        GitLabDriver::get_dist(self, identifier).map(|m| {
             m.into_iter()
                 .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
                 .collect()
-        }))
+        })
     }
 
-    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
-        Ok(GitLabDriver::get_source(self, identifier)
+    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+        GitLabDriver::get_source(self, identifier)
             .into_iter()
             .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
-            .collect())
+            .collect()
     }
 
     fn get_url(&self) -> String {

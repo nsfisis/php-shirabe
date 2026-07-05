@@ -628,12 +628,12 @@ impl crate::repository::vcs::VcsDriverInterface for SvnDriver {
         Ok(self.get_tags()?.clone())
     }
 
-    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
-        Ok(SvnDriver::get_dist(self, identifier))
+    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+        SvnDriver::get_dist(self, identifier)
     }
 
-    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
-        Ok(SvnDriver::get_source(self, identifier))
+    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+        SvnDriver::get_source(self, identifier)
     }
 
     fn get_url(&self) -> String {

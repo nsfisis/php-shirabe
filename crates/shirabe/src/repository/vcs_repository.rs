@@ -869,7 +869,7 @@ impl VcsRepository {
         );
 
         if !data.contains_key("dist") {
-            let dist = driver.get_dist(identifier)?;
+            let dist = driver.get_dist(identifier);
             data.insert(
                 "dist".to_string(),
                 match dist {
@@ -883,7 +883,7 @@ impl VcsRepository {
             );
         }
         if !data.contains_key("source") {
-            let source = driver.get_source(identifier)?;
+            let source = driver.get_source(identifier);
             data.insert(
                 "source".to_string(),
                 PhpMixed::Array(
