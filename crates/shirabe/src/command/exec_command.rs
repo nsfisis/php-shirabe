@@ -3,6 +3,7 @@
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::console::Application;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
@@ -195,10 +196,16 @@ impl Command for ExecCommand {
             0,
         );
 
-        // TODO(phase-c): getApplication()->getInitialWorkingDirectory() needs the shared shirabe
-        // Application handle (deferred with the Application shared-ownership work). Until then the
-        // working-directory restore is skipped.
-        let initial_working_directory: Option<String> = None;
+        let initial_working_directory = self.get_application().and_then(|application| {
+            let application = application.borrow();
+            let app_dyn: &dyn shirabe_external_packages::symfony::console::application::Application =
+                &*application;
+            app_dyn
+                .as_any()
+                .downcast_ref::<Application>()
+                .expect("a Composer command's application is a shirabe Application")
+                .get_initial_working_directory()
+        });
         if let Some(ref iwd) = initial_working_directory
             && getcwd().as_deref() != Some(iwd.as_str())
         {
