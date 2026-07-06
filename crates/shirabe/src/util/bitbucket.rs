@@ -292,7 +292,7 @@ impl Bitbucket {
             return Ok(false);
         }
 
-        // TODO(phase-b): PHP $authConfigSource parameter is unused inside storeInAuthConfig
+        // NOTE: PHP $authConfigSource parameter is unused inside storeInAuthConfig
         //   (upstream Composer bug); the dispatch on local vs. global is dropped here too.
         let _ = store_in_local_auth_config;
         self.store_in_auth_config(origin_url, &consumer_key, &consumer_secret)?;
@@ -337,7 +337,7 @@ impl Bitbucket {
             return Ok(String::new());
         }
 
-        // TODO(phase-b): PHP $authConfigSource parameter is unused inside storeInAuthConfig
+        // NOTE: PHP $authConfigSource parameter is unused inside storeInAuthConfig
         //   (upstream Composer bug); the dispatch on local vs. global is dropped here too.
         self.store_in_auth_config(origin_url, consumer_key, consumer_secret)?;
 
@@ -358,7 +358,7 @@ impl Bitbucket {
         }
     }
 
-    // TODO(phase-b): PHP $authConfigSource parameter dropped — unused in upstream Composer too.
+    // NOTE: PHP $authConfigSource parameter dropped — unused in upstream Composer too.
     fn store_in_auth_config(
         &mut self,
         origin_url: &str,

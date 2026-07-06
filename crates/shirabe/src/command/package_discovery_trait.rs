@@ -29,8 +29,6 @@ use shirabe_php_shim::{
 
 /// @internal
 pub trait PackageDiscoveryTrait: BaseCommand {
-    // PHP: private $repos; private $repositorySets;
-    // TODO(phase-b): trait fields require an associated state struct in Rust; expose via accessors
     fn get_repos_mut(
         &self,
     ) -> std::cell::RefMut<'_, Option<crate::repository::RepositoryInterfaceHandle>>;
