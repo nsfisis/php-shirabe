@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/BaseConfigCommand.php
 
 use crate::command::BaseCommand;
+use crate::command::base_command::base_command_initialize;
 use crate::config::Config;
 use crate::config::JsonConfigSource;
 use crate::factory::Factory;
@@ -23,9 +24,11 @@ pub trait BaseConfigCommand: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<()> {
-        // TODO(phase-b): BaseCommand::initialize chained via Self::initialize would recurse;
-        // omitted until trait disambiguation is sorted.
+    ) -> anyhow::Result<()>
+    where
+        Self: Sized,
+    {
+        base_command_initialize(self, input.clone(), output.clone())?;
 
         if input
             .borrow()
