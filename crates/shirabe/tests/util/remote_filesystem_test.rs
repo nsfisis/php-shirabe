@@ -273,19 +273,71 @@ fn test_copy() {
 #[test]
 #[ignore = "requires a MockObject subclass of RemoteFilesystem overriding private get_remote_contents; no subclass-mocking infrastructure exists"]
 fn test_copy_with_no_retry_on_failure() {
+    // TODO(phase-d): requires a MockObject subclass of RemoteFilesystem overriding the
+    // private get_remote_contents method. There is no subclass-mocking infrastructure in
+    // Rust for this, and get_remote_contents's http(s) branch is itself still a
+    // TODO(phase-c) stub (always returns Ok(None)), so there is nothing yet to intercept
+    // even with a seam.
     todo!()
 }
 
 #[test]
 #[ignore = "requires MockObject subclasses overriding RemoteFilesystem::get_remote_contents and AuthHelper::prompt_auth_if_needed; no subclass-mocking infrastructure exists"]
 fn test_copy_with_success_on_retry() {
+    // TODO(phase-d): requires MockObject subclasses overriding
+    // RemoteFilesystem::get_remote_contents and AuthHelper::prompt_auth_if_needed to
+    // simulate a first failure and a retried success; same missing-subclass-mocking-
+    // infrastructure and TODO(phase-c) http(s)-stub blockers as
+    // test_copy_with_no_retry_on_failure above.
     todo!()
 }
 
 #[test]
-#[ignore = "get_tls_defaults validates the (nonexistent) cafile and errors; constructor swallows it, so no ssl defaults are produced. Faithful porting needs CaBundle::validate_ca_file semantics for a missing file"]
 fn test_get_options_for_url_creates_secure_tls_defaults() {
-    todo!()
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+
+    let mut ssl: IndexMap<String, PhpMixed> = IndexMap::new();
+    ssl.insert(
+        "cafile".to_string(),
+        PhpMixed::String("/some/path/file.crt".to_string()),
+    );
+    let mut additional_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    additional_options.insert("ssl".to_string(), PhpMixed::Array(ssl));
+
+    let res = call_get_options_for_url(
+        io,
+        "example.org",
+        additional_options,
+        IndexMap::new(),
+        "http://www.example.org",
+    );
+
+    let ssl_res = res.get("ssl").and_then(|v| v.as_array()).unwrap();
+    let ciphers = ssl_res.get("ciphers").and_then(|v| v.as_string()).unwrap();
+    assert!(ciphers.contains(
+        "!aNULL:!eNULL:!EXPORT:!DES:!3DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"
+    ));
+    assert_eq!(
+        Some(true),
+        ssl_res.get("verify_peer").and_then(|v| v.as_bool())
+    );
+    assert_eq!(
+        Some(true),
+        ssl_res.get("SNI_enabled").and_then(|v| v.as_bool())
+    );
+    assert_eq!(
+        Some(7),
+        ssl_res.get("verify_depth").and_then(|v| v.as_int())
+    );
+    assert_eq!(
+        Some("/some/path/file.crt"),
+        ssl_res.get("cafile").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some(true),
+        ssl_res.get("disable_compression").and_then(|v| v.as_bool())
+    );
 }
 
 // Mirrors RemoteFilesystemTest::provideBitbucketPublicDownloadUrls.

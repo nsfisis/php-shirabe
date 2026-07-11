@@ -1,8 +1,13 @@
 //! ref: composer/tests/Composer/Test/Util/StreamContextFactoryTest.php
 
 // These build a stream context and assert proxy/option handling driven by HTTP(S)_PROXY /
-// no_proxy environment variables; the env-dependent setup (without its setUp/tearDown
-// isolation) is not ported.
+// no_proxy environment variables. PHP's setUp/tearDown isolation (which resets the env vars and
+// the ProxyManager singleton before/after every test method) is emulated per-test via
+// set_up()/tear_down()+TearDown below; since env vars and the ProxyManager singleton are global
+// process state, and cargo runs tests in parallel by default (unlike PHPUnit's default serial
+// execution), every test here is also tagged `#[serial_test::serial]` to avoid racing other
+// serial-tagged tests in this binary that touch the same global state (see
+// util/http/proxy_manager_test.rs and http_downloader_test.rs).
 use indexmap::IndexMap;
 use shirabe::util::http::proxy_manager::ProxyManager;
 use shirabe::util::platform::Platform;
@@ -35,6 +40,38 @@ fn map(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
         .collect()
 }
 
+// `PhpMixed`'s `PartialEq` models PHP's `===` (order-sensitive for associative arrays). These
+// tests port PHPUnit's `assertEquals`, which compares associative arrays by key/value regardless
+// of insertion order (PHP `List`/sequential arrays are still position-sensitive, since reordering
+// them changes which value is at which index). This mirrors that PHPUnit semantics for the
+// `IndexMap<String, PhpMixed>` results `stream_context_get_options` returns.
+fn php_equals(a: &PhpMixed, b: &PhpMixed) -> bool {
+    match (a, b) {
+        (PhpMixed::Array(a), PhpMixed::Array(b)) => {
+            a.len() == b.len()
+                && a.iter()
+                    .all(|(k, v)| b.get(k).is_some_and(|bv| php_equals(v, bv)))
+        }
+        (PhpMixed::List(a), PhpMixed::List(b)) => {
+            a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| php_equals(x, y))
+        }
+        _ => a == b,
+    }
+}
+
+#[track_caller]
+fn assert_options_eq(expected: &IndexMap<String, PhpMixed>, actual: &IndexMap<String, PhpMixed>) {
+    let matches = expected.len() == actual.len()
+        && expected
+            .iter()
+            .all(|(k, v)| actual.get(k).is_some_and(|av| php_equals(v, av)));
+    assert!(
+        matches,
+        "options mismatch (order-insensitive):\n  expected: {:?}\n  actual:   {:?}",
+        expected, actual
+    );
+}
+
 fn set_up() {
     Platform::clear_env("HTTP_PROXY");
     Platform::clear_env("http_proxy");
@@ -63,18 +100,25 @@ impl Drop for TearDown {
     }
 }
 
-// PHP's dataGetContext second data set passes a `notification` closure in both the default and
-// expected params; PhpMixed has no closure variant, so that data set (and thus the all-or-nothing
-// testGetContext) cannot be expressed.
+// TODO(phase-d): PHP's dataGetContext second data set passes a `notification` closure in both
+// the default and expected params; PhpMixed has no closure variant, so that data set (and thus
+// the all-or-nothing testGetContext, which a data provider test cannot partially skip) cannot be
+// expressed.
 #[test]
+#[serial_test::serial]
 #[ignore = "dataGetContext passes a notification closure in params; PhpMixed cannot represent a PHP closure, so the data set is unportable"]
 fn test_get_context() {
     let _tear_down = TearDown;
     set_up();
+    // TODO(phase-d): dataGetContext's second data set passes a `notification` closure in
+    // params; PhpMixed cannot represent a PHP closure, so that data set (and thus the
+    // all-or-nothing testGetContext, which a data provider test cannot partially skip) is
+    // unportable.
     todo!()
 }
 
 #[test]
+#[serial_test::serial]
 #[ignore]
 fn test_http_proxy() {
     let _tear_down = TearDown;
@@ -114,11 +158,11 @@ fn test_http_proxy() {
             ("follow_location", PhpMixed::Int(1)),
         ]),
     )]);
-    assert_eq!(expected, options);
+    assert_options_eq(&expected, &options);
 }
 
 #[test]
-#[ignore]
+#[serial_test::serial]
 fn test_http_proxy_with_no_proxy() {
     let _tear_down = TearDown;
     set_up();
@@ -146,11 +190,11 @@ fn test_http_proxy_with_no_proxy() {
             ("header", list(vec![s("User-Agent: foo")])),
         ]),
     )]);
-    assert_eq!(expected, options);
+    assert_options_eq(&expected, &options);
 }
 
 #[test]
-#[ignore]
+#[serial_test::serial]
 fn test_http_proxy_with_no_proxy_wildcard() {
     let _tear_down = TearDown;
     set_up();
@@ -178,10 +222,11 @@ fn test_http_proxy_with_no_proxy_wildcard() {
             ("header", list(vec![s("User-Agent: foo")])),
         ]),
     )]);
-    assert_eq!(expected, options);
+    assert_options_eq(&expected, &options);
 }
 
 #[test]
+#[serial_test::serial]
 #[ignore]
 fn test_options_are_preserved() {
     let _tear_down = TearDown;
@@ -225,10 +270,11 @@ fn test_options_are_preserved() {
             ("follow_location", PhpMixed::Int(1)),
         ]),
     )]);
-    assert_eq!(expected, options);
+    assert_options_eq(&expected, &options);
 }
 
 #[test]
+#[serial_test::serial]
 #[ignore]
 fn test_http_proxy_without_port() {
     let _tear_down = TearDown;
@@ -263,11 +309,11 @@ fn test_http_proxy_without_port() {
             ("follow_location", PhpMixed::Int(1)),
         ]),
     )]);
-    assert_eq!(expected, options);
+    assert_options_eq(&expected, &options);
 }
 
 #[test]
-#[ignore]
+#[serial_test::serial]
 fn test_https_proxy_override() {
     let _tear_down = TearDown;
     set_up();
@@ -293,7 +339,7 @@ fn test_https_proxy_override() {
 }
 
 #[test]
-#[ignore]
+#[serial_test::serial]
 fn test_ssl_proxy() {
     let _tear_down = TearDown;
     for (expected, proxy) in [
@@ -322,7 +368,7 @@ fn test_ssl_proxy() {
                     ("header", list(vec![s("User-Agent: foo")])),
                 ]),
             )]);
-            assert_eq!(expected_options, options);
+            assert_options_eq(&expected_options, &options);
         } else {
             // The catch in PHP asserts the exception is a TransportException; the return type
             // here already guarantees that.
@@ -339,6 +385,7 @@ fn test_ssl_proxy() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() {
     let _tear_down = TearDown;
     set_up();
@@ -370,6 +417,7 @@ fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() 
 }
 
 #[test]
+#[serial_test::serial]
 #[ignore]
 fn test_init_options_does_include_proxy_auth_headers() {
     let _tear_down = TearDown;
@@ -397,6 +445,7 @@ fn test_init_options_does_include_proxy_auth_headers() {
 }
 
 #[test]
+#[serial_test::serial]
 #[ignore]
 fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
     let _tear_down = TearDown;

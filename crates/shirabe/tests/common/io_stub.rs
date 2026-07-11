@@ -10,6 +10,21 @@ use shirabe::config::Config;
 use shirabe::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use shirabe_php_shim::PhpMixed;
 
+// Records call arguments for a stubbed method, equivalent to PHPUnit's
+// `->expects($this->once())->method(...)->with(...)` call-count/argument verification.
+#[derive(Debug, Default)]
+struct CallRecorder<T>(std::cell::RefCell<Vec<T>>);
+
+impl<T: Clone> CallRecorder<T> {
+    fn push(&self, value: T) {
+        self.0.borrow_mut().push(value);
+    }
+
+    fn calls(&self) -> Vec<T> {
+        self.0.borrow().clone()
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct IOStub {
     authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
@@ -27,12 +42,29 @@ pub struct IOStub {
     get_authentication: Option<indexmap::IndexMap<String, Option<String>>>,
 
     ask: Option<PhpMixed>,
+    // When set, `askAndValidate` invokes the caller's validator with this value and returns/
+    // propagates its `Result`, equivalent to a PHPUnit `willReturnCallback` that calls the
+    // validator directly. When unset, `askAndValidate` just returns `default` (unvalidated).
+    ask_and_validate_answer: Option<PhpMixed>,
     ask_confirmation: Option<bool>,
     ask_and_hide_answer: Option<Option<String>>,
     // Keyed `askAndHideAnswer` replies, mirroring tests whose willReturnCallback
     // switches on the question string. Unknown questions return `''` like PHP's
     // `switch` default.
     ask_and_hide_answer_responses: Option<indexmap::IndexMap<String, String>>,
+
+    // Records `writeRaw` calls.
+    write_raw_calls: CallRecorder<(String, bool)>,
+    // Records `setAuthentication` calls. Kept separate from `authentications` so
+    // `with_has_authentication`/`with_get_authentication` stay static (matching a PHPUnit
+    // `willReturn`) even while `setAuthentication` is invoked.
+    set_authentication_calls: CallRecorder<(String, String, Option<String>)>,
+    // Records `askAndValidate` calls (question, attempts, default).
+    ask_and_validate_calls: CallRecorder<(String, Option<i64>, PhpMixed)>,
+    // Records `hasAuthentication` calls.
+    has_authentication_calls: CallRecorder<String>,
+    // Records `getAuthentication` calls.
+    get_authentication_calls: CallRecorder<String>,
 }
 
 impl IOStub {
@@ -71,8 +103,18 @@ impl IOStub {
         self.get_authentication = Some(value);
         self
     }
+    // Mutator counterpart of `with_get_authentication`, for tests that reconfigure the stub's
+    // response between calls (equivalent to PHPUnit's `willReturnCallback` sequencing via
+    // `array_shift`).
+    pub fn set_get_authentication(&mut self, value: indexmap::IndexMap<String, Option<String>>) {
+        self.get_authentication = Some(value);
+    }
     pub fn with_ask(mut self, value: PhpMixed) -> Self {
         self.ask = Some(value);
+        self
+    }
+    pub fn with_ask_and_validate_answer(mut self, value: PhpMixed) -> Self {
+        self.ask_and_validate_answer = Some(value);
         self
     }
     pub fn with_ask_confirmation(mut self, value: bool) -> Self {
@@ -106,6 +148,31 @@ impl IOStub {
         self.authentications.insert(repository_name.into(), auth);
         self
     }
+
+    // For testing only. Returns the recorded `writeRaw` calls in call order.
+    pub fn write_raw_calls(&self) -> Vec<(String, bool)> {
+        self.write_raw_calls.calls()
+    }
+
+    // For testing only. Returns the recorded `setAuthentication` calls in call order.
+    pub fn set_authentication_calls(&self) -> Vec<(String, String, Option<String>)> {
+        self.set_authentication_calls.calls()
+    }
+
+    // For testing only. Returns the recorded `askAndValidate` calls in call order.
+    pub fn ask_and_validate_calls(&self) -> Vec<(String, Option<i64>, PhpMixed)> {
+        self.ask_and_validate_calls.calls()
+    }
+
+    // For testing only. Returns the recorded `hasAuthentication` calls in call order.
+    pub fn has_authentication_calls(&self) -> Vec<String> {
+        self.has_authentication_calls.calls()
+    }
+
+    // For testing only. Returns the recorded `getAuthentication` calls in call order.
+    pub fn get_authentication_calls(&self) -> Vec<String> {
+        self.get_authentication_calls.calls()
+    }
 }
 
 impl IOInterfaceImmutable for IOStub {
@@ -127,7 +194,9 @@ impl IOInterfaceImmutable for IOStub {
 
     fn write3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
     fn write_error3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
-    fn write_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_raw3(&self, message: &str, newline: bool, _verbosity: i64) {
+        self.write_raw_calls.push((message.to_string(), newline));
+    }
     fn write_error_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
     fn overwrite4(&self, _message: &str, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
     fn overwrite_error4(
@@ -147,12 +216,17 @@ impl IOInterfaceImmutable for IOStub {
     }
     fn ask_and_validate(
         &self,
-        _question: String,
-        _validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
-        _attempts: Option<i64>,
+        question: String,
+        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        Ok(default)
+        self.ask_and_validate_calls
+            .push((question, attempts, default.clone()));
+        match &self.ask_and_validate_answer {
+            Some(answer) => validator(answer.clone()),
+            None => Ok(default),
+        }
     }
     fn ask_and_hide_answer(&self, question: String) -> Option<String> {
         if let Some(responses) = &self.ask_and_hide_answer_responses {
@@ -178,6 +252,8 @@ impl IOInterfaceImmutable for IOStub {
         <Self as BaseIO>::get_authentications(self)
     }
     fn has_authentication(&self, repository_name: &str) -> bool {
+        self.has_authentication_calls
+            .push(repository_name.to_string());
         match self.has_authentication {
             Some(value) => value,
             None => <Self as BaseIO>::has_authentication(self, repository_name),
@@ -187,6 +263,8 @@ impl IOInterfaceImmutable for IOStub {
         &self,
         repository_name: &str,
     ) -> indexmap::IndexMap<String, Option<String>> {
+        self.get_authentication_calls
+            .push(repository_name.to_string());
         match &self.get_authentication {
             Some(value) => value.clone(),
             None => <Self as BaseIO>::get_authentication(self, repository_name),
@@ -211,6 +289,11 @@ impl IOInterfaceMutable for IOStub {
         username: String,
         password: Option<String>,
     ) {
+        self.set_authentication_calls.push((
+            repository_name.clone(),
+            username.clone(),
+            password.clone(),
+        ));
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
     fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {

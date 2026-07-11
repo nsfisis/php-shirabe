@@ -528,33 +528,241 @@ fn test_store_auth_with_prompt_no_answer() {
     f.auth_helper.store_auth(origin, StoreAuth::Prompt).unwrap();
 }
 
+// Mirrors AuthHelperTest::testStoreAuthWithPromptInvalidAnswer. The PHP test mocks
+// `askAndValidate` itself to invoke the validator directly with an invalid answer, so the
+// RuntimeException it raises propagates out of `storeAuth` without exercising any interactive
+// retry loop; `IOStub::with_ask_and_validate_answer` mirrors that directly.
 #[test]
-#[ignore = "PHP catches a RuntimeException from the validator; the Rust QuestionHelper exhausts \
-input and panics via expect() rather than returning Err, so it cannot be represented as a \
-recoverable Result"]
 fn test_store_auth_with_prompt_invalid_answer() {
-    todo!()
+    use crate::io_stub::IOStub;
+    use shirabe_php_shim::RuntimeException;
+
+    let origin = "github.com";
+    let config_source_name = "https://api.gitlab.com/source";
+
+    let io = std::rc::Rc::new(std::cell::RefCell::new(
+        IOStub::new().with_ask_and_validate_answer(PhpMixed::String("invalid".to_string())),
+    ));
+    let config = ConfigStubBuilder::new().build_shared();
+
+    let mut source = MockConfigSource::new();
+    source
+        .expect_get_name()
+        .times(1)
+        .returning(|| "https://api.gitlab.com/source".to_string());
+    config.borrow_mut().set_auth_config_source(Box::new(source));
+
+    let auth_helper = AuthHelper::new(
+        io.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config,
+    );
+
+    let err = auth_helper
+        .store_auth(origin, StoreAuth::Prompt)
+        .expect_err("expected a RuntimeException");
+    assert!(err.downcast_ref::<RuntimeException>().is_some());
+
+    // Mirrors PHP's `->with('Do you want to store credentials for '.$origin.' in '.
+    // $configSourceName.' ? [Yn] ', $this->anything(), null, 'y')` verification on askAndValidate.
+    assert_eq!(
+        vec![(
+            format!(
+                "Do you want to store credentials for {origin} in {config_source_name} ? [Yn] "
+            ),
+            None,
+            PhpMixed::String("y".to_string()),
+        )],
+        io.borrow().ask_and_validate_calls()
+    );
 }
 
+// Mirrors AuthHelperTest::testPromptAuthIfNeededGitLabNoAuthChange. `GitLab::authorizeOauth`
+// falls back to the `gitlab-token` config entry after real `git config gitlab.accesstoken` /
+// `gitlab.deploytoken.*` lookups miss (as they do in this repo's test checkout / CI, matching
+// the same host-git-state dependency the upstream PHP test already carries), and stores the
+// same username/password IOStub already returns. Since getAuthentication is a static stub, that
+// looks like "no auth change" and AuthHelper raises a TransportException.
 #[test]
-#[ignore = "needs the extra prompt_auth_if_needed params (headers/retry_count/response_body) and \
-GitLab::authorize_oauth which shells out to real `git config`; depends on host git state and is a \
-design-level port concern"]
+#[ignore]
 fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
-    todo!()
+    use crate::io_stub::IOStub;
+    use shirabe::downloader::TransportException;
+
+    let origin = "gitlab.com";
+
+    let mut auth = IndexMap::new();
+    auth.insert("username".to_string(), Some("gitlab-user".to_string()));
+    auth.insert("password".to_string(), Some("gitlab-password".to_string()));
+    let io = std::rc::Rc::new(std::cell::RefCell::new(
+        IOStub::new()
+            .with_has_authentication(true)
+            .with_get_authentication(auth),
+    ));
+
+    let mut gitlab_token = IndexMap::new();
+    let mut token_entry = IndexMap::new();
+    token_entry.insert(
+        "username".to_string(),
+        PhpMixed::String("gitlab-user".to_string()),
+    );
+    token_entry.insert(
+        "token".to_string(),
+        PhpMixed::String("gitlab-password".to_string()),
+    );
+    gitlab_token.insert("gitlab.com".to_string(), PhpMixed::Array(token_entry));
+
+    let config = ConfigStubBuilder::new()
+        .with("github-domains", PhpMixed::List(vec![]))
+        .with(
+            "gitlab-domains",
+            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+        )
+        .with("gitlab-token", PhpMixed::Array(gitlab_token))
+        .build_shared();
+
+    let mut auth_helper = AuthHelper::new(
+        io.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config,
+    );
+
+    let result = auth_helper.prompt_auth_if_needed(
+        "https://gitlab.com/acme/archive.zip",
+        origin,
+        404,
+        Some("GitLab requires authentication and it was not provided"),
+        vec![],
+        0,
+        None,
+    );
+
+    let err = result.expect_err("expected a TransportException");
+    assert!(err.downcast_ref::<TransportException>().is_some());
+
+    assert_eq!(
+        vec![(
+            "gitlab.com".to_string(),
+            "gitlab-user".to_string(),
+            Some("gitlab-password".to_string())
+        )],
+        io.borrow().set_authentication_calls()
+    );
 }
 
+// Mirrors AuthHelperTest::testPromptAuthIfNeededMultipleBitbucketDownloads. The pre-seeded
+// `bitbucket-oauth` config entry has a non-expired access-token, so `Bitbucket::request_token`
+// resolves it from `get_token_from_config` without ever making a network call.
 #[test]
-#[ignore = "drives Bitbucket::request_token over the network and relies on willReturnCallback \
-sequencing of getAuthentication; design-level port concern"]
 fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
-    todo!()
+    use crate::io_stub::IOStub;
+
+    let origin = "bitbucket.org";
+
+    let mut token_entry = IndexMap::new();
+    token_entry.insert(
+        "access-token".to_string(),
+        PhpMixed::String("bitbucket_access_token".to_string()),
+    );
+    token_entry.insert(
+        "access-token-expiration".to_string(),
+        PhpMixed::Int(shirabe_php_shim::time() + 1800),
+    );
+    let mut bitbucket_oauth = IndexMap::new();
+    bitbucket_oauth.insert("bitbucket.org".to_string(), PhpMixed::Array(token_entry));
+
+    let config = ConfigStubBuilder::new()
+        .with("github-domains", PhpMixed::List(vec![]))
+        .with("gitlab-domains", PhpMixed::List(vec![]))
+        .with("bitbucket-oauth", PhpMixed::Array(bitbucket_oauth))
+        .build_shared();
+
+    let mut first_auth = IndexMap::new();
+    first_auth.insert(
+        "username".to_string(),
+        Some("bitbucket_client_id".to_string()),
+    );
+    first_auth.insert(
+        "password".to_string(),
+        Some("bitbucket_client_secret".to_string()),
+    );
+    let io = std::rc::Rc::new(std::cell::RefCell::new(
+        IOStub::new()
+            .with_has_authentication(true)
+            .with_get_authentication(first_auth),
+    ));
+
+    let mut auth_helper = AuthHelper::new(
+        io.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config,
+    );
+
+    let result1 = auth_helper
+        .prompt_auth_if_needed(
+            "https://bitbucket.org/workspace/repo1/get/hash1.zip",
+            origin,
+            401,
+            Some("HTTP/2 401 "),
+            vec![],
+            0,
+            None,
+        )
+        .unwrap();
+
+    let mut second_auth = IndexMap::new();
+    second_auth.insert("username".to_string(), Some("x-token-auth".to_string()));
+    second_auth.insert(
+        "password".to_string(),
+        Some("bitbucket_access_token".to_string()),
+    );
+    io.borrow_mut().set_get_authentication(second_auth);
+
+    let result2 = auth_helper
+        .prompt_auth_if_needed(
+            "https://bitbucket.org/workspace/repo2/get/hash2.zip",
+            origin,
+            401,
+            Some("HTTP/2 401 "),
+            vec![],
+            0,
+            None,
+        )
+        .unwrap();
+
+    assert!(result1.retry);
+    assert_eq!(StoreAuth::Bool(false), result1.store_auth);
+    assert!(result2.retry);
+    assert_eq!(StoreAuth::Bool(false), result2.store_auth);
+
+    assert_eq!(
+        vec![(
+            "bitbucket.org".to_string(),
+            "x-token-auth".to_string(),
+            Some("bitbucket_access_token".to_string())
+        )],
+        io.borrow().set_authentication_calls()
+    );
+
+    // Mirrors PHP's `->expects($this->exactly(2))->method('hasAuthentication')->with($origin)`
+    // and `->expects($this->exactly(2))->method('getAuthentication')` verification.
+    assert_eq!(
+        vec![origin.to_string(), origin.to_string()],
+        io.borrow().has_authentication_calls()
+    );
+    assert_eq!(
+        vec![origin.to_string(), origin.to_string()],
+        io.borrow().get_authentication_calls()
+    );
 }
 
 #[test]
 #[ignore = "exercises the deprecated addAuthenticationHeader wrapper (not ported) which relies on \
 trigger_error/E_USER_DEPRECATED; the PHP error-handler subsystem is not modeled"]
 fn test_add_authentication_header_with_custom_headers() {
+    // TODO(phase-d): exercises AuthHelper::addAuthenticationHeader, a deprecated wrapper
+    // around addAuthenticationOptions that PHP implements via
+    // trigger_error(E_USER_DEPRECATED). It has not been ported to Rust (no
+    // add_authentication_header method exists on AuthHelper) because the PHP
+    // error-handler subsystem it relies on is not modeled — same limitation as
+    // error_handler_test.rs.
     todo!()
 }
 
@@ -562,6 +770,8 @@ fn test_add_authentication_header_with_custom_headers() {
 #[ignore = "exercises the deprecated addAuthenticationHeader wrapper (not ported) which relies on \
 trigger_error/E_USER_DEPRECATED; the PHP error-handler subsystem is not modeled"]
 fn test_add_authentication_header_is_working() {
+    // TODO(phase-d): see test_add_authentication_header_with_custom_headers above — same
+    // unported addAuthenticationHeader deprecated wrapper.
     todo!()
 }
 
@@ -569,5 +779,8 @@ fn test_add_authentication_header_is_working() {
 #[ignore = "exercises the deprecated addAuthenticationHeader wrapper (not ported) which relies on \
 trigger_error/E_USER_DEPRECATED converted to a RuntimeException via set_error_handler; not modeled"]
 fn test_add_authentication_header_deprecation() {
+    // TODO(phase-d): asserts that calling addAuthenticationHeader itself raises a
+    // RuntimeException via a custom set_error_handler converting E_USER_DEPRECATED; same
+    // unported wrapper and unmodeled error-handler subsystem as the two tests above.
     todo!()
 }

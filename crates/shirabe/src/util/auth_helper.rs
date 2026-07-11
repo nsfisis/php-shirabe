@@ -33,7 +33,7 @@ pub struct PromptAuthResult {
     pub store_auth: StoreAuth,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StoreAuth {
     Bool(bool),
     Prompt,

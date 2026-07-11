@@ -1,8 +1,8 @@
 //! ref: composer/tests/Composer/Test/Util/ProcessExecutorTest.php
 
 // These run real subprocesses (capturing output/stderr/timeout) and assert ProcessExecutor's
-// password hiding, line splitting and argument escaping; the subprocess execution and mocked
-// IO are not ported.
+// password hiding, line splitting and argument escaping. A few data points remain unportable —
+// see the individual `// TODO(phase-d)` comments below.
 
 use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterface;
@@ -28,16 +28,34 @@ fn test_execute_captures_output() {
 #[ignore = "requires PHP output buffering (ob_start/ob_get_clean) to capture stdout; no equivalent symbol"]
 #[test]
 fn test_execute_outputs_if_not_captured() {
+    // TODO(phase-d): requires PHP output buffering (ob_start/ob_get_clean) to capture
+    // stdout; no equivalent symbol. ProcessExecutor::execute with
+    // ProcessExecutor::FORWARD_OUTPUT and io=None writes straight to the real process
+    // stdout (see output_handler's `print!`), and there is no safe way to capture that
+    // from within a parallel cargo test process without redirecting the real stdout file
+    // descriptor, which is unsafe under `cargo test`'s default multi-threaded runner.
     todo!()
 }
 
-#[ignore = "requires getMockBuilder('IOInterface') with expects()->once()->method('writeRaw')->with() expectation verification; no mocking framework"]
 #[test]
 fn test_use_io_is_not_null_and_if_not_captured() {
-    todo!()
+    use crate::io_stub::IOStub;
+
+    let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let mut process = ProcessExecutor::new(Some(
+        io.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
+    ));
+
+    process
+        .execute("echo foo", ProcessExecutor::FORWARD_OUTPUT, None)
+        .unwrap();
+
+    assert_eq!(
+        vec![(format!("foo{}", PHP_EOL), false)],
+        io.borrow().write_raw_calls()
+    );
 }
 
-#[ignore = "stderr capture works, but the test cwd (crates/shirabe) contains a `foo/` fixture dir, so `cat foo` reports \"Is a directory\" instead of \"No such file or directory\""]
 #[test]
 fn test_execute_captures_stderr() {
     let mut process = ProcessExecutor::new(None);
@@ -124,6 +142,14 @@ fn test_doesnt_hide_ports() {
 #[ignore = "splitLines is called with null in the PHP test, but split_lines accepts only &str (no ?string/Option overload)"]
 #[test]
 fn test_split_lines() {
+    // TODO(phase-d): splitLines is called with null in the PHP test
+    // ($process->splitLines(null)), but ProcessExecutor::split_lines here takes `&str`, not
+    // `Option<&str>` (PHP's `?string`). Porting this data point faithfully means widening
+    // split_lines's signature to Option<&str>, which touches every call site
+    // (package/version/version_guesser.rs, util/git.rs,
+    // repository/vcs/{hg,fossil,git,svn}_driver.rs — 13 call sites in total, all currently
+    // passing `&str`). That is a production API change beyond this test file; flagged for
+    // a design decision rather than made unilaterally.
     todo!()
 }
 
@@ -162,6 +188,11 @@ fn test_console_io_does_not_format_symfony_console_style() {
 #[ignore = "executeAsync returns a Process, not a cancelable promise; no promise/cancel symbol exists"]
 #[test]
 fn test_execute_async_cancel() {
+    // TODO(phase-d): PHP's executeAsync returns a React\Promise\PromiseInterface with
+    // cancel(); Rust's execute_async returns anyhow::Result<Process> directly (see the
+    // comment on ProcessExecutor::execute_async: "no test seam in the external-packages
+    // crate"), so there is no promise/cancel symbol to drive this test's
+    // `$promise->cancel()` step.
     todo!()
 }
 
