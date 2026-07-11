@@ -2157,10 +2157,6 @@ impl ApplicationHandle {
                 }
             }
 
-            // TODO(phase-b): the original PHP catches plugin discovery exceptions in a
-            // try/catch. The Rust port keeps the loop but skips IO error reporting
-            // because get_plugin_commands borrows &mut self, conflicting with io.
-            let mut plugin_warnings: Vec<String> = Vec::new();
             match (|| -> anyhow::Result<()> {
                 let plugin_commands = application.borrow_mut().get_plugin_commands()?;
                 for command in plugin_commands {
@@ -2170,7 +2166,7 @@ impl ApplicationHandle {
                         // name. Plugin command discovery (get_plugin_commands) is unimplemented, so
                         // this loop never runs; wire the concrete class name with the plugin API.
                         let cls = String::new();
-                        plugin_warnings.push(format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
+                        io.write_error(&format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
                     } else {
                         // Compatibility layer for symfony/console <7.4
                         // TODO(phase-c): registering a plugin command needs the Symfony
@@ -2200,9 +2196,6 @@ impl ApplicationHandle {
                         return Err(e);
                     }
                 }
-            }
-            for warning in &plugin_warnings {
-                io.write_error(warning);
             }
 
             application.borrow_mut().has_plugin_commands = true;
