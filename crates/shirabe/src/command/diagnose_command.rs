@@ -338,7 +338,6 @@ impl Command for DiagnoseCommand {
             }
         }
 
-        let proxy_manager = ProxyManager::get_instance();
         let protos: Vec<&str> = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
             vec!["http"]
         } else {
@@ -346,9 +345,11 @@ impl Command for DiagnoseCommand {
         };
         let proxy_check_result: anyhow::Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
             for proto in &protos {
-                let proxy = proxy_manager
-                    .lock()
-                    .unwrap()
+                // Compute the proxy under a short-lived lock: `check_http_proxy` below transitively
+                // re-enters `ProxyManager::get_instance()` (via HttpDownloader -> CurlDownloader /
+                // RemoteFilesystem), and `std::sync::Mutex` is not reentrant, so the guard must not
+                // still be held when that call happens.
+                let proxy = ProxyManager::get_instance()
                     .as_ref()
                     .unwrap()
                     .get_proxy_for_request(&format!("{}://repo.packagist.org", proto))

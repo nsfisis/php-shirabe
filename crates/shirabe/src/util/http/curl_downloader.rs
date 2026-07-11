@@ -222,8 +222,6 @@ impl CurlDownloader {
         // PHP logs the proxy in the "Downloading" line; resolving it here keeps that message
         // faithful even though reqwest does not yet apply the proxy (see send_once TODO).
         let using_proxy = ProxyManager::get_instance()
-            .lock()
-            .unwrap()
             .as_ref()
             .map(|pm| pm.get_proxy_for_request(url))
             .transpose()

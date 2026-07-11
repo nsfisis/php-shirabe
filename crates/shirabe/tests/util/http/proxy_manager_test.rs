@@ -46,21 +46,18 @@ fn test_instantiation() {
     // PHP compares object identity (===); the value-based Rust singleton exposes a per-instance
     // generation id instead, which changes only when a new ProxyManager is constructed.
     let original_instance = {
-        let mutex = ProxyManager::get_instance();
-        let guard = mutex.lock().unwrap();
+        let guard = ProxyManager::get_instance();
         guard.as_ref().unwrap().__generation()
     };
     let same_instance = {
-        let mutex = ProxyManager::get_instance();
-        let guard = mutex.lock().unwrap();
+        let guard = ProxyManager::get_instance();
         guard.as_ref().unwrap().__generation()
     };
     assert_eq!(original_instance, same_instance);
 
     ProxyManager::reset();
     let new_instance = {
-        let mutex = ProxyManager::get_instance();
-        let guard = mutex.lock().unwrap();
+        let guard = ProxyManager::get_instance();
         guard.as_ref().unwrap().__generation()
     };
     assert_ne!(same_instance, new_instance);
@@ -74,8 +71,7 @@ fn test_get_proxy_for_request_throws_on_bad_proxy_url() {
 
     Platform::put_env("http_proxy", "localhost");
     ProxyManager::reset();
-    let mutex = ProxyManager::get_instance();
-    let guard = mutex.lock().unwrap();
+    let guard = ProxyManager::get_instance();
     let proxy_manager = guard.as_ref().unwrap();
 
     assert!(
@@ -126,8 +122,7 @@ fn test_lowercase_overrides_uppercase() {
         }
         ProxyManager::reset();
 
-        let mutex = ProxyManager::get_instance();
-        let guard = mutex.lock().unwrap();
+        let guard = ProxyManager::get_instance();
         let proxy = guard.as_ref().unwrap().get_proxy_for_request(url).unwrap();
         assert_eq!(expected_url, proxy.get_status(None).unwrap());
     }
@@ -161,8 +156,7 @@ fn test_cgi_proxy_is_only_used_when_no_http_proxy() {
         }
         ProxyManager::reset();
 
-        let mutex = ProxyManager::get_instance();
-        let guard = mutex.lock().unwrap();
+        let guard = ProxyManager::get_instance();
         let proxy = guard
             .as_ref()
             .unwrap()
@@ -180,8 +174,7 @@ fn test_no_http_proxy_does_not_use_https_proxy() {
 
     Platform::put_env("https_proxy", "https://proxy.com:443");
     ProxyManager::reset();
-    let mutex = ProxyManager::get_instance();
-    let guard = mutex.lock().unwrap();
+    let guard = ProxyManager::get_instance();
     let proxy = guard
         .as_ref()
         .unwrap()
@@ -198,8 +191,7 @@ fn test_no_https_proxy_does_not_use_http_proxy() {
 
     Platform::put_env("http_proxy", "http://proxy.com:80");
     ProxyManager::reset();
-    let mutex = ProxyManager::get_instance();
-    let guard = mutex.lock().unwrap();
+    let guard = ProxyManager::get_instance();
     let proxy = guard
         .as_ref()
         .unwrap()
@@ -280,8 +272,7 @@ fn test_get_proxy_for_request() {
         }
         ProxyManager::reset();
 
-        let mutex = ProxyManager::get_instance();
-        let guard = mutex.lock().unwrap();
+        let guard = ProxyManager::get_instance();
         let proxy = guard.as_ref().unwrap().get_proxy_for_request(url).unwrap();
 
         assert_eq!(options.as_ref(), proxy.get_context_options());

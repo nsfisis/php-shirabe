@@ -4,10 +4,10 @@ use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
 use crate::util::http::ProxyItem;
 use crate::util::http::RequestProxy;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
 
-static INSTANCE: OnceLock<Mutex<Option<ProxyManager>>> = OnceLock::new();
+static INSTANCE: Mutex<Option<ProxyManager>> = Mutex::new(None);
 
 // Distinguishes ProxyManager instances so tests can mirror PHP `===` identity of the singleton,
 // which the Rust value-based singleton does not otherwise expose.
@@ -37,14 +37,25 @@ impl ProxyManager {
         instance
     }
 
-    pub fn get_instance() -> &'static Mutex<Option<ProxyManager>> {
-        INSTANCE.get_or_init(|| Mutex::new(Some(ProxyManager::new())))
+    // Returns the singleton already locked, rather than the bare `Mutex`, so that ensuring the
+    // instance is constructed and reading it happen under a single lock. Returning the `Mutex`
+    // itself would let a caller's own separate `.lock()` race a concurrent `reset()` in the gap
+    // between the two locks.
+    pub fn get_instance() -> std::sync::MutexGuard<'static, Option<ProxyManager>> {
+        // Mirrors PHP `getInstance`'s `if (self::$instance === null) { self::$instance = new self(); }`:
+        // construction is lazy, so it observes the environment at first use after a `reset`
+        // rather than at `reset` time.
+        let mut guard = INSTANCE.lock().unwrap();
+        if guard.is_none() {
+            *guard = Some(ProxyManager::new());
+        }
+        guard
     }
 
+    /// Clears the persistent instance (mirrors PHP `ProxyManager::reset`, which sets
+    /// `self::$instance = null` rather than eagerly reconstructing it).
     pub fn reset() {
-        if let Some(mutex) = INSTANCE.get() {
-            *mutex.lock().unwrap() = Some(ProxyManager::new());
-        }
+        *INSTANCE.lock().unwrap() = None;
     }
 
     /// For testing only: a unique id per constructed instance, used to mirror PHP `===` identity

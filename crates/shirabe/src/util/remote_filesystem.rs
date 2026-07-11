@@ -256,7 +256,7 @@ impl RemoteFilesystem {
             .map_err(|e| anyhow::anyhow!(e))?;
 
         let using_proxy = {
-            let proxy_manager_guard = ProxyManager::get_instance().lock().unwrap();
+            let proxy_manager_guard = ProxyManager::get_instance();
             let proxy = proxy_manager_guard
                 .as_ref()
                 .expect("ProxyManager instance")

@@ -96,7 +96,7 @@ impl StreamContextFactory {
 
         // Add stream proxy options if there is a proxy
         if !for_curl {
-            let proxy_manager = ProxyManager::get_instance().lock().unwrap();
+            let proxy_manager = ProxyManager::get_instance();
             let proxy_manager = proxy_manager.as_ref().unwrap();
             let proxy = proxy_manager.get_proxy_for_request(url)?;
             let proxy_options = proxy.get_context_options();
