@@ -1026,9 +1026,6 @@ impl Application {
 
         // filter out aliases for commands which are already on the list
         if commands.len() > 1 {
-            // $commandList = commandLoader ? array_merge(array_flip(loader->getNames()), commands) : commands
-            // TODO(review): $commandList mixes flipped loader names (string => int) with
-            // SymfonyCommand instances; this heterogeneous PHP array needs a typed representation.
             let mut command_list: IndexMap<
                 String,
                 std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
