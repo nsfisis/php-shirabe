@@ -826,15 +826,9 @@ impl Application {
             && command_loader.has(name)
         {
             let command = command_loader.get(name);
-            // $this->add($this->commandLoader->get($name))
-            // TODO(review): command_loader.get() returns Box<dyn SymfonyCommand> while add() expects
-            // Rc<RefCell<dyn SymfonyCommand>>; the loader return type needs reconciliation.
-            let _ = command;
             return self
                 .shared()
-                .add(todo!(
-                    "std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> from command_loader.get(name)"
-                ))
+                .add(command)
                 .map(|c| c.is_some())
                 .unwrap_or(false);
         }
@@ -1034,9 +1028,7 @@ impl Application {
         if commands.len() > 1 {
             // $commandList = commandLoader ? array_merge(array_flip(loader->getNames()), commands) : commands
             // TODO(review): $commandList mixes flipped loader names (string => int) with
-            // SymfonyCommand
-            // instances; this heterogeneous PHP array needs a typed representation. The alias
-            // de-duplication and the loader->get() lazy materialization are left to design.
+            // SymfonyCommand instances; this heterogeneous PHP array needs a typed representation.
             let mut command_list: IndexMap<
                 String,
                 std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
@@ -1048,13 +1040,7 @@ impl Application {
             for name_or_alias in commands {
                 if !command_list.contains_key(&name_or_alias) {
                     let loaded = self.command_loader.as_ref().unwrap().get(&name_or_alias);
-                    let _ = loaded;
-                    command_list.insert(
-                        name_or_alias.clone(),
-                        todo!(
-                            "std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> from command_loader.get(name_or_alias)"
-                        ),
-                    );
+                    command_list.insert(name_or_alias.clone(), loaded);
                 }
 
                 let command_name = command_list[&name_or_alias]
