@@ -151,12 +151,14 @@ fn get_class_of_command(command: &Rc<RefCell<dyn Command>>) -> String {
     todo!()
 }
 
-/// $command->getDefinition()->getOptions()
-fn get_definition_options(_command: &Rc<RefCell<dyn Command>>) -> Vec<InputOption> {
-    // TODO: InputDefinition::get_options() returns `&IndexMap<String, Rc<InputOption>>` but
-    // CompletionSuggestions::suggest_options() takes `Vec<InputOption>`; the option ownership
-    // model must be reconciled (Phase C).
-    todo!()
+fn get_definition_options(command: &Rc<RefCell<dyn Command>>) -> Vec<Rc<InputOption>> {
+    command
+        .borrow()
+        .get_definition()
+        .get_options()
+        .values()
+        .cloned()
+        .collect()
 }
 
 /// new $completionOutput();

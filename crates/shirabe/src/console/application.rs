@@ -718,11 +718,14 @@ impl Application {
         }
 
         if CompletionInput::TYPE_OPTION_NAME == input.get_completion_type() {
-            // $suggestions->suggestOptions($this->getDefinition()->getOptions());
-            // TODO(review): get_options() yields Rc<InputOption> (shared, non-Clone) while
-            // suggest_options() consumes owned InputOption values; an ownership/clone strategy
-            // for InputOption is needed.
-            suggestions.suggest_options(todo!("owned options from get_definition().get_options()"));
+            let options: Vec<std::rc::Rc<InputOption>> = self
+                .get_definition()
+                .borrow()
+                .get_options()
+                .values()
+                .cloned()
+                .collect();
+            suggestions.suggest_options(options);
 
             return Ok(());
         }
