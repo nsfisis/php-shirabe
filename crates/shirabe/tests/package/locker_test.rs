@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/LockerTest.php
 
+use crate::test_case::installation_manager;
 use indexmap::IndexMap;
-use shirabe::config::Config;
-use shirabe::installer::InstallationManager;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::json::{JsonEncodeOptions, JsonFile};
@@ -10,32 +9,12 @@ use shirabe::package::Locker;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::plugin::plugin_interface;
 use shirabe::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
-use shirabe::util::http_downloader::HttpDownloader;
-use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{LogicException, PhpMixed, hash};
 use tempfile::TempDir;
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
-}
-
-fn installation_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
-    // These tests never reach Locker::get_package_time, so the InstallationManager is never
-    // actually used; build it over a mock HttpDownloader to avoid the unimplemented curl backend.
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
-    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
-        io.clone(),
-        config,
-    )));
-    let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
-    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
-        r#loop,
-        io.clone(),
-        None,
-    )))
 }
 
 /// ref: LockerTest::getJsonContent — `JsonFile::encode(ksort([minimum-stability, name]), 0)`.

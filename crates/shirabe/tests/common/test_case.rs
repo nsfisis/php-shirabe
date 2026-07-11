@@ -174,7 +174,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 
 /// ref: FactoryMock::createInstallationManager (the real installers are never created in tests, so a
 /// bare InstallationManager over a mock HttpDownloader suffices).
-fn installation_manager(
+pub(crate) fn installation_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
