@@ -12,8 +12,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -70,8 +68,9 @@ fn supports_data_provider() -> Vec<&'static str> {
 #[test]
 fn test_supports() {
     for repository_url in supports_data_provider() {
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-        let config = Rc::new(RefCell::new(Config::new(true, None)));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
         assert!(HgDriver::supports(io, config, repository_url, false).unwrap());
     }
@@ -82,8 +81,9 @@ fn test_get_branches_filter_invalid_branch_names() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
@@ -120,8 +120,9 @@ fn test_file_get_content_invalid_identifier() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
@@ -148,8 +149,9 @@ fn test_get_change_date_invalid_identifier() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());

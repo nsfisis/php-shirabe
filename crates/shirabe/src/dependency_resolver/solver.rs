@@ -23,12 +23,10 @@ use crate::package::BasePackageHandle;
 use indexmap::IndexMap;
 use shirabe_php_shim::{array_shift, array_unshift, microtime, spl_object_hash};
 use shirabe_semver::constraint::AnyConstraint;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Solver {
-    pub(crate) policy: Rc<dyn PolicyInterface>,
+    pub(crate) policy: std::rc::Rc<dyn PolicyInterface>,
     pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
 
     pub(crate) rules: RuleSet,
@@ -41,7 +39,7 @@ pub struct Solver {
     /// Pairs of `(literals, level)` — PHP indexes into these with the BRANCH_* constants.
     pub(crate) branches: Vec<(Vec<i64>, i64)>,
     pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<Rc<RefCell<Rule>>>>,
+    pub(crate) learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     pub(crate) learned_why: IndexMap<String, i64>,
 
     pub test_flag_learned_positive_literal: bool,
@@ -54,7 +52,7 @@ impl Solver {
     const BRANCH_LEVEL: usize = 1;
 
     pub fn new(
-        policy: Rc<dyn PolicyInterface>,
+        policy: std::rc::Rc<dyn PolicyInterface>,
         pool: std::rc::Rc<std::cell::RefCell<Pool>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
@@ -205,14 +203,16 @@ impl Solver {
                 .is_empty()
             {
                 let mut problem = Problem::new();
-                problem.add_rule(Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
-                    Vec::new(),
-                    rule::RULE_ROOT_REQUIRE,
-                    rule::ReasonData::RootRequire {
-                        package_name: package_name.clone(),
-                        constraint: active_constraint.clone(),
-                    },
-                )))));
+                problem.add_rule(std::rc::Rc::new(std::cell::RefCell::new(Rule::Generic(
+                    GenericRule::new(
+                        Vec::new(),
+                        rule::RULE_ROOT_REQUIRE,
+                        rule::ReasonData::RootRequire {
+                            package_name: package_name.clone(),
+                            constraint: active_constraint.clone(),
+                        },
+                    ),
+                ))));
                 self.problems.push(problem);
             }
         }
@@ -223,7 +223,7 @@ impl Solver {
     pub fn solve(
         &mut self,
         request: &Request,
-        platform_requirement_filter: Option<Rc<dyn PlatformRequirementFilterInterface>>,
+        platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
     ) -> anyhow::Result<Result<LockTransaction, SolverProblemsException>> {
         let platform_requirement_filter = platform_requirement_filter
             .unwrap_or_else(|| PlatformRequirementFilterFactory::ignore_nothing());
@@ -244,7 +244,9 @@ impl Solver {
         while iterator.valid() {
             let rule = iterator.current();
             self.watch_graph
-                .insert(Rc::new(RefCell::new(RuleWatchNode::new(rule))));
+                .insert(std::rc::Rc::new(std::cell::RefCell::new(
+                    RuleWatchNode::new(rule),
+                )));
             iterator.next();
         }
 
@@ -293,7 +295,7 @@ impl Solver {
     /// If we find unit rules we make new decisions based on them
     ///
     /// Returns a `Rule` on conflict, otherwise `None`.
-    fn propagate(&mut self, level: i64) -> Option<Rc<RefCell<Rule>>> {
+    fn propagate(&mut self, level: i64) -> Option<std::rc::Rc<std::cell::RefCell<Rule>>> {
         while self.decisions.valid_offset(self.propagate_index) {
             let decision = self
                 .decisions
@@ -354,7 +356,7 @@ impl Solver {
         &mut self,
         level: i64,
         literal: i64,
-        rule: Rc<RefCell<Rule>>,
+        rule: std::rc::Rc<std::cell::RefCell<Rule>>,
     ) -> anyhow::Result<i64> {
         let mut level = level + 1;
 
@@ -390,13 +392,15 @@ impl Solver {
 
             // The same learned rule instance is shared between RuleSet,
             // RuleWatchGraph, and Decisions (PHP shares one object).
-            let new_rule = Rc::new(RefCell::new(Rule::Generic(new_rule)));
+            let new_rule = std::rc::Rc::new(std::cell::RefCell::new(Rule::Generic(new_rule)));
             self.rules.add(new_rule.clone(), RuleSet::TYPE_LEARNED)?;
 
             self.learned_why
                 .insert(spl_object_hash(&*new_rule.borrow()), why);
 
-            let rule_node = Rc::new(RefCell::new(RuleWatchNode::new(new_rule.clone())));
+            let rule_node = std::rc::Rc::new(std::cell::RefCell::new(RuleWatchNode::new(
+                new_rule.clone(),
+            )));
             rule_node.borrow_mut().watch2_on_highest(&self.decisions);
             self.watch_graph.insert(rule_node);
 
@@ -410,7 +414,7 @@ impl Solver {
         &mut self,
         level: i64,
         decision_queue: Vec<i64>,
-        rule: Rc<RefCell<Rule>>,
+        rule: std::rc::Rc<std::cell::RefCell<Rule>>,
     ) -> anyhow::Result<i64> {
         // choose best package to install from decisionQueue
         let mut literals = self.policy.select_preferred_packages(
@@ -433,7 +437,7 @@ impl Solver {
     fn analyze(
         &mut self,
         level: i64,
-        rule: Rc<RefCell<Rule>>,
+        rule: std::rc::Rc<std::cell::RefCell<Rule>>,
     ) -> anyhow::Result<(i64, i64, GenericRule, i64)> {
         let analyzed_rule = rule.clone();
         let mut rule = rule;
@@ -602,7 +606,7 @@ impl Solver {
     fn analyze_unsolvable_rule(
         &self,
         problem: &mut Problem,
-        conflict_rule: Rc<RefCell<Rule>>,
+        conflict_rule: std::rc::Rc<std::cell::RefCell<Rule>>,
         rule_seen: &mut IndexMap<String, bool>,
     ) {
         let why = spl_object_hash(&*conflict_rule.borrow());
@@ -630,7 +634,7 @@ impl Solver {
         problem.add_rule(conflict_rule);
     }
 
-    fn analyze_unsolvable(&mut self, conflict_rule: Rc<RefCell<Rule>>) {
+    fn analyze_unsolvable(&mut self, conflict_rule: std::rc::Rc<std::cell::RefCell<Rule>>) {
         let mut problem = Problem::new();
         problem.add_rule(conflict_rule.clone());
 

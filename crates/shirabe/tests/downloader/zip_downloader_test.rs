@@ -15,8 +15,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock};
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
@@ -28,9 +26,9 @@ fn run<F: std::future::Future>(future: F) -> F::Output {
 
 struct SetUp {
     test_dir: TempDir,
-    io: Rc<RefCell<dyn IOInterface>>,
-    config: Rc<RefCell<Config>>,
-    http_downloader: Rc<RefCell<HttpDownloader>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     package: PackageInterfaceHandle,
     filename: std::path::PathBuf,
 }
@@ -44,10 +42,11 @@ struct SetUp {
 fn set_up() -> SetUp {
     let test_dir = TempDir::new().unwrap();
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
-    let dl_config = Rc::new(RefCell::new(Config::new(false, None)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let dl_config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         dl_config,
     )));
@@ -94,8 +93,10 @@ impl Drop for TearDown {
 }
 
 fn make_downloader(set_up: &SetUp) -> ZipDownloader {
-    let filesystem = Rc::new(RefCell::new(Filesystem::new(None)));
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(set_up.io.clone()))));
+    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        set_up.io.clone(),
+    ))));
     ZipDownloader::new(
         set_up.io.clone(),
         set_up.config.clone(),
@@ -124,7 +125,8 @@ fn test_error_messages() {
     let test_dir = TempDir::new().unwrap();
     let _tear_down = TearDown::new(test_dir.path().to_path_buf());
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     // $this->config->method('get')->with('vendor-dir')->willReturn($this->testDir)
     let mut config = Config::new(false, None);
@@ -136,11 +138,11 @@ fn test_error_messages() {
     let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
     merged.insert("config".to_string(), PhpMixed::Array(config_options));
     config.merge(&merged, "test");
-    let config = Rc::new(RefCell::new(config));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
     // new HttpDownloader($this->io, $dlConfig): a real downloader (not the extract-path mock).
-    let dl_config = Rc::new(RefCell::new(Config::new(false, None)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+    let dl_config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         dl_config,
         IndexMap::new(),
@@ -155,8 +157,10 @@ fn test_error_messages() {
             .into();
     package.set_dist_url(Some(dist_url));
 
-    let filesystem = Rc::new(RefCell::new(Filesystem::new(None)));
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
     let mut downloader = ZipDownloader::new(
         io,
         config,

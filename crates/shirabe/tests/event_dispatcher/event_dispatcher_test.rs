@@ -17,8 +17,6 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PHP_EOL;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn tear_down() {
     Platform::clear_env("COMPOSER_SKIP_SCRIPTS");
@@ -40,9 +38,10 @@ impl Drop for TearDown {
 /// here drive only command-line / composer-script listeners, which never touch those collaborators,
 /// so a minimal full Composer carrying a Config and a RootPackage is sufficient.
 fn create_composer_instance() -> ComposerHandle {
-    let composer =
-        ComposerHandle::from_rc_unchecked(Rc::new(RefCell::new(PartialOrFullComposer::new_full())));
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
+    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
+        PartialOrFullComposer::new_full(),
+    )));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     composer.borrow_mut().set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         "foo".to_string(),
@@ -54,8 +53,8 @@ fn create_composer_instance() -> ComposerHandle {
     composer
 }
 
-fn null_io() -> Rc<RefCell<dyn IOInterface>> {
-    Rc::new(RefCell::new(shirabe::io::null_io::NullIO::new()))
+fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(shirabe::io::null_io::NullIO::new()))
 }
 
 /// Locates a `php` executable on PATH and points `PHP_BINARY` at it.
@@ -83,8 +82,8 @@ fn ensure_php_binary() -> bool {
     false
 }
 
-fn buffer_io_verbose() -> Rc<RefCell<BufferIO>> {
-    Rc::new(RefCell::new(
+fn buffer_io_verbose() -> std::rc::Rc<std::cell::RefCell<BufferIO>> {
+    std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), output_interface::VERBOSITY_VERBOSE, None).unwrap(),
     ))
 }
@@ -93,8 +92,8 @@ fn buffer_io_verbose() -> Rc<RefCell<BufferIO>> {
 /// `getMockBuilder(EventDispatcher)->onlyMethods(['getListeners'])`.
 fn dispatcher_with_listeners(
     composer: &ComposerHandle,
-    io: Rc<RefCell<dyn IOInterface>>,
-    process: Rc<RefCell<ProcessExecutor>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>>,
 ) -> EventDispatcher {
     let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, Some(process));
@@ -154,7 +153,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: Rc<RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
         Box::new(|event| match event.get_name() {
@@ -205,7 +204,7 @@ fn test_recursion_in_scripts_names() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: Rc<RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
         Box::new(|event| match event.get_name() {

@@ -17,8 +17,6 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, strtolower,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RepositoryCommand {
@@ -494,8 +492,8 @@ impl Command for RepositoryCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         <Self as crate::command::base_config_command::BaseConfigCommand>::initialize(
             self, input, output,

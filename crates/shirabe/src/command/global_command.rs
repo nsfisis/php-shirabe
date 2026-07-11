@@ -16,9 +16,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
-use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct GlobalCommand {
@@ -67,7 +65,7 @@ impl GlobalCommand {
 
     fn prepare_subcommand_input(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         quiet: bool,
     ) -> anyhow::Result<StringInput> {
         if Platform::get_env("COMPOSER").is_some() {
@@ -152,8 +150,8 @@ impl Command for GlobalCommand {
 
     fn run(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let tokens = Preg::split(r"{\s+}", &Self::input_to_string(&*input.borrow())?);
         let mut args: Vec<String> = vec![];
@@ -171,7 +169,8 @@ impl Command for GlobalCommand {
         }
 
         let sub_input = self.prepare_subcommand_input(input, false)?;
-        let sub_input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(sub_input));
+        let sub_input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(sub_input));
 
         let application = {
             let application = self
@@ -190,8 +189,8 @@ impl Command for GlobalCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

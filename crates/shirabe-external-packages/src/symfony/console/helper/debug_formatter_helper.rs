@@ -4,8 +4,6 @@ use crate::symfony::console::helper::helper::Helper;
 use crate::symfony::console::helper::helper_interface::HelperInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
 use indexmap::IndexMap;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const COLORS: [&str; 9] = [
     "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "default",
@@ -163,11 +161,11 @@ impl DebugFormatterHelper {
 }
 
 impl HelperInterface for DebugFormatterHelper {
-    fn set_helper_set(&mut self, helper_set: Option<Rc<RefCell<HelperSet>>>) {
+    fn set_helper_set(&mut self, helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>) {
         self.inner.set_helper_set(helper_set);
     }
 
-    fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
+    fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>> {
         self.inner.get_helper_set()
     }
 

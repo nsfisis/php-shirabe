@@ -16,8 +16,6 @@ use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
     PhpMixed, file_exists, file_put_contents, realpath, sys_get_temp_dir, unlink,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 // ref: ArchiverTestCase::setUp + ArchiveManagerTest::setUp.
@@ -36,30 +34,34 @@ impl TestCase {
         let guard = TempDir::new().unwrap();
         let test_dir = guard.path().to_string_lossy().to_string();
 
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-        let config = Rc::new(RefCell::new(Config::new(false, None)));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
         // The filename/unknown-format tests never drive the download path, so a mock
         // HttpDownloader (no curl backend) is sufficient to satisfy Loop's dependency.
-        let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(
+        let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+            HttpDownloader::__new_mock(io.clone(), config.clone()),
+        ));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
-            config.clone(),
-        )));
-        let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
-        let fs = Rc::new(RefCell::new(Filesystem::new(Some(process.clone()))));
+        ))));
+        let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(
+            process.clone(),
+        ))));
         let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
         // Factory::createDownloadManager registers a git downloader; the archive tests clone the
         // package source (source type 'git') through it.
         dm.set_downloader(
             "git",
-            Rc::new(RefCell::new(GitDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(GitDownloader::new(
                 io.clone(),
                 config.clone(),
                 Some(process.clone()),
                 Some(fs.clone()),
             ))),
         );
-        let dm = Rc::new(RefCell::new(dm));
-        let r#loop = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
+        let dm = std::rc::Rc::new(std::cell::RefCell::new(dm));
+        let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
 
         let mut manager = ArchiveManager::new(dm, r#loop);
         manager.add_archiver(Box::new(ZipArchiver::new()));

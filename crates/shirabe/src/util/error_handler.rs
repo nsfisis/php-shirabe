@@ -7,14 +7,13 @@ use shirabe_php_shim::{
     STDERR, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
     set_error_handler,
 };
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use std::cell::Cell;
 
 // PHP keeps `$io` / `$hasShownDeprecationNotice` as process-global statics. Composer runs
 // single-threaded, so thread-locals on the main thread reproduce that faithfully while letting
 // us hold the same shared (`Rc<RefCell<dyn IOInterface>>`) IO instance the application uses.
 thread_local! {
-    static IO: RefCell<Option<Rc<RefCell<dyn IOInterface>>>> = const { RefCell::new(None) };
+    static IO: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>> = const { std::cell::RefCell::new(None) };
     static HAS_SHOWN_DEPRECATION_NOTICE: Cell<i64> = const { Cell::new(0) };
 }
 
@@ -88,7 +87,7 @@ impl ErrorHandler {
         Ok(true)
     }
 
-    pub fn register(io: Option<Rc<RefCell<dyn IOInterface>>>) {
+    pub fn register(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) {
         set_error_handler(|level, message, file, line| {
             Self::handle(level, message.to_string(), file.to_string(), line).unwrap_or(true)
         });

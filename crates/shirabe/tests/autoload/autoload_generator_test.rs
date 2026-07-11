@@ -21,8 +21,6 @@ use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 /// The mock `InstallationManager::getInstallPath` used throughout the test: metapackages return
@@ -128,9 +126,9 @@ struct SetUp {
     vendor_dir: String,
     repository: InstalledArrayRepository,
     im: InstallationManager,
-    io: Rc<RefCell<BufferIO>>,
+    io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
     generator: AutoloadGenerator,
-    event_dispatcher: Rc<RefCell<EventDispatcher>>,
+    event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
 }
 
 impl Drop for SetUp {
@@ -148,14 +146,14 @@ fn null_path(s: &str) -> String {
 /// exercised here, so a mock HttpDownloader (no real curl backend) stands in for the loop.
 fn make_installation_manager(
     vendor_dir: &str,
-    io: Rc<RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> InstallationManager {
-    let config_for_downloader = Rc::new(RefCell::new(Config::new(false, None)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(
+    let config_for_downloader = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         config_for_downloader,
     )));
-    let loop_ = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
+    let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
 
     let mut im = InstallationManager::new(loop_, io, None);
     im.add_installer(Box::new(InstallPathStubInstaller {
@@ -173,20 +171,21 @@ fn set_up() -> SetUp {
     let prev_cwd = std::env::current_dir().unwrap();
     std::env::set_current_dir(&working_dir).unwrap();
 
-    let io = Rc::new(RefCell::new(
+    let io = std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
     ));
 
-    let dispatcher_io: Rc<RefCell<dyn IOInterface>> = io.clone();
+    let dispatcher_io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
     let im = make_installation_manager(&vendor_dir, dispatcher_io.clone());
 
     let repository = InstalledArrayRepository::new().unwrap();
 
     // EventDispatcher constructor is disabled in PHP and dispatch is never called when run-scripts
     // is off (the default), so a real dispatcher over an empty Composer is a faithful no-op stand-in.
-    let composer =
-        ComposerHandle::from_rc_unchecked(Rc::new(RefCell::new(PartialOrFullComposer::new_full())));
-    let event_dispatcher = Rc::new(RefCell::new(EventDispatcher::new(
+    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
+        PartialOrFullComposer::new_full(),
+    )));
+    let event_dispatcher = std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         dispatcher_io.clone(),
         None,

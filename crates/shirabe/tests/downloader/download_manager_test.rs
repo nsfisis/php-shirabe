@@ -8,8 +8,6 @@ use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // PHP mocks `Composer\Downloader\DownloaderInterface` with getMockBuilder.
 mockall::mock! {
@@ -91,7 +89,7 @@ fn make_package(name: &str, is_dev: bool) -> PackageInterfaceHandle {
 }
 
 /// ref: DownloadManagerTest::createDownloaderMock
-fn create_downloader_mock() -> Rc<RefCell<dyn DownloaderInterface>> {
+fn create_downloader_mock() -> std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>> {
     as_dyn(MockDownloader::new())
 }
 
@@ -107,12 +105,14 @@ fn downloader_mock(installation_source: &str) -> MockDownloader {
     downloader
 }
 
-fn as_dyn(downloader: MockDownloader) -> Rc<RefCell<dyn DownloaderInterface>> {
-    Rc::new(RefCell::new(downloader)) as Rc<RefCell<dyn DownloaderInterface>>
+fn as_dyn(downloader: MockDownloader) -> std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(downloader))
+        as std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>
 }
 
 fn create_manager() -> DownloadManager {
-    let io = Rc::new(RefCell::new(IOStub::new())) as Rc<RefCell<dyn IOInterface>>;
+    let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
+        as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
     DownloadManager::new(io, false, None)
 }
 
@@ -122,7 +122,7 @@ fn test_set_get_downloader() {
     let mut manager = create_manager();
 
     manager.set_downloader("test", downloader.clone());
-    assert!(Rc::ptr_eq(
+    assert!(std::rc::Rc::ptr_eq(
         &downloader,
         &manager.get_downloader("test").unwrap()
     ));
@@ -172,7 +172,7 @@ fn test_get_downloader_for_correctly_installed_dist_package() {
         .get_downloader_for_package(package)
         .unwrap()
         .unwrap();
-    assert!(Rc::ptr_eq(&downloader, &result));
+    assert!(std::rc::Rc::ptr_eq(&downloader, &result));
 }
 
 // The LogicException message uses get_class($downloader); the equivalent
@@ -209,7 +209,7 @@ fn test_get_downloader_for_correctly_installed_source_package() {
         .get_downloader_for_package(package)
         .unwrap()
         .unwrap();
-    assert!(Rc::ptr_eq(&downloader, &result));
+    assert!(std::rc::Rc::ptr_eq(&downloader, &result));
 }
 
 // See test_get_downloader_for_incorrectly_installed_dist_package: the LogicException

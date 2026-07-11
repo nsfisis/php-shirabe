@@ -21,18 +21,16 @@ use shirabe::util::Git as GitUtil;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
-fn null_io() -> Rc<RefCell<dyn IOInterface>> {
-    Rc::new(RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
 fn http_downloader(
-    io: &Rc<RefCell<dyn IOInterface>>,
-    config: &Rc<RefCell<Config>>,
-) -> Rc<RefCell<HttpDownloader>> {
-    Rc::new(RefCell::new(HttpDownloader::new(
+    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: &std::rc::Rc<std::cell::RefCell<Config>>,
+) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
+    std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config.clone(),
         IndexMap::new(),
@@ -41,8 +39,8 @@ fn http_downloader(
 }
 
 // `$config = new Config; $config->merge(['repositories' => ['packagist' => false]]);`
-fn make_config() -> Rc<RefCell<Config>> {
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
+fn make_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
     repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
     let mut merge: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -54,10 +52,10 @@ fn make_config() -> Rc<RefCell<Config>> {
 // Stands in for `getMockBuilder('Composer\Repository\RepositoryManager')->disableOriginalConstructor()`.
 // The loader only stores it and feeds it default repositories, so a real instance suffices.
 fn make_manager(
-    io: &Rc<RefCell<dyn IOInterface>>,
-    config: &Rc<RefCell<Config>>,
-) -> Rc<RefCell<RepositoryManager>> {
-    Rc::new(RefCell::new(RepositoryManager::new(
+    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: &std::rc::Rc<std::cell::RefCell<Config>>,
+) -> std::rc::Rc<std::cell::RefCell<RepositoryManager>> {
+    std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
         io.clone(),
         config.clone(),
         http_downloader(io, config),
@@ -103,7 +101,7 @@ mockall::mock! {
 #[ignore = "process_executor.enable_async() drives the async stream path, which calls stream_set_blocking (fcntl(2) todo!() in shirabe-php-shim::stream)"]
 fn test_stability_flags_parsing() {
     let io = null_io();
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     {
         let mut cfg = IndexMap::new();
         cfg.insert(
@@ -117,7 +115,7 @@ fn test_stability_flags_parsing() {
         config.borrow_mut().merge(&cfg, "test");
     }
 
-    let manager = Rc::new(RefCell::new(RepositoryManager::new(
+    let manager = std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
         io.clone(),
         config.clone(),
         http_downloader(&io, &config),
@@ -129,7 +127,7 @@ fn test_stability_flags_parsing() {
     process_executor.enable_async();
     let guesser = VersionGuesser::new(
         config.clone(),
-        Rc::new(RefCell::new(process_executor)),
+        std::rc::Rc::new(std::cell::RefCell::new(process_executor)),
         VersionParser::new(),
         Some(io.clone()),
     );

@@ -35,8 +35,6 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct UpdateCommand {
@@ -124,8 +122,8 @@ impl Command for UpdateCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let io = self.get_io().clone();
         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
@@ -572,8 +570,8 @@ impl Command for UpdateCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

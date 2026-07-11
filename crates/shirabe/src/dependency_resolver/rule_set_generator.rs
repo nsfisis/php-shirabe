@@ -13,13 +13,11 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
-use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RuleSetGenerator {
-    pub(crate) policy: Rc<dyn PolicyInterface>,
+    pub(crate) policy: std::rc::Rc<dyn PolicyInterface>,
     pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     pub(crate) rules: RuleSet,
     pub(crate) added_map: IndexMap<i64, PackageInterfaceHandle>,
@@ -28,7 +26,7 @@ pub struct RuleSetGenerator {
 
 impl RuleSetGenerator {
     pub fn new(
-        policy: Rc<dyn PolicyInterface>,
+        policy: std::rc::Rc<dyn PolicyInterface>,
         pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     ) -> Self {
         Self {
@@ -128,7 +126,9 @@ impl RuleSetGenerator {
     /// methods null is allowed which will not insert a rule.
     fn add_rule(&mut self, r#type: i64, new_rule: Option<Rule>) {
         if let Some(rule) = new_rule {
-            self.rules.add(Rc::new(RefCell::new(rule)), r#type).ok();
+            self.rules
+                .add(std::rc::Rc::new(std::cell::RefCell::new(rule)), r#type)
+                .ok();
         }
     }
 
@@ -397,7 +397,7 @@ impl RuleSetGenerator {
     pub fn get_rules_for(
         &mut self,
         request: &Request,
-        platform_requirement_filter: Option<Rc<dyn PlatformRequirementFilterInterface>>,
+        platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
     ) -> anyhow::Result<RuleSet> {
         let platform_requirement_filter = platform_requirement_filter
             .unwrap_or_else(PlatformRequirementFilterFactory::ignore_nothing);

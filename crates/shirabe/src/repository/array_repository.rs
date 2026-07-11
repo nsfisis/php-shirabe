@@ -16,20 +16,19 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{implode, preg_quote, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-use std::cell::RefCell;
 use std::rc::Weak;
 
 /// A repository implementation that simply stores packages in an array
 #[derive(Debug)]
 pub struct ArrayRepository {
-    pub(crate) packages: RefCell<Option<Vec<BasePackageHandle>>>,
+    pub(crate) packages: std::cell::RefCell<Option<Vec<BasePackageHandle>>>,
 
     /// @var ?array<BasePackage> indexed by package unique name and used to cache hasPackage calls
-    pub(crate) package_map: RefCell<Option<IndexMap<String, BasePackageHandle>>>,
+    pub(crate) package_map: std::cell::RefCell<Option<IndexMap<String, BasePackageHandle>>>,
 
     /// Weak reference to the outermost repository handle wrapping this `ArrayRepository`,
     /// injected via `set_self_handle`. Used to wire package -> repository back-references.
-    self_weak: RefCell<Option<RepositoryInterfaceWeakHandle>>,
+    self_weak: std::cell::RefCell<Option<RepositoryInterfaceWeakHandle>>,
 }
 
 impl ArrayRepository {
@@ -120,9 +119,9 @@ impl ArrayRepository {
     /// @param array<PackageInterface> $packages
     pub fn new(packages: Vec<PackageInterfaceHandle>) -> anyhow::Result<Self> {
         let this = Self {
-            packages: RefCell::new(None),
-            package_map: RefCell::new(None),
-            self_weak: RefCell::new(None),
+            packages: std::cell::RefCell::new(None),
+            package_map: std::cell::RefCell::new(None),
+            self_weak: std::cell::RefCell::new(None),
         };
         for package in packages {
             this.add_package(package)?;

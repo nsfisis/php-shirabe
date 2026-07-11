@@ -22,8 +22,6 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // PHP mocks `Composer\Package\Archiver\ArchiveManager` with
 // getMockBuilder(...)->disableOriginalConstructor().
@@ -108,17 +106,21 @@ fn root_package(name: &str, version: &str) -> RootPackageHandle {
 }
 
 fn full_composer(composer: Composer) -> PartialComposerHandle {
-    PartialComposerHandle::from_rc(Rc::new(RefCell::new(PartialOrFullComposer::Full(composer))))
+    PartialComposerHandle::from_rc(std::rc::Rc::new(std::cell::RefCell::new(
+        PartialOrFullComposer::Full(composer),
+    )))
 }
 
 #[test]
 fn test_uses_config_from_composer_object() {
-    let input: Rc<RefCell<dyn InputInterface>> =
-        Rc::new(RefCell::new(ArrayInput::new(vec![], None).unwrap()));
-    let output: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ArrayInput::new(vec![], None).unwrap()),
+    );
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
 
-    let config: Rc<RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
         .with("archive-format", PhpMixed::from("zip"))
         .build_shared();
 
@@ -144,8 +146,10 @@ fn test_uses_config_from_composer_object() {
 
     let mut composer = Composer::new();
     composer.set_config(config);
-    composer.set_archive_manager(Rc::new(RefCell::new(manager)));
-    composer.set_event_dispatcher(Rc::new(RefCell::new(noop_event_dispatcher())));
+    composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
+    composer.set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
+        noop_event_dispatcher(),
+    )));
     composer.set_package(package.into());
     let composer = full_composer(composer);
 
@@ -158,10 +162,12 @@ fn test_uses_config_from_composer_object() {
 
 #[test]
 fn test_uses_config_from_factory_when_composer_is_not_defined() {
-    let input: Rc<RefCell<dyn InputInterface>> =
-        Rc::new(RefCell::new(ArrayInput::new(vec![], None).unwrap()));
-    let output: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ArrayInput::new(vec![], None).unwrap()),
+    );
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
 
     // tryComposer() returns null (no Composer set), so execute() builds the Config via the Factory
     // and `archive` is stubbed (PHPUnit overrides initialize/tryComposer/archive).
@@ -188,17 +194,19 @@ fn test_uses_config_from_factory_when_composer_is_not_defined() {
 
 #[test]
 fn test_uses_config_from_composer_object_with_package_name() {
-    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
-        ArrayInput::new(
-            vec![(PhpMixed::from("package"), PhpMixed::from("foo/bar"))],
-            None,
-        )
-        .unwrap(),
-    ));
-    let output: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            ArrayInput::new(
+                vec![(PhpMixed::from("package"), PhpMixed::from("foo/bar"))],
+                None,
+            )
+            .unwrap(),
+        ));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
 
-    let config: Rc<RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
         .with("archive-format", PhpMixed::from("zip"))
         .build_shared();
 
@@ -241,10 +249,14 @@ fn test_uses_config_from_composer_object_with_package_name() {
 
     let mut composer = Composer::new();
     composer.set_config(config);
-    composer.set_archive_manager(Rc::new(RefCell::new(manager)));
-    composer.set_event_dispatcher(Rc::new(RefCell::new(noop_event_dispatcher())));
+    composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
+    composer.set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
+        noop_event_dispatcher(),
+    )));
     composer.set_package(package.into());
-    composer.set_repository_manager(Rc::new(RefCell::new(repository_manager)));
+    composer.set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
+        repository_manager,
+    )));
     let composer = full_composer(composer);
 
     let command = ArchiveCommand::new();

@@ -7,9 +7,7 @@ use crate::symfony::console::output::output_interface::OutputInterface;
 use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 
 /// Symfony Style Guide compliant question helper.
 #[derive(Debug, Default)]
@@ -24,7 +22,7 @@ impl SymfonyQuestionHelper {
 
     pub(crate) fn write_prompt(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) {
         let mut text = OutputFormatter::escape_trailing_backslash(question.get_question());
@@ -112,7 +110,7 @@ impl SymfonyQuestionHelper {
 
     pub(crate) fn write_error(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         error: &shirabe_php_shim::Exception,
     ) {
         let is_symfony_style = {

@@ -23,17 +23,17 @@ use shirabe_external_packages::symfony::console::input::streamable_input_interfa
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// Builds a ConsoleIO backed by real, side-effect-free Input/Output/QuestionHelper. PHP uses
 /// PHPUnit mocks here, but for tests that exercise only the authentication map they carry no
 /// expectations, so concrete implementations are an exact substitute.
 fn make_console_io() -> ConsoleIO {
-    let input: Rc<RefCell<dyn InputInterface>> =
-        Rc::new(RefCell::new(ArrayInput::new(vec![], None).unwrap()));
-    let output: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ArrayInput::new(vec![], None).unwrap()),
+    );
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
     ConsoleIO::new(input, output, QuestionHelper::default())
 }
 
@@ -49,12 +49,17 @@ fn get_input_stream(input: &str) -> shirabe_php_shim::PhpResource {
 /// Builds a ConsoleIO whose interactive input stream yields `answer`, plus a handle on the
 /// `BufferedOutput` so the prompt can be inspected. The input is an `ArrayInput` (interactive by
 /// default) with the answer stream attached, exactly as the question-helper tests set things up.
-fn make_console_io_with_answer(answer: &str) -> (ConsoleIO, Rc<RefCell<BufferedOutput>>) {
+fn make_console_io_with_answer(
+    answer: &str,
+) -> (ConsoleIO, std::rc::Rc<std::cell::RefCell<BufferedOutput>>) {
     let mut array_input = ArrayInput::new(vec![], None).unwrap();
     array_input.set_stream(get_input_stream(answer));
-    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(array_input));
-    let buffered = Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    let output: Rc<RefCell<dyn OutputInterface>> = buffered.clone();
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(array_input));
+    let buffered = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = buffered.clone();
     (
         ConsoleIO::new(input, output, QuestionHelper::default()),
         buffered,
@@ -66,9 +71,11 @@ fn test_is_interactive() {
     // PHP mocks isInteractive to return true then false on consecutive calls. A real ArrayInput
     // exposes a mutable interactive flag, so toggling it between the two asserts is equivalent.
     let array_input = ArrayInput::new(vec![], None).unwrap();
-    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(array_input));
-    let output: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(array_input));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
     let console_io = ConsoleIO::new(input.clone(), output, QuestionHelper::default());
 
     input.borrow_mut().set_interactive(true);
@@ -82,10 +89,13 @@ fn test_write() {
     // PHP: expects write('some information about something', false) at VERBOSITY_NORMAL.
     // A plain (non-Console) OutputInterface routes write to the main output, so the message lands
     // in the BufferedOutput verbatim (no trailing EOL since newline is false).
-    let input: Rc<RefCell<dyn InputInterface>> =
-        Rc::new(RefCell::new(ArrayInput::new(vec![], None).unwrap()));
-    let buffered = Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    let output: Rc<RefCell<dyn OutputInterface>> = buffered.clone();
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ArrayInput::new(vec![], None).unwrap()),
+    );
+    let buffered = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = buffered.clone();
     let console_io = ConsoleIO::new(input, output, QuestionHelper::default());
 
     console_io.write3("some information about something", false, NORMAL);
@@ -123,10 +133,13 @@ fn test_overwrite() {
     //   "\x08" * 12                        (clear previous, len = 12)
     //   'something longer than initial (34)' (new message)
     // The final overwrite needs no fill and newline defaults true, appending a trailing "\n".
-    let input: Rc<RefCell<dyn InputInterface>> =
-        Rc::new(RefCell::new(ArrayInput::new(vec![], None).unwrap()));
-    let buffered = Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    let output: Rc<RefCell<dyn OutputInterface>> = buffered.clone();
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ArrayInput::new(vec![], None).unwrap()),
+    );
+    let buffered = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = buffered.clone();
     let console_io = ConsoleIO::new(input, output, QuestionHelper::default());
 
     console_io.write3("something (<question>strlen = 23</question>)", true, NORMAL);

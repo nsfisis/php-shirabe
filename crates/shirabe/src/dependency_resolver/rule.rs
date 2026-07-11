@@ -18,8 +18,6 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub enum ReasonData {
@@ -323,7 +321,7 @@ impl Rule {
         pool: &mut Pool,
         is_verbose: bool,
         installed_map: &IndexMap<String, BasePackageHandle>,
-        _learned_pool: &Vec<Vec<Rc<RefCell<Rule>>>>,
+        _learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> anyhow::Result<String> {
         let mut literals = self.get_literals();
 

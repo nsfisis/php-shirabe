@@ -2,13 +2,11 @@
 
 use crate::dependency_resolver::Decisions;
 use crate::dependency_resolver::Rule;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub struct RuleWatchNode {
     pub watch1: i64,
     pub watch2: i64,
-    pub(crate) rule: Rc<RefCell<Rule>>,
+    pub(crate) rule: std::rc::Rc<std::cell::RefCell<Rule>>,
 }
 
 impl std::fmt::Debug for RuleWatchNode {
@@ -21,7 +19,7 @@ impl std::fmt::Debug for RuleWatchNode {
 }
 
 impl RuleWatchNode {
-    pub fn new(rule: Rc<RefCell<Rule>>) -> Self {
+    pub fn new(rule: std::rc::Rc<std::cell::RefCell<Rule>>) -> Self {
         let literals = rule.borrow().get_literals();
         let literal_count = literals.len();
         let watch1 = if literal_count > 0 { literals[0] } else { 0 };
@@ -54,7 +52,7 @@ impl RuleWatchNode {
         }
     }
 
-    pub fn get_rule(&self) -> Rc<RefCell<Rule>> {
+    pub fn get_rule(&self) -> std::rc::Rc<std::cell::RefCell<Rule>> {
         self.rule.clone()
     }
 

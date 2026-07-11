@@ -14,15 +14,13 @@ use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 
 /// HelpCommand displays the help for a given command.
 #[derive(Debug)]
 pub struct HelpCommand {
     inner: CommandData,
-    command: RefCell<Option<Rc<RefCell<dyn Command>>>>,
+    command: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 }
 
 impl Deref for HelpCommand {
@@ -49,7 +47,7 @@ impl HelpCommand {
     pub fn new() -> Self {
         let command = HelpCommand {
             inner: CommandData::new(None),
-            command: RefCell::new(None),
+            command: std::cell::RefCell::new(None),
         };
         command
             .configure()
@@ -57,7 +55,7 @@ impl HelpCommand {
         command
     }
 
-    pub fn set_command(&self, command: Rc<RefCell<dyn Command>>) {
+    pub fn set_command(&self, command: std::rc::Rc<std::cell::RefCell<dyn Command>>) {
         *self.command.borrow_mut() = Some(command);
     }
 
@@ -135,8 +133,8 @@ impl Command for HelpCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         if self.command.borrow().is_none() {
             let application = self.get_application().unwrap();

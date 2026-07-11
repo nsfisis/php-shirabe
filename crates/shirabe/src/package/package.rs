@@ -12,7 +12,6 @@ use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{E_USER_DEPRECATED, LogicException, PhpMixed, strpos, trigger_error};
-use std::rc::Rc;
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]
@@ -709,7 +708,7 @@ impl PackageInterface for Package {
     }
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade())
-            && !Rc::ptr_eq(&existing, repository.as_rc())
+            && !std::rc::Rc::ptr_eq(&existing, repository.as_rc())
         {
             return Err(LogicException {
                 message: "A package can only be added to one repository".to_string(),

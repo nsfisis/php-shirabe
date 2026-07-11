@@ -7,8 +7,6 @@ use crate::package::{
     AliasPackage, BasePackage, CompleteAliasPackage, CompletePackage, CompletePackageInterface,
     Package, PackageInterface, RootAliasPackage, RootPackage, RootPackageInterface,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// Any package type.
 #[derive(Debug, Clone)]
@@ -192,7 +190,7 @@ impl AnyPackage {
                 //   parent::__clone();
                 //   $this->aliasOf = clone $this->aliasOf;
                 let new_alias_of_inner = p.alias_of.0.borrow().dup();
-                let new_alias_of_rc = Rc::new(RefCell::new(new_alias_of_inner));
+                let new_alias_of_rc = std::rc::Rc::new(std::cell::RefCell::new(new_alias_of_inner));
                 let new_root = RootPackageHandle(new_alias_of_rc.clone());
                 let new_complete = CompletePackageHandle(new_alias_of_rc.clone());
                 let new_pkg = PackageHandle(new_alias_of_rc);
@@ -1361,7 +1359,7 @@ macro_rules! impl_handle_upcast {
 
 /// Shared reference to any package. Corresponds to PHP `PackageInterface`.
 #[derive(Debug, Clone)]
-pub struct PackageInterfaceHandle(Rc<RefCell<AnyPackage>>);
+pub struct PackageInterfaceHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to any package. Corresponds to PHP `BasePackage`.
 /// It is exactly the same as `PackageInterface` in Shirabe. It is only for mirroing PHP type
@@ -1370,35 +1368,35 @@ pub type BasePackageHandle = PackageInterfaceHandle;
 
 /// Shared reference to a complete package. Corresponds to PHP `CompletePackageInterface`.
 #[derive(Debug, Clone)]
-pub struct CompletePackageInterfaceHandle(Rc<RefCell<AnyPackage>>);
+pub struct CompletePackageInterfaceHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to a root package. Corresponds to PHP `RootPackageInterface`.
 #[derive(Debug, Clone)]
-pub struct RootPackageInterfaceHandle(Rc<RefCell<AnyPackage>>);
+pub struct RootPackageInterfaceHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to a real (non-alias) package. Corresponds to PHP `Package`.
 #[derive(Debug, Clone)]
-pub struct PackageHandle(Rc<RefCell<AnyPackage>>);
+pub struct PackageHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to a real complete package. Corresponds to PHP `CompletePackage`.
 #[derive(Debug, Clone)]
-pub struct CompletePackageHandle(Rc<RefCell<AnyPackage>>);
+pub struct CompletePackageHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to a real root package. Corresponds to PHP `RootPackage`.
 #[derive(Debug, Clone)]
-pub struct RootPackageHandle(Rc<RefCell<AnyPackage>>);
+pub struct RootPackageHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to an alias package. Corresponds to PHP `AliasPackage`.
 #[derive(Debug, Clone)]
-pub struct AliasPackageHandle(Rc<RefCell<AnyPackage>>);
+pub struct AliasPackageHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to a complete alias package. Corresponds to PHP `CompleteAliasPackage`.
 #[derive(Debug, Clone)]
-pub struct CompleteAliasPackageHandle(Rc<RefCell<AnyPackage>>);
+pub struct CompleteAliasPackageHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 /// Shared reference to a root alias package. Corresponds to PHP `RootAliasPackage`.
 #[derive(Debug, Clone)]
-pub struct RootAliasPackageHandle(Rc<RefCell<AnyPackage>>);
+pub struct RootAliasPackageHandle(std::rc::Rc<std::cell::RefCell<AnyPackage>>);
 
 impl_handle_common!(PackageInterfaceHandle);
 impl_handle_common!(CompletePackageInterfaceHandle);
@@ -1552,7 +1550,9 @@ impl PackageInterfaceHandle {
 
 impl PackageHandle {
     pub fn from_package(package: Package) -> Self {
-        Self(Rc::new(RefCell::new(AnyPackage::Package(package))))
+        Self(std::rc::Rc::new(std::cell::RefCell::new(
+            AnyPackage::Package(package),
+        )))
     }
 
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
@@ -1562,7 +1562,9 @@ impl PackageHandle {
 
 impl CompletePackageHandle {
     pub fn from_complete_package(package: CompletePackage) -> Self {
-        Self(Rc::new(RefCell::new(AnyPackage::CompletePackage(package))))
+        Self(std::rc::Rc::new(std::cell::RefCell::new(
+            AnyPackage::CompletePackage(package),
+        )))
     }
 
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
@@ -1572,7 +1574,9 @@ impl CompletePackageHandle {
 
 impl RootPackageHandle {
     pub fn from_root_package(package: RootPackage) -> Self {
-        Self(Rc::new(RefCell::new(AnyPackage::RootPackage(package))))
+        Self(std::rc::Rc::new(std::cell::RefCell::new(
+            AnyPackage::RootPackage(package),
+        )))
     }
 
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
@@ -1589,7 +1593,9 @@ impl RootPackageHandle {
 
 impl AliasPackageHandle {
     pub fn from_alias_package(package: AliasPackage) -> Self {
-        Self(Rc::new(RefCell::new(AnyPackage::AliasPackage(package))))
+        Self(std::rc::Rc::new(std::cell::RefCell::new(
+            AnyPackage::AliasPackage(package),
+        )))
     }
 
     pub fn new(alias_of: PackageHandle, version: String, pretty_version: String) -> Self {
@@ -1636,9 +1642,9 @@ impl AliasPackageHandle {
 
 impl CompleteAliasPackageHandle {
     pub fn from_complete_alias_package(package: CompleteAliasPackage) -> Self {
-        Self(Rc::new(RefCell::new(AnyPackage::CompleteAliasPackage(
-            package,
-        ))))
+        Self(std::rc::Rc::new(std::cell::RefCell::new(
+            AnyPackage::CompleteAliasPackage(package),
+        )))
     }
 
     pub fn new(alias_of: CompletePackageHandle, version: String, pretty_version: String) -> Self {
@@ -1669,7 +1675,9 @@ impl CompleteAliasPackageHandle {
 
 impl RootAliasPackageHandle {
     pub fn from_root_alias_package(package: RootAliasPackage) -> Self {
-        Self(Rc::new(RefCell::new(AnyPackage::RootAliasPackage(package))))
+        Self(std::rc::Rc::new(std::cell::RefCell::new(
+            AnyPackage::RootAliasPackage(package),
+        )))
     }
 
     pub fn new(alias_of: RootPackageHandle, version: String, pretty_version: String) -> Self {

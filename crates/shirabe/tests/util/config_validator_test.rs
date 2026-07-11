@@ -4,8 +4,6 @@ use shirabe::io::io_interface::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::loader::validating_array_loader::ValidatingArrayLoader;
 use shirabe::util::config_validator::ConfigValidator;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn fixture(name: &str) -> String {
     format!(
@@ -16,7 +14,8 @@ fn fixture(name: &str) -> String {
 }
 
 fn validate(file: &str) -> Vec<String> {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let config_validator = ConfigValidator::new(io);
     let (_, _, warnings) = config_validator.validate(
         file,

@@ -9,13 +9,12 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};
 use shirabe::script::{Event, OriginatingEvent};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn create_composer_instance() -> ComposerHandle {
-    let composer =
-        ComposerHandle::from_rc_unchecked(Rc::new(RefCell::new(PartialOrFullComposer::new_full())));
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
+    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
+        PartialOrFullComposer::new_full(),
+    )));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     composer.borrow_mut().set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         "foo".to_string(),
@@ -29,7 +28,8 @@ fn create_composer_instance() -> ComposerHandle {
 
 #[test]
 fn test_event_sets_originating_event() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let composer = create_composer_instance();
 
     let originating_event = BaseEvent::new("originatingEvent".to_string(), vec![], IndexMap::new());
@@ -62,7 +62,8 @@ fn test_event_sets_originating_event() {
 
 #[test]
 fn test_event_calculates_nested_originating_event() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let composer = create_composer_instance();
 
     let originating_event =

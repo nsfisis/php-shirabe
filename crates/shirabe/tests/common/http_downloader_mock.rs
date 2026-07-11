@@ -9,8 +9,6 @@ use shirabe::util::http_downloader::{
     HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
 };
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // A single HTTP request expectation as written in the PHP tests: a `url` plus an
 // optional response (`status`/`body`/`headers`). `options` of `None` matches any
@@ -41,7 +39,7 @@ pub fn expect_full(
     }
 }
 
-pub struct HttpDownloaderMockGuard(Rc<RefCell<HttpDownloader>>);
+pub struct HttpDownloaderMockGuard(std::rc::Rc<std::cell::RefCell<HttpDownloader>>);
 
 impl Drop for HttpDownloaderMockGuard {
     fn drop(&mut self) {
@@ -60,10 +58,16 @@ pub fn get_http_downloader_mock(
     expectations: Vec<HttpDownloaderMockExpectation>,
     strict: bool,
     default_handler: HttpDownloaderMockHandler,
-) -> (Rc<RefCell<HttpDownloader>>, HttpDownloaderMockGuard) {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
-    let downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(io, config)));
+) -> (
+    std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    HttpDownloaderMockGuard,
+) {
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
+        io, config,
+    )));
     downloader
         .borrow_mut()
         .__expects(expectations, strict, default_handler);

@@ -12,8 +12,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -69,8 +67,9 @@ fn support_provider() -> Vec<(&'static str, bool)> {
 #[test]
 fn test_support() {
     for (url, assertion) in support_provider() {
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-        let config = Rc::new(RefCell::new(Config::new(true, None)));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
         assert_eq!(
             assertion,
@@ -84,8 +83,9 @@ fn test_wrong_credentials_in_url() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let console: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let console: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());

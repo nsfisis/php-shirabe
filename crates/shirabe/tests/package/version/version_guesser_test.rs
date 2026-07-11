@@ -9,8 +9,6 @@ use shirabe::util::Git as GitUtil;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // Mirrors VersionGuesserTest::setUp/tearDown: reset GitUtil's cached `version`
 // static so each test re-runs `git --version` against its own mock.
@@ -27,19 +25,19 @@ impl Drop for TearDown {
 }
 
 // `$config = new Config; $config->merge(['repositories' => ['packagist' => false]]);`
-fn make_config() -> Rc<RefCell<Config>> {
+fn make_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
     let mut config = Config::new(true, None);
     let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
     repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
     let mut merge: IndexMap<String, PhpMixed> = IndexMap::new();
     merge.insert("repositories".to_string(), PhpMixed::Array(repositories));
     config.merge(&merge, Config::SOURCE_UNKNOWN);
-    Rc::new(RefCell::new(config))
+    std::rc::Rc::new(std::cell::RefCell::new(config))
 }
 
 fn make_guesser(
-    config: Rc<RefCell<Config>>,
-    process: Rc<RefCell<ProcessExecutor>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 ) -> VersionGuesser {
     VersionGuesser::new(config, process, VersionParser::new(), None)
 }
@@ -615,8 +613,8 @@ fn test_get_root_version_from_env() {
 
     for (env, expected_version) in root_env_versions {
         Platform::put_env("COMPOSER_ROOT_VERSION", env);
-        let config = Rc::new(RefCell::new(Config::new(true, None)));
-        let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
         let guesser = VersionGuesser::new(config, process, VersionParser::new(), None);
         assert_eq!(
             expected_version,

@@ -11,8 +11,6 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct SelfUpdateCommand {
@@ -72,8 +70,8 @@ impl Command for SelfUpdateCommand {
     /// been published yet. The command is therefore disabled.
     fn execute(
         &self,
-        _input: Rc<RefCell<dyn InputInterface>>,
-        _output: Rc<RefCell<dyn OutputInterface>>,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let io = self.get_io();
         io.write_error3(
@@ -87,8 +85,8 @@ impl Command for SelfUpdateCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

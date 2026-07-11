@@ -9,8 +9,6 @@ use crate::symfony::console::output::OutputInterface;
 use crate::symfony::console::output::output_interface;
 use crate::symfony::console::terminal::Terminal;
 use indexmap::IndexMap;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub const FORMAT_VERBOSE: &str = "verbose";
 pub const FORMAT_VERY_VERBOSE: &str = "very_verbose";
@@ -26,7 +24,7 @@ const FORMAT_NORMAL_NOMAX: &str = "normal_nomax";
 pub type PlaceholderFormatter = Box<
     dyn Fn(
         &ProgressBar,
-        &Rc<RefCell<dyn OutputInterface>>,
+        &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, LogicException>>,
 >;
 
@@ -44,7 +42,7 @@ pub struct ProgressBar {
     last_write_time: f64,
     min_seconds_between_redraws: f64,
     max_seconds_between_redraws: f64,
-    output: Rc<RefCell<dyn OutputInterface>>,
+    output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     step: i64,
     max: i64,
     start_time: i64,
@@ -58,14 +56,14 @@ pub struct ProgressBar {
 }
 
 thread_local! {
-    static FORMATTERS: RefCell<Option<IndexMap<String, PlaceholderFormatter>>> = const { RefCell::new(None) };
-    static FORMATS: RefCell<Option<IndexMap<String, String>>> = const { RefCell::new(None) };
+    static FORMATTERS: std::cell::RefCell<Option<IndexMap<String, PlaceholderFormatter>>> = const { std::cell::RefCell::new(None) };
+    static FORMATS: std::cell::RefCell<Option<IndexMap<String, String>>> = const { std::cell::RefCell::new(None) };
 }
 
 impl ProgressBar {
     /// `$max` Maximum steps (0 if unknown)
     pub fn new(
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         max: i64,
         min_seconds_between_redraws: f64,
     ) -> Self {
@@ -73,7 +71,7 @@ impl ProgressBar {
         // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
         // implementor that also implements ConsoleOutputInterface, so the check
         // reduces to a downcast to the concrete type.
-        let output: Rc<RefCell<dyn OutputInterface>> = {
+        let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
                 .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
@@ -596,7 +594,8 @@ impl ProgressBar {
         formatters.insert(
             "bar".to_string(),
             Box::new(
-                |bar: &ProgressBar, output: &Rc<RefCell<dyn OutputInterface>>| {
+                |bar: &ProgressBar,
+                 output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     let complete_bars = bar.get_bar_offset();
                     let mut display = shirabe_php_shim::str_repeat(
                         &bar.get_bar_character(),
@@ -627,7 +626,8 @@ impl ProgressBar {
         formatters.insert(
             "elapsed".to_string(),
             Box::new(
-                |bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
+                |bar: &ProgressBar,
+                 _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(shirabe_php_shim::PhpMixed::String(
                         Helper::format_time(
                             (shirabe_php_shim::time() - bar.get_start_time()) as f64,
@@ -640,7 +640,7 @@ impl ProgressBar {
 
         formatters.insert(
             "remaining".to_string(),
-            Box::new(|bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
+            Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
                     return Ok(Err(LogicException(shirabe_php_shim::LogicException {
                         message: "Unable to display the remaining time if the maximum number of steps is not set.".to_string(),
@@ -656,7 +656,7 @@ impl ProgressBar {
 
         formatters.insert(
             "estimated".to_string(),
-            Box::new(|bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
+            Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
                     return Ok(Err(LogicException(shirabe_php_shim::LogicException {
                         message: "Unable to display the estimated time if the maximum number of steps is not set.".to_string(),
@@ -673,7 +673,8 @@ impl ProgressBar {
         formatters.insert(
             "memory".to_string(),
             Box::new(
-                |_bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
+                |_bar: &ProgressBar,
+                 _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(shirabe_php_shim::PhpMixed::String(
                         Helper::format_memory(shirabe_php_shim::memory_get_usage()),
                     )))
@@ -684,7 +685,8 @@ impl ProgressBar {
         formatters.insert(
             "current".to_string(),
             Box::new(
-                |bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
+                |bar: &ProgressBar,
+                 _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(shirabe_php_shim::PhpMixed::String(
                         shirabe_php_shim::str_pad(
                             &bar.get_progress().to_string(),
@@ -700,7 +702,8 @@ impl ProgressBar {
         formatters.insert(
             "max".to_string(),
             Box::new(
-                |bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
+                |bar: &ProgressBar,
+                 _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(shirabe_php_shim::PhpMixed::Int(bar.get_max_steps())))
                 },
             ),
@@ -709,7 +712,8 @@ impl ProgressBar {
         formatters.insert(
             "percent".to_string(),
             Box::new(
-                |bar: &ProgressBar, _output: &Rc<RefCell<dyn OutputInterface>>| {
+                |bar: &ProgressBar,
+                 _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(shirabe_php_shim::PhpMixed::Float(
                         (bar.get_progress_percent() * 100.0).floor(),
                     )))

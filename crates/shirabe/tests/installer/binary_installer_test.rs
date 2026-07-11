@@ -7,9 +7,7 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::Filesystem;
 use shirabe::util::ProcessExecutor;
-use std::cell::RefCell;
 use std::fs;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 /// Mirror of setUp(): builds temp root/vendor/bin dirs plus a mocked IO. PHP uses a
@@ -18,7 +16,7 @@ struct SetUp {
     root: TempDir,
     vendor_dir: String,
     bin_dir: String,
-    io: Rc<RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     fs: Filesystem,
 }
 
@@ -37,7 +35,8 @@ fn set_up() -> SetUp {
     let bin_dir = format!("{}/bin", root_dir);
     fs::create_dir_all(&bin_dir).unwrap();
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
     SetUp {
         root,
@@ -94,7 +93,9 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
         setup.io.clone(),
         setup.bin_dir.clone(),
         "full".to_string(),
-        Some(Rc::new(RefCell::new(Filesystem::new(None)))),
+        Some(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
+            None,
+        )))),
         None,
     );
     installer.install_binaries(package, &pkg_dir, true);

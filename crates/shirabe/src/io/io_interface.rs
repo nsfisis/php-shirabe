@@ -3,8 +3,6 @@
 use crate::config::Config;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub const QUIET: i64 = 1;
 pub const NORMAL: i64 = 2;
@@ -167,7 +165,7 @@ pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
 // `load_configuration`) are reached via `io.borrow_mut()`. Because the handle
 // does not implement `IOInterfaceMutable`, calling those directly on the handle
 // is a compile error rather than a runtime panic.
-impl IOInterfaceImmutable for Rc<RefCell<dyn IOInterface>> {
+impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     fn is_interactive(&self) -> bool {
         self.borrow().is_interactive()
     }

@@ -8,35 +8,36 @@ use crate::repository::{
 };
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
-use std::cell::{Ref, RefCell, RefMut};
-use std::rc::{Rc, Weak};
+use std::cell::{Ref, RefMut};
+use std::rc::Weak;
 
 /// Shared reference to a repository. Corresponds to PHP `RepositoryInterface`.
 #[derive(Debug, Clone)]
-pub struct RepositoryInterfaceHandle(Rc<RefCell<dyn RepositoryInterface>>);
+pub struct RepositoryInterfaceHandle(std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>>);
 
 /// Weak back-reference held by packages to the repository that owns them.
-pub type RepositoryInterfaceWeakHandle = Weak<RefCell<dyn RepositoryInterface>>;
+pub type RepositoryInterfaceWeakHandle = Weak<std::cell::RefCell<dyn RepositoryInterface>>;
 
 impl RepositoryInterfaceHandle {
     /// Wraps a concrete repository in a shared handle and injects its own weak reference so that
     /// `add_package` can wire package -> repository back-references (PHP `setRepository($this)`).
     pub fn new<T: RepositoryInterface + 'static>(repository: T) -> Self {
-        let rc: Rc<RefCell<dyn RepositoryInterface>> = Rc::new(RefCell::new(repository));
-        rc.borrow().set_self_handle(Rc::downgrade(&rc));
+        let rc: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(repository));
+        rc.borrow().set_self_handle(std::rc::Rc::downgrade(&rc));
         Self(rc)
     }
 
-    pub fn from_rc(rc: Rc<RefCell<dyn RepositoryInterface>>) -> Self {
+    pub fn from_rc(rc: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>>) -> Self {
         Self(rc)
     }
 
-    pub fn as_rc(&self) -> &Rc<RefCell<dyn RepositoryInterface>> {
+    pub fn as_rc(&self) -> &std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> {
         &self.0
     }
 
     pub fn downgrade(&self) -> RepositoryInterfaceWeakHandle {
-        Rc::downgrade(&self.0)
+        std::rc::Rc::downgrade(&self.0)
     }
 
     pub fn borrow(&self) -> Ref<'_, dyn RepositoryInterface> {
@@ -49,12 +50,12 @@ impl RepositoryInterfaceHandle {
 
     /// PHP `===` (reference identity).
     pub fn ptr_eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
     }
 
     /// Stable identity usable as a map key (PHP `spl_object_hash`).
     pub fn ptr_id(&self) -> usize {
-        Rc::as_ptr(&self.0) as *const () as usize
+        std::rc::Rc::as_ptr(&self.0) as *const () as usize
     }
 
     /// PHP `instanceof T` for a concrete repository type. Keeps the `RefCell` borrow internal.
@@ -63,13 +64,15 @@ impl RepositoryInterfaceHandle {
     }
 
     /// Downcasts the shared handle to a concrete repository type, preserving shared ownership.
-    pub fn downcast_rc<T: RepositoryInterface + 'static>(&self) -> Option<Rc<RefCell<T>>> {
+    pub fn downcast_rc<T: RepositoryInterface + 'static>(
+        &self,
+    ) -> Option<std::rc::Rc<std::cell::RefCell<T>>> {
         if self.0.borrow().as_any().is::<T>() {
             let rc = self.0.clone();
-            let ptr = Rc::into_raw(rc) as *const RefCell<T>;
+            let ptr = std::rc::Rc::into_raw(rc) as *const std::cell::RefCell<T>;
             // SAFETY: is::<T>() proved the value is `T`, and handles are always allocated as
             // `Rc::new(RefCell::new(concrete))`, so the layout matches `RcBox<RefCell<T>>`.
-            Some(unsafe { Rc::from_raw(ptr) })
+            Some(unsafe { std::rc::Rc::from_raw(ptr) })
         } else {
             None
         }
@@ -191,7 +194,7 @@ impl RepositoryInterfaceHandle {
 
 impl PartialEq for RepositoryInterfaceHandle {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -205,21 +208,22 @@ impl std::hash::Hash for RepositoryInterfaceHandle {
 
 /// Typed shared handle over `LockArrayRepository`.
 #[derive(Debug, Clone)]
-pub struct LockArrayRepositoryHandle(Rc<RefCell<LockArrayRepository>>);
+pub struct LockArrayRepositoryHandle(std::rc::Rc<std::cell::RefCell<LockArrayRepository>>);
 
 impl LockArrayRepositoryHandle {
     pub fn new(repository: LockArrayRepository) -> Self {
-        let rc: Rc<RefCell<LockArrayRepository>> = Rc::new(RefCell::new(repository));
-        let rc_dyn: Rc<RefCell<dyn RepositoryInterface>> = rc.clone();
-        rc.borrow().set_self_handle(Rc::downgrade(&rc_dyn));
+        let rc: std::rc::Rc<std::cell::RefCell<LockArrayRepository>> =
+            std::rc::Rc::new(std::cell::RefCell::new(repository));
+        let rc_dyn: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> = rc.clone();
+        rc.borrow().set_self_handle(std::rc::Rc::downgrade(&rc_dyn));
         Self(rc)
     }
 
-    pub fn from_rc(rc: Rc<RefCell<LockArrayRepository>>) -> Self {
+    pub fn from_rc(rc: std::rc::Rc<std::cell::RefCell<LockArrayRepository>>) -> Self {
         Self(rc)
     }
 
-    pub fn as_rc(&self) -> &Rc<RefCell<LockArrayRepository>> {
+    pub fn as_rc(&self) -> &std::rc::Rc<std::cell::RefCell<LockArrayRepository>> {
         &self.0
     }
 
@@ -236,24 +240,24 @@ impl LockArrayRepositoryHandle {
     }
 
     pub fn ptr_eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
     }
 
     pub fn ptr_id(&self) -> usize {
-        Rc::as_ptr(&self.0) as *const () as usize
+        std::rc::Rc::as_ptr(&self.0) as *const () as usize
     }
 }
 
 impl From<LockArrayRepositoryHandle> for RepositoryInterfaceHandle {
     fn from(h: LockArrayRepositoryHandle) -> Self {
-        let rc: Rc<RefCell<dyn RepositoryInterface>> = h.0;
+        let rc: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> = h.0;
         RepositoryInterfaceHandle::from_rc(rc)
     }
 }
 
 impl PartialEq for LockArrayRepositoryHandle {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -267,21 +271,22 @@ impl std::hash::Hash for LockArrayRepositoryHandle {
 
 /// Typed shared handle over `PlatformRepository`.
 #[derive(Debug, Clone)]
-pub struct PlatformRepositoryHandle(Rc<RefCell<PlatformRepository>>);
+pub struct PlatformRepositoryHandle(std::rc::Rc<std::cell::RefCell<PlatformRepository>>);
 
 impl PlatformRepositoryHandle {
     pub fn new(repository: PlatformRepository) -> Self {
-        let rc: Rc<RefCell<PlatformRepository>> = Rc::new(RefCell::new(repository));
-        let rc_dyn: Rc<RefCell<dyn RepositoryInterface>> = rc.clone();
-        rc.borrow().set_self_handle(Rc::downgrade(&rc_dyn));
+        let rc: std::rc::Rc<std::cell::RefCell<PlatformRepository>> =
+            std::rc::Rc::new(std::cell::RefCell::new(repository));
+        let rc_dyn: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> = rc.clone();
+        rc.borrow().set_self_handle(std::rc::Rc::downgrade(&rc_dyn));
         Self(rc)
     }
 
-    pub fn from_rc(rc: Rc<RefCell<PlatformRepository>>) -> Self {
+    pub fn from_rc(rc: std::rc::Rc<std::cell::RefCell<PlatformRepository>>) -> Self {
         Self(rc)
     }
 
-    pub fn as_rc(&self) -> &Rc<RefCell<PlatformRepository>> {
+    pub fn as_rc(&self) -> &std::rc::Rc<std::cell::RefCell<PlatformRepository>> {
         &self.0
     }
 
@@ -294,24 +299,24 @@ impl PlatformRepositoryHandle {
     }
 
     pub fn ptr_eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
     }
 
     pub fn ptr_id(&self) -> usize {
-        Rc::as_ptr(&self.0) as *const () as usize
+        std::rc::Rc::as_ptr(&self.0) as *const () as usize
     }
 }
 
 impl From<PlatformRepositoryHandle> for RepositoryInterfaceHandle {
     fn from(h: PlatformRepositoryHandle) -> Self {
-        let rc: Rc<RefCell<dyn RepositoryInterface>> = h.0;
+        let rc: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> = h.0;
         RepositoryInterfaceHandle::from_rc(rc)
     }
 }
 
 impl PartialEq for PlatformRepositoryHandle {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
     }
 }
 

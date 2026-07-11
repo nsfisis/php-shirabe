@@ -8,7 +8,6 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
-use std::cell::RefCell;
 
 #[derive(Debug)]
 pub struct DefaultPolicy {
@@ -16,8 +15,9 @@ pub struct DefaultPolicy {
     prefer_lowest: bool,
     prefer_dev_over_prerelease: bool,
     preferred_versions: Option<IndexMap<String, String>>,
-    preferred_package_result_cache_per_pool: RefCell<IndexMap<i64, IndexMap<String, Vec<i64>>>>,
-    sorting_cache_per_pool: RefCell<IndexMap<i64, IndexMap<String, i64>>>,
+    preferred_package_result_cache_per_pool:
+        std::cell::RefCell<IndexMap<i64, IndexMap<String, Vec<i64>>>>,
+    sorting_cache_per_pool: std::cell::RefCell<IndexMap<i64, IndexMap<String, i64>>>,
 }
 
 impl DefaultPolicy {
@@ -33,8 +33,8 @@ impl DefaultPolicy {
             prefer_dev_over_prerelease: Platform::get_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE")
                 .map(|v| !v.is_empty())
                 .unwrap_or(false),
-            preferred_package_result_cache_per_pool: RefCell::new(IndexMap::new()),
-            sorting_cache_per_pool: RefCell::new(IndexMap::new()),
+            preferred_package_result_cache_per_pool: std::cell::RefCell::new(IndexMap::new()),
+            sorting_cache_per_pool: std::cell::RefCell::new(IndexMap::new()),
         }
     }
 

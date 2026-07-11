@@ -47,8 +47,6 @@ use shirabe_php_shim::{
     is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, str_contains, str_replace,
     str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {
@@ -441,8 +439,8 @@ impl Command for DiagnoseCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

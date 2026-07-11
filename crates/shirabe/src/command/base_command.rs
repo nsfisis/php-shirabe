@@ -30,8 +30,6 @@ use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
     count, explode, in_array, is_string,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub const SUCCESS: i64 = 0;
 pub const FAILURE: i64 = 1;
@@ -42,16 +40,16 @@ pub const INVALID: i64 = 2;
 #[derive(Debug)]
 pub struct BaseCommandData {
     inner: CommandData,
-    pub(crate) composer: RefCell<Option<PartialComposerHandle>>,
-    pub(crate) io: RefCell<Option<Rc<RefCell<dyn IOInterface>>>>,
+    pub(crate) composer: std::cell::RefCell<Option<PartialComposerHandle>>,
+    pub(crate) io: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>>,
 }
 
 impl BaseCommandData {
     pub fn new(name: Option<String>) -> Self {
         BaseCommandData {
             inner: CommandData::new(name),
-            composer: RefCell::new(None),
-            io: RefCell::new(None),
+            composer: std::cell::RefCell::new(None),
+            io: std::cell::RefCell::new(None),
         }
     }
 
@@ -152,15 +150,15 @@ pub trait BaseCommand: Command {
     /// Removes the cached composer instance
     fn reset_composer(&self) -> anyhow::Result<()>;
 
-    fn get_io(&self) -> Rc<RefCell<dyn IOInterface>>;
+    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
-    fn set_io(&self, io: Rc<RefCell<dyn IOInterface>>);
+    fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 
     /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
     fn create_composer_instance(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        io: Rc<RefCell<dyn IOInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
@@ -170,14 +168,14 @@ pub trait BaseCommand: Command {
     fn get_preferred_install_options(
         &self,
         config: &Config,
-        input: Rc<RefCell<dyn InputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
     ) -> anyhow::Result<(bool, bool)>;
 
     fn get_platform_requirement_filter(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Rc<dyn PlatformRequirementFilterInterface>>;
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> anyhow::Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>>;
 
     /// @param array<string> $requirements
     ///
@@ -196,7 +194,11 @@ pub trait BaseCommand: Command {
     ) -> anyhow::Result<Vec<IndexMap<String, String>>>;
 
     /// @param array<TableSeparator|mixed[]> $table
-    fn render_table(&self, table: Vec<PhpMixed>, output: Rc<RefCell<dyn OutputInterface>>);
+    fn render_table(
+        &self,
+        table: Vec<PhpMixed>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    );
 
     fn get_terminal_width(&self) -> i64;
 
@@ -205,7 +207,7 @@ pub trait BaseCommand: Command {
     /// @return Auditor::FORMAT_*
     fn get_audit_format(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         opt_name: &str,
     ) -> anyhow::Result<String>;
 
@@ -213,7 +215,7 @@ pub trait BaseCommand: Command {
     fn create_audit_config(
         &self,
         config: &mut Config,
-        input: Rc<RefCell<dyn InputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<AuditConfig>;
 }
 
@@ -327,7 +329,7 @@ impl BaseCommand for BaseCommandData {
         Ok(())
     }
 
-    fn get_io(&self) -> Rc<RefCell<dyn IOInterface>> {
+    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         if self.io.borrow().is_none() {
             match self.get_application() {
                 Some(application) => {
@@ -343,7 +345,8 @@ impl BaseCommand for BaseCommandData {
                     *self.io.borrow_mut() = Some(io);
                 }
                 None => {
-                    *self.io.borrow_mut() = Some(Rc::new(RefCell::new(NullIO::new())));
+                    *self.io.borrow_mut() =
+                        Some(std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
                 }
             }
         }
@@ -351,14 +354,14 @@ impl BaseCommand for BaseCommandData {
         self.io.borrow().clone().unwrap()
     }
 
-    fn set_io(&self, io: Rc<RefCell<dyn IOInterface>>) {
+    fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
         *self.io.borrow_mut() = Some(io);
     }
 
     fn create_composer_instance(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        io: Rc<RefCell<dyn IOInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
@@ -387,7 +390,7 @@ impl BaseCommand for BaseCommandData {
     fn get_preferred_install_options(
         &self,
         config: &Config,
-        input: Rc<RefCell<dyn InputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
     ) -> anyhow::Result<(bool, bool)> {
         let mut prefer_source = false;
@@ -510,8 +513,8 @@ impl BaseCommand for BaseCommandData {
 
     fn get_platform_requirement_filter(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Rc<dyn PlatformRequirementFilterInterface>> {
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> anyhow::Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>> {
         if !input.borrow().has_option("ignore-platform-reqs")
             || !input.borrow().has_option("ignore-platform-req")
         {
@@ -577,7 +580,11 @@ impl BaseCommand for BaseCommandData {
         parser.parse_name_version_pairs(requirements)
     }
 
-    fn render_table(&self, table: Vec<PhpMixed>, output: Rc<RefCell<dyn OutputInterface>>) {
+    fn render_table(
+        &self,
+        table: Vec<PhpMixed>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
         let mut renderer = Table::new(output);
         renderer
             .set_style("compact".into())
@@ -604,7 +611,7 @@ impl BaseCommand for BaseCommandData {
 
     fn get_audit_format(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         opt_name: &str,
     ) -> anyhow::Result<String> {
         if !input.borrow().has_option(opt_name) {
@@ -641,7 +648,7 @@ impl BaseCommand for BaseCommandData {
     fn create_audit_config(
         &self,
         config: &mut Config,
-        input: Rc<RefCell<dyn InputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<AuditConfig> {
         // Handle both --audit and --no-audit flags
         let audit = if input.borrow().has_option("audit") {
@@ -700,7 +707,11 @@ impl BaseCommand for BaseCommandData {
 /// (same for `getDisableScriptsByDefault()`), ORed into the caller's flags.
 fn apply_application_defaults(
     application: Option<
-        Rc<RefCell<dyn shirabe_external_packages::symfony::console::application::Application>>,
+        std::rc::Rc<
+            std::cell::RefCell<
+                dyn shirabe_external_packages::symfony::console::application::Application,
+            >,
+        >,
     >,
     mut disable_plugins: bool,
     mut disable_scripts: bool,
@@ -725,8 +736,8 @@ fn apply_application_defaults(
 /// future overrides) bind correctly.
 pub fn base_command_initialize(
     cmd: &dyn BaseCommand,
-    input: Rc<RefCell<dyn InputInterface>>,
-    _output: Rc<RefCell<dyn OutputInterface>>,
+    input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
 ) -> anyhow::Result<()> {
     // initialize a plugin-enabled Composer instance, either local or global
     let disable_plugins = input

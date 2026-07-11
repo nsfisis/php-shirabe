@@ -7,14 +7,12 @@ use crate::dependency_resolver::Rule;
 use crate::repository::RepositorySet;
 use crate::util::IniHelper;
 use shirabe_php_shim::RuntimeException;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct SolverProblemsException {
     inner: RuntimeException,
     pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<Rc<RefCell<Rule>>>>,
+    pub(crate) learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
 }
 
 impl SolverProblemsException {
@@ -28,7 +26,10 @@ impl SolverProblemsException {
         &self.inner.message
     }
 
-    pub fn new(problems: Vec<Problem>, learned_pool: Vec<Vec<Rc<RefCell<Rule>>>>) -> Self {
+    pub fn new(
+        problems: Vec<Problem>,
+        learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
+    ) -> Self {
         let message = format!(
             "Failed resolving dependencies with {} problems, call getPrettyString to get formatted details",
             problems.len()
@@ -154,7 +155,7 @@ impl SolverProblemsException {
 
     fn get_extension_problems(
         &self,
-        reason_sets: &indexmap::IndexMap<i64, Vec<Rc<RefCell<Rule>>>>,
+        reason_sets: &indexmap::IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> Vec<String> {
         let mut missing_extensions: indexmap::IndexMap<String, i64> = indexmap::IndexMap::new();
         for reason_set in reason_sets.values() {

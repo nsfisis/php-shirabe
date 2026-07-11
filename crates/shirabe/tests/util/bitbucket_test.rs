@@ -14,8 +14,6 @@ use shirabe::util::http_downloader::{
 };
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, time};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const USERNAME: &str = "username";
 const PASSWORD: &str = "password";
@@ -60,9 +58,9 @@ fn placeholder_auth_config_source() -> Box<MockConfigSource> {
 // real Config, the captured `time()`, and the Bitbucket under test. The mock guards
 // run their assert_complete on drop at the end of the test scope.
 struct Fixture {
-    io: Rc<RefCell<IOMock>>,
-    config: Rc<RefCell<Config>>,
-    http_downloader: Rc<RefCell<HttpDownloader>>,
+    io: std::rc::Rc<std::cell::RefCell<IOMock>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     time: i64,
     bitbucket: Bitbucket,
     _io_guard: crate::io_mock::IOMockGuard,
@@ -70,7 +68,7 @@ struct Fixture {
 }
 
 fn set_up_with_config_and_http(
-    config: Rc<RefCell<Config>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_expectations: Vec<HttpDownloaderMockExpectation>,
 ) -> Fixture {
     let (io_mock, io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
@@ -80,7 +78,7 @@ fn set_up_with_config_and_http(
         HttpDownloaderMockHandler::default(),
     );
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     let time = time();
     let bitbucket = Bitbucket::new(
         io,
@@ -127,7 +125,7 @@ fn access_token_body() -> String {
 // mirroring BitbucketTest::setExpectationsForStoringAccessToken. Verification happens
 // when the mocks are dropped together with the Config.
 fn set_expectations_for_storing_access_token(
-    config: &Rc<RefCell<Config>>,
+    config: &std::rc::Rc<std::cell::RefCell<Config>>,
     time: i64,
     remove_basic_auth: bool,
 ) {
@@ -575,7 +573,7 @@ fn test_authorize_oauth_without_available_git_config_token() {
         },
     );
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     let time = time();
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
@@ -592,7 +590,7 @@ fn test_authorize_oauth_with_available_git_config_token() {
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     let time = time();
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();

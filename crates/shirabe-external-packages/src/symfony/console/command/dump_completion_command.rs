@@ -10,9 +10,7 @@ use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 
 /// Dumps the completion script for the current shell.
 #[derive(Debug)]
@@ -180,8 +178,8 @@ impl Command for DumpCompletionCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let command_name = shirabe_php_shim::basename(
             &shirabe_php_shim::PHP_SERVER

@@ -20,8 +20,6 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
 };
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
@@ -38,14 +36,16 @@ fn run<F: std::future::Future>(future: F) -> F::Output {
 }
 
 /// ref: TestCase::getConfig
-fn get_config(config_options: IndexMap<String, PhpMixed>) -> Rc<RefCell<Config>> {
+fn get_config(
+    config_options: IndexMap<String, PhpMixed>,
+) -> std::rc::Rc<std::cell::RefCell<Config>> {
     let mut config = Config::new(false, None);
     if !config_options.is_empty() {
         let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
         merged.insert("config".to_string(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
     }
-    Rc::new(RefCell::new(config))
+    std::rc::Rc::new(std::cell::RefCell::new(config))
 }
 
 /// The PHP `getDownloader` builds a HttpDownloader mock whose `addCopy` resolves to a 200 Response
@@ -53,15 +53,16 @@ fn get_config(config_options: IndexMap<String, PhpMixed>) -> Rc<RefCell<Config>>
 /// handler returning a 200/`file~` response for any URL. The mock never writes the destination file,
 /// so the verification step throws "could not be saved to" exactly as in PHP.
 fn get_downloader(
-    io: Option<Rc<RefCell<dyn IOInterface>>>,
-    config: Option<Rc<RefCell<Config>>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
 ) -> (
     FileDownloader,
-    Rc<RefCell<HttpDownloader>>,
+    std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     crate::http_downloader_mock::HttpDownloaderMockGuard,
 ) {
-    let io = io.unwrap_or_else(|| Rc::new(RefCell::new(NullIO::new())));
-    let config = config.unwrap_or_else(|| Rc::new(RefCell::new(Config::new(false, None))));
+    let io = io.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
+    let config = config
+        .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None))));
 
     let (http_downloader, guard) = get_http_downloader_mock(
         Vec::new(),
@@ -213,14 +214,15 @@ fn test_cache_garbage_collection_is_called() {
     // The PHP Cache mock forces gcIsNecessary() true and records the single gc() call; the CacheMock
     // seam plays both roles here.
     let tmp_dir = TempDir::new().unwrap();
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut cache = Cache::new(io, tmp_dir.path().to_str().unwrap(), None, None, false);
     cache.__set_mock(CacheMock {
         gc_is_necessary: Some(true),
         gc_calls: Some(Vec::new()),
         ..Default::default()
     });
-    let cache = Rc::new(RefCell::new(cache));
+    let cache = std::rc::Rc::new(std::cell::RefCell::new(cache));
 
     let (http_downloader, _guard) = get_http_downloader_mock(
         Vec::new(),
@@ -232,7 +234,8 @@ fn test_cache_garbage_collection_is_called() {
         },
     );
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let _downloader = FileDownloader::new(
         io,
         config,
@@ -334,7 +337,7 @@ fn test_downgrade_shows_appropriate_message() {
         normalize_path_identity: true,
         ..Default::default()
     });
-    let filesystem = Rc::new(RefCell::new(filesystem));
+    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(filesystem));
 
     let (http_downloader, _guard) = get_http_downloader_mock(
         Vec::new(),
@@ -346,7 +349,7 @@ fn test_downgrade_shows_appropriate_message() {
         },
     );
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     let mut downloader = FileDownloader::new(
         io,
         config,

@@ -16,9 +16,7 @@ use shirabe::repository::RepositoryInterface;
 use shirabe::repository::WritableRepositoryInterface;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
 use std::fs;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 // PHP mocks `Composer\Downloader\DownloadManager` with getMockBuilder and asserts its
@@ -34,7 +32,7 @@ mockall::mock! {
         fn get_downloader_for_package(
             &self,
             package: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<Rc<RefCell<dyn DownloaderInterface>>>>;
+        ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
         async fn download(
             &self,
             package: PackageInterfaceHandle,
@@ -104,7 +102,7 @@ struct SetUp {
     root: TempDir,
     vendor_dir: String,
     bin_dir: String,
-    io: Rc<RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     composer: PartialComposerWeakHandle,
     fs: Filesystem,
     composer_full: ComposerHandle,
@@ -116,7 +114,7 @@ fn set_download_manager(setup: &SetUp, dm: MockDownloadManager) {
     setup
         .composer_full
         .borrow_mut()
-        .set_download_manager(Rc::new(RefCell::new(dm)));
+        .set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
 }
 
 fn set_up() -> SetUp {
@@ -144,11 +142,12 @@ fn set_up() -> SetUp {
     let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
     merged.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&merged, Config::SOURCE_UNKNOWN);
-    let config_rc = Rc::new(RefCell::new(config));
+    let config_rc = std::rc::Rc::new(std::cell::RefCell::new(config));
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
-    let composer_rc = Rc::new(RefCell::new(PartialOrFullComposer::new_full()));
+    let composer_rc = std::rc::Rc::new(std::cell::RefCell::new(PartialOrFullComposer::new_full()));
     let composer = ComposerHandle::from_rc_unchecked(composer_rc.clone());
     composer.borrow_mut().set_config(config_rc);
     // Default unconfigured mock so LibraryInstaller::new can resolve a DownloadManager even in
@@ -156,7 +155,9 @@ fn set_up() -> SetUp {
     // set_download_manager.
     composer
         .borrow_mut()
-        .set_download_manager(Rc::new(RefCell::new(MockDownloadManager::new())));
+        .set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(
+            MockDownloadManager::new(),
+        )));
 
     let weak = PartialComposerHandle::from_rc(composer_rc).downgrade();
 
@@ -236,7 +237,7 @@ fn test_install() {
     dm.expect_install()
         .times(1)
         .withf_st(move |package, target_dir| {
-            Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
+            std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
                 && target_dir == expected_path.as_str()
         })
         .returning(|_, _| Ok(None));
@@ -290,8 +291,8 @@ fn test_update() {
     dm.expect_update()
         .times(1)
         .withf_st(move |initial, target, target_dir| {
-            Rc::ptr_eq(initial.as_rc(), expected_initial.as_rc())
-                && Rc::ptr_eq(target.as_rc(), expected_target.as_rc())
+            std::rc::Rc::ptr_eq(initial.as_rc(), expected_initial.as_rc())
+                && std::rc::Rc::ptr_eq(target.as_rc(), expected_target.as_rc())
                 && target_dir == expected_path.as_str()
         })
         .returning(|_, _, _| Ok(None));
@@ -343,7 +344,7 @@ fn test_uninstall() {
     dm.expect_remove()
         .times(1)
         .withf_st(move |package, target_dir| {
-            Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
+            std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
                 && target_dir == expected_path.as_str()
         })
         .returning(|_, _| Ok(None));
@@ -426,12 +427,12 @@ fn test_ensure_binaries_installed() {
         .expect_install_binaries()
         .times(1)
         .withf_st(move |package, install_path, warn_on_overwrite| {
-            Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
+            std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
                 && install_path == expected_install_path.as_str()
                 && !*warn_on_overwrite
         })
         .returning(|_, _, _| ());
-    library.__set_binary_installer(Rc::new(RefCell::new(binary_installer)));
+    library.__set_binary_installer(std::rc::Rc::new(std::cell::RefCell::new(binary_installer)));
 
     library.ensure_binaries_presence(package.clone());
 

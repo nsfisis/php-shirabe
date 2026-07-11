@@ -9,8 +9,6 @@ use shirabe::util::Perforce;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const TEST_DEPOT: &str = "depot";
 const TEST_BRANCH: &str = "branch";
@@ -41,8 +39,9 @@ fn get_test_repo_config() -> IndexMap<String, PhpMixed> {
 }
 
 fn create_new_perforce_with_windows_flag(flag: bool) -> Perforce {
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     Perforce::new(
         get_test_repo_config(),
         TEST_PORT.to_string(),
@@ -57,8 +56,8 @@ fn create_new_perforce_with_windows_flag(flag: bool) -> Perforce {
 // ProcessExecutor and IO it configured, matching the PHP `setUp` wiring.
 fn create_perforce(
     flag: bool,
-    process: Rc<RefCell<ProcessExecutor>>,
-    io: Rc<RefCell<dyn IOInterface>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> Perforce {
     Perforce::new(
         get_test_repo_config(),
@@ -201,7 +200,8 @@ fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
@@ -224,7 +224,8 @@ fn test_query_p4_user_with_user_set_in_p4_variables_not_windows_os() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
 
@@ -240,9 +241,10 @@ fn test_query_p4_user_queries_for_user() {
     // Non-strict empty process mock: the p4-variable lookup returns empty so the
     // code falls through to io->ask().
     let (process, _guard) = get_process_executor_mock(vec![], false, MockHandler::default());
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
+        ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
@@ -261,9 +263,10 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
+        ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
@@ -284,9 +287,10 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
+        ));
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
 
@@ -304,9 +308,10 @@ fn test_query_p4_user_escapes_injection_on_windows() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new().with_ask(PhpMixed::String("foo && calc.exe".to_string())),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new().with_ask(PhpMixed::String("foo && calc.exe".to_string())),
+        ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
@@ -324,9 +329,9 @@ fn test_query_p4_user_escapes_injection_on_unix() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new().with_ask(PhpMixed::String("foo; id".to_string())),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_ask(PhpMixed::String("foo; id".to_string()))),
+    );
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
 
@@ -343,8 +348,9 @@ fn test_query_p4_password_with_password_already_set() {
         "p4password".to_string(),
         PhpMixed::String("TEST_PASSWORD".to_string()),
     );
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = Perforce::new(
         repo_config,
         "port".to_string(),
@@ -373,7 +379,8 @@ fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     let password = perforce.query_p4_password();
@@ -392,7 +399,8 @@ fn test_query_p4_password_with_password_set_in_p4_variables_not_windows_os() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(false, process, io);
 
     let password = perforce.query_p4_password();
@@ -404,9 +412,10 @@ fn test_query_p4_password_queries_for_password() {
     // Non-strict empty process mock: the p4-variable lookup returns empty so the
     // code falls through to io->askAndHideAnswer().
     let (process, _guard) = get_process_executor_mock(vec![], false, MockHandler::default());
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new().with_ask_and_hide_answer(Some("TEST_QUERY_PASSWORD".to_string())),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new().with_ask_and_hide_answer(Some("TEST_QUERY_PASSWORD".to_string())),
+        ));
     let mut perforce = create_perforce(true, process, io);
 
     let password = perforce.query_p4_password();
@@ -420,7 +429,8 @@ fn test_is_logged_in() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     perforce.is_logged_in().unwrap();
@@ -467,7 +477,8 @@ fn test_get_branches_with_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_stream("//depot/branch");
 
@@ -487,7 +498,8 @@ fn test_get_branches_without_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     let branches = perforce.get_branches();
@@ -519,7 +531,8 @@ fn test_get_tags_without_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     let tags = perforce.get_tags();
@@ -552,7 +565,8 @@ fn test_get_tags_with_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_stream("//depot/branch");
 
@@ -582,7 +596,8 @@ fn test_check_stream_with_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     let result = perforce.check_stream();
@@ -612,7 +627,8 @@ fn test_get_composer_information_without_label_without_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     let result = perforce.get_composer_information("//depot").unwrap();
@@ -657,7 +673,8 @@ fn test_get_composer_information_with_label_without_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     let result = perforce.get_composer_information("//depot@0.0.1").unwrap();
@@ -686,7 +703,8 @@ fn test_get_composer_information_without_label_with_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_stream("//depot/branch");
 
@@ -732,7 +750,8 @@ fn test_get_composer_information_with_label_with_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_stream("//depot/branch");
 
@@ -761,7 +780,8 @@ fn test_sync_code_base_without_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
     perforce.sync_code_base(Some("label")).unwrap();
@@ -786,7 +806,8 @@ fn test_sync_code_base_with_stream() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_stream("//depot/branch");
 
@@ -849,10 +870,11 @@ fn test_cleanup_client_spec_should_delete_client() {
         true,
         MockHandler::default(),
     );
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process.clone(), io);
 
-    let fs = Rc::new(RefCell::new(Filesystem::new(Some(process))));
+    let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(process))));
     perforce.set_filesystem(fs);
 
     perforce.cleanup_client_spec();

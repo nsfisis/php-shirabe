@@ -9,8 +9,6 @@ use shirabe::io::io_interface;
 use shirabe::util::Forgejo;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const USERNAME: &str = "username";
 const ACCESS_TOKEN: &str = "access-token";
@@ -63,11 +61,11 @@ fn get_conf_json_mock(origin: &str) -> Box<MockConfigSource> {
 }
 
 fn build_forgejo(
-    io_mock: &Rc<RefCell<IOMock>>,
-    config: Rc<RefCell<Config>>,
-    http_downloader: Rc<RefCell<HttpDownloader>>,
+    io_mock: &std::rc::Rc<std::cell::RefCell<IOMock>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> Forgejo {
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     Forgejo::new(io, config, http_downloader)
 }
 

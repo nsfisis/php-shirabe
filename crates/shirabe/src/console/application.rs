@@ -833,7 +833,7 @@ impl Application {
             return self
                 .shared()
                 .add(todo!(
-                    "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name)"
+                    "std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> from command_loader.get(name)"
                 ))
                 .map(|c| c.is_some())
                 .unwrap_or(false);
@@ -1052,7 +1052,7 @@ impl Application {
                     command_list.insert(
                         name_or_alias.clone(),
                         todo!(
-                            "Rc<RefCell<dyn SymfonyCommand>> from command_loader.get(name_or_alias)"
+                            "std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> from command_loader.get(name_or_alias)"
                         ),
                     );
                 }

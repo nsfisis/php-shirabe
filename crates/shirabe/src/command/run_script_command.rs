@@ -18,8 +18,6 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{InvalidArgumentException, RuntimeException};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RunScriptCommand {
@@ -59,7 +57,10 @@ impl RunScriptCommand {
         command
     }
 
-    fn list_scripts(&self, output: Rc<RefCell<dyn OutputInterface>>) -> anyhow::Result<i64> {
+    fn list_scripts(
+        &self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let scripts = self.get_scripts()?;
         if scripts.is_empty() {
             return Ok(0);
@@ -181,8 +182,8 @@ impl Command for RunScriptCommand {
 
     fn interact(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        _output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
         let _ = (|| -> anyhow::Result<()> {
             let scripts = self.get_scripts()?;
@@ -223,8 +224,8 @@ impl Command for RunScriptCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         if input
             .borrow()
@@ -323,8 +324,8 @@ impl Command for RunScriptCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

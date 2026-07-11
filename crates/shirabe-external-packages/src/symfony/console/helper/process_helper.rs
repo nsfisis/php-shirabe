@@ -8,8 +8,6 @@ use crate::symfony::console::output::ConsoleOutputInterface;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use crate::symfony::process::exception::process_failed_exception::ProcessFailedException;
 use crate::symfony::process::process::Process;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// The ProcessHelper class provides helpers to run external processes.
 ///
@@ -41,7 +39,7 @@ impl ProcessHelper {
     ///                                output available on STDOUT or STDERR
     pub fn run(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
         error: Option<&str>,
         callback: Option<Box<dyn FnMut(&str, &str)>>,
@@ -54,14 +52,14 @@ impl ProcessHelper {
         // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
         // implementor that also implements ConsoleOutputInterface, so the check
         // reduces to a downcast to the concrete type.
-        let output: Rc<RefCell<dyn OutputInterface>> = {
+        let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
                 .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };
 
-        let formatter: Rc<RefCell<DebugFormatterHelper>> = self
+        let formatter: std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>> = self
             .get_helper_set()
             .unwrap()
             .borrow()
@@ -200,7 +198,7 @@ impl ProcessHelper {
     /// @see run()
     pub fn must_run(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
         error: Option<&str>,
         callback: Option<Box<dyn FnMut(&str, &str)>>,
@@ -223,7 +221,7 @@ impl ProcessHelper {
     /// Wraps a Process callback to add debugging output.
     pub fn wrap_callback(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         process: &Process,
         mut callback: Option<Box<dyn FnMut(&str, &str)>>,
     ) -> Box<dyn FnMut(&str, &str)> {
@@ -231,14 +229,14 @@ impl ProcessHelper {
         // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
         // implementor that also implements ConsoleOutputInterface, so the check
         // reduces to a downcast to the concrete type.
-        let output: Rc<RefCell<dyn OutputInterface>> = {
+        let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
                 .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };
 
-        let formatter: Rc<RefCell<DebugFormatterHelper>> = self
+        let formatter: std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>> = self
             .get_helper_set()
             .unwrap()
             .borrow()
@@ -272,7 +270,7 @@ impl ProcessHelper {
     }
 
     fn formatter_start(
-        formatter: &Rc<RefCell<DebugFormatterHelper>>,
+        formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
         id: &str,
         message: &str,
     ) -> String {
@@ -280,7 +278,7 @@ impl ProcessHelper {
     }
 
     fn formatter_stop(
-        formatter: &Rc<RefCell<DebugFormatterHelper>>,
+        formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
         id: &str,
         message: &str,
         successful: bool,
@@ -289,7 +287,7 @@ impl ProcessHelper {
     }
 
     fn formatter_progress(
-        formatter: &Rc<RefCell<DebugFormatterHelper>>,
+        formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
         id: &str,
         buffer: &str,
         error: bool,
@@ -301,11 +299,11 @@ impl ProcessHelper {
 }
 
 impl HelperInterface for ProcessHelper {
-    fn set_helper_set(&mut self, helper_set: Option<Rc<RefCell<HelperSet>>>) {
+    fn set_helper_set(&mut self, helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>) {
         self.inner.set_helper_set(helper_set);
     }
 
-    fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
+    fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>> {
         self.inner.get_helper_set()
     }
 

@@ -14,21 +14,24 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{LogicException, PhpMixed, hash};
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
-fn null_io() -> Rc<RefCell<dyn IOInterface>> {
-    Rc::new(RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
-fn installation_manager(io: &Rc<RefCell<dyn IOInterface>>) -> Rc<RefCell<InstallationManager>> {
+fn installation_manager(
+    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
     // These tests never reach Locker::get_package_time, so the InstallationManager is never
     // actually used; build it over a mock HttpDownloader to avoid the unimplemented curl backend.
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(io.clone(), config)));
-    let r#loop = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
-    Rc::new(RefCell::new(InstallationManager::new(
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
+        io.clone(),
+        config,
+    )));
+    let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
+    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
         r#loop,
         io.clone(),
         None,
@@ -57,7 +60,11 @@ fn get_json_content(custom_data: &[(&str, &str)]) -> String {
 fn make_locker(
     json_content: &str,
     lock_contents: Option<&str>,
-) -> (Locker, TempDir, Rc<RefCell<dyn IOInterface>>) {
+) -> (
+    Locker,
+    TempDir,
+    std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+) {
     let temp_dir = TempDir::new().unwrap();
     let lock_path = temp_dir.path().join("composer.lock");
     if let Some(contents) = lock_contents {
@@ -66,7 +73,9 @@ fn make_locker(
 
     let io = null_io();
     let json_file = JsonFile::new(lock_path.to_string_lossy().into_owned(), None, None).unwrap();
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
     let locker = Locker::new(
         io.clone(),
         json_file,

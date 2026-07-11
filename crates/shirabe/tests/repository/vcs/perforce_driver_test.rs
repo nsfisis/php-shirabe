@@ -10,8 +10,6 @@ use shirabe::util::HttpDownloader;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 const TEST_URL: &str = "TEST_PERFORCE_URL";
@@ -92,9 +90,10 @@ fn make_driver(
     config: Config,
     repo_config: &IndexMap<String, PhpMixed>,
 ) -> (PerforceDriver, ProcessExecutorMockGuard) {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(config));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config.clone(),
         IndexMap::new(),
@@ -130,8 +129,9 @@ impl Drop for TearDown {
 
 #[test]
 fn test_supports_returns_false_no_deep_check() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
     assert!(!PerforceDriver::supports(io, config, "existing.url", false).unwrap());
 }

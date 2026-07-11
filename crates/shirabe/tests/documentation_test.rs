@@ -3,10 +3,8 @@
 use shirabe::console::application::ApplicationHandle;
 use shirabe_external_packages::symfony::console::command::Command;
 use shirabe_external_packages::symfony::console::descriptor::application_description::ApplicationDescription;
-use std::cell::RefCell;
-use std::rc::Rc;
 
-fn get_command_name(command: &Rc<RefCell<dyn Command>>) -> String {
+fn get_command_name(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
     let mut name = command.borrow().get_name().unwrap_or_default();
     for alias in command.borrow().get_aliases() {
         name = format!("{} / {}", name, alias);
@@ -15,7 +13,7 @@ fn get_command_name(command: &Rc<RefCell<dyn Command>>) -> String {
     name
 }
 
-fn provide_command_cases() -> Vec<Rc<RefCell<dyn Command>>> {
+fn provide_command_cases() -> Vec<std::rc::Rc<std::cell::RefCell<dyn Command>>> {
     let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
 

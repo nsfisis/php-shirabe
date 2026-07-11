@@ -5,8 +5,6 @@ use crate::io::IOInterface;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub trait VcsDriverInterface: std::fmt::Debug {
     fn initialize(&mut self) -> anyhow::Result<()>;
@@ -40,8 +38,8 @@ pub trait VcsDriverInterface: std::fmt::Debug {
     fn cleanup(&mut self) -> anyhow::Result<()>;
 
     fn supports(
-        io: Rc<RefCell<dyn IOInterface>>,
-        config: Rc<RefCell<Config>>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool>

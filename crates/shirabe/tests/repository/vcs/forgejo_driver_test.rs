@@ -11,14 +11,12 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
     home: TempDir,
-    config: Rc<RefCell<Config>>,
-    io: Rc<RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 fn set_up() -> SetUp {
@@ -39,11 +37,12 @@ fn set_up() -> SetUp {
 
     // PHP mocks IOInterface with isInteractive() => true; on the passing (200) paths
     // exercised here the interactivity flag is never consulted, so a bare NullIO matches.
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
     SetUp {
         home,
-        config: Rc::new(RefCell::new(config)),
+        config: std::rc::Rc::new(std::cell::RefCell::new(config)),
         io,
     }
 }
@@ -73,7 +72,7 @@ impl Drop for TearDown {
 fn initialize_driver(
     set_up: &SetUp,
     repo_url: &str,
-    http_downloader: Rc<RefCell<HttpDownloader>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> (ForgejoDriver, ProcessExecutorMockGuard) {
     let (process, process_guard) = get_process_executor_mock(vec![], false, MockHandler::default());
 
@@ -93,7 +92,10 @@ fn initialize_driver(
 
 fn http_mock(
     expectations: Vec<shirabe::util::http_downloader::HttpDownloaderMockExpectation>,
-) -> (Rc<RefCell<HttpDownloader>>, HttpDownloaderMockGuard) {
+) -> (
+    std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    HttpDownloaderMockGuard,
+) {
     get_http_downloader_mock(expectations, true, HttpDownloaderMockHandler::default())
 }
 

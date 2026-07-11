@@ -9,13 +9,11 @@ use shirabe_php_shim::{
     PHP_URL_HOST, PhpMixed, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, file_get_contents,
     parse_url, strpos, unlink,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
 // get('gitlab-domains') return [], everything else returns null. add_authentication_options
 // reads gitlab-domains, so seed it as an empty list.
-fn config_mock() -> Rc<RefCell<shirabe::config::Config>> {
+fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
     ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::List(vec![]))
         .with("gitlab-domains", PhpMixed::List(vec![]))
@@ -25,7 +23,7 @@ fn config_mock() -> Rc<RefCell<shirabe::config::Config>> {
 // Mirrors RemoteFilesystemTest::callGetOptionsForUrl: build a RemoteFilesystem, set the
 // private file_url, then invoke the private get_options_for_url with the given args.
 fn call_get_options_for_url(
-    io: Rc<RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     origin_url: &str,
     additional_options: IndexMap<String, PhpMixed>,
     options: IndexMap<String, PhpMixed>,
@@ -50,8 +48,9 @@ fn http_header_list(res: &IndexMap<String, PhpMixed>) -> Option<Vec<String>> {
 
 #[test]
 fn test_get_options_for_url() {
-    let io: Rc<RefCell<dyn IOInterface>> =
-        Rc::new(RefCell::new(IOStub::new().with_has_authentication(false)));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_has_authentication(false)),
+    );
 
     let res = call_get_options_for_url(
         io,
@@ -72,11 +71,12 @@ fn test_get_options_for_url_with_authorization() {
     let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
     auth.insert("username".to_string(), Some("login".to_string()));
     auth.insert("password".to_string(), Some("password".to_string()));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new()
-            .with_has_authentication(true)
-            .with_get_authentication(auth),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new()
+                .with_has_authentication(true)
+                .with_get_authentication(auth),
+        ));
 
     let options = call_get_options_for_url(
         io,
@@ -100,11 +100,12 @@ fn test_get_options_for_url_with_stream_options() {
     let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
     auth.insert("username".to_string(), None);
     auth.insert("password".to_string(), None);
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new()
-            .with_has_authentication(true)
-            .with_get_authentication(auth),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new()
+                .with_has_authentication(true)
+                .with_get_authentication(auth),
+        ));
 
     let mut ssl: IndexMap<String, PhpMixed> = IndexMap::new();
     ssl.insert("allow_self_signed".to_string(), PhpMixed::Bool(true));
@@ -136,11 +137,12 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
     let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
     auth.insert("username".to_string(), None);
     auth.insert("password".to_string(), None);
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new()
-            .with_has_authentication(true)
-            .with_get_authentication(auth),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new()
+                .with_has_authentication(true)
+                .with_get_authentication(auth),
+        ));
 
     let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
     http.insert(
@@ -172,7 +174,8 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
 
 #[test]
 fn test_callback_get_file_size() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
     fs.__callback_get(STREAM_NOTIFY_FILE_SIZE_IS, 0, Some(String::new()), 0, 0, 20)
         .unwrap();
@@ -181,7 +184,8 @@ fn test_callback_get_file_size() {
 
 #[test]
 fn test_callback_get_notify_progress() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
     fs.__set_bytes_max(20);
     fs.__set_progress(true);
@@ -193,7 +197,8 @@ fn test_callback_get_notify_progress() {
 
 #[test]
 fn test_callback_get_passes_through404() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
 
     fs.__callback_get(
@@ -226,7 +231,8 @@ fn this_file() -> String {
 
 #[test]
 fn test_get_contents() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
 
     let res = fs
@@ -242,7 +248,8 @@ fn test_get_contents() {
 
 #[test]
 fn test_copy() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
 
     let file = tempfile::NamedTempFile::new().unwrap();
@@ -293,7 +300,8 @@ fn provide_bitbucket_public_download_urls() -> Vec<(&'static str, &'static str)>
 #[ignore = "performs a real network download; get_remote_contents has no stream layer (TODO(phase-c)) and returns None, so getContents raises a TransportException"]
 fn test_bit_bucket_public_download() {
     for (url, contents) in provide_bitbucket_public_download_urls() {
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
         let mut rfs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
         let hostname = parse_url(url, PHP_URL_HOST);
         let hostname = hostname.as_string().unwrap_or("");

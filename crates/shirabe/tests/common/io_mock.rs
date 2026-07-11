@@ -8,9 +8,7 @@ use shirabe::util::platform::Platform;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::{PHP_EOL, PhpMixed, preg_quote};
-use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::rc::Rc;
 
 // A single entry of the IO expectation list. PHP models these as associative
 // arrays (`{text, regex?}` / `{ask, reply}` / `{auth: [repo, user, pass]}`); the
@@ -344,7 +342,7 @@ fn trim_eol(question: &str) -> &str {
     question.trim_end_matches(['\r', '\n'])
 }
 
-pub struct IOMockGuard(Rc<RefCell<IOMock>>);
+pub struct IOMockGuard(std::rc::Rc<std::cell::RefCell<IOMock>>);
 
 impl Drop for IOMockGuard {
     fn drop(&mut self) {
@@ -358,7 +356,9 @@ impl Drop for IOMockGuard {
 
 // For testing only. Mirrors TestCase::getIOMock: returns a shared IOMock handle
 // plus a guard that runs assert_complete when it drops at the end of the test scope.
-pub fn get_io_mock(verbosity: i64) -> anyhow::Result<(Rc<RefCell<IOMock>>, IOMockGuard)> {
-    let mock = Rc::new(RefCell::new(IOMock::new(verbosity)?));
+pub fn get_io_mock(
+    verbosity: i64,
+) -> anyhow::Result<(std::rc::Rc<std::cell::RefCell<IOMock>>, IOMockGuard)> {
+    let mock = std::rc::Rc::new(std::cell::RefCell::new(IOMock::new(verbosity)?));
     Ok((mock.clone(), IOMockGuard(mock)))
 }

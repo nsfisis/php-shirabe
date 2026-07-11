@@ -2,7 +2,6 @@ use crate::ErrorException;
 use crate::PhpMixed;
 use crate::{StreamBacking, StreamState};
 use indexmap::IndexMap;
-use std::cell::RefCell;
 use zip::write::SimpleFileOptions;
 
 /// Test-only behaviour mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`, where
@@ -36,7 +35,7 @@ enum ZipState {
 #[derive(Debug)]
 pub struct ZipArchive {
     pub num_files: i64,
-    state: RefCell<ZipState>,
+    state: std::cell::RefCell<ZipState>,
     /// Test-only mock state. `None` in production; set via [`ZipArchive::__mock`] in tests.
     mock: Option<ZipArchiveMock>,
 }
@@ -51,7 +50,7 @@ impl ZipArchive {
     pub fn new() -> Self {
         Self {
             num_files: 0,
-            state: RefCell::new(ZipState::Closed),
+            state: std::cell::RefCell::new(ZipState::Closed),
             mock: None,
         }
     }
@@ -61,7 +60,7 @@ impl ZipArchive {
     pub fn __mock(mock: ZipArchiveMock) -> Self {
         Self {
             num_files: mock.count,
-            state: RefCell::new(ZipState::Closed),
+            state: std::cell::RefCell::new(ZipState::Closed),
             mock: Some(mock),
         }
     }

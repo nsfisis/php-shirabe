@@ -16,8 +16,6 @@ use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterface
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[allow(dead_code)]
 struct Fixtures {
@@ -122,13 +120,18 @@ fn check_solver_result_repo_set(
     expected: Vec<ExpectedJob>,
 ) {
     // createSolver()
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let pool = repo_set
         .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
         .unwrap();
-    let policy: Rc<dyn PolicyInterface> = Rc::new(DefaultPolicy::new(false, false, None));
-    let mut solver =
-        shirabe::dependency_resolver::solver::Solver::new(policy, Rc::new(RefCell::new(pool)), io);
+    let policy: std::rc::Rc<dyn PolicyInterface> =
+        std::rc::Rc::new(DefaultPolicy::new(false, false, None));
+    let mut solver = shirabe::dependency_resolver::solver::Solver::new(
+        policy,
+        std::rc::Rc::new(std::cell::RefCell::new(pool)),
+        io,
+    );
 
     let transaction = solver.solve(&request, None).unwrap().unwrap();
 
@@ -197,7 +200,7 @@ struct SolveError {
     exception: SolverProblemsException,
     repo_set: RepositorySet,
     request: Request,
-    pool: Rc<RefCell<Pool>>,
+    pool: std::rc::Rc<std::cell::RefCell<Pool>>,
 }
 
 /// ref: SolverTest::createSolver + solve, returning the caught SolverProblemsException.
@@ -212,13 +215,15 @@ fn solve_expecting_problems(
         .unwrap();
     repo_set.add_repository(repo_locked.into()).unwrap();
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let pool = Rc::new(RefCell::new(
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let pool = std::rc::Rc::new(std::cell::RefCell::new(
         repo_set
             .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
             .unwrap(),
     ));
-    let policy: Rc<dyn PolicyInterface> = Rc::new(DefaultPolicy::new(false, false, None));
+    let policy: std::rc::Rc<dyn PolicyInterface> =
+        std::rc::Rc::new(DefaultPolicy::new(false, false, None));
     let mut solver = shirabe::dependency_resolver::solver::Solver::new(policy, pool.clone(), io);
 
     let exception = match solver.solve(&request, None).unwrap() {
@@ -2489,13 +2494,18 @@ fn test_learn_positive_literal() {
     let mut request = fixtures.request;
     request.require_name("A", None).unwrap();
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let pool = repo_set
         .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
         .unwrap();
-    let policy: Rc<dyn PolicyInterface> = Rc::new(DefaultPolicy::new(false, false, None));
-    let mut solver =
-        shirabe::dependency_resolver::solver::Solver::new(policy, Rc::new(RefCell::new(pool)), io);
+    let policy: std::rc::Rc<dyn PolicyInterface> =
+        std::rc::Rc::new(DefaultPolicy::new(false, false, None));
+    let mut solver = shirabe::dependency_resolver::solver::Solver::new(
+        policy,
+        std::rc::Rc::new(std::cell::RefCell::new(pool)),
+        io,
+    );
 
     // check correct setup for assertion later
     assert!(!solver.test_flag_learned_positive_literal);

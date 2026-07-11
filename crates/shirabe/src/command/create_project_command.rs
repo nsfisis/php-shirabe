@@ -44,9 +44,7 @@ use shirabe_php_shim::{
     UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd, implode,
     is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
 };
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 /// Install a package as new project into new directory.
 #[derive(Debug)]
@@ -257,8 +255,8 @@ impl Command for CreateProjectCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

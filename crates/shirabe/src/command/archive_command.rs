@@ -28,14 +28,12 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{LogicException, get_debug_type};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
     base_command_data: BaseCommandData,
     /// For testing only: partial-mock seam mirroring PHPUnit `onlyMethods(['initialize', 'archive'])`.
-    test_hooks: RefCell<ArchiveCommandTestHooks>,
+    test_hooks: std::cell::RefCell<ArchiveCommandTestHooks>,
 }
 
 /// For testing only: records and stubs for the `ArchiveCommand` partial-mock seam.
@@ -70,7 +68,7 @@ impl ArchiveCommand {
     pub fn new() -> Self {
         let command = ArchiveCommand {
             base_command_data: BaseCommandData::new(None),
-            test_hooks: RefCell::new(ArchiveCommandTestHooks::default()),
+            test_hooks: std::cell::RefCell::new(ArchiveCommandTestHooks::default()),
         };
         command
             .configure()
@@ -104,8 +102,8 @@ impl Command for ArchiveCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.try_composer(None, None);
 
@@ -206,8 +204,8 @@ impl Command for ArchiveCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         if self.test_hooks.borrow().skip_initialize {
             return Ok(());

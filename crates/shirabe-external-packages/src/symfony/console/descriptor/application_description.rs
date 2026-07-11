@@ -5,13 +5,11 @@ use crate::symfony::console::command::command::Command;
 use crate::symfony::console::exception::command_not_found_exception::CommandNotFoundException;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// @internal
 #[derive(Debug)]
 pub struct ApplicationDescription {
-    application: Rc<RefCell<dyn Application>>,
+    application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
     namespace: Option<String>,
     show_hidden: bool,
 
@@ -20,17 +18,17 @@ pub struct ApplicationDescription {
     namespaces: Option<IndexMap<String, IndexMap<String, PhpMixed>>>,
 
     /// @var array<string, Command>
-    commands: Option<IndexMap<String, Rc<RefCell<dyn Command>>>>,
+    commands: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 
     /// @var array<string, Command>
-    aliases: Option<IndexMap<String, Rc<RefCell<dyn Command>>>>,
+    aliases: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 }
 
 impl ApplicationDescription {
     pub const GLOBAL_NAMESPACE: &'static str = "_global";
 
     pub fn new(
-        application: Rc<RefCell<dyn Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         namespace: Option<String>,
         show_hidden: bool,
     ) -> Self {
@@ -53,7 +51,9 @@ impl ApplicationDescription {
     }
 
     /// @return Command[]
-    pub fn get_commands(&mut self) -> &IndexMap<String, Rc<RefCell<dyn Command>>> {
+    pub fn get_commands(
+        &mut self,
+    ) -> &IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>> {
         if self.commands.is_none() {
             self.inspect_application();
         }
@@ -62,7 +62,10 @@ impl ApplicationDescription {
     }
 
     /// @throws CommandNotFoundException
-    pub fn get_command(&self, name: &str) -> anyhow::Result<Rc<RefCell<dyn Command>>> {
+    pub fn get_command(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn Command>>> {
         let in_commands = self
             .commands
             .as_ref()
@@ -144,13 +147,18 @@ impl ApplicationDescription {
 
     fn sort_commands(
         &self,
-        commands: IndexMap<String, Rc<RefCell<dyn Command>>>,
-    ) -> IndexMap<String, IndexMap<String, Rc<RefCell<dyn Command>>>> {
-        let mut namespaced_commands: IndexMap<String, IndexMap<String, Rc<RefCell<dyn Command>>>> =
+        commands: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
+    ) -> IndexMap<String, IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>> {
+        let mut namespaced_commands: IndexMap<
+            String,
+            IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
+        > = IndexMap::new();
+        let mut global_commands: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>> =
             IndexMap::new();
-        let mut global_commands: IndexMap<String, Rc<RefCell<dyn Command>>> = IndexMap::new();
-        let mut sorted_commands: IndexMap<String, IndexMap<String, Rc<RefCell<dyn Command>>>> =
-            IndexMap::new();
+        let mut sorted_commands: IndexMap<
+            String,
+            IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
+        > = IndexMap::new();
         for (name, command) in commands {
             let key = self.application.borrow().extract_namespace(&name, Some(1));
             if ["", Self::GLOBAL_NAMESPACE].contains(&key.as_str()) {

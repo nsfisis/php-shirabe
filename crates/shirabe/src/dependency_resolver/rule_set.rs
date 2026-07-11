@@ -7,15 +7,13 @@ use crate::dependency_resolver::RuleSetIterator;
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
 use shirabe_php_shim::OutOfBoundsException;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RuleSet {
-    pub rule_by_id: IndexMap<i64, Rc<RefCell<Rule>>>,
-    pub(crate) rules: IndexMap<i64, Vec<Rc<RefCell<Rule>>>>,
+    pub rule_by_id: IndexMap<i64, std::rc::Rc<std::cell::RefCell<Rule>>>,
+    pub(crate) rules: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     pub(crate) next_rule_id: i64,
-    pub(crate) rules_by_hash: IndexMap<String, Vec<Rc<RefCell<Rule>>>>,
+    pub(crate) rules_by_hash: IndexMap<String, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
 }
 
 impl Default for RuleSet {
@@ -54,7 +52,11 @@ impl RuleSet {
         Self::types().into_keys().collect()
     }
 
-    pub fn add(&mut self, rule: Rc<RefCell<Rule>>, r#type: i64) -> anyhow::Result<()> {
+    pub fn add(
+        &mut self,
+        rule: std::rc::Rc<std::cell::RefCell<Rule>>,
+        r#type: i64,
+    ) -> anyhow::Result<()> {
         let types = Self::types();
         if !types.contains_key(&r#type) {
             return Err(OutOfBoundsException {
@@ -92,11 +94,11 @@ impl RuleSet {
         self.next_rule_id
     }
 
-    pub fn rule_by_id(&self, id: i64) -> Rc<RefCell<Rule>> {
+    pub fn rule_by_id(&self, id: i64) -> std::rc::Rc<std::cell::RefCell<Rule>> {
         self.rule_by_id[&id].clone()
     }
 
-    pub fn get_rules(&self) -> &IndexMap<i64, Vec<Rc<RefCell<Rule>>>> {
+    pub fn get_rules(&self) -> &IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>> {
         &self.rules
     }
 
@@ -105,7 +107,7 @@ impl RuleSet {
     }
 
     pub fn get_iterator_for(&self, types: Vec<i64>) -> RuleSetIterator {
-        let mut rules: IndexMap<i64, Vec<Rc<RefCell<Rule>>>> = IndexMap::new();
+        let mut rules: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>> = IndexMap::new();
         for r#type in types {
             if let Some(rules_for_type) = self.rules.get(&r#type) {
                 rules.insert(r#type, rules_for_type.clone());
@@ -115,7 +117,7 @@ impl RuleSet {
     }
 
     pub fn get_iterator_without(&self, types: Vec<i64>) -> RuleSetIterator {
-        let mut rules: IndexMap<i64, Vec<Rc<RefCell<Rule>>>> = IndexMap::new();
+        let mut rules: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>> = IndexMap::new();
         for (r#type, rules_for_type) in &self.rules {
             if types.contains(r#type) {
                 continue;

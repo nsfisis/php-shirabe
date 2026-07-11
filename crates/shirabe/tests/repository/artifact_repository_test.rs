@@ -4,8 +4,6 @@ use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
 use shirabe_php_shim::{PhpMixed, extension_loaded};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// Returns true when the test should be skipped because the zip extension is
 /// unavailable, mirroring PHP's markTestSkipped in setUp.
@@ -29,7 +27,8 @@ fn create_repo(url: &str) -> ArtifactRepository {
     coordinates.insert("type".to_string(), PhpMixed::String("artifact".to_string()));
     coordinates.insert("url".to_string(), PhpMixed::String(url.to_string()));
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     ArtifactRepository::new(coordinates, io).unwrap()
 }
 

@@ -11,9 +11,7 @@ use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 
 /// Responsible for providing the values to the shell completion.
 #[derive(Debug)]
@@ -105,7 +103,7 @@ impl CompleteCommand {
         &self,
         completion_input: &CompletionInput,
         _output: &dyn OutputInterface,
-    ) -> Option<Rc<RefCell<dyn Command>>> {
+    ) -> Option<std::rc::Rc<std::cell::RefCell<dyn Command>>> {
         // try { ... } catch (CommandNotFoundException $e) {}
         let input_name = completion_input.get_first_argument()?;
 
@@ -144,14 +142,16 @@ impl CompleteCommand {
     }
 }
 
-fn get_class_of_command(command: &Rc<RefCell<dyn Command>>) -> String {
+fn get_class_of_command(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
     // LazyCommand is intentionally not ported.
     // TODO: get_class() takes a PhpMixed but the command is a `dyn Command`; reflecting the
     // concrete class name of a trait object requires a class-name hook on Command (Phase C).
     todo!()
 }
 
-fn get_definition_options(command: &Rc<RefCell<dyn Command>>) -> Vec<Rc<InputOption>> {
+fn get_definition_options(
+    command: &std::rc::Rc<std::cell::RefCell<dyn Command>>,
+) -> Vec<std::rc::Rc<InputOption>> {
     command
         .borrow()
         .get_definition()
@@ -209,8 +209,8 @@ impl Command for CompleteCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         let _ = (input, output);
         self.is_debug.set(shirabe_php_shim::filter_var_boolean(
@@ -224,8 +224,8 @@ impl Command for CompleteCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         // try { ... } catch (\Throwable $e) { ...; if ($output->isDebug()) { throw $e; } return 2; }
         let result: anyhow::Result<i64> = (|| {

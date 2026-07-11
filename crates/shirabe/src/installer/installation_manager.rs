@@ -737,7 +737,7 @@ impl InstallationManager {
                 // PHP appends a post-exec step to the promise chain that dispatches the
                 // POST_PACKAGE_* event via the event dispatcher with repo/all_operations/operation.
                 // TODO(phase-c): the callback captures the event dispatcher (&mut) and the operation
-                // and must outlive the loop body; that requires the dispatcher behind Rc<RefCell>
+                // and must outlive the loop body; that requires the dispatcher behind Rc<RefCell<_>>
                 // and the deferred event dispatch to be wired into the promise chain (todo!()).
                 let _ = event_name_post;
                 post_exec_callbacks.push(Box::new(|| {

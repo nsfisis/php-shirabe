@@ -18,7 +18,6 @@ use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_spdx_licenses::SpdxLicenses;
-use std::cell::RefCell;
 
 #[derive(Debug)]
 pub struct ValidatingArrayLoader {
@@ -26,9 +25,9 @@ pub struct ValidatingArrayLoader {
     version_parser: VersionParser,
     // RefCell: `load` implements `LoaderInterface`, whose signature takes `&self`, but PHP's
     // implementation freely mutates these as scratch state for the duration of a single call.
-    errors: RefCell<Vec<String>>,
-    warnings: RefCell<Vec<String>>,
-    config: RefCell<IndexMap<String, PhpMixed>>,
+    errors: std::cell::RefCell<Vec<String>>,
+    warnings: std::cell::RefCell<Vec<String>>,
+    config: std::cell::RefCell<IndexMap<String, PhpMixed>>,
     flags: i64,
 }
 
@@ -55,9 +54,9 @@ impl ValidatingArrayLoader {
         Self {
             loader,
             version_parser,
-            errors: RefCell::new(Vec::new()),
-            warnings: RefCell::new(Vec::new()),
-            config: RefCell::new(IndexMap::new()),
+            errors: std::cell::RefCell::new(Vec::new()),
+            warnings: std::cell::RefCell::new(Vec::new()),
+            config: std::cell::RefCell::new(IndexMap::new()),
             flags,
         }
     }

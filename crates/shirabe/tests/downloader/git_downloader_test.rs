@@ -18,8 +18,6 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
@@ -104,14 +102,16 @@ fn setup_config(config: Config) -> Config {
 
 /// ref: GitDownloaderTest::getDownloaderMock (defaults the IO/Config/Filesystem)
 fn get_downloader_mock(
-    io: Option<Rc<RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     config: Option<Config>,
-    process: Rc<RefCell<ProcessExecutor>>,
-    filesystem: Option<Rc<RefCell<Filesystem>>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 ) -> GitDownloader {
-    let io =
-        io.unwrap_or_else(|| Rc::new(RefCell::new(IOStub::new())) as Rc<RefCell<dyn IOInterface>>);
-    let config = Rc::new(RefCell::new(setup_config(
+    let io = io.unwrap_or_else(|| {
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
+            as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
+    });
+    let config = std::rc::Rc::new(std::cell::RefCell::new(setup_config(
         config.unwrap_or_else(|| ConfigStubBuilder::new().build()),
     )));
     GitDownloader::new(io, config, Some(process), filesystem)
@@ -804,7 +804,7 @@ fn test_downgrade_shows_appropriate_message() {
         .borrow_mut()
         .expects(vec![Expectation::text_regex("{Downgrading .*}")], false)
         .unwrap();
-    let io = io_mock.clone() as Rc<RefCell<dyn IOInterface>>;
+    let io = io_mock.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
     let mut fs = Filesystem::new(None);
     fs.ensure_directory_exists(&format!("{}/.git", working_dir.path().to_string_lossy()))
@@ -882,7 +882,7 @@ fn test_not_using_downgrading_with_references() {
         .borrow_mut()
         .expects(vec![Expectation::text_regex("{Upgrading .*}")], false)
         .unwrap();
-    let io = io_mock.clone() as Rc<RefCell<dyn IOInterface>>;
+    let io = io_mock.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
     let mut fs = Filesystem::new(None);
     fs.ensure_directory_exists(&format!("{}/.git", working_dir.path().to_string_lossy()))

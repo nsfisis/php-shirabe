@@ -31,8 +31,6 @@ use shirabe_php_shim::{
     is_string, preg_quote, realpath, str_replace, strpos, strtolower, trim, ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct InitCommand {
@@ -116,8 +114,8 @@ impl Command for InitCommand {
     /// @throws \Seld\JsonLint\ParsingException
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let io = self.get_io();
 
@@ -402,8 +400,8 @@ impl Command for InitCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input.clone(), output.clone())?;
 
@@ -430,8 +428,8 @@ impl Command for InitCommand {
 
     fn interact(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
         let _ = (|| -> anyhow::Result<()> {
             let io = self.get_io();

@@ -6,8 +6,6 @@ use crate::symfony::console::completion::completion_suggestions::CompletionSugge
 use crate::symfony::console::helper::helper_set::HelperSet;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use indexmap::IndexMap;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// `Symfony\Component\Console\Application` is a concrete class in PHP, but it is ported here as a
 /// trait rather than a struct.
@@ -28,13 +26,13 @@ pub trait Application: std::fmt::Debug + shirabe_php_shim::AsAny {
     fn all(
         &mut self,
         namespace: Option<&str>,
-    ) -> anyhow::Result<IndexMap<String, Rc<RefCell<dyn Command>>>>;
+    ) -> anyhow::Result<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>;
 
-    fn find(&mut self, name: &str) -> anyhow::Result<Rc<RefCell<dyn Command>>>;
+    fn find(&mut self, name: &str) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn Command>>>;
 
-    fn get_definition(&mut self) -> Rc<RefCell<InputDefinition>>;
+    fn get_definition(&mut self) -> std::rc::Rc<std::cell::RefCell<InputDefinition>>;
 
-    fn get_helper_set(&mut self) -> Rc<RefCell<HelperSet>>;
+    fn get_helper_set(&mut self) -> std::rc::Rc<std::cell::RefCell<HelperSet>>;
 
     fn complete(
         &mut self,

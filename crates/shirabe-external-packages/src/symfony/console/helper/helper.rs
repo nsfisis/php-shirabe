@@ -3,21 +3,22 @@
 use crate::symfony::console::formatter::output_formatter_interface::OutputFormatterInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
 use crate::symfony::string::unicode_string::UnicodeString;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// Helper is the base class for all helper classes.
 #[derive(Debug, Default)]
 pub struct Helper {
-    pub(crate) helper_set: Option<Rc<RefCell<HelperSet>>>,
+    pub(crate) helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>,
 }
 
 impl Helper {
-    pub fn set_helper_set(&mut self, helper_set: Option<Rc<RefCell<HelperSet>>>) {
+    pub fn set_helper_set(
+        &mut self,
+        helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>,
+    ) {
         self.helper_set = helper_set;
     }
 
-    pub fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
+    pub fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>> {
         self.helper_set.clone()
     }
 

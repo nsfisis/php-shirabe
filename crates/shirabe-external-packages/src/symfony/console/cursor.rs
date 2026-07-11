@@ -2,18 +2,16 @@
 
 use crate::symfony::console::output::OutputInterface;
 use crate::symfony::console::output::output_interface;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Cursor {
-    output: Rc<RefCell<dyn OutputInterface>>,
+    output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     input: shirabe_php_shim::PhpResource,
 }
 
 impl Cursor {
     pub fn new(
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         input: Option<shirabe_php_shim::PhpResource>,
     ) -> Self {
         let input = input.unwrap_or(shirabe_php_shim::STDIN);

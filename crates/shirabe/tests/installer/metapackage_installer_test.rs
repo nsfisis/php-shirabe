@@ -8,8 +8,6 @@ use shirabe::installer::{InstallerInterface, MetapackageInstaller};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::{InstalledArrayRepository, RepositoryInterface};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
@@ -19,7 +17,8 @@ fn run<F: std::future::Future>(future: F) -> F::Output {
 }
 
 fn installer() -> MetapackageInstaller {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     MetapackageInstaller::new(io)
 }
 

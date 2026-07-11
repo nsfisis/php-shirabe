@@ -27,7 +27,6 @@ use shirabe_php_shim::{
     PhpMixed, array_search, function_exists, implode, in_array, is_array, is_string,
     mb_check_encoding, mb_convert_encoding, microtime, str_repeat, strip_tags, strlen,
 };
-use std::cell::RefCell;
 
 /// The Input/Output helper.
 #[derive(Debug)]
@@ -41,10 +40,10 @@ pub struct ConsoleIO {
     /// `$this->helperSet->get('question')` on every ask. The Application class, which constructs
     /// this class, registers a single `QuestionHelper`. So this port holds the `QuestionHelper`
     /// directly instead of a `HelperSet`.
-    question_helper: RefCell<QuestionHelper>,
+    question_helper: std::cell::RefCell<QuestionHelper>,
 
-    pub(crate) last_message: RefCell<String>,
-    pub(crate) last_message_err: RefCell<String>,
+    pub(crate) last_message: std::cell::RefCell<String>,
+    pub(crate) last_message_err: std::cell::RefCell<String>,
 
     start_time: Option<f64>,
     verbosity_map: IndexMap<i64, i64>,
@@ -69,9 +68,9 @@ impl ConsoleIO {
             authentications: indexmap![],
             input,
             output,
-            question_helper: RefCell::new(question_helper),
-            last_message: RefCell::new(String::new()),
-            last_message_err: RefCell::new(String::new()),
+            question_helper: std::cell::RefCell::new(question_helper),
+            last_message: std::cell::RefCell::new(String::new()),
+            last_message_err: std::cell::RefCell::new(String::new()),
             start_time: None,
             verbosity_map,
         }

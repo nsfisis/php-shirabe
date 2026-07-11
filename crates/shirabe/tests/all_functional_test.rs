@@ -10,7 +10,6 @@ use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{CaptureKey, PREG_SPLIT_DELIM_CAPTURE, PhpMixed, intval};
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
@@ -19,7 +18,7 @@ use std::path::{Path, PathBuf};
 /// cwd and removes the unique temp dir created by `testIntegration`. Modelled as an RAII guard.
 struct TearDown {
     old_cwd: PathBuf,
-    test_dir: RefCell<Option<PathBuf>>,
+    test_dir: std::cell::RefCell<Option<PathBuf>>,
 }
 
 impl Drop for TearDown {
@@ -42,7 +41,7 @@ fn set_up() -> TearDown {
     std::env::set_current_dir(fixtures_dir()).unwrap();
     TearDown {
         old_cwd,
-        test_dir: RefCell::new(None),
+        test_dir: std::cell::RefCell::new(None),
     }
 }
 

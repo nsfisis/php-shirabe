@@ -14,8 +14,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 // A getMockBuilder('Composer\Util\Perforce') stand-in: the seam trait extracted from the
@@ -83,13 +81,14 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
     // RepositoryInterface), so it cannot be held in a RepositoryInterfaceHandle. The package
     // is therefore built without a repository, yielding an empty repo config.
     let test_path = TempDir::new().unwrap();
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
-    let config = Rc::new(RefCell::new(get_config(test_path.path())));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(test_path.path())));
     let package = make_package(None);
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
-    let fs = Rc::new(RefCell::new(Filesystem::new(None)));
+    let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let mut downloader = PerforceDownloader::new(io, config, process, fs);
 
     downloader.init_perforce(
@@ -102,11 +101,12 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
 #[test]
 fn test_init_perforce_does_nothing_if_perforce_already_set() {
     let test_path = TempDir::new().unwrap();
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
-    let config = Rc::new(RefCell::new(get_config(test_path.path())));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(test_path.path())));
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
-    let fs = Rc::new(RefCell::new(Filesystem::new(None)));
+    let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let mut downloader = PerforceDownloader::new(io, config, process, fs);
 
     // The already-set perforce only sees initializePath; the repository's getRepoConfig is
@@ -147,11 +147,11 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>)
             false,
         )
         .unwrap();
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
-    let config = Rc::new(RefCell::new(get_config(test_path.path())));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(test_path.path())));
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
-    let fs = Rc::new(RefCell::new(Filesystem::new(None)));
+    let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let mut downloader = PerforceDownloader::new(io, config, process, fs);
 
     let mut perforce = MockPerforce::new();

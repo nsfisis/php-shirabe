@@ -20,8 +20,6 @@ use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::terminal::Terminal;
 use crate::symfony::string::s;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// The QuestionHelper class provides helpers to interact with the user.
 #[derive(Debug, Default)]
@@ -46,7 +44,7 @@ impl QuestionHelper {
     pub fn ask(
         &mut self,
         input: &mut dyn InputInterface,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
         let mut output = output;
@@ -73,12 +71,12 @@ impl QuestionHelper {
 
         let result: anyhow::Result<Result<PhpMixed, MissingInputException>> = (|| {
             if question.get_validator().is_none() {
-                return self.do_ask(Rc::clone(&output), question);
+                return self.do_ask(std::rc::Rc::clone(&output), question);
             }
 
-            let interviewer = || self.do_ask(Rc::clone(&output), question);
+            let interviewer = || self.do_ask(std::rc::Rc::clone(&output), question);
 
-            self.validate_attempts(&interviewer, Rc::clone(&output), question)
+            self.validate_attempts(&interviewer, std::rc::Rc::clone(&output), question)
         })();
 
         let result = result?;
@@ -113,10 +111,10 @@ impl QuestionHelper {
     /// @throws RuntimeException In case the fallback is deactivated and the response cannot be hidden
     fn do_ask(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
-        self.write_prompt(Rc::clone(&output), question);
+        self.write_prompt(std::rc::Rc::clone(&output), question);
 
         let input_stream = self
             .input_stream
@@ -134,8 +132,12 @@ impl QuestionHelper {
             // The autocompleter callback yields an iterable (Option here); PHP
             // treats a null result as an empty list of suggestions.
             let callback = move |input: &str| callback(input).unwrap_or_default();
-            let autocomplete =
-                self.autocomplete(Rc::clone(&output), question, &input_stream, &callback);
+            let autocomplete = self.autocomplete(
+                std::rc::Rc::clone(&output),
+                question,
+                &input_stream,
+                &callback,
+            );
             ret = PhpMixed::String(if question.is_trimmable() {
                 shirabe_php_shim::trim(&autocomplete, None)
             } else {
@@ -145,7 +147,7 @@ impl QuestionHelper {
             let mut r: PhpMixed = PhpMixed::Bool(false);
             if question.is_hidden() {
                 match self.get_hidden_response(
-                    Rc::clone(&output),
+                    std::rc::Rc::clone(&output),
                     &input_stream,
                     question.is_trimmable(),
                 )? {
@@ -261,7 +263,7 @@ impl QuestionHelper {
     /// Outputs the question prompt.
     pub(crate) fn write_prompt(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) {
         let mut message = question.get_question().to_string();
@@ -313,7 +315,7 @@ impl QuestionHelper {
     /// Outputs an error message.
     pub(crate) fn write_error(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         error: &shirabe_php_shim::Exception,
     ) {
         let message = if let Some(helper_set) = self.get_helper_set() {
@@ -338,12 +340,12 @@ impl QuestionHelper {
     /// @param resource $inputStream
     fn autocomplete(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
         input_stream: &shirabe_php_shim::PhpResource,
         autocomplete: &dyn Fn(&str) -> Vec<PhpMixed>,
     ) -> String {
-        let cursor = Cursor::new(Rc::clone(&output), Some(input_stream.clone()));
+        let cursor = Cursor::new(std::rc::Rc::clone(&output), Some(input_stream.clone()));
 
         let mut full_choice = String::new();
         let mut ret = String::new();
@@ -594,7 +596,7 @@ impl QuestionHelper {
     /// @throws RuntimeException In case the fallback is deactivated and the response cannot be hidden
     fn get_hidden_response(
         &self,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         input_stream: &shirabe_php_shim::PhpResource,
         trimmable: bool,
     ) -> anyhow::Result<Result<String, RuntimeException>> {
@@ -679,7 +681,7 @@ impl QuestionHelper {
     fn validate_attempts(
         &self,
         interviewer: &dyn Fn() -> anyhow::Result<Result<PhpMixed, MissingInputException>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
         let mut error: Option<shirabe_php_shim::Exception> = None;
@@ -694,7 +696,7 @@ impl QuestionHelper {
             }
 
             if let Some(ref error) = error {
-                self.write_error(Rc::clone(&output), error);
+                self.write_error(std::rc::Rc::clone(&output), error);
             }
 
             let interviewed = match interviewer()? {
@@ -876,11 +878,11 @@ fn magic_file() -> String {
 }
 
 impl HelperInterface for QuestionHelper {
-    fn set_helper_set(&mut self, helper_set: Option<Rc<RefCell<HelperSet>>>) {
+    fn set_helper_set(&mut self, helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>) {
         self.inner.set_helper_set(helper_set);
     }
 
-    fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
+    fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>> {
         self.inner.get_helper_set()
     }
 

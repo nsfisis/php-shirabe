@@ -24,15 +24,13 @@ use crate::symfony::console::style::output_style::OutputStyle;
 use crate::symfony::console::style::style_interface::StyleInterface;
 use crate::symfony::console::terminal::Terminal;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// Output decorator helpers for the Symfony Style Guide.
 #[derive(Debug)]
 pub struct SymfonyStyle {
     inner: OutputStyle,
-    input: Rc<RefCell<dyn InputInterface>>,
-    output: Rc<RefCell<dyn OutputInterface>>,
+    input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     question_helper: Option<SymfonyQuestionHelper>,
     progress_bar: Option<ProgressBar>,
     line_length: i64,
@@ -43,8 +41,8 @@ pub const MAX_LINE_LENGTH: i64 = 120;
 
 impl SymfonyStyle {
     pub fn new(
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Self {
         let buffered_output = TrimmedBufferOutput::new(
             if std::path::MAIN_SEPARATOR == '\\' {
@@ -260,7 +258,7 @@ impl SymfonyStyle {
             Self::as_console_output_interface(&self.output)
                 .unwrap()
                 .borrow()
-                .section() as Rc<RefCell<dyn OutputInterface>>
+                .section() as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>
         } else {
             self.output.clone()
         };
@@ -435,11 +433,13 @@ impl SymfonyStyle {
         lines
     }
 
-    fn get_formatter(&self) -> Rc<RefCell<dyn OutputFormatterInterface>> {
+    fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>> {
         self.output.borrow().get_formatter()
     }
 
-    fn is_console_output_interface(output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
+    fn is_console_output_interface(
+        output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> bool {
         // ConsoleOutput is the only OutputInterface implementor that also implements
         // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this downcast.
         shirabe_php_shim::AsAny::as_any(&*output.borrow())
@@ -448,8 +448,8 @@ impl SymfonyStyle {
     }
 
     fn as_console_output_interface(
-        _output: &Rc<RefCell<dyn OutputInterface>>,
-    ) -> Option<Rc<RefCell<dyn ConsoleOutputInterface>>> {
+        _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> Option<std::rc::Rc<std::cell::RefCell<dyn ConsoleOutputInterface>>> {
         todo!()
     }
 

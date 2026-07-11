@@ -7,8 +7,6 @@ use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[path = "common/config_stub.rs"]
 mod config_stub;
@@ -50,7 +48,7 @@ fn test_default_values_are_as_expected() {
         .with("disable-tls", PhpMixed::Bool(true))
         .build_shared();
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     Factory::create_http_downloader(io, &config, IndexMap::new()).unwrap();
 }
 

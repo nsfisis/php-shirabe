@@ -16,8 +16,6 @@ use shirabe_external_packages::symfony::console::output::output_interface::{
     OutputInterface, VERBOSITY_DEBUG, VERBOSITY_NORMAL,
 };
 use shirabe_php_shim::{PHP_EOL, trim};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[test]
 fn test_execute_captures_output() {
@@ -90,11 +88,12 @@ fn hide_password_provider() -> Vec<(&'static str, &'static str)> {
 #[test]
 fn test_hide_passwords() {
     for (command, expected_command_output) in hide_password_provider() {
-        let buffer = Rc::new(RefCell::new(
+        let buffer = std::rc::Rc::new(std::cell::RefCell::new(
             BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
         ));
-        let mut process =
-            ProcessExecutor::new(Some(buffer.clone() as Rc<RefCell<dyn IOInterface>>));
+        let mut process = ProcessExecutor::new(Some(
+            buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
+        ));
         let mut output = String::new();
         process.execute(command, &mut output, None).unwrap();
         assert_eq!(
@@ -106,10 +105,12 @@ fn test_hide_passwords() {
 
 #[test]
 fn test_doesnt_hide_ports() {
-    let buffer = Rc::new(RefCell::new(
+    let buffer = std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
     ));
-    let mut process = ProcessExecutor::new(Some(buffer.clone() as Rc<RefCell<dyn IOInterface>>));
+    let mut process = ProcessExecutor::new(Some(
+        buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
+    ));
     let mut output = String::new();
     process
         .execute("echo https://localhost:1234/", &mut output, None)
@@ -128,21 +129,22 @@ fn test_split_lines() {
 
 #[test]
 fn test_console_io_does_not_format_symfony_console_style() {
-    let output = Rc::new(RefCell::new(BufferedOutput::new(
+    let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
         Some(VERBOSITY_NORMAL),
         true,
         None,
     )));
-    let input: Rc<RefCell<dyn InputInterface>> =
-        Rc::new(RefCell::new(ArrayInput::new(vec![], None).unwrap()));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ArrayInput::new(vec![], None).unwrap()),
+    );
     let console_io = ConsoleIO::new(
         input,
-        output.clone() as Rc<RefCell<dyn OutputInterface>>,
+        output.clone() as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         QuestionHelper::default(),
     );
-    let mut process = ProcessExecutor::new(Some(
-        Rc::new(RefCell::new(console_io)) as Rc<RefCell<dyn IOInterface>>
-    ));
+    let mut process =
+        ProcessExecutor::new(Some(std::rc::Rc::new(std::cell::RefCell::new(console_io))
+            as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>));
 
     process
         .execute(

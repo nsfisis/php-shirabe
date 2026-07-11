@@ -15,8 +15,6 @@ use crate::symfony::console::output::console_section_output::ConsoleSectionOutpu
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// A single cell within a table row.
 ///
@@ -58,7 +56,7 @@ impl Cell {
         }
     }
 
-    fn style(&self) -> Option<Rc<TableCellStyle>> {
+    fn style(&self) -> Option<std::rc::Rc<TableCellStyle>> {
         match self {
             Cell::Cell(c) => c.get_style(),
             Cell::Separator(s) => s.get_style(),
@@ -246,7 +244,7 @@ pub struct Table {
     /// Number of columns cache.
     number_of_columns: Option<i64>,
 
-    output: Rc<RefCell<dyn OutputInterface>>,
+    output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
 
     style: TableStyle,
 
@@ -276,7 +274,7 @@ fn styles() -> &'static std::sync::Mutex<Option<IndexMap<String, TableStyle>>> {
 }
 
 impl Table {
-    pub fn new(output: Rc<RefCell<dyn OutputInterface>>) -> Self {
+    pub fn new(output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) -> Self {
         let mut styles_guard = styles().lock().unwrap();
         if styles_guard.is_none() {
             *styles_guard = Some(Self::init_styles());
@@ -1383,7 +1381,9 @@ impl Table {
         )))
     }
 
-    fn formatter_is_wrappable(_output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
+    fn formatter_is_wrappable(
+        _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> bool {
         // PHP: $this->output->getFormatter() instanceof WrappableOutputFormatterInterface
         // TODO(phase-c/d): instanceof on `dyn OutputFormatterInterface` needs an AsAny supertrait
         // on OutputFormatterInterface to downcast to the concrete wrappable formatter; adding it
@@ -1399,7 +1399,9 @@ impl Table {
         Helper::remove_decoration(&mut *formatter, string)
     }
 
-    fn output_is_console_section(output: &Rc<RefCell<dyn OutputInterface>>) -> bool {
+    fn output_is_console_section(
+        output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> bool {
         // PHP: $this->output instanceof ConsoleSectionOutput
         let borrowed = output.borrow();
         (*borrowed)
@@ -1417,7 +1419,7 @@ impl Table {
 
     fn table_cell_options_colspan_style(
         colspan: i64,
-        style: Option<Rc<TableCellStyle>>,
+        style: Option<std::rc::Rc<TableCellStyle>>,
     ) -> IndexMap<String, TableCellOption> {
         // PHP: ['colspan' => $colspan, 'style' => $style]
         let mut options = IndexMap::new();

@@ -7,8 +7,6 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::FossilDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -66,8 +64,9 @@ fn support_provider() -> Vec<(&'static str, bool)> {
 #[test]
 fn test_support() {
     for (url, assertion) in support_provider() {
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-        let config = Rc::new(RefCell::new(Config::new(true, None)));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
         let result = FossilDriver::supports(io, config, url, false).unwrap();
         assert_eq!(assertion, result);
     }

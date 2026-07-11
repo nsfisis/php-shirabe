@@ -1,9 +1,11 @@
 BANNED_USE_PATHS = %w[
   anyhow::Result
   std::any::Any
+  std::cell::RefCell
   std::io::Read
   std::io::Write
   std::process::Command
+  std::rc::Rc
 ].freeze
 
 def no_banned_use(root_dir, excludes = [])

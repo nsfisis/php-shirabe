@@ -8,8 +8,6 @@ use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::Platform;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[path = "common/io_mock.rs"]
 #[allow(dead_code)] // io_mock exposes more helpers than this binary uses
@@ -509,7 +507,7 @@ fn test_prohibited_urls_warning_verify_peer() {
         .unwrap();
 
     let mut config = Config::new(false, None);
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     let mut repo_options: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_options.insert(
         "ssl".to_string(),

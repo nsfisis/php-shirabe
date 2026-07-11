@@ -5,8 +5,6 @@ use crate::dependency_resolver::Rule;
 use crate::dependency_resolver::RuleWatchChain;
 use crate::dependency_resolver::RuleWatchNode;
 use indexmap::IndexMap;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct RuleWatchGraph {
@@ -26,7 +24,7 @@ impl RuleWatchGraph {
         }
     }
 
-    pub fn insert(&mut self, node: Rc<RefCell<RuleWatchNode>>) {
+    pub fn insert(&mut self, node: std::rc::Rc<std::cell::RefCell<RuleWatchNode>>) {
         if node.borrow().get_rule().borrow().is_assertion() {
             return;
         }
@@ -64,7 +62,7 @@ impl RuleWatchGraph {
         decided_literal: i64,
         level: i64,
         decisions: &mut Decisions,
-    ) -> Option<Rc<RefCell<Rule>>> {
+    ) -> Option<std::rc::Rc<std::cell::RefCell<Rule>>> {
         let literal = -decided_literal;
 
         if !self.watch_chains.contains_key(&literal) {
@@ -127,7 +125,7 @@ impl RuleWatchGraph {
         &mut self,
         from_literal: i64,
         to_literal: i64,
-        node: Rc<RefCell<RuleWatchNode>>,
+        node: std::rc::Rc<std::cell::RefCell<RuleWatchNode>>,
     ) {
         if !self.watch_chains.contains_key(&to_literal) {
             self.watch_chains.insert(to_literal, RuleWatchChain::new());

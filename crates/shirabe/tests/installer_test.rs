@@ -9,8 +9,6 @@ use config_stub::ConfigStubBuilder;
 use test_case::{get_package, get_version_constraint};
 
 use indexmap::IndexMap;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::autoload::{AutoloadGeneratorInterface, ClassLoader};
@@ -83,7 +81,7 @@ impl DownloadManagerInterface for StubDownloadManager {
     fn get_downloader_for_package(
         &self,
         _package: PackageInterfaceHandle,
-    ) -> anyhow::Result<Option<Rc<RefCell<dyn DownloaderInterface>>>> {
+    ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>> {
         Ok(None)
     }
     async fn download(
@@ -186,7 +184,7 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
     fn set_dry_run(&mut self, _dry_run: bool) {}
     fn set_platform_requirement_filter(
         &mut self,
-        _platform_requirement_filter: Rc<dyn PlatformRequirementFilterInterface>,
+        _platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) {
     }
     #[allow(clippy::too_many_arguments)]
@@ -348,10 +346,10 @@ fn test_installer() {
     let _tear_down = TearDown;
 
     for case in provide_installer() {
-        let io_buffer = Rc::new(RefCell::new(
+        let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
             BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
         ));
-        let io: Rc<RefCell<dyn IOInterface>> = io_buffer.clone();
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
 
         let config = ConfigStubBuilder::new()
             .with("vendor-dir", PhpMixed::String("foo".to_string()))
@@ -359,13 +357,12 @@ fn test_installer() {
             .with("notify-on-install", PhpMixed::Bool(true))
             .build_shared();
 
-        let download_manager: Rc<RefCell<dyn DownloadManagerInterface>> =
-            Rc::new(RefCell::new(StubDownloadManager));
+        let download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(StubDownloadManager));
 
-        let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(
-            io.clone(),
-            config.clone(),
-        )));
+        let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+            HttpDownloader::__new_mock(io.clone(), config.clone()),
+        ));
 
         let mut repository_manager = RepositoryManager::new(
             io.clone(),
@@ -380,13 +377,19 @@ fn test_installer() {
         for repository in &case.repositories {
             repository_manager.add_repository(repository.clone());
         }
-        let repository_manager: Rc<RefCell<dyn RepositoryManagerInterface>> =
-            Rc::new(RefCell::new(repository_manager));
+        let repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(repository_manager));
 
-        let r#loop = Rc::new(RefCell::new(Loop::new(http_downloader.clone(), None)));
-        let installation_manager: Rc<RefCell<InstallationManager>> = Rc::new(RefCell::new(
-            InstallationManager::__new_mock(r#loop, io.clone(), None),
-        ));
+        let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
+            http_downloader.clone(),
+            None,
+        )));
+        let installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>> =
+            std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
+                r#loop,
+                io.clone(),
+                None,
+            )));
 
         // emulate a writable lock file: a real JsonFile over a fresh temp path (initially absent, so
         // the installer falls back to an update; PHP uses an in-memory JsonFile mock instead).
@@ -394,17 +397,20 @@ fn test_installer() {
         let lock_path = lock_dir.path().join("composer.lock");
         let lock_json =
             JsonFile::new(lock_path.to_string_lossy().into_owned(), None, None).unwrap();
-        let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
-        let locker: Rc<RefCell<dyn LockerInterface>> = Rc::new(RefCell::new(Locker::new(
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
-            lock_json,
-            installation_manager.clone(),
-            "{}",
-            process,
-        )));
+        ))));
+        let locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(Locker::new(
+                io.clone(),
+                lock_json,
+                installation_manager.clone(),
+                "{}",
+                process,
+            )));
 
-        let autoload_generator: Rc<RefCell<dyn AutoloadGeneratorInterface>> =
-            Rc::new(RefCell::new(StubAutoloadGenerator));
+        let autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(StubAutoloadGenerator));
 
         let root_package: RootPackageInterfaceHandle =
             RootPackageInterfaceHandle::dup(&case.root_package.clone().into());
@@ -416,7 +422,7 @@ fn test_installer() {
             repository_manager,
             locker,
             installation_manager.clone(),
-            Rc::new(RefCell::new(StubEventDispatcher)),
+            std::rc::Rc::new(std::cell::RefCell::new(StubEventDispatcher)),
             autoload_generator,
         );
         installer.set_audit_config(
@@ -790,10 +796,10 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         return; // markTestSkipped
     }
 
-    let io_buffer = Rc::new(RefCell::new(
+    let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
     ));
-    let io: Rc<RefCell<dyn IOInterface>> = io_buffer.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
 
     let is_exception = matches!(case.expect_result, ExpectResult::Exception(_));
 
@@ -845,9 +851,11 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
 
     // The Locker needs a concrete InstallationManager; build a fresh recording mock just for it. The
     // asserted trace comes from the composer's own installation manager (read via as_any below).
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
     let locker_loop = composer.borrow().get_loop();
-    let locker_im = Rc::new(RefCell::new(InstallationManager::__new_mock(
+    let locker_im = std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
         locker_loop,
         io.clone(),
         None,
@@ -856,16 +864,20 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let locker = Locker::new(io.clone(), lock_json, locker_im, &contents, process);
     composer
         .borrow_mut()
-        .set_locker(Rc::new(RefCell::new(locker)));
+        .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
 
     composer
         .borrow_mut()
-        .set_autoload_generator(Rc::new(RefCell::new(StubAutoloadGenerator)));
+        .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(
+            StubAutoloadGenerator,
+        )));
     composer
         .borrow_mut()
-        .set_event_dispatcher(Rc::new(RefCell::new(StubEventDispatcher)));
+        .set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
+            StubEventDispatcher,
+        )));
 
-    let installer = Rc::new(RefCell::new(Installer::create(
+    let installer = std::rc::Rc::new(std::cell::RefCell::new(Installer::create(
         io.clone(),
         &composer.upcast(),
     )));
@@ -874,9 +886,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
 
-    let run_result: Rc<RefCell<Option<anyhow::Result<i64>>>> = Rc::new(RefCell::new(None));
+    let run_result: std::rc::Rc<std::cell::RefCell<Option<anyhow::Result<i64>>>> =
+        std::rc::Rc::new(std::cell::RefCell::new(None));
 
-    let install = Rc::new(RefCell::new(CommandData::new(Some("install".to_string()))));
+    let install = std::rc::Rc::new(std::cell::RefCell::new(CommandData::new(Some(
+        "install".to_string(),
+    ))));
     {
         let install_ref = install.borrow();
         install_ref
@@ -944,10 +959,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         }));
     }
     application
-        .add(install.clone() as Rc<RefCell<dyn SymfonyCommand>>)
+        .add(install.clone() as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)
         .unwrap();
 
-    let update = Rc::new(RefCell::new(CommandData::new(Some("update".to_string()))));
+    let update = std::rc::Rc::new(std::cell::RefCell::new(CommandData::new(Some(
+        "update".to_string(),
+    ))));
     {
         let update_ref = update.borrow();
         for (name, mode) in [
@@ -1045,7 +1062,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         }));
     }
     application
-        .add(update.clone() as Rc<RefCell<dyn SymfonyCommand>>)
+        .add(update.clone() as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)
         .unwrap();
 
     assert!(
@@ -1059,8 +1076,10 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         .expect("php://memory is a valid stream");
     let mut string_input = StringInput::new(&format!("{} -vvv", case.run)).unwrap();
     string_input.set_interactive(false);
-    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(string_input));
-    let output: Rc<RefCell<dyn OutputInterface>> = Rc::new(RefCell::new(app_output));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(string_input));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(app_output));
 
     let app_run = application.run(Some(input), Some(output));
 

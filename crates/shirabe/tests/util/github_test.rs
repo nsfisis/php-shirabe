@@ -9,8 +9,6 @@ use shirabe::io::io_interface;
 use shirabe::util::GitHub;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const PASSWORD: &str = "password";
 const MESSAGE: &str = "mymessage";
@@ -62,18 +60,18 @@ fn get_conf_json_mock(origin: &str) -> Box<MockConfigSource> {
 }
 
 fn build_github(
-    io_mock: &Rc<RefCell<IOMock>>,
-    config: Rc<RefCell<Config>>,
-    http_downloader: Rc<RefCell<HttpDownloader>>,
+    io_mock: &std::rc::Rc<std::cell::RefCell<IOMock>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> GitHub {
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     GitHub::new(io, config, None, Some(http_downloader)).unwrap()
 }
 
 // The PHP Config mock returns null for `get('github-expose-hostname')`, which is
 // falsy and skips the `hostname` process call. A real Config defaults that key to
 // true, so the stub seeds false to reproduce the mock's behaviour.
-fn build_config() -> Rc<RefCell<Config>> {
+fn build_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
     ConfigStubBuilder::new()
         .with("github-expose-hostname", PhpMixed::Bool(false))
         .build_shared()

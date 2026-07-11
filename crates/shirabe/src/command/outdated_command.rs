@@ -11,8 +11,6 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct OutdatedCommand {
@@ -74,8 +72,8 @@ impl Command for OutdatedCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let mut args: IndexMap<String, PhpMixed> = IndexMap::new();
         args.insert("command".to_string(), PhpMixed::String("show".to_string()));
@@ -206,7 +204,8 @@ impl Command for OutdatedCommand {
             None,
         )?;
 
-        let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(input));
+        let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(input));
 
         let application = {
             let application = self
@@ -225,8 +224,8 @@ impl Command for OutdatedCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

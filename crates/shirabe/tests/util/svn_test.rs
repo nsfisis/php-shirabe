@@ -6,8 +6,6 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::svn::Svn;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
     pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
@@ -43,8 +41,9 @@ fn url_provider() -> Vec<(&'static str, Vec<&'static str>)> {
 #[test]
 fn test_credentials() {
     for (url, expect) in url_provider() {
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-        let config = Rc::new(RefCell::new(Config::new(true, None)));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
         let mut svn = Svn::new(url.to_string(), io, config, None);
 
         let expect: Vec<String> = expect.iter().map(|s| s.to_string()).collect();
@@ -56,8 +55,9 @@ fn test_credentials() {
 fn test_interactive_string() {
     let url = "http://svn.example.org";
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     let mut svn = Svn::new(url.to_string(), io, config, None);
 
     assert_eq!(
@@ -79,8 +79,14 @@ fn test_credentials_from_config() {
     let mut config = Config::new(true, None);
     config.merge(&http_basic_config("svn.apache.org", "foo", "bar"), "test");
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let mut svn = Svn::new(url.to_string(), io, Rc::new(RefCell::new(config)), None);
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let mut svn = Svn::new(
+        url.to_string(),
+        io,
+        std::rc::Rc::new(std::cell::RefCell::new(config)),
+        None,
+    );
 
     assert_eq!(
         vec![
@@ -100,8 +106,14 @@ fn test_credentials_from_config_with_cache_credentials_true() {
     let mut config = Config::new(true, None);
     config.merge(&http_basic_config("svn.apache.org", "foo", "bar"), "test");
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let mut svn = Svn::new(url.to_string(), io, Rc::new(RefCell::new(config)), None);
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let mut svn = Svn::new(
+        url.to_string(),
+        io,
+        std::rc::Rc::new(std::cell::RefCell::new(config)),
+        None,
+    );
     svn.set_cache_credentials(true);
 
     assert_eq!(
@@ -122,8 +134,14 @@ fn test_credentials_from_config_with_cache_credentials_false() {
     let mut config = Config::new(true, None);
     config.merge(&http_basic_config("svn.apache.org", "foo", "bar"), "test");
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let mut svn = Svn::new(url.to_string(), io, Rc::new(RefCell::new(config)), None);
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let mut svn = Svn::new(
+        url.to_string(),
+        io,
+        std::rc::Rc::new(std::cell::RefCell::new(config)),
+        None,
+    );
     svn.set_cache_credentials(false);
 
     assert_eq!(

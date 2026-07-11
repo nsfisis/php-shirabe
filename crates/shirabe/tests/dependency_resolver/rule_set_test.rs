@@ -7,8 +7,6 @@ use shirabe::dependency_resolver::{
 };
 use shirabe::repository::RepositorySet;
 use shirabe_semver::constraint::{MatchAllConstraint, MatchNoneConstraint};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {
@@ -17,16 +15,16 @@ fn root_require_reason() -> ReasonData {
     }
 }
 
-fn rule(literals: Vec<i64>) -> Rc<RefCell<Rule>> {
-    Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
+fn rule(literals: Vec<i64>) -> std::rc::Rc<std::cell::RefCell<Rule>> {
+    std::rc::Rc::new(std::cell::RefCell::new(Rule::Generic(GenericRule::new(
         literals,
         RULE_ROOT_REQUIRE,
         root_require_reason(),
     ))))
 }
 
-fn learned_rule() -> Rc<RefCell<Rule>> {
-    Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
+fn learned_rule() -> std::rc::Rc<std::cell::RefCell<Rule>> {
+    std::rc::Rc::new(std::cell::RefCell::new(Rule::Generic(GenericRule::new(
         vec![],
         RULE_LEARNED,
         ReasonData::Int(1),
@@ -67,11 +65,11 @@ fn test_add() {
     );
     let request = &rules[&RuleSet::TYPE_REQUEST];
     assert_eq!(2, request.len());
-    assert!(Rc::ptr_eq(&request[0], &request0));
-    assert!(Rc::ptr_eq(&request[1], &request1));
+    assert!(std::rc::Rc::ptr_eq(&request[0], &request0));
+    assert!(std::rc::Rc::ptr_eq(&request[1], &request1));
     let learned = &rules[&RuleSet::TYPE_LEARNED];
     assert_eq!(1, learned.len());
-    assert!(Rc::ptr_eq(&learned[0], &learned0));
+    assert!(std::rc::Rc::ptr_eq(&learned[0], &learned0));
 }
 
 #[test]
@@ -110,7 +108,7 @@ fn test_rule_by_id() {
     let rule = rule(vec![]);
     rule_set.add(rule.clone(), RuleSet::TYPE_REQUEST).unwrap();
 
-    assert!(Rc::ptr_eq(&rule_set.rule_by_id[&0], &rule));
+    assert!(std::rc::Rc::ptr_eq(&rule_set.rule_by_id[&0], &rule));
 }
 
 #[test]
@@ -122,9 +120,9 @@ fn test_get_iterator() {
     rule_set.add(rule2.clone(), RuleSet::TYPE_LEARNED).unwrap();
 
     let mut iterator = rule_set.get_iterator();
-    assert!(Rc::ptr_eq(&iterator.current(), &rule1));
+    assert!(std::rc::Rc::ptr_eq(&iterator.current(), &rule1));
     iterator.next();
-    assert!(Rc::ptr_eq(&iterator.current(), &rule2));
+    assert!(std::rc::Rc::ptr_eq(&iterator.current(), &rule2));
 }
 
 #[test]
@@ -136,7 +134,7 @@ fn test_get_iterator_for() {
     rule_set.add(rule2.clone(), RuleSet::TYPE_LEARNED).unwrap();
 
     let iterator = rule_set.get_iterator_for(vec![RuleSet::TYPE_LEARNED]);
-    assert!(Rc::ptr_eq(&iterator.current(), &rule2));
+    assert!(std::rc::Rc::ptr_eq(&iterator.current(), &rule2));
 }
 
 #[test]
@@ -148,7 +146,7 @@ fn test_get_iterator_without() {
     rule_set.add(rule2.clone(), RuleSet::TYPE_LEARNED).unwrap();
 
     let iterator = rule_set.get_iterator_without(vec![RuleSet::TYPE_REQUEST]);
-    assert!(Rc::ptr_eq(&iterator.current(), &rule2));
+    assert!(std::rc::Rc::ptr_eq(&iterator.current(), &rule2));
 }
 
 // The constraint is MatchNoneConstraint, so what_provides returns no packages and the
@@ -178,7 +176,7 @@ fn test_pretty_string() {
 
     let mut rule_set = RuleSet::new();
     let literal = p.get_id();
-    let rule = Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
+    let rule = std::rc::Rc::new(std::cell::RefCell::new(Rule::Generic(GenericRule::new(
         vec![literal],
         RULE_ROOT_REQUIRE,
         ReasonData::RootRequire {

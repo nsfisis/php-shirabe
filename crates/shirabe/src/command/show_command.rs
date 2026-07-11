@@ -47,8 +47,6 @@ use shirabe_php_shim::{
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_spdx_licenses::SpdxLicenses;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ShowCommand {
@@ -209,8 +207,8 @@ impl Command for ShowCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         *self.version_parser.borrow_mut() = VersionParser::new();
         if input.borrow().get_option("tree")?.as_bool() == Some(true) {
@@ -1443,8 +1441,8 @@ impl Command for ShowCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

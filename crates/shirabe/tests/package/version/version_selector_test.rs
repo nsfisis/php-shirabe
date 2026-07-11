@@ -19,8 +19,6 @@ use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION};
 use shirabe_semver::constraint::AnyConstraint;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 mockall::mock! {
     RepositorySet {}
@@ -41,8 +39,10 @@ impl std::fmt::Debug for MockRepositorySet {
     }
 }
 
-fn into_seam(mock: MockRepositorySet) -> Rc<RefCell<dyn RepositorySetInterface>> {
-    Rc::new(RefCell::new(mock))
+fn into_seam(
+    mock: MockRepositorySet,
+) -> std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(mock))
 }
 
 /// Mirrors PHPUnit `assertSame($expected, $best)`: object identity, not value equality.
@@ -77,7 +77,7 @@ fn find_best(
             dyn shirabe::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
         >,
     >,
-    io: Option<Rc<RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
 ) -> Option<PackageInterfaceHandle> {
     version_selector
         .find_best_candidate(
@@ -159,10 +159,10 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     let mut version_selector =
         VersionSelector::new(into_seam(repository_set), Some(&mut platform)).unwrap();
 
-    let io = Rc::new(RefCell::new(
+    let io = std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
     ));
-    let io_dyn: Rc<RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
     let best = find_best(
         &mut version_selector,
         package_name,
@@ -180,10 +180,10 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
         io.borrow().get_output()
     );
 
-    let io = Rc::new(RefCell::new(
+    let io = std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), output_interface::VERBOSITY_VERBOSE, None).unwrap(),
     ));
-    let io_dyn: Rc<RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
     let best = find_best(
         &mut version_selector,
         package_name,

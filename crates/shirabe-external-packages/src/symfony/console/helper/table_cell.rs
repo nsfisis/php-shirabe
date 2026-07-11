@@ -3,13 +3,12 @@
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::helper::table_cell_style::TableCellStyle;
 use indexmap::IndexMap;
-use std::rc::Rc;
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
 #[derive(Debug, Clone)]
 pub enum TableCellOption {
     Int(i64),
-    Style(Rc<TableCellStyle>),
+    Style(std::rc::Rc<TableCellStyle>),
     Null,
 }
 
@@ -94,7 +93,7 @@ impl TableCell {
         }
     }
 
-    pub fn get_style(&self) -> Option<Rc<TableCellStyle>> {
+    pub fn get_style(&self) -> Option<std::rc::Rc<TableCellStyle>> {
         match &self.options["style"] {
             TableCellOption::Style(style) => Some(style.clone()),
             _ => None,

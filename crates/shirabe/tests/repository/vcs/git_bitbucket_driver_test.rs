@@ -11,8 +11,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -70,14 +68,16 @@ fn http_body(
 // then calls initialize().
 fn get_driver(
     url: &str,
-    io: Rc<RefCell<dyn IOInterface>>,
-    config: Rc<RefCell<Config>>,
-    http_downloader: Rc<RefCell<HttpDownloader>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
 
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
 
     let mut driver = GitBitbucketDriver::new(repo_config, io, config, http_downloader, process);
     driver.initialize()?;
@@ -89,8 +89,9 @@ fn test_get_root_identifier_wrong_scm_type() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![http_body(
@@ -124,8 +125,9 @@ fn test_driver() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let urls = [
         "https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner",
@@ -238,8 +240,9 @@ fn test_initialize_invalid_repository_url() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard) =
         get_http_downloader_mock(vec![], true, HttpDownloaderMockHandler::default());
@@ -257,8 +260,9 @@ fn test_invalid_support_data() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let repo_url = "https://bitbucket.org/user/repo.git";
 
@@ -306,8 +310,9 @@ fn test_invalid_support_data() {
 
 #[test]
 fn test_supports() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
     assert!(
         GitBitbucketDriver::supports(

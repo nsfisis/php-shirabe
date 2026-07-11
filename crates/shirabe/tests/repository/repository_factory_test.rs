@@ -7,14 +7,13 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::RepositoryFactory;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[test]
 fn test_manager_with_all_repository_types() {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config.clone(),
         IndexMap::new(),

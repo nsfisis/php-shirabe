@@ -6,7 +6,6 @@ use crate::symfony::console::input::input_argument::InputArgument;
 use crate::symfony::console::input::input_option::InputOption;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::rc::Rc;
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -15,11 +14,11 @@ use std::rc::Rc;
 /// (PHP `bind` assigns the definition by reference).
 #[derive(Debug, Clone)]
 pub struct InputDefinition {
-    arguments: IndexMap<String, Rc<InputArgument>>,
+    arguments: IndexMap<String, std::rc::Rc<InputArgument>>,
     required_count: i64,
-    last_array_argument: Option<Rc<InputArgument>>,
-    last_optional_argument: Option<Rc<InputArgument>>,
-    options: IndexMap<String, Rc<InputOption>>,
+    last_array_argument: Option<std::rc::Rc<InputArgument>>,
+    last_optional_argument: Option<std::rc::Rc<InputArgument>>,
+    options: IndexMap<String, std::rc::Rc<InputOption>>,
     negations: IndexMap<String, String>,
     shortcuts: IndexMap<String, String>,
 }
@@ -50,7 +49,7 @@ impl InputDefinition {
     /// reference, mirroring `new InputDefinition($definition->getOptions())`.
     /// `InputOption` is not `Clone` and lives behind `Rc`, so the options are
     /// reused rather than reconstructed by value.
-    pub fn from_options(options: Vec<Rc<InputOption>>) -> anyhow::Result<Self> {
+    pub fn from_options(options: Vec<std::rc::Rc<InputOption>>) -> anyhow::Result<Self> {
         let mut input_definition = InputDefinition {
             arguments: IndexMap::new(),
             required_count: 0,
@@ -108,7 +107,7 @@ impl InputDefinition {
     }
 
     pub fn add_argument(&mut self, argument: InputArgument) -> anyhow::Result<()> {
-        let argument = Rc::new(argument);
+        let argument = std::rc::Rc::new(argument);
 
         if self.arguments.contains_key(argument.get_name()) {
             return Err(LogicException(shirabe_php_shim::LogicException {
@@ -148,13 +147,13 @@ impl InputDefinition {
         }
 
         if argument.is_array() {
-            self.last_array_argument = Some(Rc::clone(&argument));
+            self.last_array_argument = Some(std::rc::Rc::clone(&argument));
         }
 
         if argument.is_required() {
             self.required_count += 1;
         } else {
-            self.last_optional_argument = Some(Rc::clone(&argument));
+            self.last_optional_argument = Some(std::rc::Rc::clone(&argument));
         }
 
         self.arguments
@@ -164,7 +163,7 @@ impl InputDefinition {
     }
 
     /// Returns an InputArgument by name or by position.
-    pub fn get_argument(&self, name: &PhpMixed) -> anyhow::Result<Rc<InputArgument>> {
+    pub fn get_argument(&self, name: &PhpMixed) -> anyhow::Result<std::rc::Rc<InputArgument>> {
         if !self.has_argument(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
@@ -177,12 +176,13 @@ impl InputDefinition {
 
         match name {
             PhpMixed::Int(index) => {
-                let arguments: Vec<Rc<InputArgument>> = self.arguments.values().cloned().collect();
-                Ok(Rc::clone(&arguments[*index as usize]))
+                let arguments: Vec<std::rc::Rc<InputArgument>> =
+                    self.arguments.values().cloned().collect();
+                Ok(std::rc::Rc::clone(&arguments[*index as usize]))
             }
             _ => {
                 let key = shirabe_php_shim::php_to_string(name);
-                Ok(Rc::clone(&self.arguments[&key]))
+                Ok(std::rc::Rc::clone(&self.arguments[&key]))
             }
         }
     }
@@ -191,7 +191,8 @@ impl InputDefinition {
     pub fn has_argument(&self, name: &PhpMixed) -> bool {
         match name {
             PhpMixed::Int(index) => {
-                let arguments: Vec<Rc<InputArgument>> = self.arguments.values().cloned().collect();
+                let arguments: Vec<std::rc::Rc<InputArgument>> =
+                    self.arguments.values().cloned().collect();
                 *index >= 0 && (*index as usize) < arguments.len()
             }
             _ => {
@@ -202,7 +203,7 @@ impl InputDefinition {
     }
 
     /// Gets the array of InputArgument objects.
-    pub fn get_arguments(&self) -> &IndexMap<String, Rc<InputArgument>> {
+    pub fn get_arguments(&self) -> &IndexMap<String, std::rc::Rc<InputArgument>> {
         &self.arguments
     }
 
@@ -250,12 +251,12 @@ impl InputDefinition {
     }
 
     pub fn add_option(&mut self, option: InputOption) -> anyhow::Result<()> {
-        self.add_option_rc(Rc::new(option))
+        self.add_option_rc(std::rc::Rc::new(option))
     }
 
     /// Adds an option that is already shared behind `Rc`, mirroring PHP passing
     /// `InputOption` objects by reference.
-    pub fn add_option_rc(&mut self, option: Rc<InputOption>) -> anyhow::Result<()> {
+    pub fn add_option_rc(&mut self, option: std::rc::Rc<InputOption>) -> anyhow::Result<()> {
         if let Some(existing) = self.options.get(option.get_name())
             && !option.equals(existing)
         {
@@ -291,7 +292,7 @@ impl InputDefinition {
         }
 
         self.options
-            .insert(option.get_name().to_string(), Rc::clone(&option));
+            .insert(option.get_name().to_string(), std::rc::Rc::clone(&option));
         if let Some(shortcut) = option.get_shortcut() {
             for shortcut in shirabe_php_shim::explode("|", shortcut) {
                 self.shortcuts
@@ -319,7 +320,7 @@ impl InputDefinition {
     }
 
     /// Returns an InputOption by name.
-    pub fn get_option(&self, name: &str) -> anyhow::Result<Rc<InputOption>> {
+    pub fn get_option(&self, name: &str) -> anyhow::Result<std::rc::Rc<InputOption>> {
         if !self.has_option(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
@@ -330,7 +331,7 @@ impl InputDefinition {
             );
         }
 
-        Ok(Rc::clone(&self.options[name]))
+        Ok(std::rc::Rc::clone(&self.options[name]))
     }
 
     /// Returns true if an InputOption object exists by name.
@@ -342,7 +343,7 @@ impl InputDefinition {
     }
 
     /// Gets the array of InputOption objects.
-    pub fn get_options(&self) -> &IndexMap<String, Rc<InputOption>> {
+    pub fn get_options(&self) -> &IndexMap<String, std::rc::Rc<InputOption>> {
         &self.options
     }
 
@@ -357,7 +358,10 @@ impl InputDefinition {
     }
 
     /// Gets an InputOption by shortcut.
-    pub fn get_option_for_shortcut(&self, shortcut: &str) -> anyhow::Result<Rc<InputOption>> {
+    pub fn get_option_for_shortcut(
+        &self,
+        shortcut: &str,
+    ) -> anyhow::Result<std::rc::Rc<InputOption>> {
         self.get_option(&self.shortcut_to_name(shortcut)?)
     }
 

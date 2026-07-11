@@ -21,8 +21,6 @@ use shirabe_external_packages::symfony::console::input::input_interface::InputIn
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn set_up() {
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
@@ -61,18 +59,22 @@ fn test_dev_warning_suppressed_for_self_update() {
     }
 
     let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
-    let command: Rc<RefCell<dyn Command>> = Rc::new(RefCell::new(SelfUpdateCommand::new()));
+    let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
+        std::rc::Rc::new(std::cell::RefCell::new(SelfUpdateCommand::new()));
     application.add(command).unwrap();
 
-    let output = Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
-        ArrayInput::new(
-            vec![(PhpMixed::from("command"), PhpMixed::from("self-update"))],
-            None,
-        )
-        .unwrap(),
-    ));
-    let output_trait: Rc<RefCell<dyn OutputInterface>> = output.clone();
+    let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            ArrayInput::new(
+                vec![(PhpMixed::from("command"), PhpMixed::from("self-update"))],
+                None,
+            )
+            .unwrap(),
+        ));
+    let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
     application.do_run(input, output_trait).unwrap();
 
     assert_eq!(
@@ -88,29 +90,34 @@ fn test_process_isolation_works_multiple_times() {
     set_up();
 
     let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
-    let command: Rc<RefCell<dyn Command>> = Rc::new(RefCell::new(AboutCommand::new()));
+    let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
+        std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new()));
     application.add(command).unwrap();
 
-    let input1: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
-        ArrayInput::new(
-            vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
-            None,
-        )
-        .unwrap(),
-    ));
-    let output1: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input1: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            ArrayInput::new(
+                vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
+                None,
+            )
+            .unwrap(),
+        ));
+    let output1: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
     assert_eq!(0, application.do_run(input1, output1).unwrap());
 
-    let input2: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
-        ArrayInput::new(
-            vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
-            None,
-        )
-        .unwrap(),
-    ));
-    let output2: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input2: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            ArrayInput::new(
+                vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
+                None,
+            )
+            .unwrap(),
+        ));
+    let output2: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
     assert_eq!(0, application.do_run(input2, output2).unwrap());
 }
 
@@ -143,18 +150,20 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
 
     // Run list command with --no-plugins, this triggers script command registration which previously
     // created a Composer instance with plugins enabled regardless of the --no-plugins flag
-    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
-        ArrayInput::new(
-            vec![
-                (PhpMixed::from("command"), PhpMixed::from("list")),
-                (PhpMixed::from("--no-plugins"), PhpMixed::from(true)),
-            ],
-            None,
-        )
-        .unwrap(),
-    ));
-    let output: Rc<RefCell<dyn OutputInterface>> =
-        Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            ArrayInput::new(
+                vec![
+                    (PhpMixed::from("command"), PhpMixed::from("list")),
+                    (PhpMixed::from("--no-plugins"), PhpMixed::from(true)),
+                ],
+                None,
+            )
+            .unwrap(),
+        ));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
+    );
     application.do_run(input, output).unwrap();
 
     let composer = application.__get_composer(false, None, None).unwrap();
@@ -207,15 +216,18 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
     let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
 
-    let app_output = Rc::new(RefCell::new(BufferedOutput::new(None, false, None)));
-    let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(
-        ArrayInput::new(
-            vec![(PhpMixed::from("command"), PhpMixed::from("check"))],
-            None,
-        )
-        .unwrap(),
-    ));
-    let output_trait: Rc<RefCell<dyn OutputInterface>> = app_output.clone();
+    let app_output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            ArrayInput::new(
+                vec![(PhpMixed::from("command"), PhpMixed::from("check"))],
+                None,
+            )
+            .unwrap(),
+        ));
+    let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = app_output.clone();
     let exit_code = application.do_run(input, output_trait).unwrap();
 
     assert_eq!(0, exit_code, "Script command should have run successfully");

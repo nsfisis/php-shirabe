@@ -14,9 +14,7 @@ use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 
 /// ListCommand displays the list of all available commands for the application.
 #[derive(Debug)]
@@ -140,8 +138,8 @@ impl Command for ListCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let mut helper = DescriptorHelper::new();
         let object = DescribableObject::Application(self.get_application().unwrap());

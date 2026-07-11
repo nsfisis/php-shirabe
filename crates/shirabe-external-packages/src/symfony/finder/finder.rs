@@ -11,7 +11,6 @@ use crate::symfony::finder::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{file_exists, glob, is_dir, preg_quote, rtrim};
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -75,7 +74,7 @@ enum Sort {
     None,
     ByName,
     ByAccessedTime,
-    Closure(RefCell<Box<dyn FnMut(&PathBuf, &PathBuf) -> i64>>),
+    Closure(std::cell::RefCell<Box<dyn FnMut(&PathBuf, &PathBuf) -> i64>>),
 }
 
 /// One traversal result, replacing `Symfony\Component\Finder\SplFileInfo`.
@@ -97,7 +96,7 @@ pub struct Finder {
     names: Vec<String>,
     not_names: Vec<String>,
     exclude: Vec<String>,
-    filters: Vec<RefCell<Box<dyn FnMut(&Path) -> bool>>>,
+    filters: Vec<std::cell::RefCell<Box<dyn FnMut(&Path) -> bool>>>,
     depths: Vec<(String, i64)>,
     follow_links: bool,
     reverse_sorting: bool,
@@ -204,7 +203,7 @@ impl Finder {
     }
 
     pub fn filter(&mut self, closure: Box<dyn FnMut(&std::path::Path) -> bool>) -> &mut Self {
-        self.filters.push(RefCell::new(closure));
+        self.filters.push(std::cell::RefCell::new(closure));
 
         self
     }
@@ -263,7 +262,7 @@ impl Finder {
     where
         F: FnMut(&PathBuf, &PathBuf) -> i64 + 'static,
     {
-        self.sort = Sort::Closure(RefCell::new(Box::new(comparator)));
+        self.sort = Sort::Closure(std::cell::RefCell::new(Box::new(comparator)));
 
         self
     }

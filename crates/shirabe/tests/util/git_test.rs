@@ -12,8 +12,6 @@ use shirabe::util::git::Git;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, RuntimeException};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // No-op ConfigSourceInterface, equivalent to PHPUnit's
 // `getMockBuilder(Config::class)` auto-stubbing getConfigSource/getAuthConfigSource:
@@ -73,10 +71,15 @@ impl ConfigSourceInterface for NullConfigSource {
 // flattens each callable to a `Vec<String>` and hands it to `execute_args`, which always
 // builds a `PhpMixed::List`. So the single-token string command becomes a one-element list,
 // and the corresponding process expectation is a one-element list as well.
-fn build_git(io: IOStub, config: Config, process: Rc<RefCell<ProcessExecutor>>) -> Git {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(io));
-    let config = Rc::new(RefCell::new(config));
-    let fs = Rc::new(RefCell::new(Filesystem::new(None)));
+fn build_git(
+    io: IOStub,
+    config: Config,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+) -> Git {
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(io));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     Git::new(io, config, process, fs)
 }
 

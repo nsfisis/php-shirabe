@@ -11,8 +11,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -196,16 +194,19 @@ fn test_load_versions() {
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
-    let config = Rc::new(RefCell::new(config));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config.clone(),
         IndexMap::new(),
         false,
     )));
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
     // VcsRepository's git driver / VersionGuesser run async git processes; constructing a Loop
     // enables async on the shared ProcessExecutor.
     let _loop = Loop::new(http_downloader.clone(), Some(process.clone()));

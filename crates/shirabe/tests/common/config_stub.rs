@@ -11,8 +11,6 @@
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub struct ConfigStubBuilder {
     use_environment: bool,
@@ -65,8 +63,8 @@ impl ConfigStubBuilder {
         config
     }
 
-    pub fn build_shared(self) -> Rc<RefCell<Config>> {
-        Rc::new(RefCell::new(self.build()))
+    pub fn build_shared(self) -> std::rc::Rc<std::cell::RefCell<Config>> {
+        std::rc::Rc::new(std::cell::RefCell::new(self.build()))
     }
 }
 

@@ -15,8 +15,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -136,8 +134,9 @@ fn test_supports() {
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
     for (expected, repo_url) in supports_provider() {
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-        let config = Rc::new(RefCell::new(Config::new(true, None)));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
         assert_eq!(
             expected,
@@ -157,13 +156,14 @@ fn test_private_repository() {
     let identifier = "v0.0.0";
     let sha = "SOMESHA";
 
-    let config = Rc::new(RefCell::new(config));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-        IOStub::new()
-            .with_is_interactive(true)
-            .with_ask_and_hide_answer(Some("sometoken".to_string())),
-    ));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new()
+                .with_is_interactive(true)
+                .with_ask_and_hide_answer(Some("sometoken".to_string())),
+        ));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![
@@ -239,9 +239,10 @@ fn test_public_repository() {
     let identifier = "v0.0.0";
     let sha = "SOMESHA";
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> =
-        Rc::new(RefCell::new(IOStub::new().with_is_interactive(true)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
+    );
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![http_body(
@@ -252,7 +253,7 @@ fn test_public_repository() {
         HttpDownloaderMockHandler::default(),
     );
 
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
@@ -296,9 +297,10 @@ fn test_public_repository2() {
     let identifier = "feature/3.2-foo";
     let sha = "SOMESHA";
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> =
-        Rc::new(RefCell::new(IOStub::new().with_is_interactive(true)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
+    );
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -329,7 +331,7 @@ fn test_public_repository2() {
         HttpDownloaderMockHandler::default(),
     );
 
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
@@ -379,9 +381,10 @@ fn test_invalid_support_data() {
     let identifier = "feature/3.2-foo";
     let sha = "SOMESHA";
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> =
-        Rc::new(RefCell::new(IOStub::new().with_is_interactive(true)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
+    );
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -412,7 +415,7 @@ fn test_invalid_support_data() {
         HttpDownloaderMockHandler::default(),
     );
 
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
@@ -522,9 +525,10 @@ fn test_funding_format() {
         let identifier = "feature/3.2-foo";
         let sha = "SOMESHA";
 
-        let config = Rc::new(RefCell::new(config));
-        let io: Rc<RefCell<dyn IOInterface>> =
-            Rc::new(RefCell::new(IOStub::new().with_is_interactive(true)));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+            std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
+        );
 
         let (http_downloader, _http_guard) = get_http_downloader_mock(
             vec![
@@ -552,7 +556,7 @@ fn test_funding_format() {
             HttpDownloaderMockHandler::default(),
         );
 
-        let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
@@ -621,9 +625,10 @@ fn test_public_repository_archived() {
         sha
     );
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> =
-        Rc::new(RefCell::new(IOStub::new().with_is_interactive(true)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
+    );
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -657,7 +662,7 @@ fn test_public_repository_archived() {
         HttpDownloaderMockHandler::default(),
     );
 
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
@@ -688,9 +693,10 @@ fn test_private_repository_no_interaction() {
     let identifier = "v0.0.0";
     let sha = "SOMESHA";
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> =
-        Rc::new(RefCell::new(IOStub::new().with_is_interactive(false)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_is_interactive(false)),
+    );
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![http_status(repo_api_url, 404)],
@@ -810,12 +816,13 @@ fn test_initialize_invalid_repo_url() {
         let SetUp { home, config } = set_up();
         let _tear_down = TearDown::new(home.path().to_path_buf());
 
-        let config = Rc::new(RefCell::new(config));
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
         let (http_downloader, _http_guard) =
             get_http_downloader_mock(vec![], true, HttpDownloaderMockHandler::default());
-        let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
@@ -838,9 +845,10 @@ fn test_get_empty_file_content() {
 
     let repo_url = "http://github.com/composer/packagist";
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> =
-        Rc::new(RefCell::new(IOStub::new().with_is_interactive(true)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
+    );
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -857,7 +865,7 @@ fn test_get_empty_file_content() {
         HttpDownloaderMockHandler::default(),
     );
 
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));

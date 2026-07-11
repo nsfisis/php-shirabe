@@ -6,14 +6,13 @@ use shirabe::event_dispatcher::EventInterface;
 use shirabe::installer::InstallerEvent;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[test]
 fn test_getter() {
-    let composer_rc = Rc::new(RefCell::new(PartialOrFullComposer::new_full()));
+    let composer_rc = std::rc::Rc::new(std::cell::RefCell::new(PartialOrFullComposer::new_full()));
     let composer = ComposerHandle::from_rc_unchecked(composer_rc);
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let transaction = Transaction::new(vec![], vec![]);
     let event = InstallerEvent::new(
         "EVENT_NAME".to_string(),

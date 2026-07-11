@@ -10,8 +10,6 @@ use shirabe::repository::vcs::GitLabDriver;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, extension_loaded};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // Mirrors GitLabDriverTest::setUp's `gitlab-domains` configuration.
 fn make_config() -> Config {
@@ -38,15 +36,16 @@ fn make_config() -> Config {
 // bare `getMock()` ProcessExecutor; none of these tests invoke git, so an empty
 // strict expectation set both matches PHP and catches unexpected process calls.
 struct Fixtures {
-    io: Rc<RefCell<dyn IOInterface>>,
-    config: Rc<RefCell<Config>>,
-    process: Rc<RefCell<ProcessExecutor>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     _process_guard: ProcessExecutorMockGuard,
 }
 
 fn fixtures() -> Fixtures {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(make_config()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(make_config()));
     let (process, _process_guard) = get_process_executor_mock(vec![], true, MockHandler::default());
     Fixtures {
         io,
@@ -60,7 +59,10 @@ fn fixtures() -> Fixtures {
 fn http_mock_with_body(
     url: &str,
     body: &str,
-) -> (Rc<RefCell<HttpDownloader>>, HttpDownloaderMockGuard) {
+) -> (
+    std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    HttpDownloaderMockGuard,
+) {
     get_http_downloader_mock(
         vec![expect_full(url, None, 200, body, vec![String::new()])],
         true,
@@ -625,8 +627,9 @@ fn test_get_branches() {
 #[test]
 fn test_supports() {
     for (url, expected) in data_for_test_supports() {
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-        let config = Rc::new(RefCell::new(make_config()));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(make_config()));
 
         assert_eq!(
             expected,
@@ -867,7 +870,7 @@ fn test_protocol_override_repository_url_generation() {
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
-    let config = Rc::new(RefCell::new(config));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));

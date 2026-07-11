@@ -12,8 +12,7 @@ use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use std::cell::{Cell, Ref, RefCell};
-use std::rc::Rc;
+use std::cell::{Cell, Ref};
 
 /// The base-class state of the PHP `Command` class.
 ///
@@ -28,22 +27,23 @@ use std::rc::Rc;
 /// command does not lock the object, so a command can be re-entered (e.g. the help command
 /// describing itself) without the borrow conflicts a `&mut self` design would cause.
 pub struct CommandData {
-    application: RefCell<Option<Rc<RefCell<dyn Application>>>>,
-    name: RefCell<Option<String>>,
-    process_title: RefCell<Option<String>>,
-    aliases: RefCell<Vec<String>>,
-    definition: RefCell<Option<InputDefinition>>,
+    application: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn Application>>>>,
+    name: std::cell::RefCell<Option<String>>,
+    process_title: std::cell::RefCell<Option<String>>,
+    aliases: std::cell::RefCell<Vec<String>>,
+    definition: std::cell::RefCell<Option<InputDefinition>>,
     hidden: Cell<bool>,
-    help: RefCell<String>,
-    description: RefCell<String>,
-    full_definition: RefCell<Option<InputDefinition>>,
+    help: std::cell::RefCell<String>,
+    description: std::cell::RefCell<String>,
+    full_definition: std::cell::RefCell<Option<InputDefinition>>,
     ignore_validation_errors: Cell<bool>,
     // A callable(InputInterface, OutputInterface) -> i64.
-    code:
-        RefCell<Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>>,
-    synopsis: RefCell<IndexMap<String, String>>,
-    usages: RefCell<Vec<String>>,
-    helper_set: RefCell<Option<Rc<RefCell<HelperSet>>>>,
+    code: std::cell::RefCell<
+        Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
+    >,
+    synopsis: std::cell::RefCell<IndexMap<String, String>>,
+    usages: std::cell::RefCell<Vec<String>>,
+    helper_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>>,
 }
 
 impl CommandData {
@@ -81,22 +81,22 @@ impl CommandData {
     /// virtual dispatch of `$this->configure()` from the parent constructor.
     pub fn new(name: Option<String>) -> Self {
         let this = CommandData {
-            application: RefCell::new(None),
-            name: RefCell::new(None),
-            process_title: RefCell::new(None),
-            aliases: RefCell::new(Vec::new()),
-            definition: RefCell::new(Some(
+            application: std::cell::RefCell::new(None),
+            name: std::cell::RefCell::new(None),
+            process_title: std::cell::RefCell::new(None),
+            aliases: std::cell::RefCell::new(Vec::new()),
+            definition: std::cell::RefCell::new(Some(
                 InputDefinition::new(Vec::new()).expect("an empty InputDefinition cannot fail"),
             )),
             hidden: Cell::new(false),
-            help: RefCell::new(String::new()),
-            description: RefCell::new(String::new()),
-            full_definition: RefCell::new(None),
+            help: std::cell::RefCell::new(String::new()),
+            description: std::cell::RefCell::new(String::new()),
+            full_definition: std::cell::RefCell::new(None),
             ignore_validation_errors: Cell::new(false),
-            code: RefCell::new(None),
-            synopsis: RefCell::new(IndexMap::new()),
-            usages: RefCell::new(Vec::new()),
-            helper_set: RefCell::new(None),
+            code: std::cell::RefCell::new(None),
+            synopsis: std::cell::RefCell::new(IndexMap::new()),
+            usages: std::cell::RefCell::new(Vec::new()),
+            helper_set: std::cell::RefCell::new(None),
         };
 
         // PHP's __construct also derives the name from getDefaultName() when null and
@@ -345,8 +345,8 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// forgot to implement it (PHP throws LogicException — a programming error here).
     fn execute(
         &self,
-        _input: Rc<RefCell<dyn InputInterface>>,
-        _output: Rc<RefCell<dyn OutputInterface>>,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         panic!("You must override the execute() method in the concrete command class.");
     }
@@ -354,16 +354,16 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// Interacts with the user before the InputDefinition is validated.
     fn interact(
         &self,
-        _input: Rc<RefCell<dyn InputInterface>>,
-        _output: Rc<RefCell<dyn OutputInterface>>,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
     }
 
     /// Initializes the command after the input has been bound and before it is validated.
     fn initialize(
         &self,
-        _input: Rc<RefCell<dyn InputInterface>>,
-        _output: Rc<RefCell<dyn OutputInterface>>,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -387,8 +387,8 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// or that late binding breaks.
     fn run(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         self.base_run(input, output)
     }
@@ -399,8 +399,8 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// binding of `initialize`/`interact`/`execute` to the concrete command breaks.
     fn base_run(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         // add the application arguments and options
         self.merge_application_definition(true);
@@ -477,13 +477,16 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     fn is_enabled(&self) -> bool;
 
-    fn set_application(&self, application: Option<Rc<RefCell<dyn Application>>>);
+    fn set_application(
+        &self,
+        application: Option<std::rc::Rc<std::cell::RefCell<dyn Application>>>,
+    );
 
-    fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>>;
+    fn get_application(&self) -> Option<std::rc::Rc<std::cell::RefCell<dyn Application>>>;
 
-    fn set_helper_set(&self, helper_set: Rc<RefCell<HelperSet>>);
+    fn set_helper_set(&self, helper_set: std::rc::Rc<std::cell::RefCell<HelperSet>>);
 
-    fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>>;
+    fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>;
 
     fn merge_application_definition(&self, merge_args: bool);
 
@@ -549,7 +552,10 @@ impl Command for CommandData {
         true
     }
 
-    fn set_application(&self, application: Option<Rc<RefCell<dyn Application>>>) {
+    fn set_application(
+        &self,
+        application: Option<std::rc::Rc<std::cell::RefCell<dyn Application>>>,
+    ) {
         *self.application.borrow_mut() = application.clone();
         if let Some(application) = application {
             self.set_helper_set(application.borrow_mut().get_helper_set());
@@ -560,15 +566,15 @@ impl Command for CommandData {
         *self.full_definition.borrow_mut() = None;
     }
 
-    fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>> {
+    fn get_application(&self) -> Option<std::rc::Rc<std::cell::RefCell<dyn Application>>> {
         self.application.borrow().clone()
     }
 
-    fn set_helper_set(&self, helper_set: Rc<RefCell<HelperSet>>) {
+    fn set_helper_set(&self, helper_set: std::rc::Rc<std::cell::RefCell<HelperSet>>) {
         *self.helper_set.borrow_mut() = Some(helper_set);
     }
 
-    fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
+    fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>> {
         self.helper_set.borrow().clone()
     }
 

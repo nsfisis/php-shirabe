@@ -6,9 +6,7 @@ use shirabe::config::JsonConfigSource;
 use shirabe::json::JsonFile;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 fn set_up() -> TearDown {
@@ -58,7 +56,7 @@ fn assert_file_equals(expected: &std::path::Path, actual: &std::path::Path) {
 
 fn json_config_source(config: &std::path::Path) -> JsonConfigSource {
     let json_file = JsonFile::new(config.to_string_lossy().to_string(), None, None).unwrap();
-    JsonConfigSource::new(Rc::new(RefCell::new(json_file)), false)
+    JsonConfigSource::new(std::rc::Rc::new(std::cell::RefCell::new(json_file)), false)
 }
 
 #[test]

@@ -8,16 +8,18 @@ use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::{InstalledRepository, LockArrayRepository, RepositoryInterfaceHandle};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// ref: SuggestedPackagesReporterTest::setUp.
 ///
 /// Builds an IO mock and a SuggestedPackagesReporter sharing it. The IOMockGuard runs
 /// assert_complete when it drops at the end of the test scope.
-fn set_up() -> (Rc<RefCell<IOMock>>, SuggestedPackagesReporter, IOMockGuard) {
+fn set_up() -> (
+    std::rc::Rc<std::cell::RefCell<IOMock>>,
+    SuggestedPackagesReporter,
+    IOMockGuard,
+) {
     let (mock, guard) = get_io_mock(io_interface::NORMAL).unwrap();
-    let io: Rc<RefCell<dyn IOInterface>> = mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = mock.clone();
     let reporter = SuggestedPackagesReporter::new(io);
     (mock, reporter, guard)
 }
@@ -32,7 +34,8 @@ fn get_suggested_package_array() -> IndexMap<String, String> {
 }
 
 fn reporter() -> SuggestedPackagesReporter {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     SuggestedPackagesReporter::new(io)
 }
 

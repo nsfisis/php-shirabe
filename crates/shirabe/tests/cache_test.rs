@@ -4,9 +4,7 @@ use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::filesystem::Filesystem;
-use std::cell::RefCell;
 use std::fs;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -28,7 +26,8 @@ fn set_up() -> SetUp {
 
     // PHP mocks Cache::getFinder and keeps the real Filesystem; here the CacheMock finder seam plays
     // that role and the Cache otherwise operates on the real temp directory.
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let cache = Cache::new(io, root.path().to_str().unwrap(), None, None, false);
 
     SetUp { root, files, cache }
@@ -113,7 +112,8 @@ fn test_remove_files_when_cache_is_too_large() {
 #[test]
 fn test_clear_cache() {
     let root = TempDir::new().unwrap();
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut cache = Cache::new(
         io,
         root.path().to_str().unwrap(),

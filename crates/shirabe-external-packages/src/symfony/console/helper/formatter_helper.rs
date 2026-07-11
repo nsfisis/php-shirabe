@@ -4,8 +4,6 @@ use crate::symfony::console::formatter::output_formatter::OutputFormatter;
 use crate::symfony::console::helper::helper::Helper;
 use crate::symfony::console::helper::helper_interface::HelperInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// The Formatter class provides helpers to format messages.
 #[derive(Debug, Default)]
@@ -80,11 +78,11 @@ impl FormatterHelper {
 }
 
 impl HelperInterface for FormatterHelper {
-    fn set_helper_set(&mut self, helper_set: Option<Rc<RefCell<HelperSet>>>) {
+    fn set_helper_set(&mut self, helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>) {
         self.inner.set_helper_set(helper_set);
     }
 
-    fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
+    fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>> {
         self.inner.get_helper_set()
     }
 

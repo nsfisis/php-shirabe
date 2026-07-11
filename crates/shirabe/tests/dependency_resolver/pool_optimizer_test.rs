@@ -15,7 +15,6 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::PREG_SPLIT_DELIM_CAPTURE;
 use shirabe_php_shim::PhpMixed;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 fn load_package(package_data: &PhpMixed) -> BasePackageHandle {
     let loader = ArrayLoader::new(None, false);
@@ -237,7 +236,7 @@ fn run_test_pool_optimizer(
         IndexMap::new(),
         IndexMap::new(),
     );
-    let mut pool_optimizer = PoolOptimizer::new(Rc::new(DefaultPolicy::new(
+    let mut pool_optimizer = PoolOptimizer::new(std::rc::Rc::new(DefaultPolicy::new(
         prefer_stable,
         prefer_lowest,
         None,

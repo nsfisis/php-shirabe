@@ -2,8 +2,6 @@
 
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // A command expectation as written in the PHP tests: either a bare command
 // (`'git command'` / `['git', '--version']`) or the full
@@ -72,7 +70,7 @@ impl<const N: usize> IntoMockCmd for [&str; N] {
     }
 }
 
-pub struct ProcessExecutorMockGuard(Rc<RefCell<ProcessExecutor>>);
+pub struct ProcessExecutorMockGuard(std::rc::Rc<std::cell::RefCell<ProcessExecutor>>);
 
 impl Drop for ProcessExecutorMockGuard {
     fn drop(&mut self) {
@@ -91,8 +89,11 @@ pub fn get_process_executor_mock(
     expectations: Vec<MockExpectation>,
     strict: bool,
     default_handler: MockHandler,
-) -> (Rc<RefCell<ProcessExecutor>>, ProcessExecutorMockGuard) {
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+) -> (
+    std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ProcessExecutorMockGuard,
+) {
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
     process
         .borrow_mut()
         .__expects(expectations, strict, default_handler);

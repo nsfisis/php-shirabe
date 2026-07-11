@@ -11,8 +11,6 @@ use shirabe::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PhpMixed, file_get_contents, hash, realpath, serialize,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn fixtures_dir() -> String {
     format!(
@@ -23,14 +21,15 @@ fn fixtures_dir() -> String {
 
 /// ref: PathRepositoryTest::createPathRepo
 fn create_path_repo(options: IndexMap<String, PhpMixed>) -> PathRepository {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
-    let config = Rc::new(RefCell::new(Config::new(true, None)));
-    let proc = Rc::new(RefCell::new(ProcessExecutor::new(None)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+    let proc = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     // ref: createPathRepo wires the ProcessExecutor through a Loop so the VersionGuesser's async
     // git calls are permitted; constructing the Loop calls enable_async() on the shared executor.
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config.clone(),
         IndexMap::new(),

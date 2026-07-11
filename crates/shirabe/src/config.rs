@@ -15,7 +15,6 @@ use shirabe_php_shim::{
     is_array, is_string, parse_url, php_to_string, rtrim, strtolower, strtoupper, strtr, substr,
     trigger_error,
 };
-use std::cell::RefCell;
 
 use crate::advisory::Auditor;
 use crate::downloader::TransportException;
@@ -40,7 +39,7 @@ pub struct Config {
     warned_hosts: IndexMap<String, bool>,
     /// @var array<string, true>
     ssl_verify_warned_hosts: IndexMap<String, bool>,
-    source_of_config_value: RefCell<IndexMap<String, String>>,
+    source_of_config_value: std::cell::RefCell<IndexMap<String, String>>,
 }
 
 impl Config {
@@ -229,7 +228,7 @@ impl Config {
             local_auth_config_source: None,
             warned_hosts: IndexMap::new(),
             ssl_verify_warned_hosts: IndexMap::new(),
-            source_of_config_value: RefCell::new(IndexMap::new()),
+            source_of_config_value: std::cell::RefCell::new(IndexMap::new()),
         };
 
         let config_clone = this.config.clone();

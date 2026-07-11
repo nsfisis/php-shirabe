@@ -14,8 +14,6 @@ use shirabe::repository::{
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -50,13 +48,15 @@ impl Drop for TearDown {
     }
 }
 
-fn null_io() -> Rc<RefCell<dyn IOInterface>> {
-    Rc::new(RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
-fn http_downloader(io: &Rc<RefCell<dyn IOInterface>>) -> Rc<RefCell<HttpDownloader>> {
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
-    Rc::new(RefCell::new(HttpDownloader::new(
+fn http_downloader(
+    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config,
         IndexMap::new(),
@@ -78,7 +78,7 @@ fn test_prepend() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
 
     let repository1 = RepositoryInterfaceHandle::new(ArrayRepository::new(vec![]).unwrap());
@@ -96,7 +96,7 @@ fn test_repo_creation() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     let mut rm =
         RepositoryManager::new(io.clone(), config.clone(), http_downloader(&io), None, None);
 
@@ -181,7 +181,7 @@ fn test_invalid_repo_creation_throws() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     let rm = RepositoryManager::new(io.clone(), config.clone(), http_downloader(&io), None, None);
 
     config.borrow_mut().merge(
@@ -217,7 +217,7 @@ fn test_filter_repo_wrapping() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
 
     rm.set_repository_class("path", "Composer\\Repository\\PathRepository");

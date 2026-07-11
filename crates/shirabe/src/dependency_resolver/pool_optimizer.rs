@@ -12,13 +12,12 @@ use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-use std::rc::Rc;
 
 /// Optimizes a given pool
 #[derive(Debug)]
 pub struct PoolOptimizer {
     /// @var PolicyInterface
-    policy: Rc<dyn PolicyInterface>,
+    policy: std::rc::Rc<dyn PolicyInterface>,
 
     /// @var array<int, true>
     irremovable_packages: IndexMap<i64, bool>,
@@ -46,7 +45,7 @@ struct IdenticalDefinitionPointers {
 }
 
 impl PoolOptimizer {
-    pub fn new(policy: Rc<dyn PolicyInterface>) -> Self {
+    pub fn new(policy: std::rc::Rc<dyn PolicyInterface>) -> Self {
         Self {
             policy,
             irremovable_packages: IndexMap::new(),

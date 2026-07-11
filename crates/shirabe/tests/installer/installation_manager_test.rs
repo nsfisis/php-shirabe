@@ -14,8 +14,6 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
@@ -27,17 +25,23 @@ fn run<F: std::future::Future>(future: F) -> F::Output {
 /// ref: setUp(): the PHP loop/io mocks are never exercised by these tests (the loop has its
 /// constructor disabled), so a real Loop over a real HttpDownloader and a NullIO stand in.
 struct SetUp {
-    loop_: Rc<RefCell<Loop>>,
-    io: Rc<RefCell<dyn IOInterface>>,
+    loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 fn set_up() -> SetUp {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
-    let config = Rc::new(RefCell::new(shirabe::config::Config::new(false, None)));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(shirabe::config::Config::new(
+        false, None,
+    )));
     // The PHP loop mock has its constructor disabled and is never exercised by these tests, so a
     // mock HttpDownloader (no real curl backend) stands in.
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(io.clone(), config)));
-    let loop_ = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
+        io.clone(),
+        config,
+    )));
+    let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
     SetUp { loop_, io }
 }
 
@@ -150,12 +154,12 @@ struct BinaryInstallerCalls {
 
 #[derive(Debug)]
 struct BinaryInstaller {
-    calls: Rc<RefCell<BinaryInstallerCalls>>,
+    calls: std::rc::Rc<std::cell::RefCell<BinaryInstallerCalls>>,
 }
 
 impl BinaryInstaller {
-    fn new() -> (Self, Rc<RefCell<BinaryInstallerCalls>>) {
-        let calls = Rc::new(RefCell::new(BinaryInstallerCalls::default()));
+    fn new() -> (Self, std::rc::Rc<std::cell::RefCell<BinaryInstallerCalls>>) {
+        let calls = std::rc::Rc::new(std::cell::RefCell::new(BinaryInstallerCalls::default()));
         (
             Self {
                 calls: calls.clone(),
@@ -262,7 +266,7 @@ fn typed_package(name: &str, version: &str, r#type: &str) -> PackageInterfaceHan
 }
 
 fn same_handle(a: &PackageInterfaceHandle, b: &PackageInterfaceHandle) -> bool {
-    Rc::ptr_eq(a.as_rc(), b.as_rc())
+    std::rc::Rc::ptr_eq(a.as_rc(), b.as_rc())
 }
 
 #[test]

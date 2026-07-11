@@ -10,8 +10,6 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 fn run<F: std::future::Future>(future: F) -> F::Output {
@@ -69,17 +67,20 @@ fn get_package(source_reference: Option<&str>, source_url: Option<&str>) -> Pack
 /// returns null for everything; a default real `Config` resolves the only
 /// relevant key (`secure-http`) compatibly for the https URLs used here.
 fn get_downloader_mock(
-    io: Option<Rc<RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     config: Option<Config>,
-    process: Rc<RefCell<ProcessExecutor>>,
-    filesystem: Option<Rc<RefCell<Filesystem>>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 ) -> HgDownloader {
-    let io =
-        io.unwrap_or_else(|| Rc::new(RefCell::new(IOStub::new())) as Rc<RefCell<dyn IOInterface>>);
-    let config = Rc::new(RefCell::new(
+    let io = io.unwrap_or_else(|| {
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
+            as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
+    });
+    let config = std::rc::Rc::new(std::cell::RefCell::new(
         config.unwrap_or_else(|| Config::new(false, None)),
     ));
-    let fs = filesystem.unwrap_or_else(|| Rc::new(RefCell::new(Filesystem::new(None))));
+    let fs = filesystem
+        .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
     HgDownloader::new(io, config, process, fs)
 }
 
@@ -224,7 +225,7 @@ fn test_remove() {
         remove_directory_async_result: Some(true),
         ..Default::default()
     });
-    let filesystem = Rc::new(RefCell::new(filesystem));
+    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(filesystem));
 
     let mut downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
     run(async {

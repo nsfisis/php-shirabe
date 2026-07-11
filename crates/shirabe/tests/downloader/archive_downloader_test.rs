@@ -15,8 +15,6 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
@@ -27,7 +25,8 @@ fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
 /// ref: ArchiveDownloaderTest::getArchiveDownloaderMock (the inherited getFileName/processUrl
 /// live on FileDownloader, so the concrete downloader is built directly).
 fn get_archive_downloader(vendor_dir: Option<&str>) -> FileDownloader {
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
     let mut config = Config::new(false, None);
     if let Some(vendor_dir) = vendor_dir {
@@ -40,9 +39,9 @@ fn get_archive_downloader(vendor_dir: Option<&str>) -> FileDownloader {
         merged.insert("config".to_string(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
     }
-    let config = Rc::new(RefCell::new(config));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config.clone(),
         IndexMap::new(),

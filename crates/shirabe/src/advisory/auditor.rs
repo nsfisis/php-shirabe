@@ -18,8 +18,6 @@ use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
     array_keys, array_reduce, get_class, sprintf, str_starts_with,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// Shape of the `--format=json` audit output.
 #[derive(serde::Serialize)]
@@ -115,7 +113,7 @@ impl Auditor {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn audit(
         &self,
-        io: &Rc<RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         repo_set: &RepositorySet,
         packages: Vec<PackageInterfaceHandle>,
         format: &str,
@@ -428,7 +426,7 @@ impl Auditor {
     /// @param self::FORMAT_* $format The format that will be used to output audit results.
     fn output_advisories(
         &self,
-        io: &Rc<RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
         format: &str,
     ) -> anyhow::Result<()> {
@@ -528,7 +526,7 @@ impl Auditor {
     /// @param array<string, array<SecurityAdvisory>> $advisories
     fn output_advisories_plain(
         &self,
-        io: &Rc<RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
     ) -> anyhow::Result<()> {
         let mut error: Vec<String> = vec![];
@@ -575,7 +573,7 @@ impl Auditor {
     /// @param self::FORMAT_PLAIN|self::FORMAT_TABLE $format
     fn output_abandoned_packages(
         &self,
-        io: &Rc<RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         packages: &[CompletePackageInterfaceHandle],
         format: &str,
     ) -> anyhow::Result<()> {

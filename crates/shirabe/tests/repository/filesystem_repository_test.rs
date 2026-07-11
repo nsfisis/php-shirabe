@@ -15,8 +15,6 @@ use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
 /// materialized as a real temp file whose decoded JSON reproduces the mock return value exactly.
@@ -107,14 +105,14 @@ mockall::mock! {
         fn execute(
             &mut self,
             repo: &mut dyn InstalledRepositoryInterface,
-            operations: Vec<Rc<dyn OperationInterface>>,
+            operations: Vec<std::rc::Rc<dyn OperationInterface>>,
             dev_mode: bool,
             run_scripts: bool,
             download_only: bool,
         ) -> anyhow::Result<()>;
         fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
         fn set_output_progress(&mut self, output_progress: bool);
-        fn notify_installs(&mut self, io: Rc<RefCell<dyn IOInterface>>);
+        fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
     }
 }
 

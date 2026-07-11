@@ -9,8 +9,6 @@ use shirabe::io::io_interface;
 use shirabe::util::GitLab;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const USERNAME: &str = "username";
 const PASSWORD: &str = "password";
@@ -50,7 +48,10 @@ fn get_auth_json_mock() -> Box<MockAuthJson> {
     Box::new(mock)
 }
 
-fn set_up(io_mock: &Rc<RefCell<IOMock>>, config: &Rc<RefCell<Config>>) {
+fn set_up(
+    io_mock: &std::rc::Rc<std::cell::RefCell<IOMock>>,
+    config: &std::rc::Rc<std::cell::RefCell<Config>>,
+) {
     config
         .borrow_mut()
         .set_auth_config_source(get_auth_json_mock());
@@ -91,7 +92,7 @@ fn test_username_password_authentication_flow() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     assert!(
@@ -138,7 +139,7 @@ fn test_username_password_failure() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     let err = gitlab

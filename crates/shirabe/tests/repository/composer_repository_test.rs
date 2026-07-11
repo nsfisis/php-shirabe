@@ -11,8 +11,6 @@ use shirabe::repository::composer_repository::{ComposerRepository, ProviderListi
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 // Mirrors PHP's `['url' => .., 'body' => ..]` mock entry (status defaults to 200,
@@ -53,8 +51,8 @@ fn create_config_read_only() -> (Config, TempDir) {
     (config, home)
 }
 
-fn null_io() -> Rc<RefCell<dyn IOInterface>> {
-    Rc::new(RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
 fn repo_config(url: &str) -> IndexMap<String, PhpMixed> {
@@ -250,9 +248,9 @@ fn test_what_provides() {
     )
     .unwrap();
 
-    let rc = Rc::new(RefCell::new(repo));
-    let rc_dyn: Rc<RefCell<dyn RepositoryInterface>> = rc.clone();
-    rc.borrow().set_self_handle(Rc::downgrade(&rc_dyn));
+    let rc = std::rc::Rc::new(std::cell::RefCell::new(repo));
+    let rc_dyn: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> = rc.clone();
+    rc.borrow().set_self_handle(std::rc::Rc::downgrade(&rc_dyn));
 
     let mut provider_listing: IndexMap<String, ProviderListingEntry> = IndexMap::new();
     provider_listing.insert("a".to_string(), ProviderListingEntry { sha256 });

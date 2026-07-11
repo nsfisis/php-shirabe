@@ -4,8 +4,7 @@
 //! is held behind `Rc<RefCell<_>>`. `DOMDocument`, `DOMNode` and `DOMNodeList` are thin
 //! handles over that graph.
 
-use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Weak;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum NodeType {
@@ -23,8 +22,8 @@ struct NodeInner {
     attributes: Vec<(String, String)>,
     /// Character data for text nodes.
     value: String,
-    children: Vec<Rc<RefCell<NodeInner>>>,
-    owner_document: Weak<RefCell<NodeInner>>,
+    children: Vec<std::rc::Rc<std::cell::RefCell<NodeInner>>>,
+    owner_document: Weak<std::cell::RefCell<NodeInner>>,
     /// Document-only fields.
     version: String,
     encoding: String,
@@ -33,11 +32,11 @@ struct NodeInner {
 
 /// A document handle. PHP \DOMDocument.
 #[derive(Debug, Clone)]
-pub struct DOMDocument(Rc<RefCell<NodeInner>>);
+pub struct DOMDocument(std::rc::Rc<std::cell::RefCell<NodeInner>>);
 
 /// A node handle (element or text). PHP \DOMNode or \DOMElement.
 #[derive(Debug, Clone)]
-pub struct DOMNode(Rc<RefCell<NodeInner>>);
+pub struct DOMNode(std::rc::Rc<std::cell::RefCell<NodeInner>>);
 
 /// An ordered, live-ish snapshot of nodes. PHP \DOMNodeList.
 #[derive(Debug, Clone)]
@@ -45,7 +44,7 @@ pub struct DOMNodeList(Vec<DOMNode>);
 
 impl DOMDocument {
     pub fn new(version: &str, encoding: &str) -> DOMDocument {
-        DOMDocument(Rc::new(RefCell::new(NodeInner {
+        DOMDocument(std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
             node_type: NodeType::Document,
             name: String::new(),
             attributes: Vec::new(),
@@ -64,13 +63,13 @@ impl DOMDocument {
     }
 
     pub fn create_element(&self, name: &str) -> DOMNode {
-        DOMNode(Rc::new(RefCell::new(NodeInner {
+        DOMNode(std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
             node_type: NodeType::Element,
             name: name.to_string(),
             attributes: Vec::new(),
             value: String::new(),
             children: Vec::new(),
-            owner_document: Rc::downgrade(&self.0),
+            owner_document: std::rc::Rc::downgrade(&self.0),
             version: String::new(),
             encoding: String::new(),
             format_output: false,
@@ -85,13 +84,13 @@ impl DOMDocument {
     }
 
     pub fn create_text_node(&self, data: &str) -> DOMNode {
-        DOMNode(Rc::new(RefCell::new(NodeInner {
+        DOMNode(std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
             node_type: NodeType::Text,
             name: String::new(),
             attributes: Vec::new(),
             value: data.to_string(),
             children: Vec::new(),
-            owner_document: Rc::downgrade(&self.0),
+            owner_document: std::rc::Rc::downgrade(&self.0),
             version: String::new(),
             encoding: String::new(),
             format_output: false,
@@ -105,7 +104,7 @@ impl DOMDocument {
 
     /// Deep- or shallow-copy a node so it can be inserted into this document.
     pub fn import_node(&self, node: &DOMNode, deep: bool) -> DOMNode {
-        DOMNode(deep_clone(&node.0, &Rc::downgrade(&self.0), deep))
+        DOMNode(deep_clone(&node.0, &std::rc::Rc::downgrade(&self.0), deep))
     }
 
     pub fn get_elements_by_tag_name(&self, name: &str) -> DOMNodeList {
@@ -205,10 +204,10 @@ impl IntoIterator for DOMNodeList {
 }
 
 fn deep_clone(
-    node: &Rc<RefCell<NodeInner>>,
-    owner: &Weak<RefCell<NodeInner>>,
+    node: &std::rc::Rc<std::cell::RefCell<NodeInner>>,
+    owner: &Weak<std::cell::RefCell<NodeInner>>,
     deep: bool,
-) -> Rc<RefCell<NodeInner>> {
+) -> std::rc::Rc<std::cell::RefCell<NodeInner>> {
     let source = node.borrow();
     let children = if deep {
         source
@@ -219,7 +218,7 @@ fn deep_clone(
     } else {
         Vec::new()
     };
-    Rc::new(RefCell::new(NodeInner {
+    std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
         node_type: source.node_type,
         name: source.name.clone(),
         attributes: source.attributes.clone(),
@@ -233,9 +232,9 @@ fn deep_clone(
 }
 
 fn collect_by_tag(
-    node: &Rc<RefCell<NodeInner>>,
+    node: &std::rc::Rc<std::cell::RefCell<NodeInner>>,
     name: &str,
-    out: &mut Vec<Rc<RefCell<NodeInner>>>,
+    out: &mut Vec<std::rc::Rc<std::cell::RefCell<NodeInner>>>,
 ) {
     for child in &node.borrow().children {
         let is_match = {
@@ -250,7 +249,7 @@ fn collect_by_tag(
 }
 
 fn serialize_node<W: std::io::Write>(
-    node: &Rc<RefCell<NodeInner>>,
+    node: &std::rc::Rc<std::cell::RefCell<NodeInner>>,
     depth: usize,
     format: bool,
     out: &mut W,

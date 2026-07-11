@@ -2,7 +2,6 @@
 
 use crate::symfony::console::completion::suggestion::Suggestion;
 use crate::symfony::console::input::input_option::InputOption;
-use std::rc::Rc;
 
 /// PHP union type `string|Suggestion` used by `suggestValue`/`suggestValues`.
 #[derive(Debug)]
@@ -15,7 +14,7 @@ pub enum StringOrSuggestion {
 #[derive(Debug)]
 pub struct CompletionSuggestions {
     value_suggestions: Vec<Suggestion>,
-    option_suggestions: Vec<Rc<InputOption>>,
+    option_suggestions: Vec<std::rc::Rc<InputOption>>,
 }
 
 impl Default for CompletionSuggestions {
@@ -52,14 +51,14 @@ impl CompletionSuggestions {
     }
 
     /// Add a suggestion for an input option name.
-    pub fn suggest_option(&mut self, option: Rc<InputOption>) -> &mut Self {
+    pub fn suggest_option(&mut self, option: std::rc::Rc<InputOption>) -> &mut Self {
         self.option_suggestions.push(option);
 
         self
     }
 
     /// Add multiple suggestions for input option names at once.
-    pub fn suggest_options(&mut self, options: Vec<Rc<InputOption>>) -> &mut Self {
+    pub fn suggest_options(&mut self, options: Vec<std::rc::Rc<InputOption>>) -> &mut Self {
         for option in options {
             self.suggest_option(option);
         }
@@ -67,7 +66,7 @@ impl CompletionSuggestions {
         self
     }
 
-    pub fn get_option_suggestions(&self) -> &Vec<Rc<InputOption>> {
+    pub fn get_option_suggestions(&self) -> &Vec<std::rc::Rc<InputOption>> {
         &self.option_suggestions
     }
 

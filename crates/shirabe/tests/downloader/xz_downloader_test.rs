@@ -14,8 +14,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
@@ -82,21 +80,24 @@ fn test_error_messages() {
     let dist_url = format!("file://{}", file!());
     package.set_dist_url(Some(dist_url));
 
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
         PhpMixed::String(test_dir.to_string_lossy().into_owned()),
     );
-    let config = Rc::new(RefCell::new(get_config(config_options, false)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::new(
+    let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(config_options, false)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
         io.clone(),
         config.clone(),
         IndexMap::new(),
         false,
     )));
-    let filesystem = Rc::new(RefCell::new(Filesystem::new(None)));
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
     let mut downloader = XzDownloader::new(
         io,
         config,

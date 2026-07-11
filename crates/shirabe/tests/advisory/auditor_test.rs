@@ -29,8 +29,6 @@ use shirabe_php_shim::date_create;
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn constraint(operator: &str, version: &str) -> shirabe_semver::constraint::AnyConstraint {
     SimpleConstraint::new(operator.to_string(), version.to_string(), None).into()
@@ -594,9 +592,10 @@ Found 2 abandoned packages:
 
     for case in cases {
         let repo_set = get_repo_set();
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-        ));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(
+                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+            ));
         let auditor = Auditor;
         let result = auditor
             .audit(
@@ -824,7 +823,7 @@ fn test_audit_with_ignore() {
         let repo_set = get_repo_set();
         let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
         let auditor = Auditor;
-        let io_dyn: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+        let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
         let result = auditor
             .audit(
                 &io_dyn,
@@ -924,9 +923,10 @@ fn test_audit_with_ignore_unreachable() {
     // Without the ignoreUnreachable flag the TransportException propagates.
     {
         let repo_set = make_repo_set();
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-        ));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(
+                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+            ));
         let err = auditor
             .audit(
                 &io,
@@ -947,9 +947,10 @@ fn test_audit_with_ignore_unreachable() {
     // With the ignoreUnreachable flag the advisories from reachable repos are reported.
     {
         let repo_set = make_repo_set();
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-        ));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(
+                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+            ));
         let result = auditor
             .audit(
                 &io,
@@ -983,9 +984,10 @@ fn test_audit_with_ignore_unreachable() {
     // With JSON format the unreachable repositories and advisories are both included.
     {
         let repo_set = make_repo_set();
-        let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(
-            BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-        ));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(
+                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+            ));
         let result = auditor
             .audit(
                 &io,
@@ -1082,7 +1084,7 @@ fn test_audit_with_ignore_severity() {
         let repo_set = get_repo_set();
         let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
         let auditor = Auditor;
-        let io_dyn: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+        let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
         let result = auditor
             .audit(
                 &io_dyn,

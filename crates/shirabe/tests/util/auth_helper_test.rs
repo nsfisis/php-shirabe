@@ -8,21 +8,19 @@ use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
 use shirabe_php_shim::{PhpMixed, base64_encode, json_encode};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
 // shared with the AuthHelper under test. The IOMockGuard runs assert_complete on drop.
 struct Fixture {
-    io: Rc<RefCell<IOMock>>,
-    config: Rc<RefCell<shirabe::config::Config>>,
+    io: std::rc::Rc<std::cell::RefCell<IOMock>>,
+    config: std::rc::Rc<std::cell::RefCell<shirabe::config::Config>>,
     auth_helper: AuthHelper,
     _guard: crate::io_mock::IOMockGuard,
 }
 
-fn set_up_with_config(config: Rc<RefCell<shirabe::config::Config>>) -> Fixture {
+fn set_up_with_config(config: std::rc::Rc<std::cell::RefCell<shirabe::config::Config>>) -> Fixture {
     let (mock, guard) = get_io_mock(io_interface::DEBUG).unwrap();
-    let io: Rc<RefCell<dyn IOInterface>> = mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = mock.clone();
     let auth_helper = AuthHelper::new(io, config.clone());
     Fixture {
         io: mock,
@@ -38,7 +36,12 @@ fn set_up() -> Fixture {
 
 // Mirrors AuthHelperTest::expectsAuthentication: pre-seed the IO so hasAuthentication
 // and getAuthentication return the given credentials for `origin`.
-fn expects_authentication(io: &Rc<RefCell<IOMock>>, origin: &str, username: &str, password: &str) {
+fn expects_authentication(
+    io: &std::rc::Rc<std::cell::RefCell<IOMock>>,
+    origin: &str,
+    username: &str,
+    password: &str,
+) {
     use shirabe::io::IOInterfaceMutable;
     io.borrow_mut().set_authentication(
         origin.to_string(),

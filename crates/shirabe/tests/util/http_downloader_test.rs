@@ -12,8 +12,6 @@ use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_php_shim::{PHP_EOL, PhpMixed};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // PHP performs a live HTTP get to assert the URL's user:pass is captured via
 // setAuthentication. The credential capture happens in `add_job`, before any
@@ -37,12 +35,12 @@ fn test_capture_authentication_params_from_url() {
         .unwrap();
 
     // The PHP Config mock returns [] for github-domains/gitlab-domains.
-    let config: Rc<RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::Array(IndexMap::new()))
         .with("gitlab-domains", PhpMixed::Array(IndexMap::new()))
         .build_shared();
 
-    let io: Rc<RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
     let mut fs = HttpDownloader::new(io, config, IndexMap::new(), false);
@@ -59,10 +57,10 @@ fn test_capture_authentication_params_from_url() {
 
 #[test]
 fn test_output_warnings() {
-    let io: Rc<RefCell<BufferIO>> = Rc::new(RefCell::new(
+    let io: std::rc::Rc<std::cell::RefCell<BufferIO>> = std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
     ));
-    let io_dyn: Rc<RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
     HttpDownloader::output_warnings(io_dyn.clone(), "$URL", &IndexMap::new()).unwrap();
     assert_eq!("", io.borrow().get_output());

@@ -20,8 +20,6 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::InvalidArgumentException;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ReinstallCommand {
@@ -79,8 +77,8 @@ impl Command for ReinstallCommand {
 
     fn execute(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer);
@@ -243,9 +241,9 @@ impl Command for ReinstallCommand {
             indexmap::IndexMap::new(),
         );
 
-        let uninstall_operations: Vec<Rc<dyn OperationInterface>> = uninstall_operations
+        let uninstall_operations: Vec<std::rc::Rc<dyn OperationInterface>> = uninstall_operations
             .into_iter()
-            .map(|op| Rc::new(op) as Rc<dyn OperationInterface>)
+            .map(|op| std::rc::Rc::new(op) as std::rc::Rc<dyn OperationInterface>)
             .collect();
         {
             let mut local_repo_ref = local_repo.borrow_mut();
@@ -356,8 +354,8 @@ impl Command for ReinstallCommand {
 
     fn initialize(
         &self,
-        input: Rc<RefCell<dyn InputInterface>>,
-        output: Rc<RefCell<dyn OutputInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
     }

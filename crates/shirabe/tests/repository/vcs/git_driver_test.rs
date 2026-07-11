@@ -13,8 +13,6 @@ use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
-use std::cell::RefCell;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -80,8 +78,9 @@ fn test_get_root_identifier_from_remote_local_repository() {
     let home_path = home.path().to_string_lossy().into_owned();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
@@ -114,8 +113,9 @@ fn test_get_root_identifier_from_remote() {
     let home_path = home.path().to_string_lossy().into_owned();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
@@ -182,8 +182,9 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
@@ -218,8 +219,9 @@ fn test_get_branches_filter_invalid_branch_names() {
     let home_path = home.path().to_string_lossy().into_owned();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
@@ -270,8 +272,9 @@ fn test_file_get_content_invalid_identifier() {
     } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
@@ -302,8 +305,9 @@ fn test_get_change_date_invalid_identifier() {
     } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
-    let config = Rc::new(RefCell::new(config));
-    let io: Rc<RefCell<dyn IOInterface>> = Rc::new(RefCell::new(IOStub::new()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());

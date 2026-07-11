@@ -7,8 +7,6 @@ use shirabe_external_packages::symfony::console::input::streamable_input_interfa
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
 use shirabe_php_shim::PhpMixed;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const TRUE_ANSWER_REGEX: &str = "/^y(?:es)?$/i";
 const FALSE_ANSWER_REGEX: &str = "/^no?$/i";
@@ -111,12 +109,12 @@ fn get_input_stream(input: &str) -> shirabe_php_shim::PhpResource {
     stream
 }
 
-fn create_output_interface() -> Rc<RefCell<dyn OutputInterface>> {
+fn create_output_interface() -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
     let stream = shirabe_php_shim::php_fopen_resource("php://memory", "r+");
     let output = StreamOutput::new(stream, None, None, None)
         .unwrap()
         .expect("php://memory is a valid stream");
-    Rc::new(RefCell::new(output))
+    std::rc::Rc::new(std::cell::RefCell::new(output))
 }
 
 /// @return array{ArrayInput, QuestionHelper}

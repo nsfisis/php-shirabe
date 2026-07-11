@@ -30,9 +30,7 @@ use shirabe_external_packages::symfony::console::output::stream_output::StreamOu
 use shirabe_php_shim::{PhpMixed, PhpResource};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
@@ -170,17 +168,22 @@ pub fn init_temp_composer(
     }
 }
 
-fn null_io() -> Rc<RefCell<dyn IOInterface>> {
-    Rc::new(RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
 /// ref: FactoryMock::createInstallationManager (the real installers are never created in tests, so a
 /// bare InstallationManager over a mock HttpDownloader suffices).
-fn installation_manager(io: &Rc<RefCell<dyn IOInterface>>) -> Rc<RefCell<InstallationManager>> {
-    let config = Rc::new(RefCell::new(Config::new(false, None)));
-    let http_downloader = Rc::new(RefCell::new(HttpDownloader::__new_mock(io.clone(), config)));
-    let r#loop = Rc::new(RefCell::new(Loop::new(http_downloader, None)));
-    Rc::new(RefCell::new(InstallationManager::new(
+fn installation_manager(
+    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
+        io.clone(),
+        config,
+    )));
+    let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
+    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
         r#loop,
         io.clone(),
         None,
@@ -227,7 +230,9 @@ pub fn create_composer_lock(
     let io = null_io();
     let json_file = JsonFile::new("./composer.lock".to_string(), None, None).unwrap();
     let composer_file_contents = std::fs::read_to_string("./composer.json").unwrap_or_default();
-    let process = Rc::new(RefCell::new(ProcessExecutor::new(Some(io.clone()))));
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io.clone(),
+    ))));
     let mut locker = Locker::new(
         io.clone(),
         json_file,
@@ -279,7 +284,7 @@ pub struct ApplicationTester {
     application: ApplicationHandle,
     inputs: Vec<String>,
     status_code: Option<i32>,
-    output: Option<Rc<RefCell<dyn OutputInterface>>>,
+    output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     /// Handles retained before injection so `get_display`/`get_error_output` can read the memory
     /// streams without relying on a `get_stream()` accessor across the ConsoleOutput composition gap.
     output_stream: Option<PhpResource>,
@@ -320,7 +325,8 @@ impl ApplicationTester {
 
         self.init_output(&options);
 
-        let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(array_input));
+        let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(array_input));
         let output = self.output.clone().expect("init_output initializes output");
 
         let status_code = self.application.run(Some(input), Some(output))?;
@@ -346,7 +352,7 @@ impl ApplicationTester {
             if let Some(verbosity) = options.verbosity {
                 output.set_verbosity(verbosity);
             }
-            self.output = Some(Rc::new(RefCell::new(output)));
+            self.output = Some(std::rc::Rc::new(std::cell::RefCell::new(output)));
         } else {
             let stdout = shirabe_php_shim::php_fopen_resource("php://memory", "w");
             let stderr = shirabe_php_shim::php_fopen_resource("php://memory", "w");
@@ -363,10 +369,10 @@ impl ApplicationTester {
             error_output.set_verbosity(output.get_verbosity());
             error_output.set_decorated(output.is_decorated());
 
-            output.set_error_output(Rc::new(RefCell::new(error_output)));
+            output.set_error_output(std::rc::Rc::new(std::cell::RefCell::new(error_output)));
             output.__set_stream(stdout);
 
-            self.output = Some(Rc::new(RefCell::new(output)));
+            self.output = Some(std::rc::Rc::new(std::cell::RefCell::new(output)));
         }
     }
 
