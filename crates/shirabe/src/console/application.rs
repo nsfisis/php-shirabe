@@ -83,6 +83,7 @@ use shirabe_external_packages::symfony::console::input::InputOption;
 use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
+use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::{
     self, OutputInterface,
@@ -2610,9 +2611,16 @@ impl ApplicationHandle {
              e: &anyhow::Error,
              output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 // if ($output instanceof ConsoleOutputInterface) render to its error output
-                // TODO(review): downcasting a `dyn OutputInterface` to `ConsoleOutputInterface`
-                // is not directly expressible; the ConsoleOutputInterface branch needs design.
-                this.render_throwable(e, output.clone());
+                // ConsoleOutput is the only OutputInterface implementor that also implements
+                // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this
+                // downcast to the concrete type.
+                let error_output = shirabe_php_shim::AsAny::as_any(&*output.borrow())
+                    .downcast_ref::<ConsoleOutput>()
+                    .map(|console_output| console_output.get_error_output());
+                match error_output {
+                    Some(error_output) => this.render_throwable(e, error_output),
+                    None => this.render_throwable(e, output.clone()),
+                }
             };
 
         let result = (|| -> anyhow::Result<i32> {
