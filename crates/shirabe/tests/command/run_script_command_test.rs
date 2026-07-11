@@ -16,6 +16,12 @@ use shirabe_php_shim::PhpMixed;
             Reaching it would require adding as_any to EventInterface, i.e. a src change, which is \
             forbidden here -- so the faithful body is currently inexpressible and is left as todo!()."]
 fn test_detect_and_pass_dev_mode_to_event_and_to_dispatching() {
+    // TODO(phase-d): PHP asserts the ScriptEvent passed to hasEventListeners has isDevMode() ==
+    // (dev || !no_dev), but EventInterface (src/event_dispatcher/event.rs:49) has no as_any/downcast
+    // seam, so a trait object cannot reach the concrete ScriptEvent::is_dev_mode
+    // (src/script/event.rs:51). Reaching it would require adding as_any to EventInterface, i.e. a
+    // src change, which is forbidden here -- so the faithful body is currently inexpressible and is
+    // left as todo!().
     todo!()
 }
 
@@ -119,11 +125,17 @@ fn test_can_define_aliases() {
 #[test]
 #[ignore = "requires writing and executing a PHP-generated Symfony Command class (file_put_contents MyCommand.php) loaded via composer autoload; fundamentally unportable, no PHP runtime command loading in shirabe"]
 fn test_execution_of_simple_symfony_command() {
+    // TODO(phase-d): requires writing and executing a PHP-generated Symfony Command class
+    // (file_put_contents MyCommand.php) loaded via composer autoload; fundamentally unportable, no
+    // PHP runtime command loading in shirabe.
     todo!()
 }
 
 #[test]
 #[ignore = "requires writing and executing a PHP-generated Symfony Command class (file_put_contents MyCommandWithDefinitions.php) loaded via composer autoload; fundamentally unportable, no PHP runtime command loading in shirabe"]
 fn test_execution_of_symfony_command_with_configuration() {
+    // TODO(phase-d): requires writing and executing a PHP-generated Symfony Command class
+    // (file_put_contents MyCommandWithDefinitions.php) loaded via composer autoload; fundamentally
+    // unportable, no PHP runtime command loading in shirabe.
     todo!()
 }

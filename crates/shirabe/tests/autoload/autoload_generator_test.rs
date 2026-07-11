@@ -1731,51 +1731,51 @@ fn test_exclude_from_classmap() {
     assert_autoload_files("classmap", &composer_out, "classmap");
 }
 
-// These remain ignored: they need test infrastructure not yet ported.
-//
-// - testFilesAutoloadOrderByDependencies / testFilesAutoloadGeneration's `require autoload.php`
-//   + function_exists assertions: PHP runtime require is unportable (composer_require todo!()).
-// - testFilesAutoloadGenerationRemoveExtraEntitiesFromAutoloadFiles: needs getCanonicalPackages
-//   returnValueMap over consecutive calls (the repo mock yields different package sets per call).
-// - testIncludePathsArePrependedInAutoloadFile / testIncludePathsInRootPackage /
-//   testUseGlobalIncludePath: assert PHP's get_include_path() after `require autoload.php`.
-// - testPreAndPostEventsAreDispatchedDuringAutoloadDump: EventDispatcher::dispatchScript spy.
-// - testAutoloadRulesInPackageThatDoesNotExistOnDisk: exercises buildPackageMap/parseAutoloads
-//   directly plus a CompletePackage; multi-dump with mutation.
-
 #[test]
 #[ignore = "require autoload.php + function_exists() assertions are unportable (composer_require todo!())"]
 fn test_files_autoload_order_by_dependencies() {
+    // TODO(phase-d): PHP `require autoload.php` + function_exists() assertions have no Rust
+    // equivalent (no runtime PHP file loading/class definition).
     todo!()
 }
 
 #[test]
 #[ignore = "needs getCanonicalPackages consecutive-call return values (different package set per dump)"]
 fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
+    // TODO(phase-d): needs a repository mock returning a different package set on each of several
+    // consecutive dump() calls (PHPUnit consecutive-call mock); not modeled by InstalledArrayRepository.
     todo!()
 }
 
 #[test]
 #[ignore = "asserts PHP get_include_path() after require autoload.php"]
 fn test_include_paths_are_prepended_in_autoload_file() {
+    // TODO(phase-d): asserts PHP get_include_path() after `require autoload.php`; no Rust
+    // equivalent for PHP's include path / runtime require.
     todo!()
 }
 
 #[test]
 #[ignore = "asserts PHP get_include_path() after require autoload.php"]
 fn test_include_paths_in_root_package() {
+    // TODO(phase-d): asserts PHP get_include_path() after `require autoload.php`; no Rust
+    // equivalent for PHP's include path / runtime require.
     todo!()
 }
 
 #[test]
 #[ignore = "EventDispatcher::dispatchScript spy not modeled"]
 fn test_pre_and_post_events_are_dispatched_during_autoload_dump() {
+    // TODO(phase-d): requires spying on EventDispatcher::dispatchScript to record the events
+    // dispatched around the dump; no dispatcher spy/mock hook is modeled yet.
     todo!()
 }
 
 #[test]
 #[ignore = "asserts PHP get_include_path()/require behavior with use-include-path"]
 fn test_use_global_include_path() {
+    // TODO(phase-d): asserts PHP get_include_path()/require() behavior driven by the
+    // use-include-path setting; no Rust equivalent.
     todo!()
 }
 
@@ -1975,6 +1975,9 @@ fn test_up_level_relative_paths() {
 #[test]
 #[ignore = "exercises buildPackageMap/parseAutoloads directly with multi-dump mutation"]
 fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
+    // TODO(phase-d): exercises AutoloadGenerator::buildPackageMap/parseAutoloads directly across
+    // multiple dump() calls with the package list mutated between calls; needs those internals
+    // exposed to tests.
     todo!()
 }
 

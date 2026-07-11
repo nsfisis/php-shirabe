@@ -44,6 +44,8 @@ fn test_dev_warning() {
     let _tear_down = TearDown;
     set_up();
 
+    // TODO(phase-d): no define() setter exists for the COMPOSER_DEV_WARNING_TIME constant (the
+    // shim's defined() is a fixed matches!), so this test's runtime define() cannot be reproduced.
     todo!()
 }
 

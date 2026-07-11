@@ -109,12 +109,18 @@ fn test_write() {
 #[ignore = "PHP mocks ConsoleOutputInterface so getErrorOutput returns the same mock; a real ConsoleOutput's error StreamOutput writes to php://stderr, which cannot be read back, and the trait offers no seam to inject a BufferedOutput error sink"]
 #[test]
 fn test_write_error() {
+    // TODO(phase-d): PHP mocks ConsoleOutputInterface so getErrorOutput returns the same mock; a
+    // real ConsoleOutput's error StreamOutput writes to php://stderr, which cannot be read back,
+    // and the trait offers no seam to inject a BufferedOutput error sink.
     todo!()
 }
 
 #[ignore = "ConsoleIO::write3 takes a single &str; the test feeds a 2-element array ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed messages array, which the &str signature cannot represent"]
 #[test]
 fn test_write_with_multiple_line_string_when_debugging() {
+    // TODO(phase-d): ConsoleIO::write3 takes a single &str; the test feeds a 2-element array
+    // ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed
+    // messages array, which the &str signature cannot represent.
     todo!()
 }
 
@@ -263,5 +269,8 @@ fn test_has_authentication() {
 #[ignore = "data provider includes malformed-UTF-8 inputs (e.g. \\xFF, \\xC3\\x28); sanitize() takes PhpMixed::String which is UTF-8-only and cannot carry invalid bytes, so those cases are unrepresentable"]
 #[test]
 fn test_sanitize() {
+    // TODO(phase-d): the data provider includes malformed-UTF-8 inputs (e.g. \xFF, \xC3\x28);
+    // sanitize() takes PhpMixed::String which is UTF-8-only and cannot carry invalid bytes, so
+    // those cases are unrepresentable.
     todo!()
 }

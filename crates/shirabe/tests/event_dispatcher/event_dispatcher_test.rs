@@ -332,6 +332,8 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
 #[ignore = "listener `EventDispatcherTest::call` is a PHP-script callable; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
 fn test_listener_exceptions_are_caught() {
     let _tear_down = TearDown;
+    // TODO(phase-d): listener `EventDispatcherTest::call` is a PHP-script callable; dynamic
+    // static-method invocation requires the plugin runtime (execute_event_php_script is todo!())
     todo!()
 }
 
@@ -339,6 +341,8 @@ fn test_listener_exceptions_are_caught() {
 #[ignore = "requires a PHPUnit spy on AutoloadGenerator::setDevMode plus Event::isDevMode mocking; no mock infrastructure exists"]
 fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
     let _tear_down = TearDown;
+    // TODO(phase-d): requires a PHPUnit spy on AutoloadGenerator::setDevMode plus Event::isDevMode
+    // mocking; no mock infrastructure exists
     todo!()
 }
 
@@ -346,6 +350,9 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
 #[ignore = "listeners are object-method array callables ([\\$this, 'someMethod']) invoked + removed by object identity; the array-callable invocation path is an unimplemented plugin-runtime stub"]
 fn test_dispatcher_remove_listener() {
     let _tear_down = TearDown;
+    // TODO(phase-d): listeners are object-method array callables ([$this, 'someMethod']) invoked
+    // and removed by object identity; the array-callable invocation path is an unimplemented
+    // plugin-runtime stub
     todo!()
 }
 
@@ -353,6 +360,9 @@ fn test_dispatcher_remove_listener() {
 #[ignore = "mixes a PHP-script listener (EventDispatcherTest::someMethod) into the stack; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
 fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let _tear_down = TearDown;
+    // TODO(phase-d): mixes a PHP-script listener (EventDispatcherTest::someMethod) into the
+    // stack; dynamic static-method invocation requires the plugin runtime
+    // (execute_event_php_script is todo!())
     todo!()
 }
 
@@ -360,6 +370,9 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
 #[ignore = "second listener EventDispatcherTest::getTestEnv is a PHP-script callable; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
 fn test_dispatcher_can_put_env() {
     let _tear_down = TearDown;
+    // TODO(phase-d): second listener EventDispatcherTest::getTestEnv is a PHP-script callable;
+    // dynamic static-method invocation requires the plugin runtime (execute_event_php_script is
+    // todo!())
     todo!()
 }
 
@@ -367,6 +380,9 @@ fn test_dispatcher_can_put_env() {
 #[ignore = "listeners are PHP-script callables (createsVendorBinFolderChecksEnv*) asserting on PATH; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
 fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let _tear_down = TearDown;
+    // TODO(phase-d): listeners are PHP-script callables (createsVendorBinFolderChecksEnv*)
+    // asserting on PATH; dynamic static-method invocation requires the plugin runtime
+    // (execute_event_php_script is todo!())
     todo!()
 }
 
@@ -374,6 +390,8 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
 #[ignore = "requires ReflectionMethod(getPhpExecCommand) and a real PHP binary to compute the expected @php command; getPhpExecCommand has no test seam"]
 fn test_dispatcher_support_for_additional_args() {
     let _tear_down = TearDown;
+    // TODO(phase-d): requires ReflectionMethod(getPhpExecCommand) and a real PHP binary to
+    // compute the expected @php command; getPhpExecCommand has no test seam
     todo!()
 }
 
@@ -381,6 +399,8 @@ fn test_dispatcher_support_for_additional_args() {
 #[ignore = "uses an unmocked ProcessExecutor running a real `echo foo` and a PHPUnit IO spy on writeError/writeRaw; no real-shell-output IO mocking exists"]
 fn test_dispatcher_outputs_command() {
     let _tear_down = TearDown;
+    // TODO(phase-d): uses an unmocked ProcessExecutor running a real `echo foo` and a PHPUnit IO
+    // spy on writeError/writeRaw; no real-shell-output IO mocking exists
     todo!()
 }
 
@@ -388,5 +408,7 @@ fn test_dispatcher_outputs_command() {
 #[ignore = "uses an unmocked ProcessExecutor running a real `exit 1`; depends on real shell execution"]
 fn test_dispatcher_outputs_error_on_failed_command() {
     let _tear_down = TearDown;
+    // TODO(phase-d): uses an unmocked ProcessExecutor running a real `exit 1`; depends on real
+    // shell execution
     todo!()
 }

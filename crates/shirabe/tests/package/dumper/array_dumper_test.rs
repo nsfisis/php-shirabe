@@ -90,5 +90,9 @@ fn test_dump_abandoned_replacement() {
 #[test]
 #[ignore = "authors/scripts/funding data sets pass loosely-typed PHP arrays the narrowed Rust set_authors/set_scripts/set_funding types cannot represent, and the dumper re-wraps them; faithful all-or-nothing port blocked without loosening those production types"]
 fn test_keys() {
+    // TODO(phase-d): authors/scripts/funding data sets pass loosely-typed PHP arrays the
+    // narrowed Rust set_authors/set_scripts/set_funding types cannot represent, and the
+    // dumper re-wraps them; faithful all-or-nothing port blocked without loosening those
+    // production types.
     todo!()
 }

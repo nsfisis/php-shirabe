@@ -292,12 +292,18 @@ fn test_add_get_installer() {
 #[ignore = "removeInstaller compares installers by object identity, but add_installer moves the Box<dyn InstallerInterface> into the manager, leaving no &dyn reference to pass back to remove_installer; faithful reproduction needs a shared-ownership installer registry"]
 #[test]
 fn test_add_remove_installer() {
+    // TODO(phase-d): removeInstaller compares installers by object identity, but add_installer
+    // moves the Box<dyn InstallerInterface> into the manager, leaving no &dyn reference to pass
+    // back to remove_installer; faithful reproduction needs a shared-ownership installer registry.
     todo!()
 }
 
 #[ignore = "partial mock of InstallationManager (onlyMethods install/update/uninstall) with expects(once)->with(...) is not reproducible without method-overriding mocks; execute() also takes the batched download path"]
 #[test]
 fn test_execute() {
+    // TODO(phase-d): a partial mock of InstallationManager (onlyMethods install/update/uninstall)
+    // with expects(once)->with(...) is not reproducible without method-overriding mocks; execute()
+    // also takes the batched download path.
     todo!()
 }
 

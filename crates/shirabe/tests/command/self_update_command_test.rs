@@ -17,6 +17,9 @@ fn set_up() -> crate::test_case::TearDown {
 fn test_successful_update() {
     let _tear_down = set_up();
 
+    // TODO(phase-d): spawns `new Process([PHP_BINARY, $this->phar, 'self-update'])` running
+    // composer-test.phar over HTTP; requires Symfony Process and the composer-test.phar fixture,
+    // neither ported.
     todo!()
 }
 
@@ -28,6 +31,9 @@ fn test_successful_update() {
 fn test_update_to_specific_version() {
     let _tear_down = set_up();
 
+    // TODO(phase-d): spawns `new Process([PHP_BINARY, $this->phar, 'self-update', '2.4.0'])`
+    // running composer-test.phar over HTTP; requires Symfony Process and the composer-test.phar
+    // fixture, neither ported.
     todo!()
 }
 
@@ -63,5 +69,8 @@ fn test_update_with_invalid_option_throws_exception() {
 fn test_update_to_different_channel() {
     let _tear_down = set_up();
 
+    // TODO(phase-d): spawns `new Process([PHP_BINARY, $this->phar, 'self-update', $option])`
+    // running composer-test.phar over HTTP (data provider: --stable/--preview/--snapshot);
+    // requires Symfony Process and the composer-test.phar fixture, neither ported.
     todo!()
 }
