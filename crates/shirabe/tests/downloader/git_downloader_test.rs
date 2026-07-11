@@ -334,17 +334,126 @@ fn test_download_with_cache() {
     fs.remove_directory(&cache_path).ok();
 }
 
-#[ignore = "Source-side blocker: getSourceUrls() must list the mirror ahead of the \
-            source url, which requires a preferred source mirror. A git source mirror is \
-            processed through ComposerMirror::process_git_url, whose github regex lacks PCRE \
-            delimiters and panics when compiled by the php-shim Preg. PHP mocks getSourceUrls \
-            directly and never exercises that path."]
+#[serial]
 #[test]
 fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    todo!()
+
+    let package = get_package(
+        "composer/composer",
+        "1.0.0",
+        Some("ref"),
+        Some("https://github.com/composer/composer"),
+    );
+    // A preferred mirror with no `%...%` placeholders is passed through
+    // ComposerMirror::process_git_url unchanged, so getSourceUrls() lists it (unmodified) ahead
+    // of the source url, mirroring the PHP mock's
+    // `willReturn(['https://github.com/mirrors/composer', 'https://github.com/composer/composer'])`.
+    package.set_source_mirrors(Some(vec![Mirror {
+        url: "https://github.com/mirrors/composer".to_string(),
+        preferred: true,
+    }]));
+
+    let expected_path = working_dir
+        .path()
+        .join("composerPath")
+        .to_string_lossy()
+        .into_owned();
+
+    let (process, _guard) = get_process_executor_mock(
+        vec![
+            cmd_full(
+                vec![
+                    "git",
+                    "clone",
+                    "--no-checkout",
+                    "--",
+                    "https://github.com/mirrors/composer",
+                    &expected_path,
+                ],
+                1,
+                "",
+                "Error1",
+            ),
+            cmd(vec![
+                "git",
+                "clone",
+                "--no-checkout",
+                "--",
+                "git@github.com:mirrors/composer",
+                &expected_path,
+            ]),
+            cmd(vec![
+                "git",
+                "remote",
+                "add",
+                "composer",
+                "--",
+                "git@github.com:mirrors/composer",
+            ]),
+            cmd(["git", "fetch", "composer"]),
+            cmd(vec![
+                "git",
+                "remote",
+                "set-url",
+                "origin",
+                "--",
+                "git@github.com:mirrors/composer",
+            ]),
+            cmd(vec![
+                "git",
+                "remote",
+                "set-url",
+                "composer",
+                "--",
+                "git@github.com:mirrors/composer",
+            ]),
+            cmd(vec![
+                "git",
+                "remote",
+                "set-url",
+                "origin",
+                "--",
+                "https://github.com/composer/composer",
+            ]),
+            cmd(vec![
+                "git",
+                "remote",
+                "set-url",
+                "--push",
+                "origin",
+                "--",
+                "git@github.com:composer/composer.git",
+            ]),
+            cmd(["git", "branch", "-r"]),
+            cmd(["git", "checkout", "ref", "--"]),
+            cmd(["git", "reset", "--hard", "ref", "--"]),
+        ],
+        true,
+        Default::default(),
+    );
+
+    let mut downloader = get_downloader_mock(None, None, process, None);
+
+    run(async {
+        downloader
+            .download(package.clone(), &expected_path, None)
+            .await
+            .unwrap();
+        downloader
+            .prepare("install", package.clone(), &expected_path, None)
+            .await
+            .unwrap();
+        downloader
+            .install(package.clone(), &expected_path)
+            .await
+            .unwrap();
+        downloader
+            .cleanup("install", package, &expected_path, None)
+            .await
+            .unwrap();
+    });
 }
 
 #[serial]
@@ -768,18 +877,105 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
     assert!(e.to_string().contains("git@github.com:composer/composer"));
 }
 
-#[ignore = "Source-side blocker: getSourceUrls() == ['/', github] requires a source \
-            mirror so the list has two entries. A git source mirror is processed through \
-            ComposerMirror::process_git_url, whose github regex lacks PCRE delimiters and \
-            panics when compiled by the php-shim Preg. PHP mocks getSourceUrls directly and \
-            never exercises that path."]
+#[serial]
 #[test]
 fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but_is_able_to_recover()
  {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    todo!()
+
+    let package = get_package("composer/composer", "1.0.0", Some("ref"), Some("/"));
+    // A non-preferred mirror is appended after the source url, mirroring the PHP mock's
+    // `willReturn(['/', 'https://github.com/composer/composer'])`: the first ("/") url fails,
+    // and VcsDownloader::update retries with the second (the mirror).
+    package.set_source_mirrors(Some(vec![Mirror {
+        url: "https://github.com/composer/composer".to_string(),
+        preferred: false,
+    }]));
+
+    let (process, _guard) = get_process_executor_mock(
+        vec![
+            cmd(["git", "show-ref", "--head", "-d"]),
+            cmd(["git", "status", "--porcelain", "--untracked-files=no"]),
+            // commit not yet in so we try to fetch
+            cmd_full(
+                ["git", "rev-parse", "--quiet", "--verify", "ref^{commit}"],
+                1,
+                "",
+                "",
+            ),
+            // fail first source URL
+            cmd(["git", "remote", "-v"]),
+            cmd(vec!["git", "remote", "set-url", "composer", "--", "/"]),
+            cmd_full(["git", "fetch", "composer"], 1, "", ""),
+            cmd(["git", "--version"]),
+            // commit not yet in so we try to fetch
+            cmd_full(
+                ["git", "rev-parse", "--quiet", "--verify", "ref^{commit}"],
+                1,
+                "",
+                "",
+            ),
+            // pass second source URL
+            cmd(["git", "remote", "-v"]),
+            cmd(vec![
+                "git",
+                "remote",
+                "set-url",
+                "composer",
+                "--",
+                "https://github.com/composer/composer",
+            ]),
+            cmd(["git", "fetch", "composer"]),
+            cmd(["git", "fetch", "--tags", "composer"]),
+            cmd(["git", "remote", "-v"]),
+            cmd(vec![
+                "git",
+                "remote",
+                "set-url",
+                "composer",
+                "--",
+                "https://github.com/composer/composer",
+            ]),
+            cmd(["git", "branch", "-r"]),
+            cmd(["git", "checkout", "ref", "--"]),
+            cmd(["git", "reset", "--hard", "ref", "--"]),
+            cmd(["git", "remote", "-v"]),
+        ],
+        true,
+        Default::default(),
+    );
+
+    let mut fs = Filesystem::new(None);
+    fs.ensure_directory_exists(&format!("{}/.git", working_dir.path().to_string_lossy()))
+        .unwrap();
+    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+
+    let mut downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
+
+    run(async {
+        downloader
+            .download(package.clone(), &working_dir_str, Some(package.clone()))
+            .await
+            .unwrap();
+        downloader
+            .prepare(
+                "update",
+                package.clone(),
+                &working_dir_str,
+                Some(package.clone()),
+            )
+            .await
+            .unwrap();
+        downloader
+            .update(package.clone(), package.clone(), &working_dir_str)
+            .await
+            .unwrap();
+        downloader
+            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .await
+            .unwrap();
+    });
 }
 
 #[serial]
@@ -929,6 +1125,10 @@ fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
     let _ = &working_dir;
+    // TODO(phase-d): PHP mocks Filesystem::removeDirectoryAsync (asserting it is called once
+    // with the working dir). With no Filesystem mock, the real removeDirectoryAsync drives
+    // the Filesystem's own ProcessExecutor for `rm -rf`, which requires a Composer\Loop and
+    // cannot be redirected through the mocked ProcessExecutor.
     todo!()
 }
 

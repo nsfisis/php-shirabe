@@ -276,6 +276,8 @@ fn test_zip_archive_only_good() {
 #[test]
 fn test_system_unzip_only_failed() {
     let _ = set_up();
+    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
+    // todo!() (no Process mock seam exists in the external-packages crate).
     todo!()
 }
 
@@ -283,6 +285,8 @@ fn test_system_unzip_only_failed() {
 #[test]
 fn test_system_unzip_only_good() {
     let _ = set_up();
+    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
+    // todo!() (no Process mock seam exists in the external-packages crate).
     todo!()
 }
 
@@ -290,6 +294,8 @@ fn test_system_unzip_only_good() {
 #[test]
 fn test_non_windows_fallback_good() {
     let _ = set_up();
+    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
+    // todo!() (no Process mock seam exists in the external-packages crate).
     todo!()
 }
 
@@ -297,5 +303,7 @@ fn test_non_windows_fallback_good() {
 #[test]
 fn test_non_windows_fallback_failed() {
     let _ = set_up();
+    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
+    // todo!() (no Process mock seam exists in the external-packages crate).
     todo!()
 }
