@@ -96,6 +96,9 @@ impl RemoteFilesystem {
         }
     }
 
+    /// Returns the response headers alongside the result (rather than requiring a follow-up
+    /// `get_last_headers()` call) so that a caller sharing this instance via `Rc<RefCell<...>>`
+    /// always reads the headers produced by its own call, not one clobbered by a concurrent one.
     pub fn copy(
         &mut self,
         origin_url: &str,
@@ -103,24 +106,27 @@ impl RemoteFilesystem {
         file_name: &str,
         progress: bool,
         options: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<GetResult> {
-        self.get(
+    ) -> anyhow::Result<(GetResult, Vec<String>)> {
+        let result = self.get(
             origin_url,
             file_url,
             options,
             Some(file_name.to_string()),
             progress,
-        )
+        )?;
+        Ok((result, self.last_headers.clone()))
     }
 
+    /// See `copy` for why the headers are bundled into the return value.
     pub fn get_contents(
         &mut self,
         origin_url: &str,
         file_url: &str,
         progress: bool,
         options: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<GetResult> {
-        self.get(origin_url, file_url, options, None, progress)
+    ) -> anyhow::Result<(GetResult, Vec<String>)> {
+        let result = self.get(origin_url, file_url, options, None, progress)?;
+        Ok((result, self.last_headers.clone()))
     }
 
     pub fn get_options(&self) -> &IndexMap<String, PhpMixed> {

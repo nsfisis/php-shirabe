@@ -42,7 +42,7 @@ pub struct HttpDownloader {
     /// @var ?CurlDownloader
     curl: Option<CurlDownloader>,
     /// @var ?RemoteFilesystem
-    rfs: Option<RemoteFilesystem>,
+    rfs: Option<std::rc::Rc<std::cell::RefCell<RemoteFilesystem>>>,
     /// @var int
     id_gen: i64,
     /// @var bool
@@ -174,13 +174,15 @@ impl HttpDownloader {
             None
         };
 
-        let rfs = Some(RemoteFilesystem::new(
-            io.clone(),
-            config.clone(),
-            options.clone(),
-            disable_tls,
-            None,
-        ));
+        let rfs = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            RemoteFilesystem::new(
+                io.clone(),
+                config.clone(),
+                options.clone(),
+                disable_tls,
+                None,
+            ),
+        )));
 
         let mut max_jobs: i64 = 12;
         let max_jobs_env = Platform::get_env("COMPOSER_MAX_PARALLEL_HTTP");
@@ -435,21 +437,24 @@ impl HttpDownloader {
         }
 
         let result: anyhow::Result<Response> = {
-            let rfs = self.rfs.as_mut().unwrap();
+            let rfs = self.rfs.as_ref().unwrap().clone();
             (|| -> anyhow::Result<Response> {
                 if let Some(copy_to) = copy_to.as_deref() {
-                    rfs.copy(&origin, &url, copy_to, false, options.clone())?;
+                    let (_, headers) =
+                        rfs.borrow_mut()
+                            .copy(&origin, &url, copy_to, false, options.clone())?;
 
-                    let headers = rfs.get_last_headers().to_vec();
                     let code = RemoteFilesystem::find_status_code(&headers);
                     let body = Some(format!("{}~", copy_to));
                     Ok(Response::new(request.url.clone(), code, headers, body))
                 } else {
-                    let body = match rfs.get_contents(&origin, &url, false, options.clone())? {
+                    let (result, headers) =
+                        rfs.borrow_mut()
+                            .get_contents(&origin, &url, false, options.clone())?;
+                    let body = match result {
                         GetResult::Content(s) => Some(s),
                         _ => None,
                     };
-                    let headers = rfs.get_last_headers().to_vec();
                     let code = RemoteFilesystem::find_status_code(&headers);
                     Ok(Response::new(request.url.clone(), code, headers, body))
                 }

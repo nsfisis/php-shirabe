@@ -235,7 +235,7 @@ fn test_get_contents() {
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let mut fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
 
-    let res = fs
+    let (res, _headers) = fs
         .get_contents(
             "http://example.org",
             &format!("file://{}", this_file()),
@@ -262,7 +262,8 @@ fn test_copy() {
             false,
             IndexMap::new()
         )
-        .unwrap(),
+        .unwrap()
+        .0,
         GetResult::True
     ));
     assert!(std::path::Path::new(&file).exists());
@@ -358,7 +359,7 @@ fn test_bit_bucket_public_download() {
         let hostname = parse_url(url, PHP_URL_HOST);
         let hostname = hostname.as_string().unwrap_or("");
 
-        let result = rfs
+        let (result, _headers) = rfs
             .get_contents(hostname, url, false, IndexMap::new())
             .unwrap();
 
