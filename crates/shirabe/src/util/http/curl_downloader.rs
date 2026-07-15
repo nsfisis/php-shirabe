@@ -72,7 +72,7 @@ pub struct CurlDownloader {
     next_id: i64,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    auth_helper: AuthHelper,
+    auth_helper: std::rc::Rc<std::cell::RefCell<AuthHelper>>,
     max_redirects: i64,
     max_retries: i64,
 }
@@ -106,7 +106,10 @@ impl CurlDownloader {
             // cannot proceed, mirroring PHP aborting when curl is missing.
             .expect("failed to build reqwest client for CurlDownloader");
 
-        let auth_helper = AuthHelper::new(io.clone(), config.clone());
+        let auth_helper = std::rc::Rc::new(std::cell::RefCell::new(AuthHelper::new(
+            io.clone(),
+            config.clone(),
+        )));
 
         Self {
             client,
@@ -304,9 +307,11 @@ impl CurlDownloader {
 
             // PHP merges auth options + stream-context options at curl_setopt time. We need the
             // resulting header/method/content/timeout/ssl/max_file_size, so do it here per send.
-            let send_options =
-                self.auth_helper
-                    .add_authentication_options(options.clone(), &origin, &url)?;
+            let send_options = self.auth_helper.borrow_mut().add_authentication_options(
+                options.clone(),
+                &origin,
+                &url,
+            )?;
             let send_options =
                 crate::util::StreamContextFactory::init_options(&url, send_options, true)
                     .map_err(|e| anyhow::anyhow!(e.message))?;
@@ -511,7 +516,7 @@ impl CurlDownloader {
                     Some(PhpMixed::Bool(b)) => StoreAuth::Bool(b),
                     _ => StoreAuth::Bool(false),
                 };
-                self.auth_helper.store_auth(&origin, store_auth)?;
+                self.auth_helper.borrow().store_auth(&origin, store_auth)?;
             }
 
             // Atomic rename of the `~` temp file to its final name (file mode).
@@ -774,7 +779,7 @@ impl CurlDownloader {
         {
             let status_message = response.inner.get_status_message();
             let body = response.inner.get_body().map(|s| s.to_string());
-            let result = self.auth_helper.prompt_auth_if_needed(
+            let result = self.auth_helper.borrow_mut().prompt_auth_if_needed(
                 url,
                 origin,
                 response.inner.get_status_code(),
@@ -794,7 +799,7 @@ impl CurlDownloader {
 
         // check for bitbucket login page asking to authenticate
         if origin == "bitbucket.org"
-            && !self.auth_helper.is_public_bit_bucket_download(url)
+            && !self.auth_helper.borrow().is_public_bit_bucket_download(url)
             && substr(url, -4, None) == ".zip"
             && (location_header.is_none()
                 || substr(location_header.as_deref().unwrap_or(""), -4, None) != ".zip")
@@ -828,7 +833,7 @@ impl CurlDownloader {
 
         if let Some(msg) = needs_auth_retry {
             if retry_auth_failure {
-                let result = self.auth_helper.prompt_auth_if_needed(
+                let result = self.auth_helper.borrow_mut().prompt_auth_if_needed(
                     url,
                     origin,
                     401,
