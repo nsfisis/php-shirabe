@@ -54,12 +54,12 @@ pub struct HttpDownloader {
     /// expectation queue instead of performing real I/O. See ADR 0005 for the rationale
     /// (the same internal-hook pattern used for `ProcessExecutor`). Mirrors
     /// composer/tests/Composer/Test/Mock/HttpDownloaderMock.php.
-    mock: Option<HttpDownloaderMockState>,
+    mock: Option<std::rc::Rc<std::cell::RefCell<HttpDownloaderMockState>>>,
 }
 
 /// For testing only. State backing the `HttpDownloaderMock`: an optional expectation queue,
 /// strict flag, default handler for undefined requests, and a log of received URLs.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HttpDownloaderMockState {
     expectations: Option<Vec<HttpDownloaderMockExpectation>>,
     strict: bool,
@@ -918,12 +918,14 @@ impl HttpDownloader {
         strict: bool,
         default_handler: HttpDownloaderMockHandler,
     ) {
-        self.mock = Some(HttpDownloaderMockState {
-            expectations: Some(expectations),
-            strict,
-            default_handler,
-            log: Vec::new(),
-        });
+        self.mock = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            HttpDownloaderMockState {
+                expectations: Some(expectations),
+                strict,
+                default_handler,
+                log: Vec::new(),
+            },
+        )));
     }
 
     /// For testing only. Mirrors HttpDownloaderMock::assertComplete: panics if any expected
@@ -932,6 +934,7 @@ impl HttpDownloader {
         let Some(mock) = &self.mock else {
             return;
         };
+        let mock = mock.borrow();
         // this was not configured to expect anything, so no need to react here
         let Some(expectations) = &mock.expectations else {
             return;
@@ -966,7 +969,12 @@ impl HttpDownloader {
             .into());
         }
 
-        let mock = self.mock.as_mut().expect("mock_get called without a mock");
+        let mock = self
+            .mock
+            .as_ref()
+            .expect("mock_get called without a mock")
+            .clone();
+        let mut mock = mock.borrow_mut();
         mock.log.push(file_url.to_string());
 
         let matches_first = mock
