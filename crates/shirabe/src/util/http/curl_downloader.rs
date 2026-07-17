@@ -403,7 +403,12 @@ impl CurlDownloader {
                     });
                 }
                 Ok(_) => {}
-                Err(e) => return Ok(Decision::Failed(e)),
+                Err(e) => {
+                    if let Some(filename) = filename {
+                        unlink_silent(&format!("{}~", filename));
+                    }
+                    return Ok(Decision::Failed(e));
+                }
             }
         }
 
