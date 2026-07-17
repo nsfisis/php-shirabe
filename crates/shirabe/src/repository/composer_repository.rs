@@ -1004,18 +1004,16 @@ impl ComposerRepository {
                     Some(a) => a.clone(),
                     None => continue,
                 };
-                let sec_advs_arr = match response_arr
-                    .get("security-advisories")
-                    .and_then(|v| v.as_array())
-                {
-                    Some(a) => a.clone(),
-                    None => continue,
+                let sec_advs_arr = match response_arr.get("security-advisories") {
+                    Some(PhpMixed::List(l)) => l.clone(),
+                    Some(PhpMixed::Array(a)) => a.values().cloned().collect(),
+                    _ => continue,
                 };
 
                 names_found.insert(name.clone(), true);
                 if !sec_advs_arr.is_empty() {
                     let mut entries: Vec<AnySecurityAdvisory> = Vec::new();
-                    for (_k, data_mixed) in sec_advs_arr.iter() {
+                    for data_mixed in sec_advs_arr.iter() {
                         if let Some(data) = data_mixed.as_array() {
                             let data_map: IndexMap<String, PhpMixed> =
                                 data.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
