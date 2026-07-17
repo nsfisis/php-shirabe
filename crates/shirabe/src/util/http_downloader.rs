@@ -330,7 +330,7 @@ impl HttpDownloader {
             };
         }
 
-        let rfs = self.rfs.as_ref().unwrap().clone();
+        let rfs = self.rfs.as_ref().unwrap();
         if let Some(copy_to) = copy_to {
             let (_, headers) =
                 rfs.borrow_mut()

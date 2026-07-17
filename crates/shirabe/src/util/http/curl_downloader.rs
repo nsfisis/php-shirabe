@@ -45,7 +45,7 @@ pub struct CurlDownloader {
     client: reqwest::Client,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    auth_helper: std::rc::Rc<std::cell::RefCell<AuthHelper>>,
+    auth_helper: std::cell::RefCell<AuthHelper>,
     max_redirects: i64,
     max_retries: i64,
 }
@@ -88,10 +88,7 @@ impl CurlDownloader {
             // cannot proceed, mirroring PHP aborting when curl is missing.
             .expect("failed to build reqwest client for CurlDownloader");
 
-        let auth_helper = std::rc::Rc::new(std::cell::RefCell::new(AuthHelper::new(
-            io.clone(),
-            config.clone(),
-        )));
+        let auth_helper = std::cell::RefCell::new(AuthHelper::new(io.clone(), config.clone()));
 
         Self {
             client,
