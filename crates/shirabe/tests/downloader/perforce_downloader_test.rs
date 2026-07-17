@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/PerforceDownloaderTest.php
 
+use crate::async_runtime::run;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::get_process_executor_mock;
@@ -40,13 +41,6 @@ mockall::mock! {
             identifier: &str,
         ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
     }
-}
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
 }
 
 /// ref: PerforceDownloaderTest::getConfig (seeds `home` with the temp dir)

@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/GitDownloaderTest.php
 
+use crate::async_runtime::run;
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
@@ -19,13 +20,6 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
-}
 
 fn set_up() -> TempDir {
     // skipIfNotExecutable('git') is irrelevant because every git invocation is mocked.

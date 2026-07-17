@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/DownloadManagerTest.php
 
+use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use indexmap::IndexMap;
 use shirabe::downloader::DownloaderInterface;
@@ -56,13 +57,6 @@ mockall::mock! {
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
     }
-}
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
 }
 
 /// ref: DownloadManagerTest::createPackageMock

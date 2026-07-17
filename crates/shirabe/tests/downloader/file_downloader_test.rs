@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/FileDownloaderTest.php
 
+use crate::async_runtime::run;
 use crate::http_downloader_mock::get_http_downloader_mock;
 use crate::io_mock::{Expectation, get_io_mock};
 use indexmap::IndexMap;
@@ -26,13 +27,6 @@ use tempfile::TempDir;
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
     CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
-}
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
 }
 
 /// ref: TestCase::getConfig

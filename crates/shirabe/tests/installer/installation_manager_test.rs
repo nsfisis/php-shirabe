@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Installer/InstallationManagerTest.php
 
+use crate::async_runtime::run;
 use crate::test_case::get_package;
 use shirabe::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
@@ -14,13 +15,6 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
-}
 
 /// ref: setUp(): the PHP loop/io mocks are never exercised by these tests (the loop has its
 /// constructor disabled), so a real Loop over a real HttpDownloader and a NullIO stand in.

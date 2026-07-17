@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/ZipDownloaderTest.php
 
+use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -16,13 +17,6 @@ use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
-}
 
 struct SetUp {
     test_dir: TempDir,

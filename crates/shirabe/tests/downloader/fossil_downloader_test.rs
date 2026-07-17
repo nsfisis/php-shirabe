@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/FossilDownloaderTest.php
 
+use crate::async_runtime::run;
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::get_process_executor_mock;
@@ -13,13 +14,6 @@ use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
-}
 
 fn set_up() -> TempDir {
     TempDir::new().unwrap()

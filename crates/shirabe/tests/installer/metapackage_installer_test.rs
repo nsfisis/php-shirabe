@@ -3,18 +3,12 @@
 //! PHP verifies the mocked repository's add/remove/hasPackage calls; here the same
 //! behaviour is checked against a real InstalledArrayRepository by observing its state.
 
+use crate::async_runtime::run;
 use crate::test_case::get_package;
 use shirabe::installer::{InstallerInterface, MetapackageInstaller};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::{InstalledArrayRepository, RepositoryInterface};
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
-}
 
 fn installer() -> MetapackageInstaller {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =

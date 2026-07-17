@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Installer/LibraryInstallerTest.php
 
+use crate::async_runtime::run;
 use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::composer::{
@@ -85,13 +86,6 @@ mockall::mock! {
         );
         fn remove_binaries(&mut self, package: PackageInterfaceHandle);
     }
-}
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
 }
 
 /// Mirror of setUp(): builds the Composer/Config over temp root/vendor/bin dirs plus a NullIO and a

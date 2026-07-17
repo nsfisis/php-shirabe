@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Downloader/HgDownloaderTest.php
 
+use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, get_process_executor_mock};
 use shirabe::config::Config;
@@ -11,13 +12,6 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
-
-fn run<F: std::future::Future>(future: F) -> F::Output {
-    tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap()
-        .block_on(future)
-}
 
 fn set_up() -> TempDir {
     TempDir::new().unwrap()
