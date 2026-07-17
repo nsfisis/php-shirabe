@@ -11,7 +11,7 @@
 //! is preserved. Per-request TLS/proxy/IP-resolve settings that reqwest only exposes per-Client
 //! are simplified to a single default Client; see the TODOs below.
 //!
-//! `abortRequest()` (PHP `CurlDownloader::abortRequest`, called from
+//! TODO(phase-c): `abortRequest()` (PHP `CurlDownloader::abortRequest`, called from
 //! `HttpDownloader.php:275` when a React\Promise consumer cancels a download) has no equivalent
 //! here: shirabe has never ported the Promise/canceler machinery (`HttpDownloader::STATUS_ABORTED`
 //! is likewise unused), and there is no job table left to cancel now that `download()` runs to
