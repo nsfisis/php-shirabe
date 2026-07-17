@@ -3155,11 +3155,7 @@ impl ComposerRepository {
             }
         }
 
-        let response_result = self
-            .http_downloader
-            .borrow_mut()
-            .add(&filename, options)
-            .await;
+        let response_result = self.http_downloader.borrow().add(&filename, options).await;
         match response_result {
             Ok(response) => self.async_fetch_file_accept(response, &filename, cache_key),
             Err(e) => self.async_fetch_file_reject(e, &filename, cache_key, last_modified_time),

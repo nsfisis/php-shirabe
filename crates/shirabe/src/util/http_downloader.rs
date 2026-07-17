@@ -91,29 +91,6 @@ impl Default for HttpDownloaderMockHandler {
     }
 }
 
-/// A single-threaded tokio Runtime used only to drive `CurlDownloader::download()` (which needs a
-/// real reactor now that it uses the non-blocking `reqwest::Client`, unlike `sync_executor::block_on`
-/// which assumes every awaited future resolves synchronously). `current_thread` is used because
-/// `block_on` (unlike `spawn`) has no `Send` bound, and `download()`'s future closes over
-/// `Rc<RefCell<...>>` handles that are not `Send`.
-///
-/// `get()`/`copy()` bridge into the async core via `sync_executor::block_on` instead of this
-/// Runtime (nesting this same Runtime's `block_on` inside itself, on the curl path, would panic
-/// with "Cannot start a runtime from within a runtime"); this Runtime is only ever entered at the
-/// single point where `CurlDownloader::download()` is awaited.
-///
-/// TODO(phase-e): remove this once `HttpDownloader::add`/`get` are driven by `Loop::wait`'s
-/// `FuturesUnordered` under a single top-level Runtime (see the async re-architecture design).
-fn curl_runtime() -> &'static tokio::runtime::Runtime {
-    static RT: std::sync::LazyLock<tokio::runtime::Runtime> = std::sync::LazyLock::new(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to build the temporary CurlDownloader bridge runtime")
-    });
-    &RT
-}
-
 impl HttpDownloader {
     /// @param IOInterface $io         The IO instance
     /// @param Config      $config     The config
@@ -346,7 +323,7 @@ impl HttpDownloader {
             }
 
             let curl = self.curl.as_ref().unwrap();
-            return match curl_runtime().block_on(curl.download(&origin, url, options, copy_to)) {
+            return match curl.download(&origin, url, options, copy_to).await {
                 Ok(Ok(response)) => Ok(response),
                 Ok(Err(transport_exception)) => Err(transport_exception.into()),
                 Err(e) => Err(e),
