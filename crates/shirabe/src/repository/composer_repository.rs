@@ -33,6 +33,8 @@ use crate::util::Url;
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
 use crate::util::sync_executor;
+use futures::StreamExt;
+use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_metadata_minifier::MetadataMinifier;
@@ -91,7 +93,7 @@ pub struct ComposerRepository {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
-    pub(crate) cache: Cache,
+    pub(crate) cache: std::cell::RefCell<Cache>,
     pub(crate) notify_url: Option<String>,
     pub(crate) search_url: Option<String>,
     pub(crate) providers_api_url: Option<String>,
@@ -108,7 +110,7 @@ pub struct ComposerRepository {
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     source_mirrors: Option<IndexMap<String, Vec<SourceMirror>>>,
     dist_mirrors: Option<Vec<DistMirror>>,
-    degraded_mode: bool,
+    degraded_mode: std::cell::Cell<bool>,
     root_data: Option<RootData>,
     has_partial_packages: bool,
     partial_packages_by_name: Option<IndexMap<String, Vec<IndexMap<String, PhpMixed>>>>,
@@ -116,10 +118,10 @@ pub struct ComposerRepository {
     security_advisory_config: Option<SecurityAdvisoryConfig>,
     /// list of package names which are fresh and can be loaded from the cache directly in case loadPackage is called several times
     /// useful for v2 metadata repositories with lazy providers
-    fresh_metadata_urls: IndexMap<String, bool>,
+    fresh_metadata_urls: std::cell::RefCell<IndexMap<String, bool>>,
     /// list of package names which returned a 404 and should not be re-fetched in case loadPackage is called several times
     /// useful for v2 metadata repositories with lazy providers
-    packages_not_found_cache: IndexMap<String, bool>,
+    packages_not_found_cache: std::cell::RefCell<IndexMap<String, bool>>,
     version_parser: VersionParser,
 }
 
@@ -274,7 +276,7 @@ impl ComposerRepository {
             None,
         )));
 
-        let mut this = Self {
+        let this = Self {
             inner: inner?,
             self_weak: std::cell::RefCell::new(None),
             repo_config,
@@ -284,7 +286,7 @@ impl ComposerRepository {
             io,
             http_downloader,
             r#loop,
-            cache,
+            cache: std::cell::RefCell::new(cache),
             notify_url: None,
             search_url: None,
             providers_api_url: None,
@@ -301,17 +303,18 @@ impl ComposerRepository {
             event_dispatcher,
             source_mirrors: None,
             dist_mirrors: None,
-            degraded_mode: false,
+            degraded_mode: std::cell::Cell::new(false),
             root_data: None,
             has_partial_packages: false,
             partial_packages_by_name: None,
             displayed_warning_about_non_matching_package_index: false,
             security_advisory_config: None,
-            fresh_metadata_urls: IndexMap::new(),
-            packages_not_found_cache: IndexMap::new(),
+            fresh_metadata_urls: std::cell::RefCell::new(IndexMap::new()),
+            packages_not_found_cache: std::cell::RefCell::new(IndexMap::new()),
             version_parser,
         };
         this.cache
+            .borrow_mut()
             .set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
         Ok(this)
     }
@@ -482,10 +485,10 @@ impl ComposerRepository {
 
     fn get_vendor_names(&mut self) -> anyhow::Result<Vec<String>> {
         let cache_key = "vendor-list.txt";
-        let cache_age = self.cache.get_age(cache_key);
+        let cache_age = self.cache.borrow_mut().get_age(cache_key);
         if let Some(age) = cache_age
             && age < 600
-            && let Some(cached_data) = self.cache.read(cache_key)
+            && let Some(cached_data) = self.cache.borrow_mut().read(cache_key)
         {
             let cached_data: Vec<String> = cached_data.split('\n').map(|s| s.to_string()).collect();
             return Ok(cached_data);
@@ -501,8 +504,10 @@ impl ComposerRepository {
 
         let vendors: Vec<String> = uniques.keys().cloned().collect();
 
-        if !self.cache.is_read_only() {
-            self.cache.write(cache_key, &vendors.join("\n"));
+        if !self.cache.borrow().is_read_only() {
+            self.cache
+                .borrow_mut()
+                .write(cache_key, &vendors.join("\n"));
         }
 
         Ok(vendors)
@@ -542,10 +547,10 @@ impl ComposerRepository {
         }
 
         let cache_key = "package-list.txt";
-        let cache_age = self.cache.get_age(cache_key);
+        let cache_age = self.cache.borrow_mut().get_age(cache_key);
         if let Some(age) = cache_age
             && age < 600
-            && let Some(cached_data) = self.cache.read(cache_key)
+            && let Some(cached_data) = self.cache.borrow_mut().read(cache_key)
         {
             let cached_data: Vec<String> = cached_data.split('\n').map(|s| s.to_string()).collect();
             return Ok(cached_data);
@@ -566,8 +571,10 @@ impl ComposerRepository {
                     .collect()
             })
             .unwrap_or_default();
-        if !self.cache.is_read_only() {
-            self.cache.write(cache_key, &package_names.join("\n"));
+        if !self.cache.borrow().is_read_only() {
+            self.cache
+                .borrow_mut()
+                .write(cache_key, &package_names.join("\n"));
         }
 
         Ok(package_names)
@@ -956,17 +963,36 @@ impl ComposerRepository {
             .is_some_and(|c| c.metadata)
             && (allow_partial_advisories || api_url.is_none())
         {
-            let names: Vec<String> = package_constraint_map.keys().cloned().collect();
-            for name in names {
-                let name = strtolower(&name);
-
+            let names: Vec<String> = package_constraint_map
+                .keys()
+                .map(|name| strtolower(name))
                 // skip platform packages, root package and composer-plugin-api
-                if PlatformRepository::is_platform_package(&name) || name == "__root__" {
-                    continue;
-                }
+                .filter(|name| !PlatformRepository::is_platform_package(name) && name != "__root__")
+                .collect();
 
-                let spec =
-                    sync_executor::block_on(self.start_cached_async_download(&name, Some(&name)))?;
+            // PHP fires off `startCachedAsyncDownload(...)->then(...)` for every name up front and
+            // then does a single `$this->loop->wait($promises)`; mirror that here by polling all
+            // downloads concurrently via FuturesOrdered (submission order preserved) before doing
+            // any of the per-name response processing below.
+            // TODO(phase-c-promise): the fan-out below is structurally concurrent, but each
+            // `start_cached_async_download` future still resolves through `HttpDownloader::add`'s
+            // `curl_runtime()`/`sync_executor::block_on` bridge, so real I/O overlap does not happen
+            // yet (see util/loop.rs::wait). That only changes once a single top-level Runtime
+            // replaces those bridges.
+            let this: &ComposerRepository = &*self;
+            let specs: Vec<anyhow::Result<PhpMixed>> = sync_executor::block_on(async {
+                let downloads: FuturesOrdered<_> = names
+                    .iter()
+                    .map(|name| {
+                        let name = name.clone();
+                        async move { this.start_cached_async_download(&name, Some(&name)).await }
+                    })
+                    .collect();
+                downloads.collect().await
+            });
+
+            for (name, spec) in names.into_iter().zip(specs) {
+                let spec = spec?;
 
                 // [$response] = $spec;
                 let response = spec
@@ -1316,9 +1342,9 @@ impl ComposerRepository {
             let mut packages_opt: Option<IndexMap<String, PhpMixed>> = None;
             if !use_last_modified_check
                 && hash_opt.is_some()
-                && self.cache.sha256(&cache_key).as_deref() == hash_opt.as_deref()
+                && self.cache.borrow_mut().sha256(&cache_key).as_deref() == hash_opt.as_deref()
             {
-                if let Some(raw) = self.cache.read(&cache_key) {
+                if let Some(raw) = self.cache.borrow_mut().read(&cache_key) {
                     let decoded = json_decode(&raw, true)?;
                     if let Some(arr) = decoded.as_array() {
                         let map: IndexMap<String, PhpMixed> =
@@ -1331,31 +1357,14 @@ impl ComposerRepository {
                         ));
                     }
                 }
-            } else if use_last_modified_check
-                && let Some(contents_raw) = self.cache.read(&cache_key)
-            {
-                let contents = json_decode(&contents_raw, true)?;
-                let contents_arr = contents.as_array().cloned();
-                // we already loaded some packages from this file, so assume it is fresh and avoid fetching it again
-                if already_loaded.contains_key(name) {
-                    if let Some(arr) = &contents_arr {
-                        let map: IndexMap<String, PhpMixed> =
-                            arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                        packages_opt = Some(map);
-                        packages_source = Some(format!(
-                            "cached file ({} originating from {})",
-                            cache_key,
-                            Url::sanitize(url.clone())
-                        ));
-                    }
-                } else if let Some(arr) = &contents_arr
-                    && let Some(last_modified) =
-                        arr.get("last-modified").and_then(|v| v.as_string())
-                {
-                    let response =
-                        self.fetch_file_if_last_modified(&url, &cache_key, last_modified)?;
-                    match response {
-                        FetchFileIfLastModifiedResult::NotModified => {
+            } else if use_last_modified_check {
+                let contents_raw_opt = self.cache.borrow_mut().read(&cache_key);
+                if let Some(contents_raw) = contents_raw_opt {
+                    let contents = json_decode(&contents_raw, true)?;
+                    let contents_arr = contents.as_array().cloned();
+                    // we already loaded some packages from this file, so assume it is fresh and avoid fetching it again
+                    if already_loaded.contains_key(name) {
+                        if let Some(arr) = &contents_arr {
                             let map: IndexMap<String, PhpMixed> =
                                 arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                             packages_opt = Some(map);
@@ -1365,10 +1374,30 @@ impl ComposerRepository {
                                 Url::sanitize(url.clone())
                             ));
                         }
-                        FetchFileIfLastModifiedResult::Data(data) => {
-                            packages_opt = Some(data);
-                            packages_source =
-                                Some(format!("downloaded file ({})", Url::sanitize(url.clone())));
+                    } else if let Some(arr) = &contents_arr
+                        && let Some(last_modified) =
+                            arr.get("last-modified").and_then(|v| v.as_string())
+                    {
+                        let response =
+                            self.fetch_file_if_last_modified(&url, &cache_key, last_modified)?;
+                        match response {
+                            FetchFileIfLastModifiedResult::NotModified => {
+                                let map: IndexMap<String, PhpMixed> =
+                                    arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                                packages_opt = Some(map);
+                                packages_source = Some(format!(
+                                    "cached file ({} originating from {})",
+                                    cache_key,
+                                    Url::sanitize(url.clone())
+                                ));
+                            }
+                            FetchFileIfLastModifiedResult::Data(data) => {
+                                packages_opt = Some(data);
+                                packages_source = Some(format!(
+                                    "downloaded file ({})",
+                                    Url::sanitize(url.clone())
+                                ));
+                            }
                         }
                     }
                 }
@@ -1716,18 +1745,48 @@ impl ComposerRepository {
                 (k.clone(), cloned)
             })
             .collect();
-        for (name, constraint) in names_iter {
-            let name = strtolower(&name);
+        let download_targets: Vec<(String, String, Option<AnyConstraint>)> = names_iter
+            .into_iter()
+            .filter_map(|(name, constraint)| {
+                let name = strtolower(&name);
+                let real_name = Preg::replace(r"{~dev$}", "", &name);
+                // skip platform packages, root package and composer-plugin-api
+                if PlatformRepository::is_platform_package(&real_name) || real_name == "__root__" {
+                    None
+                } else {
+                    Some((name, real_name, constraint))
+                }
+            })
+            .collect();
 
-            let real_name = Preg::replace(r"{~dev$}", "", &name);
-            // skip platform packages, root package and composer-plugin-api
-            if PlatformRepository::is_platform_package(&real_name) || real_name == "__root__" {
-                continue;
-            }
+        // PHP fires off `startCachedAsyncDownload(...)->then(...)` for every name up front and then
+        // does a single `$this->loop->wait($promises)`; mirror that here by polling all downloads
+        // concurrently via FuturesOrdered (submission order preserved) before doing any of the
+        // per-name response processing below.
+        // TODO(phase-c-promise): the fan-out below is structurally concurrent, but each
+        // `start_cached_async_download` future still resolves through `HttpDownloader::add`'s
+        // `curl_runtime()`/`sync_executor::block_on` bridge, so real I/O overlap does not happen yet
+        // (see util/loop.rs::wait). That only changes once a single top-level Runtime replaces those
+        // bridges.
+        let this: &ComposerRepository = &*self;
+        let specs: Vec<anyhow::Result<PhpMixed>> = sync_executor::block_on(async {
+            let downloads: FuturesOrdered<_> = download_targets
+                .iter()
+                .map(|(name, real_name, _)| {
+                    let name = name.clone();
+                    let real_name = real_name.clone();
+                    async move {
+                        this.start_cached_async_download(&name, Some(&real_name))
+                            .await
+                    }
+                })
+                .collect();
+            downloads.collect().await
+        });
 
+        for ((_name, real_name, constraint), spec) in download_targets.into_iter().zip(specs) {
+            let spec = spec?;
             let version_parser = self.version_parser.clone();
-            let spec =
-                sync_executor::block_on(self.start_cached_async_download(&name, Some(&real_name)))?;
 
             // [$response, $packagesSource] = $spec;
             let spec_list = spec.as_list().cloned().unwrap_or_default();
@@ -1871,7 +1930,7 @@ impl ComposerRepository {
     }
 
     async fn start_cached_async_download(
-        &mut self,
+        &self,
         file_name: &str,
         package_name: Option<&str>,
     ) -> anyhow::Result<PhpMixed> {
@@ -1896,7 +1955,7 @@ impl ComposerRepository {
 
         let mut last_modified: Option<String> = None;
         let contents_opt: Option<IndexMap<String, PhpMixed>>;
-        if let Some(raw) = self.cache.read(&cache_key) {
+        if let Some(raw) = self.cache.borrow_mut().read(&cache_key) {
             let decoded = json_decode(&raw, true)?;
             if let Some(arr) = decoded.as_array() {
                 let map: IndexMap<String, PhpMixed> =
@@ -2064,12 +2123,13 @@ impl ComposerRepository {
         }
 
         let mut data: Option<IndexMap<String, PhpMixed>> = None;
-        if let Some(cached_raw) = self.cache.read("packages.json") {
+        let cached_raw_opt = self.cache.borrow_mut().read("packages.json");
+        if let Some(cached_raw) = cached_raw_opt {
             let cached_decoded = json_decode(&cached_raw, true)?;
             if let Some(arr) = cached_decoded.as_array() {
                 let cached_data: IndexMap<String, PhpMixed> =
                     arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                let age = self.cache.get_age("packages.json");
+                let age = self.cache.borrow_mut().get_age("packages.json");
                 if root_max_age.is_some() && age.is_some() && age.unwrap() <= root_max_age.unwrap()
                 {
                     data = Some(cached_data);
@@ -2458,8 +2518,10 @@ impl ComposerRepository {
                 let url = format!("{}/{}", self.base_url, include.replace("%hash%", &sha256));
                 let cache_key = include.replace("%hash%", "").replace("$", "");
                 let included_data: IndexMap<String, PhpMixed> =
-                    if self.cache.sha256(&cache_key).as_deref() == Some(sha256.as_str()) {
-                        let raw = self.cache.read(&cache_key).unwrap_or_default();
+                    if self.cache.borrow_mut().sha256(&cache_key).as_deref()
+                        == Some(sha256.as_str())
+                    {
+                        let raw = self.cache.borrow_mut().read(&cache_key).unwrap_or_default();
                         let decoded = json_decode(&raw, true)?;
                         decoded
                             .as_array()
@@ -2548,8 +2610,8 @@ impl ComposerRepository {
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string());
                 let included_data: IndexMap<String, PhpMixed> = if let Some(ref sha1) = sha1 {
-                    if self.cache.sha1(include).as_deref() == Some(sha1.as_str()) {
-                        let raw = self.cache.read(include).unwrap_or_default();
+                    if self.cache.borrow_mut().sha1(include).as_deref() == Some(sha1.as_str()) {
+                        let raw = self.cache.borrow_mut().read(include).unwrap_or_default();
                         let decoded = json_decode(&raw, true)?;
                         decoded
                             .as_array()
@@ -2779,7 +2841,7 @@ impl ComposerRepository {
 
                 if let Some(ck) = cache_key_owned.as_ref()
                     && !ck.is_empty()
-                    && !self.cache.is_read_only()
+                    && !self.cache.borrow().is_read_only()
                 {
                     if store_last_modified_time
                         && let Some(last_modified_date) = response.get_header("last-modified")
@@ -2796,7 +2858,7 @@ impl ComposerRepository {
                         );
                         json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none());
                     }
-                    self.cache.write(ck, &json);
+                    self.cache.borrow_mut().write(ck, &json);
                 }
 
                 response.collect();
@@ -2825,19 +2887,19 @@ impl ComposerRepository {
 
                     if let Some(ck) = cache_key_owned.as_ref()
                         && !ck.is_empty()
-                        && let Some(contents) = self.cache.read(ck)
+                        && let Some(contents) = self.cache.borrow_mut().read(ck)
                     {
-                        if !self.degraded_mode {
+                        if !self.degraded_mode.get() {
                             self.io.write_error(&format!(
                                         "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
                                         self.url,
                                         e
                                     ));
                         }
-                        self.degraded_mode = true;
+                        self.degraded_mode.set(true);
                         let parsed = JsonFile::parse_json(
                             Some(&contents),
-                            Some(&format!("{}{}", self.cache.get_root(), ck)),
+                            Some(&format!("{}{}", self.cache.borrow().get_root(), ck)),
                         )?;
                         let map: IndexMap<String, PhpMixed> = parsed
                             .as_array()
@@ -2976,8 +3038,8 @@ impl ComposerRepository {
                     PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
                 json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none());
             }
-            if !self.cache.is_read_only() {
-                self.cache.write(cache_key, &json);
+            if !self.cache.borrow().is_read_only() {
+                self.cache.borrow_mut().write(cache_key, &json);
             }
 
             Ok(FetchFileIfLastModifiedResult::Data(data))
@@ -2995,14 +3057,14 @@ impl ComposerRepository {
                     return Err(e);
                 }
 
-                if !self.degraded_mode {
+                if !self.degraded_mode.get() {
                     self.io.write_error(&format!(
                         "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
                         self.url,
                         e
                     ));
                 }
-                self.degraded_mode = true;
+                self.degraded_mode.set(true);
 
                 Ok(FetchFileIfLastModifiedResult::NotModified)
             }
@@ -3010,7 +3072,7 @@ impl ComposerRepository {
     }
 
     async fn async_fetch_file(
-        &mut self,
+        &self,
         filename: &str,
         cache_key: &str,
         last_modified_time: Option<&str>,
@@ -3023,13 +3085,18 @@ impl ComposerRepository {
             .into());
         }
 
-        if self.packages_not_found_cache.contains_key(filename) {
+        if self
+            .packages_not_found_cache
+            .borrow()
+            .contains_key(filename)
+        {
             let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
             empty.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
             return Ok(PhpMixed::Array(empty.into_iter().collect()));
         }
 
-        if self.fresh_metadata_urls.contains_key(filename) && last_modified_time.is_some() {
+        if self.fresh_metadata_urls.borrow().contains_key(filename) && last_modified_time.is_some()
+        {
             // make it look like we got a 304 response
             return Ok(PhpMixed::Bool(true));
         }
@@ -3102,7 +3169,7 @@ impl ComposerRepository {
     /// The onFulfilled handler of `asyncFetchFile`: turns the HTTP response into decoded metadata,
     /// caches it, and records the URL as fresh.
     fn async_fetch_file_accept(
-        &mut self,
+        &self,
         mut response: Response,
         filename: &str,
         cache_key: &str,
@@ -3110,6 +3177,7 @@ impl ComposerRepository {
         // package not found is acceptable for a v2 protocol repository
         if response.get_status_code() == 404 {
             self.packages_not_found_cache
+                .borrow_mut()
                 .insert(filename.to_string(), true);
 
             let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -3119,7 +3187,9 @@ impl ComposerRepository {
 
         let mut json = response.get_body().unwrap_or("").to_string();
         if json.is_empty() && response.get_status_code() == 304 {
-            self.fresh_metadata_urls.insert(filename.to_string(), true);
+            self.fresh_metadata_urls
+                .borrow_mut()
+                .insert(filename.to_string(), true);
 
             return Ok(PhpMixed::Bool(true));
         }
@@ -3147,10 +3217,12 @@ impl ComposerRepository {
                 },
             );
         }
-        if !self.cache.is_read_only() {
-            self.cache.write(cache_key, &json);
+        if !self.cache.borrow().is_read_only() {
+            self.cache.borrow_mut().write(cache_key, &json);
         }
-        self.fresh_metadata_urls.insert(filename.to_string(), true);
+        self.fresh_metadata_urls
+            .borrow_mut()
+            .insert(filename.to_string(), true);
 
         Ok(PhpMixed::Array(data.into_iter().collect()))
     }
@@ -3158,7 +3230,7 @@ impl ComposerRepository {
     /// The onRejected handler of `asyncFetchFile`: marks the package as not found / the repo as
     /// degraded, and fakes a 304/404 response from cache where appropriate.
     fn async_fetch_file_reject(
-        &mut self,
+        &self,
         e: anyhow::Error,
         filename: &str,
         cache_key: &str,
@@ -3168,19 +3240,20 @@ impl ComposerRepository {
             && te.get_status_code() == Some(404)
         {
             self.packages_not_found_cache
+                .borrow_mut()
                 .insert(filename.to_string(), true);
 
             return Ok(PhpMixed::Bool(false));
         }
 
-        if !self.degraded_mode {
+        if !self.degraded_mode.get() {
             self.io.write_error(&format!(
                 "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
                 self.url,
                 e
             ));
         }
-        self.degraded_mode = true;
+        self.degraded_mode.set(true);
 
         // if the file is in the cache, we fake a 304 Not Modified to allow the process to continue
         if last_modified_time.is_some() {
