@@ -97,34 +97,15 @@ impl Default for HttpDownloaderMockHandler {
     }
 }
 
+#[derive(Debug)]
 struct Job {
     id: i64,
     status: i64,
     request: Request,
     sync: bool,
     origin: String,
-    curl_id: Option<i64>,
     response: Option<Response>,
     exception: Option<anyhow::Error>,
-    /// Completion slot written by the curl resolve/reject closures (driven by `curl.tick()`)
-    /// and read by `count_active_jobs`. Uses `Arc<Mutex>` because `CurlDownloader::download`
-    /// requires `Send + Sync` callbacks.
-    settled: std::sync::Arc<std::sync::Mutex<Option<anyhow::Result<Response>>>>,
-}
-
-impl std::fmt::Debug for Job {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Job")
-            .field("id", &self.id)
-            .field("status", &self.status)
-            .field("request", &self.request)
-            .field("sync", &self.sync)
-            .field("origin", &self.origin)
-            .field("curl_id", &self.curl_id)
-            .field("response", &self.response)
-            .field("exception", &self.exception)
-            .finish()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +113,24 @@ struct Request {
     url: String,
     options: IndexMap<String, PhpMixed>,
     copy_to: Option<String>,
+}
+
+/// A single-threaded tokio Runtime used only to drive `CurlDownloader::download()` (which needs a
+/// real reactor now that it uses the non-blocking `reqwest::Client`, unlike `sync_executor::block_on`
+/// which assumes every awaited future resolves synchronously). `current_thread` is used because
+/// `block_on` (unlike `spawn`) has no `Send` bound, and `download()`'s future closes over
+/// `Rc<RefCell<...>>` handles that are not `Send`.
+///
+/// TODO(phase-e): remove this once `HttpDownloader::add`/`get` are driven by `Loop::wait`'s
+/// `FuturesUnordered` under a single top-level Runtime (see the async re-architecture design).
+fn curl_runtime() -> &'static tokio::runtime::Runtime {
+    static RT: std::sync::LazyLock<tokio::runtime::Runtime> = std::sync::LazyLock::new(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to build the temporary CurlDownloader bridge runtime")
+    });
+    &RT
 }
 
 impl HttpDownloader {
@@ -397,10 +396,8 @@ impl HttpDownloader {
             request: request.clone(),
             sync,
             origin,
-            curl_id: None,
             response: None,
             exception: None,
-            settled: std::sync::Arc::new(std::sync::Mutex::new(None)),
         };
         let can_use_curl = self.can_use_curl(&job);
         self.jobs.insert(id, job);
@@ -560,38 +557,20 @@ impl HttpDownloader {
             return;
         }
 
-        // curl branch: register the request with the curl multi handle. Completion is delivered
-        // by curl.tick() into the job's `settled` slot (read by count_active_jobs). The resolve
-        // callback stores the Response, reject stores the error; this mirrors PHP's promise
-        // resolve/reject firing during tick(). PHP catches any exception from download() and
-        // rejects the job.
-        let settled = self.jobs.get(&id).unwrap().settled.clone();
-        let settled_for_reject = settled.clone();
-        let resolve: Box<dyn Fn(Response) + Send + Sync> = Box::new(move |response: Response| {
-            *settled.lock().unwrap() = Some(Ok(response));
-        });
-        let reject: Box<dyn Fn(anyhow::Error) + Send + Sync> =
-            Box::new(move |error: anyhow::Error| {
-                *settled_for_reject.lock().unwrap() = Some(Err(error));
-            });
-
-        let download_result = {
-            let curl = self.curl.as_mut().unwrap();
-            curl.download(resolve, reject, &origin, &url, options, copy_to.as_deref())
+        // curl branch: `CurlDownloader::download` now runs the whole redirect/retry/auth state
+        // machine to completion itself and returns the settled result directly, so this drives
+        // it through the temporary bridge runtime instead of PHP's promise resolve/reject firing
+        // during tick(). PHP catches any exception from download() and rejects the job.
+        let result: anyhow::Result<Response> = {
+            let curl = self.curl.as_ref().unwrap();
+            match curl_runtime().block_on(curl.download(&origin, &url, options, copy_to.as_deref()))
+            {
+                Ok(Ok(response)) => Ok(response),
+                Ok(Err(transport_exception)) => Err(transport_exception.into()),
+                Err(e) => Err(e),
+            }
         };
-        match download_result {
-            Ok(Ok(curl_id)) => {
-                if let Some(job) = self.jobs.get_mut(&id) {
-                    job.curl_id = Some(curl_id);
-                }
-            }
-            Ok(Err(e)) => {
-                self.settle_job(id, Err(e.into()));
-            }
-            Err(e) => {
-                self.settle_job(id, Err(e));
-            }
-        }
+        self.settle_job(id, result);
     }
 
     fn mark_job_done(&mut self) {
@@ -637,24 +616,9 @@ impl HttpDownloader {
             }
         }
 
-        if let Some(curl) = self.curl.as_mut() {
-            curl.tick()?;
-        }
-
-        // Apply completions delivered by curl.tick() into each started job's `settled` slot.
-        // This reproduces the effect of PHP's resolve/reject callbacks firing during tick().
-        let started_ids: Vec<i64> = self
-            .jobs
-            .values()
-            .filter(|j| j.status == Self::STATUS_STARTED)
-            .map(|j| j.id)
-            .collect();
-        for id in started_ids {
-            let settled = self.jobs.get(&id).unwrap().settled.lock().unwrap().take();
-            if let Some(result) = settled {
-                self.settle_job(id, result);
-            }
-        }
+        // Unlike the old tick()-driven curl path, `start_job` now settles curl jobs synchronously
+        // (via the temporary bridge runtime), so no job is ever left lingering in STATUS_STARTED
+        // by the time we get here — nothing left to poll or collect.
 
         if let Some(index) = index {
             return Ok(
