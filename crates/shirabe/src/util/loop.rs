@@ -2,6 +2,8 @@
 
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use shirabe_external_packages::symfony::console::helper::ProgressBar;
 
 #[derive(Debug)]
@@ -44,25 +46,24 @@ impl Loop {
         >,
         _progress: Option<&mut ProgressBar>,
     ) -> anyhow::Result<()> {
+        let mut pending: FuturesUnordered<_> = promises.into_iter().collect();
         let mut uncaught: Option<anyhow::Error> = None;
 
-        // TODO(phase-c-promise): the asynchronous worker classes (HttpDownloader / ProcessExecutor)
-        // run single-threaded for now, so the promises are consumed serially. Once the workers run
-        // on a multi-thread runtime these futures should be driven concurrently instead of in order.
+        // TODO(phase-c-promise): promises are now polled concurrently via FuturesUnordered, but
+        // each individual future (HttpDownloader::add/add_copy etc.) still resolves through a
+        // blocking bridge (curl_runtime()/sync_executor::block_on), so real I/O overlap does not
+        // happen yet — the bridged future fully blocks the thread until it settles before the next
+        // one gets polled. That only changes once a single top-level Runtime replaces those bridges.
         // The PHP progress bar is tied to the worker active-job count and is also deferred until then.
-        for promise in promises {
-            if let Err(e) = promise.await
+        while let Some(result) = pending.next().await {
+            if let Err(e) = result
                 && uncaught.is_none()
             {
                 uncaught = Some(e);
             }
         }
 
-        if let Some(e) = uncaught {
-            return Err(e);
-        }
-
-        Ok(())
+        uncaught.map_or(Ok(()), Err)
     }
 
     pub fn abort_jobs(&self) {

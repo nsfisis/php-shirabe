@@ -20,6 +20,7 @@ async-trait = "0.1.89"
 base64 = "0.22.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 fastrand = "2.4.1"
+futures = "0.3.32"
 indexmap = { version = "2.14.0", features = ["serde"] }
 jsonschema = { version = "0.46.6", default-features = false }
 md5 = "0.7.0"
