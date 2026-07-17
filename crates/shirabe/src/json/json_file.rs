@@ -593,7 +593,7 @@ impl jsonschema::Retrieve for FileRetriever {
         match uri.scheme().as_str() {
             "file" => {
                 let file = std::fs::File::open(uri.path().as_str())?;
-                Ok(serde_json::from_reader(file)?)
+                Ok(serde_json::from_reader(std::io::BufReader::new(file))?)
             }
             scheme => Err(format!("Unknown scheme {scheme}").into()),
         }
