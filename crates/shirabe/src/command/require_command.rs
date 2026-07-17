@@ -30,7 +30,6 @@ use crate::util::Filesystem;
 use crate::util::PackageSorter;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -1110,13 +1109,19 @@ impl RequireCommand {
                 io_interface::NORMAL,
             );
 
-            if Preg::is_match(
-                r"{^dev-(?!main$|master$|trunk$|latest$)}",
-                requirements
-                    .get(package_name)
-                    .map(|s| s.as_str())
-                    .unwrap_or(""),
-            ) {
+            // Regex pattern compatibility:
+            // PCRE `{^dev-(?!main$|master$|trunk$|latest$)}` uses a negative lookahead,
+            // which the `regex` crate does not support. Decomposed into hand-written logic.
+            let requirement_str = requirements
+                .get(package_name)
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            if requirement_str.starts_with("dev-")
+                && !matches!(
+                    &requirement_str[4..],
+                    "main" | "master" | "trunk" | "latest"
+                )
+            {
                 self.get_io().warning(
                     &format!(
                         "Version {} looks like it may be a feature branch which is unlikely to keep working in the long run and may be in an unstable state",

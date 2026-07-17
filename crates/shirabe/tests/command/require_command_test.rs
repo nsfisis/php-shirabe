@@ -340,10 +340,6 @@ fn provide_inconsistent_require_keys() -> Vec<(bool, bool, &'static str)> {
 
 #[test]
 #[serial]
-#[ignore = "the solver-pool root-package issue is fixed; now panics in shirabe_php_shim::preg \
-            (\"look-around, including look-ahead and look-behind, is not supported\") because \
-            the dev-branch pattern `^dev-(?!main$|master$|trunk$|latest$)` uses a lookahead the \
-            `regex` crate cannot express (see docs/dev/regex-porting.md)"]
 fn test_inconsistent_require_keys() {
     for (is_dev, is_interactive, expected_warning) in provide_inconsistent_require_keys() {
         let current_key = if is_dev { "require" } else { "require-dev" };
