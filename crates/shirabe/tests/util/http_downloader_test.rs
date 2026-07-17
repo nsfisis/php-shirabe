@@ -43,7 +43,7 @@ fn test_capture_authentication_params_from_url() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
-    let mut fs = HttpDownloader::new(io, config, IndexMap::new(), false);
+    let fs = HttpDownloader::new(io, config, IndexMap::new(), false);
     Platform::clear_env("COMPOSER_DISABLE_NETWORK");
 
     if let Err(e) = fs.get(

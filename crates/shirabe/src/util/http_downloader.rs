@@ -14,6 +14,7 @@ use crate::util::StreamContextFactory;
 use crate::util::Url;
 use crate::util::http::CurlDownloader;
 use crate::util::http::Response;
+use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -23,28 +24,21 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
-/// @phpstan-type Request array{url: non-empty-string, options: mixed[], copyTo: string|null}
-/// @phpstan-type Job array{id: int, status: int, request: Request, sync: bool, origin: string, resolve?: callable, reject?: callable, curl_id?: int, response?: Response, exception?: \Throwable}
 #[derive(Debug)]
 pub struct HttpDownloader {
     /// @var IOInterface
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    /// @var array<Job>
-    jobs: IndexMap<i64, Job>,
     /// @var mixed[]
     options: IndexMap<String, PhpMixed>,
-    /// @var int
-    running_jobs: i64,
-    /// @var int
-    max_jobs: i64,
+    /// Replaces PHP's `$runningJobs`/`$maxJobs` counters: a permit is held for the duration of
+    /// each in-flight request and released when it settles.
+    semaphore: std::rc::Rc<tokio::sync::Semaphore>,
     /// @var ?CurlDownloader
     curl: Option<CurlDownloader>,
     /// @var ?RemoteFilesystem
     rfs: Option<std::rc::Rc<std::cell::RefCell<RemoteFilesystem>>>,
-    /// @var int
-    id_gen: i64,
     /// @var bool
     disabled: bool,
     /// @var bool
@@ -97,29 +91,16 @@ impl Default for HttpDownloaderMockHandler {
     }
 }
 
-#[derive(Debug)]
-struct Job {
-    id: i64,
-    status: i64,
-    request: Request,
-    sync: bool,
-    origin: String,
-    response: Option<Response>,
-    exception: Option<anyhow::Error>,
-}
-
-#[derive(Debug, Clone)]
-struct Request {
-    url: String,
-    options: IndexMap<String, PhpMixed>,
-    copy_to: Option<String>,
-}
-
 /// A single-threaded tokio Runtime used only to drive `CurlDownloader::download()` (which needs a
 /// real reactor now that it uses the non-blocking `reqwest::Client`, unlike `sync_executor::block_on`
 /// which assumes every awaited future resolves synchronously). `current_thread` is used because
 /// `block_on` (unlike `spawn`) has no `Send` bound, and `download()`'s future closes over
 /// `Rc<RefCell<...>>` handles that are not `Send`.
+///
+/// `get()`/`copy()` bridge into the async core via `sync_executor::block_on` instead of this
+/// Runtime (nesting this same Runtime's `block_on` inside itself, on the curl path, would panic
+/// with "Cannot start a runtime from within a runtime"); this Runtime is only ever entered at the
+/// single point where `CurlDownloader::download()` is awaited.
 ///
 /// TODO(phase-e): remove this once `HttpDownloader::add`/`get` are driven by `Loop::wait`'s
 /// `FuturesUnordered` under a single top-level Runtime (see the async re-architecture design).
@@ -134,12 +115,6 @@ fn curl_runtime() -> &'static tokio::runtime::Runtime {
 }
 
 impl HttpDownloader {
-    const STATUS_QUEUED: i64 = 1;
-    const STATUS_STARTED: i64 = 2;
-    const STATUS_COMPLETED: i64 = 3;
-    const STATUS_FAILED: i64 = 4;
-    const STATUS_ABORTED: i64 = 5;
-
     /// @param IOInterface $io         The IO instance
     /// @param Config      $config     The config
     /// @param mixed[]     $options    The options
@@ -201,13 +176,10 @@ impl HttpDownloader {
         Self {
             io,
             config,
-            jobs: IndexMap::new(),
             options: self_options,
-            running_jobs: 0,
-            max_jobs,
+            semaphore: std::rc::Rc::new(tokio::sync::Semaphore::new(max_jobs as usize)),
             curl,
             rfs,
-            id_gen: 0,
             disabled,
             allow_async: false,
             mock: None,
@@ -215,101 +187,50 @@ impl HttpDownloader {
     }
 
     /// Download a file synchronously
-    pub fn get(
-        &mut self,
-        url: &str,
-        options: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<Response> {
-        if self.mock.is_some() {
-            return self.mock_get(url, &options);
-        }
-        if url.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "$url must not be an empty string".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-        let job = self.add_job(
-            Request {
-                url: url.to_string(),
-                options,
-                copy_to: None,
-            },
-            true,
-        )?;
-        self.wait_id(Some(job.id))?;
-
-        let response = self.get_response(job.id)?;
-
-        Ok(response)
+    pub fn get(&self, url: &str, options: IndexMap<String, PhpMixed>) -> anyhow::Result<Response> {
+        sync_executor::block_on(self.execute(url, options, None, true))
     }
 
     /// Create an async download operation
     pub async fn add(
-        &mut self,
+        &self,
         url: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<Response> {
-        if self.mock.is_some() {
-            return self.mock_get(url, &options);
-        }
-        if url.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "$url must not be an empty string".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-        let job = self.add_job(
-            Request {
-                url: url.to_string(),
-                options,
-                copy_to: None,
-            },
-            false,
-        )?;
-        self.wait_id(Some(job.id))?;
-
-        self.get_response(job.id)
+        self.execute(url, options, None, false).await
     }
 
     /// Copy a file synchronously
     pub fn copy(
-        &mut self,
+        &self,
         url: &str,
         to: &str,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<Response> {
-        if self.mock.is_some() {
-            return self.mock_get(url, &options);
-        }
-        if url.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "$url must not be an empty string".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-        let job = self.add_job(
-            Request {
-                url: url.to_string(),
-                options,
-                copy_to: Some(to.to_string()),
-            },
-            true,
-        )?;
-        self.wait_id(Some(job.id))?;
-
-        self.get_response(job.id)
+        sync_executor::block_on(self.execute(url, options, Some(to), true))
     }
 
     /// Create an async copy operation
     pub async fn add_copy(
-        &mut self,
+        &self,
         url: &str,
         to: &str,
         options: IndexMap<String, PhpMixed>,
+    ) -> anyhow::Result<Response> {
+        self.execute(url, options, Some(to), false).await
+    }
+
+    /// @phpstan-param non-empty-string $url
+    ///
+    /// Shared core of `get`/`add`/`copy`/`add_copy`: mock short-circuit, empty-URL guard, the
+    /// sync/allow_async gate, and the concurrency-limiting semaphore permit. Mirrors PHP `addJob`
+    /// up to (but not including) the resolver, which is `dispatch`.
+    async fn execute(
+        &self,
+        url: &str,
+        options: IndexMap<String, PhpMixed>,
+        copy_to: Option<&str>,
+        sync: bool,
     ) -> anyhow::Result<Response> {
         if self.mock.is_some() {
             return self.mock_get(url, &options);
@@ -321,41 +242,6 @@ impl HttpDownloader {
             }
             .into());
         }
-        let job = self.add_job(
-            Request {
-                url: url.to_string(),
-                options,
-                copy_to: Some(to.to_string()),
-            },
-            false,
-        )?;
-        self.wait_id(Some(job.id))?;
-
-        self.get_response(job.id)
-    }
-
-    /// Retrieve the options set in the constructor
-    pub fn get_options(&self) -> &IndexMap<String, PhpMixed> {
-        &self.options
-    }
-
-    /// Merges new options
-    pub fn set_options(&mut self, options: IndexMap<String, PhpMixed>) {
-        self.options = array_replace_recursive(self.options.clone(), options);
-    }
-
-    /// @phpstan-param Request $request
-    ///
-    /// Queues a job and starts it if there is capacity. Mirrors PHP `addJob`: for non-curl (rfs)
-    /// jobs the work runs synchronously here (PHP runs it in the Promise resolver during
-    /// construction); for curl jobs the work is driven later by `start_job` / `count_active_jobs`.
-    fn add_job(&mut self, mut request: Request, sync: bool) -> anyhow::Result<JobHandle> {
-        request.options = array_replace_recursive(self.options.clone(), request.options);
-
-        let id = self.id_gen;
-        self.id_gen += 1;
-        let origin = Url::get_origin(&self.config.borrow(), &request.url);
-
         if !sync && !self.allow_async {
             return Err(LogicException {
                 message:
@@ -366,13 +252,31 @@ impl HttpDownloader {
             .into());
         }
 
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .expect("semaphore is never closed");
+        self.dispatch(url, options, copy_to).await
+    }
+
+    /// Mirrors the resolver PHP's `addJob` builds (the curl branch queues itself for `startJob`;
+    /// the non-curl branch runs the blocking RemoteFilesystem download immediately) plus
+    /// `startJob`'s network-disabled short-circuit. That short-circuit only ever reached the curl
+    /// branch in PHP too: the non-curl resolver runs synchronously during Promise construction,
+    /// before `startJob` (and its `disabled` check) is ever invoked for that job.
+    async fn dispatch(
+        &self,
+        url: &str,
+        options: IndexMap<String, PhpMixed>,
+        copy_to: Option<&str>,
+    ) -> anyhow::Result<Response> {
+        let options = array_replace_recursive(self.options.clone(), options);
+        let origin = Url::get_origin(&self.config.borrow(), url);
+
         // capture username/password from URL if there is one
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3(
-            r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i",
-            &request.url,
-            Some(&mut m),
-        ) {
+        if Preg::is_match3(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i", url, Some(&mut m)) {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
                 rawurldecode(
@@ -390,291 +294,100 @@ impl HttpDownloader {
             );
         }
 
-        let job = Job {
-            id,
-            status: Self::STATUS_QUEUED,
-            request: request.clone(),
-            sync,
-            origin,
-            response: None,
-            exception: None,
-        };
-        let can_use_curl = self.can_use_curl(&job);
-        self.jobs.insert(id, job);
-
-        // PHP runs the resolver synchronously while constructing the Promise. For non-curl jobs
-        // the resolver performs the blocking RemoteFilesystem download and resolves immediately.
-        if !can_use_curl {
-            self.run_rfs_job(id);
-        }
-
-        if self.running_jobs < self.max_jobs {
-            self.start_job(id);
-        }
-
-        Ok(JobHandle { id })
-    }
-
-    /// Mirrors the non-curl branch of PHP `addJob`'s Promise resolver plus the `.then` side
-    /// effects: performs the blocking RemoteFilesystem download and settles the job.
-    fn run_rfs_job(&mut self, id: i64) {
-        let (request, origin, url, options, copy_to) = {
-            let job = self.jobs.get(&id).unwrap();
-            (
-                job.request.clone(),
-                job.origin.clone(),
-                job.request.url.clone(),
-                job.request.options.clone(),
-                job.request.copy_to.clone(),
-            )
-        };
-
-        if let Some(job) = self.jobs.get_mut(&id) {
-            job.status = Self::STATUS_STARTED;
-        }
-
-        let result: anyhow::Result<Response> = {
-            let rfs = self.rfs.as_ref().unwrap().clone();
-            (|| -> anyhow::Result<Response> {
-                if let Some(copy_to) = copy_to.as_deref() {
-                    let (_, headers) =
-                        rfs.borrow_mut()
-                            .copy(&origin, &url, copy_to, false, options.clone())?;
-
-                    let code = RemoteFilesystem::find_status_code(&headers);
-                    let body = Some(format!("{}~", copy_to));
-                    Ok(Response::new(request.url.clone(), code, headers, body))
-                } else {
-                    let (result, headers) =
-                        rfs.borrow_mut()
-                            .get_contents(&origin, &url, false, options.clone())?;
-                    let body = match result {
-                        GetResult::Content(s) => Some(s),
-                        _ => None,
-                    };
-                    let code = RemoteFilesystem::find_status_code(&headers);
-                    Ok(Response::new(request.url.clone(), code, headers, body))
+        if self.can_use_curl(url, &options) {
+            if self.disabled {
+                let has_if_modified_since = {
+                    let http_header = options
+                        .get("http")
+                        .and_then(|v| match v {
+                            PhpMixed::Array(m) => m.get("header"),
+                            _ => None,
+                        })
+                        .cloned();
+                    if let Some(PhpMixed::List(list)) = http_header.as_ref() {
+                        let joined = implode(
+                            "",
+                            &list
+                                .iter()
+                                .map(|v| v.as_string().unwrap_or("").to_string())
+                                .collect::<Vec<_>>(),
+                        );
+                        stripos(&joined, "if-modified-since").is_some()
+                    } else if let Some(PhpMixed::Array(m)) = http_header.as_ref() {
+                        let joined = implode(
+                            "",
+                            &m.values()
+                                .map(|v| v.as_string().unwrap_or("").to_string())
+                                .collect::<Vec<_>>(),
+                        );
+                        stripos(&joined, "if-modified-since").is_some()
+                    } else {
+                        false
+                    }
+                };
+                if has_if_modified_since {
+                    return Ok(Response::new(
+                        url.to_string(),
+                        Some(304),
+                        Vec::new(),
+                        Some(String::new()),
+                    ));
                 }
-            })()
-        };
 
-        self.settle_job(id, result);
-    }
-
-    /// Applies the effect of PHP's promise `.then` handlers: records the response/exception,
-    /// transitions the job status and decrements the running-job counter.
-    fn settle_job(&mut self, id: i64, result: anyhow::Result<Response>) {
-        match result {
-            Ok(response) => {
-                if let Some(job) = self.jobs.get_mut(&id) {
-                    job.status = Self::STATUS_COMPLETED;
-                    job.response = Some(response);
-                }
-            }
-            Err(e) => {
-                if let Some(job) = self.jobs.get_mut(&id) {
-                    job.status = Self::STATUS_FAILED;
-                    job.exception = Some(e);
-                }
-            }
-        }
-        self.mark_job_done();
-    }
-
-    fn start_job(&mut self, id: i64) {
-        let job_status = self.jobs.get(&id).map(|j| j.status);
-        if job_status != Some(Self::STATUS_QUEUED) {
-            return;
-        }
-
-        // start job
-        if let Some(job) = self.jobs.get_mut(&id) {
-            job.status = Self::STATUS_STARTED;
-        }
-        self.running_jobs += 1;
-
-        let (request, origin, copy_to) = {
-            let job = self.jobs.get(&id).unwrap();
-            (
-                job.request.clone(),
-                job.origin.clone(),
-                job.request.copy_to.clone(),
-            )
-        };
-        let url = request.url.clone();
-        let options = request.options.clone();
-
-        if self.disabled {
-            let has_if_modified_since = {
-                let http_header = options
-                    .get("http")
-                    .and_then(|v| match v {
-                        PhpMixed::Array(m) => m.get("header"),
-                        _ => None,
-                    })
-                    .cloned();
-                if let Some(PhpMixed::List(list)) = http_header.as_ref() {
-                    let joined = implode(
-                        "",
-                        &list
-                            .iter()
-                            .map(|v| v.as_string().unwrap_or("").to_string())
-                            .collect::<Vec<_>>(),
-                    );
-                    stripos(&joined, "if-modified-since").is_some()
-                } else if let Some(PhpMixed::Array(m)) = http_header.as_ref() {
-                    let joined = implode(
-                        "",
-                        &m.values()
-                            .map(|v| v.as_string().unwrap_or("").to_string())
-                            .collect::<Vec<_>>(),
-                    );
-                    stripos(&joined, "if-modified-since").is_some()
-                } else {
-                    false
-                }
-            };
-            if has_if_modified_since {
-                let response = Ok(Response::new(
-                    url.clone(),
-                    Some(304),
-                    Vec::new(),
-                    Some(String::new()),
-                ));
-                self.settle_job(id, response);
-            } else {
                 let mut e = TransportException::new(
                     format!(
                         "Network disabled, request canceled: {}",
-                        Url::sanitize(url.clone())
+                        Url::sanitize(url.to_string())
                     ),
                     499,
                 );
                 e.set_status_code(Some(499));
-                self.settle_job(id, Err(e.into()));
+                return Err(e.into());
             }
 
-            return;
-        }
-
-        // curl branch: `CurlDownloader::download` now runs the whole redirect/retry/auth state
-        // machine to completion itself and returns the settled result directly, so this drives
-        // it through the temporary bridge runtime instead of PHP's promise resolve/reject firing
-        // during tick(). PHP catches any exception from download() and rejects the job.
-        let result: anyhow::Result<Response> = {
             let curl = self.curl.as_ref().unwrap();
-            match curl_runtime().block_on(curl.download(&origin, &url, options, copy_to.as_deref()))
-            {
+            return match curl_runtime().block_on(curl.download(&origin, url, options, copy_to)) {
                 Ok(Ok(response)) => Ok(response),
                 Ok(Err(transport_exception)) => Err(transport_exception.into()),
                 Err(e) => Err(e),
-            }
-        };
-        self.settle_job(id, result);
-    }
-
-    fn mark_job_done(&mut self) {
-        self.running_jobs -= 1;
-    }
-
-    /// Wait for current async download jobs to complete
-    ///
-    /// @param int|null $index For internal use only, the job id
-    pub fn wait(&mut self) -> anyhow::Result<()> {
-        self.wait_id(None)
-    }
-
-    fn wait_id(&mut self, index: Option<i64>) -> anyhow::Result<()> {
-        loop {
-            let job_count = self.count_active_jobs(index)?;
-            if job_count == 0 {
-                break;
-            }
+            };
         }
-        Ok(())
+
+        let rfs = self.rfs.as_ref().unwrap().clone();
+        if let Some(copy_to) = copy_to {
+            let (_, headers) =
+                rfs.borrow_mut()
+                    .copy(&origin, url, copy_to, false, options.clone())?;
+
+            let code = RemoteFilesystem::find_status_code(&headers);
+            let body = Some(format!("{}~", copy_to));
+            Ok(Response::new(url.to_string(), code, headers, body))
+        } else {
+            let (result, headers) =
+                rfs.borrow_mut()
+                    .get_contents(&origin, url, false, options.clone())?;
+            let body = match result {
+                GetResult::Content(s) => Some(s),
+                _ => None,
+            };
+            let code = RemoteFilesystem::find_status_code(&headers);
+            Ok(Response::new(url.to_string(), code, headers, body))
+        }
+    }
+
+    /// Retrieve the options set in the constructor
+    pub fn get_options(&self) -> &IndexMap<String, PhpMixed> {
+        &self.options
+    }
+
+    /// Merges new options
+    pub fn set_options(&mut self, options: IndexMap<String, PhpMixed>) {
+        self.options = array_replace_recursive(self.options.clone(), options);
     }
 
     /// @internal
     pub fn enable_async(&mut self) {
         self.allow_async = true;
-    }
-
-    /// @internal
-    pub fn count_active_jobs(&mut self, index: Option<i64>) -> anyhow::Result<i64> {
-        if self.running_jobs < self.max_jobs {
-            let queued_ids: Vec<i64> = self
-                .jobs
-                .values()
-                .filter(|j| j.status == Self::STATUS_QUEUED)
-                .map(|j| j.id)
-                .collect();
-            for id in queued_ids {
-                if self.running_jobs >= self.max_jobs {
-                    break;
-                }
-                self.start_job(id);
-            }
-        }
-
-        // Unlike the old tick()-driven curl path, `start_job` now settles curl jobs synchronously
-        // (via the temporary bridge runtime), so no job is ever left lingering in STATUS_STARTED
-        // by the time we get here — nothing left to poll or collect.
-
-        if let Some(index) = index {
-            return Ok(
-                if self.jobs.get(&index).map(|j| j.status).unwrap_or(0) < Self::STATUS_COMPLETED {
-                    1
-                } else {
-                    0
-                },
-            );
-        }
-
-        let mut active: i64 = 0;
-        let ids: Vec<i64> = self.jobs.keys().copied().collect();
-        for id in ids {
-            let (status, sync) = {
-                let j = self.jobs.get(&id).unwrap();
-                (j.status, j.sync)
-            };
-            if status < Self::STATUS_COMPLETED {
-                active += 1;
-            } else if !sync {
-                self.jobs.shift_remove(&id);
-            }
-        }
-
-        Ok(active)
-    }
-
-    /// @param  int $index Job id
-    fn get_response(&mut self, index: i64) -> anyhow::Result<Response> {
-        if !self.jobs.contains_key(&index) {
-            return Err(LogicException {
-                message: "Invalid request id".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        if self.jobs.get(&index).unwrap().status == Self::STATUS_FAILED {
-            // PHP: assert(isset($this->jobs[$index]['exception']))
-            let mut job = self.jobs.shift_remove(&index).unwrap();
-            return Err(job.exception.take().unwrap());
-        }
-
-        if self.jobs.get(&index).unwrap().response.is_none() {
-            return Err(LogicException {
-                message: "Response not available yet, call wait() first".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        let mut job = self.jobs.shift_remove(&index).unwrap();
-        let resp = job.response.take().unwrap();
-
-        Ok(resp)
     }
 
     /// @internal
@@ -820,17 +533,16 @@ impl HttpDownloader {
         None
     }
 
-    /// @param  Job  $job
-    fn can_use_curl(&self, job: &Job) -> bool {
+    fn can_use_curl(&self, url: &str, options: &IndexMap<String, PhpMixed>) -> bool {
         if self.curl.is_none() {
             return false;
         }
 
-        if !Preg::is_match(r"{^https?://}i", &job.request.url) {
+        if !Preg::is_match(r"{^https?://}i", url) {
             return false;
         }
 
-        let allow_self_signed = job.request.options.get("ssl").and_then(|v| match v {
+        let allow_self_signed = options.get("ssl").and_then(|v| match v {
             PhpMixed::Array(m) => m.get("allow_self_signed").cloned(),
             _ => None,
         });
@@ -861,13 +573,10 @@ impl HttpDownloader {
         Self {
             io,
             config,
-            jobs: IndexMap::new(),
             options: IndexMap::new(),
-            running_jobs: 0,
-            max_jobs: 12,
+            semaphore: std::rc::Rc::new(tokio::sync::Semaphore::new(12)),
             curl: None,
             rfs: None,
-            id_gen: 0,
             disabled: false,
             allow_async: false,
             mock: None,
@@ -921,7 +630,7 @@ impl HttpDownloader {
     /// For testing only. Mirrors HttpDownloaderMock::get: consumes the next matching expectation
     /// (or falls back to the default handler when not strict) and returns the canned response.
     fn mock_get(
-        &mut self,
+        &self,
         file_url: &str,
         options: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<Response> {
@@ -1018,9 +727,4 @@ impl HttpDownloader {
 
         Err(e.into())
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct JobHandle {
-    id: i64,
 }
