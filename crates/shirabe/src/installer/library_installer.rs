@@ -22,7 +22,9 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
-    pub(crate) vendor_dir: String,
+    /// Behind a RefCell so initialize_vendor_dir can canonicalize it through `&self` (the
+    /// installer instance is shared between concurrent package operations).
+    pub(crate) vendor_dir: std::cell::RefCell<String>,
     pub(crate) download_manager:
         Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -93,7 +95,7 @@ impl LibraryInstaller {
             io,
             r#type,
             filesystem,
-            vendor_dir,
+            vendor_dir: std::cell::RefCell::new(vendor_dir),
             binary_installer,
         }
     }
@@ -108,7 +110,7 @@ impl LibraryInstaller {
     }
 
     /// Make sure binaries are installed for a given package.
-    pub fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+    pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
         let install_path = self.get_install_path(package.clone()).unwrap();
         self.binary_installer
             .borrow_mut()
@@ -119,7 +121,7 @@ impl LibraryInstaller {
     ///
     /// It is used for BC as getInstallPath tends to be overridden by
     /// installer plugins but not getPackageBasePath
-    pub(crate) fn get_package_base_path(&mut self, package: PackageInterfaceHandle) -> String {
+    pub(crate) fn get_package_base_path(&self, package: PackageInterfaceHandle) -> String {
         let install_path = self.get_install_path(package.clone()).unwrap();
         let target_dir = package.get_target_dir();
 
@@ -143,7 +145,7 @@ impl LibraryInstaller {
     /// @return PromiseInterface|null
     /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn install_code(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let download_path = self.get_install_path(package.clone()).unwrap();
@@ -157,7 +159,7 @@ impl LibraryInstaller {
     /// @return PromiseInterface|null
     /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn update_code(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -188,7 +190,7 @@ impl LibraryInstaller {
     /// @return PromiseInterface|null
     /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn remove_code(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let download_path = self.get_package_base_path(package.clone());
@@ -199,11 +201,12 @@ impl LibraryInstaller {
             .await
     }
 
-    pub(crate) fn initialize_vendor_dir(&mut self) {
+    pub(crate) fn initialize_vendor_dir(&self) {
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&self.vendor_dir);
-        self.vendor_dir = realpath(&self.vendor_dir).unwrap_or_default();
+            .ensure_directory_exists(&self.vendor_dir.borrow());
+        let realpath = realpath(&self.vendor_dir.borrow()).unwrap_or_default();
+        *self.vendor_dir.borrow_mut() = realpath;
     }
 
     pub(crate) fn get_download_manager(
@@ -237,7 +240,7 @@ impl InstallerInterface for LibraryInstaller {
     }
 
     fn is_installed(
-        &mut self,
+        &self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
@@ -267,7 +270,7 @@ impl InstallerInterface for LibraryInstaller {
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -281,7 +284,7 @@ impl InstallerInterface for LibraryInstaller {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -296,7 +299,7 @@ impl InstallerInterface for LibraryInstaller {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -311,7 +314,7 @@ impl InstallerInterface for LibraryInstaller {
     }
 
     async fn install(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -339,7 +342,7 @@ impl InstallerInterface for LibraryInstaller {
     }
 
     async fn update(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
@@ -372,7 +375,7 @@ impl InstallerInterface for LibraryInstaller {
     }
 
     async fn uninstall(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -407,13 +410,14 @@ impl InstallerInterface for LibraryInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         self.initialize_vendor_dir();
 
+        let vendor_dir = self.vendor_dir.borrow();
         let base_path = format!(
             "{}{}",
-            if !self.vendor_dir.is_empty() {
-                format!("{}/", self.vendor_dir)
+            if !vendor_dir.is_empty() {
+                format!("{}/", vendor_dir)
             } else {
                 String::new()
             },
@@ -432,13 +436,13 @@ impl InstallerInterface for LibraryInstaller {
         })
     }
 
-    fn as_binary_presence_interface(&mut self) -> Option<&mut dyn BinaryPresenceInterface> {
+    fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {
         Some(self)
     }
 }
 
 impl BinaryPresenceInterface for LibraryInstaller {
-    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
         LibraryInstaller::ensure_binaries_presence(self, package);
     }
 }

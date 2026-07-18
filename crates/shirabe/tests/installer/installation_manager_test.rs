@@ -52,16 +52,16 @@ mockall::mock! {
     pub Installer {
         fn supports(&self, package_type: &str) -> bool;
         fn install(
-            &mut self,
+            &self,
             package: PackageInterfaceHandle,
         ) -> anyhow::Result<Option<PhpMixed>>;
         fn update(
-            &mut self,
+            &self,
             initial: PackageInterfaceHandle,
             target: PackageInterfaceHandle,
         ) -> anyhow::Result<Option<PhpMixed>>;
         fn uninstall(
-            &mut self,
+            &self,
             package: PackageInterfaceHandle,
         ) -> anyhow::Result<Option<PhpMixed>>;
     }
@@ -74,7 +74,7 @@ impl InstallerInterface for MockInstaller {
     }
 
     fn is_installed(
-        &mut self,
+        &self,
         _repo: &dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> bool {
@@ -82,7 +82,7 @@ impl InstallerInterface for MockInstaller {
     }
 
     async fn download(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -90,7 +90,7 @@ impl InstallerInterface for MockInstaller {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -99,7 +99,7 @@ impl InstallerInterface for MockInstaller {
     }
 
     async fn install(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -107,7 +107,7 @@ impl InstallerInterface for MockInstaller {
     }
 
     async fn update(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
@@ -116,7 +116,7 @@ impl InstallerInterface for MockInstaller {
     }
 
     async fn uninstall(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -124,7 +124,7 @@ impl InstallerInterface for MockInstaller {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -132,7 +132,7 @@ impl InstallerInterface for MockInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
         None
     }
 }
@@ -174,7 +174,7 @@ impl InstallerInterface for BinaryInstaller {
     }
 
     fn is_installed(
-        &mut self,
+        &self,
         _repo: &dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> bool {
@@ -182,7 +182,7 @@ impl InstallerInterface for BinaryInstaller {
     }
 
     async fn download(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -190,7 +190,7 @@ impl InstallerInterface for BinaryInstaller {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -199,7 +199,7 @@ impl InstallerInterface for BinaryInstaller {
     }
 
     async fn install(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -207,7 +207,7 @@ impl InstallerInterface for BinaryInstaller {
     }
 
     async fn update(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
@@ -216,7 +216,7 @@ impl InstallerInterface for BinaryInstaller {
     }
 
     async fn uninstall(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -224,7 +224,7 @@ impl InstallerInterface for BinaryInstaller {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -232,17 +232,17 @@ impl InstallerInterface for BinaryInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
         None
     }
 
-    fn as_binary_presence_interface(&mut self) -> Option<&mut dyn BinaryPresenceInterface> {
+    fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {
         Some(self)
     }
 }
 
 impl BinaryPresenceInterface for BinaryInstaller {
-    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
         self.calls
             .borrow_mut()
             .ensure_binaries_presence

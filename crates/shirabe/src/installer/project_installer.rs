@@ -36,7 +36,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     fn is_installed(
-        &mut self,
+        &self,
         _repo: &dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> bool {
@@ -44,7 +44,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -69,7 +69,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -81,7 +81,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -93,7 +93,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn install(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -104,7 +104,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn update(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
@@ -117,7 +117,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn uninstall(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -128,7 +128,7 @@ impl InstallerInterface for ProjectInstaller {
         .into())
     }
 
-    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
         Some(self.install_path.clone())
     }
 }

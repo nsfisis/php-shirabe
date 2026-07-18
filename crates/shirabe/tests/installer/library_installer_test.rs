@@ -196,7 +196,7 @@ fn test_installer_creation_should_not_create_bin_directory() {
 #[test]
 fn test_is_installed() {
     let mut setup = set_up();
-    let mut library =
+    let library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("test/pkg", "1.0.0");
 
@@ -237,7 +237,7 @@ fn test_install() {
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
 
-    let mut library =
+    let library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
 
     let mut repository = InstalledArrayRepository::new().unwrap();
@@ -296,7 +296,7 @@ fn test_update() {
     repository.add_package(initial.clone()).unwrap();
 
     // The default Filesystem is fine; the LibraryInstaller's own filesystem performs the rename.
-    let mut library =
+    let library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
 
     run(library.update(&mut repository, initial.clone(), target.clone())).unwrap();
@@ -344,7 +344,7 @@ fn test_uninstall() {
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
 
-    let mut library =
+    let library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
 
     // PHP mocks hasPackage to return (true, false) over two calls; a real repository
@@ -366,7 +366,7 @@ fn test_uninstall() {
 #[test]
 fn test_get_install_path_without_target_dir() {
     let mut setup = set_up();
-    let mut library =
+    let library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("Vendor/Pkg", "1.0.0");
 
@@ -381,7 +381,7 @@ fn test_get_install_path_without_target_dir() {
 #[test]
 fn test_get_install_path_with_target_dir() {
     let mut setup = set_up();
-    let mut library =
+    let library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("Foo/Bar", "1.0.0");
     package.__set_target_dir(Some("Some/Namespace".to_string()));

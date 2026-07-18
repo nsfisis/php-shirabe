@@ -38,7 +38,7 @@ impl InstallerInterface for InstallPathStubInstaller {
     }
 
     fn is_installed(
-        &mut self,
+        &self,
         _repo: &dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> bool {
@@ -46,7 +46,7 @@ impl InstallerInterface for InstallPathStubInstaller {
     }
 
     async fn download(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -54,7 +54,7 @@ impl InstallerInterface for InstallPathStubInstaller {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -63,7 +63,7 @@ impl InstallerInterface for InstallPathStubInstaller {
     }
 
     async fn install(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -71,7 +71,7 @@ impl InstallerInterface for InstallPathStubInstaller {
     }
 
     async fn update(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
@@ -80,7 +80,7 @@ impl InstallerInterface for InstallPathStubInstaller {
     }
 
     async fn uninstall(
-        &mut self,
+        &self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -88,7 +88,7 @@ impl InstallerInterface for InstallPathStubInstaller {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -96,7 +96,7 @@ impl InstallerInterface for InstallPathStubInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         if package.get_type() == "metapackage" {
             return None;
         }

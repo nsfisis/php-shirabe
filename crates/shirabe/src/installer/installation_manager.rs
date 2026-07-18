@@ -29,11 +29,13 @@ use shirabe_php_shim::{
 /// Package operation manager.
 #[derive(Debug)]
 pub struct InstallationManager {
-    installers: Vec<Box<dyn InstallerInterface>>,
+    /// Rc rather than Box so `get_installer` can hand out shareable handles: the download/cleanup
+    /// futures collected for Loop::wait must own their installer beyond the loop iteration that
+    /// created them (PHP closures capture $installer the same way).
+    installers: Vec<std::rc::Rc<dyn InstallerInterface>>,
     /// Maps a package type to the index of its installer in `installers`. PHP caches the installer
-    /// instance itself; here we store an index instead to avoid sharing ownership of the boxed
-    /// installer. The index never dangles because both `add_installer` and `remove_installer`
-    /// clear the cache whenever `installers` changes.
+    /// instance itself; here we store an index instead. The index never dangles because both
+    /// `add_installer` and `remove_installer` clear the cache whenever `installers` changes.
     cache: IndexMap<String, usize>,
     notifiable_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
@@ -125,7 +127,7 @@ impl InstallationManager {
 
     /// Adds installer
     pub fn add_installer(&mut self, installer: Box<dyn InstallerInterface>) {
-        array_unshift(&mut self.installers, installer);
+        array_unshift(&mut self.installers, std::rc::Rc::from(installer));
         self.cache = IndexMap::new();
     }
 
@@ -135,7 +137,7 @@ impl InstallationManager {
         let key = self
             .installers
             .iter()
-            .position(|inst| inst.as_ref() as *const dyn InstallerInterface as *const () == target);
+            .position(|inst| &**inst as *const dyn InstallerInterface as *const () == target);
         if let Some(k) = key {
             array_splice(&mut self.installers, k as i64, Some(1), vec![]);
             self.cache = IndexMap::new();
@@ -148,19 +150,22 @@ impl InstallationManager {
     /// disabling the PluginManager. This ensures that no third-party
     /// code is ever executed.
     pub fn disable_plugins(&mut self) {
-        for installer in self.installers.iter_mut() {
-            if let Some(plugin_installer) = installer.as_plugin_installer_mut() {
+        for installer in self.installers.iter() {
+            if let Some(plugin_installer) = installer.as_plugin_installer() {
                 plugin_installer.disable_plugins();
             }
         }
     }
 
     /// Returns installer for a specific package type.
-    pub fn get_installer(&mut self, r#type: &str) -> anyhow::Result<&mut dyn InstallerInterface> {
+    pub fn get_installer(
+        &mut self,
+        r#type: &str,
+    ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
         if let Some(&index) = self.cache.get(&r#type) {
-            return Ok(self.installers[index].as_mut());
+            return Ok(self.installers[index].clone());
         }
 
         let index = self
@@ -169,7 +174,7 @@ impl InstallationManager {
             .position(|installer| installer.supports(&r#type));
         if let Some(index) = index {
             self.cache.insert(r#type.clone(), index);
-            return Ok(self.installers[index].as_mut());
+            return Ok(self.installers[index].clone());
         }
 
         Err(InvalidArgumentException {
@@ -416,17 +421,9 @@ impl InstallationManager {
         download_only: bool,
         all_operations: Vec<std::rc::Rc<dyn OperationInterface>>,
     ) -> anyhow::Result<()> {
-        // PHP: waitOnPromises() shows a ProgressBar while the concurrent downloads resolve.
-        // TODO(phase-c-promise): see the identical note in execute_batch — the single-threaded
-        // port downloads serially in this same loop, so only a 0% -> 100% jump is rendered after
-        // the loop instead of PHP's timing-driven intermediate snapshots.
-        let download_promise_count = operations
-            .values()
-            .filter(|op| {
-                let t = op.get_operation_type();
-                t == "update" || t == "install"
-            })
-            .count() as i64;
+        let mut promises: Vec<
+            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+        > = vec![];
 
         for (index, operation) in &operations {
             let op_type = operation.get_operation_type();
@@ -452,62 +449,58 @@ impl InstallationManager {
             }
             let installer = self.get_installer(&package.get_type())?;
 
-            // PHP: $cleanupPromises[$index] = function () use ($index, $installer, $type, $package) {
+            // PHP: $cleanupPromises[$index] = static function () use ($opType, $installer, $package, $initialPackage) {
             //   if (null === $package->getInstallationSource()) { return \React\Promise\resolve(null); }
-            //   return $installer->cleanup($type, $package); };
-            // TODO(phase-c): the cleanup callable must capture the installer and package and invoke
-            // installer.cleanup(...) returning a React promise. It is a 'static closure stored in
-            // cleanup_promises, so installer/package must be Rc-shared (the installer registry is
-            // not Rc yet, see get_installer) and the promise type must be modelled. Both depend on
-            // the async/React-Promise rework, so a no-op future is stored instead.
-            let _ = installer;
-            let op_type_clone = op_type.clone();
+            //   return $installer->cleanup($opType, $package, $initialPackage); };
             let cleanup: Box<
                 dyn Fn() -> Option<
                     std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
                 >,
-            > = Box::new(move || {
-                // avoid calling cleanup if the download was not even initialized for a package
-                // as without installation source configured nothing will work
-                // TODO(phase-b): if (null === $package->getInstallationSource()) return resolve(null);
-                let _ = &op_type_clone;
-                // TODO(phase-c-promise): build the real installer.cleanup() future once the installer
-                // can be shared into a 'static cleanup closure (Stage 2 Rc/Arc).
-                let fut: std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>> =
-                    Box::pin(async { Ok(()) });
-                Some(fut)
-            });
+            > = {
+                let installer = installer.clone();
+                let op_type = op_type.clone();
+                let package = package.clone();
+                let initial_package = initial_package.clone();
+                Box::new(move || {
+                    // avoid calling cleanup if the download was not even initialized for a package
+                    // as without installation source configured nothing will work
+                    if package.get_installation_source().is_none() {
+                        let fut: std::pin::Pin<
+                            Box<dyn std::future::Future<Output = anyhow::Result<()>>>,
+                        > = Box::pin(async { Ok(()) });
+                        return Some(fut);
+                    }
+
+                    let installer = installer.clone();
+                    let op_type = op_type.clone();
+                    let package = package.clone();
+                    let initial_package = initial_package.clone();
+                    let fut: std::pin::Pin<
+                        Box<dyn std::future::Future<Output = anyhow::Result<()>>>,
+                    > = Box::pin(async move {
+                        installer
+                            .cleanup(&op_type, package, initial_package)
+                            .await
+                            .map(|_| ())
+                    });
+                    Some(fut)
+                })
+            };
             cleanup_promises.insert(*index, cleanup);
 
             if op_type != "uninstall" {
-                // TODO(phase-c-promise): PHP collects every download and runs them concurrently via
-                // Loop::wait; the single-threaded loop awaits each serially instead.
-                let installer = self.get_installer(&package.get_type())?;
-                installer.download(package, initial_package).await?;
+                let installer = installer.clone();
+                let package = package.clone();
+                let initial_package = initial_package.clone();
+                promises.push(Box::pin(async move {
+                    installer.download(package, initial_package).await.map(|_| ())
+                }));
             }
         }
 
-        if self.output_progress
-            && !Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0")
-            && !self.io.is_debug()
-            && download_promise_count > 1
-        {
-            let bar = {
-                let io_ref = self.io.borrow();
-                io_ref
-                    .as_any()
-                    .downcast_ref::<ConsoleIO>()
-                    .map(|console_io| console_io.get_progress_bar(download_promise_count))
-            };
-            if let Some(mut bar) = bar {
-                bar.start(Some(download_promise_count))?;
-                bar.set_progress(download_promise_count)?;
-                bar.finish()?;
-                bar.clear()?;
-                if !self.io.is_decorated() {
-                    self.io.write_error("");
-                }
-            }
+        // execute all downloads first
+        if !promises.is_empty() {
+            self.wait_on_promises(promises).await?;
         }
 
         if download_only {
@@ -1010,6 +1003,48 @@ impl InstallationManager {
                 .or_default()
                 .push(package.clone());
         }
+    }
+
+    /// PHP: waitOnPromises() creates a ProgressBar up front and Loop::wait advances it while the
+    /// concurrent promises resolve.
+    /// TODO(phase-c-promise): Loop::wait has no active-job counter to feed the bar yet, so a
+    /// single 0% -> 100% jump is rendered after the wait instead of PHP's timing-driven
+    /// intermediate snapshots.
+    async fn wait_on_promises(
+        &mut self,
+        promises: Vec<
+            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+        >,
+    ) -> anyhow::Result<()> {
+        let promise_count = promises.len() as i64;
+        let show_progress = self.output_progress
+            && !Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0")
+            && !self.io.is_debug()
+            && promise_count > 1;
+
+        let result = self.loop_.borrow_mut().wait(promises, None).await;
+
+        if result.is_ok() && show_progress {
+            let bar = {
+                let io_ref = self.io.borrow();
+                io_ref
+                    .as_any()
+                    .downcast_ref::<ConsoleIO>()
+                    .map(|console_io| console_io.get_progress_bar(promise_count))
+            };
+            if let Some(mut bar) = bar {
+                bar.start(Some(promise_count))?;
+                bar.set_progress(promise_count)?;
+                bar.finish()?;
+                bar.clear()?;
+                // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
+                if !self.io.is_decorated() {
+                    self.io.write_error("");
+                }
+            }
+        }
+
+        result
     }
 
     async fn run_cleanup(

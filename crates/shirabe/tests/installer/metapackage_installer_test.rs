@@ -19,7 +19,7 @@ fn installer() -> MetapackageInstaller {
 #[test]
 fn test_install() {
     let package = get_package("test/pkg", "1.0.0");
-    let mut installer = installer();
+    let installer = installer();
     let mut repository = InstalledArrayRepository::new_with_packages(vec![]).unwrap();
 
     run(installer.install(&mut repository, package.clone())).unwrap();
@@ -31,7 +31,7 @@ fn test_install() {
 fn test_update() {
     let initial = get_package("test/initial", "1.0.0");
     let target = get_package("test/target", "1.0.1");
-    let mut installer = installer();
+    let installer = installer();
     let mut repository =
         InstalledArrayRepository::new_with_packages(vec![initial.clone()]).unwrap();
 
@@ -47,7 +47,7 @@ fn test_update() {
 #[test]
 fn test_uninstall() {
     let package = get_package("test/pkg", "1.0.0");
-    let mut installer = installer();
+    let installer = installer();
     let mut repository =
         InstalledArrayRepository::new_with_packages(vec![package.clone()]).unwrap();
 

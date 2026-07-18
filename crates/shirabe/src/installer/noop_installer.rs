@@ -15,7 +15,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     fn is_installed(
-        &mut self,
+        &self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
@@ -23,7 +23,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn download(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -31,7 +31,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -40,7 +40,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -49,7 +49,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn install(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -61,7 +61,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn update(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
@@ -83,7 +83,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn uninstall(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -99,7 +99,7 @@ impl InstallerInterface for NoopInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         let target_dir = package.get_target_dir();
         let pretty_name = package.get_pretty_name();
 

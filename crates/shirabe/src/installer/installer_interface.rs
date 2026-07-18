@@ -11,57 +11,57 @@ pub trait InstallerInterface: std::fmt::Debug {
     fn supports(&self, package_type: &str) -> bool;
 
     fn is_installed(
-        &mut self,
+        &self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool;
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn install(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn update(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn uninstall(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
 
-    fn as_binary_presence_interface(&mut self) -> Option<&mut dyn BinaryPresenceInterface> {
+    fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {
         None
     }
 
-    fn as_plugin_installer_mut(&mut self) -> Option<&mut PluginInstaller> {
+    fn as_plugin_installer(&self) -> Option<&PluginInstaller> {
         None
     }
 }

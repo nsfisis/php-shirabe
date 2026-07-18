@@ -29,7 +29,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     fn is_installed(
-        &mut self,
+        &self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
@@ -37,7 +37,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn download(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -45,7 +45,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -54,7 +54,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -63,7 +63,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn install(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -79,7 +79,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn update(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
@@ -108,7 +108,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn uninstall(
-        &mut self,
+        &self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -131,7 +131,7 @@ impl InstallerInterface for MetapackageInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
         None
     }
 }
