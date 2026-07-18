@@ -33,6 +33,7 @@ hyperfine \
   --export-json "$OUTDIR/results-$PACKAGE_SLUG.json" \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
   --ignore-failure \
+  --show-output \
   --command-name Shirabe "'$BIN' create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-shirabe'" \
   --command-name Composer "composer create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-composer'"
 
