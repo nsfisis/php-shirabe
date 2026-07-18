@@ -548,9 +548,16 @@ impl ProcessExecutor {
 
     /// starts a process on the commandline in async mode
     ///
-    /// `&self` so that concurrent calls through the same `Rc<RefCell<ProcessExecutor>>` can
-    /// coexist (shared borrows); the max_jobs throttle is enforced by the semaphore.
-    pub async fn execute_async<C>(&self, command: C, cwd: Option<&str>) -> anyhow::Result<Process>
+    /// Returns a future that does NOT borrow the executor: everything it needs is captured up
+    /// front, so callers can drop their `Ref`/`RefMut` on the shared `Rc<RefCell<ProcessExecutor>>`
+    /// before awaiting (`let fut = pe.borrow().execute_async(...); fut.await`). Holding a borrow
+    /// across the await would panic as soon as a sibling future or a sync `execute()` call touches
+    /// the same executor. The max_jobs throttle is enforced by the semaphore.
+    pub fn execute_async<C>(
+        &self,
+        command: C,
+        cwd: Option<&str>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
     where
         C: IntoExecCommand,
     {
@@ -563,64 +570,70 @@ impl ProcessExecutor {
             // returning a misleading Process.
             todo!("ProcessExecutorMock async path needs a Process mock seam in external-packages");
         }
-        if !self.allow_async {
-            return Err(LogicException {
-                message: "You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        // PHP queues the job and only startJob()s it once runningJobs < maxJobs; the permit is the
-        // equivalent gate, so everything below (including the "Executing async command" debug
-        // line PHP prints from startJob) happens only once a slot is free.
+        let allow_async = self.allow_async;
         let semaphore = self.semaphore.clone();
-        let _permit = semaphore
-            .acquire()
-            .await
-            .expect("the semaphore is never closed");
+        let io = self.io.clone();
+        let cwd = cwd.map(ToOwned::to_owned);
 
-        self.output_command_run(&command, cwd, true);
-
-        // PHP: $job['reject']($e) on process construction/start failure — surfaced as Err here.
-        let mut process = if is_string(&command) {
-            Process::from_shell_commandline(
-                command.as_string().unwrap_or(""),
-                cwd,
-                None,
-                PhpMixed::Null,
-                Some(Self::get_timeout() as f64),
-            )?
-        } else if let PhpMixed::List(ref list) = command {
-            Process::new(
-                list.iter()
-                    .map(|v| v.as_string().unwrap_or("").to_string())
-                    .collect(),
-                cwd.map(ToOwned::to_owned),
-                None,
-                PhpMixed::Null,
-                Some(Self::get_timeout() as f64),
-            )?
-        } else {
-            return Err(LogicException {
-                message: "Invalid command type".to_string(),
-                code: 0,
+        Box::pin(async move {
+            if !allow_async {
+                return Err(LogicException {
+                    message: "You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string(),
+                    code: 0,
+                }
+                .into());
             }
-            .into());
-        };
 
-        process.start(None, IndexMap::new())?;
+            // PHP queues the job and only startJob()s it once runningJobs < maxJobs; the permit is
+            // the equivalent gate, so everything below (including the "Executing async command"
+            // debug line PHP prints from startJob) happens only once a slot is free.
+            let _permit = semaphore
+                .acquire()
+                .await
+                .expect("the semaphore is never closed");
 
-        // PHP's countActiveJobs tick: pump the process until it exits, checking the timeout each
-        // round. The async sleep yields to the reactor so sibling jobs genuinely overlap.
-        while process.is_running() {
-            process.check_timeout()?;
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-        }
+            Self::output_command_run_with(&io, &command, cwd.as_deref(), true);
 
-        // PHP resolves the promise with the Process regardless of its exit status; callers
-        // inspect is_successful() themselves.
-        Ok(process)
+            // PHP: $job['reject']($e) on process construction/start failure — surfaced as Err here.
+            let mut process = if is_string(&command) {
+                Process::from_shell_commandline(
+                    command.as_string().unwrap_or(""),
+                    cwd.as_deref(),
+                    None,
+                    PhpMixed::Null,
+                    Some(Self::get_timeout() as f64),
+                )?
+            } else if let PhpMixed::List(ref list) = command {
+                Process::new(
+                    list.iter()
+                        .map(|v| v.as_string().unwrap_or("").to_string())
+                        .collect(),
+                    cwd.clone(),
+                    None,
+                    PhpMixed::Null,
+                    Some(Self::get_timeout() as f64),
+                )?
+            } else {
+                return Err(LogicException {
+                    message: "Invalid command type".to_string(),
+                    code: 0,
+                }
+                .into());
+            };
+
+            process.start(None, IndexMap::new())?;
+
+            // PHP's countActiveJobs tick: pump the process until it exits, checking the timeout
+            // each round. The async sleep yields to the reactor so sibling jobs genuinely overlap.
+            while process.is_running() {
+                process.check_timeout()?;
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            }
+
+            // PHP resolves the promise with the Process regardless of its exit status; callers
+            // inspect is_successful() themselves.
+            Ok(process)
+        })
     }
 
     fn output_handler(
@@ -712,7 +725,18 @@ impl ProcessExecutor {
 
     /// @param string|list<string> $command
     fn output_command_run(&self, command: &PhpMixed, cwd: Option<&str>, r#async: bool) {
-        if self.io.is_none() || !self.io.as_ref().unwrap().is_debug() {
+        Self::output_command_run_with(&self.io, command, cwd, r#async);
+    }
+
+    /// `output_command_run` body as an associated fn so the `execute_async` future can carry a
+    /// clone of the io handle instead of borrowing the executor.
+    fn output_command_run_with(
+        io: &Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        command: &PhpMixed,
+        cwd: Option<&str>,
+        r#async: bool,
+    ) {
+        if io.is_none() || !io.as_ref().unwrap().is_debug() {
             return;
         }
 
@@ -754,7 +778,7 @@ impl ProcessExecutor {
             "--password '***' ",
             &safe_command,
         );
-        self.io.as_ref().unwrap().write_error(&format!(
+        io.as_ref().unwrap().write_error(&format!(
             "Executing{} command ({}): {}",
             if r#async { " async" } else { "" },
             cwd.unwrap_or("CWD"),

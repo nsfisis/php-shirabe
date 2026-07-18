@@ -576,9 +576,9 @@ impl VersionGuesser {
                         },
                         &scm_cmdline,
                     );
-                    let mut process = sync_executor::block_on(
-                        self.process.borrow().execute_async(&cmd_line, Some(path)),
-                    )?;
+                    let process_future =
+                        self.process.borrow().execute_async(&cmd_line, Some(path));
+                    let mut process = sync_executor::block_on(process_future)?;
                     if !process.is_successful() {
                         continue;
                     }

@@ -17,42 +17,39 @@ use std::path::{Path, PathBuf};
 
 pub trait ArchiveDownloader {
     fn inner(&self) -> &FileDownloader;
-    fn inner_mut(&mut self) -> &mut FileDownloader;
-    fn cleanup_executed(&self) -> &IndexMap<String, bool>;
-    fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool>;
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>>;
 
     async fn extract(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.cleanup_executed_mut()
+        self.cleanup_executed()
+            .borrow_mut()
             .shift_remove(&package.get_name());
-        self.inner_mut()
-            .prepare(r#type, package, path, prev_package)
-            .await
+        self.inner().prepare(r#type, package, path, prev_package).await
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.cleanup_executed_mut().insert(package.get_name(), true);
-        self.inner_mut()
-            .cleanup(r#type, package, path, prev_package)
-            .await
+        self.cleanup_executed()
+            .borrow_mut()
+            .insert(package.get_name(), true);
+        self.inner().cleanup(r#type, package, path, prev_package).await
     }
 
     /// @inheritDoc
@@ -60,13 +57,13 @@ pub trait ArchiveDownloader {
     /// @throws \RuntimeException
     /// @throws \UnexpectedValueException
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.inner().io.write_error(&format!(
+            self.inner().io.borrow().write_error(&format!(
                 "  - {}{}",
                 InstallOperation::format(package.clone(), false),
                 self.get_install_operation_appendix(package.clone(), path)
@@ -98,7 +95,7 @@ pub trait ArchiveDownloader {
                     .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR)),
             )
         {
-            self.inner_mut()
+            self.inner()
                 .filesystem
                 .borrow_mut()
                 .empty_directory(path, true);
@@ -111,15 +108,14 @@ pub trait ArchiveDownloader {
             }
         };
 
-        self.inner_mut()
-            .add_cleanup_path(package.clone(), &temporary_dir);
+        self.inner().add_cleanup_path(package.clone(), &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
         if !is_dir(path) || realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
-            self.inner_mut().add_cleanup_path(package.clone(), path);
+            self.inner().add_cleanup_path(package.clone(), path);
         }
 
-        self.inner_mut()
+        self.inner()
             .filesystem
             .borrow_mut()
             .ensure_directory_exists(&temporary_dir);
@@ -130,7 +126,7 @@ pub trait ArchiveDownloader {
             .await
         {
             Err(e) => {
-                install_cleanup(self.inner_mut(), package.clone(), path, &temporary_dir)?;
+                install_cleanup(self.inner(), package.clone(), path, &temporary_dir)?;
                 Err(e)
             }
             Ok(_) => {
@@ -191,14 +187,10 @@ pub trait ArchiveDownloader {
                     )?;
                 }
 
-                self.inner()
-                    .filesystem
-                    .borrow_mut()
-                    .remove_directory_async(&temporary_dir)
+                Filesystem::remove_directory_async_via(&self.inner().filesystem, &temporary_dir)
                     .await?;
-                self.inner_mut()
-                    .remove_cleanup_path(package.clone(), &temporary_dir);
-                self.inner_mut().remove_cleanup_path(package, path);
+                self.inner().remove_cleanup_path(package.clone(), &temporary_dir);
+                self.inner().remove_cleanup_path(package, path);
 
                 Ok(None)
             }
@@ -216,7 +208,7 @@ pub trait ArchiveDownloader {
 }
 
 fn install_cleanup(
-    inner: &mut FileDownloader,
+    inner: &FileDownloader,
     package: PackageInterfaceHandle,
     path: &str,
     temporary_dir: &str,

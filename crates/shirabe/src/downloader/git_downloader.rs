@@ -27,12 +27,12 @@ use shirabe_php_shim::{
 pub struct GitDownloader {
     inner: VcsDownloaderBase,
     /// @var array<string, bool>
-    has_stashed_changes: IndexMap<String, bool>,
+    has_stashed_changes: std::cell::RefCell<IndexMap<String, bool>>,
     /// @var array<string, bool>
-    has_discarded_changes: IndexMap<String, bool>,
-    git_util: GitUtil,
+    has_discarded_changes: std::cell::RefCell<IndexMap<String, bool>>,
+    git_util: std::cell::RefCell<GitUtil>,
     /// @var array<int, array<string, bool>>
-    cached_packages: IndexMap<i64, IndexMap<String, bool>>,
+    cached_packages: std::cell::RefCell<IndexMap<i64, IndexMap<String, bool>>>,
 }
 
 impl GitDownloader {
@@ -51,10 +51,10 @@ impl GitDownloader {
         );
         Self {
             inner,
-            has_stashed_changes: IndexMap::new(),
-            has_discarded_changes: IndexMap::new(),
-            git_util,
-            cached_packages: IndexMap::new(),
+            has_stashed_changes: std::cell::RefCell::new(IndexMap::new()),
+            has_discarded_changes: std::cell::RefCell::new(IndexMap::new()),
+            git_util: std::cell::RefCell::new(git_util),
+            cached_packages: std::cell::RefCell::new(IndexMap::new()),
         }
     }
 
@@ -256,7 +256,7 @@ impl GitDownloader {
     /// @throws \RuntimeException
     /// @return null|string       if a string is returned, it is the commit reference that was checked out if the original could not be found
     pub(crate) fn update_to_commit(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         reference: &str,
@@ -264,10 +264,16 @@ impl GitDownloader {
     ) -> anyhow::Result<Option<String>> {
         let force: Vec<String> = if self
             .has_discarded_changes
+            .borrow()
             .get(path)
             .copied()
             .unwrap_or(false)
-            || self.has_stashed_changes.get(path).copied().unwrap_or(false)
+            || self
+                .has_stashed_changes
+                .borrow()
+                .get(path)
+                .copied()
+                .unwrap_or(false)
         {
             vec!["-f".to_string()]
         } else {
@@ -489,7 +495,7 @@ impl GitDownloader {
         .into())
     }
 
-    pub(crate) fn update_origin_url(&mut self, path: &str, url: &str) {
+    pub(crate) fn update_origin_url(&self, path: &str, url: &str) {
         let mut output = String::new();
         self.inner.process.borrow_mut().execute_args(
             &[
@@ -506,7 +512,7 @@ impl GitDownloader {
         self.set_push_url(path, url);
     }
 
-    pub(crate) fn set_push_url(&mut self, path: &str, url: &str) {
+    pub(crate) fn set_push_url(&self, path: &str, url: &str) {
         // set push url for github projects
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
@@ -553,7 +559,7 @@ impl GitDownloader {
 
     /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
-    pub(crate) async fn discard_changes(&mut self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+    pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -582,14 +588,14 @@ impl GitDownloader {
             .into());
         }
 
-        self.has_discarded_changes.insert(path, true);
+        self.has_discarded_changes.borrow_mut().insert(path, true);
 
         Ok(None)
     }
 
     /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
-    pub(crate) async fn stash_changes(&mut self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+    pub(crate) async fn stash_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -609,13 +615,13 @@ impl GitDownloader {
             .into());
         }
 
-        self.has_stashed_changes.insert(path, true);
+        self.has_stashed_changes.borrow_mut().insert(path, true);
 
         Ok(None)
     }
 
     /// @throws \RuntimeException
-    pub(crate) fn view_diff(&mut self, path: &str) -> anyhow::Result<()> {
+    pub(crate) fn view_diff(&self, path: &str) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -680,7 +686,7 @@ impl GitDownloader {
     /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
     /// local changes.
     fn fail_on_local_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<()> {
@@ -708,7 +714,7 @@ impl DvcsDownloaderInterface for GitDownloader {
 
 impl ChangeReportInterface for GitDownloader {
     fn get_local_changes(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -775,16 +781,12 @@ impl VcsDownloader for GitDownloader {
         &self.inner.filesystem
     }
 
-    fn has_cleaned_changes(&self) -> &IndexMap<String, bool> {
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
         &self.inner.has_cleaned_changes
     }
 
-    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool> {
-        &mut self.inner.has_cleaned_changes
-    }
-
     async fn do_download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
@@ -831,7 +833,7 @@ impl VcsDownloader for GitDownloader {
             );
             let r#ref = package.get_source_reference();
             let pretty_version = package.get_pretty_version();
-            if self.git_util.fetch_ref_or_sync_mirror(
+            if self.git_util.borrow_mut().fetch_ref_or_sync_mirror(
                 url,
                 &cache_path,
                 r#ref.as_deref().unwrap_or(""),
@@ -839,6 +841,7 @@ impl VcsDownloader for GitDownloader {
             )? && is_dir(&cache_path)
             {
                 self.cached_packages
+                    .borrow_mut()
                     .entry(package.get_id())
                     .or_default()
                     .insert(r#ref.as_deref().unwrap_or("").to_string(), true);
@@ -855,7 +858,7 @@ impl VcsDownloader for GitDownloader {
     }
 
     async fn do_install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
@@ -878,6 +881,7 @@ impl VcsDownloader for GitDownloader {
         let commands: Vec<Vec<String>>;
         let has_cached = self
             .cached_packages
+            .borrow()
             .get(&package.get_id())
             .and_then(|m| m.get(&r#ref))
             .copied()
@@ -983,6 +987,7 @@ impl VcsDownloader for GitDownloader {
         self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
         self.git_util
+            .borrow_mut()
             .run_commands(commands, url, Some(&path), true, ())?;
 
         let source_url = package.get_source_url();
@@ -1006,7 +1011,7 @@ impl VcsDownloader for GitDownloader {
     }
 
     async fn do_update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -1041,6 +1046,7 @@ impl VcsDownloader for GitDownloader {
         let remote_url;
         let has_cached = self
             .cached_packages
+            .borrow()
             .get(&target.get_id())
             .and_then(|m| m.get(&r#ref))
             .copied()
@@ -1101,6 +1107,7 @@ impl VcsDownloader for GitDownloader {
             ];
 
             self.git_util
+                .borrow_mut()
                 .run_commands(commands, url, Some(&path), false, ())?;
         }
 
@@ -1113,6 +1120,7 @@ impl VcsDownloader for GitDownloader {
             "%sanitizedUrl%".to_string(),
         ];
         self.git_util
+            .borrow_mut()
             .run_commands(vec![command], url, Some(&path), false, ())?;
 
         let pretty_version = target.get_pretty_version();
@@ -1167,7 +1175,7 @@ impl VcsDownloader for GitDownloader {
     }
 
     async fn clean_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         update: bool,
@@ -1330,15 +1338,16 @@ impl VcsDownloader for GitDownloader {
         Ok(None)
     }
 
-    fn reapply_changes(&mut self, path: &str) -> anyhow::Result<()> {
+    fn reapply_changes(&self, path: &str) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         if self
             .has_stashed_changes
+            .borrow()
             .get(&path)
             .copied()
             .unwrap_or(false)
         {
-            self.has_stashed_changes.shift_remove(&path);
+            self.has_stashed_changes.borrow_mut().shift_remove(&path);
             self.inner.io.write_error3(
                 "    <info>Re-applying stashed changes</info>",
                 true,
@@ -1362,12 +1371,12 @@ impl VcsDownloader for GitDownloader {
             }
         }
 
-        self.has_discarded_changes.shift_remove(&path);
+        self.has_discarded_changes.borrow_mut().shift_remove(&path);
         Ok(())
     }
 
     fn get_commit_logs(
-        &mut self,
+        &self,
         from_reference: &str,
         to_reference: &str,
         path: &str,
@@ -1421,9 +1430,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
         Some(self)
     }
 
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -1434,7 +1441,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -1444,7 +1451,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -1454,7 +1461,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     }
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
@@ -1463,7 +1470,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -1472,7 +1479,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     }
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
@@ -1481,7 +1488,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

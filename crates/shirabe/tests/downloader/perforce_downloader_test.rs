@@ -83,7 +83,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
     let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
-    let mut downloader = PerforceDownloader::new(io, config, process, fs);
+    let downloader = PerforceDownloader::new(io, config, process, fs);
 
     downloader.init_perforce(
         package,
@@ -101,7 +101,7 @@ fn test_init_perforce_does_nothing_if_perforce_already_set() {
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
     let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
-    let mut downloader = PerforceDownloader::new(io, config, process, fs);
+    let downloader = PerforceDownloader::new(io, config, process, fs);
 
     // The already-set perforce only sees initializePath; the repository's getRepoConfig is
     // never consulted (the early return happens before reaching it).
@@ -146,7 +146,7 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>)
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
     let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
-    let mut downloader = PerforceDownloader::new(io, config, process, fs);
+    let downloader = PerforceDownloader::new(io, config, process, fs);
 
     let mut perforce = MockPerforce::new();
     let expected_path = test_path_str.clone();

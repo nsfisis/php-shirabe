@@ -18,39 +18,39 @@ mockall::mock! {
     impl DownloaderInterface for Downloader {
         fn get_installation_source(&self) -> String;
         async fn download(
-            &mut self,
+            &self,
             package: PackageInterfaceHandle,
             path: &str,
             prev_package: Option<PackageInterfaceHandle>,
             output: bool,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn prepare(
-            &mut self,
+            &self,
             r#type: &str,
             package: PackageInterfaceHandle,
             path: &str,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn install(
-            &mut self,
+            &self,
             package: PackageInterfaceHandle,
             path: &str,
             output: bool,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn update(
-            &mut self,
+            &self,
             initial: PackageInterfaceHandle,
             target: PackageInterfaceHandle,
             path: &str,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn remove(
-            &mut self,
+            &self,
             package: PackageInterfaceHandle,
             path: &str,
             output: bool,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn cleanup(
-            &mut self,
+            &self,
             r#type: &str,
             package: PackageInterfaceHandle,
             path: &str,

@@ -51,7 +51,10 @@ pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
 #[derive(Debug)]
 pub struct FileDownloader {
     /// @var IOInterface
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    ///
+    /// Behind a RefCell so `get_local_changes` can temporarily swap in a NullIO through `&self`
+    /// (PHP: `$this->io = new NullIO;` ... restore), now that the downloader methods take `&self`.
+    pub(crate) io: std::cell::RefCell<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @var Config
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var HttpDownloader
@@ -72,7 +75,10 @@ pub struct FileDownloader {
     /// this write needs guarding, so it is the only field isolated behind a lock.
     last_cache_writes: Mutex<IndexMap<String, String>>,
     /// @var array<string, string[]> Map of package name to list of paths
-    additional_cleanup_paths: IndexMap<String, Vec<String>>,
+    ///
+    /// Behind a RefCell so add/remove_cleanup_path work through `&self` (needed since install()
+    /// mutates it while downloads of other packages may be in flight on sibling futures).
+    additional_cleanup_paths: std::cell::RefCell<IndexMap<String, Vec<String>>>,
 }
 
 impl FileDownloader {
@@ -106,7 +112,7 @@ impl FileDownloader {
         });
 
         let this = Self {
-            io,
+            io: std::cell::RefCell::new(io),
             config,
             http_downloader,
             event_dispatcher,
@@ -114,14 +120,14 @@ impl FileDownloader {
             process,
             filesystem,
             last_cache_writes: Mutex::new(IndexMap::new()),
-            additional_cleanup_paths: IndexMap::new(),
+            additional_cleanup_paths: std::cell::RefCell::new(IndexMap::new()),
         };
 
         if let Some(cache) = &this.cache
             && cache.borrow().gc_is_necessary()
         {
             // PHP: writeError('Running cache garbage collection', true, io_interface::VERY_VERBOSE)
-            this.io.write_error("Running cache garbage collection");
+            this.io.borrow().write_error("Running cache garbage collection");
             let ttl = this
                 .config
                 .borrow_mut()
@@ -148,15 +154,13 @@ impl DownloaderInterface for FileDownloader {
         "dist".to_owned()
     }
 
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
     /// @inheritDoc
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -234,7 +238,7 @@ impl DownloaderInterface for FileDownloader {
 
             if from_cache {
                 if output {
-                    self.io.write_error3(
+                    self.io.borrow().write_error3(
                         &format!(
                             "  - Loading <info>{}</info> (<comment>{}</comment>) from cache",
                             package.get_name(),
@@ -260,7 +264,7 @@ impl DownloaderInterface for FileDownloader {
                 }
             } else {
                 if output {
-                    self.io.write_error(&format!(
+                    self.io.borrow().write_error(&format!(
                         "  - Downloading <info>{}</info> (<comment>{}</comment>)",
                         package.get_name(),
                         package.get_full_pretty_version(
@@ -272,7 +276,7 @@ impl DownloaderInterface for FileDownloader {
 
                 let add_copy_result = self
                     .http_downloader
-                    .borrow_mut()
+                    .borrow()
                     .add_copy(&url.processed, &file_name, package.get_transport_options())
                     .await;
                 match add_copy_result {
@@ -367,20 +371,20 @@ impl DownloaderInterface for FileDownloader {
                             let code = e
                                 .downcast_ref::<TransportException>()
                                 .map_or(0, |te| te.get_code());
-                            if self.io.is_debug() {
-                                self.io.write_error(&format!(
+                            if self.io.borrow().is_debug() {
+                                self.io.borrow().write_error(&format!(
                                     "    Failed downloading {}: [{}] {}: {}",
                                     package.get_name(),
                                     get_class(&PhpMixed::Null),
                                     code,
                                     e
                                 ));
-                                self.io.write_error(&format!(
+                                self.io.borrow().write_error(&format!(
                                     "    Trying the next URL for {}",
                                     package.get_name()
                                 ));
                             } else {
-                                self.io.write_error(&format!(
+                                self.io.borrow().write_error(&format!(
                                     "    Failed downloading {}, trying the next URL ({}: {})",
                                     package.get_name(),
                                     code,
@@ -433,7 +437,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn prepare(
-        &mut self,
+        &self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _path: &str,
@@ -444,7 +448,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn cleanup(
-        &mut self,
+        &self,
         _type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -477,6 +481,7 @@ impl DownloaderInterface for FileDownloader {
 
         if let Some(paths) = self
             .additional_cleanup_paths
+            .borrow()
             .get(&package.get_name())
             .cloned()
         {
@@ -499,13 +504,13 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.write_error(&format!(
+            self.io.borrow().write_error(&format!(
                 "  - {}",
                 InstallOperation::format(package.clone(), false)
             ));
@@ -556,12 +561,12 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.write_error(&format!(
+        self.io.borrow().write_error(&format!(
             "  - {}{}",
             UpdateOperation::format(initial.clone(), target.clone(), false),
             self.get_install_operation_appendix(target.clone(), path)
@@ -574,22 +579,18 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.write_error(&format!(
+            self.io.borrow().write_error(&format!(
                 "  - {}",
                 UninstallOperation::format(package, false)
             ));
         }
-        let result = self
-            .filesystem
-            .borrow_mut()
-            .remove_directory_async(path)
-            .await?;
+        let result = Filesystem::remove_directory_async_via(&self.filesystem, path).await?;
         if !result {
             return Err(RuntimeException {
                 message: format!("Could not completely delete {}, aborting.", path),
@@ -606,15 +607,16 @@ impl ChangeReportInterface for FileDownloader {
     /// @inheritDoc
     /// @throws \RuntimeException
     fn get_local_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
         let prev_io = std::mem::replace(
-            &mut self.io,
+            &mut *self.io.borrow_mut(),
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
         );
         self.io
+            .borrow()
             .borrow_mut()
             .load_configuration(&mut self.config.borrow_mut())?;
 
@@ -652,7 +654,7 @@ impl ChangeReportInterface for FileDownloader {
             Ok(output)
         })();
 
-        self.io = prev_io;
+        *self.io.borrow_mut() = prev_io;
 
         let (e, output) = match result {
             Ok(output) => (None, output),
@@ -660,7 +662,7 @@ impl ChangeReportInterface for FileDownloader {
         };
 
         if let Some(err) = e {
-            if self.io.is_debug() {
+            if self.io.borrow().is_debug() {
                 return Err(err);
             }
 
@@ -712,15 +714,20 @@ impl FileDownloader {
         }
     }
 
-    pub(crate) fn add_cleanup_path(&mut self, package: PackageInterfaceHandle, path: &str) {
+    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
         self.additional_cleanup_paths
+            .borrow_mut()
             .entry(package.get_name())
             .or_default()
             .push(path.to_string());
     }
 
-    pub(crate) fn remove_cleanup_path(&mut self, package: PackageInterfaceHandle, path: &str) {
-        if let Some(paths) = self.additional_cleanup_paths.get_mut(&package.get_name()) {
+    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
+        if let Some(paths) = self
+            .additional_cleanup_paths
+            .borrow_mut()
+            .get_mut(&package.get_name())
+        {
             // PHP: array_search($path, ..., true)
             let idx = paths.iter().position(|p| p == path);
             if let Some(i) = idx {

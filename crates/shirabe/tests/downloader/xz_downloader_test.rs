@@ -92,7 +92,7 @@ fn test_error_messages() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let mut downloader = XzDownloader::new(
+    let downloader = XzDownloader::new(
         io,
         config,
         http_downloader.clone(),

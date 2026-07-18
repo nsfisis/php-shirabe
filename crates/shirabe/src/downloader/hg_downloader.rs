@@ -50,16 +50,12 @@ impl VcsDownloader for HgDownloader {
         &self.inner.filesystem
     }
 
-    fn has_cleaned_changes(&self) -> &IndexMap<String, bool> {
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
         &self.inner.has_cleaned_changes
     }
 
-    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool> {
-        &mut self.inner.has_cleaned_changes
-    }
-
     async fn do_download(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _path: &str,
         _url: &str,
@@ -77,7 +73,7 @@ impl VcsDownloader for HgDownloader {
     }
 
     async fn do_install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
@@ -131,7 +127,7 @@ impl VcsDownloader for HgDownloader {
     }
 
     async fn do_update(
-        &mut self,
+        &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -182,7 +178,7 @@ impl VcsDownloader for HgDownloader {
     }
 
     fn get_commit_logs(
-        &mut self,
+        &self,
         from_reference: &str,
         to_reference: &str,
         path: &str,
@@ -224,7 +220,7 @@ impl VcsDownloader for HgDownloader {
 
 impl ChangeReportInterface for HgDownloader {
     fn get_local_changes(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -257,9 +253,7 @@ impl VcsCapableDownloaderInterface for HgDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for HgDownloader {
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -274,7 +268,7 @@ impl DownloaderInterface for HgDownloader {
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -284,7 +278,7 @@ impl DownloaderInterface for HgDownloader {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -294,7 +288,7 @@ impl DownloaderInterface for HgDownloader {
     }
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
@@ -303,7 +297,7 @@ impl DownloaderInterface for HgDownloader {
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -312,7 +306,7 @@ impl DownloaderInterface for HgDownloader {
     }
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
@@ -321,7 +315,7 @@ impl DownloaderInterface for HgDownloader {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

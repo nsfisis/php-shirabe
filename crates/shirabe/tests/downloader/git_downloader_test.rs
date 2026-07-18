@@ -120,7 +120,7 @@ fn test_download_for_package_without_source_reference() {
     let package = get_package("dummy/pkg", "1.0.0", None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(async {
         downloader.download(package.clone(), "/path", None).await?;
@@ -183,7 +183,7 @@ fn test_download() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     run(async {
         downloader
@@ -303,7 +303,7 @@ fn test_download_with_cache() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, Some(config), process, None);
+    let downloader = get_downloader_mock(None, Some(config), process, None);
 
     run(async {
         downloader
@@ -428,7 +428,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     run(async {
         downloader
@@ -529,7 +529,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
         top.insert("config".to_string(), PhpMixed::Array(section));
         config.merge(&top, Config::SOURCE_UNKNOWN);
 
-        let mut downloader = get_downloader_mock(None, Some(config), process, None);
+        let downloader = get_downloader_mock(None, Some(config), process, None);
 
         run(async {
             downloader
@@ -578,7 +578,7 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(async {
         downloader
@@ -610,7 +610,7 @@ fn test_updatefor_package_without_source_reference() {
     let source_package = get_package("dummy/pkg", "1.0.0", None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(async {
         downloader
@@ -680,7 +680,7 @@ fn test_update() {
         .unwrap();
     let working_dir_str = working_dir.path().to_string_lossy().into_owned();
 
-    let mut downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
+    let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
     run(async {
         downloader
@@ -760,7 +760,7 @@ fn test_update_with_new_repo_url() {
         .unwrap();
     let working_dir_str = working_dir.path().to_string_lossy().into_owned();
 
-    let mut downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
+    let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
     run(async {
         downloader
@@ -842,7 +842,7 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
 
     let config = Config::new(false, None);
 
-    let mut downloader = get_downloader_mock(None, Some(config), process, None);
+    let downloader = get_downloader_mock(None, Some(config), process, None);
 
     let result = run(async {
         downloader
@@ -945,7 +945,7 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
         .unwrap();
     let working_dir_str = working_dir.path().to_string_lossy().into_owned();
 
-    let mut downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
+    let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
     run(async {
         downloader
@@ -1001,7 +1001,7 @@ fn test_downgrade_shows_appropriate_message() {
         .unwrap();
     let working_dir_str = working_dir.path().to_string_lossy().into_owned();
 
-    let mut downloader = get_downloader_mock(Some(io), None, process, None);
+    let downloader = get_downloader_mock(Some(io), None, process, None);
 
     run(async {
         downloader
@@ -1079,7 +1079,7 @@ fn test_not_using_downgrading_with_references() {
         .unwrap();
     let working_dir_str = working_dir.path().to_string_lossy().into_owned();
 
-    let mut downloader = get_downloader_mock(Some(io), None, process, None);
+    let downloader = get_downloader_mock(Some(io), None, process, None);
 
     run(async {
         downloader

@@ -28,7 +28,7 @@ pub struct VcsDownloaderBase {
     pub config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    pub has_cleaned_changes: IndexMap<String, bool>,
+    pub has_cleaned_changes: std::cell::RefCell<IndexMap<String, bool>>,
 }
 
 impl VcsDownloaderBase {
@@ -48,7 +48,7 @@ impl VcsDownloaderBase {
             config,
             process,
             filesystem,
-            has_cleaned_changes: IndexMap::new(),
+            has_cleaned_changes: std::cell::RefCell::new(IndexMap::new()),
         }
     }
 
@@ -78,12 +78,11 @@ pub trait VcsDownloader:
     fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>>;
     fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
     fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>>;
-    fn has_cleaned_changes(&self) -> &IndexMap<String, bool>;
-    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool>;
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>>;
 
     /// Downloads data needed to run an install/update later
     async fn do_download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
@@ -92,7 +91,7 @@ pub trait VcsDownloader:
 
     /// Downloads specific package into specific folder.
     async fn do_install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
@@ -100,7 +99,7 @@ pub trait VcsDownloader:
 
     /// Updates specific package in specific folder from initial to target version.
     async fn do_update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -109,7 +108,7 @@ pub trait VcsDownloader:
 
     /// Fetches the commit logs between two commits
     fn get_commit_logs(
-        &mut self,
+        &self,
         from_reference: &str,
         to_reference: &str,
         path: &str,
@@ -124,7 +123,7 @@ pub trait VcsDownloader:
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -180,7 +179,7 @@ pub trait VcsDownloader:
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -189,7 +188,8 @@ pub trait VcsDownloader:
         if r#type == "update" {
             self.clean_changes(prev_package.clone().unwrap(), path, true)
                 .await?;
-            self.has_cleaned_changes_mut()
+            self.has_cleaned_changes()
+                .borrow_mut()
                 .insert(prev_package.unwrap().get_unique_name(), true);
         } else if r#type == "install" {
             self.filesystem().borrow_mut().empty_directory(path, true)?;
@@ -201,7 +201,7 @@ pub trait VcsDownloader:
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         _package: PackageInterfaceHandle,
         path: &str,
@@ -212,12 +212,14 @@ pub trait VcsDownloader:
                 .clone()
                 .map(|p| {
                     self.has_cleaned_changes()
+                        .borrow()
                         .contains_key(&p.get_unique_name())
                 })
                 .unwrap_or(false)
         {
             self.reapply_changes(path)?;
-            self.has_cleaned_changes_mut()
+            self.has_cleaned_changes()
+                .borrow_mut()
                 .shift_remove(&prev_package.unwrap().get_unique_name());
         }
 
@@ -225,7 +227,7 @@ pub trait VcsDownloader:
     }
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -284,7 +286,7 @@ pub trait VcsDownloader:
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -386,7 +388,7 @@ pub trait VcsDownloader:
     }
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -396,11 +398,7 @@ pub trait VcsDownloader:
             io_interface::NORMAL,
         );
 
-        let result = self
-            .filesystem()
-            .borrow_mut()
-            .remove_directory_async(path)
-            .await?;
+        let result = Filesystem::remove_directory_async_via(self.filesystem(), path).await?;
         if !result {
             return Err(RuntimeException {
                 message: format!("Could not completely delete {}, aborting.", path),
@@ -436,7 +434,7 @@ pub trait VcsDownloader:
     /// @param  bool $update  if true (update) the changes can be stashed and reapplied after an update,
     ///                       if false (remove) the changes should be assumed to be lost if the operation is not aborted
     async fn clean_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _update: bool,
@@ -454,7 +452,7 @@ pub trait VcsDownloader:
     }
 
     /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)
-    fn reapply_changes(&mut self, _path: &str) -> anyhow::Result<()> {
+    fn reapply_changes(&self, _path: &str) -> anyhow::Result<()> {
         Ok(())
     }
 

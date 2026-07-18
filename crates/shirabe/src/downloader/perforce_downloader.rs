@@ -20,7 +20,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug)]
 pub struct PerforceDownloader {
     inner: VcsDownloaderBase,
-    pub(crate) perforce: Option<Box<dyn PerforceInterface>>,
+    pub(crate) perforce: std::cell::RefCell<Option<Box<dyn PerforceInterface>>>,
 }
 
 impl PerforceDownloader {
@@ -32,7 +32,7 @@ impl PerforceDownloader {
     ) -> Self {
         Self {
             inner: VcsDownloaderBase::new(io, config, Some(process), Some(fs)),
-            perforce: None,
+            perforce: std::cell::RefCell::new(None),
         }
     }
 
@@ -45,8 +45,8 @@ impl PerforceDownloader {
         None
     }
 
-    pub fn init_perforce(&mut self, package: PackageInterfaceHandle, path: String, url: String) {
-        if let Some(perforce) = self.perforce.as_mut() {
+    pub fn init_perforce(&self, package: PackageInterfaceHandle, path: String, url: String) {
+        if let Some(perforce) = self.perforce.borrow_mut().as_mut() {
             perforce.initialize_path(&path);
             return;
         }
@@ -61,7 +61,7 @@ impl PerforceDownloader {
         } else {
             None
         };
-        self.perforce = Some(Box::new(Perforce::create(
+        *self.perforce.borrow_mut() = Some(Box::new(Perforce::create(
             repo_config.unwrap_or_default(),
             url,
             path,
@@ -74,8 +74,8 @@ impl PerforceDownloader {
         repository.get_repo_config().clone()
     }
 
-    pub fn set_perforce(&mut self, perforce: Box<dyn PerforceInterface>) {
-        self.perforce = Some(perforce);
+    pub fn set_perforce(&self, perforce: Box<dyn PerforceInterface>) {
+        *self.perforce.borrow_mut() = Some(perforce);
     }
 }
 
@@ -96,16 +96,12 @@ impl VcsDownloader for PerforceDownloader {
         &self.inner.filesystem
     }
 
-    fn has_cleaned_changes(&self) -> &IndexMap<String, bool> {
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
         &self.inner.has_cleaned_changes
     }
 
-    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool> {
-        &mut self.inner.has_cleaned_changes
-    }
-
     async fn do_download(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _path: &str,
         _url: &str,
@@ -115,7 +111,7 @@ impl VcsDownloader for PerforceDownloader {
     }
 
     async fn do_install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         url: &str,
@@ -128,21 +124,22 @@ impl VcsDownloader for PerforceDownloader {
             source_ref.clone().unwrap_or_default()
         ));
         self.init_perforce(package, path.to_string(), url.to_string());
-        self.perforce
-            .as_mut()
-            .unwrap()
-            .set_stream(&source_ref.clone().unwrap_or_default());
-        self.perforce.as_mut().unwrap().p4_login();
-        self.perforce.as_mut().unwrap().write_p4_client_spec();
-        self.perforce.as_mut().unwrap().connect_client();
-        self.perforce.as_mut().unwrap().sync_code_base(label);
-        self.perforce.as_mut().unwrap().cleanup_client_spec();
+        {
+            let mut perforce = self.perforce.borrow_mut();
+            let perforce = perforce.as_mut().unwrap();
+            perforce.set_stream(&source_ref.clone().unwrap_or_default());
+            perforce.p4_login();
+            perforce.write_p4_client_spec();
+            perforce.connect_client();
+            perforce.sync_code_base(label);
+            perforce.cleanup_client_spec();
+        }
 
         Ok(None)
     }
 
     async fn do_update(
-        &mut self,
+        &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -152,13 +149,14 @@ impl VcsDownloader for PerforceDownloader {
     }
 
     fn get_commit_logs(
-        &mut self,
+        &self,
         from_reference: &str,
         to_reference: &str,
         _path: &str,
     ) -> anyhow::Result<String> {
         Ok(self
             .perforce
+            .borrow_mut()
             .as_mut()
             .unwrap()
             .get_commit_logs(from_reference, to_reference)
@@ -172,7 +170,7 @@ impl VcsDownloader for PerforceDownloader {
 
 impl ChangeReportInterface for PerforceDownloader {
     fn get_local_changes(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         _path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -192,9 +190,7 @@ impl VcsCapableDownloaderInterface for PerforceDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for PerforceDownloader {
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -209,7 +205,7 @@ impl DownloaderInterface for PerforceDownloader {
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -219,7 +215,7 @@ impl DownloaderInterface for PerforceDownloader {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -229,7 +225,7 @@ impl DownloaderInterface for PerforceDownloader {
     }
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
@@ -238,7 +234,7 @@ impl DownloaderInterface for PerforceDownloader {
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -247,7 +243,7 @@ impl DownloaderInterface for PerforceDownloader {
     }
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         _output: bool,
@@ -256,7 +252,7 @@ impl DownloaderInterface for PerforceDownloader {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

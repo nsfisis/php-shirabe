@@ -8,7 +8,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
     fn get_installation_source(&self) -> String;
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -17,7 +17,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
 
     /// Convenience for the PHP default `$output = true` overload.
     async fn download3(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -26,7 +26,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -34,7 +34,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -42,7 +42,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
 
     /// Convenience for the PHP default `$output = true` overload.
     async fn install2(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -50,14 +50,14 @@ pub trait DownloaderInterface: std::fmt::Debug {
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -65,7 +65,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
 
     /// Convenience for the PHP default `$output = true` overload.
     async fn remove2(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -73,16 +73,14 @@ pub trait DownloaderInterface: std::fmt::Debug {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         None
     }
 

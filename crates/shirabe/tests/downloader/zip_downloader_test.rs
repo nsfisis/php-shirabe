@@ -155,7 +155,7 @@ fn test_error_messages() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let mut downloader = ZipDownloader::new(
+    let downloader = ZipDownloader::new(
         io,
         config,
         http_downloader.clone(),
@@ -173,13 +173,13 @@ fn test_error_messages() {
     let result: anyhow::Result<()> = (|| {
         let mut loop_ = Loop::new(http_downloader.clone(), None);
         let promise = Box::pin(async {
-            DownloaderInterface::download(&mut downloader, package.clone(), &path, None, true)
+            DownloaderInterface::download(&downloader, package.clone(), &path, None, true)
                 .await
                 .map(|_| ())
         });
         run(loop_.wait(vec![promise], None))?;
         run(DownloaderInterface::install(
-            &mut downloader,
+            &downloader,
             package.clone(),
             &path,
             true,
@@ -198,7 +198,7 @@ fn test_zip_archive_only_failed() {
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
     ZipDownloader::__set_has_zip_archive(Some(true));
-    let mut downloader = make_downloader(&set_up);
+    let downloader = make_downloader(&set_up);
     let zip_archive = ZipArchive::__mock(ZipArchiveMock {
         open: Ok(()),
         count: 0,
@@ -224,7 +224,7 @@ fn test_zip_archive_extract_only_failed() {
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
     ZipDownloader::__set_has_zip_archive(Some(true));
-    let mut downloader = make_downloader(&set_up);
+    let downloader = make_downloader(&set_up);
     let zip_archive = ZipArchive::__mock(ZipArchiveMock {
         open: Ok(()),
         count: 0,
@@ -252,7 +252,7 @@ fn test_zip_archive_only_good() {
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
     ZipDownloader::__set_has_zip_archive(Some(true));
-    let mut downloader = make_downloader(&set_up);
+    let downloader = make_downloader(&set_up);
     let zip_archive = ZipArchive::__mock(ZipArchiveMock {
         open: Ok(()),
         count: 0,

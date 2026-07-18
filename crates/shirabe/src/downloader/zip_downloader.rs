@@ -25,9 +25,9 @@ static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
 #[derive(Debug)]
 pub struct ZipDownloader {
     inner: FileDownloader,
-    cleanup_executed: IndexMap<String, bool>,
+    cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
     // @phpstan-ignore property.onlyRead (helper property that is set via reflection for testing purposes)
-    zip_archive_object: Option<ZipArchive>,
+    zip_archive_object: std::cell::RefCell<Option<ZipArchive>>,
 }
 
 impl ZipDownloader {
@@ -52,13 +52,13 @@ impl ZipDownloader {
                 Some(filesystem),
                 Some(process),
             ),
-            cleanup_executed: IndexMap::new(),
-            zip_archive_object: None,
+            cleanup_executed: std::cell::RefCell::new(IndexMap::new()),
+            zip_archive_object: std::cell::RefCell::new(None),
         }
     }
 
     async fn extract_with_system_unzip(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
@@ -119,7 +119,7 @@ impl ZipDownloader {
                 ) {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     if version_compare(&m1, "21.01", "<") {
-                        self.inner.io.write_error(&format!(
+                        self.inner.io.borrow().write_error(&format!(
                             "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
                             executable, m1, executable,
                         ));
@@ -128,16 +128,18 @@ impl ZipDownloader {
             }
         }
 
-        let process_result = self
-            .inner
-            .process
-            .borrow()
-            .execute_async(&command, None)
-            .await;
+        // Build the future first so the executor borrow is released before awaiting; a borrow
+        // held across the await would collide with sibling extracts or sync execute() calls.
+        let process_future = self.inner.process.borrow().execute_async(&command, None);
+        let process_result = process_future.await;
         match process_result {
             Ok(mut process) => {
                 if !process.is_successful() {
-                    if self.cleanup_executed.contains_key(&package.get_name()) {
+                    if self
+                        .cleanup_executed
+                        .borrow()
+                        .contains_key(&package.get_name())
+                    {
                         return Err(RuntimeException {
                             message: format!(
                                 "Failed to extract {} as the installation was aborted by another package operation.",
@@ -187,7 +189,7 @@ impl ZipDownloader {
     }
 
     async fn try_fallback(
-        &mut self,
+        &self,
         process_error: anyhow::Error,
         is_last_chance: bool,
         file: &str,
@@ -206,15 +208,17 @@ impl ZipDownloader {
         if !is_file(file) {
             self.inner
                 .io
+                .borrow()
                 .write_error(&format!("    <warning>{}</warning>", process_error));
-            self.inner.io.write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
-            self.inner.io.write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
+            self.inner.io.borrow().write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
+            self.inner.io.borrow().write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
         } else {
             self.inner
                 .io
+                .borrow()
                 .write_error(&format!("    <warning>{}</warning>", process_error));
-            self.inner.io.write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
-            self.inner.io.write_error(&format!(
+            self.inner.io.borrow().write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
+            self.inner.io.borrow().write_error(&format!(
                 "    Unzip with {} command failed, falling back to ZipArchive class",
                 executable
             ));
@@ -223,30 +227,30 @@ impl ZipDownloader {
             if Platform::get_env("GITHUB_ACTIONS").is_some()
                 && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
             {
-                self.inner.io.write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
-                self.inner.io.write_error(&format!(
+                self.inner.io.borrow().write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
+                self.inner.io.borrow().write_error(&format!(
                     "File size: {}",
                     filesize(file).map(|s| s.to_string()).unwrap_or_default()
                 ));
-                self.inner.io.write_error(&format!(
+                self.inner.io.borrow().write_error(&format!(
                     "File SHA1: {}",
                     hash_file("sha1", file).unwrap_or_default()
                 ));
-                self.inner.io.write_error(&format!(
+                self.inner.io.borrow().write_error(&format!(
                     "First 100 bytes (hex): {}",
                     bin2hex(
                         substr(&file_get_contents(file).unwrap_or_default(), 0, Some(100))
                             .as_bytes()
                     )
                 ));
-                self.inner.io.write_error(&format!(
+                self.inner.io.borrow().write_error(&format!(
                     "Last 100 bytes (hex): {}",
                     bin2hex(
                         substr(&file_get_contents(file).unwrap_or_default(), -100, None).as_bytes()
                     )
                 ));
                 if strlen(&package.get_dist_url().unwrap_or_default()) > 0 {
-                    self.inner.io.write_error(&format!(
+                    self.inner.io.borrow().write_error(&format!(
                         "Origin URL: {}",
                         self.inner.process_url(
                             package.clone(),
@@ -264,7 +268,7 @@ impl ZipDownloader {
                             None => PhpMixed::List(vec![]),
                         }
                     };
-                    self.inner.io.write_error(&format!(
+                    self.inner.io.borrow().write_error(&format!(
                         "Response Headers: {}",
                         json_encode(&headers).unwrap_or_default()
                     ));
@@ -276,12 +280,12 @@ impl ZipDownloader {
     }
 
     async fn extract_with_zip_archive(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let mut zip_archive = self.zip_archive_object.take().unwrap_or_default();
+        let mut zip_archive = self.zip_archive_object.borrow_mut().take().unwrap_or_default();
 
         let result: anyhow::Result<Option<PhpMixed>> = (|| {
             let retval = if !file_exists(file) || filesize(file).is_none_or(|s| s == 0) {
@@ -412,8 +416,8 @@ impl ZipDownloader {
 
     /// For testing only. Mirrors the test's `setPrivateProperty('zipArchiveObject', $zipArchive, $obj)`
     /// reflection on the instance's `$zipArchiveObject` property.
-    pub fn __set_zip_archive_object(&mut self, value: Option<ZipArchive>) {
-        self.zip_archive_object = value;
+    pub fn __set_zip_archive_object(&self, value: Option<ZipArchive>) {
+        *self.zip_archive_object.borrow_mut() = value;
     }
 }
 
@@ -422,20 +426,12 @@ impl ArchiveDownloader for ZipDownloader {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut FileDownloader {
-        &mut self.inner
-    }
-
-    fn cleanup_executed(&self) -> &IndexMap<String, bool> {
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
         &self.cleanup_executed
     }
 
-    fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool> {
-        &mut self.cleanup_executed
-    }
-
     async fn extract(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,
@@ -446,7 +442,7 @@ impl ArchiveDownloader for ZipDownloader {
 
 impl ChangeReportInterface for ZipDownloader {
     fn get_local_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -460,14 +456,12 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -588,13 +582,13 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
                 if !is_windows_guard.unwrap() && unzip_commands_empty {
                     if proc_open_missing {
-                        self.inner.io.write_error("<warning>proc_open is disabled so 'unzip' and '7z' commands cannot be used, zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.io.write_error("<warning>Enabling proc_open and installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
+                        self.inner.io.borrow().write_error("<warning>proc_open is disabled so 'unzip' and '7z' commands cannot be used, zip files are being unpacked using the PHP zip extension.</warning>");
+                        self.inner.io.borrow().write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
+                        self.inner.io.borrow().write_error("<warning>Enabling proc_open and installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
                     } else {
-                        self.inner.io.write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.io.write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
+                        self.inner.io.borrow().write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
+                        self.inner.io.borrow().write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
+                        self.inner.io.borrow().write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
                     }
                 }
             }
@@ -606,7 +600,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -616,7 +610,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     }
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -625,7 +619,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -634,7 +628,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     }
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -643,7 +637,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

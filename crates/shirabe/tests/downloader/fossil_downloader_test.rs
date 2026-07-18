@@ -87,7 +87,7 @@ fn test_install_for_package_without_source_reference() {
     let package = get_package(None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     let path = format!("{}/path", working_dir.path().to_string_lossy());
     let result = run(downloader.install(package, &path));
@@ -121,7 +121,7 @@ fn test_install() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
     run(downloader.install(package, &working_dir_str)).unwrap();
 }
 
@@ -134,7 +134,7 @@ fn test_updatefor_package_without_source_reference() {
     let source_package = get_package(None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(async {
         downloader
@@ -182,7 +182,7 @@ fn test_update() {
         Default::default(),
     );
 
-    let mut downloader = get_downloader_mock(None, None, process, None);
+    let downloader = get_downloader_mock(None, None, process, None);
     run(async {
         downloader
             .prepare(
@@ -229,7 +229,7 @@ fn test_remove() {
     });
     let filesystem = std::rc::Rc::new(std::cell::RefCell::new(filesystem));
 
-    let mut downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
+    let downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
     run(async {
         downloader
             .prepare("uninstall", package.clone(), &working_dir_str, None)

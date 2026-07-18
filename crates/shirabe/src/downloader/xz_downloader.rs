@@ -18,7 +18,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug)]
 pub struct XzDownloader {
     inner: FileDownloader,
-    cleanup_executed: IndexMap<String, bool>,
+    cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
 }
 
 impl XzDownloader {
@@ -41,7 +41,7 @@ impl XzDownloader {
                 Some(filesystem),
                 Some(process),
             ),
-            cleanup_executed: IndexMap::new(),
+            cleanup_executed: std::cell::RefCell::new(IndexMap::new()),
         }
     }
 }
@@ -51,20 +51,12 @@ impl ArchiveDownloader for XzDownloader {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut FileDownloader {
-        &mut self.inner
-    }
-
-    fn cleanup_executed(&self) -> &IndexMap<String, bool> {
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
         &self.cleanup_executed
     }
 
-    fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool> {
-        &mut self.cleanup_executed
-    }
-
     async fn extract(
-        &mut self,
+        &self,
         _package: PackageInterfaceHandle,
         file: &str,
         path: &str,
@@ -98,7 +90,7 @@ impl ArchiveDownloader for XzDownloader {
 
 impl ChangeReportInterface for XzDownloader {
     fn get_local_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -112,14 +104,12 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -131,7 +121,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -141,7 +131,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     }
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -150,7 +140,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -159,7 +149,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     }
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -168,7 +158,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

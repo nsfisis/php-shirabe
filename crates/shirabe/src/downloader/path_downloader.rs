@@ -65,7 +65,7 @@ impl PathDownloader {
             self.inner.config.clone(),
             self.inner.process.clone(),
             parser.clone(),
-            Some(self.inner.io.clone()),
+            Some(self.inner.io.borrow().clone()),
         );
         let dumper = ArrayDumper::new();
 
@@ -209,7 +209,7 @@ impl VcsCapableDownloaderInterface for PathDownloader {
 
 impl crate::downloader::ChangeReportInterface for PathDownloader {
     fn get_local_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -223,9 +223,7 @@ impl DownloaderInterface for PathDownloader {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -236,7 +234,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn download(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -298,7 +296,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn prepare(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -310,7 +308,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn install(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -331,7 +329,7 @@ impl DownloaderInterface for PathDownloader {
         if realpath(&path).as_deref() == Some(&real_url) {
             if output {
                 let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
-                self.inner.io.write_error3(
+                self.inner.io.borrow().write_error3(
                     &format!(
                         "  - {}{}",
                         InstallOperation::format(package.clone(), false),
@@ -358,7 +356,7 @@ impl DownloaderInterface for PathDownloader {
         self.inner.filesystem.borrow_mut().remove_directory(&path);
 
         if output {
-            self.inner.io.write_error3(
+            self.inner.io.borrow().write_error3(
                 &format!("  - {}: ", InstallOperation::format(package, false)),
                 false,
                 io_interface::NORMAL,
@@ -372,7 +370,7 @@ impl DownloaderInterface for PathDownloader {
                     if Platform::is_windows() {
                         // Implement symlinks as NTFS junctions on Windows
                         if output {
-                            self.inner.io.write_error3(
+                            self.inner.io.borrow().write_error3(
                                 &format!("Junctioning from {}", url),
                                 false,
                                 io_interface::NORMAL,
@@ -386,7 +384,7 @@ impl DownloaderInterface for PathDownloader {
                     } else {
                         let path = path.trim_end_matches('/').to_string();
                         if output {
-                            self.inner.io.write_error3(
+                            self.inner.io.borrow().write_error3(
                                 &format!("Symlinking from {}", url),
                                 false,
                                 io_interface::NORMAL,
@@ -429,8 +427,8 @@ impl DownloaderInterface for PathDownloader {
                 Err(_e) => {
                     if allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
                         if output {
-                            self.inner.io.write_error3("", true, io_interface::NORMAL);
-                            self.inner.io.write_error3(
+                            self.inner.io.borrow().write_error3("", true, io_interface::NORMAL);
+                            self.inner.io.borrow().write_error3(
                                 "    <error>Symlink failed, fallback to use mirroring!</error>",
                                 true,
                                 io_interface::NORMAL,
@@ -457,7 +455,7 @@ impl DownloaderInterface for PathDownloader {
             let real_url = self.inner.filesystem.borrow_mut().normalize_path(&real_url);
 
             if output {
-                self.inner.io.write_error3(
+                self.inner.io.borrow().write_error3(
                     &format!(
                         "{}Mirroring from {}",
                         if is_fallback { "    " } else { "" },
@@ -477,14 +475,14 @@ impl DownloaderInterface for PathDownloader {
         }
 
         if output {
-            self.inner.io.write_error3("", true, io_interface::NORMAL);
+            self.inner.io.borrow().write_error3("", true, io_interface::NORMAL);
         }
 
         Ok(None)
     }
 
     async fn update(
-        &mut self,
+        &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -493,7 +491,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn remove(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -509,7 +507,7 @@ impl DownloaderInterface for PathDownloader {
         // to fail hard.
         if Platform::is_windows() && self.inner.filesystem.borrow_mut().is_junction(&path) {
             if output {
-                self.inner.io.write_error3(
+                self.inner.io.borrow().write_error3(
                     &format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package.clone(), false),
@@ -520,7 +518,7 @@ impl DownloaderInterface for PathDownloader {
                 );
             }
             if !self.inner.filesystem.borrow_mut().remove_junction(&path)? {
-                self.inner.io.write_error3(
+                self.inner.io.borrow().write_error3(
                     &format!(
                         "    <warning>Could not remove junction at {} - is another process locking it?</warning>",
                         path
@@ -566,7 +564,7 @@ impl DownloaderInterface for PathDownloader {
         };
         if fs.normalize_path(&abs_path) == fs.normalize_path(&abs_dist_url) {
             if output {
-                self.inner.io.write_error3(
+                self.inner.io.borrow().write_error3(
                     &format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package.clone(), false),
@@ -584,7 +582,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn cleanup(
-        &mut self,
+        &self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

@@ -79,7 +79,7 @@ fn get_downloader(
 fn test_download_for_package_without_dist_reference() {
     let package = get_package("dummy/pkg", "1.0.0");
 
-    let (mut downloader, _http_downloader, _guard) = get_downloader(None, None);
+    let (downloader, _http_downloader, _guard) = get_downloader(None, None);
     let result = run(downloader.download(package, "/path", None, true));
 
     let e = result.expect_err("expected InvalidArgumentException");
@@ -101,7 +101,7 @@ fn test_download_to_existing_file() {
     std::fs::write(&path, b"").unwrap();
     let path = path.to_string_lossy().into_owned();
 
-    let (mut downloader, _http_downloader, _guard) = get_downloader(None, None);
+    let (downloader, _http_downloader, _guard) = get_downloader(None, None);
 
     let result = run(downloader.download(package, &path, None, true));
 
@@ -154,7 +154,7 @@ fn test_download_but_file_is_unsaved() {
     );
     let config = get_config(config_options);
 
-    let (mut downloader, http_downloader, _guard) = get_downloader(None, Some(config));
+    let (downloader, http_downloader, _guard) = get_downloader(None, Some(config));
 
     let mut loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
@@ -272,7 +272,7 @@ fn test_download_file_with_invalid_checksum() {
 
     // The PHP test injects a Filesystem mock so cleanup is a no-op; a real Filesystem behaves the
     // same here since nothing under the temp dir needs preserving.
-    let (mut downloader, http_downloader, _guard) = get_downloader(None, Some(config));
+    let (downloader, http_downloader, _guard) = get_downloader(None, Some(config));
 
     // make sure the file expected to be downloaded is on disk already
     let dl_file = downloader.__get_file_name(package.clone(), &path);
@@ -350,7 +350,7 @@ fn test_downgrade_shows_appropriate_message() {
     );
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
-    let mut downloader = FileDownloader::new(
+    let downloader = FileDownloader::new(
         io,
         config,
         http_downloader.clone(),

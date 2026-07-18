@@ -222,7 +222,7 @@ impl DownloadManager {
             };
 
             let result = match downloader
-                .borrow_mut()
+                .borrow()
                 .download3(package.clone(), &target_dir, prev_package.clone())
                 .await
             {
@@ -281,7 +281,7 @@ impl DownloadManager {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
-                .borrow_mut()
+                .borrow()
                 .prepare(r#type, package, &target_dir, prev_package)
                 .await;
         }
@@ -304,7 +304,7 @@ impl DownloadManager {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
-            return downloader.borrow_mut().install2(package, &target_dir).await;
+            return downloader.borrow().install2(package, &target_dir).await;
         }
 
         Ok(None)
@@ -338,7 +338,7 @@ impl DownloadManager {
             return initial_downloader
                 .as_ref()
                 .unwrap()
-                .borrow_mut()
+                .borrow()
                 .remove2(initial, &target_dir)
                 .await;
         }
@@ -349,7 +349,7 @@ impl DownloadManager {
             match downloader
                 .as_ref()
                 .unwrap()
-                .borrow_mut()
+                .borrow()
                 .update(initial.clone(), target.clone(), &target_dir)
                 .await
             {
@@ -388,7 +388,7 @@ impl DownloadManager {
         let _ = initial_downloader
             .as_ref()
             .unwrap()
-            .borrow_mut()
+            .borrow()
             .remove2(initial, &target_dir)
             .await?;
         self.install(target, &target_dir).await
@@ -406,7 +406,7 @@ impl DownloadManager {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
-            return downloader.borrow_mut().remove2(package, &target_dir).await;
+            return downloader.borrow().remove2(package, &target_dir).await;
         }
 
         Ok(None)
@@ -429,7 +429,7 @@ impl DownloadManager {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
-                .borrow_mut()
+                .borrow()
                 .cleanup(r#type, package, &target_dir, prev_package)
                 .await;
         }

@@ -163,38 +163,48 @@ impl Filesystem {
     ///
     /// Uses the process component if proc_open is enabled on the PHP
     /// installation.
-    pub async fn remove_directory_async(&mut self, directory: &str) -> anyhow::Result<bool> {
-        if let Some(mock) = self.mock.as_mut()
-            && let Some(result) = mock.remove_directory_async_result
-        {
-            mock.remove_directory_async_calls += 1;
-            return Ok(result);
-        }
+    ///
+    /// Takes the shared handle instead of `&mut self`: the Filesystem is borrowed only for the
+    /// synchronous head and tail, never across the subprocess await, so sibling futures can keep
+    /// using the same `Rc<RefCell<Filesystem>>` while the removal runs.
+    pub async fn remove_directory_async_via(
+        this: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
+        directory: &str,
+    ) -> anyhow::Result<bool> {
+        let (process_executor, cmd) = {
+            let mut fs = this.borrow_mut();
 
-        let edge_case_result = self.remove_edge_cases(directory, true)?;
-        if let Some(r) = edge_case_result {
-            return Ok(r);
-        }
+            if let Some(mock) = fs.mock.as_mut()
+                && let Some(result) = mock.remove_directory_async_result
+            {
+                mock.remove_directory_async_calls += 1;
+                return Ok(result);
+            }
 
-        let cmd: Vec<String> = if Platform::is_windows() {
-            vec![
-                "rmdir".to_string(),
-                "/S".to_string(),
-                "/Q".to_string(),
-                Platform::realpath(directory),
-            ]
-        } else {
-            vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
+            let edge_case_result = fs.remove_edge_cases(directory, true)?;
+            if let Some(r) = edge_case_result {
+                return Ok(r);
+            }
+
+            let cmd: Vec<String> = if Platform::is_windows() {
+                vec![
+                    "rmdir".to_string(),
+                    "/S".to_string(),
+                    "/Q".to_string(),
+                    Platform::realpath(directory),
+                ]
+            } else {
+                vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
+            };
+
+            (fs.get_process_handle(), cmd)
         };
 
-        let process_executor = self.get_process_handle();
-        let mut process = process_executor
-            .borrow()
-            .execute_async(
-                PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
-                None,
-            )
-            .await?;
+        let process_future = process_executor.borrow().execute_async(
+            PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
+            None,
+        );
+        let mut process = process_future.await?;
 
         // clear stat cache because external processes aren't tracked by the php stat cache
         clearstatcache2(false, "");
@@ -203,7 +213,7 @@ impl Filesystem {
             return Ok(true);
         }
 
-        self.remove_directory_php(directory)
+        this.borrow_mut().remove_directory_php(directory)
     }
 
     /// Returns null when no edge case was hit. Otherwise a bool whether removal was successful

@@ -4,7 +4,7 @@ use crate::package::PackageInterfaceHandle;
 
 pub trait ChangeReportInterface {
     fn get_local_changes(
-        &mut self,
+        &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>>;
