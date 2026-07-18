@@ -196,8 +196,7 @@ fn test_installer_creation_should_not_create_bin_directory() {
 #[test]
 fn test_is_installed() {
     let mut setup = set_up();
-    let library =
-        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("test/pkg", "1.0.0");
 
     let mut repository = InstalledArrayRepository::new().unwrap();
@@ -237,12 +236,17 @@ fn test_install() {
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
 
-    let library =
-        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
 
     let mut repository = InstalledArrayRepository::new().unwrap();
 
-    run(library.install(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package.clone())).unwrap();
+    run(library.install(
+        &std::cell::RefCell::new(
+            &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface,
+        ),
+        package.clone(),
+    ))
+    .unwrap();
 
     // PHP asserts repository->addPackage was called once with $package.
     assert!(repository.has_package(package));
@@ -296,10 +300,16 @@ fn test_update() {
     repository.add_package(initial.clone()).unwrap();
 
     // The default Filesystem is fine; the LibraryInstaller's own filesystem performs the rename.
-    let library =
-        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
 
-    run(library.update(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), initial.clone(), target.clone())).unwrap();
+    run(library.update(
+        &std::cell::RefCell::new(
+            &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface,
+        ),
+        initial.clone(),
+        target.clone(),
+    ))
+    .unwrap();
 
     assert!(
         std::path::Path::new(&new_target_dir).exists(),
@@ -320,7 +330,16 @@ fn test_update() {
     );
 
     // Updating again, with the initial package no longer installed, fails.
-    assert!(run(library.update(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), initial, target)).is_err());
+    assert!(
+        run(library.update(
+            &std::cell::RefCell::new(
+                &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface
+            ),
+            initial,
+            target
+        ))
+        .is_err()
+    );
 
     tear_down(&mut setup);
 }
@@ -344,8 +363,7 @@ fn test_uninstall() {
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
 
-    let library =
-        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
 
     // PHP mocks hasPackage to return (true, false) over two calls; a real repository
     // seeded with the package reproduces this naturally: present, then absent after
@@ -353,12 +371,26 @@ fn test_uninstall() {
     let mut repository = InstalledArrayRepository::new().unwrap();
     repository.add_package(package.clone()).unwrap();
 
-    run(library.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package.clone())).unwrap();
+    run(library.uninstall(
+        &std::cell::RefCell::new(
+            &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface,
+        ),
+        package.clone(),
+    ))
+    .unwrap();
 
     assert!(!repository.has_package(package.clone()));
 
     // Uninstalling again, with the package no longer installed, fails.
-    assert!(run(library.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package)).is_err());
+    assert!(
+        run(library.uninstall(
+            &std::cell::RefCell::new(
+                &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface
+            ),
+            package
+        ))
+        .is_err()
+    );
 
     tear_down(&mut setup);
 }
@@ -366,8 +398,7 @@ fn test_uninstall() {
 #[test]
 fn test_get_install_path_without_target_dir() {
     let mut setup = set_up();
-    let library =
-        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("Vendor/Pkg", "1.0.0");
 
     assert_eq!(
@@ -381,8 +412,7 @@ fn test_get_install_path_without_target_dir() {
 #[test]
 fn test_get_install_path_with_target_dir() {
     let mut setup = set_up();
-    let library =
-        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("Foo/Bar", "1.0.0");
     package.__set_target_dir(Some("Some/Namespace".to_string()));
 

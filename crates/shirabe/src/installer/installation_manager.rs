@@ -500,7 +500,10 @@ impl InstallationManager {
                 let package = package.clone();
                 let initial_package = initial_package.clone();
                 promises.push(Box::pin(async move {
-                    installer.download(package, initial_package).await.map(|_| ())
+                    installer
+                        .download(package, initial_package)
+                        .await
+                        .map(|_| ())
                 }));
             }
         }

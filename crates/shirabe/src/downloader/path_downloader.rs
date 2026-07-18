@@ -427,7 +427,10 @@ impl DownloaderInterface for PathDownloader {
                 Err(_e) => {
                     if allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
                         if output {
-                            self.inner.io.borrow().write_error3("", true, io_interface::NORMAL);
+                            self.inner
+                                .io
+                                .borrow()
+                                .write_error3("", true, io_interface::NORMAL);
                             self.inner.io.borrow().write_error3(
                                 "    <error>Symlink failed, fallback to use mirroring!</error>",
                                 true,
@@ -475,7 +478,10 @@ impl DownloaderInterface for PathDownloader {
         }
 
         if output {
-            self.inner.io.borrow().write_error3("", true, io_interface::NORMAL);
+            self.inner
+                .io
+                .borrow()
+                .write_error3("", true, io_interface::NORMAL);
         }
 
         Ok(None)

@@ -905,7 +905,9 @@ impl Filesystem {
 
     /// Hands out the executor handle itself so async callers can hold only a shared borrow
     /// across their awaits (a RefMut held across an await panics once calls overlap).
-    pub(crate) fn get_process_handle(&mut self) -> std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
+    pub(crate) fn get_process_handle(
+        &mut self,
+    ) -> std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
         if self.process_executor.is_none() {
             self.process_executor = Some(std::rc::Rc::new(std::cell::RefCell::new(
                 ProcessExecutor::new(None),

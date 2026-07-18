@@ -36,7 +36,9 @@ pub trait ArchiveDownloader {
         self.cleanup_executed()
             .borrow_mut()
             .shift_remove(&package.get_name());
-        self.inner().prepare(r#type, package, path, prev_package).await
+        self.inner()
+            .prepare(r#type, package, path, prev_package)
+            .await
     }
 
     async fn cleanup(
@@ -49,7 +51,9 @@ pub trait ArchiveDownloader {
         self.cleanup_executed()
             .borrow_mut()
             .insert(package.get_name(), true);
-        self.inner().cleanup(r#type, package, path, prev_package).await
+        self.inner()
+            .cleanup(r#type, package, path, prev_package)
+            .await
     }
 
     /// @inheritDoc
@@ -108,7 +112,8 @@ pub trait ArchiveDownloader {
             }
         };
 
-        self.inner().add_cleanup_path(package.clone(), &temporary_dir);
+        self.inner()
+            .add_cleanup_path(package.clone(), &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
         if !is_dir(path) || realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
@@ -189,7 +194,8 @@ pub trait ArchiveDownloader {
 
                 Filesystem::remove_directory_async_via(&self.inner().filesystem, &temporary_dir)
                     .await?;
-                self.inner().remove_cleanup_path(package.clone(), &temporary_dir);
+                self.inner()
+                    .remove_cleanup_path(package.clone(), &temporary_dir);
                 self.inner().remove_cleanup_path(package, path);
 
                 Ok(None)

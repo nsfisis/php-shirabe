@@ -285,7 +285,11 @@ impl ZipDownloader {
         file: &str,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let mut zip_archive = self.zip_archive_object.borrow_mut().take().unwrap_or_default();
+        let mut zip_archive = self
+            .zip_archive_object
+            .borrow_mut()
+            .take()
+            .unwrap_or_default();
 
         let result: anyhow::Result<Option<PhpMixed>> = (|| {
             let retval = if !file_exists(file) || filesize(file).is_none_or(|s| s == 0) {

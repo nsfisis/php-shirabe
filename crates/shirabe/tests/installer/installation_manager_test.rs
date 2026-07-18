@@ -326,7 +326,10 @@ fn test_install() {
     let operation = InstallOperation::new(package.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.install(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
+    run(manager.install(
+        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
+        &operation,
+    ));
 }
 
 #[test]
@@ -358,7 +361,10 @@ fn test_update_with_equal_types() {
     let operation = UpdateOperation::new(initial.clone(), target.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.update(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
+    run(manager.update(
+        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
+        &operation,
+    ));
 }
 
 #[test]
@@ -400,7 +406,10 @@ fn test_update_with_not_equal_types() {
     let operation = UpdateOperation::new(initial.clone(), target.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.update(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
+    run(manager.update(
+        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
+        &operation,
+    ));
 }
 
 #[test]
@@ -428,7 +437,10 @@ fn test_uninstall() {
     let operation = UninstallOperation::new(package.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
+    run(manager.uninstall(
+        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
+        &operation,
+    ));
 }
 
 #[test]
