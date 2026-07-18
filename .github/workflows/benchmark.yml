@@ -20,6 +20,13 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.5"
+          # TODO(phase-c): imagick disabled because PlatformRepository's ext-imagick
+          # version probe (crates/shirabe/src/repository/platform_repository.rs) calls
+          # Runtime::construct -> shirabe_php_shim::instantiate_class, which is
+          # todo!() (crates/shirabe-php-shim/src/var.rs). Constructing PHP objects
+          # over php-rpc is out of scope for now (docs/dev/php-rpc.md). Once that's
+          # implemented, drop this and let the benchmark run against a stock PHP setup.
+          extensions: "-imagick"
           tools: composer
 
       - name: Install hyperfine
