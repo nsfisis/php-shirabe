@@ -46,7 +46,7 @@ impl PluginInstaller {
     async fn rollback_install(
         &self,
         e: anyhow::Error,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         self.inner.io.write_error(&format!(
@@ -135,7 +135,7 @@ impl InstallerInterface for PluginInstaller {
 
     async fn install(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.install(repo, package).await?;
@@ -149,7 +149,7 @@ impl InstallerInterface for PluginInstaller {
 
     async fn update(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -165,7 +165,7 @@ impl InstallerInterface for PluginInstaller {
 
     async fn uninstall(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // TODO(plugin): uninstall package from plugin manager

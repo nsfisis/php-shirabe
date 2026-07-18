@@ -22,7 +22,7 @@ fn test_install() {
     let installer = installer();
     let mut repository = InstalledArrayRepository::new_with_packages(vec![]).unwrap();
 
-    run(installer.install(&mut repository, package.clone())).unwrap();
+    run(installer.install(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package.clone())).unwrap();
 
     assert!(repository.has_package(package));
 }
@@ -35,13 +35,13 @@ fn test_update() {
     let mut repository =
         InstalledArrayRepository::new_with_packages(vec![initial.clone()]).unwrap();
 
-    run(installer.update(&mut repository, initial.clone(), target.clone())).unwrap();
+    run(installer.update(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), initial.clone(), target.clone())).unwrap();
 
     assert!(!repository.has_package(initial.clone()));
     assert!(repository.has_package(target.clone()));
 
     // Updating again, with the initial package no longer installed, fails.
-    assert!(run(installer.update(&mut repository, initial, target)).is_err());
+    assert!(run(installer.update(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), initial, target)).is_err());
 }
 
 #[test]
@@ -51,10 +51,10 @@ fn test_uninstall() {
     let mut repository =
         InstalledArrayRepository::new_with_packages(vec![package.clone()]).unwrap();
 
-    run(installer.uninstall(&mut repository, package.clone())).unwrap();
+    run(installer.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package.clone())).unwrap();
 
     assert!(!repository.has_package(package.clone()));
 
     // Uninstalling again, with the package no longer installed, fails.
-    assert!(run(installer.uninstall(&mut repository, package)).is_err());
+    assert!(run(installer.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package)).is_err());
 }

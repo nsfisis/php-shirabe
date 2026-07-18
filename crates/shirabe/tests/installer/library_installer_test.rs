@@ -242,7 +242,7 @@ fn test_install() {
 
     let mut repository = InstalledArrayRepository::new().unwrap();
 
-    run(library.install(&mut repository, package.clone())).unwrap();
+    run(library.install(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package.clone())).unwrap();
 
     // PHP asserts repository->addPackage was called once with $package.
     assert!(repository.has_package(package));
@@ -299,7 +299,7 @@ fn test_update() {
     let library =
         LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
 
-    run(library.update(&mut repository, initial.clone(), target.clone())).unwrap();
+    run(library.update(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), initial.clone(), target.clone())).unwrap();
 
     assert!(
         std::path::Path::new(&new_target_dir).exists(),
@@ -320,7 +320,7 @@ fn test_update() {
     );
 
     // Updating again, with the initial package no longer installed, fails.
-    assert!(run(library.update(&mut repository, initial, target)).is_err());
+    assert!(run(library.update(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), initial, target)).is_err());
 
     tear_down(&mut setup);
 }
@@ -353,12 +353,12 @@ fn test_uninstall() {
     let mut repository = InstalledArrayRepository::new().unwrap();
     repository.add_package(package.clone()).unwrap();
 
-    run(library.uninstall(&mut repository, package.clone())).unwrap();
+    run(library.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package.clone())).unwrap();
 
     assert!(!repository.has_package(package.clone()));
 
     // Uninstalling again, with the package no longer installed, fails.
-    assert!(run(library.uninstall(&mut repository, package)).is_err());
+    assert!(run(library.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface), package)).is_err());
 
     tear_down(&mut setup);
 }

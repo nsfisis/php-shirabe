@@ -64,7 +64,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     async fn install(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -72,7 +72,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     async fn update(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -81,7 +81,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     async fn uninstall(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)

@@ -50,9 +50,10 @@ impl InstallerInterface for NoopInstaller {
 
     async fn install(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
+        let mut repo = repo.borrow_mut();
         if !repo.has_package(package.clone()) {
             repo.add_package(PackageInterfaceHandle::dup(&package));
         }
@@ -62,10 +63,11 @@ impl InstallerInterface for NoopInstaller {
 
     async fn update(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
+        let mut repo = repo.borrow_mut();
         if !repo.has_package(initial.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
@@ -84,9 +86,10 @@ impl InstallerInterface for NoopInstaller {
 
     async fn uninstall(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
+        let mut repo = repo.borrow_mut();
         if !repo.has_package(package.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),

@@ -29,22 +29,25 @@ pub trait InstallerInterface: std::fmt::Debug {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
+    // install/update/uninstall take the repository behind a RefCell: the concurrent operation
+    // chains share it, and implementations must borrow it only in synchronous sections (never
+    // across an await).
     async fn install(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn update(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn uninstall(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 

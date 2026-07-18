@@ -8,7 +8,7 @@ pub trait WritableRepositoryInterface: RepositoryInterface {
     fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &mut InstallationManager,
+        installation_manager: &InstallationManager,
     ) -> anyhow::Result<()>;
 
     fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;

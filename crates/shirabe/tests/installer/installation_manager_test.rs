@@ -100,7 +100,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn install(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         MockInstaller::install(self, package)
@@ -108,7 +108,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn update(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -117,7 +117,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn uninstall(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         MockInstaller::uninstall(self, package)
@@ -200,7 +200,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn install(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -208,7 +208,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn update(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -217,7 +217,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn uninstall(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -326,7 +326,7 @@ fn test_install() {
     let operation = InstallOperation::new(package.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.install(&mut repository, &operation));
+    run(manager.install(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
 }
 
 #[test]
@@ -358,7 +358,7 @@ fn test_update_with_equal_types() {
     let operation = UpdateOperation::new(initial.clone(), target.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.update(&mut repository, &operation));
+    run(manager.update(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
 }
 
 #[test]
@@ -400,7 +400,7 @@ fn test_update_with_not_equal_types() {
     let operation = UpdateOperation::new(initial.clone(), target.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.update(&mut repository, &operation));
+    run(manager.update(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
 }
 
 #[test]
@@ -428,7 +428,7 @@ fn test_uninstall() {
     let operation = UninstallOperation::new(package.clone());
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.uninstall(&mut repository, &operation));
+    run(manager.uninstall(&std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface), &operation));
 }
 
 #[test]

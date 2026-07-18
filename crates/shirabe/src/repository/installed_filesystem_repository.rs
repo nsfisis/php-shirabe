@@ -74,7 +74,7 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
     fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &mut crate::installer::InstallationManager,
+        installation_manager: &crate::installer::InstallationManager,
     ) -> anyhow::Result<()> {
         // For testing only (ref InstalledFilesystemRepositoryMock::write is a noop).
         if self.mock {

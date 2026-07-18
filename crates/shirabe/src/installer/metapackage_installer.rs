@@ -64,7 +64,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn install(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error3(
@@ -73,18 +73,19 @@ impl InstallerInterface for MetapackageInstaller {
             io_interface::NORMAL,
         );
 
-        repo.add_package(PackageInterfaceHandle::dup(&package));
+        repo.borrow_mut()
+            .add_package(PackageInterfaceHandle::dup(&package));
 
         Ok(None)
     }
 
     async fn update(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.has_package(initial.clone()) {
+        if !repo.borrow().has_package(initial.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -101,6 +102,7 @@ impl InstallerInterface for MetapackageInstaller {
             io_interface::NORMAL,
         );
 
+        let mut repo = repo.borrow_mut();
         repo.remove_package(initial.clone());
         repo.add_package(PackageInterfaceHandle::dup(&target));
 
@@ -109,10 +111,10 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn uninstall(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.has_package(package.clone()) {
+        if !repo.borrow().has_package(package.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,
@@ -126,7 +128,7 @@ impl InstallerInterface for MetapackageInstaller {
             io_interface::NORMAL,
         );
 
-        repo.remove_package(package.clone());
+        repo.borrow_mut().remove_package(package.clone());
 
         Ok(None)
     }

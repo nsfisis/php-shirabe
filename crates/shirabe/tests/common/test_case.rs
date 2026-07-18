@@ -216,7 +216,7 @@ pub fn create_installed_json(
 
     let io = null_io();
     let im = installation_manager(&io);
-    repo.write(dev_mode, &mut im.borrow_mut()).unwrap();
+    repo.write(dev_mode, &im.borrow()).unwrap();
 }
 
 /// ref: TestCase::createComposerLock

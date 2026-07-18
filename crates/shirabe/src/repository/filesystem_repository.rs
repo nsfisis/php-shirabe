@@ -205,7 +205,7 @@ impl FilesystemRepository {
     pub fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &mut dyn InstallationManagerInterface,
+        installation_manager: &dyn InstallationManagerInterface,
     ) -> anyhow::Result<()> {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert("packages".to_string(), PhpMixed::List(vec![]));

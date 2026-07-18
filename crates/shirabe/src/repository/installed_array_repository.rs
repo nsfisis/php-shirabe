@@ -50,7 +50,7 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
     fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &mut crate::installer::InstallationManager,
+        installation_manager: &crate::installer::InstallationManager,
     ) -> anyhow::Result<()> {
         self.inner.write(dev_mode, installation_manager)
     }

@@ -110,7 +110,7 @@ mockall::mock! {
             run_scripts: bool,
             download_only: bool,
         ) -> anyhow::Result<()>;
-        fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
+        fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
         fn set_output_progress(&mut self, output_progress: bool);
         fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
     }
@@ -151,7 +151,7 @@ fn test_repository_write() {
     repository
         .add_package(get_package("mypkg", "0.1.10"))
         .unwrap();
-    repository.write(true, &mut im).unwrap();
+    repository.write(true, &im).unwrap();
 
     let written = std::fs::read_to_string(&json_path).unwrap();
     let actual: serde_json::Value = serde_json::from_str(&written).unwrap();
@@ -312,7 +312,7 @@ fn test_repository_writes_installed_php() {
         Some(format!("vendor/{}", package.get_name()))
     });
 
-    repository.write(true, &mut im).unwrap();
+    repository.write(true, &im).unwrap();
 
     let expected = std::fs::read_to_string(format!(
         "{}/../../composer/tests/Composer/Test/Repository/Fixtures/installed.php",

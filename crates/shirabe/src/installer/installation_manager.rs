@@ -36,8 +36,10 @@ pub struct InstallationManager {
     /// Maps a package type to the index of its installer in `installers`. PHP caches the installer
     /// instance itself; here we store an index instead. The index never dangles because both
     /// `add_installer` and `remove_installer` clear the cache whenever `installers` changes.
-    cache: IndexMap<String, usize>,
-    notifiable_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    /// RefCell so lookups can populate the cache through `&self` from concurrent operation chains.
+    cache: std::cell::RefCell<IndexMap<String, usize>>,
+    /// RefCell so mark_for_notification works through `&self` from concurrent operation chains.
+    notifiable_packages: std::cell::RefCell<IndexMap<String, Vec<PackageInterfaceHandle>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -65,8 +67,8 @@ impl InstallationManager {
     ) -> Self {
         Self {
             installers: vec![],
-            cache: IndexMap::new(),
-            notifiable_packages: IndexMap::new(),
+            cache: std::cell::RefCell::new(IndexMap::new()),
+            notifiable_packages: std::cell::RefCell::new(IndexMap::new()),
             loop_,
             io,
             event_dispatcher,
@@ -121,14 +123,14 @@ impl InstallationManager {
     }
 
     pub fn reset(&mut self) {
-        self.notifiable_packages = IndexMap::new();
+        self.notifiable_packages = std::cell::RefCell::new(IndexMap::new());
         FileDownloader::reset_download_metadata();
     }
 
     /// Adds installer
     pub fn add_installer(&mut self, installer: Box<dyn InstallerInterface>) {
         array_unshift(&mut self.installers, std::rc::Rc::from(installer));
-        self.cache = IndexMap::new();
+        self.cache = std::cell::RefCell::new(IndexMap::new());
     }
 
     /// Removes installer
@@ -140,7 +142,7 @@ impl InstallationManager {
             .position(|inst| &**inst as *const dyn InstallerInterface as *const () == target);
         if let Some(k) = key {
             array_splice(&mut self.installers, k as i64, Some(1), vec![]);
-            self.cache = IndexMap::new();
+            self.cache = std::cell::RefCell::new(IndexMap::new());
         }
     }
 
@@ -159,12 +161,12 @@ impl InstallationManager {
 
     /// Returns installer for a specific package type.
     pub fn get_installer(
-        &mut self,
+        &self,
         r#type: &str,
     ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
-        if let Some(&index) = self.cache.get(&r#type) {
+        if let Some(&index) = self.cache.borrow().get(&r#type) {
             return Ok(self.installers[index].clone());
         }
 
@@ -173,7 +175,7 @@ impl InstallationManager {
             .iter()
             .position(|installer| installer.supports(&r#type));
         if let Some(index) = index {
-            self.cache.insert(r#type.clone(), index);
+            self.cache.borrow_mut().insert(r#type.clone(), index);
             return Ok(self.installers[index].clone());
         }
 
@@ -186,7 +188,7 @@ impl InstallationManager {
 
     /// Checks whether provided package is installed in one of the registered installers.
     pub fn is_package_installed(
-        &mut self,
+        &self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
@@ -209,7 +211,7 @@ impl InstallationManager {
 
     /// Install binary for the given package.
     /// If the installer associated to this package doesn't handle that function, it'll do nothing.
-    pub fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+    pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
         let installer = self.get_installer(&package.get_type());
         let installer = match installer {
             Ok(i) => i,
@@ -324,6 +326,11 @@ impl InstallationManager {
 
         let all_operations: Vec<std::rc::Rc<dyn OperationInterface>> = operations.clone();
 
+        // The concurrent operation chains share the repository; each chain borrows it only in
+        // synchronous sections, never across an await.
+        let repo_cell: std::cell::RefCell<&mut dyn InstalledRepositoryInterface> =
+            std::cell::RefCell::new(repo);
+
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
@@ -367,7 +374,7 @@ impl InstallationManager {
 
             for batch_to_execute in batches {
                 sync_executor::block_on(self.download_and_execute_batch(
-                    repo,
+                    &repo_cell,
                     batch_to_execute,
                     &mut cleanup_promises,
                     dev_mode,
@@ -398,15 +405,15 @@ impl InstallationManager {
         // do a last write so that we write the repository even if nothing changed
         // as that can trigger an update of some files like InstalledVersions.php if
         // running a new composer version
-        repo.write(dev_mode, self);
+        repo_cell.into_inner().write(dev_mode, self);
 
         Ok(())
     }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     async fn download_and_execute_batch(
-        &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        &self,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         operations: IndexMap<i64, std::rc::Rc<dyn OperationInterface>>,
         cleanup_promises: &mut IndexMap<
             i64,
@@ -558,8 +565,8 @@ impl InstallationManager {
     }
 
     async fn execute_batch(
-        &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        &self,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         operations: IndexMap<i64, std::rc::Rc<dyn OperationInterface>>,
         cleanup_promises: &IndexMap<
             i64,
@@ -573,24 +580,9 @@ impl InstallationManager {
         run_scripts: bool,
         all_operations: &[std::rc::Rc<dyn OperationInterface>],
     ) -> anyhow::Result<()> {
-        let mut post_exec_callbacks: Vec<Box<dyn Fn()>> = vec![];
-
-        // PHP: waitOnPromises() shows a ProgressBar while React\Promise\all($promises) resolves,
-        // driven by Loop::wait's active-job polling as concurrent downloads/installs finish over
-        // real wall-clock time, interleaved with nothing else since the "- Installing ..." lines
-        // are all written up front while the promises are being constructed.
-        // TODO(phase-c-promise): the single-threaded port runs prepare/install/cleanup serially
-        // in this same loop that also writes the "- Installing ..." lines, so there is no way to
-        // draw a step-by-step bar without garbling it into the middle of that output (the bar's
-        // line-overwrite state and the plain `write_error` lines fight over the same terminal
-        // line). Rendering a single 0% -> 100% jump after the loop keeps output well-formed at
-        // the cost of the intermediate snapshots real Composer shows.
-        let promise_count = operations
-            .values()
-            .filter(|op| {
-                ["update", "install", "uninstall"].contains(&op.get_operation_type().as_str())
-            })
-            .count() as i64;
+        let mut promises: Vec<
+            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
+        > = vec![];
 
         for (index, operation) in operations {
             let op_type = operation.get_operation_type();
@@ -613,7 +605,7 @@ impl InstallationManager {
                             .expect(
                                 "op_type == \"markAliasInstalled\" implies MarkAliasInstalledOperation",
                             );
-                        self.mark_alias_installed(repo, op);
+                        self.mark_alias_installed(&mut **repo.borrow_mut(), op);
                     }
                     "markAliasUninstalled" => {
                         let op = operation
@@ -622,7 +614,7 @@ impl InstallationManager {
                             .expect(
                                 "op_type == \"markAliasUninstalled\" implies MarkAliasUninstalledOperation",
                             );
-                        self.mark_alias_uninstalled(repo, op);
+                        self.mark_alias_uninstalled(&mut **repo.borrow_mut(), op);
                     }
                     _ => {}
                 }
@@ -652,7 +644,8 @@ impl InstallationManager {
 
             if run_scripts && self.event_dispatcher.is_some() {
                 // TODO(phase-c): dispatch_package_event takes Box<dyn RepositoryInterface>/Vec<Box<...>>
-                // but we hold &mut dyn here. Needs structural rework (likely shared Rc on repo and ops).
+                // but we hold a RefCell'd &mut dyn here. Needs structural rework (likely shared Rc
+                // on repo and ops).
                 let _ = (
                     event_name,
                     dev_mode,
@@ -662,118 +655,97 @@ impl InstallationManager {
                 );
             }
 
-            let _dispatcher = self.event_dispatcher.as_ref();
-            let _io = self.io.as_ref();
+            let installer = self.get_installer(&package.get_type())?;
 
-            {
-                let installer = self.get_installer(&package.get_type())?;
-                installer
-                    .prepare(&op_type, package.clone(), initial_package.clone())
-                    .await?;
-            }
+            // PHP: $promise = $installer->prepare(...)
+            //      ->then(fn() => $this->{$opType}($repo, $operation))
+            //      ->then($cleanupPromises[$index])
+            //      ->then(fn() => $repo->write($devMode, $this), fn($e) => { "<op> of <pkg>
+            //      failed"; throw $e; })
+            //      ->then(fn() => dispatch POST_PACKAGE_* event);
+            // each package gets its own chain and the whole batch resolves via waitOnPromises.
+            promises.push(Box::pin(async move {
+                let chain_result: anyhow::Result<()> = async {
+                    installer
+                        .prepare(&op_type, package.clone(), initial_package.clone())
+                        .await?;
 
-            // PHP: $promise = $promise->then(fn() => $this->{$type}(...))->then($cleanupPromises[$index])
-            //      ->then(fn() => $repo->write($devMode, $this->io)); the chained steps run install/
-            //      update/uninstall, then cleanup, then persist the repository. The single-threaded
-            //      loop awaits the steps serially instead of composing React promises.
-            let op_result = match op_type.as_str() {
-                "install" => {
-                    let op = operation
-                        .as_install_operation()
-                        .expect("op_type == \"install\" implies InstallOperation");
-                    self.install(repo, op).await
+                    match op_type.as_str() {
+                        "install" => {
+                            let op = operation
+                                .as_install_operation()
+                                .expect("op_type == \"install\" implies InstallOperation");
+                            self.install(repo, op).await?;
+                        }
+                        "update" => {
+                            let op = operation
+                                .as_update_operation()
+                                .expect("op_type == \"update\" implies UpdateOperation");
+                            self.update(repo, op).await?;
+                        }
+                        "uninstall" => {
+                            let op = operation
+                                .as_uninstall_operation()
+                                .expect("op_type == \"uninstall\" implies UninstallOperation");
+                            self.uninstall(repo, op).await?;
+                        }
+                        _ => unreachable!("op_type is one of install/update/uninstall"),
+                    }
+
+                    if let Some(cleanup) = cleanup_promises.get(&index)
+                        && let Some(fut) = cleanup()
+                    {
+                        fut.await?;
+                    }
+
+                    Ok(())
                 }
-                "update" => {
-                    let op = operation
-                        .as_update_operation()
-                        .expect("op_type == \"update\" implies UpdateOperation");
-                    self.update(repo, op).await
+                .await;
+
+                // PHP rejects the promise with an "<op> of <name> failed" message before rethrowing.
+                if let Err(e) = chain_result {
+                    self.io.write_error(&format!(
+                        "    <error>{} of {} failed</error>",
+                        shirabe_php_shim::ucfirst(&op_type),
+                        package.get_pretty_name()
+                    ));
+                    return Err(e);
                 }
-                "uninstall" => {
-                    let op = operation
-                        .as_uninstall_operation()
-                        .expect("op_type == \"uninstall\" implies UninstallOperation");
-                    self.uninstall(repo, op).await
+
+                // PHP: ->then(fn() => $repo->write($devMode, $this)) persists the repository after each op.
+                repo.borrow_mut().write(dev_mode, self);
+
+                let event_name_post = match op_type.as_str() {
+                    "install" => PackageEvents::POST_PACKAGE_INSTALL,
+                    "update" => PackageEvents::POST_PACKAGE_UPDATE,
+                    "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
+                    _ => "",
+                };
+
+                if run_scripts && self.event_dispatcher.is_some() {
+                    // PHP dispatches the POST_PACKAGE_* event at the end of the chain via the event
+                    // dispatcher with repo/all_operations/operation.
+                    // TODO(phase-c): dispatch_package_event takes Box<dyn RepositoryInterface>/
+                    // Vec<Box<...>> but we hold a RefCell'd &mut dyn here. Needs structural rework
+                    // (likely shared Rc on repo and ops).
+                    let _ = event_name_post;
                 }
-                _ => unreachable!("op_type is one of install/update/uninstall"),
-            };
 
-            // PHP rejects the promise with an "<op> of <name> failed" message before rethrowing.
-            if let Err(e) = op_result {
-                self.io.write_error(&format!(
-                    "    <error>{} of {} failed</error>",
-                    shirabe_php_shim::ucfirst(&op_type),
-                    package.get_pretty_name()
-                ));
-                return Err(e);
-            }
-
-            // TODO(phase-c-promise): cleanup_promises[index] currently resolves to a no-op future
-            // (the real installer.cleanup() chain depends on the Rc/Arc installer rework).
-            if let Some(cleanup) = cleanup_promises.get(&index)
-                && let Some(fut) = cleanup()
-            {
-                fut.await?;
-            }
-
-            // PHP: ->then(fn() => $repo->write($devMode, $this)) persists the repository after each op.
-            repo.write(dev_mode, self);
-
-            let event_name_post = match op_type.as_str() {
-                "install" => PackageEvents::POST_PACKAGE_INSTALL,
-                "update" => PackageEvents::POST_PACKAGE_UPDATE,
-                "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
-                _ => "",
-            };
-
-            if run_scripts && self.event_dispatcher.is_some() {
-                // PHP appends a post-exec step to the promise chain that dispatches the
-                // POST_PACKAGE_* event via the event dispatcher with repo/all_operations/operation.
-                // TODO(phase-c): the callback captures the event dispatcher (&mut) and the operation
-                // and must outlive the loop body; that requires the dispatcher behind Rc<RefCell<_>>
-                // and the deferred event dispatch to be wired into the promise chain (todo!()).
-                let _ = event_name_post;
-                post_exec_callbacks.push(Box::new(|| {
-                    // dispatcher.dispatch_package_event(event_name_post, dev_mode, repo, all_operations, operation);
-                }));
-            }
+                Ok(())
+            }));
         }
 
-        if self.output_progress
-            && !Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0")
-            && !self.io.is_debug()
-            && promise_count > 1
-        {
-            let bar = {
-                let io_ref = self.io.borrow();
-                io_ref
-                    .as_any()
-                    .downcast_ref::<ConsoleIO>()
-                    .map(|console_io| console_io.get_progress_bar(promise_count))
-            };
-            if let Some(mut bar) = bar {
-                bar.start(Some(promise_count))?;
-                bar.set_progress(promise_count)?;
-                bar.finish()?;
-                bar.clear()?;
-                // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
-                if !self.io.is_decorated() {
-                    self.io.write_error("");
-                }
-            }
+        if !promises.is_empty() {
+            self.wait_on_promises(promises).await?;
         }
 
         Platform::workaround_filesystem_issues();
-
-        for cb in &post_exec_callbacks {
-            cb();
-        }
 
         Ok(())
     }
 
     /// Executes download operation.
-    pub async fn download(&mut self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
+    pub async fn download(&self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
         let installer = self.get_installer(&package.get_type()).ok()?;
 
         installer.cleanup("install", package, None).await.ok()?
@@ -781,8 +753,8 @@ impl InstallationManager {
 
     /// Executes install operation.
     pub async fn install(
-        &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        &self,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         operation: &InstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
@@ -796,8 +768,8 @@ impl InstallationManager {
 
     /// Executes update operation.
     pub async fn update(
-        &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        &self,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         operation: &UpdateOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let initial = operation.get_initial_package().clone();
@@ -824,8 +796,8 @@ impl InstallationManager {
 
     /// Uninstalls package.
     pub async fn uninstall(
-        &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        &self,
+        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         operation: &UninstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
@@ -860,7 +832,7 @@ impl InstallationManager {
     }
 
     /// Returns the installation path of a package
-    pub fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         // For testing only (ref InstallationManagerMock::getInstallPath).
         if self.mock.is_some() {
             return Some(format!("vendor/{}", package.get_name()));
@@ -884,7 +856,7 @@ impl InstallationManager {
         // TODO(phase-c-promise): PHP collects every http_downloader.add() promise and runs them via
         // Loop::wait; the single-threaded sync bridge block_on's each notification serially instead.
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-            for (repo_url, packages) in &self.notifiable_packages {
+            for (repo_url, packages) in self.notifiable_packages.borrow().iter() {
                 // non-batch API, deprecated
                 if str_contains(repo_url, "%package%") {
                     for package in packages {
@@ -996,9 +968,10 @@ impl InstallationManager {
         self.reset();
     }
 
-    fn mark_for_notification(&mut self, package: PackageInterfaceHandle) {
+    fn mark_for_notification(&self, package: PackageInterfaceHandle) {
         if let Some(notification_url) = package.get_notification_url() {
             self.notifiable_packages
+                .borrow_mut()
                 .entry(notification_url)
                 .or_default()
                 .push(package.clone());
@@ -1010,10 +983,10 @@ impl InstallationManager {
     /// TODO(phase-c-promise): Loop::wait has no active-job counter to feed the bar yet, so a
     /// single 0% -> 100% jump is rendered after the wait instead of PHP's timing-driven
     /// intermediate snapshots.
-    async fn wait_on_promises(
-        &mut self,
+    async fn wait_on_promises<'p>(
+        &self,
         promises: Vec<
-            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+            std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + 'p>>,
         >,
     ) -> anyhow::Result<()> {
         let promise_count = promises.len() as i64;
@@ -1048,7 +1021,7 @@ impl InstallationManager {
     }
 
     async fn run_cleanup(
-        &mut self,
+        &self,
         cleanup_promises: &IndexMap<
             i64,
             Box<
@@ -1107,7 +1080,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         run_scripts: bool,
         download_only: bool,
     ) -> anyhow::Result<()>;
-    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
     fn set_output_progress(&mut self, output_progress: bool);
     fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 }
@@ -1134,11 +1107,11 @@ impl InstallationManagerInterface for InstallationManager {
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
-        self.is_package_installed(repo, package)
+        InstallationManager::is_package_installed(self, repo, package)
     }
 
     fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
-        self.ensure_binaries_presence(package);
+        InstallationManager::ensure_binaries_presence(self, package);
     }
 
     fn execute(
@@ -1152,7 +1125,7 @@ impl InstallationManagerInterface for InstallationManager {
         self.execute(repo, operations, dev_mode, run_scripts, download_only)
     }
 
-    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         self.get_install_path(package)
     }
 
