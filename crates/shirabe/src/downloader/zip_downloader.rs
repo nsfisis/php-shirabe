@@ -131,7 +131,7 @@ impl ZipDownloader {
         let process_result = self
             .inner
             .process
-            .borrow_mut()
+            .borrow()
             .execute_async(&command, None)
             .await;
         match process_result {

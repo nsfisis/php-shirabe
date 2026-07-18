@@ -15,7 +15,7 @@ use shirabe_external_packages::symfony::process::exception::RuntimeException as 
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, array_intersect, array_map, call_user_func, escapeshellarg,
     explode, implode, in_array, is_array, is_dir, is_numeric, is_string, php_regex, rtrim, sprintf,
-    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim, usleep,
+    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -32,14 +32,12 @@ pub struct ProcessExecutor {
     pub(crate) error_output: String,
     /// @var ?IOInterface
     pub(crate) io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    /// @phpstan-var array<int, array<string, mixed>>
-    jobs: IndexMap<i64, Job>,
-    /// @var int
-    running_jobs: i64,
     /// @var int
     max_jobs: i64,
-    /// @var int
-    id_gen: i64,
+    /// PHP throttles async jobs through the $jobs queue and $maxJobs; here concurrent
+    /// `execute_async` calls hold a permit for the duration of the child process instead
+    /// (same design as HttpDownloader).
+    semaphore: std::rc::Rc<tokio::sync::Semaphore>,
     /// @var bool
     allow_async: bool,
     /// Test-only mock state. `None` in production; set via [`ProcessExecutor::__expects`] in tests.
@@ -105,27 +103,6 @@ pub struct MockHandler {
     pub stderr: String,
 }
 
-struct Job {
-    id: i64,
-    status: i64,
-    command: PhpMixed,
-    cwd: Option<String>,
-    process: Option<Process>,
-    exception: Option<anyhow::Error>,
-}
-
-impl std::fmt::Debug for Job {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Job")
-            .field("id", &self.id)
-            .field("status", &self.status)
-            .field("command", &self.command)
-            .field("cwd", &self.cwd)
-            .field("process", &self.process)
-            .finish()
-    }
-}
-
 /// Output target marking the "no `$output` argument" case of `ProcessExecutor::execute`, where the
 /// child's output is forwarded to STDOUT/STDERR (or the IO) instead of captured. Use the
 /// [`ProcessExecutor::FORWARD_OUTPUT`] constant rather than constructing this directly.
@@ -133,12 +110,6 @@ pub struct ProcessForwardOutput;
 
 impl ProcessExecutor {
     pub const FORWARD_OUTPUT: ProcessForwardOutput = ProcessForwardOutput;
-
-    const STATUS_QUEUED: i64 = 1;
-    const STATUS_STARTED: i64 = 2;
-    const STATUS_COMPLETED: i64 = 3;
-    const STATUS_FAILED: i64 = 4;
-    const STATUS_ABORTED: i64 = 5;
 
     const BUILTIN_CMD_COMMANDS: [&'static str; 47] = [
         "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir",
@@ -157,10 +128,8 @@ impl ProcessExecutor {
             capture_output: false,
             error_output: String::new(),
             io,
-            jobs: IndexMap::new(),
-            running_jobs: 0,
             max_jobs: 10,
-            id_gen: 0,
+            semaphore: std::rc::Rc::new(tokio::sync::Semaphore::new(10)),
             allow_async: false,
             mock: None,
         };
@@ -578,23 +547,20 @@ impl ProcessExecutor {
     }
 
     /// starts a process on the commandline in async mode
-    pub async fn execute_async<C>(
-        &mut self,
-        command: C,
-        cwd: Option<&str>,
-    ) -> anyhow::Result<Process>
+    ///
+    /// `&self` so that concurrent calls through the same `Rc<RefCell<ProcessExecutor>>` can
+    /// coexist (shared borrows); the max_jobs throttle is enforced by the semaphore.
+    pub async fn execute_async<C>(&self, command: C, cwd: Option<&str>) -> anyhow::Result<Process>
     where
         C: IntoExecCommand,
     {
         let command = command.into_exec_command();
         if self.mock.is_some() {
             // PHP resolves the promise with a Process mock whose getOutput/isSuccessful/getExitCode
-            // reflect the doExecute result. We consume the expectation/log via mock_do_execute, but
-            // cannot fabricate a Process mock here: Process has no test seam in the external-packages
-            // crate (out of scope to modify). No portable test currently exercises the async mock
-            // path, so leave it unimplemented rather than returning a misleading Process.
-            let mut captured = PhpMixed::String(String::new());
-            let _result = self.mock_do_execute(command, cwd, &mut captured)?;
+            // reflect the doExecute result. We cannot fabricate a Process mock here: Process has no
+            // test seam in the external-packages crate (out of scope to modify). No portable test
+            // currently exercises the async mock path, so leave it unimplemented rather than
+            // returning a misleading Process.
             todo!("ProcessExecutorMock async path needs a Process mock seam in external-packages");
         }
         if !self.allow_async {
@@ -605,38 +571,56 @@ impl ProcessExecutor {
             .into());
         }
 
-        let id = self.id_gen;
-        self.id_gen += 1;
-        let job = Job {
-            id,
-            status: Self::STATUS_QUEUED,
-            command,
-            cwd: cwd.map(ToOwned::to_owned),
-            process: None,
-            exception: None,
+        // PHP queues the job and only startJob()s it once runningJobs < maxJobs; the permit is the
+        // equivalent gate, so everything below (including the "Executing async command" debug
+        // line PHP prints from startJob) happens only once a slot is free.
+        let semaphore = self.semaphore.clone();
+        let _permit = semaphore
+            .acquire()
+            .await
+            .expect("the semaphore is never closed");
+
+        self.output_command_run(&command, cwd, true);
+
+        // PHP: $job['reject']($e) on process construction/start failure — surfaced as Err here.
+        let mut process = if is_string(&command) {
+            Process::from_shell_commandline(
+                command.as_string().unwrap_or(""),
+                cwd,
+                None,
+                PhpMixed::Null,
+                Some(Self::get_timeout() as f64),
+            )?
+        } else if let PhpMixed::List(ref list) = command {
+            Process::new(
+                list.iter()
+                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .collect(),
+                cwd.map(ToOwned::to_owned),
+                None,
+                PhpMixed::Null,
+                Some(Self::get_timeout() as f64),
+            )?
+        } else {
+            return Err(LogicException {
+                message: "Invalid command type".to_string(),
+                code: 0,
+            }
+            .into());
         };
 
-        self.jobs.insert(id, job);
+        process.start(None, IndexMap::new())?;
 
-        if self.running_jobs < self.max_jobs {
-            self.start_job(id);
+        // PHP's countActiveJobs tick: pump the process until it exits, checking the timeout each
+        // round. The async sleep yields to the reactor so sibling jobs genuinely overlap.
+        while process.is_running() {
+            process.check_timeout()?;
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         }
 
-        // Drive the job to completion (serial pump). PHP resolves the promise with the Process
-        // once it stops running; here we await by pumping count_active_jobs and then hand back the
-        // Process (or the rejection captured during start_job).
-        self.wait_id(Some(id))?;
-
-        let mut job = self.jobs.shift_remove(&id).unwrap();
-        if let Some(process) = job.process.take() {
-            Ok(process)
-        } else if let Some(e) = job.exception.take() {
-            Err(e)
-        } else {
-            Err(anyhow::anyhow!(
-                "ProcessExecutor async job completed without a process"
-            ))
-        }
+        // PHP resolves the promise with the Process regardless of its exit status; callers
+        // inspect is_successful() themselves.
+        Ok(process)
     }
 
     fn output_handler(
@@ -666,87 +650,9 @@ impl ProcessExecutor {
         }
     }
 
-    fn start_job(&mut self, id: i64) {
-        let job_status = self.jobs.get(&id).map(|j| j.status);
-        if job_status != Some(Self::STATUS_QUEUED) {
-            return;
-        }
-
-        // start job
-        if let Some(job) = self.jobs.get_mut(&id) {
-            job.status = Self::STATUS_STARTED;
-        }
-        self.running_jobs += 1;
-
-        let (command, cwd) = {
-            let j = self.jobs.get(&id).unwrap();
-            (j.command.clone(), j.cwd.clone())
-        };
-
-        self.output_command_run(&command, cwd.as_deref(), true);
-
-        let process_result: anyhow::Result<Process> = if is_string(&command) {
-            Process::from_shell_commandline(
-                command.as_string().unwrap_or(""),
-                cwd.as_deref(),
-                None,
-                PhpMixed::Null,
-                Some(Self::get_timeout() as f64),
-            )
-        } else if let PhpMixed::List(ref list) = command {
-            Process::new(
-                list.iter()
-                    .map(|v| v.as_string().unwrap_or("").to_string())
-                    .collect(),
-                cwd.clone(),
-                None,
-                PhpMixed::Null,
-                Some(Self::get_timeout() as f64),
-            )
-        } else {
-            Err(LogicException {
-                message: "Invalid command type".to_string(),
-                code: 0,
-            }
-            .into())
-        };
-        let process = match process_result {
-            Ok(p) => p,
-            Err(e) => {
-                // PHP: $job['reject']($e) — record the rejection and settle the job as failed.
-                if let Some(job) = self.jobs.get_mut(&id) {
-                    job.status = Self::STATUS_FAILED;
-                    job.exception = Some(e);
-                }
-                self.mark_job_done();
-                return;
-            }
-        };
-
-        if let Some(job) = self.jobs.get_mut(&id) {
-            job.process = Some(process);
-        }
-
-        // PHP: $process->start($callback); — we operate on the stored job.process directly
-        let start_result = if let Some(job) = self.jobs.get_mut(&id)
-            && let Some(p) = job.process.as_mut()
-        {
-            p.start(None, IndexMap::new())
-        } else {
-            Ok(())
-        };
-        if let Err(e) = start_result {
-            // PHP: $job['reject']($e) — record the rejection and settle the job as failed.
-            if let Some(job) = self.jobs.get_mut(&id) {
-                job.status = Self::STATUS_FAILED;
-                job.exception = Some(e);
-            }
-            self.mark_job_done();
-        }
-    }
-
     pub fn set_max_jobs(&mut self, max_jobs: i64) {
         self.max_jobs = max_jobs;
+        self.semaphore = std::rc::Rc::new(tokio::sync::Semaphore::new(max_jobs as usize));
     }
 
     pub fn reset_max_jobs(&mut self) {
@@ -765,102 +671,12 @@ impl ProcessExecutor {
         } else {
             self.max_jobs = 10;
         }
-    }
-
-    /// @param  ?int $index job id
-    pub fn wait(&mut self) -> anyhow::Result<()> {
-        self.wait_id(None)
-    }
-
-    pub fn wait_id(&mut self, index: Option<i64>) -> anyhow::Result<()> {
-        loop {
-            if 0 == self.count_active_jobs(index)? {
-                return Ok(());
-            }
-
-            usleep(1000);
-        }
+        self.semaphore = std::rc::Rc::new(tokio::sync::Semaphore::new(self.max_jobs as usize));
     }
 
     /// @internal
     pub fn enable_async(&mut self) {
         self.allow_async = true;
-    }
-
-    /// @internal
-    pub fn count_active_jobs(&mut self, index: Option<i64>) -> anyhow::Result<i64> {
-        // tick
-        let ids: Vec<i64> = self.jobs.keys().copied().collect();
-        for id in &ids {
-            let (status, has_process) = {
-                let j = self.jobs.get(id).unwrap();
-                (j.status, j.process.is_some())
-            };
-            if status == Self::STATUS_STARTED && has_process {
-                let is_running = self
-                    .jobs
-                    .get_mut(id)
-                    .and_then(|j| j.process.as_mut())
-                    .map(|p| p.is_running())
-                    .unwrap_or(false);
-                if !is_running {
-                    // PHP: call_user_func($job['resolve'], $job['process']) — the .then handler
-                    // marks the job completed/failed based on the process exit status.
-                    let successful = self
-                        .jobs
-                        .get_mut(id)
-                        .and_then(|j| j.process.as_mut())
-                        .map(|p| p.is_successful())
-                        .unwrap_or(false);
-                    if let Some(job) = self.jobs.get_mut(id) {
-                        job.status = if successful {
-                            Self::STATUS_COMPLETED
-                        } else {
-                            Self::STATUS_FAILED
-                        };
-                    }
-                    self.mark_job_done();
-                }
-
-                if let Some(p) = self.jobs.get_mut(id).and_then(|j| j.process.as_mut()) {
-                    p.check_timeout()?;
-                }
-            }
-
-            if self.running_jobs < self.max_jobs {
-                let status_now = self.jobs.get(id).map(|j| j.status).unwrap_or(0);
-                if status_now == Self::STATUS_QUEUED {
-                    self.start_job(*id);
-                }
-            }
-        }
-
-        if let Some(index) = index {
-            return Ok(
-                if self.jobs.get(&index).map(|j| j.status).unwrap_or(0) < Self::STATUS_COMPLETED {
-                    1
-                } else {
-                    0
-                },
-            );
-        }
-
-        let mut active: i64 = 0;
-        let ids2: Vec<i64> = self.jobs.keys().copied().collect();
-        for id in ids2 {
-            let status = self.jobs.get(&id).map(|j| j.status).unwrap_or(0);
-            if status < Self::STATUS_COMPLETED {
-                active += 1;
-            } else {
-                self.jobs.shift_remove(&id);
-            }
-        }
-
-        Ok(active)
-    }
-
-    fn mark_job_done(&mut self) {
-        self.running_jobs -= 1;
     }
 
     /// @return string[]

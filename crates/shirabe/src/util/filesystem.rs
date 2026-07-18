@@ -187,8 +187,9 @@ impl Filesystem {
             vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
         };
 
-        let mut process = self
-            .get_process()
+        let process_executor = self.get_process_handle();
+        let mut process = process_executor
+            .borrow()
             .execute_async(
                 PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
                 None,
@@ -887,13 +888,21 @@ impl Filesystem {
     }
 
     pub(crate) fn get_process(&mut self) -> std::cell::RefMut<'_, ProcessExecutor> {
+        self.get_process_handle();
+
+        self.process_executor.as_ref().unwrap().borrow_mut()
+    }
+
+    /// Hands out the executor handle itself so async callers can hold only a shared borrow
+    /// across their awaits (a RefMut held across an await panics once calls overlap).
+    pub(crate) fn get_process_handle(&mut self) -> std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
         if self.process_executor.is_none() {
             self.process_executor = Some(std::rc::Rc::new(std::cell::RefCell::new(
                 ProcessExecutor::new(None),
             )));
         }
 
-        self.process_executor.as_ref().unwrap().borrow_mut()
+        self.process_executor.as_ref().unwrap().clone()
     }
 
     /// delete symbolic link implementation (commonly known as "unlink()")
