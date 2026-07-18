@@ -1,0 +1,41 @@
+name: Benchmark
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          tools: composer
+
+      - name: Install hyperfine
+        run: sudo apt-get update && sudo apt-get install -y hyperfine
+
+      - name: Run require benchmark
+        run: bash scripts/bench/require.sh
+
+      - name: Run create-project benchmark
+        run: bash scripts/bench/create-project.sh
+
+      - name: Publish benchmark summary
+        if: always()
+        run: |
+          {
+            echo '## require (monolog/monolog)'
+            cat "$(ls -t "${TMPDIR:-/tmp}"/shirabe-bench-require-*/results-*.md | head -n1)"
+            echo
+            echo '## create-project (laravel/laravel)'
+            cat "$(ls -t "${TMPDIR:-/tmp}"/shirabe-bench-create-project-*/results-*.md | head -n1)"
+          } >> "$GITHUB_STEP_SUMMARY"
