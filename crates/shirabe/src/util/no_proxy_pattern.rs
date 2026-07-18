@@ -4,8 +4,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists, chr,
-    empty, explode, filter_var_int_with_range, filter_var_ip, inet_pton, ltrim, parse_url, str_pad,
-    str_repeat, stripos, strlen, strpbrk, strpos, substr, substr_count, unpack,
+    empty, explode, filter_var_int_with_range, filter_var_ip, inet_pton, ltrim, parse_url,
+    php_regex, str_pad, str_repeat, stripos, strlen, strpbrk, strpos, substr, substr_count, unpack,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -38,7 +38,7 @@ impl NoProxyPattern {
     /// @param string $pattern NO_PROXY pattern
     pub fn new(pattern: &str) -> Self {
         // PHP: Preg::split('{[\s,]+}', $pattern, -1, PREG_SPLIT_NO_EMPTY)
-        let host_names = Preg::split(r"{[\s,]+}", pattern);
+        let host_names = Preg::split(php_regex!(r"{[\s,]+}"), pattern);
         let noproxy = host_names.is_empty() || host_names[0] == "*";
         Self {
             host_names,

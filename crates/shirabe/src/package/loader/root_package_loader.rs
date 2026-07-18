@@ -16,7 +16,9 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, strtolower};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, strtolower,
+};
 
 #[derive(Debug)]
 pub struct RootPackageLoader {
@@ -261,7 +263,7 @@ impl RootPackageLoader {
         for (req_name, req_version) in requires {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
-                r"{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}",
+                php_regex!(r"{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}"),
                 req_version,
                 Some(&mut m),
             ) {
@@ -315,7 +317,7 @@ impl RootPackageLoader {
         for (req_name, req_version) in requires {
             let mut constraints: Vec<String> = vec![];
 
-            let or_split = Preg::split(r"{\s*\|\|?\s*}", req_version.trim());
+            let or_split = Preg::split(php_regex!(r"{\s*\|\|?\s*}"), req_version.trim());
             for or_constraint in &or_split {
                 let and_split = shirabe_semver::split_and_constraints(or_constraint);
                 for and_constraint in and_split {
@@ -348,8 +350,9 @@ impl RootPackageLoader {
             }
 
             for constraint in &constraints {
-                let req_version_stripped = Preg::replace(r"{^([^,\s@]+) as .+$}", "$1", constraint);
-                if Preg::is_match(r"{^[^,\s@]+$}", &req_version_stripped) {
+                let req_version_stripped =
+                    Preg::replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", constraint);
+                if Preg::is_match(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped) {
                     let stability_name = VersionParser::parse_stability(&req_version_stripped);
                     if stability_name != "stable" {
                         let name = strtolower(req_name);
@@ -373,10 +376,13 @@ impl RootPackageLoader {
         mut references: IndexMap<String, String>,
     ) -> IndexMap<String, String> {
         for (req_name, req_version) in requires {
-            let req_version = Preg::replace(r"{^([^,\s@]+) as .+$}", "$1", req_version);
+            let req_version = Preg::replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", req_version);
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(r"{^[^,\s@]+?#([a-f0-9]+)$}", &req_version, Some(&mut m))
-                && VersionParser::parse_stability(&req_version) == "dev"
+            if Preg::is_match3(
+                php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"),
+                &req_version,
+                Some(&mut m),
+            ) && VersionParser::parse_stability(&req_version) == "dev"
             {
                 let name = strtolower(req_name);
                 references.insert(

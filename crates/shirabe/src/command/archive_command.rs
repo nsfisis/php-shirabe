@@ -27,7 +27,7 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{LogicException, get_debug_type};
+use shirabe_php_shim::{LogicException, get_debug_type, php_regex};
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
@@ -379,7 +379,7 @@ impl ArchiveCommand {
         if let Some(version_str) = &version {
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::match3(
-                r"{@(stable|RC|beta|alpha|dev)$}i",
+                php_regex!(r"{@(stable|RC|beta|alpha|dev)$}i"),
                 version_str,
                 Some(&mut matches),
             ) {

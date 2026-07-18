@@ -41,7 +41,7 @@ use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
     UnexpectedValueException, extension_loaded, hash, http_build_query, in_array, json_decode,
-    parse_url_all, realpath, strtolower, strtr, urlencode, var_export,
+    parse_url_all, php_regex, realpath, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
@@ -160,7 +160,7 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        if !Preg::is_match(r"{^[\w.]+\??://}", &url_str) {
+        if !Preg::is_match(php_regex!(r"{^[\w.]+\??://}"), &url_str) {
             if let Some(local_file_path) = realpath(&url_str) {
                 // it is a local path, add file scheme
                 repo_config.insert(
@@ -247,7 +247,7 @@ impl ComposerRepository {
         // force url for packagist.org to repo.packagist.org
         let mut match_packagist: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            r"{^(?P<proto>https?)://packagist\.org/?$}i",
+            php_regex!(r"{^(?P<proto>https?)://packagist\.org/?$}i"),
             &url,
             Some(&mut match_packagist),
         ) {
@@ -258,7 +258,8 @@ impl ComposerRepository {
             url = format!("{}://repo.packagist.org", proto);
         }
 
-        let base_url_trimmed = Preg::replace(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}", "", &url);
+        let base_url_trimmed =
+            Preg::replace(php_regex!(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}"), "", &url);
         let base_url = base_url_trimmed.trim_end_matches('/').to_string();
         assert!(!base_url.is_empty());
 
@@ -772,7 +773,7 @@ impl ComposerRepository {
 
         if mode == SEARCH_VENDOR {
             let mut results: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            let parts = Preg::split(r"{\s+}", &query);
+            let parts = Preg::split(php_regex!(r"{\s+}"), &query);
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let vendor_names = self.get_vendor_names()?;
@@ -791,7 +792,7 @@ impl ComposerRepository {
             // optimize search for "^foo/bar" where at least "^foo/" is present by loading this directly from the listUrl if present
             let mut match_groups: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
-                r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i",
+                php_regex!(r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i"),
                 &query,
                 Some(&mut match_groups),
             ) && let Some(list_url) = self.list_url.as_ref()
@@ -837,7 +838,7 @@ impl ComposerRepository {
             }
 
             let mut results: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            let parts = Preg::split(r"{\s+}", &query);
+            let parts = Preg::split(php_regex!(r"{\s+}"), &query);
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let package_names = self.get_package_names(None)?;
@@ -1747,7 +1748,7 @@ impl ComposerRepository {
             .into_iter()
             .filter_map(|(name, constraint)| {
                 let name = strtolower(&name);
-                let real_name = Preg::replace(r"{~dev$}", "", &name);
+                let real_name = Preg::replace(php_regex!(r"{~dev$}"), "", &name);
                 // skip platform packages, root package and composer-plugin-api
                 if PlatformRepository::is_platform_package(&real_name) || real_name == "__root__" {
                     None
@@ -2435,7 +2436,11 @@ impl ComposerRepository {
 
         if url.starts_with('/') {
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(r"{^[^:]++://[^/]*+}", &self.url, Some(&mut matches)) {
+            if Preg::is_match3(
+                php_regex!(r"{^[^:]++://[^/]*+}"),
+                &self.url,
+                Some(&mut matches),
+            ) {
                 return Ok(format!(
                     "{}{}",
                     matches
@@ -2732,7 +2737,7 @@ impl ComposerRepository {
         // url-encode $ signs in URLs as bad proxies choke on them
         if let Some(pos) = filename.find('$')
             && pos > 0
-            && Preg::is_match(r"{^https?://}i", &filename)
+            && Preg::is_match(php_regex!(r"{^https?://}i"), &filename)
         {
             filename = format!("{}%24{}", &filename[..pos], &filename[pos + 1..]);
         }

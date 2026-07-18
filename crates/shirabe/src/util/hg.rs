@@ -6,7 +6,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::rawurlencode;
+use shirabe_php_shim::{php_regex, rawurlencode};
 use std::sync::OnceLock;
 
 static VERSION: OnceLock<Option<String>> = OnceLock::new();
@@ -58,7 +58,9 @@ impl Hg {
         // Try with the authentication information available
         let mut matches: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
         let matched = Preg::is_match_named(
-            r"{^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?}mi",
+            php_regex!(
+                r"{^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?}mi"
+            ),
             &url,
             &mut matches,
         );
@@ -152,7 +154,7 @@ impl Hg {
                     None,
                 ) == 0
                     && let Some(matches) = Preg::is_match_with_indexed_captures(
-                        r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/",
+                        php_regex!(r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/"),
                         &output,
                     )
                 {

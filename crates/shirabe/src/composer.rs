@@ -12,6 +12,7 @@ use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::php_regex;
 
 // TODO: change this information to Shirabe version.
 pub const VERSION: &str = "2.9.7";
@@ -24,7 +25,7 @@ pub fn get_version() -> String {
     if VERSION == "@package_version@" {
         return SOURCE_VERSION.to_string();
     }
-    if !BRANCH_ALIAS_VERSION.is_empty() && Preg::is_match("{^[a-f0-9]{40}$}", VERSION) {
+    if !BRANCH_ALIAS_VERSION.is_empty() && Preg::is_match(php_regex!("{^[a-f0-9]{40}$}"), VERSION) {
         return format!("{}+{}", BRANCH_ALIAS_VERSION, VERSION);
     }
     VERSION.to_string()

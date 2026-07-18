@@ -17,8 +17,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map, clearstatcache,
-    explode, implode, in_array, is_dir, preg_quote, rawurldecode, rawurlencode, str_contains,
-    str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
+    explode, implode, in_array, is_dir, php_regex, preg_quote, rawurldecode, rawurlencode,
+    str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use std::sync::Mutex;
 
@@ -114,7 +114,7 @@ impl Git {
                 map.insert("%url%".to_string(), url.to_string());
                 map.insert(
                     "%sanitizedUrl%".to_string(),
-                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", url),
+                    Preg::replace(php_regex!(r"{://([^@]+?):(.+?)@}"), "://", url),
                 );
 
                 array_map(
@@ -215,7 +215,7 @@ impl Git {
             status
         };
 
-        if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", url) {
+        if Preg::is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url) {
             return Err(InvalidArgumentException {
                 message: format!(
                     "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
@@ -236,7 +236,7 @@ impl Git {
             );
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
-                r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im",
+                php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
                 &output,
                 Some(&mut m),
             ) {
@@ -258,7 +258,7 @@ impl Git {
         // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            &format!(
+            format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
@@ -326,7 +326,7 @@ impl Git {
             _ => vec![],
         };
         let bypass_ssh_for_github = Preg::is_match(
-            &format!(
+            format!(
                 "{{^git@{}:(.+?)\\.git$}}i",
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
@@ -357,14 +357,14 @@ impl Git {
             // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             let github_matched = Preg::is_match3(
-                &format!(
+                format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
                     Self::get_github_domains_regex(&self.config.borrow())
                 ),
                 url,
                 Some(&mut m),
             ) || Preg::is_match3(
-                &format!(
+                format!(
                     "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
                     Self::get_github_domains_regex(&self.config.borrow())
                 ),
@@ -422,11 +422,11 @@ impl Git {
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
             } else if Preg::is_match3(
-                r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i",
+                php_regex!(r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i"),
                 url,
                 Some(&mut m),
             ) || Preg::is_match3(
-                r"{^(git)@(bitbucket\.org):(.+?\.git)$}i",
+                php_regex!(r"{^(git)@(bitbucket\.org):(.+?\.git)$}i"),
                 url,
                 Some(&mut m),
             ) {
@@ -568,14 +568,14 @@ impl Git {
 
                 error_msg = self.process.borrow().get_error_output().to_string();
             } else if Preg::is_match3(
-                &format!(
+                format!(
                     "{{^(git)@{}:(.+?\\.git)$}}i",
                     Self::get_gitlab_domains_regex(&self.config.borrow())
                 ),
                 url,
                 Some(&mut m),
             ) || Preg::is_match3(
-                &format!(
+                format!(
                     "{{^(https?)://{}/(.*)}}i",
                     Self::get_gitlab_domains_regex(&self.config.borrow())
                 ),
@@ -924,10 +924,14 @@ impl Git {
         pretty_version: Option<&str>,
     ) -> anyhow::Result<bool> {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
-            if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref)
+            if Preg::is_match(php_regex!(r"{^[a-f0-9]{40}$}"), r#ref)
                 && let Some(pretty_version) = pretty_version
             {
-                let branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", pretty_version);
+                let branch = Preg::replace(
+                    php_regex!(r"{(?:^dev-|(?:\.x)?-dev$)}i"),
+                    "",
+                    pretty_version,
+                );
                 let mut branches: Option<String> = None;
                 let mut tags: Option<String> = None;
                 let mut output = String::new();
@@ -955,12 +959,12 @@ impl Git {
                 // see https://github.com/composer/composer/discussions/11002
                 if branches.is_some()
                     && !Preg::is_match(
-                        &format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
+                        format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
                         branches.as_deref().unwrap_or(""),
                     )
                     && tags.is_some()
                     && !Preg::is_match(
-                        &format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
+                        format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
                         tags.as_deref().unwrap_or(""),
                     )
                 {
@@ -1050,7 +1054,7 @@ impl Git {
         }
 
         // Filter out "commit <hash>" lines for older git versions
-        Preg::replace(r"{^commit [a-f0-9]{40}\n?}m", "", output)
+        Preg::replace(php_regex!(r"{^commit [a-f0-9]{40}\n?}m"), "", output)
     }
 
     fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> anyhow::Result<bool> {
@@ -1091,7 +1095,11 @@ impl Git {
     /// @return array<int, string>|null
     fn get_authentication_failure(&self, url: &str) -> Option<IndexMap<CaptureKey, String>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match3(r"{^(https?://)([^/]+)(.*)$}i", url, Some(&mut m)) {
+        if !Preg::is_match3(
+            php_regex!(r"{^(https?://)([^/]+)(.*)$}i"),
+            url,
+            Some(&mut m),
+        ) {
             return None;
         }
 
@@ -1176,7 +1184,11 @@ impl Git {
                 .split_lines(output_mixed.as_string().unwrap_or(""));
             for line in lines {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{^\s*HEAD branch:\s(.+)\s*$}m", &line, Some(&mut matches)) {
+                if Preg::is_match3(
+                    php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"),
+                    &line,
+                    Some(&mut matches),
+                ) {
                     return Ok(Some(
                         matches
                             .get(&CaptureKey::ByIndex(1))
@@ -1314,7 +1326,7 @@ impl Git {
             if exit_code == 0 {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::is_match3(
-                    r"/^git version (\d+(?:\.\d+)+)/m",
+                    php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"),
                     &output,
                     Some(&mut matches),
                 ) {

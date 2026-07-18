@@ -28,7 +28,9 @@ use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, in_array, str_replace, strpos};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, in_array, php_regex, str_replace, strpos,
+};
 use shirabe_semver::constraint::SimpleConstraint;
 
 // TODO(phase-c): the driver registration should be refactored later.
@@ -479,7 +481,7 @@ impl VcsRepository {
                 data.insert(
                     "version".to_string(),
                     PhpMixed::String(Preg::replace(
-                        r"{[.-]?dev$}i",
+                        php_regex!(r"{[.-]?dev$}i"),
                         "",
                         data.get("version")
                             .and_then(|v| v.as_string())
@@ -489,7 +491,7 @@ impl VcsRepository {
                 data.insert(
                     "version_normalized".to_string(),
                     PhpMixed::String(Preg::replace(
-                        r"{(^dev-|[.-]?dev$)}i",
+                        php_regex!(r"{(^dev-|[.-]?dev$)}i"),
                         "",
                         data.get("version_normalized")
                             .and_then(|v| v.as_string())
@@ -509,7 +511,7 @@ impl VcsRepository {
                 // broken package, version doesn't match tag
                 if version_normalized != parsed_tag {
                     if is_very_verbose {
-                        if Preg::is_match(r"{(^dev-|[.-]?dev$)}i", &parsed_tag) {
+                        if Preg::is_match(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag) {
                             self.io.write_error(&format!(
                                 "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
                                 tag

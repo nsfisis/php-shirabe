@@ -17,7 +17,7 @@ use crate::util::http::Response;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
+    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, php_regex, urlencode,
 };
 
 #[derive(Debug)]
@@ -585,7 +585,7 @@ impl ForgejoDriver {
         let links = explode(",", &header);
         for link in links {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::match3(r#"{<(.+?)>; *rel="next"}"#, &link, Some(&mut m))
+            if Preg::match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &link, Some(&mut m))
                 && let Some(url) = m.get(&CaptureKey::ByIndex(1))
             {
                 return Some(url.clone());

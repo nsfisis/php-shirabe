@@ -19,7 +19,7 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array, is_array,
-    is_string, ord, strpos, strtolower,
+    is_string, ord, php_regex, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -193,7 +193,7 @@ impl GitLabDriver {
 
         self.namespace = implode("/", &url_parts);
         self.repository = Preg::replace(
-            r"#(\.git)$#",
+            php_regex!(r"#(\.git)$#"),
             "",
             &match_
                 .get(&CaptureKey::ByName("repo".to_string()))
@@ -426,7 +426,7 @@ impl GitLabDriver {
 
         // Convert the root identifier to a cacheable commit id
         let mut identifier = identifier.to_string();
-        if !Preg::is_match(r"{[a-f0-9]{40}}i", &identifier) {
+        if !Preg::is_match(php_regex!(r"{[a-f0-9]{40}}i"), &identifier) {
             let branches = self.get_branches()?;
             if let Some(sha) = branches.get(&identifier) {
                 identifier = sha.clone();
@@ -1048,7 +1048,11 @@ impl GitLabDriver {
         let links = explode(",", &header);
         for link in &links {
             let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(r#"{<(.+?)>; *rel="next"}"#, link, Some(&mut match_)) {
+            if Preg::is_match3(
+                php_regex!(r#"{<(.+?)>; *rel="next"}"#),
+                link,
+                Some(&mut match_),
+            ) {
                 return Some(
                     match_
                         .get(&CaptureKey::ByIndex(1))
@@ -1108,7 +1112,7 @@ impl GitLabDriver {
                 false,
             ) || (port_number.is_some()
                 && in_array(
-                    PhpMixed::String(Preg::replace(r"{:\d+}", "", &guessed_domain)),
+                    PhpMixed::String(Preg::replace(php_regex!(r"{:\d+}"), "", &guessed_domain)),
                     configured_domains,
                     false,
                 ))

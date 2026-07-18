@@ -11,7 +11,7 @@ use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_regex};
 use std::cell::{Cell, Ref};
 
 /// The base-class state of the PHP `Command` class.
@@ -136,7 +136,8 @@ impl CommandData {
     /// Throws InvalidArgumentException when the name is invalid.
     fn validate_name(&self, name: &str) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         let mut matches: Vec<Option<String>> = Vec::new();
-        if !shirabe_php_shim::preg_match(r"/^[^\:]++(\:[^\:]++)*$/", name, &mut matches) {
+        if !shirabe_php_shim::preg_match(php_regex!(r"/^[^\:]++(\:[^\:]++)*$/"), name, &mut matches)
+        {
             return Ok(Err(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
                     message: format!("Command name \"{}\" is invalid.", name),

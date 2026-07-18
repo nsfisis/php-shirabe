@@ -10,7 +10,9 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{PhpMixed, RuntimeException, http_build_query, json_decode, time};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, http_build_query, json_decode, php_regex, time,
+};
 
 #[derive(Debug)]
 pub struct GitLab {
@@ -50,7 +52,7 @@ impl GitLab {
 
     pub fn authorize_oauth(&mut self, origin_url: &str) -> bool {
         // before composer 1.9, origin URLs had no port number in them
-        let bc_origin_url = Preg::replace("{:\\d+}", "", origin_url);
+        let bc_origin_url = Preg::replace(php_regex!("{:\\d+}"), "", origin_url);
 
         let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
         let domains = match gitlab_domains.as_array() {

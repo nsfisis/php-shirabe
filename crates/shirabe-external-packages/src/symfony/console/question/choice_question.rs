@@ -5,7 +5,7 @@ use crate::symfony::console::exception::logic_exception::LogicException;
 use crate::symfony::console::question::Question;
 use crate::symfony::console::question::QuestionInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_regex};
 
 /// Represents a choice question.
 #[derive(Debug)]
@@ -125,7 +125,7 @@ impl ChoiceQuestion {
                 // Check for a separated comma values
                 let mut matches: Vec<Option<String>> = Vec::new();
                 if !shirabe_php_shim::preg_match(
-                    "/^[^,]+(?:,[^,]+)*$/",
+                    php_regex!("/^[^,]+(?:,[^,]+)*$/"),
                     &shirabe_php_shim::strval(&selected),
                     &mut matches,
                 ) {

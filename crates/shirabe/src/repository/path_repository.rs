@@ -26,7 +26,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined,
-    file_exists, file_get_contents, glob_with_flags, hash, realpath, serialize,
+    file_exists, file_get_contents, glob_with_flags, hash, php_regex, realpath, serialize,
 };
 
 #[derive(Debug)]
@@ -161,9 +161,9 @@ impl PathRepository {
         let url_matches = self.get_url_matches()?;
 
         if url_matches.is_empty() {
-            if Preg::is_match(r"{[*{}]}", &self.url) {
+            if Preg::is_match(php_regex!(r"{[*{}]}"), &self.url) {
                 let mut url = self.url.clone();
-                while Preg::is_match(r"{[*{}]}", &url) {
+                while Preg::is_match(php_regex!(r"{[*{}]}"), &url) {
                     url = shirabe_php_shim::dirname(&url);
                 }
                 // the parent directory before any wildcard exists, so we assume it is correctly configured but simply empty

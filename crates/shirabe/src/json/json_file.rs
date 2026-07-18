@@ -14,8 +14,8 @@ use shirabe_external_packages::seld::json_lint::{ParsingException, ParsingExcept
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
-    file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, realpath, str_contains,
-    str_ends_with, str_repeat, strlen, strpos, usleep,
+    file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, php_regex, realpath,
+    str_contains, str_ends_with, str_repeat, strlen, strpos, usleep,
 };
 
 #[derive(Debug, Clone)]
@@ -113,7 +113,7 @@ impl JsonFile {
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Self> {
-        if http_downloader.is_none() && Preg::is_match(r"{^https?://}i", &path) {
+        if http_downloader.is_none() && Preg::is_match(php_regex!(r"{^https?://}i"), &path) {
             return Err(InvalidArgumentException {
                 message: "http urls require a HttpDownloader instance to be passed".to_string(),
                 code: 0,
@@ -466,7 +466,7 @@ impl JsonFile {
             // Pretty printing and not using default indentation
             let indent_owned = options.indent.clone();
             return Preg::replace_callback(
-                r"#^ {4,}#m",
+                php_regex!(r"#^ {4,}#m"),
                 move |m: &indexmap::IndexMap<
                     shirabe_external_packages::composer::pcre::CaptureKey,
                     String,
@@ -510,7 +510,9 @@ impl JsonFile {
             {
                 let mut count: usize = 0;
                 let replaced = Preg::replace5(
-                    r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#,
+                    php_regex!(
+                        r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#
+                    ),
                     "    \"content-hash\": \"VCS merge conflict detected. Please run `composer update --lock`.\",$1",
                     json,
                     -1,
@@ -574,7 +576,11 @@ impl JsonFile {
 
     pub fn detect_indenting(json: Option<&str>) -> String {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3(r##"#^([ \t]+)"#m"##, json.unwrap_or(""), Some(&mut m)) {
+        if Preg::is_match3(
+            php_regex!(r##"#^([ \t]+)"#m"##),
+            json.unwrap_or(""),
+            Some(&mut m),
+        ) {
             return m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
         }
 

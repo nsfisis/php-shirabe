@@ -127,7 +127,7 @@ impl LibraryInstaller {
             && !target_dir.is_empty()
         {
             let replaced = Preg::replace(
-                &format!(
+                format!(
                     "{{/*{}/?$}}",
                     preg_quote(&target_dir, None).replace('/', "/+")
                 ),

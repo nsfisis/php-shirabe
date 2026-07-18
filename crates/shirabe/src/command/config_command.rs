@@ -24,7 +24,7 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array, is_array,
-    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, str_replace, strpos,
+    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, php_regex, str_replace, strpos,
     strtolower, system, touch, var_export,
 };
 use shirabe_semver::VersionParser;
@@ -350,7 +350,7 @@ impl Command for ConfigCommand {
             let mut value: PhpMixed;
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
-                "/^repos?(?:itories)?(?:\\.(.+))?/",
+                php_regex!("/^repos?(?:itories)?(?:\\.(.+))?/"),
                 &setting_key,
                 Some(&mut matches),
             ) {
@@ -589,7 +589,7 @@ impl Command for ConfigCommand {
         // handle preferred-install per-package config
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            "/^preferred-install\\.(.+)/",
+            php_regex!("/^preferred-install\\.(.+)/"),
             &setting_key,
             Some(&mut matches),
         ) {
@@ -630,7 +630,7 @@ impl Command for ConfigCommand {
         // handle allow-plugins config setting elements true or false to add/remove
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            "{^allow-plugins\\.([a-zA-Z0-9/*-]+)}",
+            php_regex!("{^allow-plugins\\.([a-zA-Z0-9/*-]+)}"),
             &setting_key,
             Some(&mut matches),
         ) {
@@ -703,7 +703,7 @@ impl Command for ConfigCommand {
         // handle repositories
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            "/^repos?(?:itories)?\\.(.+)/",
+            php_regex!("/^repos?(?:itories)?\\.(.+)/"),
             &setting_key,
             Some(&mut matches),
         ) {
@@ -778,7 +778,11 @@ impl Command for ConfigCommand {
 
         // handle extra
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^extra\\.(.+)/", &setting_key, Some(&mut matches)) {
+        if Preg::is_match3(
+            php_regex!("/^extra\\.(.+)/"),
+            &setting_key,
+            Some(&mut matches),
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -851,7 +855,11 @@ impl Command for ConfigCommand {
 
         // handle suggest
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)) {
+        if Preg::is_match3(
+            php_regex!("/^suggest\\.(.+)/"),
+            &setting_key,
+            Some(&mut matches),
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -889,7 +897,11 @@ impl Command for ConfigCommand {
 
         // handle platform
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^platform\\.(.+)/", &setting_key, Some(&mut matches)) {
+        if Preg::is_match3(
+            php_regex!("/^platform\\.(.+)/"),
+            &setting_key,
+            Some(&mut matches),
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1013,7 +1025,9 @@ impl Command for ConfigCommand {
         // handle auth
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            "/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/",
+            php_regex!(
+                "/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/"
+            ),
             &setting_key,
             Some(&mut matches),
         ) {
@@ -1153,7 +1167,11 @@ impl Command for ConfigCommand {
 
                     // Check if the header is in correct "Name: Value" format
                     let mut header_parts: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if !Preg::is_match3("/^[^:]+:\\s*.+$/", header, Some(&mut header_parts)) {
+                    if !Preg::is_match3(
+                        php_regex!("/^[^:]+:\\s*.+$/"),
+                        header,
+                        Some(&mut header_parts),
+                    ) {
                         return Err(RuntimeException {
                             message: format!(
                                 "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
@@ -1208,7 +1226,11 @@ impl Command for ConfigCommand {
 
         // handle script
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)) {
+        if Preg::is_match3(
+            php_regex!("/^scripts\\.(.+)/"),
+            &setting_key,
+            Some(&mut matches),
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1407,7 +1429,11 @@ impl ConfigCommand {
                     || (key == "repositories" && k.is_none()))
             {
                 let mut new_k = k.clone().unwrap_or_default();
-                new_k.push_str(&Preg::replace("{^config\\.}", "", &format!("{}.", key)));
+                new_k.push_str(&Preg::replace(
+                    php_regex!("{^config\\.}"),
+                    "",
+                    &format!("{}.", key),
+                ));
                 k = Some(new_k);
                 self.list_configuration(
                     value_inner,
@@ -1466,13 +1492,13 @@ impl ConfigCommand {
                     } else {
                         k.clone().unwrap()
                     };
-                    let id = Preg::replace("{\\..*$}", "", &id_source);
+                    let id = Preg::replace(php_regex!("{\\..*$}"), "", &id_source);
                     let id = Preg::replace(
-                        "{[^a-z0-9]}i",
+                        php_regex!("{[^a-z0-9]}i"),
                         "-",
                         &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
                     );
-                    let id = Preg::replace("{-+}", "-", &id);
+                    let id = Preg::replace(php_regex!("{-+}"), "-", &id);
                     format!("https://getcomposer.org/doc/06-config.md#{}", id)
                 };
             if is_string(&raw_val)
@@ -1707,7 +1733,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         (
             Box::new(|val| {
                 PhpMixed::Bool(Preg::is_match3(
-                    "/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i",
+                    php_regex!("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i"),
                     val.as_string().unwrap_or(""),
                     None,
                 ))

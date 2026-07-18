@@ -16,7 +16,7 @@ use crate::repository::{
 };
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, var_export};
+use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, php_regex, var_export};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -85,7 +85,11 @@ impl PackageRepository {
 
     pub fn get_repo_name(&self) -> String {
         use crate::repository::RepositoryInterface;
-        Preg::replace(r"{^array }", "package ", &self.inner.get_repo_name())
+        Preg::replace(
+            php_regex!(r"{^array }"),
+            "package ",
+            &self.inner.get_repo_name(),
+        )
     }
 
     // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to load

@@ -3,6 +3,7 @@
 use crate::symfony::console::formatter::output_formatter_interface::OutputFormatterInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
 use crate::symfony::string::unicode_string::UnicodeString;
+use shirabe_php_shim::php_regex;
 
 /// Helper is the base class for all helper classes.
 #[derive(Debug, Default)]
@@ -39,7 +40,7 @@ impl Helper {
     /// Returns the width of a string, using mb_strwidth if it is available.
     /// The width is how many characters positions the string will use.
     pub fn width(string: &str) -> i64 {
-        if shirabe_php_shim::preg_match("//u", string, &mut Vec::new()) {
+        if shirabe_php_shim::preg_match(php_regex!("//u"), string, &mut Vec::new()) {
             return UnicodeString::new(string).width(false);
         }
 
@@ -55,7 +56,7 @@ impl Helper {
     /// Returns the length of a string, using mb_strlen if it is available.
     /// The length is related to how many bytes the string will use.
     pub fn length(string: &str) -> i64 {
-        if shirabe_php_shim::preg_match("//u", string, &mut Vec::new()) {
+        if shirabe_php_shim::preg_match(php_regex!("//u"), string, &mut Vec::new()) {
             return UnicodeString::new(string).length();
         }
 
@@ -147,10 +148,13 @@ impl Helper {
         // remove <...> formatting
         let string = formatter.format(Some(string)).unwrap().unwrap_or_default();
         // remove already formatted characters
-        let string = shirabe_php_shim::preg_replace("/\u{1b}\\[[^m]*m/", "", &string);
+        let string = shirabe_php_shim::preg_replace(php_regex!("/\u{1b}\\[[^m]*m/"), "", &string);
         // remove terminal hyperlinks
-        let string =
-            shirabe_php_shim::preg_replace("/\u{1b}]8;[^;]*;[^\u{1b}]*\u{1b}\\\\/", "", &string);
+        let string = shirabe_php_shim::preg_replace(
+            php_regex!("/\u{1b}]8;[^;]*;[^\u{1b}]*\u{1b}\\\\/"),
+            "",
+            &string,
+        );
         formatter.set_decorated(is_decorated);
 
         string

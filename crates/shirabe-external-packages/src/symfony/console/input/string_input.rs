@@ -6,7 +6,7 @@ use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::streamable_input_interface::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CaptureKey, PhpMixed};
+use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -58,14 +58,20 @@ impl StringInput {
             }
 
             let mut m: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-            if shirabe_php_shim::preg_match2(r"/\s+/A", input, &mut m, 0, cursor as usize) {
+            if shirabe_php_shim::preg_match2(
+                php_regex!(r"/\s+/A"),
+                input,
+                &mut m,
+                0,
+                cursor as usize,
+            ) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
             } else if shirabe_php_shim::preg_match2(
-                &format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
+                format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
                 input,
                 &mut m,
                 0,
@@ -88,7 +94,7 @@ impl StringInput {
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
             } else if shirabe_php_shim::preg_match2(
-                &format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
+                format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
                 input,
                 &mut m,
                 0,
@@ -106,7 +112,7 @@ impl StringInput {
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
             } else if shirabe_php_shim::preg_match2(
-                &format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
+                format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
                 input,
                 &mut m,
                 0,

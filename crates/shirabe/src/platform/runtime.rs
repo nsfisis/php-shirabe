@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, class_exists, function_exists, html_entity_decode, implode, instantiate_class, ltrim,
-    strip_tags, trim,
+    php_regex, strip_tags, trim,
 };
 
 /// Seam over the PHP runtime so PlatformRepository can be tested against mocked
@@ -96,7 +96,7 @@ impl Runtime {
 
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::match3(
-            r"~<h2>\s*<a[^>]*>([^<]+)</a>\s*</h2>~i",
+            php_regex!(r"~<h2>\s*<a[^>]*>([^<]+)</a>\s*</h2>~i"),
             html,
             Some(&mut matches),
         ) {
@@ -114,7 +114,9 @@ impl Runtime {
 
         let mut matches: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
         if Preg::match_all3(
-            r#"~<tr>\s*<td class="e">\s*(.*?)\s*</td>\s*<td class="v">\s*(.*?)\s*</td>\s*</tr>~is"#,
+            php_regex!(
+                r#"~<tr>\s*<td class="e">\s*(.*?)\s*</td>\s*<td class="v">\s*(.*?)\s*</td>\s*</tr>~is"#
+            ),
             html,
             Some(&mut matches),
         ) > 0

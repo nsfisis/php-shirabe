@@ -13,7 +13,7 @@ use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded};
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded, php_regex};
 
 #[derive(Debug)]
 pub struct VcsDriverBase {
@@ -56,7 +56,7 @@ impl VcsDriverBase {
     }
 
     pub fn should_cache(&self, identifier: &str) -> bool {
-        self.cache.is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier)
+        self.cache.is_some() && Preg::is_match(php_regex!("{^[a-f0-9]{40}$}iD"), identifier)
     }
 
     pub fn get_scheme(&self) -> &str {
@@ -199,7 +199,7 @@ pub trait VcsDriver: VcsDriverInterface {
     fn cache_mut(&mut self) -> Option<&mut Cache>;
 
     fn should_cache(&self, identifier: &str) -> bool {
-        self.cache().is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier)
+        self.cache().is_some() && Preg::is_match(php_regex!("{^[a-f0-9]{40}$}iD"), identifier)
     }
 
     fn get_composer_information(

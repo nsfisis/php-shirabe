@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{CaptureKey, PREG_SPLIT_DELIM_CAPTURE, PhpMixed, intval};
+use shirabe_php_shim::{CaptureKey, PREG_SPLIT_DELIM_CAPTURE, PhpMixed, intval, php_regex};
 use std::path::{Path, PathBuf};
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
@@ -67,7 +67,7 @@ fn unique_tmp_directory() -> PathBuf {
 fn parse_test_file(file: &Path) -> IndexMap<String, String> {
     let contents = std::fs::read_to_string(file).unwrap();
     let tokens = Preg::split4(
-        r"#(?:^|\n*)--([A-Z-]+)--\n#",
+        php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"),
         &contents,
         -1,
         PREG_SPLIT_DELIM_CAPTURE,
@@ -147,7 +147,7 @@ fn expect_matches(expected: &str, output: &str) {
         }
         if eb[i] == b'%' {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if !Preg::is_match3("{%(.+?)%}", &expected[i..], Some(&mut m)) {
+            if !Preg::is_match3(php_regex!("{%(.+?)%}"), &expected[i..], Some(&mut m)) {
                 panic!("Failed to match %...% in {}", &expected[i..]);
             }
             let regex = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap();

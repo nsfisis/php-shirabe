@@ -9,8 +9,8 @@ use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
     PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, is_string,
-    pathinfo, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers, strlen,
-    strpos, strrpos, strtr, substr,
+    pathinfo, php_regex, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers,
+    strlen, strpos, strrpos, strtr, substr,
 };
 use std::path::PathBuf;
 
@@ -187,7 +187,7 @@ impl ClassMapGenerator {
                 // optional leading group `(^|[^:])` that is re-emitted in the replacement. Slash runs
                 // are always separated by path-segment characters, so consuming the single preceding
                 // char never prevents an adjacent run from matching.
-                file_path = Preg::replace(r"{(^|[^:])[\\/]{2,}}", "${1}/", &file_path);
+                file_path = Preg::replace(php_regex!(r"{(^|[^:])[\\/]{2,}}"), "${1}/", &file_path);
             }
 
             if file_path.is_empty() {
@@ -340,12 +340,12 @@ impl ClassMapGenerator {
             };
             let cwd = Self::normalize_path(&cwd);
             let short_path = Preg::replace(
-                &format!("{{^{}}}", preg_quote(&cwd, None)),
+                format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 &Self::normalize_path(file_path),
             );
             let short_base_path = Preg::replace(
-                &format!("{{^{}}}", preg_quote(&cwd, None)),
+                format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 &Self::normalize_path(base_path),
             );
@@ -391,7 +391,7 @@ impl ClassMapGenerator {
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
         let mut r#match: indexmap::IndexMap<_, _> = indexmap![];
         if Preg::is_match3(
-            r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix",
+            php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
             Some(&mut r#match),
         ) {
@@ -420,7 +420,7 @@ impl ClassMapGenerator {
 
         // ensure c: is normalized to C:
         let prefix = Preg::replace_callback(
-            r"{(?:^|://)[a-z]:$}i",
+            php_regex!(r"{(?:^|://)[a-z]:$}i"),
             |m| {
                 m.get(&CaptureKey::ByIndex(0))
                     .cloned()

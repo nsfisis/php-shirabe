@@ -13,7 +13,7 @@ use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_regex};
 
 /// JSON descriptor.
 ///
@@ -163,7 +163,7 @@ impl JsonDescriptor {
         data.insert(
             "description".to_string(),
             PhpMixed::String(Preg::replace(
-                "/\\s*[\\r\\n]\\s*/",
+                php_regex!("/\\s*[\\r\\n]\\s*/"),
                 " ",
                 argument.get_description(),
             )),
@@ -224,7 +224,7 @@ impl JsonDescriptor {
             data.insert(
                 "description".to_string(),
                 PhpMixed::String(Preg::replace(
-                    "/\\s*[\\r\\n]\\s*/",
+                    php_regex!("/\\s*[\\r\\n]\\s*/"),
                     " ",
                     option.get_description(),
                 )),

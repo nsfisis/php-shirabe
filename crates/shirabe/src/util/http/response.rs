@@ -2,7 +2,7 @@
 
 use crate::json::JsonFile;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{PhpMixed, preg_quote};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_quote};
 
 #[derive(Debug)]
 pub struct Response {
@@ -29,7 +29,7 @@ impl Response {
     pub fn get_status_message(&self) -> Option<String> {
         let mut value = None;
         for header in &self.headers {
-            if Preg::is_match(r"{^HTTP/\S+ \d+}i", header) {
+            if Preg::is_match(php_regex!(r"{^HTTP/\S+ \d+}i"), header) {
                 // In case of redirects, headers contain the headers of all responses
                 // so we can not return directly and need to keep iterating
                 value = Some(header.clone());

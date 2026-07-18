@@ -4,7 +4,7 @@ use crate::symfony::console::exception::invalid_argument_exception::InvalidArgum
 use crate::symfony::console::exception::runtime_exception::RuntimeException;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, PhpResource};
+use shirabe_php_shim::{PhpMixed, PhpResource, php_regex};
 
 /// Input is the base class for all concrete Input classes.
 ///
@@ -219,7 +219,7 @@ impl Input {
     /// Escapes a token through escapeshellarg if it contains unsafe chars.
     pub fn escape_token(&self, token: &str) -> String {
         let mut matches: Vec<Option<String>> = vec![];
-        if shirabe_php_shim::preg_match("{^[\\w-]+$}", token, &mut matches) {
+        if shirabe_php_shim::preg_match(php_regex!("{^[\\w-]+$}"), token, &mut matches) {
             token.to_string()
         } else {
             shirabe_php_shim::escapeshellarg(token)

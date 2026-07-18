@@ -13,7 +13,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, phpversion,
+    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, php_regex, phpversion,
     spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos, strtolower, substr,
     substr_count, version_compare,
 };
@@ -229,7 +229,9 @@ impl Problem {
                 true,
             ) {
                 Preg::is_match3(
-                    r"{^(?P<package>\S+) (?P<version>\S+) (?P<type>requires|conflicts)}",
+                    php_regex!(
+                        r"{^(?P<package>\S+) (?P<version>\S+) (?P<type>requires|conflicts)}"
+                    ),
                     &message,
                     Some(&mut m),
                 )
@@ -238,7 +240,7 @@ impl Problem {
             };
             if matched {
                 message = str_replace("%", "%%", &message);
-                let template = Preg::replace(r"{^\S+ \S+ }", "%s%s ", &message);
+                let template = Preg::replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
                 messages.push(template.clone());
                 let pkg_key = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
@@ -305,8 +307,11 @@ impl Problem {
                     };
                     if versions_list.len() > 1 {
                         // remove the s from requires/conflicts to correct grammar
-                        let message_var =
-                            Preg::replace(r"{^(%s%s (?:require|conflict))s}", "$1", message);
+                        let message_var = Preg::replace(
+                            php_regex!(r"{^(%s%s (?:require|conflict))s}"),
+                            "$1",
+                            message,
+                        );
                         result.push(sprintf(
                             &message_var,
                             &[
@@ -560,9 +565,13 @@ impl Problem {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == SimpleConstraint::STR_OP_EQ
-            && Preg::is_match3(r"{^dev-.*#.*}", &c.get_pretty_string(), None)
+            && Preg::is_match3(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string(), None)
         {
-            let new_constraint = Preg::replace(r"{ +as +([^,\s|]+)$}", "", &c.get_pretty_string());
+            let new_constraint = Preg::replace(
+                php_regex!(r"{ +as +([^,\s|]+)$}"),
+                "",
+                &c.get_pretty_string(),
+            );
             let packages = repository_set.find_packages(
                 package_name,
                 Some(
@@ -1011,8 +1020,8 @@ impl Problem {
             ));
         }
 
-        if !Preg::is_match3(r"{^[A-Za-z0-9_./-]+$}", package_name, None) {
-            let illegal_chars = Preg::replace(r"{[A-Za-z0-9_./-]+}", "", package_name);
+        if !Preg::is_match3(php_regex!(r"{^[A-Za-z0-9_./-]+$}"), package_name, None) {
+            let illegal_chars = Preg::replace(php_regex!(r"{[A-Za-z0-9_./-]+}"), "", package_name);
 
             return Ok((
                 format!("- Root composer.json requires {}, it ", package_name),
@@ -1223,7 +1232,7 @@ impl Problem {
                     .or_default()
                     .push(pretty.clone());
             } else {
-                let key = Preg::replace(r"{^(\d+)\..*}", "$1", version);
+                let key = Preg::replace(php_regex!(r"{^(\d+)\..*}"), "$1", version);
                 by_major.entry(key).or_default().push(pretty.clone());
             }
         }
@@ -1400,7 +1409,11 @@ impl Problem {
             && c.get_operator() == SimpleConstraint::STR_OP_EQ
             && !str_starts_with(c.get_version(), "dev-")
         {
-            if !Preg::is_match3(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None) {
+            if !Preg::is_match3(
+                php_regex!(r"{^\d+(?:\.\d+)*$}"),
+                &c.get_pretty_string(),
+                None,
+            ) {
                 return format!(" {} (exact version match)", c.get_pretty_string());
             }
 

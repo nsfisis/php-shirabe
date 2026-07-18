@@ -15,7 +15,7 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{LogicException, RuntimeException, chdir};
+use shirabe_php_shim::{LogicException, RuntimeException, chdir, php_regex};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -100,7 +100,7 @@ impl GlobalCommand {
         }
 
         let new_input_str = Preg::replace4(
-            r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}",
+            php_regex!(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}"),
             "",
             &Self::input_to_string(&*input.borrow())?,
             1,
@@ -153,7 +153,10 @@ impl Command for GlobalCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let tokens = Preg::split(r"{\s+}", &Self::input_to_string(&*input.borrow())?);
+        let tokens = Preg::split(
+            php_regex!(r"{\s+}"),
+            &Self::input_to_string(&*input.borrow())?,
+        );
         let mut args: Vec<String> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with('-') {

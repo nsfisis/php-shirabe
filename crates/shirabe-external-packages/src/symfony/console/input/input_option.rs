@@ -2,7 +2,7 @@
 
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::logic_exception::LogicException;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_regex};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -110,7 +110,7 @@ impl InputOption {
 
     fn normalize_shortcut(s: String) -> anyhow::Result<Option<String>> {
         let stripped = shirabe_php_shim::ltrim(&s, Some("-"));
-        let parts = shirabe_php_shim::preg_split(r"{(\|)-?}", &stripped);
+        let parts = shirabe_php_shim::preg_split(php_regex!(r"{(\|)-?}"), &stripped);
         let filtered: Vec<String> =
             shirabe_php_shim::array_filter(&parts, |s: &String| !s.is_empty());
         let result = shirabe_php_shim::implode("|", &filtered);

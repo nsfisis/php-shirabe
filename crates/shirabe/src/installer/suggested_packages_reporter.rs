@@ -8,6 +8,7 @@ use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_php_shim::php_regex;
 
 #[derive(Debug)]
 pub struct SuggestedPackagesReporter {
@@ -206,6 +207,6 @@ impl SuggestedPackagesReporter {
     }
 
     fn remove_control_characters(&self, string: &str) -> String {
-        Preg::replace("/[[:cntrl:]]/", "", &string.replace('\n', " "))
+        Preg::replace(php_regex!("/[[:cntrl:]]/"), "", &string.replace('\n', " "))
     }
 }

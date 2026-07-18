@@ -12,8 +12,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
-    file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir,
-    substr, trim, umask,
+    file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, php_regex, realpath,
+    rmdir, substr, trim, umask,
 };
 
 /// Seam over the BinaryInstaller methods reached through LibraryInstaller, so tests can inject a
@@ -204,7 +204,7 @@ impl BinaryInstaller {
         };
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m",
+            php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
             &line,
             Some(&mut m),
         ) {
@@ -325,9 +325,10 @@ impl BinaryInstaller {
             file_get_contents5(bin, false, PhpMixed::Null, 0, Some(500)).unwrap_or_default();
         // For php files, we generate a PHP proxy instead of a shell one,
         // which allows calling the proxy with a custom php process
-        if let Some(m) =
-            Preg::is_match_with_indexed_captures(r"{^(#!.*\r?\n)?[\r\n\t ]*<\?php}", &bin_contents)
-        {
+        if let Some(m) = Preg::is_match_with_indexed_captures(
+            php_regex!(r"{^(#!.*\r?\n)?[\r\n\t ]*<\?php}"),
+            &bin_contents,
+        ) {
             // carry over the existing shebang if present, otherwise add our own
             let proxy_code = if m.get(1).is_none() {
                 "#!/usr/bin/env php".to_string()

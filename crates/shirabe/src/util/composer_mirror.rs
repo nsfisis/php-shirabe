@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::hash;
+use shirabe_php_shim::{hash, php_regex};
 
 pub struct ComposerMirror;
 
@@ -15,7 +15,7 @@ impl ComposerMirror {
         pretty_version: Option<&str>,
     ) -> String {
         let reference = reference.map(|r| {
-            if Preg::is_match(r"{^([a-f0-9]*|%reference%)$}", r) {
+            if Preg::is_match(php_regex!(r"{^([a-f0-9]*|%reference%)$}"), r) {
                 r.to_string()
             } else {
                 hash("md5", r)
@@ -56,7 +56,9 @@ impl ComposerMirror {
         let mut gh_matches: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
         let mut bb_matches: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
         let normalized_url = if Preg::match3(
-            r"#^(?:(?:https?|git)://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?$#",
+            php_regex!(
+                r"#^(?:(?:https?|git)://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?$#"
+            ),
             url,
             Some(&mut gh_matches),
         ) {
@@ -72,7 +74,7 @@ impl ComposerMirror {
                     .unwrap_or_default(),
             )
         } else if Preg::match3(
-            r"#^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$#",
+            php_regex!(r"#^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$#"),
             url,
             Some(&mut bb_matches),
         ) {
@@ -88,7 +90,7 @@ impl ComposerMirror {
                     .unwrap_or_default(),
             )
         } else {
-            Preg::replace(r"{[^a-z0-9_.-]}i", "-", url.trim_matches('/'))
+            Preg::replace(php_regex!(r"{[^a-z0-9_.-]}i"), "-", url.trim_matches('/'))
         };
 
         ["%package%", "%normalizedUrl%", "%type%"]

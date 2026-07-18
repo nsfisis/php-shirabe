@@ -10,7 +10,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string};
+use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string, php_regex};
 
 #[derive(Debug)]
 pub struct ScriptAliasCommand {
@@ -138,7 +138,7 @@ impl Command for ScriptAliasCommand {
         // TODO(phase-c): InputInterface lacks to_string; use a placeholder until it is modeled.
         let input_as_string = String::new();
         let _ = input;
-        let script_alias_input = Preg::replace4(r"{^\S+ ?}", "", &input_as_string, 1);
+        let script_alias_input = Preg::replace4(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1);
         let mut flags = indexmap::IndexMap::new();
         flags.insert(
             "script-alias-input".to_string(),

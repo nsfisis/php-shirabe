@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
-    php_to_string,
+    php_regex, php_to_string,
 };
 
 pub struct RepositoryFactory;
@@ -320,7 +320,7 @@ impl RepositoryFactory {
     ) -> String {
         let mut name = if matches!(index, PhpMixed::Int(_)) && repo.contains_key("url") {
             let url = repo.get("url").and_then(|v| v.as_string()).unwrap_or("");
-            Preg::replace("{^https?://}i", "", url)
+            Preg::replace(php_regex!("{^https?://}i"), "", url)
         } else {
             php_to_string(index)
         };
@@ -336,7 +336,7 @@ impl RepositoryFactory {
         existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
     ) -> String {
         let mut name = if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
-            Preg::replace("{^https?://}i", "", url)
+            Preg::replace(php_regex!("{^https?://}i"), "", url)
         } else {
             index.to_string()
         };

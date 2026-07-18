@@ -4,6 +4,7 @@ use crate::constraint::AnyConstraint;
 use crate::constraint::MatchAllConstraint;
 use crate::constraint::MultiConstraint;
 use crate::constraint::SimpleConstraint;
+use shirabe_php_shim::php_regex;
 
 // Regex to match pre-release data (sort of).
 //
@@ -24,7 +25,7 @@ pub struct VersionParser;
 
 impl VersionParser {
     pub fn parse_stability(version: &str) -> String {
-        let version = shirabe_php_shim::preg_replace("{#.+$}", "", version);
+        let version = shirabe_php_shim::preg_replace(php_regex!("{#.+$}"), "", version);
 
         if version.starts_with("dev-") || version.ends_with("-dev") {
             return "dev".to_string();
@@ -86,8 +87,11 @@ impl VersionParser {
 
         // strip off aliasing
         let mut match_: Vec<Option<String>> = Vec::new();
-        if shirabe_php_shim::preg_match("{^([^,\\s]++) ++as ++([^,\\s]++)$}", &version, &mut match_)
-        {
+        if shirabe_php_shim::preg_match(
+            php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"),
+            &version,
+            &mut match_,
+        ) {
             version = match_[1].clone().unwrap_or_default();
         }
 
@@ -112,7 +116,11 @@ impl VersionParser {
 
         // strip off build metadata
         let mut match_: Vec<Option<String>> = Vec::new();
-        if shirabe_php_shim::preg_match("{^([^,\\s+]++)\\+[^\\s]++$}", &version, &mut match_) {
+        if shirabe_php_shim::preg_match(
+            php_regex!("{^([^,\\s+]++)\\+[^\\s]++$}"),
+            &version,
+            &mut match_,
+        ) {
             version = match_[1].clone().unwrap_or_default();
         }
 
@@ -144,7 +152,7 @@ impl VersionParser {
             );
             if shirabe_php_shim::preg_match(&datetime_pattern, &version, &mut matches) {
                 version = shirabe_php_shim::preg_replace(
-                    "{\\D}",
+                    php_regex!("{\\D}"),
                     ".",
                     matches[1].as_deref().unwrap_or(""),
                 );
@@ -189,7 +197,7 @@ impl VersionParser {
 
         // match dev branches
         let mut match_: Vec<Option<String>> = Vec::new();
-        if shirabe_php_shim::preg_match("{(.*?)[.-]?dev$}i", &version, &mut match_) {
+        if shirabe_php_shim::preg_match(php_regex!("{(.*?)[.-]?dev$}i"), &version, &mut match_) {
             let branch_name = match_[1].clone().unwrap_or_default();
             // a branch ending with -dev is only valid if it is numeric
             // if it gets prefixed with dev- it means the branch name should
@@ -202,7 +210,7 @@ impl VersionParser {
         }
 
         let extra_message = if shirabe_php_shim::preg_match(
-            &format!(
+            format!(
                 "{{ +as +{}(?:@(?:{}))?$}}",
                 shirabe_php_shim::preg_quote(&version, None),
                 STABILITIES_REGEX
@@ -215,7 +223,7 @@ impl VersionParser {
                 full_version
             )
         } else if shirabe_php_shim::preg_match(
-            &format!(
+            format!(
                 "{{^{}(?:@(?:{}))?  +as +}}",
                 shirabe_php_shim::preg_quote(&version, None),
                 STABILITIES_REGEX
@@ -243,7 +251,7 @@ impl VersionParser {
         let mut matches: Vec<Option<String>> = Vec::new();
         // matches['version'] == matches[1] ((?P<version>...) is group 1)
         if shirabe_php_shim::preg_match(
-            "{^(?P<version>(\\d++\\.)*\\d++)(?:\\.x)?-dev$}i",
+            php_regex!("{^(?P<version>(\\d++\\.)*\\d++)(?:\\.x)?-dev$}i"),
             branch,
             &mut matches,
         ) {
@@ -262,7 +270,7 @@ impl VersionParser {
         // 5=patch(inner), 6=".fourth"(outer), 7=fourth(inner).
         // We use the outer groups [1,2,4,6] to replicate PHP's groups [1,2,3,4].
         if shirabe_php_shim::preg_match(
-            "{^v?(\\d++)(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?$}i",
+            php_regex!("{^v?(\\d++)(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?$}i"),
             &name,
             &mut matches,
         ) {
@@ -297,7 +305,7 @@ impl VersionParser {
         let pretty_constraint = constraints.to_string();
 
         let or_constraints = shirabe_php_shim::preg_split(
-            "{\\s*\\|\\|?\\s*}",
+            php_regex!("{\\s*\\|\\|?\\s*}"),
             &shirabe_php_shim::trim(constraints, None),
         );
 
@@ -338,7 +346,7 @@ impl VersionParser {
         // strip off aliasing
         let mut match_: Vec<Option<String>> = Vec::new();
         if shirabe_php_shim::preg_match(
-            "{^([^,\\s]++) ++as ++([^,\\s]++)$}",
+            php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"),
             &constraint,
             &mut match_,
         ) {
@@ -365,7 +373,7 @@ impl VersionParser {
         // get rid of #refs as those are used by composer only
         let mut match_: Vec<Option<String>> = Vec::new();
         if shirabe_php_shim::preg_match(
-            "{^(dev-[^,\\s@]+?|[^,\\s@]+?\\.x-dev)#.+$}i",
+            php_regex!("{^(dev-[^,\\s@]+?|[^,\\s@]+?\\.x-dev)#.+$}i"),
             &constraint,
             &mut match_,
         ) {
@@ -373,7 +381,11 @@ impl VersionParser {
         }
 
         let mut match_: Vec<Option<String>> = Vec::new();
-        if shirabe_php_shim::preg_match("{^(v)?[xX*](\\.[xX*])*$}i", &constraint, &mut match_) {
+        if shirabe_php_shim::preg_match(
+            php_regex!("{^(v)?[xX*](\\.[xX*])*$}i"),
+            &constraint,
+            &mut match_,
+        ) {
             let m1_nonempty = !match_
                 .get(1)
                 .and_then(|o| o.as_deref())
@@ -520,7 +532,7 @@ impl VersionParser {
         // special character is in fact optional.
         let mut matches: Vec<Option<String>> = Vec::new();
         if shirabe_php_shim::preg_match(
-            "{^v?(\\d++)(?:\\.(\\d++))?(?:\\.(\\d++))?(?:\\.[xX*])++$}",
+            php_regex!("{^v?(\\d++)(?:\\.(\\d++))?(?:\\.(\\d++))?(?:\\.[xX*])++$}"),
             &constraint,
             &mut matches,
         ) {
@@ -635,8 +647,11 @@ impl VersionParser {
 
         // Basic Comparators
         let mut match_: Vec<Option<String>> = Vec::new();
-        if shirabe_php_shim::preg_match("{^(<>|!=|>=?|<=?|==?)?\\s*(.*)}", &constraint, &mut match_)
-        {
+        if shirabe_php_shim::preg_match(
+            php_regex!("{^(<>|!=|>=?|<=?|==?)?\\s*(.*)}"),
+            &constraint,
+            &mut match_,
+        ) {
             let version_str = match_[2].clone().unwrap_or_default();
             let op_str = match_[1].clone().unwrap_or_default();
 
@@ -648,7 +663,7 @@ impl VersionParser {
                     // case it must be a parse error
                     if version_str.ends_with("-dev")
                         && shirabe_php_shim::preg_match(
-                            "{^[0-9a-zA-Z-./]+$}",
+                            php_regex!("{^[0-9a-zA-Z-./]+$}"),
                             &version_str,
                             &mut Vec::new(),
                         )

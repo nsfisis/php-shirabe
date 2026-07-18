@@ -20,7 +20,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string, json_encode,
-    ltrim, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+    ltrim, php_regex, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -504,7 +504,7 @@ impl ArrayLoader {
             && !shirabe_php_shim::empty(time_value)
         {
             let time_str = time_value.as_string().unwrap_or("");
-            let time = if Preg::is_match(r"/^\d++$/D", time_str) {
+            let time = if Preg::is_match(php_regex!(r"/^\d++$/D"), time_str) {
                 format!("@{}", time_str)
             } else {
                 time_str.to_string()
@@ -674,7 +674,7 @@ impl ArrayLoader {
         if let Some(alias_normalized) = alias_normalized
             && !alias_normalized.is_empty()
         {
-            let pretty_alias = Preg::replace(r"{(\.9{7})+}", ".x", &alias_normalized);
+            let pretty_alias = Preg::replace(php_regex!(r"{(\.9{7})+}"), ".x", &alias_normalized);
 
             return Ok(match package {
                 CompleteOrRootPackage::Root(root) => RootAliasPackageHandle::new(
@@ -938,7 +938,7 @@ impl ArrayLoader {
             && default_branch_is_true
             && self
                 .version_parser
-                .parse_numeric_alias_prefix(&Preg::replace(r"{^v}", "", &version_str))
+                .parse_numeric_alias_prefix(&Preg::replace(php_regex!(r"{^v}"), "", &version_str))
                 .is_none()
         {
             return Ok(Some(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()));

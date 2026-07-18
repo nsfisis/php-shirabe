@@ -41,8 +41,8 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, date, date_format_to_strftime, extension_loaded, in_array, realpath, strtolower,
-    version_compare,
+    array_search, date, date_format_to_strftime, extension_loaded, in_array, php_regex, realpath,
+    strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -2775,7 +2775,7 @@ impl ShowCommand {
             let mut groups: IndexMap<CaptureKey, String> = IndexMap::new();
             if major_only
                 && Preg::is_match3(
-                    r"{^(?P<zero_major>(?:0\.)+)?(?P<first_meaningful>\d+)\.}",
+                    php_regex!(r"{^(?P<zero_major>(?:0\.)+)?(?P<first_meaningful>\d+)\.}"),
                     &package.get_version(),
                     Some(&mut groups),
                 )
@@ -2802,7 +2802,8 @@ impl ShowCommand {
             }
 
             if patch_only {
-                let trimmed_version = Preg::replace(r"{(\.0)+$}D", "", &package.get_version());
+                let trimmed_version =
+                    Preg::replace(php_regex!(r"{(\.0)+$}D"), "", &package.get_version());
                 let parts_needed = if trimmed_version.starts_with('0') {
                     4
                 } else {

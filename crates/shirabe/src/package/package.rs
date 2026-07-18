@@ -11,7 +11,9 @@ use crate::util::ComposerMirror;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{E_USER_DEPRECATED, LogicException, PhpMixed, strpos, trigger_error};
+use shirabe_php_shim::{
+    E_USER_DEPRECATED, LogicException, PhpMixed, php_regex, strpos, trigger_error,
+};
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]
@@ -138,7 +140,7 @@ impl Package {
         let target_dir = self.target_dir.as_ref()?;
 
         let replaced = Preg::replace(
-            "{ (?:^|[\\\\/]+) \\.\\.? (?:[\\\\/]+|$) (?:\\.\\.? (?:[\\\\/]+|$) )*}x",
+            php_regex!("{ (?:^|[\\\\/]+) \\.\\.? (?:[\\\\/]+|$) (?:\\.\\.? (?:[\\\\/]+|$) )*}x"),
             "/",
             target_dir,
         );
@@ -415,13 +417,15 @@ impl Package {
         // TODO generalize this a bit for self-managed/on-prem versions? Some kind of replace token in dist urls which allow this?
         if self.get_dist_url().is_some()
             && Preg::is_match(
-                "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i",
+                php_regex!(
+                    "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i"
+                ),
                 &self.get_dist_url().unwrap_or_default(),
             )
         {
             self.set_dist_reference(Some(reference.clone()));
             self.set_dist_url(Some(Preg::replace(
-                "{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i",
+                php_regex!("{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i"),
                 &reference,
                 &self.get_dist_url().unwrap_or_default(),
             )));

@@ -15,6 +15,7 @@ use indexmap::IndexMap;
 pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
     PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_SPLIT_OFFSET_CAPTURE, PREG_UNMATCHED_AS_NULL,
+    PregPattern,
 };
 
 #[derive(Debug)]
@@ -22,7 +23,7 @@ pub struct Preg;
 
 impl Preg {
     pub fn match3(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> bool {
@@ -30,7 +31,7 @@ impl Preg {
     }
 
     pub fn match5(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
         flags: i64,
@@ -54,12 +55,12 @@ impl Preg {
         result
     }
 
-    pub fn match_all(pattern: &str, subject: &str) -> usize {
+    pub fn match_all(pattern: impl PregPattern, subject: &str) -> usize {
         Self::match_all5(pattern, subject, None, 0, 0)
     }
 
     pub fn match_all3(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> usize {
@@ -67,7 +68,7 @@ impl Preg {
     }
 
     pub fn match_all5(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
         flags: i64,
@@ -93,7 +94,7 @@ impl Preg {
     }
 
     pub fn match_all_with_offsets5(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
         flags: i64,
@@ -117,16 +118,21 @@ impl Preg {
         result
     }
 
-    pub fn replace(pattern: &str, replacement: &str, subject: &str) -> String {
+    pub fn replace(pattern: impl PregPattern, replacement: &str, subject: &str) -> String {
         Self::replace_impl(pattern, replacement, subject, -1, None)
     }
 
-    pub fn replace4(pattern: &str, replacement: &str, subject: &str, limit: i64) -> String {
+    pub fn replace4(
+        pattern: impl PregPattern,
+        replacement: &str,
+        subject: &str,
+        limit: i64,
+    ) -> String {
         Self::replace_impl(pattern, replacement, subject, limit, None)
     }
 
     pub fn replace5(
-        pattern: &str,
+        pattern: impl PregPattern,
         replacement: &str,
         subject: &str,
         limit: i64,
@@ -136,7 +142,7 @@ impl Preg {
     }
 
     fn replace_impl(
-        pattern: &str,
+        pattern: impl PregPattern,
         replacement: &str,
         subject: &str,
         limit: i64,
@@ -149,7 +155,7 @@ impl Preg {
     }
 
     pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
-        pattern: &str,
+        pattern: impl PregPattern,
         replacement: F,
         subject: &str,
     ) -> String {
@@ -157,7 +163,7 @@ impl Preg {
     }
 
     pub fn replace_callback6<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
-        pattern: &str,
+        pattern: impl PregPattern,
         mut replacement: F,
         subject: &str,
         limit: i64,
@@ -171,11 +177,11 @@ impl Preg {
         shirabe_php_shim::preg_replace_callback2(pattern, adapter, subject, limit, count, flags)
     }
 
-    pub fn split(pattern: &str, subject: &str) -> Vec<String> {
+    pub fn split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
         Self::split4(pattern, subject, -1, 0)
     }
 
-    pub fn split4(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<String> {
+    pub fn split4(pattern: impl PregPattern, subject: &str, limit: i64, flags: i64) -> Vec<String> {
         assert!(
             flags & PREG_SPLIT_OFFSET_CAPTURE == 0,
             "PREG_SPLIT_OFFSET_CAPTURE is not supported as it changes the type of $matches, use splitWithOffsets() instead"
@@ -184,20 +190,20 @@ impl Preg {
         shirabe_php_shim::preg_split2(pattern, subject, limit, flags)
     }
 
-    pub fn grep(pattern: &str, array: &[&str]) -> Vec<String> {
+    pub fn grep(pattern: impl PregPattern, array: &[&str]) -> Vec<String> {
         Self::grep3(pattern, array, 0)
     }
 
-    pub fn grep3(pattern: &str, array: &[&str], flags: i64) -> Vec<String> {
+    pub fn grep3(pattern: impl PregPattern, array: &[&str], flags: i64) -> Vec<String> {
         shirabe_php_shim::preg_grep2(pattern, array, flags)
     }
 
-    pub fn is_match(pattern: &str, subject: &str) -> bool {
+    pub fn is_match(pattern: impl PregPattern, subject: &str) -> bool {
         Self::match5(pattern, subject, None, 0, 0)
     }
 
     pub fn is_match3(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> bool {
@@ -205,7 +211,7 @@ impl Preg {
     }
 
     pub fn is_match5(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
         flags: i64,
@@ -215,7 +221,7 @@ impl Preg {
     }
 
     pub fn is_match_named(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: &mut IndexMap<String, String>,
     ) -> bool {
@@ -238,7 +244,10 @@ impl Preg {
         result
     }
 
-    pub fn is_match_with_indexed_captures(pattern: &str, subject: &str) -> Option<Vec<String>> {
+    pub fn is_match_with_indexed_captures(
+        pattern: impl PregPattern,
+        subject: &str,
+    ) -> Option<Vec<String>> {
         // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
         // unmatched groups are truncated, interior unmatched groups become "".
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
@@ -270,7 +279,7 @@ impl Preg {
     }
 
     pub fn is_match_all3(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> bool {
@@ -278,7 +287,7 @@ impl Preg {
     }
 
     pub fn is_match_all_with_offsets3(
-        pattern: &str,
+        pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
     ) -> bool {

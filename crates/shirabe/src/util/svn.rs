@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     LogicException, PHP_URL_HOST, PhpMixed, RuntimeException, empty, implode, parse_url,
-    parse_url_all, stripos, strpos, trim,
+    parse_url_all, php_regex, stripos, strpos, trim,
 };
 use std::sync::Mutex;
 
@@ -444,7 +444,11 @@ impl Svn {
                 None,
             ) {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{(\d+(?:\.\d+)+)}", &output, Some(&mut matches)) {
+                if Preg::is_match3(
+                    php_regex!(r"{(\d+(?:\.\d+)+)}"),
+                    &output,
+                    Some(&mut matches),
+                ) {
                     *cached = Some(
                         matches
                             .get(&CaptureKey::ByIndex(1))

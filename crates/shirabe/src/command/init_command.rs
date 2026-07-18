@@ -28,7 +28,7 @@ use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
     file_exists, file_get_contents, file_put_contents, get_current_user, implode, is_dir,
-    is_string, preg_quote, realpath, str_replace, strpos, strtolower, trim, ucwords,
+    is_string, php_regex, preg_quote, realpath, str_replace, strpos, strtolower, trim, ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 
@@ -143,7 +143,7 @@ impl Command for InitCommand {
 
         if options.contains_key("name")
             && !Preg::is_match(
-                r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D",
+                php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
                 options
                     .get("name")
                     .and_then(|v| v.as_string())
@@ -556,7 +556,7 @@ impl Command for InitCommand {
                     }
 
                     if !Preg::is_match(
-                        r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D",
+                        php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
                         value.as_string().unwrap_or(""),
                     ) {
                         return Err(InvalidArgumentException {
@@ -877,7 +877,7 @@ impl Command for InitCommand {
                     value_str
                 };
 
-                if !Preg::is_match(r"{^[^/][A-Za-z0-9\-_/]+/$}", &value_or_default)
+                if !Preg::is_match(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default)
                 {
                     return Err(InvalidArgumentException {
                         message: format!(
@@ -921,7 +921,7 @@ impl InitCommand {
     ) -> anyhow::Result<IndexMap<String, Option<String>>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
+            php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
             author,
             Some(&mut m),
         ) {
@@ -988,7 +988,7 @@ impl InitCommand {
 
         let namespace: Vec<String> = array_map(
             |part: &String| {
-                let part = Preg::replace(r"/[^a-z0-9]/i", " ", part);
+                let part = Preg::replace(php_regex!(r"/[^a-z0-9]/i"), " ", part);
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
@@ -1015,7 +1015,7 @@ impl InitCommand {
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
             let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
-            if Preg::is_match_all3(r"{^([^=]+)=(.*)$}m", &output, Some(&mut m)) {
+            if Preg::is_match_all3(php_regex!(r"{^([^=]+)=(.*)$}m"), &output, Some(&mut m)) {
                 let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let values: Vec<String> =
                     m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
@@ -1174,14 +1174,14 @@ impl InitCommand {
 
     fn sanitize_package_name_component(&self, name: &str) -> String {
         let name = Preg::replace(
-            r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
+            php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
             "$1$3-$2$4",
             name,
         );
         let name = strtolower(&name);
-        let name = Preg::replace(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u", "", &name);
+        let name = Preg::replace(php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"), "", &name);
 
-        Preg::replace(r"{([_.-]){2,}}u", "$1", &name)
+        Preg::replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
     }
 
     fn get_default_package_name(&self) -> String {

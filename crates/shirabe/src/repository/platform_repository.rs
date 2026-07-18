@@ -23,7 +23,7 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
-    array_slice_strs, explode, get_class, implode, in_array, is_string, str_replace,
+    array_slice_strs, explode, get_class, implode, in_array, is_string, php_regex, str_replace,
     str_starts_with, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
@@ -223,7 +223,8 @@ impl PlatformRepository {
                 version = v;
             }
             Err(_) => {
-                pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &php_version_str);
+                pretty_version =
+                    Preg::replace(php_regex!("#^([^~+-]+).*$#"), "$1", &php_version_str);
                 version = self
                     .version_parser
                     .as_ref()
@@ -344,7 +345,7 @@ impl PlatformRepository {
                     // librabbitmq version => 0.9.0
                     let mut librabbitmq_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^librabbitmq version => (?<version>.+)$/im",
+                        php_regex!("/^librabbitmq version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut librabbitmq_matches),
                     ) {
@@ -363,7 +364,7 @@ impl PlatformRepository {
                     // AMQP protocol version => 0-9-1
                     let mut protocol_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^AMQP protocol version => (?<version>.+)$/im",
+                        php_regex!("/^AMQP protocol version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut protocol_matches),
                     ) {
@@ -388,7 +389,7 @@ impl PlatformRepository {
                     // BZip2 Version => 1.0.6, 6-Sept-2010
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^BZip2 Version => (?<version>.*),/im",
+                        php_regex!("/^BZip2 Version => (?<version>.*),/im"),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -423,7 +424,7 @@ impl PlatformRepository {
                     // SSL Version => OpenSSL/1.0.1t
                     let mut ssl_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "{^SSL Version => (?<library>[^/]+)/(?<version>.+)$}im",
+                        php_regex!("{^SSL Version => (?<library>[^/]+)/(?<version>.+)$}im"),
                         &info,
                         Some(&mut ssl_matches),
                     ) {
@@ -459,7 +460,7 @@ impl PlatformRepository {
                                 let mut securetransport_matches: IndexMap<CaptureKey, String> =
                                     IndexMap::new();
                                 if Preg::is_match3(
-                                    "{^\\(securetransport\\) ([a-z0-9]+)}",
+                                    php_regex!("{^\\(securetransport\\) ([a-z0-9]+)}"),
                                     &library,
                                     Some(&mut securetransport_matches),
                                 ) {
@@ -491,7 +492,9 @@ impl PlatformRepository {
                     // libSSH Version => libssh2/1.4.3
                     let mut ssh_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "{^libSSH Version => (?<library>[^/]+)/(?<version>.+?)(?:/.*)?$}im",
+                        php_regex!(
+                            "{^libSSH Version => (?<library>[^/]+)/(?<version>.+?)(?:/.*)?$}im"
+                        ),
                         &info,
                         Some(&mut ssh_matches),
                     ) {
@@ -516,7 +519,7 @@ impl PlatformRepository {
                     // ZLib Version => 1.2.8
                     let mut zlib_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "{^ZLib Version => (?<version>.+)$}im",
+                        php_regex!("{^ZLib Version => (?<version>.+)$}im"),
                         &info,
                         Some(&mut zlib_matches),
                     ) {
@@ -539,7 +542,7 @@ impl PlatformRepository {
                     // timelib version => 2018.03
                     let mut timelib_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^timelib version => (?<version>.+)$/im",
+                        php_regex!("/^timelib version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut timelib_matches),
                     ) {
@@ -558,7 +561,7 @@ impl PlatformRepository {
                     // Timezone Database => internal
                     let mut zoneinfo_source_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^Timezone Database => (?<source>internal|external)$/im",
+                        php_regex!("/^Timezone Database => (?<source>internal|external)$/im"),
                         &info,
                         Some(&mut zoneinfo_source_matches),
                     ) {
@@ -568,7 +571,9 @@ impl PlatformRepository {
                             .unwrap_or(false);
                         let mut zoneinfo_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
-                            "/^\"Olson\" Timezone Database Version => (?<version>.+?)(?:\\.system)?$/im",
+                            php_regex!(
+                                "/^\"Olson\" Timezone Database Version => (?<version>.+?)(?:\\.system)?$/im"
+                            ),
                             &info,
                             Some(&mut zoneinfo_matches),
                         ) {
@@ -608,7 +613,7 @@ impl PlatformRepository {
                     // libmagic => 537
                     let mut magic_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libmagic => (?<version>.+)$/im",
+                        php_regex!("/^libmagic => (?<version>.+)$/im"),
                         &info,
                         Some(&mut magic_matches),
                     ) {
@@ -644,7 +649,7 @@ impl PlatformRepository {
 
                     let mut libjpeg_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im",
+                        php_regex!("/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im"),
                         &info,
                         Some(&mut libjpeg_matches),
                     ) {
@@ -665,7 +670,7 @@ impl PlatformRepository {
 
                     let mut libpng_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libPNG Version => (?<version>.+)$/im",
+                        php_regex!("/^libPNG Version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut libpng_matches),
                     ) {
@@ -683,7 +688,7 @@ impl PlatformRepository {
 
                     let mut freetype_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^FreeType Version => (?<version>.+)$/im",
+                        php_regex!("/^FreeType Version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut freetype_matches),
                     ) {
@@ -701,7 +706,7 @@ impl PlatformRepository {
 
                     let mut libxpm_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libXpm Version => (?<versionId>\\d+)$/im",
+                        php_regex!("/^libXpm Version => (?<versionId>\\d+)$/im"),
                         &info,
                         Some(&mut libxpm_matches),
                     ) {
@@ -775,7 +780,7 @@ impl PlatformRepository {
                     } else {
                         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
-                            "/^ICU version => (?<version>.+)$/im",
+                            php_regex!("/^ICU version => (?<version>.+)$/im"),
                             &info,
                             Some(&mut matches),
                         ) {
@@ -795,7 +800,7 @@ impl PlatformRepository {
                     // ICU TZData version => 2019c
                     let mut zoneinfo_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^ICU TZData version => (?<version>.*)$/im",
+                        php_regex!("/^ICU TZData version => (?<version>.*)$/im"),
                         &info,
                         Some(&mut zoneinfo_matches),
                     ) {
@@ -878,7 +883,7 @@ impl PlatformRepository {
                     // 7.x: ImageMagick 7.0.8-34 Q16 x86_64 2019-03-23 https://imagemagick.org
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^ImageMagick (?<version>[\\d.]+)(?:-(?<patch>\\d+))?/",
+                        php_regex!("/^ImageMagick (?<version>[\\d.]+)(?:-(?<patch>\\d+))?/"),
                         &image_magick_version_str,
                         Some(&mut matches),
                     ) {
@@ -907,11 +912,11 @@ impl PlatformRepository {
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     let mut vendor_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^Vendor Version => (?<versionId>\\d+)$/im",
+                        php_regex!("/^Vendor Version => (?<versionId>\\d+)$/im"),
                         &info,
                         Some(&mut matches),
                     ) && Preg::is_match3(
-                        "/^Vendor Name => (?<vendor>.+)$/im",
+                        php_regex!("/^Vendor Name => (?<vendor>.+)$/im"),
                         &info,
                         Some(&mut vendor_matches),
                     ) {
@@ -966,7 +971,7 @@ impl PlatformRepository {
                     // libmbfl version => 1.3.2
                     let mut libmbfl_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libmbfl version => (?<version>.+)$/im",
+                        php_regex!("/^libmbfl version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut libmbfl_matches),
                     ) {
@@ -1002,7 +1007,9 @@ impl PlatformRepository {
                     } else {
                         let mut oniguruma_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
-                            "/^(?:oniguruma|Multibyte regex \\(oniguruma\\)) version => (?<version>.+)$/im",
+                            php_regex!(
+                                "/^(?:oniguruma|Multibyte regex \\(oniguruma\\)) version => (?<version>.+)$/im"
+                            ),
                             &info,
                             Some(&mut oniguruma_matches),
                         ) {
@@ -1026,7 +1033,7 @@ impl PlatformRepository {
                     // libmemcached version => 1.0.18
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libmemcached version => (?<version>.+)$/im",
+                        php_regex!("/^libmemcached version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1052,7 +1059,7 @@ impl PlatformRepository {
                     // OpenSSL 1.1.1g  21 Apr 2020
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i",
+                        php_regex!("{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i"),
                         &openssl_text_str,
                         Some(&mut matches),
                     ) {
@@ -1084,7 +1091,8 @@ impl PlatformRepository {
                         PhpMixed::String(s) => s.clone(),
                         _ => "".to_string(),
                     };
-                    let stripped = Preg::replace("{^(\\S+).*}", "$1", &pcre_version_str);
+                    let stripped =
+                        Preg::replace(php_regex!("{^(\\S+).*}"), "$1", &pcre_version_str);
                     self.add_library(&mut libraries, name, Some(&stripped), None, &[], &[])?;
 
                     let info = self.runtime.get_extension_info(name)?;
@@ -1092,7 +1100,7 @@ impl PlatformRepository {
                     // PCRE Unicode Version => 12.1.0
                     let mut pcre_unicode_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^PCRE Unicode Version => (?<version>.+)$/im",
+                        php_regex!("/^PCRE Unicode Version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut pcre_unicode_matches),
                     ) {
@@ -1114,7 +1122,9 @@ impl PlatformRepository {
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^(?:Client API version|Version) => mysqlnd (?<version>.+?) /mi",
+                        php_regex!(
+                            "/^(?:Client API version|Version) => mysqlnd (?<version>.+?) /mi"
+                        ),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1136,7 +1146,7 @@ impl PlatformRepository {
 
                     let mut libmongoc_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libmongoc bundled version => (?<version>.+)$/im",
+                        php_regex!("/^libmongoc bundled version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut libmongoc_matches),
                     ) {
@@ -1154,7 +1164,7 @@ impl PlatformRepository {
 
                     let mut libbson_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libbson bundled version => (?<version>.+)$/im",
+                        php_regex!("/^libbson bundled version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut libbson_matches),
                     ) {
@@ -1192,7 +1202,7 @@ impl PlatformRepository {
 
                         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
-                            "/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im",
+                            php_regex!("/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im"),
                             &info,
                             Some(&mut matches),
                         ) {
@@ -1215,7 +1225,7 @@ impl PlatformRepository {
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im",
+                        php_regex!("/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im"),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1239,7 +1249,7 @@ impl PlatformRepository {
                     // libpq => 14.3 (Ubuntu 14.3-1.pgdg22.04+1) => 15.0.2
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libpq => (?<compiled>.+) => (?<linked>.+)$/im",
+                        php_regex!("/^libpq => (?<compiled>.+) => (?<linked>.+)$/im"),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1318,7 +1328,7 @@ impl PlatformRepository {
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^SQLite Library => (?<version>.+)$/im",
+                        php_regex!("/^SQLite Library => (?<version>.+)$/im"),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1340,7 +1350,7 @@ impl PlatformRepository {
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libssh2 version => (?<version>.+)$/im",
+                        php_regex!("/^libssh2 version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1375,7 +1385,9 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info("xsl")?;
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^libxslt compiled against libxml Version => (?<version>.+)$/im",
+                        php_regex!(
+                            "/^libxslt compiled against libxml Version => (?<version>.+)$/im"
+                        ),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1397,7 +1409,7 @@ impl PlatformRepository {
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        "/^LibYAML Version => (?<version>.+)$/im",
+                        php_regex!("/^LibYAML Version => (?<version>.+)$/im"),
                         &info,
                         Some(&mut matches),
                     ) {
@@ -1458,7 +1470,7 @@ impl PlatformRepository {
                         let info = self.runtime.get_extension_info(name)?;
                         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
-                            "/^Linked Version => (?<version>.+)$/im",
+                            php_regex!("/^Linked Version => (?<version>.+)$/im"),
                             &info,
                             Some(&mut matches),
                         ) {
@@ -1494,7 +1506,8 @@ impl PlatformRepository {
                     version = v;
                 }
                 Err(_) => {
-                    pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &hhvm_version);
+                    pretty_version =
+                        Preg::replace(php_regex!("#^([^~+-]+).*$#"), "$1", &hhvm_version);
                     version = self
                         .version_parser
                         .as_ref()
@@ -1655,7 +1668,7 @@ impl PlatformRepository {
                 extra_description = Some(format!(" (actual version: {})", pretty_version));
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::is_match3(
-                    "{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}",
+                    php_regex!("{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}"),
                     &pretty_version,
                     Some(&mut m),
                 ) {

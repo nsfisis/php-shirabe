@@ -14,7 +14,7 @@ use crate::symfony::console::helper::table_style::TableStyle;
 use crate::symfony::console::output::console_section_output::ConsoleSectionOutput;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_regex};
 
 /// A single cell within a table row.
 ///
@@ -847,7 +847,7 @@ impl Table {
         let mut pad_type = style.get_pad_type();
         if cell.is_table_cell() && cell.style().is_some() {
             let is_not_styled_by_tag = !Preg::is_match(
-                "/^<(\\w+|(\\w+=[\\w,]+;?)*)>.+<\\/(\\w+|(\\w+=\\w+;?)*)?>$/",
+                php_regex!("/^<(\\w+|(\\w+=[\\w,]+;?)*)>.+<\\/(\\w+|(\\w+=\\w+;?)*)?>$/"),
                 &cell_str,
             );
             if is_not_styled_by_tag {

@@ -3,7 +3,7 @@
 use shirabe_external_packages::composer::ca_bundle::ca_bundle::CaBundle;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, ltrim, preg_quote, str_replace, strtolower, substr, substr_count,
+    PhpMixed, ltrim, php_regex, preg_quote, str_replace, strtolower, substr, substr_count,
 };
 
 /// Extracted certificate names. Mirrors PHP's `array{cn: string, san: string[]}`.
@@ -81,7 +81,7 @@ impl TlsHelper {
             .and_then(|e| e.get("subjectAltName"))
             .and_then(|s| s.as_string())
         {
-            let split = Preg::split("{\\s*,\\s*}", san);
+            let split = Preg::split(php_regex!("{\\s*,\\s*}"), san);
             subject_alt_names = split
                 .into_iter()
                 .filter_map(|name| {

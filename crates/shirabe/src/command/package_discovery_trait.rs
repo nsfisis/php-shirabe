@@ -24,7 +24,7 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, explode, file_get_contents, implode, in_array, is_array, is_file,
-    is_numeric, json_decode, levenshtein, strlen, strpos, trim,
+    is_numeric, json_decode, levenshtein, php_regex, strlen, strpos, trim,
 };
 
 /// @internal
@@ -145,7 +145,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             for mut requirement in requires_norm {
                 if requirement.contains_key("version")
                     && Preg::is_match(
-                        r"{^\d+(\.\d+)?$}",
+                        php_regex!(r"{^\d+(\.\d+)?$}"),
                         requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
                     )
                 {
@@ -337,7 +337,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
                             if Preg::is_match3(
-                                r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}",
+                                php_regex!(r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}"),
                                 &selection,
                                 Some(&mut m),
                             ) {

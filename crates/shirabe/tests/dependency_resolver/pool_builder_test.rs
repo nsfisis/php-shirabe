@@ -20,8 +20,8 @@ use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_factory::RepositoryFactory;
 use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::PREG_SPLIT_DELIM_CAPTURE;
 use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, php_regex};
 use std::path::PathBuf;
 
 /// Maps the PHP `$loadPackage` closure: pops the optional `id` from the data, loads the
@@ -58,7 +58,7 @@ fn load_package(
 fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
     let contents = shirabe_php_shim::file_get_contents(file).unwrap();
     let tokens = Preg::split4(
-        r"#(?:^|\n*)--([A-Z-]+)--\n#",
+        php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"),
         &contents,
         -1,
         PREG_SPLIT_DELIM_CAPTURE,
@@ -144,7 +144,7 @@ fn get_integration_tests(fixtures_dir: &std::path::Path) -> IndexMap<String, Int
     for file in files {
         let file = file.to_str().unwrap().to_string();
 
-        if !Preg::is_match(r"/\.test$/", &file) {
+        if !Preg::is_match(php_regex!(r"/\.test$/"), &file) {
             continue;
         }
 

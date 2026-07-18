@@ -19,7 +19,9 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
+use shirabe_php_shim::{
+    PhpMixed, file_get_contents, file_put_contents, is_writable, php_regex, strtolower,
+};
 
 #[derive(Debug)]
 pub struct BumpCommand {
@@ -171,7 +173,7 @@ impl BumpCommand {
         let packages_filter = if !packages_filter.is_empty() {
             let packages_filter: Vec<String> = packages_filter
                 .iter()
-                .map(|constraint| Preg::replace(r"{[:= ].+}", "", constraint))
+                .map(|constraint| Preg::replace(php_regex!(r"{[:= ].+}"), "", constraint))
                 .collect();
             let unique_lower: Vec<String> = packages_filter
                 .iter()

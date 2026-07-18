@@ -6,7 +6,7 @@ use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::streamable_input_interface::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_regex};
 
 /// ArgvInput represents an input coming from the CLI arguments.
 ///
@@ -512,7 +512,8 @@ impl std::fmt::Display for ArgvInput {
             .iter()
             .map(|token| {
                 let mut r#match: Vec<Option<String>> = Vec::new();
-                if shirabe_php_shim::preg_match("{^(-[^=]+=)(.+)}", token, &mut r#match) {
+                if shirabe_php_shim::preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token, &mut r#match)
+                {
                     return format!(
                         "{}{}",
                         r#match[1].as_deref().unwrap_or(""),

@@ -15,11 +15,11 @@ use chrono::TimeZone;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
     sys_get_temp_dir,
 };
+use shirabe_php_shim::{PhpMixed, php_regex};
 
 #[derive(Debug)]
 pub struct GitDriver {
@@ -50,7 +50,7 @@ impl GitDriver {
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let cache_url;
         if Filesystem::is_local_path(&self.inner.url) {
-            self.inner.url = Preg::replace(r"{[\\/]\.git/?$}", "", &self.inner.url);
+            self.inner.url = Preg::replace(php_regex!(r"{[\\/]\.git/?$}"), "", &self.inner.url);
             if !is_dir(&self.inner.url) {
                 return Err(RuntimeException {
                     message: format!(
@@ -107,7 +107,7 @@ impl GitDriver {
                 .into());
             }
 
-            if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", &self.inner.url) {
+            if Preg::is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url) {
                 return Err(InvalidArgumentException {
                     message: format!(
                         "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
@@ -214,7 +214,7 @@ impl GitDriver {
                 for branch in &branches {
                     if !branch.is_empty() {
                         let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::match3(r"{^\* +(\S+)}", branch, Some(&mut caps))
+                        if Preg::match3(php_regex!(r"{^\* +(\S+)}"), branch, Some(&mut caps))
                             && let Some(name) = caps.get(&CaptureKey::ByIndex(1))
                         {
                             self.root_identifier = Some(name.clone());
@@ -333,7 +333,7 @@ impl GitDriver {
                 if !tag.is_empty() {
                     let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::match3(
-                        r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}",
+                        php_regex!(r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}"),
                         &tag,
                         Some(&mut caps),
                     ) && let (Some(hash), Some(name)) = (
@@ -369,10 +369,10 @@ impl GitDriver {
                 Some(&self.repo_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                if !branch.is_empty() && !Preg::is_match(r"{^ *[^/]+/HEAD }", &branch) {
+                if !branch.is_empty() && !Preg::is_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch) {
                     let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::match3(
-                        r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}",
+                        php_regex!(r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}"),
                         &branch,
                         Some(&mut caps),
                     ) && let (Some(name), Some(hash)) = (
@@ -398,7 +398,7 @@ impl GitDriver {
         deep: bool,
     ) -> anyhow::Result<bool> {
         if Preg::is_match(
-            r"#(^git://|\.git/?$|git(?:olite)?@|//git\.|//github.com/)#i",
+            php_regex!(r"#(^git://|\.git/?$|git(?:olite)?@|//git\.|//github.com/)#i"),
             url,
         ) {
             return Ok(true);

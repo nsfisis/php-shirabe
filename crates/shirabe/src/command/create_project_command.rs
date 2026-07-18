@@ -735,7 +735,7 @@ impl CreateProjectCommand {
                 let ok = {
                     let mut matched: IndexMap<CaptureKey, String> = IndexMap::new();
                     let ok = Preg::is_match3(
-                        &format!(
+                        format!(
                             "{{^[^,\\s]*?@({})$}}i",
                             implode(
                                 "|",

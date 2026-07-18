@@ -19,7 +19,7 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
     array_search_mixed, extension_loaded, http_build_query_mixed, implode, in_array, is_array,
-    strpos,
+    php_regex, strpos,
 };
 
 #[derive(Debug)]
@@ -86,7 +86,7 @@ impl GitBitbucketDriver {
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let mut m: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
         if !Preg::is_match3(
-            r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i",
+            php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
             &self.inner.url,
             Some(&mut m),
         ) {
@@ -788,7 +788,7 @@ impl GitBitbucketDriver {
                 // Format: https://(user@)bitbucket.org/{user}/{repo}
                 // Strip username from URL (only present in clone URL's for private repositories)
                 self.clone_https_url = Preg::replace(
-                    r"/https:\/\/([^@]+@)?/",
+                    php_regex!(r"/https:\/\/([^@]+@)?/"),
                     "https://",
                     m.get("href").and_then(|v| v.as_string()).unwrap_or(""),
                 );
@@ -850,7 +850,7 @@ impl GitBitbucketDriver {
         _deep: bool,
     ) -> anyhow::Result<bool> {
         if !Preg::is_match(
-            r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i",
+            php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i"),
             url,
         ) {
             return Ok(false);

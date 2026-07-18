@@ -25,10 +25,10 @@ use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::{
     InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, class_exists, defined, file_exists, get_class, implode,
-    ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, preg_quote, realpath,
-    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
-    str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper, substr,
-    trim,
+    ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, php_regex, preg_quote,
+    realpath, spl_autoload_functions, spl_autoload_register, spl_autoload_unregister,
+    spl_object_hash, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos,
+    strtoupper, substr, trim,
 };
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
@@ -306,7 +306,7 @@ impl EventDispatcher {
             if let Callable::String(ref s) = callable
                 && str_contains(s, "@no_additional_args")
             {
-                let replaced = Preg::replace("{ ?@no_additional_args}", "", s);
+                let replaced = Preg::replace(php_regex!("{ ?@no_additional_args}"), "", s);
                 callable = Callable::String(replaced);
                 additional_args = Vec::new();
             }
@@ -652,13 +652,13 @@ impl EventDispatcher {
                         if !possible_local_binaries.is_empty() {
                             for local_exec in &possible_local_binaries {
                                 if Preg::is_match(
-                                    &format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
+                                    format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
                                     local_exec,
                                 ) {
                                     let caller =
                                         BinaryInstaller::determine_binary_caller(local_exec);
                                     exec = Preg::replace(
-                                        &format!("{{^{}}}", preg_quote(&callable_str, None)),
+                                        format!("{{^{}}}", preg_quote(&callable_str, None)),
                                         &format!("{} {}", caller, local_exec),
                                         &exec,
                                     );
@@ -684,7 +684,7 @@ impl EventDispatcher {
                             let mut path_and_args = substr(&exec, 5, None);
                             if Platform::is_windows() {
                                 path_and_args = Preg::replace_callback(
-                                    "{^\\S+}",
+                                    php_regex!("{^\\S+}"),
                                     |m| str_replace("/", "\\", &m[0]),
                                     &path_and_args,
                                 );
@@ -692,8 +692,11 @@ impl EventDispatcher {
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match3("{^[^\\'\"\\s/\\\\]+}", &path_and_args, Some(&mut m))
-                            {
+                            if Preg::is_match3(
+                                php_regex!("{^[^\\'\"\\s/\\\\]+}"),
+                                &path_and_args,
+                                Some(&mut m),
+                            ) {
                                 let m0 =
                                     m.get(&CaptureKey::ByIndex(0)).cloned().unwrap_or_default();
                                 if !file_exists(&m0) {
@@ -702,7 +705,7 @@ impl EventDispatcher {
                                         let mut path_to_exec = path_to_exec;
                                         if Platform::is_windows() {
                                             let exec_without_ext = Preg::replace(
-                                                "{\\.(exe|bat|cmd|com)$}i",
+                                                php_regex!("{\\.(exe|bat|cmd|com)$}i"),
                                                 "",
                                                 &path_to_exec,
                                             );
@@ -729,7 +732,7 @@ impl EventDispatcher {
 
                             if Platform::is_windows() {
                                 exec = Preg::replace_callback(
-                                    "{^\\S+}",
+                                    php_regex!("{^\\S+}"),
                                     |m| str_replace("/", "\\", &m[0]),
                                     &exec,
                                 );
@@ -1080,7 +1083,7 @@ impl EventDispatcher {
             let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
             let path_value = Platform::get_env(path_env).unwrap_or_default();
             if !Preg::is_match(
-                &format!(
+                format!(
                     "{{(^|{}){}($|{})}}",
                     PATH_SEPARATOR,
                     preg_quote(&bin_dir, None),

@@ -16,7 +16,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
+use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, php_regex, version_compare};
 
 #[derive(Debug)]
 pub struct SvnDownloader {
@@ -278,7 +278,7 @@ impl VcsDownloader for SvnDownloader {
         }
 
         let changes_str = changes.unwrap();
-        let changes: Vec<String> = Preg::split(r"{\s*\r?\n\s*}", &changes_str)
+        let changes: Vec<String> = Preg::split(php_regex!(r"{\s*\r?\n\s*}"), &changes_str)
             .into_iter()
             .map(|elem| format!("    {}", elem))
             .collect();
@@ -364,8 +364,8 @@ impl VcsDownloader for SvnDownloader {
         to_reference: &str,
         path: &str,
     ) -> anyhow::Result<String> {
-        if Preg::is_match(r"{@(\d+)$}", from_reference)
-            && Preg::is_match(r"{@(\d+)$}", to_reference)
+        if Preg::is_match(php_regex!(r"{@(\d+)$}"), from_reference)
+            && Preg::is_match(php_regex!(r"{@(\d+)$}"), to_reference)
         {
             // retrieve the svn base url from the checkout folder
             let command = vec![
@@ -411,8 +411,8 @@ impl VcsDownloader for SvnDownloader {
             };
 
             // strip paths from references and only keep the actual revision
-            let from_revision = Preg::replace(r"{.*@(\d+)$}", "$1", from_reference);
-            let to_revision = Preg::replace(r"{.*@(\d+)$}", "$1", to_reference);
+            let from_revision = Preg::replace(php_regex!(r"{.*@(\d+)$}"), "$1", from_reference);
+            let to_revision = Preg::replace(php_regex!(r"{.*@(\d+)$}"), "$1", to_reference);
 
             let command = vec![
                 "svn".to_string(),
@@ -469,7 +469,7 @@ impl ChangeReportInterface for SvnDownloader {
             Some(path),
         );
 
-        Ok(if Preg::is_match("{^ *[^X ] +}m", &output) {
+        Ok(if Preg::is_match(php_regex!("{^ *[^X ] +}m"), &output) {
             Some(output)
         } else {
             None

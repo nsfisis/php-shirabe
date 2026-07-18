@@ -10,7 +10,7 @@ use crate::composer::pcre::{CaptureKey, Preg};
 use crate::symfony::finder::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::{IndexMap, IndexSet};
-use shirabe_php_shim::{file_exists, glob, is_dir, preg_quote, rtrim};
+use shirabe_php_shim::{file_exists, glob, is_dir, php_regex, preg_quote, rtrim};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -311,7 +311,7 @@ impl Finder {
 
         let dir = rtrim(dir, Some("/"));
 
-        if Preg::is_match("#^(ssh2\\.)?s?ftp://#", &dir) {
+        if Preg::is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir) {
             format!("{dir}/")
         } else {
             dir
@@ -660,7 +660,7 @@ fn is_regex(str: &str) -> bool {
             .unwrap_or_default();
 
         if start == end {
-            return !Preg::is_match("/[*?[:alnum:] \\\\]/", &start);
+            return !Preg::is_match(php_regex!("/[*?[:alnum:] \\\\]/"), &start);
         }
 
         for (open, close) in [("{", "}"), ("(", ")"), ("[", "]"), ("<", ">")] {

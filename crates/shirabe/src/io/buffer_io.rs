@@ -9,8 +9,8 @@ use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::output::StreamOutput;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, rewind,
-    stream_get_contents, strip_tags,
+    PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, php_regex,
+    rewind, stream_get_contents, strip_tags,
 };
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl BufferIO {
         let mut output = output;
         loop {
             let next = Preg::replace_callback(
-                r"{(^|\n|\x08)(.+?)(\x08+)}",
+                php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
                 |matches: &indexmap::IndexMap<
                     shirabe_external_packages::composer::pcre::CaptureKey,
                     String,

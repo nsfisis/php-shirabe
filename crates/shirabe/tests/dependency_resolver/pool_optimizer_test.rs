@@ -12,8 +12,8 @@ use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::handle::LockArrayRepositoryHandle;
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::PREG_SPLIT_DELIM_CAPTURE;
 use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, php_regex};
 use std::path::PathBuf;
 
 fn load_package(package_data: &PhpMixed) -> BasePackageHandle {
@@ -62,7 +62,7 @@ fn reduce_packages_info_for_comparison(packages: &[BasePackageHandle]) -> Vec<St
 fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
     let contents = shirabe_php_shim::file_get_contents(file).unwrap();
     let tokens = Preg::split4(
-        r"#(?:^|\n*)--([A-Z-]+)--\n#",
+        php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"),
         &contents,
         -1,
         PREG_SPLIT_DELIM_CAPTURE,
@@ -147,7 +147,7 @@ fn provide_integration_tests() -> IndexMap<
     for file in files {
         let file = file.to_str().unwrap().to_string();
 
-        if !Preg::is_match(r"/\.test$/", &file) {
+        if !Preg::is_match(php_regex!(r"/\.test$/"), &file) {
             continue;
         }
 

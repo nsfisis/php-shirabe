@@ -12,8 +12,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
     array_merge, array_search_mixed, array_unique, empty, filter_var_url, implode, in_array,
-    is_array, is_string, parse_url, php_to_string, rtrim, strtolower, strtoupper, strtr, substr,
-    trigger_error,
+    is_array, is_string, parse_url, php_regex, php_to_string, rtrim, strtolower, strtoupper, strtr,
+    substr, trigger_error,
 };
 
 use crate::advisory::Auditor;
@@ -497,7 +497,7 @@ impl Config {
                     .to_string();
                 if is_composer
                     && Preg::is_match(
-                        r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}",
+                        php_regex!(r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}"),
                         &repo_url,
                     )
                 {
@@ -676,7 +676,7 @@ impl Config {
                     .to_string();
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if !Preg::is_match3(
-                    r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i",
+                    php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
                     &raw,
                     Some(&mut matches),
                 ) {
@@ -1046,7 +1046,7 @@ impl Config {
         let value_str = value.as_string().unwrap_or("").to_string();
         let mut error = None;
         let result = Preg::replace_callback(
-            r"#\{\$(.+)\}#",
+            php_regex!(r"#\{\$(.+)\}#"),
             |m: &IndexMap<CaptureKey, String>| -> String {
                 let key_match = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 match self.get_with_flags(&key_match, flags) {
@@ -1069,7 +1069,7 @@ impl Config {
     ///
     /// Since the dirs might not exist yet we can not call realpath or it will fail.
     fn realpath(&self, path: &str) -> String {
-        if Preg::is_match(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i", path) {
+        if Preg::is_match(php_regex!(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i"), path) {
             return path.to_string();
         }
 
@@ -1115,7 +1115,7 @@ impl Config {
         repo_options: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs
-        if !filter_var_url(url) && !Preg::is_match(r"{^https?://}", url) {
+        if !filter_var_url(url) && !Preg::is_match(php_regex!(r"{^https?://}"), url) {
             return Ok(());
         }
 

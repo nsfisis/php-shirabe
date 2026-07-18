@@ -11,7 +11,7 @@ use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
     file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,
-    is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,
+    is_dir, is_writable, mkdir, php_regex, random_bytes, random_int, rename, time, unlink,
 };
 use std::sync::Mutex;
 
@@ -94,7 +94,10 @@ impl Cache {
     }
 
     pub fn is_usable(path: &str) -> bool {
-        !Preg::is_match(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}", path)
+        !Preg::is_match(
+            php_regex!(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}"),
+            path,
+        )
     }
 
     pub fn is_enabled(&mut self) -> bool {
@@ -124,7 +127,7 @@ impl Cache {
     /// @return string|false
     pub fn read(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 self.io.write_error3(
@@ -144,7 +147,7 @@ impl Cache {
         let was_enabled = self.enabled == Some(true);
 
         if self.is_enabled() && !self.read_only {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
 
             self.io.write_error3(
                 &format!("Writing {}{} into cache", self.root, file),
@@ -185,7 +188,9 @@ impl Cache {
                     );
                     let mut m = indexmap::IndexMap::new();
                     if Preg::match3(
-                        r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}",
+                        php_regex!(
+                            r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}"
+                        ),
                         &e.message,
                         Some(&mut m),
                     ) {
@@ -223,7 +228,7 @@ impl Cache {
     /// Copy a file into the cache
     pub fn copy_from(&mut self, file: &str, source: &str) -> bool {
         if self.is_enabled() && !self.read_only {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             self.filesystem
                 .borrow_mut()
@@ -252,7 +257,7 @@ impl Cache {
     /// Copy a file out of the cache
     pub fn copy_to(&mut self, file: &str, target: &str) -> anyhow::Result<bool> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 let touch_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -312,7 +317,7 @@ impl Cache {
 
     pub fn remove(&mut self, file: &str) -> bool {
         if self.is_enabled() && !self.read_only {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 return self
@@ -343,7 +348,7 @@ impl Cache {
     /// @phpstan-return int<0, max>|false
     pub fn get_age(&mut self, file: &str) -> Option<i64> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path)
                 && let Some(mtime) = filemtime(&full_path)
@@ -461,7 +466,7 @@ impl Cache {
     /// @return string|false
     pub fn sha1(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 return hash_file("sha1", &full_path);
@@ -474,7 +479,7 @@ impl Cache {
     /// @return string|false
     pub fn sha256(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 return hash_file("sha256", &full_path);

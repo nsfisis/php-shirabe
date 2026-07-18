@@ -12,7 +12,7 @@ use crate::symfony::process::pipes::unix_pipes::UnixPipes;
 use crate::symfony::process::pipes::windows_pipes::WindowsPipes;
 use crate::symfony::process::process_utils::ProcessUtils;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
+use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, php_regex};
 use std::sync::OnceLock;
 
 /// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output.
@@ -1542,13 +1542,15 @@ impl Process {
         let mut var_count = 0;
         let mut var_cache: IndexMap<String, String> = IndexMap::new();
         let cmd = shirabe_php_shim::preg_replace_callback(
-            r#"/"(?:(
+            php_regex!(
+                r#"/"(?:(
                 [^"%!^]*+
                 (?:
                     (?: !LF! | "(?:\^[%!^])?+" )
                     [^"%!^]*+
                 )++
-            ) | [^"]*+ )"/x"#,
+            ) | [^"]*+ )"/x"#
+            ),
             |m: &[Option<String>]| -> anyhow::Result<String> {
                 let m0 = m.first().cloned().flatten().unwrap_or_default();
                 let m1 = m.get(1).cloned().flatten();
@@ -1577,7 +1579,7 @@ impl Process {
                 }
                 value = format!(
                     "\"{}\"",
-                    shirabe_php_shim::preg_replace(r#"/(\\*)"/"#, "$1$1\\\"", &value)
+                    shirabe_php_shim::preg_replace(php_regex!(r#"/(\\*)"/"#), "$1$1\\\"", &value)
                 );
                 var_count += 1;
                 let var = format!("{}{}", uid, var_count);
@@ -1599,7 +1601,11 @@ impl Process {
                     .map(|spec| {
                         format!(
                             "\"{}\"",
-                            shirabe_php_shim::preg_replace(r#"{(\\*+)"}"#, "$1$1\\\"", &spec)
+                            shirabe_php_shim::preg_replace(
+                                php_regex!(r#"{(\\*+)"}"#),
+                                "$1$1\\\"",
+                                &spec,
+                            )
                         )
                     })
             })
@@ -1655,13 +1661,13 @@ impl Process {
             argument = argument.replace('\0', "?");
         }
         if !shirabe_php_shim::preg_match(
-            r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#,
+            php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#),
             &argument,
             &mut Vec::new(),
         ) {
             return argument;
         }
-        argument = shirabe_php_shim::preg_replace(r"/(\\+)$/", "$1$1", &argument);
+        argument = shirabe_php_shim::preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument);
 
         let mut result = argument;
         for (from, to) in [
@@ -1682,7 +1688,7 @@ impl Process {
         env: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<String> {
         shirabe_php_shim::preg_replace_callback(
-            r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#,
+            php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
             |matches: &[Option<String>]| -> anyhow::Result<String> {
                 let key = matches.get(1).cloned().flatten().unwrap_or_default();
                 match env.get(&key) {

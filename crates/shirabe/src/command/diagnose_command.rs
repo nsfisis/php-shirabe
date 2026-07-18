@@ -44,8 +44,8 @@ use shirabe_php_shim::{
     PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, defined,
     disk_free_space, extension_loaded, file_exists, filter_var_boolean, function_exists,
     get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
-    is_array, is_string, ob_get_clean, ob_start, phpinfo, rtrim, str_contains, str_replace,
-    str_starts_with, strpos, strstr, strtolower, trim, version_compare,
+    is_array, is_string, ob_get_clean, ob_start, php_regex, phpinfo, rtrim, str_contains,
+    str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -1176,7 +1176,9 @@ impl DiagnoseCommand {
         let mut phpinfo_match: IndexMap<CaptureKey, String> = IndexMap::new();
         if phpinfo_str.is_some()
             && Preg::is_match3(
-                "{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m",
+                php_regex!(
+                    "{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"
+                ),
                 phpinfo_str.as_ref().unwrap(),
                 Some(&mut phpinfo_match),
             )

@@ -23,7 +23,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_flip, dirname, r#eval, file_get_contents, get_class_err, get_debug_type, in_array,
-    is_array, is_null, is_string, ksort, realpath, str_repeat, trim, usort, var_export,
+    is_array, is_null, is_string, ksort, php_regex, realpath, str_repeat, trim, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -356,7 +356,7 @@ impl FilesystemRepository {
             let mixed = PhpMixed::String(data.clone());
             if is_string(&mixed) && Preg::is_match(pattern, &trim(&data, None)) {
                 let replaced = Preg::replace(
-                    r#"{=>\s*+__DIR__\s*+\.\s*+(['\"])}"#,
+                    php_regex!(r#"{=>\s*+__DIR__\s*+\.\s*+(['\"])}"#),
                     &format!(
                         "=> {} . $1",
                         var_export(&PhpMixed::String(dirname(path)), true),

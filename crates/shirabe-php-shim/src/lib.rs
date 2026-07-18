@@ -54,6 +54,11 @@ pub use zip::*;
 
 use indexmap::IndexMap;
 
+// Re-exported at the crate root so `php_regex!` can reach it via `$crate::regex!` regardless of
+// which crate invokes the macro.
+#[doc(hidden)]
+pub use regex_macro::regex;
+
 #[derive(Debug, Clone, Default)]
 pub enum PhpMixed {
     #[default]

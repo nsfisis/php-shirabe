@@ -10,7 +10,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::psr::log::LogLevel;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, in_array, json_encode_ex,
+    UnexpectedValueException, array_merge, in_array, json_encode_ex, php_regex,
 };
 
 fn log_context(context: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
@@ -141,7 +141,7 @@ pub trait BaseIO: IOInterface {
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
-                if !Preg::is_match(r"{^[.A-Za-z0-9_]+$}", &token_str) {
+                if !Preg::is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), &token_str) {
                     return Err(anyhow::anyhow!(UnexpectedValueException {
                         message: format!(
                             "Your github oauth token for {} contains invalid characters: \"{}\"",

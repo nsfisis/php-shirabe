@@ -99,8 +99,8 @@ use shirabe_php_shim::{
     disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, getcwd, getmypid, glob, in_array, ini_set, is_array, is_dir, is_file,
     is_string, is_subclass_of, json_decode, memory_get_peak_usage, memory_get_usage, microtime,
-    php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains,
-    str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
+    php_regex, php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round,
+    str_contains, str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
@@ -882,7 +882,7 @@ impl Application {
             .map(|p| shirabe_php_shim::preg_quote(&p, None))
             .collect();
         let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
-        let namespaces = shirabe_php_shim::preg_grep(&format!("{{^{}}}", expr), &all_namespaces);
+        let namespaces = shirabe_php_shim::preg_grep(format!("{{^{}}}", expr), &all_namespaces);
 
         if namespaces.is_empty() {
             let mut message = format!(
@@ -983,15 +983,15 @@ impl Application {
             .map(|p| shirabe_php_shim::preg_quote(&p, None))
             .collect();
         let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
-        let mut commands = shirabe_php_shim::preg_grep(&format!("{{^{}}}", expr), &all_commands);
+        let mut commands = shirabe_php_shim::preg_grep(format!("{{^{}}}", expr), &all_commands);
 
         if commands.is_empty() {
-            commands = shirabe_php_shim::preg_grep(&format!("{{^{}}}i", expr), &all_commands);
+            commands = shirabe_php_shim::preg_grep(format!("{{^{}}}i", expr), &all_commands);
         }
 
         // if no commands matched or we just matched namespaces
         if commands.is_empty()
-            || shirabe_php_shim::preg_grep(&format!("{{^{}$}}i", expr), &commands).is_empty()
+            || shirabe_php_shim::preg_grep(format!("{{^{}$}}i", expr), &commands).is_empty()
         {
             if let Some(pos) = shirabe_php_shim::strrpos(name, ":") {
                 // check if a namespace exists and contains commands
@@ -1278,7 +1278,7 @@ impl Application {
             };
             let mut lines: Vec<(String, i64)> = Vec::new();
             let split = if !message.is_empty() {
-                shirabe_php_shim::preg_split(r"/\r?\n/", &message)
+                shirabe_php_shim::preg_split(php_regex!(r"/\r?\n/"), &message)
             } else {
                 Vec::new()
             };
@@ -1723,7 +1723,7 @@ impl Application {
         let mut m: indexmap::IndexMap<shirabe_php_shim::CaptureKey, Option<String>> =
             indexmap::IndexMap::new();
         while shirabe_php_shim::preg_match2(
-            r"/.{1,10000}/u",
+            php_regex!(r"/.{1,10000}/u"),
             &utf8_string,
             &mut m,
             0,

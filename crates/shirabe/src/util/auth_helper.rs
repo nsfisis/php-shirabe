@@ -12,8 +12,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, base64_encode, explode,
-    in_array, is_array, is_string, json_decode, parse_url, str_replace, strpos, strtolower, substr,
-    trim,
+    in_array, is_array, is_string, json_decode, parse_url, php_regex, str_replace, strpos,
+    strtolower, substr, trim,
 };
 
 #[derive(Debug)]
@@ -516,7 +516,7 @@ impl AuthHelper {
                 }
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
-                if Preg::is_match(r"{^https?://api\.github\.com/}", url) {
+                if Preg::is_match(php_regex!(r"{^https?://api\.github\.com/}"), url) {
                     headers.push(PhpMixed::String(format!(
                         "Authorization: token {}",
                         username,

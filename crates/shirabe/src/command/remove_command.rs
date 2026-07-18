@@ -396,7 +396,7 @@ impl Command for RemoveCommand {
                     .unwrap_or_default();
                 let type_keys_refs: Vec<&str> = type_keys.iter().map(|s| s.as_str()).collect();
                 let matches_in_type = Preg::grep(
-                    &base_package::package_name_to_regexp(package),
+                    base_package::package_name_to_regexp(package),
                     &type_keys_refs,
                 );
 
@@ -409,7 +409,7 @@ impl Command for RemoveCommand {
                 let alt_type_keys_refs: Vec<&str> =
                     alt_type_keys.iter().map(|s| s.as_str()).collect();
                 let matches_in_alt_type = Preg::grep(
-                    &base_package::package_name_to_regexp(package),
+                    base_package::package_name_to_regexp(package),
                     &alt_type_keys_refs,
                 );
 

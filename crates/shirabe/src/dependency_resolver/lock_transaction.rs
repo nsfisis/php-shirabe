@@ -6,6 +6,7 @@ use crate::dependency_resolver::Transaction;
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::php_regex;
 
 #[derive(Debug)]
 pub struct LockTransaction {
@@ -159,12 +160,14 @@ impl LockTransaction {
             if package.get_dist_url().is_some()
                 && present_package.get_dist_reference().is_some()
                 && Preg::is_match(
-                    r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i",
+                    php_regex!(
+                        r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i"
+                    ),
                     &package.get_dist_url().unwrap(),
                 )
             {
                 let new_dist_url = Preg::replace(
-                    r"{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i",
+                    php_regex!(r"{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i"),
                     &present_package.get_dist_reference().unwrap(),
                     &package.get_dist_url().unwrap(),
                 );

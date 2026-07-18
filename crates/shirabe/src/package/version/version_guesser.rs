@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
-    function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,
+    function_exists, implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen,
     strnatcasecmp, strpos, substr, trim, usort,
 };
 
@@ -163,10 +163,13 @@ impl VersionGuesser {
         }
 
         if "-dev" == substr(version_data.version.as_deref().unwrap_or(""), -4, None)
-            && Preg::is_match(r"{\.9{7}}", version_data.version.as_deref().unwrap_or(""))
+            && Preg::is_match(
+                php_regex!(r"{\.9{7}}"),
+                version_data.version.as_deref().unwrap_or(""),
+            )
         {
             version_data.pretty_version = Some(Preg::replace(
-                r"{(\.9{7})+}",
+                php_regex!(r"{(\.9{7})+}"),
                 ".x",
                 version_data.version.as_deref().unwrap_or(""),
             ));
@@ -185,12 +188,12 @@ impl VersionGuesser {
                     None,
                 )
             && Preg::is_match(
-                r"{\.9{7}}",
+                php_regex!(r"{\.9{7}}"),
                 version_data.feature_version.as_deref().unwrap_or(""),
             )
         {
             version_data.feature_pretty_version = Some(Preg::replace(
-                r"{(\.9{7})+}",
+                php_regex!(r"{(\.9{7})+}"),
                 ".x",
                 version_data.feature_version.as_deref().unwrap_or(""),
             ));
@@ -237,7 +240,9 @@ impl VersionGuesser {
                 if !branch.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}",
+                        php_regex!(
+                            r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}"
+                        ),
                         &branch,
                         Some(&mut m),
                     ) {
@@ -263,11 +268,13 @@ impl VersionGuesser {
 
                 if !branch.is_empty() && {
                     let mut tmp: IndexMap<CaptureKey, String> = IndexMap::new();
-                    !Preg::is_match3(r"{^ *.+/HEAD }", &branch, Some(&mut tmp))
+                    !Preg::is_match3(php_regex!(r"{^ *.+/HEAD }"), &branch, Some(&mut tmp))
                 } {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
-                        r"{^(?:\* )? *((?:remotes/(?:origin|upstream)/)?[^\s/]+) *([a-f0-9]+) .*$}",
+                        php_regex!(
+                            r"{^(?:\* )? *((?:remotes/(?:origin|upstream)/)?[^\s/]+) *([a-f0-9]+) .*$}"
+                        ),
                         &branch,
                         Some(&mut m),
                     ) {
@@ -516,7 +523,8 @@ impl VersionGuesser {
         )
         .is_some();
         if !has_branch_alias || has_self_version {
-            let branch = Preg::replace(r"{^dev-}", "", version.as_deref().unwrap_or(""));
+            let branch =
+                Preg::replace(php_regex!(r"{^dev-}"), "", version.as_deref().unwrap_or(""));
             let mut length: i64 = PHP_INT_MAX;
 
             // return directly, if branch is configured to be non-feature branch
@@ -549,7 +557,8 @@ impl VersionGuesser {
                 let mut last_index: i64 = -1;
                 for (index, candidate) in branches.iter().enumerate() {
                     let index = index as i64;
-                    let candidate_version = Preg::replace(r"{^remotes/\S+/}", "", candidate);
+                    let candidate_version =
+                        Preg::replace(php_regex!(r"{^remotes/\S+/}"), "", candidate);
 
                     // do not compare against itself or other feature branches
                     if candidate == &branch
@@ -625,7 +634,7 @@ impl VersionGuesser {
         }
 
         !Preg::is_match(
-            &format!(
+            format!(
                 r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
                 non_feature_branches,
             ),
@@ -772,7 +781,11 @@ impl VersionGuesser {
             }
         };
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3(r"{^(\d+(?:\.\d+)*)-dev$}i", &version, Some(&mut m)) {
+        if Preg::is_match3(
+            php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"),
+            &version,
+            Some(&mut m),
+        ) {
             return Ok(format!(
                 "{}.x-dev",
                 m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()

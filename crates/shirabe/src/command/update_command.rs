@@ -31,7 +31,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, in_array, strtolower,
+    array_keys, array_merge_map, array_search_in_vec, in_array, php_regex, strtolower,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
@@ -184,7 +184,7 @@ impl Command for UpdateCommand {
         if !packages.is_empty() {
             let allowlist_packages_with_requirements: Vec<String> =
                 array_filter(&packages, |pkg: &String| -> bool {
-                    Preg::is_match(r"{\S+[ =:]\S+}", pkg)
+                    Preg::is_match(php_regex!(r"{\S+[ =:]\S+}"), pkg)
                 });
             for (package, constraint) in
                 self.format_requirements(allowlist_packages_with_requirements.clone())?
@@ -194,7 +194,8 @@ impl Command for UpdateCommand {
 
             // replace the foo/bar:req by foo/bar in the allowlist
             for package in &allowlist_packages_with_requirements {
-                let package_name = Preg::replace(r"{^([^ =:]+)[ =:].*$}", "$1", package);
+                let package_name =
+                    Preg::replace(php_regex!(r"{^([^ =:]+)[ =:].*$}"), "$1", package);
                 if let Some(idx) = array_search_in_vec(package, &packages) {
                     packages[idx] = package_name;
                 }
@@ -266,7 +267,7 @@ impl Command for UpdateCommand {
                     continue;
                 }
                 let matches = Preg::is_match_with_indexed_captures(
-                    r"{^(\d+\.\d+\.\d+)}",
+                    php_regex!(r"{^(\d+\.\d+\.\d+)}"),
                     &package.get_version(),
                 );
                 let Some(matches) = matches else {

@@ -13,8 +13,8 @@ use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists,
-    hash_file, is_file, json_encode, random_int, str_contains, str_replace, strlen, substr,
-    version_compare,
+    hash_file, is_file, json_encode, php_regex, random_int, str_contains, str_replace, strlen,
+    substr, version_compare,
 };
 use std::sync::Mutex;
 
@@ -113,7 +113,7 @@ impl ZipDownloader {
             {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::is_match3(
-                    r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}",
+                    php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"),
                     &output,
                     Some(&mut m),
                 ) {

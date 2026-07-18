@@ -15,7 +15,8 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, strtolower,
+    InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, php_regex,
+    strtolower,
 };
 
 #[derive(Debug)]
@@ -287,7 +288,7 @@ impl Command for RepositoryCommand {
                     }));
                 }
                 let arg1_str = arg1.as_deref().unwrap();
-                let repo_config: PhpMixed = if Preg::is_match(r"{^\s*\{}", arg1_str) {
+                let repo_config: PhpMixed = if Preg::is_match(php_regex!(r"{^\s*\{}"), arg1_str) {
                     JsonFile::parse_json(Some(arg1_str), None)?
                 } else {
                     if arg2.is_none() {

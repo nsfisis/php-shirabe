@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::util::GitHub;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array, parse_url};
+use shirabe_php_shim::{PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array, parse_url, php_regex};
 
 pub struct Url;
 
@@ -18,7 +18,9 @@ impl Url {
         if host == "api.github.com" || host == "github.com" || host == "www.github.com" {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::match3(
-                r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i",
+                php_regex!(
+                    r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i"
+                ),
                 &url,
                 Some(&mut m),
             ) {
@@ -30,7 +32,9 @@ impl Url {
                     r#ref
                 );
             } else if Preg::match3(
-                r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$}i",
+                php_regex!(
+                    r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$}i"
+                ),
                 &url,
                 Some(&mut m),
             ) {
@@ -42,7 +46,9 @@ impl Url {
                     r#ref
                 );
             } else if Preg::match3(
-                r"{^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$}i",
+                php_regex!(
+                    r"{^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$}i"
+                ),
                 &url,
                 Some(&mut m),
             ) {
@@ -57,7 +63,9 @@ impl Url {
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::match3(
-                r"{^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$}i",
+                php_regex!(
+                    r"{^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$}i"
+                ),
                 &url,
                 Some(&mut m),
             ) {
@@ -72,7 +80,9 @@ impl Url {
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::match3(
-                r"{^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$}i",
+                php_regex!(
+                    r"{^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$}i"
+                ),
                 &url,
                 Some(&mut m),
             ) {
@@ -89,7 +99,7 @@ impl Url {
             true,
         ) {
             url = Preg::replace(
-                r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i",
+                php_regex!(r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i"),
                 &format!("$1/{}", r#ref),
                 &url,
             );
@@ -99,7 +109,9 @@ impl Url {
             true,
         ) {
             url = Preg::replace(
-                r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i",
+                php_regex!(
+                    r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i"
+                ),
                 &format!("${{1}}{}", r#ref),
                 &url,
             );
@@ -164,10 +176,10 @@ impl Url {
     pub fn sanitize(url: String) -> String {
         // GitHub repository rename result in redirect locations containing the access_token as GET parameter
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
-        let url = Preg::replace(r"{([&?]access_token=)[^&]+}", "$1***", &url);
+        let url = Preg::replace(php_regex!(r"{([&?]access_token=)[^&]+}"), "$1***", &url);
 
         Preg::replace_callback(
-            r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i",
+            php_regex!(r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i"),
             |m| {
                 let user = m
                     .get(&CaptureKey::ByName("user".to_string()))

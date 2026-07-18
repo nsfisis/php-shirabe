@@ -57,7 +57,7 @@ impl ArchivableFilesFinder {
             }
 
             let relative_path = Preg::replace(
-                &format!("#^{}#", preg_quote(&sources_clone, Some('#'))),
+                format!("#^{}#", preg_quote(&sources_clone, Some('#'))),
                 "",
                 &fs.normalize_path(&realpath.to_string_lossy()),
             );

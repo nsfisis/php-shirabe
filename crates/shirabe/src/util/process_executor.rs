@@ -14,7 +14,7 @@ use shirabe_external_packages::symfony::process::exception::ProcessSignaledExcep
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, array_intersect, array_map, call_user_func, escapeshellarg,
-    explode, implode, in_array, is_array, is_dir, is_numeric, is_string, rtrim, sprintf,
+    explode, implode, in_array, is_array, is_dir, is_numeric, is_string, php_regex, rtrim, sprintf,
     str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim, usleep,
 };
 use std::sync::{LazyLock, Mutex};
@@ -236,7 +236,7 @@ impl ProcessExecutor {
             let mut command_str = command.as_string().unwrap_or("").to_string();
             if Platform::is_windows() {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{^([^:/\\]++) }", &command_str, Some(&mut m)) {
+                if Preg::is_match3(php_regex!(r"{^([^:/\\]++) }"), &command_str, Some(&mut m)) {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     command_str = substr_replace(
                         &command_str,
@@ -870,7 +870,7 @@ impl ProcessExecutor {
         if output.is_empty() {
             vec![]
         } else {
-            Preg::split(r"{\r?\n}", &output)
+            Preg::split(php_regex!(r"{\r?\n}"), &output)
         }
     }
 
@@ -912,7 +912,7 @@ impl ProcessExecutor {
             String::new()
         };
         let safe_command = Preg::replace_callback(
-            r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i",
+            php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
             |m: &IndexMap<CaptureKey, String>| -> String {
                 let user_key = CaptureKey::ByName("user".to_string());
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
@@ -934,7 +934,7 @@ impl ProcessExecutor {
             &command_string,
         );
         let safe_command = Preg::replace(
-            r"{--password (.*[^\\]') }",
+            php_regex!(r"{--password (.*[^\\]') }"),
             "--password '***' ",
             &safe_command,
         );
@@ -980,8 +980,14 @@ impl ProcessExecutor {
         let mut quote = strpbrk(&argument, " \t,").is_some();
         let mut dquotes: usize = 0;
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
-        argument = Preg::replace5(r#"/(\\*)"/"#, r#"$1$1\""#, &argument, -1, &mut dquotes);
-        let meta = dquotes > 0 || Preg::is_match(r"/%[^%]+%|![^!]+!/", &argument);
+        argument = Preg::replace5(
+            php_regex!(r#"/(\\*)"/"#),
+            r#"$1$1\""#,
+            &argument,
+            -1,
+            &mut dquotes,
+        );
+        let meta = dquotes > 0 || Preg::is_match(php_regex!(r"/%[^%]+%|![^!]+!/"), &argument);
 
         if !meta && !quote {
             quote = strpbrk(&argument, "^&|<>()").is_some();
@@ -992,8 +998,8 @@ impl ProcessExecutor {
         }
 
         if meta {
-            argument = Preg::replace(r#"/(["^&|<>()%])/"#, "^$1", &argument);
-            argument = Preg::replace(r"/(!)/", "^^$1", &argument);
+            argument = Preg::replace(php_regex!(r#"/(["^&|<>()%])/"#), "^$1", &argument);
+            argument = Preg::replace(php_regex!(r"/(!)/"), "^^$1", &argument);
         }
 
         argument

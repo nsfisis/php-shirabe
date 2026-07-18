@@ -27,7 +27,7 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
     array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
-    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, preg_quote,
+    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex, preg_quote,
     random_bytes, realpath, str_contains, str_replace, str_starts_with, strlen, strpos, strtr,
     substr, substr_count, trim, unlink, var_export,
 };
@@ -514,7 +514,7 @@ impl AutoloadGenerator {
                     file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default();
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::match3(
-                    "{ComposerAutoloaderInit([^:\\s]+)::}",
+                    php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"),
                     &content,
                     Some(&mut matches),
                 ) {
@@ -704,7 +704,9 @@ impl AutoloadGenerator {
             for pattern in &excluded {
                 // extract the constant string prefix of the pattern here, until we reach a non-escaped regex special character
                 let pattern_processed = Preg::replace(
-                    "{^(([^.+*?\\[^\\]$(){}=!<>|:\\\\#-]+|\\\\[.+*?\\[^\\]$(){}=!<>|:#-])*).*}",
+                    php_regex!(
+                        "{^(([^.+*?\\[^\\]$(){}=!<>|:\\\\#-]+|\\\\[.+*?\\[^\\]$(){}=!<>|:#-])*).*}"
+                    ),
                     "$1",
                     pattern,
                 );
@@ -1072,7 +1074,7 @@ impl AutoloadGenerator {
             }
         }
 
-        if Preg::is_match("{\\.phar([\\\\/]|$)}", &path) {
+        if Preg::is_match(php_regex!("{\\.phar([\\\\/]|$)}"), &path) {
             base_dir = format!("'phar://' . {}", base_dir);
         }
 
@@ -1098,8 +1100,11 @@ impl AutoloadGenerator {
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
-                    && let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned()
+                if Preg::match3(
+                    php_regex!("{^ext-(.+)$}iD"),
+                    link.get_target(),
+                    Some(&mut matches),
+                ) && let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned()
                 {
                     extension_providers
                         .entry(ext)
@@ -1141,7 +1146,11 @@ impl AutoloadGenerator {
 
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if check_platform.as_bool() == Some(true)
-                    && Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
+                    && Preg::match3(
+                        php_regex!("{^ext-(.+)$}iD"),
+                        link.get_target(),
+                        Some(&mut matches),
+                    )
                 {
                     let ext_key = matches
                         .get(&CaptureKey::ByIndex(1))
@@ -1662,8 +1671,11 @@ class ComposerStaticInit{}
                 );
                 m
             });
-            let value = shirabe_php_shim::ltrim(&Preg::replace("/^ */m", "    $0$0", &value), None);
-            let value = Preg::replace("/ +$/m", "", &value);
+            let value = shirabe_php_shim::ltrim(
+                &Preg::replace(php_regex!("/^ */m"), "    $0$0", &value),
+                None,
+            );
+            let value = Preg::replace(php_regex!("/ +$/m"), "", &value);
 
             file.push_str(&format!(
                 "    public static ${} = {};\n\n",
@@ -1785,7 +1797,7 @@ class ComposerStaticInit{}
                             );
                             path_str = ltrim(
                                 &Preg::replace(
-                                    &format!("{{^{}}}", target_dir),
+                                    format!("{{^{}}}", target_dir),
                                     "",
                                     &ltrim(&path_str, Some("\\/")),
                                 ),
@@ -1804,7 +1816,7 @@ class ComposerStaticInit{}
                     if r#type == "exclude-from-classmap" {
                         // first escape user input
                         let p = Preg::replace(
-                            "{/+}",
+                            php_regex!("{/+}"),
                             "/",
                             &preg_quote(&trim(&strtr(&path_str, "\\", "/"), Some("/")), None),
                         );
@@ -1821,7 +1833,7 @@ class ComposerStaticInit{}
                         let updir_cell: std::cell::RefCell<Option<String>> =
                             std::cell::RefCell::new(None);
                         let p = Preg::replace_callback(
-                            "{^((?:(?:\\\\\\.){1,2}+/)+)}",
+                            php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
                             |matches: &IndexMap<CaptureKey, String>| -> String {
                                 // undo preg_quote for the matched string
                                 *updir_cell.borrow_mut() = Some(str_replace(

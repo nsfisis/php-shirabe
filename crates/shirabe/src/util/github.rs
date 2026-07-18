@@ -9,7 +9,7 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
+use shirabe_php_shim::{PhpMixed, date, php_regex, stripos, strtolower};
 
 #[derive(Debug)]
 pub struct GitHub {
@@ -331,7 +331,11 @@ impl GitHub {
                 continue;
             }
             let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::match3(r"{\burl=(?P<url>[^\s;]+)}", header, Some(&mut caps)) {
+            if Preg::match3(
+                php_regex!(r"{\burl=(?P<url>[^\s;]+)}"),
+                header,
+                Some(&mut caps),
+            ) {
                 return caps.get(&CaptureKey::ByName("url".to_string())).cloned();
             }
         }
@@ -341,7 +345,7 @@ impl GitHub {
 
     pub fn is_rate_limited(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(r"{^x-ratelimit-remaining: *0$}i", header.trim()) {
+            if Preg::is_match(php_regex!(r"{^x-ratelimit-remaining: *0$}i"), header.trim()) {
                 return true;
             }
         }
@@ -351,7 +355,7 @@ impl GitHub {
 
     pub fn requires_sso(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(r"{^x-github-sso: required}i", header.trim()) {
+            if Preg::is_match(php_regex!(r"{^x-github-sso: required}i"), header.trim()) {
                 return true;
             }
         }

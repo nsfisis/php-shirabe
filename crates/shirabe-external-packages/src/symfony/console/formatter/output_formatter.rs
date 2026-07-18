@@ -7,6 +7,7 @@ use crate::symfony::console::formatter::output_formatter_style_interface::Output
 use crate::symfony::console::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::symfony::console::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
 use crate::symfony::string::b;
+use shirabe_php_shim::php_regex;
 
 /// Formatter class for console output.
 #[derive(Debug)]
@@ -19,7 +20,8 @@ pub struct OutputFormatter {
 impl OutputFormatter {
     /// Escapes "<" and ">" special chars in given text.
     pub fn escape(text: &str) -> anyhow::Result<String> {
-        let text = shirabe_php_shim::preg_replace("/([^\\\\]|^)([<>])/", "$1\\\\$2", text);
+        let text =
+            shirabe_php_shim::preg_replace(php_regex!("/([^\\\\]|^)([<>])/"), "$1\\\\$2", text);
 
         Ok(Self::escape_trailing_backslash(&text))
     }
@@ -102,7 +104,7 @@ impl OutputFormatter {
 
         let mut matches: Vec<Vec<String>> = vec![];
         if shirabe_php_shim::preg_match_all_set_order(
-            "/([^=]+)=([^;]+)(;|$)/",
+            php_regex!("/([^=]+)=([^;]+)(;|$)/"),
             string,
             &mut matches,
         ) == 0
@@ -121,11 +123,12 @@ impl OutputFormatter {
             } else if r#match[0] == "bg" {
                 style.set_background(Some(&shirabe_php_shim::strtolower(&r#match[1])));
             } else if r#match[0] == "href" {
-                let url = shirabe_php_shim::preg_replace("{\\\\([<>])}", "$1", &r#match[1]);
+                let url =
+                    shirabe_php_shim::preg_replace(php_regex!("{\\\\([<>])}"), "$1", &r#match[1]);
                 style.set_href(&url);
             } else if r#match[0] == "options" {
                 let mut options = shirabe_php_shim::preg_match_all(
-                    "([^,;]+)",
+                    php_regex!("([^,;]+)"),
                     &shirabe_php_shim::strtolower(&r#match[1]),
                 );
                 let options = shirabe_php_shim::array_shift(&mut options).unwrap_or_default();
@@ -176,7 +179,7 @@ impl OutputFormatter {
         }
 
         let mut matches: Vec<Option<String>> = vec![];
-        shirabe_php_shim::preg_match("~(\\n)$~", &text, &mut matches);
+        shirabe_php_shim::preg_match(php_regex!("~(\\n)$~"), &text, &mut matches);
         text = format!("{}{}", prefix, self.add_line_breaks(&text, width));
         let trailing = matches.get(1).and_then(|m| m.clone()).unwrap_or_default();
         text = format!("{}{}", shirabe_php_shim::rtrim(&text, Some("\n")), trailing);
@@ -287,7 +290,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         let mut current_line_length: i64 = 0;
         let mut matches: shirabe_php_shim::PregOffsetCaptureMatches = Default::default();
         shirabe_php_shim::preg_match_all_offset_capture(
-            &format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
+            format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,
             &mut matches,
         );

@@ -86,7 +86,7 @@ fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<St
         if !file.is_dir() {
             let real_path = file.canonicalize().unwrap();
             files.push(Preg::replace(
-                &format!("#^{}#", preg_quote(&set_up.sources, Some('#'))),
+                format!("#^{}#", preg_quote(&set_up.sources, Some('#'))),
                 "",
                 &set_up.fs.normalize_path(&real_path.to_string_lossy()),
             ));

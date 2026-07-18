@@ -33,7 +33,7 @@ use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, in_array, parse_url, preg_quote, rename, strpos, substr, unlink_silent,
+    PhpMixed, in_array, parse_url, php_regex, preg_quote, rename, strpos, substr, unlink_silent,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -150,7 +150,7 @@ impl CurlDownloader {
 
         // check URL can be accessed (i.e. is not insecure), but allow insecure Packagist calls to
         // $hashed providers as file integrity is verified with sha256
-        if !Preg::is_match(r"{^http://(repo\.)?packagist\.org/p/}", url)
+        if !Preg::is_match(php_regex!(r"{^http://(repo\.)?packagist\.org/p/}"), url)
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
             self.config.borrow_mut().prohibit_url_by_config(
@@ -659,7 +659,7 @@ impl CurlDownloader {
                 let url_host = parse_url(url, shirabe_php_shim::PHP_URL_HOST);
                 let url_host_str = url_host.as_string().unwrap_or("");
                 target_url = Preg::replace(
-                    &format!(
+                    format!(
                         r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",
                         preg_quote(url_host_str, None)
                     ),
@@ -669,7 +669,7 @@ impl CurlDownloader {
             } else {
                 // Relative path; e.g. foo
                 target_url = Preg::replace(
-                    r"{^(.+/)[^/?]*(?:\?.*)?$}",
+                    php_regex!(r"{^(.+/)[^/?]*(?:\?.*)?$}"),
                     &format!("\\1{}", location_header),
                     url,
                 );
@@ -754,7 +754,7 @@ impl CurlDownloader {
             && (location_header.is_none()
                 || substr(location_header.as_deref().unwrap_or(""), -4, None) != ".zip")
             && Preg::is_match(
-                r"{^text/html\b}i",
+                php_regex!(r"{^text/html\b}i"),
                 &response
                     .inner
                     .get_header("content-type")

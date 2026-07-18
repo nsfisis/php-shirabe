@@ -19,8 +19,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, chr,
-    extension_loaded, file_get_contents, function_exists, implode, is_numeric, rawurldecode,
-    stream_context_create, stripos, strpos, substr, ucfirst,
+    extension_loaded, file_get_contents, function_exists, implode, is_numeric, php_regex,
+    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -253,7 +253,11 @@ impl HttpDownloader {
 
         // capture username/password from URL if there is one
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i", url, Some(&mut m)) {
+        if Preg::is_match3(
+            php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"),
+            url,
+            Some(&mut m),
+        ) {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
                 rawurldecode(
@@ -378,7 +382,7 @@ impl HttpDownloader {
         let clean_message = |msg: &str| -> anyhow::Result<String> {
             if !io.is_decorated() {
                 return Ok(Preg::replace(
-                    &format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"),
+                    format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"),
                     "",
                     msg,
                 ));
@@ -515,7 +519,7 @@ impl HttpDownloader {
             return false;
         }
 
-        if !Preg::is_match(r"{^https?://}i", url) {
+        if !Preg::is_match(php_regex!(r"{^https?://}i"), url) {
             return false;
         }
 

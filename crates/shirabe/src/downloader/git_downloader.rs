@@ -19,7 +19,7 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
+    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir, php_regex,
     preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
 };
 
@@ -96,7 +96,11 @@ impl GitDownloader {
 
         let mut refs = trim(&output, None);
         let mut head_match: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match3(r"{^([a-f0-9]+) HEAD$}mi", &refs, Some(&mut head_match)) {
+        if !Preg::is_match3(
+            php_regex!(r"{^([a-f0-9]+) HEAD$}mi"),
+            &refs,
+            Some(&mut head_match),
+        ) {
             // could not match the HEAD for some reason
             return Ok(None);
         }
@@ -107,7 +111,7 @@ impl GitDownloader {
 
         let mut branches_match: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
         if !Preg::is_match_all3(
-            &format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
+            format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
             Some(&mut branches_match),
         ) {
@@ -132,7 +136,7 @@ impl GitDownloader {
             for candidate in &candidate_branches {
                 let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
                 if Preg::is_match_all3(
-                    &format!(
+                    format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
                         preg_quote(candidate, None)
                     ),
@@ -276,7 +280,11 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", pretty_version);
+        let mut branch = Preg::replace(
+            php_regex!(r"{(?:^dev-|(?:\.x)?-dev$)}i"),
+            "",
+            pretty_version,
+        );
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.
@@ -296,10 +304,10 @@ impl GitDownloader {
 
         // check whether non-commitish are branches or tags, and fetch branches with the remote name
         let git_ref = reference.to_string();
-        if !Preg::is_match(r"{^[a-f0-9]{40}$}", reference)
+        if !Preg::is_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference)
             && branches.is_some()
             && Preg::is_match(
-                &format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
+                format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
                 branches.as_deref().unwrap_or(""),
             )
         {
@@ -342,15 +350,15 @@ impl GitDownloader {
         }
 
         // try to checkout branch by name and then reset it so it's on the proper branch name
-        if Preg::is_match(r"{^[a-f0-9]{40}$}", reference) {
+        if Preg::is_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference) {
             // add 'v' in front of the branch if it was stripped when generating the pretty name
             if branches.is_some()
                 && !Preg::is_match(
-                    &format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
+                    format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
                 && Preg::is_match(
-                    &format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
+                    format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
             {
@@ -502,7 +510,7 @@ impl GitDownloader {
         // set push url for github projects
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
-            &format!(
+            format!(
                 "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
                 GitUtil::get_github_domains_regex(&self.inner.config.borrow())
             ),
@@ -661,7 +669,8 @@ impl GitDownloader {
     }
 
     pub(crate) fn get_short_hash(&self, reference: &str) -> String {
-        if !self.inner.io.is_verbose() && Preg::is_match(r"{^[0-9a-f]{40}$}", reference) {
+        if !self.inner.io.is_verbose() && Preg::is_match(php_regex!(r"{^[0-9a-f]{40}$}"), reference)
+        {
             return substr(reference, 0, Some(10));
         }
 
@@ -1127,11 +1136,11 @@ impl VcsDownloader for GitDownloader {
             let mut origin_match: IndexMap<CaptureKey, String> = IndexMap::new();
             let mut composer_match: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
-                r"{^origin\s+(?P<url>\S+)}m",
+                php_regex!(r"{^origin\s+(?P<url>\S+)}m"),
                 &output,
                 Some(&mut origin_match),
             ) && Preg::is_match3(
-                r"{^composer\s+(?P<url>\S+)}m",
+                php_regex!(r"{^composer\s+(?P<url>\S+)}m"),
                 &output,
                 Some(&mut composer_match),
             ) {
@@ -1212,7 +1221,7 @@ impl VcsDownloader for GitDownloader {
 
         let changes: Vec<String> = array_map(
             |elem: &String| format!("    {}", elem),
-            &Preg::split(r"{\s*\r?\n\s*}", &changes),
+            &Preg::split(php_regex!(r"{\s*\r?\n\s*}"), &changes),
         );
         self.inner.io.write_error3(
             &format!(

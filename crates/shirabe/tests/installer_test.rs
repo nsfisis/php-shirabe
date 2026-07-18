@@ -50,7 +50,7 @@ use shirabe_external_packages::symfony::console::output::output_interface::{
     OutputInterface, VERBOSITY_NORMAL,
 };
 use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
-use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, PhpMixed};
+use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, PhpMixed, php_regex};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -550,7 +550,7 @@ fn read_test_file(
 ) -> IndexMap<String, String> {
     let contents = std::fs::read_to_string(file).unwrap();
     let tokens = Preg::split4(
-        r"#(?:^|\n*)--([A-Z-]+)--\n#",
+        php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"),
         &contents,
         -1,
         PREG_SPLIT_DELIM_CAPTURE,
@@ -654,7 +654,7 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
                     return;
                 }
                 if let Some(url) = repo.get("url").and_then(|u| u.as_str())
-                    && Preg::is_match(r"{^file://[^/]}", url)
+                    && Preg::is_match(php_regex!(r"{^file://[^/]}"), url)
                 {
                     let new_url = format!("file://{}/{}", fixtures_str, &url[7..]);
                     repo["url"] = serde_json::Value::String(new_url);
@@ -1204,8 +1204,16 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     if let Some(expect_output) = expect_output
         && !expect_output.is_empty()
     {
-        let output = Preg::replace(r"{^    - .*?\.ini$}m", "__inilist__", &output_string);
-        let output = Preg::replace(r"{(__inilist__\r?\n)+}", "__inilist__\n", &output);
+        let output = Preg::replace(
+            php_regex!(r"{^    - .*?\.ini$}m"),
+            "__inilist__",
+            &output_string,
+        );
+        let output = Preg::replace(
+            php_regex!(r"{(__inilist__\r?\n)+}"),
+            "__inilist__\n",
+            &output,
+        );
         assert_string_matches_format(expect_output.trim_end(), output.trim_end(), &output_string);
     }
 }

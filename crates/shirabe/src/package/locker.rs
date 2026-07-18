@@ -29,7 +29,7 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array, is_int,
-    ksort, realpath, strcmp, strtolower, touch2, trim, usort,
+    ksort, php_regex, realpath, strcmp, strtolower, touch2, trim, usort,
 };
 
 /// Reads/writes project lockfile (composer.lock).
@@ -849,7 +849,7 @@ impl Locker {
                             ),
                             None,
                         );
-                        if Preg::is_match(r"{^\s*\d+\s*$}", &output_str) {
+                        if Preg::is_match(php_regex!(r"{^\s*\d+\s*$}"), &output_str) {
                             let ts = trim(&output_str, None).parse::<i64>().unwrap_or(0);
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
                         }
@@ -871,7 +871,7 @@ impl Locker {
                     )? {
                         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
-                            r"{^\s*(\d+)\s*}",
+                            php_regex!(r"{^\s*(\d+)\s*}"),
                             output.as_string().unwrap_or(""),
                             Some(&mut m),
                         ) {

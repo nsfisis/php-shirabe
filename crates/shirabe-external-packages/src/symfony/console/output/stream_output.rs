@@ -5,6 +5,7 @@ use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::output::OutputInterface;
 use crate::symfony::console::output::output::{DoWrite, Output};
 use crate::symfony::console::output::output_interface::VERBOSITY_NORMAL;
+use shirabe_php_shim::php_regex;
 
 /// StreamOutput writes the output to a given stream.
 ///
@@ -127,7 +128,9 @@ impl StreamOutput {
         // See https://github.com/chalk/supports-color/blob/d4f413efaf8da045c5ab440ed418ef02dbb28bf1/index.js#L157
         let mut matches: Vec<Option<String>> = Vec::new();
         shirabe_php_shim::preg_match(
-            "/^((screen|xterm|vt100|vt220|putty|rxvt|ansi|cygwin|linux).*)|(.*-256(color)?(-bce)?)$/",
+            php_regex!(
+                "/^((screen|xterm|vt100|vt220|putty|rxvt|ansi|cygwin|linux).*)|(.*-256(color)?(-bce)?)$/"
+            ),
             &term,
             &mut matches,
         )

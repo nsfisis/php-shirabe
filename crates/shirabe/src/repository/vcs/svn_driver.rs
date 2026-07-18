@@ -15,7 +15,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_key_exists, stripos, strrpos, strtr, substr, trim,
+    PhpMixed, RuntimeException, array_key_exists, php_regex, stripos, strrpos, strtr, substr, trim,
 };
 
 #[derive(Debug)]
@@ -157,7 +157,7 @@ impl SvnDriver {
     }
 
     pub(crate) fn should_cache(&self, identifier: &str) -> bool {
-        self.inner.cache.is_some() && Preg::is_match(r"{@\d+$}", identifier)
+        self.inner.cache.is_some() && Preg::is_match(php_regex!(r"{@\d+$}"), identifier)
     }
 
     pub fn get_composer_information(
@@ -262,7 +262,7 @@ impl SvnDriver {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
         let (path, rev) = if let Some(m) =
-            Preg::is_match_with_indexed_captures(r"{^(.+?)(@\d+)?/$}", &identifier)
+            Preg::is_match_with_indexed_captures(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
         {
             if m.get(2).is_some() {
                 (
@@ -302,7 +302,7 @@ impl SvnDriver {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
         let (path, rev) = if let Some(m) =
-            Preg::is_match_with_indexed_captures(r"{^(.+?)(@\d+)?/$}", &identifier)
+            Preg::is_match_with_indexed_captures(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
         {
             if m.get(2).is_some() {
                 (
@@ -323,7 +323,11 @@ impl SvnDriver {
         for line in self.inner.process.borrow().split_lines(&output) {
             if !line.is_empty() {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{^Last Changed Date: ([^(]+)}", &line, Some(&mut m)) {
+                if Preg::is_match3(
+                    php_regex!(r"{^Last Changed Date: ([^(]+)}"),
+                    &line,
+                    Some(&mut m),
+                ) {
                     let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
                         .ok()
@@ -351,7 +355,11 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty() {
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m)) {
+                            if Preg::is_match3(
+                                php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
+                                &line,
+                                Some(&mut m),
+                            ) {
                                 let rev: i64 = m
                                     .get(&CaptureKey::ByIndex(1))
                                     .and_then(|s| s.parse().ok())
@@ -398,7 +406,11 @@ impl SvnDriver {
                     let line = trim(&line, None);
                     if !line.is_empty() {
                         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m)) {
+                        if Preg::is_match3(
+                            php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
+                            &line,
+                            Some(&mut m),
+                        ) {
                             let rev: i64 = m
                                 .get(&CaptureKey::ByIndex(1))
                                 .and_then(|s| s.parse().ok())
@@ -436,7 +448,11 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty() {
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m)) {
+                            if Preg::is_match3(
+                                php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
+                                &line,
+                                Some(&mut m),
+                            ) {
                                 let rev: i64 = m
                                     .get(&CaptureKey::ByIndex(1))
                                     .and_then(|s| s.parse().ok())
@@ -472,7 +488,7 @@ impl SvnDriver {
         deep: bool,
     ) -> anyhow::Result<bool> {
         let url = Self::normalize_url(url);
-        if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url) {
+        if Preg::is_match(php_regex!(r"#(^svn://|^svn\+ssh://|svn\.)#i"), &url) {
             return Ok(true);
         }
 

@@ -11,8 +11,8 @@ use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date, explode, fclose, feof, fgets,
-    file_get_contents, fopen, fwrite, gethostname, json_decode, str_replace_array, strcmp, strlen,
-    strpos, strrpos, substr, time, trim,
+    file_get_contents, fopen, fwrite, gethostname, json_decode, php_regex, str_replace_array,
+    strcmp, strlen, strpos, strrpos, substr, time, trim,
 };
 
 /// @phpstan-type RepoConfig array{unique_perforce_client_name?: string, depot?: string, branch?: string, p4user?: string, p4password?: string}
@@ -690,7 +690,7 @@ impl Perforce {
                 let res_bits = explode(" ", line);
                 if res_bits.len() > 4 {
                     let branch = Preg::replace(
-                        r"/[^A-Za-z0-9 ]/",
+                        php_regex!(r"/[^A-Za-z0-9 ]/"),
                         "",
                         &res_bits.get(4).cloned().unwrap_or_default(),
                     );

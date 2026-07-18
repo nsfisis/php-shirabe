@@ -6,7 +6,7 @@ use crate::package::version::VersionParser;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_regex};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -37,8 +37,11 @@ impl PartialSecurityAdvisory {
         let constraint: AnyConstraint = match parser.parse_constraints(affected_versions_str) {
             Ok(c) => c,
             Err(_) => {
-                let affected_version =
-                    Preg::replace(r"{(^[>=<^~]*[\d.]+).*}", "$1", affected_versions_str);
+                let affected_version = Preg::replace(
+                    php_regex!(r"{(^[>=<^~]*[\d.]+).*}"),
+                    "$1",
+                    affected_versions_str,
+                );
                 match parser.parse_constraints(&affected_version) {
                     Ok(c) => c,
                     Err(_) => SimpleConstraint::new(

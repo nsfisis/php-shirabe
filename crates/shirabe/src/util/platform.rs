@@ -6,7 +6,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
     file_get_contents, fstat, function_exists, getcwd, getenv, in_array, ini_get, is_array,
-    is_readable, mb_strlen, php_os_family, posix_geteuid, posix_getpwuid, posix_getuid,
+    is_readable, mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid,
     posix_isatty, putenv, putenv_clear, realpath, stream_isatty, stripos, strlen, strtoupper,
     substr, usleep,
 };
@@ -90,7 +90,7 @@ impl Platform {
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
         use shirabe_external_packages::composer::pcre::CaptureKey;
-        if Preg::is_match(r"#^~[\\/]#", path) {
+        if Preg::is_match(php_regex!(r"#^~[\\/]#"), path) {
             return format!(
                 "{}{}",
                 Self::get_user_directory().unwrap(),
@@ -103,7 +103,7 @@ impl Platform {
         // only for the `%VAR%` form. The Rust regex crate does not support conditionals, so the
         // two forms are written as an explicit alternation: `$VAR` or `%VAR%`.
         Preg::replace_callback(
-            r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#",
+            php_regex!(r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#"),
             |matches: &indexmap::IndexMap<CaptureKey, String>| -> String {
                 let var = matches
                     .get(&CaptureKey::ByName("dvar".to_string()))
