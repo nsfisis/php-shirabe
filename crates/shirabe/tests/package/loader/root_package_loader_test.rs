@@ -5,6 +5,7 @@
 // look-around regex the regex crate cannot compile.
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use crate::test_case::GitVersionGuard;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -70,16 +71,6 @@ fn require_map(entries: &[(&str, &str)]) -> PhpMixed {
         m.insert(k.to_string(), PhpMixed::String(v.to_string()));
     }
     PhpMixed::Array(m)
-}
-
-// Resets the cached git `version` static on drop so a seeded value does not leak into other
-// tests in this binary (VersionGuesserTest seeds/resets the same static).
-struct GitVersionGuard;
-
-impl Drop for GitVersionGuard {
-    fn drop(&mut self) {
-        GitUtil::__reset_version();
-    }
 }
 
 // A test double for the concrete VersionGuesser, supplied through the VersionGuesserInterface seam.
@@ -271,7 +262,6 @@ fn test_pretty_version_for_root_package_in_version_branch() {
 }
 
 #[test]
-#[ignore = "feature-branch guessing calls ProcessExecutor::execute_async, whose mock path is todo!()"]
 #[serial]
 fn test_feature_branch_pretty_version() {
     // proc_open() is always available; the PHP markTestSkipped guard does not apply here.

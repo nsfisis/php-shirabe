@@ -10,12 +10,14 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::Process;
+use shirabe_external_packages::symfony::process::ProcessMock;
 use shirabe_external_packages::symfony::process::exception::ProcessSignaledException;
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
-    LogicException, PHP_EOL, PhpMixed, array_intersect, array_map, call_user_func, escapeshellarg,
-    explode, implode, in_array, is_array, is_dir, is_numeric, is_string, php_regex, rtrim, sprintf,
-    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
+    LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
+    call_user_func, escapeshellarg, explode, implode, in_array, is_array, is_dir, is_numeric,
+    is_string, php_regex, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower,
+    strtr_array, substr_replace, trim,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -41,8 +43,9 @@ pub struct ProcessExecutor {
     /// @var bool
     allow_async: bool,
     /// Test-only mock state. `None` in production; set via [`ProcessExecutor::__expects`] in tests.
-    /// Mirrors `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`.
-    mock: Option<ProcessExecutorMockState>,
+    /// Mirrors `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`. Wrapped in a `RefCell`
+    /// so `execute_async`'s `&self` receiver can still consume the expectation queue.
+    mock: Option<std::cell::RefCell<ProcessExecutorMockState>>,
 }
 
 /// Test-only state for the ProcessExecutorMock behaviour (cf.
@@ -154,7 +157,16 @@ impl ProcessExecutor {
 
     /// Convenience wrapper used by phase-A code that calls
     /// `process.execute(&[String], &mut String, Option<&str>) == 0`.
-    /// Forwards to `execute`, returning the status code (0 on Err for compatibility).
+    /// Forwards to `execute`, returning the status code (1 on Err for compatibility) — this
+    /// mirrors PHP call sites that check the `int` return of `execute()` without a surrounding
+    /// `try`/`catch`, where an uncaught mock-mismatch exception would otherwise propagate.
+    // TODO(phase-d): under a strict `ProcessExecutorMock`, an incomplete expectation list now
+    // surfaces here as a swallowed "exit code 1" instead of the old `panic!`, so a future test
+    // ported through this call site could silently take a wrong branch instead of failing loudly.
+    // `ProcessExecutorMockGuard::__assert_complete` still catches unconsumed expectations at
+    // scope exit, but not a mismatch that happened to consume nothing. Distinguishing "expectation
+    // mismatch" from "real process failure" here would need a marker type incompatible with
+    // `RuntimeException` (see `mock_match`'s doc comment) — deferred until a concrete test needs it.
     pub fn execute_args(
         &mut self,
         command: &[String],
@@ -372,26 +384,22 @@ impl ProcessExecutor {
             .unwrap_or(0))
     }
 
-    /// Mock replacement for `do_execute` when [`Self::mock`] is set (cf.
-    /// `ProcessExecutorMock::doExecute`). Logs the command, matches it against the head of the
-    /// expectation queue (exact `===`), pops on match (firing the optional callback), falls back to
-    /// the default handler in non-strict mode, or panics in strict mode. Emits stdout/stderr through
-    /// the output target and records `error_output`.
-    fn mock_do_execute<'o, O>(
-        &mut self,
-        command: PhpMixed,
+    /// Shared expectation-matching logic behind the mock branches of `do_execute` and
+    /// `execute_async` (cf. `ProcessExecutorMock::doExecute`). Logs the command, matches it
+    /// against the head of the expectation queue (exact `===`), pops on match (firing the
+    /// optional callback), falls back to the default handler in non-strict mode, or returns an
+    /// error in strict mode (cf. PHPUnit's `AssertionFailedError`, itself a catchable
+    /// `\RuntimeException` — callers such as `Git::get_mirror_default_branch` rely on being able
+    /// to catch a strict-mode mismatch rather than have it abort the process). Returns `(stdout,
+    /// stderr, return)`. Takes `&self`: the expectation queue is wrapped in a `RefCell` so
+    /// `execute_async`'s `&self` receiver can still consume it.
+    fn mock_match(
+        &self,
+        command: &PhpMixed,
         cwd: Option<&str>,
-        output: O,
-    ) -> anyhow::Result<i64>
-    where
-        O: IntoExecOutput<'o>,
-    {
-        let capture_output = output.capture_output();
-        self.capture_output = capture_output;
-        self.error_output = String::new();
-
-        let command_string = if is_array(&command) {
-            match &command {
+    ) -> anyhow::Result<(String, String, i64)> {
+        let command_string = if is_array(command) {
+            match command {
                 PhpMixed::List(l) => implode(
                     " ",
                     &l.iter()
@@ -410,24 +418,23 @@ impl ProcessExecutor {
             command.as_string().unwrap_or("").to_string()
         };
 
-        let mock = self.mock.as_mut().unwrap();
+        let mut mock = self.mock.as_ref().unwrap().borrow_mut();
         mock.log.push(command_string.clone());
 
         let matched = mock
             .expectations
             .as_ref()
-            .map(|exps| !exps.is_empty() && exps[0].cmd == command)
+            .map(|exps| !exps.is_empty() && exps[0].cmd == *command)
             .unwrap_or(false);
 
         let (stdout, stderr, r#return);
+        let mut callback = None;
         if matched {
             let mut expect = mock.expectations.as_mut().unwrap().remove(0);
             stdout = expect.stdout.clone();
             stderr = expect.stderr.clone();
             r#return = expect.r#return;
-            if let Some(callback) = expect.callback.as_mut() {
-                callback();
-            }
+            callback = expect.callback.take();
         } else if !mock.strict {
             stdout = mock.default_handler.stdout.clone();
             stderr = mock.default_handler.stderr.clone();
@@ -440,17 +447,56 @@ impl ProcessExecutor {
                 .map(|exps| format!("Expected {:?} at this point.", exps[0].cmd))
                 .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
             let received = mock.log[..mock.log.len().saturating_sub(1)].join(PHP_EOL);
-            panic!(
-                "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
-                command,
-                cwd.unwrap_or(""),
-                PHP_EOL,
-                expected,
-                PHP_EOL,
-                PHP_EOL,
-                received
-            );
+            // PHPUnit's `AssertionFailedError` (thrown by `ProcessExecutorMock::doExecute` on a
+            // strict-mode mismatch) extends `\RuntimeException`, so PHP call sites that
+            // `catch (\RuntimeException $e)` around a mock-driven git/hg/svn call (e.g.
+            // `GitDriver::supports`) treat a mismatch as an ordinary recoverable failure. Using
+            // the same `RuntimeException` type here keeps `downcast_ref::<RuntimeException>()`
+            // checks working the same way against a mismatch.
+            return Err(RuntimeException {
+                message: format!(
+                    "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
+                    command,
+                    cwd.unwrap_or(""),
+                    PHP_EOL,
+                    expected,
+                    PHP_EOL,
+                    PHP_EOL,
+                    received
+                ),
+                code: 0,
+            }
+            .into());
         }
+
+        // Release the RefMut before firing the callback: a callback that re-enters the same
+        // executor (e.g. via a cloned `Rc<RefCell<ProcessExecutor>>`) would otherwise hit
+        // `already mutably borrowed` here even before reaching the outer RefCell.
+        drop(mock);
+        if let Some(mut callback) = callback {
+            callback();
+        }
+
+        Ok((stdout, stderr, r#return))
+    }
+
+    /// Mock replacement for `do_execute` when [`Self::mock`] is set (cf.
+    /// `ProcessExecutorMock::doExecute`). Delegates the matching to [`Self::mock_match`], then
+    /// emits stdout/stderr through the output target and records `error_output`.
+    fn mock_do_execute<'o, O>(
+        &mut self,
+        command: PhpMixed,
+        cwd: Option<&str>,
+        output: O,
+    ) -> anyhow::Result<i64>
+    where
+        O: IntoExecOutput<'o>,
+    {
+        let capture_output = output.capture_output();
+        self.capture_output = capture_output;
+        self.error_output = String::new();
+
+        let (stdout, stderr, r#return) = self.mock_match(&command, cwd)?;
 
         // Feed stdout/stderr through the output target, mirroring the PHP `$callback(...)` calls.
         match output.to_callback() {
@@ -489,12 +535,12 @@ impl ProcessExecutor {
         strict: bool,
         default_handler: MockHandler,
     ) {
-        self.mock = Some(ProcessExecutorMockState {
+        self.mock = Some(std::cell::RefCell::new(ProcessExecutorMockState {
             expectations: Some(expectations),
             strict,
             default_handler,
             log: Vec::new(),
-        });
+        }));
     }
 
     /// For testing only. Asserts all configured expectations were consumed (cf.
@@ -503,6 +549,7 @@ impl ProcessExecutor {
         let Some(mock) = self.mock.as_ref() else {
             return;
         };
+        let mock = mock.borrow();
         // Not configured to expect anything, so no need to react here.
         let Some(expectations) = mock.expectations.as_ref() else {
             return;
@@ -548,13 +595,18 @@ impl ProcessExecutor {
 
     /// starts a process on the commandline in async mode
     ///
-    /// Returns a future that does NOT borrow the executor: everything it needs is captured up
+    /// The returned future does NOT borrow the executor: everything it needs is captured up
     /// front, so callers can drop their `Ref`/`RefMut` on the shared `Rc<RefCell<ProcessExecutor>>`
-    /// before awaiting (`let fut = pe.borrow().execute_async(...); fut.await`). Holding a borrow
-    /// across the await would panic as soon as a sibling future or a sync `execute()` call touches
-    /// the same executor. The max_jobs throttle is enforced by the semaphore.
+    /// before awaiting (`let fut = pe.borrow_mut().execute_async(...); fut.await`). Holding a
+    /// borrow across the await would panic as soon as a sibling future or a sync `execute()` call
+    /// touches the same executor. The max_jobs throttle is enforced by the semaphore.
+    ///
+    /// Takes `&mut self` (unlike the `&self` used while this only read `self.mock`) so the mock
+    /// branch can update `error_output`/`capture_output` before returning, mirroring
+    /// `ProcessExecutorMock::executeAsync` — which resolves through the same `doExecute` the sync
+    /// path uses, so it updates the executor's cached error output too (cf. `mock_do_execute`).
     pub fn execute_async<C>(
-        &self,
+        &mut self,
         command: C,
         cwd: Option<&str>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
@@ -564,11 +616,22 @@ impl ProcessExecutor {
         let command = command.into_exec_command();
         if self.mock.is_some() {
             // PHP resolves the promise with a Process mock whose getOutput/isSuccessful/getExitCode
-            // reflect the doExecute result. We cannot fabricate a Process mock here: Process has no
-            // test seam in the external-packages crate (out of scope to modify). No portable test
-            // currently exercises the async mock path, so leave it unimplemented rather than
-            // returning a misleading Process.
-            todo!("ProcessExecutorMock async path needs a Process mock seam in external-packages");
+            // reflect the doExecute result; reuse the same expectation matching as the sync mock
+            // branch and fabricate the resolved Process via `Process::__mock`, a test seam mirroring
+            // `ZipArchive::__mock`.
+            let matched = self.mock_match(&command, cwd);
+            if let Ok((_, ref stderr, _)) = matched {
+                self.capture_output = true;
+                self.error_output = stderr.clone();
+            }
+            return Box::pin(async move {
+                let (stdout, stderr, r#return) = matched?;
+                Ok(Process::__mock(ProcessMock {
+                    exit_code: r#return,
+                    stdout,
+                    stderr,
+                }))
+            });
         }
         let allow_async = self.allow_async;
         let semaphore = self.semaphore.clone();

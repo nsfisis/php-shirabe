@@ -5,12 +5,15 @@ use crate::io_stub::IOStub;
 use crate::process_executor_mock::{
     ProcessExecutorMockGuard, cmd, cmd_full, get_process_executor_mock,
 };
+use crate::test_case::GitVersionGuard;
 use indexmap::IndexMap;
+use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::GitHubDriver;
+use shirabe::util::Git as GitUtil;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
@@ -681,9 +684,17 @@ fn test_public_repository_archived() {
     assert_eq!(Some(true), data.get("abandoned").and_then(|v| v.as_bool()));
 }
 
+// GitDriver::initialize calls GitUtil::cleanEnv, which calls GitUtil::getVersion; PHP's
+// `GitUtil::$version` is a class-level static that persists for the whole PHPUnit run, so by the
+// time this test runs it has already been populated (as a side effect of some earlier-run test
+// invoking the real `git --version`) and the mock expectation list below never needs to include it.
+// Rust test execution order isn't guaranteed the same way, so the cache is seeded explicitly here.
 #[test]
-#[ignore = "GitDriver clone-fallback path runs an unexpected `git --version` (Git::get_version) not in the PHP mock expectation list; needs the version static seeded and the Rust sync_mirror command sequence to match"]
+#[serial]
 fn test_private_repository_no_interaction() {
+    GitUtil::__set_version(Some("2.52.0".to_string()));
+    let _git_guard = GitVersionGuard;
+
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 

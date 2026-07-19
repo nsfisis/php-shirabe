@@ -9,7 +9,7 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, date, php_regex, stripos, strtolower};
+use shirabe_php_shim::{PhpMixed, date, in_array, php_regex, stripos, strtolower};
 
 #[derive(Debug)]
 pub struct GitHub {
@@ -52,12 +52,11 @@ impl GitHub {
 
     pub fn authorize_oauth(&mut self, origin_url: &str) -> bool {
         let github_domains = self.config.borrow_mut().get("github-domains");
-        let domains = match github_domains.as_array() {
-            Some(arr) => arr.clone(),
-            None => return false,
-        };
-        let origin_in_domains = domains.values().any(|v| v.as_string() == Some(origin_url));
-        if !origin_in_domains {
+        if !in_array(
+            PhpMixed::String(origin_url.to_string()),
+            &github_domains,
+            false,
+        ) {
             return false;
         }
 

@@ -1,9 +1,10 @@
 //! ref: composer/tests/Composer/Test/Command/InitCommandTest.php
 
-use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use crate::test_case::{RestoreEnv, RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
+use shirabe::util::platform::Platform;
 use shirabe_php_shim::{PHP_SERVER, PhpMixed};
 use tempfile::TempDir;
 
@@ -597,12 +598,26 @@ fn test_format_authors() {
     assert_eq!(expected, authors[0]);
 }
 
+/// ref: InitCommandTest::testGetGitConfig.
+///
+/// Composer's own CI runs `git config --global user.name/user.email` before the test suite so a
+/// global config is guaranteed to exist; here `HOME` is pointed at a throwaway directory carrying
+/// its own `.gitconfig` with those keys so the test doesn't depend on (or mutate) the real user's
+/// global git config.
 #[test]
-#[ignore = "requires the host's global git config to have user.name/user.email set (Composer's \
-            own CI runs `git config --global user.name/user.email` before the test suite); \
-            fails in environments without that global config"]
+#[serial]
 fn test_get_git_config() {
     set_up();
+
+    let home = TempDir::new().unwrap();
+    std::fs::write(
+        home.path().join(".gitconfig"),
+        "[user]\n\tname = Test User\n\temail = test-user@example.com\n",
+    )
+    .unwrap();
+    let original_home = Platform::get_env("HOME");
+    Platform::put_env("HOME", &home.path().to_string_lossy());
+    let _restore_home = RestoreEnv::new("HOME", original_home);
 
     let command = InitCommand::new();
     let git_config = command.__get_git_config();

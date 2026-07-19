@@ -200,7 +200,7 @@ impl Filesystem {
             (fs.get_process_handle(), cmd)
         };
 
-        let process_future = process_executor.borrow().execute_async(
+        let process_future = process_executor.borrow_mut().execute_async(
             PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
             None,
         );

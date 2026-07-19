@@ -229,11 +229,11 @@ impl Git {
         if !initial_clone {
             // capture username/password from URL if there is one and we have no auth configured yet
             let mut output = String::new();
-            self.process.borrow_mut().execute_args(
-                &["git".to_string(), "remote".to_string(), "-v".to_string()],
+            self.process.borrow_mut().execute(
+                &["git".to_string(), "remote".to_string(), "-v".to_string()][..],
                 &mut output,
                 cwd,
-            );
+            )?;
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),

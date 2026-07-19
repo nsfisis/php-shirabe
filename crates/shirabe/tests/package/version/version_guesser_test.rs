@@ -185,7 +185,6 @@ fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch()
     assert_eq!(another_commit_hash, version_data.commit.unwrap());
 }
 
-#[ignore = "feature-branch guessing calls ProcessExecutor::execute_async, whose mock path is todo!()"]
 #[test]
 #[serial]
 fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming() {
@@ -239,7 +238,6 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     );
 }
 
-#[ignore = "feature-branch guessing calls ProcessExecutor::execute_async, whose mock path is todo!()"]
 #[test]
 #[serial]
 fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming_regex()
@@ -560,7 +558,6 @@ fn test_numeric_branches_show_nicely() {
     assert_eq!("1.5.9999999.9999999-dev", version_data.version.unwrap());
 }
 
-#[ignore = "remote-branch feature guessing calls ProcessExecutor::execute_async, whose mock path is todo!()"]
 #[test]
 #[serial]
 fn test_remote_branches_are_selected() {

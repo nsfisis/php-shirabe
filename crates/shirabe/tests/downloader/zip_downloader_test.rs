@@ -14,6 +14,7 @@ use shirabe::util::HttpDownloader;
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
+use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
@@ -87,10 +88,17 @@ impl Drop for TearDown {
 }
 
 fn make_downloader(set_up: &SetUp) -> ZipDownloader {
-    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         set_up.io.clone(),
     ))));
+    make_downloader_with_process(set_up, process)
+}
+
+fn make_downloader_with_process(
+    set_up: &SetUp,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+) -> ZipDownloader {
+    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     ZipDownloader::new(
         set_up.io.clone(),
         set_up.config.clone(),
@@ -102,11 +110,6 @@ fn make_downloader(set_up: &SetUp) -> ZipDownloader {
     )
 }
 
-// The system-unzip / non-windows-fallback paths route through ProcessExecutor::execute_async, whose
-// mock branch is an unimplemented todo!() (no Process mock seam exists in the external-packages
-// crate). The PHP tests below mock Process/ProcessExecutor::executeAsync, which is not reproducible
-// here, so they remain ignored.
-//
 // testErrorMessages drives a real HttpDownloader + Loop, but RemoteFilesystem::get_remote_contents
 // is a phase-c stub returning None, so the file:// dist download fails before the ZipArchive path.
 
@@ -266,38 +269,146 @@ fn test_zip_archive_only_good() {
     result.expect("extract should succeed");
 }
 
-#[ignore = "routes through ProcessExecutor::execute_async whose mock branch is todo!() (no Process mock seam in external-packages)"]
+// setPrivateProperty('unzipCommands', [['unzip', 'unzip -qq %s -d %s']]) in PHP: a single
+// two-element commandSpec (executable name, then one literal arg string that contains %s
+// placeholders rather than %file%/%path%, so it is passed through to executeAsync verbatim). The
+// PHPUnit test fully replaces $processExecutor, so the exact command content is never asserted on;
+// this only needs to be non-empty so extractWithSystemUnzip proceeds past the "no commands"
+// short-circuit into ZipDownloader::extract_with_zip_archive.
+fn unzip_command_spec() -> Vec<Vec<String>> {
+    vec![vec!["unzip".to_string(), "unzip -qq %s -d %s".to_string()]]
+}
+
 #[test]
+#[serial]
 fn test_system_unzip_only_failed() {
-    let _ = set_up();
-    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
-    // todo!() (no Process mock seam exists in the external-packages crate).
-    todo!()
+    let set_up = set_up();
+    let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
+
+    ZipDownloader::__set_is_windows(Some(false));
+    ZipDownloader::__set_has_zip_archive(Some(false));
+    ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
+
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+    process.borrow_mut().__expects(
+        vec![],
+        false,
+        MockHandler {
+            r#return: 1,
+            stdout: String::new(),
+            stderr: "output".to_string(),
+        },
+    );
+    let downloader = make_downloader_with_process(&set_up, process);
+
+    let filename = set_up.filename.to_string_lossy().into_owned();
+    let result = run(downloader.extract(set_up.package.clone(), &filename, "vendor/dir"));
+
+    let e = result.expect_err("expected RuntimeException");
+    assert!(
+        e.to_string()
+            .contains("Failed to extract test/pkg: (1) unzip"),
+        "got: {e}"
+    );
 }
 
-#[ignore = "routes through ProcessExecutor::execute_async whose mock branch is todo!() (no Process mock seam in external-packages)"]
 #[test]
+#[serial]
 fn test_system_unzip_only_good() {
-    let _ = set_up();
-    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
-    // todo!() (no Process mock seam exists in the external-packages crate).
-    todo!()
+    let set_up = set_up();
+    let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
+
+    ZipDownloader::__set_is_windows(Some(false));
+    ZipDownloader::__set_has_zip_archive(Some(false));
+    ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
+
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+    process.borrow_mut().__expects(
+        vec![],
+        false,
+        MockHandler {
+            r#return: 0,
+            stdout: String::new(),
+            stderr: "output".to_string(),
+        },
+    );
+    let downloader = make_downloader_with_process(&set_up, process);
+
+    let filename = set_up.filename.to_string_lossy().into_owned();
+    let result = run(downloader.extract(set_up.package.clone(), &filename, "vendor/dir"));
+
+    result.expect("extract should succeed");
 }
 
-#[ignore = "routes through ProcessExecutor::execute_async whose mock branch is todo!() (no Process mock seam in external-packages)"]
 #[test]
+#[serial]
 fn test_non_windows_fallback_good() {
-    let _ = set_up();
-    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
-    // todo!() (no Process mock seam exists in the external-packages crate).
-    todo!()
+    let set_up = set_up();
+    let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
+
+    ZipDownloader::__set_is_windows(Some(false));
+    ZipDownloader::__set_has_zip_archive(Some(true));
+    ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
+
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+    process.borrow_mut().__expects(
+        vec![],
+        false,
+        MockHandler {
+            r#return: 1,
+            stdout: String::new(),
+            stderr: "output".to_string(),
+        },
+    );
+    let downloader = make_downloader_with_process(&set_up, process);
+    let zip_archive = ZipArchive::__mock(ZipArchiveMock {
+        open: Ok(()),
+        count: 0,
+        extract_to: Ok(true),
+    });
+    downloader.__set_zip_archive_object(Some(zip_archive));
+
+    let filename = set_up.filename.to_string_lossy().into_owned();
+    let result = run(downloader.extract(set_up.package.clone(), &filename, "vendor/dir"));
+
+    result.expect("extract should succeed");
 }
 
-#[ignore = "routes through ProcessExecutor::execute_async whose mock branch is todo!() (no Process mock seam in external-packages)"]
 #[test]
+#[serial]
 fn test_non_windows_fallback_failed() {
-    let _ = set_up();
-    // TODO(phase-d): routes through ProcessExecutor::execute_async, whose mock branch is
-    // todo!() (no Process mock seam exists in the external-packages crate).
-    todo!()
+    let set_up = set_up();
+    let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
+
+    ZipDownloader::__set_is_windows(Some(false));
+    ZipDownloader::__set_has_zip_archive(Some(true));
+    ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
+
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+    process.borrow_mut().__expects(
+        vec![],
+        false,
+        MockHandler {
+            r#return: 1,
+            stdout: String::new(),
+            stderr: "output".to_string(),
+        },
+    );
+    let downloader = make_downloader_with_process(&set_up, process);
+    let zip_archive = ZipArchive::__mock(ZipArchiveMock {
+        open: Ok(()),
+        count: 0,
+        extract_to: Ok(false),
+    });
+    downloader.__set_zip_archive_object(Some(zip_archive));
+
+    let filename = set_up.filename.to_string_lossy().into_owned();
+    let result = run(downloader.extract(set_up.package.clone(), &filename, "vendor/dir"));
+
+    let e = result.expect_err("expected RuntimeException");
+    assert!(
+        e.to_string()
+            .contains("There was an error extracting the ZIP file"),
+        "got: {e}"
+    );
 }

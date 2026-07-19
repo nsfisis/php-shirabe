@@ -405,10 +405,34 @@ fn test_dispatcher_outputs_command() {
 }
 
 #[test]
-#[ignore = "uses an unmocked ProcessExecutor running a real `exit 1`; depends on real shell execution"]
+#[serial]
 fn test_dispatcher_outputs_error_on_failed_command() {
     let _tear_down = TearDown;
-    // TODO(phase-d): uses an unmocked ProcessExecutor running a real `exit 1`; depends on real
-    // shell execution
-    todo!()
+
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+    let composer = create_composer_instance();
+    let io = std::rc::Rc::new(std::cell::RefCell::new(
+        BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+    ));
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+
+    let code = "exit 1";
+    let mut dispatcher =
+        dispatcher_with_listeners(&composer, io_dyn, process, listeners_const(vec![code]));
+
+    let result = dispatcher.dispatch_script(
+        ScriptEvents::POST_INSTALL_CMD,
+        false,
+        vec![],
+        IndexMap::new(),
+    );
+
+    let e = result.expect_err("expected ScriptExecutionException");
+    assert!(e.to_string().contains("Error Output: "), "got: {e}");
+
+    let expected = format!(
+        "> exit 1{eol}Script exit 1 handling the post-install-cmd event returned with error code 1{eol}",
+        eol = PHP_EOL
+    );
+    assert_eq!(expected, io.borrow().get_output());
 }

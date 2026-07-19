@@ -16,6 +16,7 @@ use shirabe::package::handle::{
     CompleteAliasPackageHandle, CompletePackageHandle, PackageInterfaceHandle,
 };
 use shirabe::repository::{InstalledFilesystemRepository, WritableRepositoryInterface};
+use shirabe::util::Git as GitUtil;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
@@ -165,6 +166,46 @@ pub fn init_temp_composer(
         temp_dir,
         prev_cwd,
         prev_composer_home,
+    }
+}
+
+/// For testing only. Resets the cached `GitUtil` version static on drop, mirroring the
+/// `ReflectionProperty(GitUtil::class, 'version')->setValue(null, false)` reset done in
+/// `VersionGuesserTest`'s setUp/tearDown. `GitUtil::VERSION` is shared process-wide, so any test
+/// that seeds it via `GitUtil::__set_version` should hold one of these (and be `#[serial]`, since
+/// `#[serial]` only excludes other `#[serial]` tests from running concurrently).
+pub struct GitVersionGuard;
+
+impl Drop for GitVersionGuard {
+    fn drop(&mut self) {
+        GitUtil::__reset_version();
+    }
+}
+
+/// Restores an environment variable to its prior value (or clears it if it was unset) once
+/// dropped. Pair with `Platform::get_env(name)` captured before the override:
+/// ```ignore
+/// let original = Platform::get_env("HOME");
+/// Platform::put_env("HOME", "/tmp/fake-home");
+/// let _restore = RestoreEnv::new("HOME", original);
+/// ```
+pub struct RestoreEnv {
+    name: &'static str,
+    original: Option<String>,
+}
+
+impl RestoreEnv {
+    pub fn new(name: &'static str, original: Option<String>) -> Self {
+        Self { name, original }
+    }
+}
+
+impl Drop for RestoreEnv {
+    fn drop(&mut self) {
+        match &self.original {
+            Some(value) => Platform::put_env(self.name, value),
+            None => Platform::clear_env(self.name),
+        }
     }
 }
 

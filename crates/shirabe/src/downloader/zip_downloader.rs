@@ -130,7 +130,11 @@ impl ZipDownloader {
 
         // Build the future first so the executor borrow is released before awaiting; a borrow
         // held across the await would collide with sibling extracts or sync execute() calls.
-        let process_future = self.inner.process.borrow().execute_async(&command, None);
+        let process_future = self
+            .inner
+            .process
+            .borrow_mut()
+            .execute_async(&command, None);
         let process_result = process_future.await;
         match process_result {
             Ok(mut process) => {

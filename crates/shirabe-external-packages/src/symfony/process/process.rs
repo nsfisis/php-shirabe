@@ -29,6 +29,18 @@ enum CommandLine {
     String(String),
 }
 
+/// Test-only behaviour for a Process fabricated via [`Process::__mock`]: `getOutput`/
+/// `getErrorOutput`/`getExitCode`/`isSuccessful` return these fixed values instead of reading a
+/// real subprocess. Mirrors PHPUnit's `getMockBuilder(Process::class)->disableOriginalConstructor()`
+/// mocks used by the Composer test suite (e.g. `ZipDownloaderTest`). Held in [`Process::mock`];
+/// always `None` in production.
+#[derive(Debug, Clone)]
+pub struct ProcessMock {
+    pub exit_code: i64,
+    pub stdout: String,
+    pub stderr: String,
+}
+
 /// Process is a thin wrapper around proc_* functions to easily
 /// start independent PHP processes.
 pub struct Process {
@@ -59,6 +71,8 @@ pub struct Process {
     process_pipes: Option<Box<dyn PipesInterface>>,
     latest_signal: Option<i64>,
     cached_exit_code: Option<i64>,
+    /// Test-only mock state. `None` in production; set via [`Process::__mock`] in tests.
+    mock: Option<ProcessMock>,
 }
 
 impl std::fmt::Debug for Process {
@@ -198,7 +212,19 @@ impl Process {
             process_pipes: None,
             latest_signal: None,
             cached_exit_code: None,
+            mock: None,
         }
+    }
+
+    /// For testing only. Builds an already-terminated mock Process whose getOutput/
+    /// getErrorOutput/getExitCode/isSuccessful return the configured values, without spawning a
+    /// real subprocess.
+    pub fn __mock(mock: ProcessMock) -> Self {
+        let mut this = Self::empty();
+        this.status = Self::STATUS_TERMINATED.to_string();
+        this.exitcode = Some(mock.exit_code);
+        this.mock = Some(mock);
+        this
     }
 
     pub fn new(
@@ -612,6 +638,10 @@ impl Process {
 
     /// Returns the current output of the process (STDOUT).
     pub fn get_output(&mut self) -> anyhow::Result<String> {
+        if let Some(mock) = &self.mock {
+            return Ok(mock.stdout.clone());
+        }
+
         self.read_pipes_for_output("getOutput", false)?;
 
         Ok(
@@ -718,6 +748,10 @@ impl Process {
 
     /// Returns the current error output of the process (STDERR).
     pub fn get_error_output(&mut self) -> anyhow::Result<String> {
+        if let Some(mock) = &self.mock {
+            return Ok(mock.stderr.clone());
+        }
+
         self.read_pipes_for_output("getErrorOutput", false)?;
 
         Ok(
@@ -752,6 +786,10 @@ impl Process {
 
     /// Returns the exit code returned by the process.
     pub fn get_exit_code(&mut self) -> Option<i64> {
+        if self.mock.is_some() {
+            return self.exitcode;
+        }
+
         self.update_status(false);
 
         self.exitcode
