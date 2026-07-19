@@ -72,9 +72,6 @@ fn run_fund_case(
 
 #[test]
 #[serial]
-#[ignore = "FundCommand queries every repository (incl. the default packagist ComposerRepository) over \
-            HTTP for funding metadata before falling back to locally installed data, reaching \
-            shirabe-php-shim curl.rs curl_version (todo!()); this path needs real network access"]
 fn test_fund_command() {
     // 'no funding links present, locally or remotely'
     run_fund_case(

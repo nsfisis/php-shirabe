@@ -1468,10 +1468,12 @@ impl ValidatingArrayLoader {
         }
 
         let is_empty = !self.config.borrow().contains_key(property)
-            || self.config.borrow()[property]
-                .as_array()
-                .map(|m| m.is_empty())
-                .unwrap_or(true);
+            || match &self.config.borrow()[property] {
+                PhpMixed::Array(m) => m.is_empty(),
+                PhpMixed::List(l) => l.is_empty(),
+                // is_array() above guarantees the value is Array or List here.
+                _ => unreachable!("validate_array: non-array value survived the is_array check"),
+            };
         if is_empty {
             if mandatory {
                 self.errors.borrow_mut().push(format!(
