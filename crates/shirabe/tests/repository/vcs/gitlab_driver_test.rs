@@ -485,7 +485,6 @@ fn test_get_tags() {
 }
 
 #[test]
-#[ignore = "Response::find_header_value passes a `(?i)`-prefixed (non-delimited) pattern that compile_php_pattern (Preg) mis-translates to an invalid regex (`(?s)?i)^link:...`), so get_next_page panics when parsing the Link header. Pre-existing Preg/Response porting bug, unrelated to GitLabDriver."]
 fn test_get_paginated_refs() {
     let fixtures = fixtures();
     let (mut driver, _init_guard) = do_test_initialize(
