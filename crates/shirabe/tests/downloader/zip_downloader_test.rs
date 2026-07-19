@@ -110,10 +110,6 @@ fn make_downloader_with_process(
     )
 }
 
-// testErrorMessages drives a real HttpDownloader + Loop, but RemoteFilesystem::get_remote_contents
-// is a phase-c stub returning None, so the file:// dist download fails before the ZipArchive path.
-
-#[ignore = "drives a real HttpDownloader whose RemoteFilesystem::get_remote_contents is a phase-c stub returning None, so the file:// dist download fails with a \"could not be downloaded\" TransportException before reaching the ZipArchive \"is not a zip archive\" path"]
 #[test]
 #[serial]
 fn test_error_messages() {
