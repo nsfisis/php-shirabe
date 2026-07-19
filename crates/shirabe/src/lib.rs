@@ -182,10 +182,6 @@ mod cli_tests {
         run_config => "config",
         run_create_project => "create-project",
         run_depends => "depends",
-        #[ignore = "DiagnoseCommand::check_http passes &config.borrow() into a call chain that \
-                    reaches CurlDownloader::download, which then does self.config.borrow_mut() on \
-                    the same Config RefCell, panicking with 'RefCell already borrowed'; same root \
-                    cause as tests/command/diagnose_command_test.rs"]
         run_diagnose => "diagnose",
         run_dump_autoload => "dump-autoload",
         run_exec => "exec",

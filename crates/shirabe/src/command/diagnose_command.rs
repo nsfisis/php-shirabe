@@ -168,7 +168,7 @@ impl Command for DiagnoseCommand {
         ));
 
         io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
-        let r = self.check_composer_audit(&config.borrow())?;
+        let r = self.check_composer_audit(&config)?;
         self.output_result(r);
 
         let platform_overrides = config
@@ -292,14 +292,15 @@ impl Command for DiagnoseCommand {
         self.output_result(PhpMixed::String(r));
 
         io.write_no_newline("Checking http connectivity to packagist: ");
-        let r = self.check_http("http", &config.borrow())?;
+        let r = self.check_http("http", &config)?;
         self.output_result(r);
 
         io.write_no_newline("Checking https connectivity to packagist: ");
-        let r = self.check_http("https", &config.borrow())?;
+        let r = self.check_http("https", &config)?;
         self.output_result(r);
 
-        for repo in config.borrow().get_repositories() {
+        let repositories = config.borrow().get_repositories();
+        for repo in repositories {
             let repo_arr = repo.1.as_array().cloned().unwrap_or_default();
             if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer")
                 && repo_arr.get("url").is_some()
@@ -333,7 +334,7 @@ impl Command for DiagnoseCommand {
                         .and_then(|v| v.as_string())
                         .unwrap_or("")
                 ));
-                let r = self.check_composer_repo(&url, &config.borrow())?;
+                let r = self.check_composer_repo(&url, &config)?;
                 self.output_result(r);
             }
         }
@@ -545,7 +546,11 @@ impl DiagnoseCommand {
         format!("<info>OK</> <comment>git version {}</>", git_version)
     }
 
-    fn check_http(&self, proto: &str, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_http(
+        &self,
+        proto: &str,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+    ) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -553,7 +558,7 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<PhpMixed> = vec![];
         let mut tls_warning: Option<String> = None;
-        if proto == "https" && config.get("disable-tls").as_bool() == Some(true) {
+        if proto == "https" && config.borrow().get("disable-tls").as_bool() == Some(true) {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
@@ -599,7 +604,11 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_composer_repo(&self, url: &str, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_composer_repo(
+        &self,
+        url: &str,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+    ) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -607,7 +616,9 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<PhpMixed> = vec![];
         let mut tls_warning: Option<String> = None;
-        if str_starts_with(url, "https://") && config.get("disable-tls").as_bool() == Some(true) {
+        if str_starts_with(url, "https://")
+            && config.borrow().get("disable-tls").as_bool() == Some(true)
+        {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
@@ -941,7 +952,10 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_composer_audit(&self, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_composer_audit(
+        &self,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+    ) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -989,7 +1003,7 @@ impl DiagnoseCommand {
             crate::repository::RepositoryInterfaceHandle::new(ComposerRepository::new(
                 repo_config,
                 std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
-                config,
+                &config.borrow(),
                 self.http_downloader.borrow().clone().unwrap(),
                 None,
             )?);

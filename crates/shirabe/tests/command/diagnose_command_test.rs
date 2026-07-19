@@ -7,11 +7,6 @@ use shirabe_php_shim::PhpMixed;
 
 #[test]
 #[serial]
-#[ignore = "DiagnoseCommand::check_http passes &config.borrow() into a call chain that reaches \
-            CurlDownloader::download, which then does self.config.borrow_mut() on the same \
-            Config RefCell, panicking with 'RefCell already borrowed'; beyond that, diagnose checks \
-            live http/https connectivity to packagist and the github.com rate limit, so the test \
-            also requires real network access (as the PHP original does)"]
 fn test_cmd_fail() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({ "name": "foo/bar", "description": "test pkg" })),
@@ -51,11 +46,11 @@ Checking github.com rate limit: "
 
 #[test]
 #[serial]
-#[ignore = "DiagnoseCommand::check_http passes &config.borrow() into a call chain that reaches \
-            CurlDownloader::download, which then does self.config.borrow_mut() on the same \
-            Config RefCell, panicking with 'RefCell already borrowed'; beyond that, diagnose checks \
-            live http/https connectivity to packagist and the github.com rate limit, so the test \
-            also requires real network access (as the PHP original does)"]
+#[ignore = "shirabe_php_shim::OPENSSL_VERSION_NUMBER is a hardcoded stub (0), which always trips \
+            check_platform's `< 0x1000100f` TLSv1.1/1.2 support check regardless of the real \
+            linked OpenSSL, forcing a non-zero exit code; diagnose also checks live http/https \
+            connectivity to packagist and the github.com rate limit (as the PHP original does), \
+            so the test additionally requires real network access"]
 fn test_cmd_success() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
