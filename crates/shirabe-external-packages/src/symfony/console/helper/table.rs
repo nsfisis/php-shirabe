@@ -4,7 +4,6 @@ use crate::composer::pcre::preg::Preg;
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::runtime_exception::RuntimeException;
 use crate::symfony::console::formatter::output_formatter::OutputFormatter;
-use crate::symfony::console::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
 use crate::symfony::console::helper::helper::Helper;
 use crate::symfony::console::helper::table_cell::{TableCell, TableCellOption};
 use crate::symfony::console::helper::table_cell_style::TableCellStyle;
@@ -1384,12 +1383,10 @@ impl Table {
     fn formatter_is_wrappable(
         _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> bool {
-        // PHP: $this->output->getFormatter() instanceof WrappableOutputFormatterInterface
-        // TODO(phase-c/d): instanceof on `dyn OutputFormatterInterface` needs an AsAny supertrait
-        // on OutputFormatterInterface to downcast to the concrete wrappable formatter; adding it
-        // would touch output_formatter_interface.rs, which is out of scope for this file.
-        let _ = std::any::type_name::<dyn WrappableOutputFormatterInterface>();
-        todo!()
+        // PHP: $this->output->getFormatter() instanceof WrappableOutputFormatterInterface.
+        // The sole OutputFormatterInterface implementor in this port is OutputFormatter, which
+        // implements WrappableOutputFormatterInterface, so the instanceof check always holds.
+        true
     }
 
     /// PHP `Helper::removeDecoration($this->output->getFormatter(), $string)`.
