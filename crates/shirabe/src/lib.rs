@@ -182,10 +182,10 @@ mod cli_tests {
         run_config => "config",
         run_create_project => "create-project",
         run_depends => "depends",
-        #[ignore = "DiagnoseCommand::check_platform captures phpinfo() via ob_start()/ob_get_clean(), \
-                    which are todo!() in shirabe-php-shim (PHP output buffering and runtime \
-                    introspection are unmodeled), so the command panics; same root cause as \
-                    tests/command/diagnose_command_test.rs"]
+        #[ignore = "DiagnoseCommand::check_http passes &config.borrow() into a call chain that \
+                    reaches CurlDownloader::download, which then does self.config.borrow_mut() on \
+                    the same Config RefCell, panicking with 'RefCell already borrowed'; same root \
+                    cause as tests/command/diagnose_command_test.rs"]
         run_diagnose => "diagnose",
         run_dump_autoload => "dump-autoload",
         run_exec => "exec",

@@ -22,6 +22,11 @@ $dispatch = [
         $re->info();
         return (string) ob_get_clean();
     },
+    'phpinfo' => static function ($what) {
+        ob_start();
+        phpinfo((int) $what);
+        return (string) ob_get_clean();
+    },
 ];
 $read_exact = static function ($conn, int $len): ?string {
     $buf = '';

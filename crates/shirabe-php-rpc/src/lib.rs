@@ -58,6 +58,14 @@ pub fn get_extension_info(name: &str) -> String {
     }
 }
 
+/// PHP `phpinfo($what)` output, captured via `ob_start()`/`ob_get_clean()`.
+pub fn get_phpinfo(what: i64) -> String {
+    match call("phpinfo", &what.to_string()) {
+        PhpMixed::String(s) => s,
+        other => panic!("PHP RPC: `phpinfo` did not return a string: {other:?}"),
+    }
+}
+
 /// PHP `phpversion($extension)`.
 pub fn phpversion(extension: &str) -> Option<String> {
     match call("phpversion", extension) {

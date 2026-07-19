@@ -44,8 +44,8 @@ use shirabe_php_shim::{
     PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, defined,
     disk_free_space, extension_loaded, file_exists, filter_var_boolean, function_exists,
     get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
-    is_array, is_string, ob_get_clean, ob_start, php_regex, phpinfo, rtrim, str_contains,
-    str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
+    is_array, is_string, php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos,
+    strstr, strtolower, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -1170,19 +1170,13 @@ impl DiagnoseCommand {
             warnings.insert("zlib".to_string(), PhpMixed::Bool(true));
         }
 
-        ob_start();
-        phpinfo(INFO_GENERAL);
-        let phpinfo_str = ob_get_clean();
+        let phpinfo_str = shirabe_php_rpc::get_phpinfo(INFO_GENERAL);
         let mut phpinfo_match: IndexMap<CaptureKey, String> = IndexMap::new();
-        if phpinfo_str.is_some()
-            && Preg::is_match3(
-                php_regex!(
-                    "{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"
-                ),
-                phpinfo_str.as_ref().unwrap(),
-                Some(&mut phpinfo_match),
-            )
-        {
+        if Preg::is_match3(
+            php_regex!("{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"),
+            &phpinfo_str,
+            Some(&mut phpinfo_match),
+        ) {
             let configure = phpinfo_match
                 .get(&CaptureKey::ByIndex(1))
                 .cloned()
