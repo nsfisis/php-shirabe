@@ -613,7 +613,6 @@ fn test_funding_format() {
     }
 }
 
-#[ignore = "funding/archived parsing differs from PHP; not date-related"]
 #[test]
 fn test_public_repository_archived() {
     let SetUp { home, config } = set_up();

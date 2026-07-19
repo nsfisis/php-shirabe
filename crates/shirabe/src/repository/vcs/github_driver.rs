@@ -326,9 +326,9 @@ impl GitHubDriver {
                     .map(|m| m.contains_key("source"))
                     .unwrap_or(false);
                 if support_source_missing {
+                    // PHP's `?:` chain only evaluates getBranches() when the tags search is falsy.
                     let tags_map = self.get_tags()?;
-                    let branches_map = self.get_branches()?;
-                    let label = array_search_mixed(
+                    let mut label = array_search_mixed(
                         &PhpMixed::String(identifier.to_string()),
                         &PhpMixed::Array(
                             tags_map
@@ -338,9 +338,10 @@ impl GitHubDriver {
                         ),
                         false,
                     )
-                    .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null))
-                    .or_else(|| {
-                        array_search_mixed(
+                    .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null));
+                    if label.is_none() {
+                        let branches_map = self.get_branches()?;
+                        label = array_search_mixed(
                             &PhpMixed::String(identifier.to_string()),
                             &PhpMixed::Array(
                                 branches_map
@@ -350,9 +351,9 @@ impl GitHubDriver {
                             ),
                             false,
                         )
-                    })
-                    .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null))
-                    .unwrap_or_else(|| PhpMixed::String(identifier.to_string()));
+                        .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null));
+                    }
+                    let label = label.unwrap_or_else(|| PhpMixed::String(identifier.to_string()));
                     let label_str = label.as_string().unwrap_or(identifier).to_string();
                     if let Some(support) = composer.get_mut("support").and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
