@@ -60,7 +60,6 @@ fn string_list(items: &[&str]) -> PhpMixed {
     )
 }
 
-#[ignore = "guess_hg_version builds an HttpDownloader for HgDriver, which calls curl_multi_init() (todo!() in shirabe-php-shim::curl)"]
 #[test]
 #[serial]
 fn test_hg_guess_version_returns_data() {
