@@ -142,8 +142,11 @@ pub fn date_default_timezone_set(tz: &str) -> bool {
 
 pub fn date(format: &str, timestamp: Option<i64>) -> String {
     let timestamp = timestamp.unwrap_or_else(time);
-    // PHP `date()` renders in the default timezone. Without a timezone database only "UTC" can be
-    // resolved; any named zone is rejected loudly rather than silently rendered in the wrong zone.
+    // TODO(phase-c): model the system default timezone. PHP `date()` renders in the default
+    // timezone (usually the system's local zone); without a timezone database only "UTC" can be
+    // resolved here, so on a non-UTC machine this diverges whenever the local date differs from
+    // the UTC date (e.g. daily 00:00-09:00 JST). Fixing this needs a timezone database (a new
+    // crate). Any named zone is rejected loudly rather than silently rendered in the wrong zone.
     let tz = date_default_timezone_get();
     if tz != "UTC" {
         panic!(
