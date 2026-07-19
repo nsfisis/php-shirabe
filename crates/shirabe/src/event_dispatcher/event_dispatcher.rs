@@ -122,6 +122,12 @@ impl EventDispatcher {
         self.get_listeners_override = Some(GetListenersOverride(callback));
     }
 
+    /// For testing only. Exposes the protected `getPhpExecCommand`, mirroring the PHP tests'
+    /// `new \ReflectionMethod($dispatcher, 'getPhpExecCommand')`.
+    pub fn __get_php_exec_command(&self) -> anyhow::Result<String> {
+        self.get_php_exec_command()
+    }
+
     /// Set whether script handlers are active or not
     pub fn set_run_scripts(&mut self, run_scripts: bool) {
         self.run_scripts = run_scripts;

@@ -324,8 +324,8 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
 
 // The remaining ignored tests drive listeners that invoke PHP scripts (`Class::method`), require
 // the autoloader rebuild of `make_autoloader` (an intentional no-op in the port), or rely on
-// ReflectionMethod / object-identity callables. None of those seams exist in the Rust port (the
-// PHP-script invocation path is an unimplemented plugin-runtime `todo!`), so they remain ignored.
+// object-identity callables. None of those seams exist in the Rust port (the PHP-script
+// invocation path is an unimplemented plugin-runtime `todo!`), so they remain ignored.
 
 #[test]
 #[ignore = "listener `EventDispatcherTest::call` is a PHP-script callable; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
@@ -391,12 +391,68 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
 }
 
 #[test]
-#[ignore = "requires ReflectionMethod(getPhpExecCommand) and a real PHP binary to compute the expected @php command; getPhpExecCommand has no test seam"]
+#[serial]
 fn test_dispatcher_support_for_additional_args() {
     let _tear_down = TearDown;
-    // TODO(phase-d): requires ReflectionMethod(getPhpExecCommand) and a real PHP binary to
-    // compute the expected @php command; getPhpExecCommand has no test seam
-    todo!()
+    if !ensure_php_binary() {
+        eprintln!("skipping: no php binary on PATH");
+        return;
+    }
+
+    let composer = create_composer_instance();
+    let io = buffer_io_verbose();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+
+    // PHP obtains phpCmd via `new \ReflectionMethod($dispatcher, 'getPhpExecCommand')`;
+    // __get_php_exec_command is that reflection seam. It only inspects the environment, so a
+    // throwaway dispatcher yields the same value as the dispatcher under test.
+    let php_cmd = EventDispatcher::new(composer.upcast().downgrade(), io_dyn.clone(), None)
+        .__get_php_exec_command()
+        .unwrap();
+
+    let args = format!(
+        "{} {} {}",
+        ProcessExecutor::escape("ARG"),
+        ProcessExecutor::escape("ARG2"),
+        ProcessExecutor::escape("--arg"),
+    );
+
+    let (process, _process_guard) = get_process_executor_mock(
+        vec![
+            cmd("echo -n foo"),
+            cmd(format!("{} foo.php {} then the rest", php_cmd, args)),
+            cmd(format!("echo -n bar {}", args)),
+        ],
+        true,
+        MockHandler::default(),
+    );
+
+    let mut dispatcher = dispatcher_with_listeners(
+        &composer,
+        io_dyn,
+        process,
+        listeners_const(vec![
+            "echo -n foo @no_additional_args",
+            "@php foo.php @additional_args then the rest",
+            "echo -n bar",
+        ]),
+    );
+
+    dispatcher
+        .dispatch_script(
+            ScriptEvents::POST_INSTALL_CMD,
+            false,
+            vec!["ARG".to_string(), "ARG2".to_string(), "--arg".to_string()],
+            IndexMap::new(),
+        )
+        .unwrap();
+
+    let expected = format!(
+        "> post-install-cmd: echo -n foo{eol}> post-install-cmd: @php foo.php {args} then the rest{eol}> post-install-cmd: echo -n bar {args}{eol}",
+        eol = PHP_EOL,
+        args = args,
+    );
+    assert_eq!(expected, io.borrow().get_output());
 }
 
 #[test]
