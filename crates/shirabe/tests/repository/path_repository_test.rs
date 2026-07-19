@@ -2,6 +2,7 @@
 
 use crate::test_case::get_package;
 use indexmap::IndexMap;
+use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::PathRepository;
@@ -166,10 +167,37 @@ fn test_load_package_with_explicit_versions() {
     assert_eq!(expected, versions);
 }
 
+/// Restores the previous cwd on drop so a panicking assertion cannot leak the changed cwd into
+/// other tests.
+struct CwdGuard {
+    prev_cwd: std::path::PathBuf,
+}
+
+impl CwdGuard {
+    fn new(dir: &str) -> Self {
+        let prev_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir).unwrap();
+        Self { prev_cwd }
+    }
+}
+
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.prev_cwd);
+    }
+}
+
 /// Verify relative repository URLs remain relative, see #4439
-#[ignore = "relies on the process cwd being the test's __DIR__ (the Repository fixtures dir) so the computed relative url resolves; under cargo the cwd is the crate manifest dir, so the relative url does not point at the fixture and getPackages errors"]
 #[test]
+#[serial]
 fn test_url_remains_relative() {
+    // PHP runs under phpunit with the process cwd inside the composer checkout, an ancestor of
+    // __DIR__, so stripping the cwd prefix yields a valid relative path; cargo runs tests from the
+    // crate manifest dir, which is not an ancestor of the fixtures, so replicate the phpunit
+    // precondition by chdir'ing to the __DIR__ equivalent for the duration of the test. #[serial]
+    // keeps other cwd-touching tests in this binary from interleaving.
+    let _cwd_guard = CwdGuard::new(&fixtures_dir().replace("/Fixtures", ""));
+
     // realpath() does not fully expand the paths
     // PHP Bug https://bugs.php.net/bug.php?id=72642
     let repository_url = [

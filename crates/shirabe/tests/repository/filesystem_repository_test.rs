@@ -2,6 +2,7 @@
 
 use crate::test_case::{get_alias_package, get_package};
 use indexmap::IndexMap;
+use serial_test::serial;
 use shirabe::dependency_resolver::operation::OperationInterface;
 use shirabe::installed_versions::InstalledVersions;
 use shirabe::installer::{InstallationManagerInterface, InstallerInterface};
@@ -215,6 +216,9 @@ fn configure_links(
 }
 
 #[test]
+// Serialized because CwdGuard changes the process-global cwd, which would race with the
+// cwd-sensitive path_repository_test::test_url_remains_relative in this binary.
+#[serial]
 fn test_repository_writes_installed_php() {
     let guard = CwdGuard::new();
     let dir = guard.path();
