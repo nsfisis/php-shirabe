@@ -53,6 +53,8 @@ pub struct IOStub {
     // `switch` default.
     ask_and_hide_answer_responses: Option<indexmap::IndexMap<String, String>>,
 
+    // Records `writeError` calls.
+    write_error_calls: CallRecorder<(String, bool)>,
     // Records `writeRaw` calls.
     write_raw_calls: CallRecorder<(String, bool)>,
     // Records `setAuthentication` calls. Kept separate from `authentications` so
@@ -149,6 +151,11 @@ impl IOStub {
         self
     }
 
+    // For testing only. Returns the recorded `writeError` calls in call order.
+    pub fn write_error_calls(&self) -> Vec<(String, bool)> {
+        self.write_error_calls.calls()
+    }
+
     // For testing only. Returns the recorded `writeRaw` calls in call order.
     pub fn write_raw_calls(&self) -> Vec<(String, bool)> {
         self.write_raw_calls.calls()
@@ -193,7 +200,9 @@ impl IOInterfaceImmutable for IOStub {
     }
 
     fn write3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
-    fn write_error3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_error3(&self, message: &str, newline: bool, _verbosity: i64) {
+        self.write_error_calls.push((message.to_string(), newline));
+    }
     fn write_raw3(&self, message: &str, newline: bool, _verbosity: i64) {
         self.write_raw_calls.push((message.to_string(), newline));
     }

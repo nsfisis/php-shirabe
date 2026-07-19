@@ -396,12 +396,47 @@ fn test_dispatcher_support_for_additional_args() {
 }
 
 #[test]
-#[ignore = "uses an unmocked ProcessExecutor running a real `echo foo` and a PHPUnit IO spy on writeError/writeRaw; no real-shell-output IO mocking exists"]
+#[serial]
 fn test_dispatcher_outputs_command() {
     let _tear_down = TearDown;
-    // TODO(phase-d): uses an unmocked ProcessExecutor running a real `echo foo` and a PHPUnit IO
-    // spy on writeError/writeRaw; no real-shell-output IO mocking exists
-    todo!()
+
+    let composer = create_composer_instance();
+    let io = std::rc::Rc::new(std::cell::RefCell::new(crate::io_stub::IOStub::new()));
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+        io_dyn.clone(),
+    ))));
+
+    let mut dispatcher = dispatcher_with_listeners(
+        &composer,
+        io_dyn,
+        process,
+        listeners_const(vec!["echo foo"]),
+    );
+
+    dispatcher
+        .dispatch_script(
+            ScriptEvents::POST_INSTALL_CMD,
+            false,
+            vec![],
+            IndexMap::new(),
+        )
+        .unwrap();
+
+    // ref: $io->expects($this->once())->method('writeError')->with('> echo foo')
+    let write_error_messages: Vec<String> = io
+        .borrow()
+        .write_error_calls()
+        .into_iter()
+        .map(|(message, _newline)| message)
+        .collect();
+    assert_eq!(write_error_messages, vec!["> echo foo".to_string()]);
+
+    // ref: $io->expects($this->once())->method('writeRaw')->with('foo'.PHP_EOL, false)
+    assert_eq!(
+        io.borrow().write_raw_calls(),
+        vec![(format!("foo{PHP_EOL}"), false)]
+    );
 }
 
 #[test]
