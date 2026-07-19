@@ -115,9 +115,6 @@ fn run_locally_modified_packages_case(
 
 #[test]
 #[serial]
-#[ignore = "runs `install` to download the package (git source / dist zip) before `status`, but \
-            InstallationManager::execute is still a todo!() stub so install never populates vendor/, \
-            and init_temp_composer disables packagist.org — running this needs a real VCS/zip fixture"]
 fn test_locally_modified_packages_from_source() {
     run_locally_modified_packages_case(
         serde_json::json!({ "require": { "composer/class-map-generator": "^1.0" } }),
@@ -135,9 +132,6 @@ fn test_locally_modified_packages_from_source() {
 
 #[test]
 #[serial]
-#[ignore = "runs `install` to download the package (git source / dist zip) before `status`, but \
-            InstallationManager::execute is still a todo!() stub so install never populates vendor/, \
-            and init_temp_composer disables packagist.org — running this needs a real VCS/zip fixture"]
 fn test_locally_modified_packages_from_dist() {
     run_locally_modified_packages_case(
         serde_json::json!({ "require": { "smarty/smarty": "^3.1" } }),

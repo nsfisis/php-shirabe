@@ -811,7 +811,6 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
     drop(tear_down);
 }
 
-#[ignore = "installed.json records install-path: null instead of the expected \"../root/req\": the InstallationManager that writes the local repo in the --no-install (update && !install) flow has no installers registered (n_installers=0), so get_install_path()->get_installer() fails and yields null. Separate from the execute_batch fix; needs the default installers wired onto that manager."]
 #[test]
 #[serial]
 fn test_package_still_present_error_when_no_install_flag_used() {

@@ -1225,7 +1225,7 @@ fn php_mixed_map_to_json(map: &IndexMap<String, PhpMixed>) -> serde_json::Value 
 }
 
 #[test]
-#[ignore = "ported; exercises the full install pipeline which is not yet executable end-to-end (execute_batch / repository / autoload stubs), so cases are expected to fail at runtime"]
+#[ignore = "ported; loops over every installer-slow/ fixture and panics at the first mismatch. The install pipeline itself now runs end-to-end (execute_batch/InstallationManager are implemented), but individual fixtures still hit independent, unrelated bugs/gaps (solver stability-flag handling, funding-notice output, lock-file exit codes, at least one todo!() in shirabe-php-shim's runtime), so the full fixture set doesn't pass yet. Needs case-by-case triage rather than one fix"]
 fn test_slow_integration() {
     let _tear_down = TearDown;
     for case in load_integration_tests("installer-slow/") {
@@ -1237,7 +1237,7 @@ fn test_slow_integration() {
 }
 
 #[test]
-#[ignore = "ported; exercises the full install pipeline which is not yet executable end-to-end (execute_batch / repository / autoload stubs), so cases are expected to fail at runtime"]
+#[ignore = "ported; loops over every installer/ fixture (189+) and panics at the first mismatch. The install pipeline itself now runs end-to-end (execute_batch/InstallationManager are implemented), but individual fixtures still hit independent, unrelated bugs/gaps (solver stability-flag handling, funding-notice output, lock-file exit codes, at least one todo!() in shirabe-php-shim's runtime), so the full fixture set doesn't pass yet. Needs case-by-case triage rather than one fix"]
 fn test_integration_with_pool_optimizer() {
     let _tear_down = TearDown;
     for case in load_integration_tests("installer/") {
@@ -1253,7 +1253,7 @@ fn test_integration_with_pool_optimizer() {
 }
 
 #[test]
-#[ignore = "ported; exercises the full install pipeline which is not yet executable end-to-end (execute_batch / repository / autoload stubs), so cases are expected to fail at runtime"]
+#[ignore = "ported; loops over every installer/ fixture (189+) and panics at the first mismatch. The install pipeline itself now runs end-to-end (execute_batch/InstallationManager are implemented), but individual fixtures still hit independent, unrelated bugs/gaps (solver stability-flag handling, funding-notice output, lock-file exit codes, at least one todo!() in shirabe-php-shim's runtime), so the full fixture set doesn't pass yet. Needs case-by-case triage rather than one fix"]
 fn test_integration_with_raw_pool() {
     let _tear_down = TearDown;
     for case in load_integration_tests("installer/") {

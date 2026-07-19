@@ -62,7 +62,6 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, PhpMixed)>, &'static str)> {
 
 #[test]
 #[serial]
-#[ignore = "ReinstallCommand::execute defers the two InstallationManager::execute(...) calls (Phase-C: needs a &mut InstalledRepositoryInterface view of local_repo, and InstallationManager::execute is itself todo!()), so no Removing/Installing lines are emitted and the output is empty. Only the \"not installed\" case, which aborts with warnings before reaching that code, would pass"]
 fn test_reinstall_command() {
     for (label, options, expected) in cases() {
         let composer_json = serde_json::json!({

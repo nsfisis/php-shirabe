@@ -183,7 +183,7 @@ pub(crate) fn installation_manager(
         config,
     )));
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
-    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
+    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
         r#loop,
         io.clone(),
         None,

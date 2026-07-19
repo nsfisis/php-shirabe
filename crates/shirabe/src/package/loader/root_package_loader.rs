@@ -337,7 +337,7 @@ impl RootPackageLoader {
                     let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
                     let stability = stabilities[normalized_m1.as_str()];
 
-                    if stability_flags.get(&name).copied().unwrap_or(i64::MAX) > stability {
+                    if stability_flags.get(&name).is_some_and(|&f| f > stability) {
                         continue;
                     }
                     stability_flags.insert(name, stability);
@@ -357,7 +357,7 @@ impl RootPackageLoader {
                     if stability_name != "stable" {
                         let name = strtolower(req_name);
                         let stability = stabilities[stability_name.as_str()];
-                        if stability_flags.get(&name).copied().unwrap_or(i64::MAX) > stability
+                        if stability_flags.get(&name).is_some_and(|&f| f > stability)
                             || minimum_stability_val > stability
                         {
                             continue;
