@@ -11,8 +11,12 @@ fn fixture(name: &str) -> String {
     )
 }
 
+// TODO(phase-d): PHP runs this test only when the zip extension is NOT loaded (it is
+// markTestSkipped otherwise). The Rust port links zip support unconditionally, so the
+// "extension not loaded" precondition cannot exist and the expected RuntimeException
+// ("The Zip Util requires PHP's zip extension") is unreachable by design.
 #[test]
-#[ignore = "skipped in PHP whenever the zip extension is loaded, which it always is here"]
+#[ignore = "requires a PHP runtime without the zip extension; the Rust port has unconditional zip support, so this precondition is impossible to reproduce"]
 fn test_throws_exception_if_zip_extension_is_not_loaded() {
     assert!(Zip::get_composer_json("").is_err());
 }
