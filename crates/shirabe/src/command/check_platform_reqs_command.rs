@@ -119,6 +119,10 @@ impl CheckPlatformReqsCommand {
                     PhpMixed::List(vec![
                         PhpMixed::String(result.platform_package.clone()),
                         PhpMixed::String(result.version.clone()),
+                        match &result.link {
+                            Some(link) => PhpMixed::String(link.to_string()),
+                            None => PhpMixed::String(String::new()),
+                        },
                         if let Some(link) = &result.link {
                             PhpMixed::String(format!(
                                 "{} {} {} ({})",

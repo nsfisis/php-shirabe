@@ -48,7 +48,6 @@ fn run_platform_reqs_are_satisfied_case(
 
 #[test]
 #[serial]
-#[ignore = "reaches a RefCell re-entrancy panic at crates/shirabe/src/downloader/file_downloader.rs:136 (\"RefCell already borrowed\") on the platform-package resolution path; src borrow bug, not fixable from the test"]
 fn test_platform_reqs_are_satisfied() {
     // 'Disables checking of require-dev packages requirements.'
     run_platform_reqs_are_satisfied_case(
