@@ -2154,7 +2154,6 @@ fn test_learn_literals_with_sorted_rule_literals() {
     );
 }
 
-#[ignore = "solver emits fewer operations than PHP for recursive aliasOf deps: expects install b + install a + markAliasInstalled a, but only install a is produced; real solver alias-resolution discrepancy, not a stub"]
 #[test]
 fn test_install_recursive_alias_dependencies() {
     let fixtures = set_up();
@@ -2273,7 +2272,6 @@ fn test_install_dev_alias() {
     );
 }
 
-#[ignore = "solver omits the leading markAliasInstalled for an already-installed package's root alias (expects markAliasInstalled a after install a); real solver alias-resolution discrepancy, not a stub"]
 #[test]
 fn test_install_root_aliases_if_alias_of_is_installed() {
     let fixtures = set_up();

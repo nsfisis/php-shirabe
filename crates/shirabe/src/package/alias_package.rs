@@ -7,9 +7,11 @@ use crate::package::PackageHandle;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::RepositoryInterfaceHandle;
+use crate::repository::RepositoryInterfaceWeakHandle;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, in_array};
+use indexmap::IndexSet;
+use shirabe_php_shim::{LogicException, PhpMixed, in_array};
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
@@ -17,6 +19,8 @@ pub struct AliasPackage {
     id: i64,
     name: String,
     pretty_name: String,
+    /// Back-reference to the owning repository. `Weak` breaks the repository -> packages cycle.
+    repository: Option<RepositoryInterfaceWeakHandle>,
 
     /// @var string
     pub(crate) version: String,
@@ -62,6 +66,7 @@ impl AliasPackage {
             id: -1,
             name: alias_name.to_lowercase(),
             pretty_name: alias_name,
+            repository: None,
             version,
             pretty_version,
             dev,
@@ -195,8 +200,9 @@ impl std::fmt::Display for AliasPackage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} ({}alias of {})",
-            self.alias_of,
+            "{}-{} ({}alias of {})",
+            self.name,
+            self.version,
             if self.root_package_alias { "root " } else { "" },
             self.alias_of.get_version(),
         )
@@ -215,15 +221,28 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_names(&self, provides: bool) -> Vec<String> {
-        self.alias_of.get_names(provides)
+        let mut names: IndexSet<String> = IndexSet::new();
+        names.insert(self.get_name().to_string());
+
+        if provides {
+            for link in self.provides.values() {
+                names.insert(link.get_target().to_string());
+            }
+        }
+
+        for link in self.replaces.values() {
+            names.insert(link.get_target().to_string());
+        }
+
+        names.into_iter().collect()
     }
 
     fn set_id(&mut self, id: i64) {
-        self.alias_of.set_id(id);
+        self.id = id;
     }
 
     fn get_id(&self) -> i64 {
-        self.alias_of.get_id()
+        self.id
     }
 
     fn is_dev(&self) -> bool {
@@ -413,24 +432,36 @@ impl PackageInterface for AliasPackage {
         truncate: bool,
         display_mode: crate::package::DisplayMode,
     ) -> String {
-        self.alias_of
-            .get_full_pretty_version(truncate, display_mode)
+        BasePackage::get_full_pretty_version(self, truncate, display_mode)
     }
 
     fn get_unique_name(&self) -> String {
-        self.alias_of.get_unique_name()
+        format!("{}-{}", self.get_name(), self.get_version())
     }
 
     fn get_pretty_string(&self) -> String {
-        self.alias_of.get_pretty_string()
+        format!("{} {}", self.get_pretty_name(), self.get_pretty_version())
     }
 
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
-        self.alias_of.set_repository(repository)
+        if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade())
+            && !std::rc::Rc::ptr_eq(&existing, repository.as_rc())
+        {
+            return Err(LogicException {
+                message: "A package can only be added to one repository".to_string(),
+                code: 0,
+            }
+            .into());
+        }
+        self.repository = Some(repository.downgrade());
+        Ok(())
     }
 
     fn get_repository(&self) -> Option<RepositoryInterfaceHandle> {
-        self.alias_of.get_repository()
+        self.repository
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .map(RepositoryInterfaceHandle::from_rc)
     }
 }
 
@@ -460,16 +491,20 @@ impl BasePackage for AliasPackage {
     }
 
     fn repository_opt(&self) -> Option<RepositoryInterfaceHandle> {
-        // PHP `AliasPackage::getRepository()` delegates to `$this->aliasOf->getRepository()`.
-        self.alias_of.get_repository()
+        self.repository
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .map(RepositoryInterfaceHandle::from_rc)
     }
 
     fn set_repository_box(&mut self, repository: RepositoryInterfaceHandle) {
-        let _ = self.alias_of.set_repository(repository);
+        self.repository = Some(repository.downgrade());
     }
 
     fn take_repository(&mut self) -> Option<RepositoryInterfaceHandle> {
-        // AliasPackage holds no repository of its own; never mutate the aliased package here.
-        None
+        self.repository
+            .take()
+            .and_then(|w| w.upgrade())
+            .map(RepositoryInterfaceHandle::from_rc)
     }
 }
