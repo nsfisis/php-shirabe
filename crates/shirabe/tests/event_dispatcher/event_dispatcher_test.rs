@@ -322,11 +322,10 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
     let _ = &mut event;
 }
 
-// The remaining tests drive listeners that invoke PHP scripts (`Class::method`), require a
-// PHPUnit-style spy on AutoloadGenerator::setDevMode, run real shell commands through an unmocked
-// ProcessExecutor, or rely on ReflectionMethod / object-identity callables. None of those seams
-// exist in the Rust port (the PHP-script invocation path is an unimplemented plugin-runtime `todo!`),
-// so they remain ignored.
+// The remaining ignored tests drive listeners that invoke PHP scripts (`Class::method`), require
+// the autoloader rebuild of `make_autoloader` (an intentional no-op in the port), or rely on
+// ReflectionMethod / object-identity callables. None of those seams exist in the Rust port (the
+// PHP-script invocation path is an unimplemented plugin-runtime `todo!`), so they remain ignored.
 
 #[test]
 #[ignore = "listener `EventDispatcherTest::call` is a PHP-script callable; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
@@ -338,11 +337,16 @@ fn test_listener_exceptions_are_caught() {
 }
 
 #[test]
-#[ignore = "requires a PHPUnit spy on AutoloadGenerator::setDevMode plus Event::isDevMode mocking; no mock infrastructure exists"]
+#[ignore = "EventDispatcher::make_autoloader (PHP makeAutoloader, called from doDispatch's script branches) is an intentional no-op in the port, so AutoloadGeneratorInterface::set_dev_mode is never invoked and a set_dev_mode spy would observe nothing"]
 fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
     let _tear_down = TearDown;
-    // TODO(phase-d): requires a PHPUnit spy on AutoloadGenerator::setDevMode plus Event::isDevMode
-    // mocking; no mock infrastructure exists
+    // TODO(phase-d): the PHP test spies on AutoloadGenerator::setDevMode, which PHP calls from
+    // makeAutoloader (invoked from doDispatch's script branches; it rebuilds and registers the
+    // project autoloader — loader->unregister, setDevMode(event->isDevMode()), buildPackageMap,
+    // parseAutoloads, createLoader->register — so that PHP-script listeners can be invoked). The
+    // Rust EventDispatcher::make_autoloader is an intentional no-op (see its TODO(plugin)
+    // marker), so set_dev_mode is never reached. A spy could be written against
+    // `dyn AutoloadGeneratorInterface` once make_autoloader does the real work.
     todo!()
 }
 
