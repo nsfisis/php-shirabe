@@ -196,7 +196,6 @@ fn test_download_with_custom_cache_key() {
 
 #[test]
 #[serial]
-#[ignore = "PHP Config::get('cache-files-ttl') casts the string via (int) (Config.php:396-398), turning '99999999' into 99999999, but shirabe's PhpMixed::as_int returns None for String so Config::get yields 0 and the assertion fails. Faithful port stays failing until the src is fixed."]
 fn test_cache_garbage_collection_is_called() {
     let expected_ttl: i64 = 99999999;
 

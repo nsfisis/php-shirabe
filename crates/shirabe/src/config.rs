@@ -12,8 +12,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
     array_merge, array_search_mixed, array_unique, empty, filter_var_url, implode, in_array,
-    is_array, is_string, parse_url, php_regex, php_to_string, rtrim, strtolower, strtoupper, strtr,
-    substr, trigger_error,
+    intval, is_array, is_string, parse_url, php_regex, php_to_string, rtrim, strtolower,
+    strtoupper, strtr, substr, trigger_error,
 };
 
 use crate::advisory::Auditor;
@@ -598,7 +598,7 @@ impl Config {
                     } else {
                         val.clone()
                     };
-                    return Ok(PhpMixed::Int(raw.as_int().unwrap_or(0).max(0)));
+                    return Ok(PhpMixed::Int(intval(&raw).max(0)));
                 }
 
                 let raw_val = if matches!(val, PhpMixed::Bool(false)) {
@@ -659,11 +659,7 @@ impl Config {
 
             // ints without env var support
             "cache-ttl" => Ok(PhpMixed::Int(
-                self.config
-                    .get(key)
-                    .and_then(|v| v.as_int())
-                    .unwrap_or(0)
-                    .max(0),
+                self.config.get(key).map(intval).unwrap_or(0).max(0),
             )),
 
             // numbers with kb/mb/gb support, without env var support
@@ -720,7 +716,7 @@ impl Config {
                 if let Some(v) = v
                     && !v.is_null()
                 {
-                    return Ok(PhpMixed::Int(v.as_int().unwrap_or(0).max(0)));
+                    return Ok(PhpMixed::Int(intval(&v).max(0)));
                 }
 
                 self.get_with_flags("cache-ttl", 0)
