@@ -705,10 +705,10 @@ impl UpdateCommand {
 
         let select_result = io.select(
             "Select packages: (Select more than one value separated by comma) ".to_string(),
-            PhpMixed::List(
+            PhpMixed::Array(
                 autocompleter_values
-                    .keys()
-                    .map(|k| PhpMixed::String(k.clone()))
+                    .iter()
+                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
                     .collect(),
             ),
             PhpMixed::Bool(false),

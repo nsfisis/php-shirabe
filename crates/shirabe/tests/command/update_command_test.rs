@@ -440,7 +440,6 @@ Package operations: 0 installs, 1 update, 0 removals
 
 #[test]
 #[serial]
-#[ignore = "interactive selection path unported: --interactive requires a TTY and errors with \"--interactive cannot be used in non-interactive terminals.\""]
 fn test_interactive_tmp() {
     for (package_names, expected) in provide_interactive_updates() {
         let composer_json = serde_json::json!({
