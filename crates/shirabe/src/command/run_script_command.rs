@@ -203,18 +203,13 @@ impl Command for RunScriptCommand {
 
             let mut options = indexmap::IndexMap::new();
             for script in &scripts {
-                options.insert(script.0.clone(), script.1.clone());
+                options.insert(script.0.clone(), PhpMixed::String(script.1.clone()));
             }
 
             let io = self.get_io();
             let script = io.select(
                 "Script to run: ".to_string(),
-                PhpMixed::List(
-                    options
-                        .keys()
-                        .map(|k| PhpMixed::String(k.clone()))
-                        .collect(),
-                ),
+                PhpMixed::Array(options),
                 PhpMixed::String(String::new()),
                 PhpMixed::Int(1),
                 "Invalid script name \"%s\"".to_string(),
