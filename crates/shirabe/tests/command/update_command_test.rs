@@ -235,7 +235,6 @@ Your requirements could not be resolved to an installable set of packages.
 
 #[test]
 #[serial]
-#[ignore = "regex porting: a Preg pattern starting with \"^array \" fails to compile in shirabe-php-shim preg.rs (\"unterminated regex pattern\"); unrelated to InputDefinition"]
 fn test_update() {
     for (label, composer_json, command, expected, create_lock) in provide_updates() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
@@ -260,7 +259,6 @@ fn test_update() {
 
 #[test]
 #[serial]
-#[ignore = "resolver does not emit the temporary-update-constraint conflict; it performs the upgrade instead of reporting \"conflicts with your temporary update constraint\""]
 fn test_update_with_patch_only() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -604,7 +602,6 @@ fn test_no_security_blocking_allows_insecure_packages() {
 
 #[test]
 #[serial]
-#[ignore = "solver error \"Fixed package __root__ 1.0.0+no-version-set was not added to solver pool.\" on the no-lockfile bump path (resolver pool construction)"]
 fn test_bump_after_update_without_lockfile() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [

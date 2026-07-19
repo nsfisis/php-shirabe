@@ -1436,14 +1436,13 @@ impl Installer {
                 alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
             })
             .collect();
-        let temporary_constraints: IndexMap<String, AnyConstraint> = IndexMap::new();
         let mut repository_set = RepositorySet::new(
             &minimum_stability,
             stability_flags,
             root_aliases_input,
             self.package.get_references().clone(),
             root_requires,
-            temporary_constraints,
+            self.temporary_constraints.clone(),
         );
         repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
             RootPackageRepository::new(self.fixed_root_package.clone()),

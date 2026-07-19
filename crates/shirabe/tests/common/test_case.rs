@@ -317,24 +317,63 @@ impl ApplicationTester {
         input: Vec<(PhpMixed, PhpMixed)>,
         options: RunOptions,
     ) -> anyhow::Result<i32> {
-        let mut array_input = ArrayInput::new(input, None)?;
-        if let Some(interactive) = options.interactive {
-            array_input.set_interactive(interactive);
+        let prev_shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY");
+
+        let result = (|| -> anyhow::Result<i32> {
+            let mut array_input = ArrayInput::new(input, None)?;
+            if let Some(interactive) = options.interactive {
+                array_input.set_interactive(interactive);
+            }
+            if !self.inputs.is_empty() {
+                array_input.set_stream(Self::create_stream(&self.inputs));
+            }
+
+            self.init_output(&options);
+
+            let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(array_input));
+            let output = self.output.clone().expect("init_output initializes output");
+
+            let status_code = self.application.run(Some(input), Some(output))?;
+            self.status_code = Some(status_code);
+
+            Ok(status_code)
+        })();
+
+        // ref: Symfony\Component\Console\Tester\ApplicationTester::run's `finally` block.
+        // Application::configureIO mutates the real SHELL_VERBOSITY env var (and the $_ENV/$_SERVER
+        // superglobal shims), so it must be restored here or one test's verbosity leaks into the
+        // next `run()` call sharing this process.
+        match &prev_shell_verbosity {
+            None => {
+                if shirabe_php_shim::function_exists("putenv") {
+                    unsafe { shirabe_php_shim::putenv_clear("SHELL_VERBOSITY") };
+                }
+                shirabe_php_shim::PHP_ENV
+                    .lock()
+                    .unwrap()
+                    .clear("SHELL_VERBOSITY");
+                shirabe_php_shim::PHP_SERVER
+                    .lock()
+                    .unwrap()
+                    .clear("SHELL_VERBOSITY");
+            }
+            Some(prev) => {
+                if shirabe_php_shim::function_exists("putenv") {
+                    unsafe { shirabe_php_shim::putenv("SHELL_VERBOSITY", prev) };
+                }
+                shirabe_php_shim::PHP_ENV
+                    .lock()
+                    .unwrap()
+                    .put("SHELL_VERBOSITY".into(), prev.clone());
+                shirabe_php_shim::PHP_SERVER
+                    .lock()
+                    .unwrap()
+                    .put("SHELL_VERBOSITY".into(), prev.clone());
+            }
         }
-        if !self.inputs.is_empty() {
-            array_input.set_stream(Self::create_stream(&self.inputs));
-        }
 
-        self.init_output(&options);
-
-        let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(array_input));
-        let output = self.output.clone().expect("init_output initializes output");
-
-        let status_code = self.application.run(Some(input), Some(output))?;
-        self.status_code = Some(status_code);
-
-        Ok(status_code)
+        result
     }
 
     fn init_output(&mut self, options: &RunOptions) {
