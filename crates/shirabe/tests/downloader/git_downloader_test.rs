@@ -787,14 +787,6 @@ fn test_update_with_new_repo_url() {
     });
 }
 
-#[ignore = "Blocked by a Config bug: Config::get(\"github-protocols\") does not drop the \
-            insecure \"git\" protocol under secure-http. array_search_mixed returns the \
-            matched index as PhpMixed::Int, but config.rs reads it via as_string (which is \
-            Some only for String), so the removal is skipped and get() returns \
-            [https, ssh, git] instead of [https, ssh]. The downloader then attempts a third \
-            git:// fetch (absent from the process mock) and the error message reads \
-            \"via https, ssh, git protocols\", failing the assertion. PHP's new Config() \
-            reduces it to two protocols."]
 #[serial]
 #[test]
 fn test_update_throws_runtime_exception_if_git_command_fails() {

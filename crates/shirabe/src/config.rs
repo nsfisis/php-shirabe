@@ -841,29 +841,14 @@ impl Config {
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
                 if secure_http {
-                    let map: IndexMap<String, String> = protos
-                        .iter()
-                        .enumerate()
-                        .map(|(i, s)| (i.to_string(), s.clone()))
-                        .collect();
                     let found = array_search_mixed(
                         &PhpMixed::String("git".to_string()),
-                        &PhpMixed::Array(
-                            map.into_iter()
-                                .map(|(k, v)| (k, PhpMixed::String(v)))
-                                .collect(),
-                        ),
+                        &PhpMixed::List(protos.iter().cloned().map(PhpMixed::String).collect()),
                         false,
                     );
                     if let Some(idx_val) = found {
-                        let idx = idx_val
-                            .as_string()
-                            .unwrap_or("")
-                            .parse::<usize>()
-                            .unwrap_or(usize::MAX);
-                        if idx < protos.len() {
-                            protos.remove(idx);
-                        }
+                        let idx = idx_val.as_int().expect("list search index") as usize;
+                        protos.remove(idx);
                     }
                 }
                 let first = protos.first().cloned();
