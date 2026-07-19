@@ -16,7 +16,7 @@ use shirabe::package::Mirror;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::Git as GitUtil;
 use shirabe::util::ProcessExecutor;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
@@ -1110,20 +1110,54 @@ fn test_not_using_downgrading_with_references() {
     });
 }
 
-#[ignore = "PHP mocks Filesystem::removeDirectoryAsync (asserting it is called once with the \
-            working dir). With no Filesystem mock, the real removeDirectoryAsync drives the \
-            Filesystem's own ProcessExecutor for `rm -rf`, which requires a Composer\\Loop and \
-            cannot be redirected through the mocked ProcessExecutor"]
+#[serial]
 #[test]
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let _ = &working_dir;
-    // TODO(phase-d): PHP mocks Filesystem::removeDirectoryAsync (asserting it is called once
-    // with the working dir). With no Filesystem mock, the real removeDirectoryAsync drives
-    // the Filesystem's own ProcessExecutor for `rm -rf`, which requires a Composer\Loop and
-    // cannot be redirected through the mocked ProcessExecutor.
-    todo!()
+    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+
+    let package = get_package("dummy/pkg", "1.0.0", None, None);
+    let (process, _guard) = get_process_executor_mock(
+        vec![
+            cmd(vec!["git", "show-ref", "--head", "-d"]),
+            cmd(vec!["git", "status", "--porcelain", "--untracked-files=no"]),
+        ],
+        true,
+        Default::default(),
+    );
+
+    Filesystem::new(None)
+        .ensure_directory_exists(&format!("{}/.git", working_dir_str))
+        .unwrap();
+
+    let mut filesystem = Filesystem::new(None);
+    filesystem.__set_mock(FilesystemMock {
+        remove_directory_async_result: Some(true),
+        ..Default::default()
+    });
+    let filesystem = std::rc::Rc::new(std::cell::RefCell::new(filesystem));
+
+    let downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
+    run(async {
+        downloader
+            .prepare("uninstall", package.clone(), &working_dir_str, None)
+            .await
+            .unwrap();
+        downloader
+            .remove(package.clone(), &working_dir_str)
+            .await
+            .unwrap();
+        downloader
+            .cleanup("uninstall", package, &working_dir_str, None)
+            .await
+            .unwrap();
+    });
+
+    assert_eq!(
+        filesystem.borrow().__remove_directory_async_paths(),
+        vec![working_dir_str]
+    );
 }
 
 #[serial]

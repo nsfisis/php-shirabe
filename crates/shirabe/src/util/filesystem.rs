@@ -27,9 +27,9 @@ pub struct Filesystem {
 /// Test-only seam mirroring the PHP FileDownloaderTest mock of `Filesystem`.
 #[derive(Debug, Default)]
 pub struct FilesystemMock {
-    /// When `Some`, `remove_directory_async` returns it without touching disk and counts the call.
+    /// When `Some`, `remove_directory_async` returns it without touching disk and records the call.
     pub remove_directory_async_result: Option<bool>,
-    pub remove_directory_async_calls: usize,
+    pub remove_directory_async_paths: Vec<String>,
     /// When true, `normalize_path` returns its argument unchanged.
     pub normalize_path_identity: bool,
 }
@@ -49,10 +49,16 @@ impl Filesystem {
 
     /// For testing only: number of `remove_directory_async` calls intercepted by the seam.
     pub fn __remove_directory_async_calls(&self) -> usize {
+        self.__remove_directory_async_paths().len()
+    }
+
+    /// For testing only: the directories passed to `remove_directory_async` calls intercepted by
+    /// the seam, in call order (ref PHPUnit's `->with($this->equalTo($this->workingDir))`).
+    pub fn __remove_directory_async_paths(&self) -> Vec<String> {
         self.mock
             .as_ref()
-            .map(|m| m.remove_directory_async_calls)
-            .unwrap_or(0)
+            .map(|m| m.remove_directory_async_paths.clone())
+            .unwrap_or_default()
     }
 
     pub fn remove(&mut self, file: impl AsRef<Path>) -> anyhow::Result<bool> {
@@ -177,7 +183,8 @@ impl Filesystem {
             if let Some(mock) = fs.mock.as_mut()
                 && let Some(result) = mock.remove_directory_async_result
             {
-                mock.remove_directory_async_calls += 1;
+                mock.remove_directory_async_paths
+                    .push(directory.to_string());
                 return Ok(result);
             }
 
