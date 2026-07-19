@@ -1612,11 +1612,16 @@ fn assert_package_links(
     }
 }
 
+// TODO(phase-d): blocked by the TODO(plugin) stubs below; re-check once the plugin RPC
+// mechanism can dispatch method calls on PHP objects.
 #[test]
-#[ignore = "all 59 provideLibraryTestCases datasets ported faithfully; several cases rely on \
-            ResourceBundle/Imagick-derived extension info (e.g. lib-icu-cldr) that is not yet \
-            modeled, so the generated package set diverges from PHP's (confirmed: fails with \
-            an extension mismatch, not a panic), and it stays ignored"]
+#[ignore = "all 59 provideLibraryTestCases datasets ported faithfully; blocked by two \
+            TODO(plugin) stubs in PlatformRepository that need dynamic method dispatch on \
+            PHP objects ($resourceBundle->get('Version'), $imagick->getVersion()): \
+            resource_bundle_get returns Null so the intl dataset drops lib-icu-cldr, and \
+            imagick_get_version_string returns \"\" so the imagick datasets drop \
+            lib-imagick-imagemagick (confirmed current failure mode: package-set mismatch \
+            on the intl dataset, not a panic)"]
 fn test_library_information() {
     let extension_version = "100.200.300";
 
