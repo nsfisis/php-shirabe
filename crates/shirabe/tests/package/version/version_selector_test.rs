@@ -543,10 +543,6 @@ fn test_false_returned_on_no_packages() {
 }
 
 #[test]
-#[ignore = "date-based cases (v20121020) fail: shirabe_semver::VersionParser::normalize yields \
-            20121020.0.0.0 instead of PHP's date-aware 20121020, so find_recommended_require_version \
-            returns ^20121020.0 rather than leaving the version untouched. Faithful port; un-ignore \
-            once normalize handles date(time) versions like PHP"]
 fn test_find_recommended_require_version() {
     let php_version = format!(
         "{}.{}.{}",

@@ -128,8 +128,13 @@ impl VersionParser {
         let mut matches: Vec<Option<String>> = Vec::new();
 
         // match classical versioning
+        // Regex pattern compatibility:
+        // PCRE's possessive `\d{1,5}+` is parsed by the `regex` crate as a stacked
+        // repetition `(?:\d{1,5})+` (i.e. `\d+`), which wrongly let 6+ digit numbers
+        // (e.g. date versions like 20121020) match here. The plain `\d{1,5}` is
+        // equivalent to the possessive form for this pattern.
         let classical_pattern = format!(
-            "{{^v?(\\d{{1,5}}+)(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?{}$}}i",
+            "{{^v?(\\d{{1,5}})(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?{}$}}i",
             MODIFIER_REGEX
         );
         if shirabe_php_shim::preg_match(&classical_pattern, &version, &mut matches) {
