@@ -55,15 +55,7 @@ fn run_fund_case(
     }
 
     let mut app_tester = get_application_tester();
-    let status_code = app_tester
-        .run(
-            input,
-            RunOptions {
-                capture_stderr_separately: true,
-                ..RunOptions::default()
-            },
-        )
-        .unwrap();
+    let status_code = app_tester.run(input, RunOptions::default()).unwrap();
     assert_eq!(0, status_code);
     assert_eq!(expected.trim(), app_tester.get_display().trim());
 
