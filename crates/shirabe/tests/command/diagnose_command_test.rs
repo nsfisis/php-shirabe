@@ -7,8 +7,11 @@ use shirabe_php_shim::PhpMixed;
 
 #[test]
 #[serial]
-#[ignore = "diagnose checks live http/https connectivity to packagist and the github.com rate \
-            limit, so it requires real network access"]
+#[ignore = "DiagnoseCommand::check_platform captures phpinfo() via ob_start()/ob_get_clean(), \
+            which are todo!() in shirabe-php-shim (PHP output buffering and runtime introspection \
+            are unmodeled), so the command panics before producing output; beyond that, diagnose \
+            checks live http/https connectivity to packagist and the github.com rate limit, so the \
+            test also requires real network access (as the PHP original does)"]
 fn test_cmd_fail() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({ "name": "foo/bar", "description": "test pkg" })),
@@ -48,8 +51,11 @@ Checking github.com rate limit: "
 
 #[test]
 #[serial]
-#[ignore = "diagnose checks live http/https connectivity to packagist and the github.com rate \
-            limit, so it requires real network access"]
+#[ignore = "DiagnoseCommand::check_platform captures phpinfo() via ob_start()/ob_get_clean(), \
+            which are todo!() in shirabe-php-shim (PHP output buffering and runtime introspection \
+            are unmodeled), so the command panics before producing output; beyond that, diagnose \
+            checks live http/https connectivity to packagist and the github.com rate limit, so the \
+            test also requires real network access (as the PHP original does)"]
 fn test_cmd_success() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
