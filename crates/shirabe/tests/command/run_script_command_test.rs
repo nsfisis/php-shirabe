@@ -10,18 +10,26 @@ use shirabe_php_shim::PhpMixed;
 /// `ScriptEvent` passed to `hasEventListeners` matches the script name AND its `isDevMode()` equals
 /// the computed dev mode (`dev || !noDev`) -- the latter being the whole point of the test.
 #[test]
-#[ignore = "PHP asserts the ScriptEvent passed to hasEventListeners has isDevMode() == (dev || !no_dev), \
-            but EventInterface (src/event_dispatcher/event.rs:49) has no as_any/downcast seam, so a \
-            trait object cannot reach the concrete ScriptEvent::is_dev_mode (src/script/event.rs:51). \
-            Reaching it would require adding as_any to EventInterface, i.e. a src change, which is \
-            forbidden here -- so the faithful body is currently inexpressible and is left as todo!()."]
+#[ignore = "PHP asserts (a) via mocked hasEventListeners that the ScriptEvent has isDevMode() == \
+            (dev || !no_dev) and (b) via mocked dispatchScript that it is called once with \
+            ($script, $expectedDevMode, []). Neither expectation is expressible: (a) the \
+            __set_get_listeners_override callback only sees &dyn EventInterface \
+            (src/event_dispatcher/event.rs:49), which has no as_any/downcast seam to reach the \
+            concrete ScriptEvent::is_dev_mode (src/script/event.rs:51) -- adding one is a \
+            cross-cutting trait change over every event type, not a small test seam; (b) \
+            dispatch_script is a concrete method with no call-recording seam, and letting the \
+            real one run would execute listeners for real. The faithful body is therefore \
+            inexpressible and is left as todo!()."]
 fn test_detect_and_pass_dev_mode_to_event_and_to_dispatching() {
-    // TODO(phase-d): PHP asserts the ScriptEvent passed to hasEventListeners has isDevMode() ==
-    // (dev || !no_dev), but EventInterface (src/event_dispatcher/event.rs:49) has no as_any/downcast
-    // seam, so a trait object cannot reach the concrete ScriptEvent::is_dev_mode
-    // (src/script/event.rs:51). Reaching it would require adding as_any to EventInterface, i.e. a
-    // src change, which is forbidden here -- so the faithful body is currently inexpressible and is
-    // left as todo!().
+    // TODO(phase-d): PHP asserts (a) via mocked hasEventListeners that the ScriptEvent has
+    // isDevMode() == (dev || !no_dev) and (b) via mocked dispatchScript that it is called once
+    // with ($script, $expectedDevMode, []). Neither expectation is expressible: (a) the
+    // __set_get_listeners_override callback only sees &dyn EventInterface
+    // (src/event_dispatcher/event.rs:49), which has no as_any/downcast seam to reach the concrete
+    // ScriptEvent::is_dev_mode (src/script/event.rs:51) -- adding one is a cross-cutting trait
+    // change over every event type, not a small test seam; (b) dispatch_script is a concrete
+    // method with no call-recording seam, and letting the real one run would execute listeners
+    // for real. The faithful body is therefore inexpressible and is left as todo!().
     todo!()
 }
 
