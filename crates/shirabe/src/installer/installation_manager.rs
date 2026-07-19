@@ -133,6 +133,15 @@ impl InstallationManager {
         self.cache = std::cell::RefCell::new(IndexMap::new());
     }
 
+    /// For testing only: adds an installer as a pre-built shared handle, so the caller keeps an
+    /// identity handle usable for PHP `assertSame`-style comparisons (`Rc::ptr_eq`) and for
+    /// `remove_installer`. `add_installer` cannot serve because `Rc::from(Box)` reallocates,
+    /// losing the caller's pointer identity.
+    pub fn __add_installer(&mut self, installer: std::rc::Rc<dyn InstallerInterface>) {
+        array_unshift(&mut self.installers, installer);
+        self.cache = std::cell::RefCell::new(IndexMap::new());
+    }
+
     /// Removes installer
     pub fn remove_installer(&mut self, installer: &dyn InstallerInterface) {
         let target = installer as *const dyn InstallerInterface as *const ();

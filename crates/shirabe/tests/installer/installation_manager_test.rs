@@ -283,13 +283,43 @@ fn test_add_get_installer() {
     assert!(manager.get_installer("unregistered").is_err());
 }
 
-#[ignore = "removeInstaller compares installers by object identity, but add_installer moves the Box<dyn InstallerInterface> into the manager, leaving no &dyn reference to pass back to remove_installer; faithful reproduction needs a shared-ownership installer registry"]
 #[test]
 fn test_add_remove_installer() {
-    // TODO(phase-d): removeInstaller compares installers by object identity, but add_installer
-    // moves the Box<dyn InstallerInterface> into the manager, leaving no &dyn reference to pass
-    // back to remove_installer; faithful reproduction needs a shared-ownership installer registry.
-    todo!()
+    let set_up = set_up();
+    let mut installer = MockInstaller::new();
+    installer
+        .expect_supports()
+        .times(2)
+        .returning(|arg| arg == "vendor");
+    // The manager stores installers as Rc, so the PHP object-identity semantics (assertSame,
+    // removeInstaller) map to Rc::ptr_eq on a handle registered via __add_installer.
+    let installer: std::rc::Rc<dyn InstallerInterface> = std::rc::Rc::new(installer);
+
+    let mut installer2 = MockInstaller::new();
+    installer2
+        .expect_supports()
+        .times(1)
+        .returning(|arg| arg == "vendor");
+    let installer2: std::rc::Rc<dyn InstallerInterface> = std::rc::Rc::new(installer2);
+
+    let mut manager =
+        shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
+
+    manager.__add_installer(installer.clone());
+    assert!(std::rc::Rc::ptr_eq(
+        &installer,
+        &manager.get_installer("vendor").unwrap()
+    ));
+    manager.__add_installer(installer2.clone());
+    assert!(std::rc::Rc::ptr_eq(
+        &installer2,
+        &manager.get_installer("vendor").unwrap()
+    ));
+    manager.remove_installer(&*installer2);
+    assert!(std::rc::Rc::ptr_eq(
+        &installer,
+        &manager.get_installer("vendor").unwrap()
+    ));
 }
 
 #[ignore = "partial mock of InstallationManager (onlyMethods install/update/uninstall) with expects(once)->with(...) is not reproducible without method-overriding mocks; execute() also takes the batched download path"]
