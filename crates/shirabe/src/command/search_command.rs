@@ -11,7 +11,7 @@ use crate::plugin::PluginEvents;
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::repository_interface::{self, RepositoryInterface};
+use crate::repository::repository_interface::{self, AbandonedInfo, RepositoryInterface};
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
@@ -259,9 +259,35 @@ impl Command for SearchCommand {
             // TODO(phase-c): faithful JSON output requires SearchResult to retain the raw result
             // array. PHP's fulltext search passes through arbitrary API fields (downloads, favers,
             // repository, ...) which the typed SearchResult (name/description/abandoned/url) drops,
-            // so encoding it here would diverge from Composer's output.
-            let _ = &results;
-            io.write(&JsonFile::encode(&PhpMixed::Null));
+            // so ComposerRepository-sourced results still diverge from Composer's raw JSON output.
+            let rows: Vec<PhpMixed> = results
+                .into_iter()
+                .map(|result| {
+                    let mut entry = IndexMap::new();
+                    entry.insert("name".to_string(), PhpMixed::String(result.name));
+                    entry.insert(
+                        "description".to_string(),
+                        result
+                            .description
+                            .map(PhpMixed::String)
+                            .unwrap_or(PhpMixed::Null),
+                    );
+                    if let Some(abandoned) = result.abandoned {
+                        entry.insert(
+                            "abandoned".to_string(),
+                            match abandoned {
+                                AbandonedInfo::Replacement(s) => PhpMixed::String(s),
+                                AbandonedInfo::Abandoned => PhpMixed::Bool(true),
+                            },
+                        );
+                    }
+                    if let Some(url) = result.url {
+                        entry.insert("url".to_string(), PhpMixed::String(url));
+                    }
+                    PhpMixed::Array(entry)
+                })
+                .collect();
+            io.write(&JsonFile::encode(&PhpMixed::List(rows)));
         }
 
         Ok(0)

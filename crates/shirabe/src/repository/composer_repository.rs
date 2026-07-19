@@ -3575,7 +3575,12 @@ impl RepositoryInterface for ComposerRepository {
                     .get("description")
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string()),
-                abandoned: None,
+                abandoned: m.get("abandoned").filter(|v| v.to_bool()).map(|v| {
+                    match v.as_string() {
+                        Some(s) => crate::repository::AbandonedInfo::Replacement(s.to_string()),
+                        None => crate::repository::AbandonedInfo::Abandoned,
+                    }
+                }),
                 url: m
                     .get("url")
                     .and_then(|v| v.as_string())

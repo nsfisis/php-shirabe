@@ -36,7 +36,6 @@ fn run_search_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str) {
 
 #[test]
 #[serial]
-#[ignore = "searching a `package`-type repo returns incomplete results (some matching packages are dropped); the search/repository path is not yet fully ported"]
 fn test_search() {
     // 'by name and description'
     run_search_case(
