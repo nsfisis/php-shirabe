@@ -196,7 +196,6 @@ mod cli_tests {
         run_reinstall => "reinstall",
         run_remove => "remove",
         run_repository => "repository",
-        #[ignore = "currently panics"]
         run_require => "require",
         run_run_script => "run-script",
         run_search => "search",

@@ -301,32 +301,38 @@ impl Command for RequireCommand {
             composer.get_package().get_minimum_stability().to_string()
         };
 
+        // Hoist argument computations into locals so no borrow of `input` is held across the
+        // call: `determine_requirements` may prompt via ConsoleIO, which mutably borrows the
+        // same input RefCell.
+        let packages: Vec<String> = input
+            .borrow()
+            .get_argument("packages")?
+            .as_list()
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        // if there is no update, we need to use the best possible version constraint directly as we cannot rely on the solver to guess the best constraint
+        let no_update = input
+            .borrow()
+            .get_option("no-update")?
+            .as_bool()
+            .unwrap_or(false);
+        let fixed = input
+            .borrow()
+            .get_option("fixed")?
+            .as_bool()
+            .unwrap_or(false);
         let requirements_result = self.determine_requirements(
             input.clone(),
             output.clone(),
-            input
-                .borrow()
-                .get_argument("packages")?
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-                .unwrap_or_default(),
+            packages,
             Some(&platform_repo),
             &preferred_stability,
-            // if there is no update, we need to use the best possible version constraint directly as we cannot rely on the solver to guess the best constraint
-            input
-                .borrow()
-                .get_option("no-update")?
-                .as_bool()
-                .unwrap_or(false),
-            input
-                .borrow()
-                .get_option("fixed")?
-                .as_bool()
-                .unwrap_or(false),
+            no_update,
+            fixed,
         );
 
         let requirements = match requirements_result {
