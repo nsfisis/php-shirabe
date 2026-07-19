@@ -722,17 +722,21 @@ impl RemoteFilesystem {
         }
 
         let mut caught_e: Option<anyhow::Error> = None;
-        let outer: Result<Option<String>, anyhow::Error> = if self.scheme == "file" {
-            Ok(match max_file_size {
-                Some(max) => file_get_contents5(file_url, false, PhpMixed::Null, 0, Some(max)),
-                None => file_get_contents(file_url),
-            })
-        } else {
-            // TODO(phase-c): wrap PHP's `file_get_contents` with stream context and error capture
-            // for http(s) and other network schemes; depends on the unmodeled PHP stream-context
-            // layer.
-            Ok(None)
-        };
+        // PHP has no scheme branch here: `file_get_contents` reads `file://` URLs and plain
+        // (scheme-less) local paths through the same stream wrapper it uses for the network
+        // schemes. Only the local subset is modeled so far.
+        let outer: Result<Option<String>, anyhow::Error> =
+            if self.scheme == "file" || self.scheme.is_empty() {
+                Ok(match max_file_size {
+                    Some(max) => file_get_contents5(file_url, false, PhpMixed::Null, 0, Some(max)),
+                    None => file_get_contents(file_url),
+                })
+            } else {
+                // TODO(phase-c): wrap PHP's `file_get_contents` with stream context and error capture
+                // for http(s) and other network schemes; depends on the unmodeled PHP stream-context
+                // layer.
+                Ok(None)
+            };
         match outer {
             Ok(v) => result = v,
             Err(e) => caught_e = Some(e),

@@ -260,7 +260,16 @@ fn test_integration_create_project_command() {
 
 #[test]
 #[serial]
-#[ignore = "RemoteFilesystem::get_remote_contents is an unimplemented Phase C stub (returns None), so reading the local packages.json repository via JsonFile/HttpDownloader fails with \"file could not be downloaded\""]
+#[ignore = "the former blocker (scheme-less packages.json read via RemoteFilesystem::\
+            get_remote_contents) is fixed and the EXPECT-REGEX assertion itself now passes, but \
+            only incidentally: the run needs live network (real git clone from github.com) and \
+            still panics with exit 101 (Composer exits 0) during CreateProjectCommand's keep-vcs \
+            cleanup, whose Symfony Finder name patterns go through Glob::to_regex, which \
+            faithfully emits PCRE lookaheads ((?=[^\\.])) the regex crate cannot compile; the \
+            fixture just never asserts the exit code. Making Glob::to_regex regex-crate-compatible \
+            would change the pattern text git_exclude_filter_test::test_pattern_escape asserts \
+            verbatim, so both that rewrite and un-ignoring this green-but-crashing test need a \
+            user decision"]
 fn test_integration_create_project_shows_full_hash_for_dev_packages() {
     run_integration("create-project-shows-full-hash-for-dev-packages.test");
 }
