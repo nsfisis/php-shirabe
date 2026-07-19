@@ -21,6 +21,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
+use crate::package::version::version_selector::ShowWarnings;
 use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::plugin::PluginBlockedException;
 use crate::repository::CompositeRepository;
@@ -895,7 +896,7 @@ impl CreateProjectCommand {
             Some(platform_requirement_filter.clone()),
             0,
             Some(io.clone()),
-            PhpMixed::Bool(true),
+            ShowWarnings::Always,
         )?;
 
         if package.is_none() {
@@ -921,7 +922,7 @@ impl CreateProjectCommand {
                         Some(PlatformRequirementFilterFactory::ignore_all()),
                         0,
                         None,
-                        PhpMixed::Bool(true),
+                        ShowWarnings::Always,
                     )?
                     .is_some()
             {

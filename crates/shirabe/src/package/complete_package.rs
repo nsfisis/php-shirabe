@@ -47,6 +47,10 @@ impl CompletePackage {
     pub fn replace_version(&mut self, version: String, pretty_version: String) {
         self.inner.replace_version(version, pretty_version);
     }
+
+    pub fn set_release_date(&mut self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
+        self.inner.set_release_date(release_date);
+    }
 }
 
 impl CompletePackageInterface for CompletePackage {

@@ -16,6 +16,7 @@ use crate::package::base_package;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
+use crate::package::version::version_selector::ShowWarnings;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::repository::CanonicalPackagesTrait;
@@ -669,7 +670,7 @@ impl UpdateCommand {
                 None,
                 0,
                 None,
-                PhpMixed::Bool(true),
+                ShowWarnings::Always,
             )?;
             let _ = &platform_req_filter;
             if let Some(latest) = latest_version

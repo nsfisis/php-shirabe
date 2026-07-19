@@ -24,6 +24,13 @@ use shirabe_php_shim::{
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
+/// PHP `$showWarnings` (`true` or a `callable(PackageInterface): bool`) as passed to
+/// `VersionSelector::findBestCandidate`.
+pub enum ShowWarnings {
+    Always,
+    Predicate(Box<dyn Fn(&PackageInterfaceHandle) -> bool>),
+}
+
 #[derive(Debug)]
 pub struct VersionSelector {
     repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
@@ -66,7 +73,7 @@ impl VersionSelector {
         platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         repo_set_flags: i64,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        show_warnings: shirabe_php_shim::PhpMixed,
+        show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         if !base_package::STABILITIES.contains_key(preferred_stability) {
             return Err(shirabe_php_shim::UnexpectedValueException {
@@ -179,8 +186,8 @@ impl VersionSelector {
                     already_seen_names.insert(pkg.get_name().to_string(), true);
                     if let Some(ref io) = io {
                         let should_warn = match &show_warnings {
-                            shirabe_php_shim::PhpMixed::Bool(b) => *b,
-                            _ => true,
+                            ShowWarnings::Always => true,
+                            ShowWarnings::Predicate(f) => f(pkg),
                         };
                         if should_warn {
                             let warn_key = format!("{}/{}", pkg.get_name(), link.get_target());

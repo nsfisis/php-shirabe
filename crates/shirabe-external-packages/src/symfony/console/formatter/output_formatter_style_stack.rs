@@ -36,10 +36,7 @@ impl OutputFormatterStyleStack {
     ) -> anyhow::Result<Result<Box<dyn OutputFormatterStyleInterface>, InvalidArgumentException>>
     {
         if self.styles.is_empty() {
-            // Returns the shared empty style; ownership cannot be expressed without Clone on the
-            // trait object.
-            // TODO(human-review): empty-style branch needs a Clone/Rc strategy in Phase C.
-            return Ok(Ok(todo!()));
+            return Ok(Ok(self.empty_style.clone_box()));
         }
 
         let style = match style.as_mut() {

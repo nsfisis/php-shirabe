@@ -126,10 +126,11 @@ impl FileDownloader {
         if let Some(cache) = &this.cache
             && cache.borrow().gc_is_necessary()
         {
-            // PHP: writeError('Running cache garbage collection', true, io_interface::VERY_VERBOSE)
-            this.io
-                .borrow()
-                .write_error("Running cache garbage collection");
+            this.io.borrow().write_error3(
+                "Running cache garbage collection",
+                true,
+                crate::io::io_interface::VERY_VERBOSE,
+            );
             let ttl = this
                 .config
                 .borrow_mut()

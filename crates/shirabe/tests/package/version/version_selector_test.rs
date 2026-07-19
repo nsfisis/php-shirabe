@@ -87,7 +87,7 @@ fn find_best(
             platform_requirement_filter,
             0,
             io,
-            PhpMixed::Bool(true),
+            shirabe::package::version::version_selector::ShowWarnings::Always,
         )
         .unwrap()
 }

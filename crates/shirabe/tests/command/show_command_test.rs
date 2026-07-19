@@ -50,18 +50,17 @@ fn show_composer_json(requires: serde_json::Value) -> serde_json::Value {
 }
 
 /// ref: ShowCommandTest::testShow (one data-provider case).
-///
-/// NOTE: PHP sets release dates on the installed packages via `setReleaseDate`, but no such setter
-/// is exposed on `PackageInterfaceHandle`, so it is omitted here. Only the "sorting by age" case
-/// depends on release dates; every other case produces identical output without them.
 fn run_show_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str, requires: serde_json::Value) {
     let _tear_down = init_temp_composer(Some(&show_composer_json(requires)), None, None, true);
 
     let pkg = get_complete_package("vendor/package", "v1.0.0");
     pkg.set_description("description of installed package".to_string());
     let major = get_complete_package("outdated/major", "v1.0.0");
+    major.set_release_date(Some(chrono::Utc::now()));
     let minor = get_complete_package("outdated/minor", "1.0.0");
+    minor.set_release_date(Some(chrono::Utc::now() - chrono::Duration::days(365 * 2)));
     let patch = get_complete_package("outdated/patch", "1.0.0");
+    patch.set_release_date(Some(chrono::Utc::now() - chrono::Duration::weeks(2)));
 
     let packages: Vec<PackageInterfaceHandle> =
         vec![pkg.into(), major.into(), minor.into(), patch.into()];
@@ -187,7 +186,6 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "blocked on two counts: (1) same package-categorization gap as the other outdated tests (packages land in the \"available\" bucket so the \"Direct/Transitive dependencies\" grouping is missing); (2) PackageInterfaceHandle exposes no set_release_date setter, so the sorting-by-age output (\"2 years old\", \"2 weeks old\", \"from today\") cannot be reproduced. Neither is an output-format issue."]
 #[test]
 #[serial]
 fn test_show_outdated_deps_sorting_by_age() {
@@ -314,7 +312,6 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
     );
 }
 
-#[ignore = "blocked: categorization fixed, but the --latest path still resolves the wrong latest-package version (gets 1.0.0, expects 1.3.0); outdated version-resolution gap, not categorization"]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_and_warns() {
@@ -387,7 +384,6 @@ vendor/package 1.1.0 ~ 1.0.0",
     );
 }
 
-#[ignore = "blocked: categorization fixed, but the --latest path resolves the wrong latest version (gets 1.2.0, expects 1.3.0); outdated version-resolution gap, not categorization"]
 #[test]
 #[serial]
 fn test_outdated_filters_according_to_platform_reqs_without_warning_for_higher_versions() {
@@ -544,12 +540,21 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
     );
 }
 
-/// Assert every leading-word of each output line is a platform package, replicating
-/// `Regex::matchAll('{^(\w+)}m', $output)`.
+/// ref: ShowCommandTest's `foreach (Regex::matchAll('{^(\w+)}m', $output)->matches as $m) {
+/// self::assertTrue(PlatformRepository::isPlatformPackage((string) $m[1])); }`.
+///
+/// `MatchAllResult::$matches` is keyed by capture group (0 = whole match, 1 = group 1), and since
+/// this pattern's single group spans the whole match, both keys hold the identical per-line list.
+/// The PHP loop therefore iterates that outer (group-indexed) array twice, each time reading index
+/// `[1]` of it — i.e. it only ever asserts on the *second* matched line, not on every line. Ported
+/// verbatim, quirk included.
 fn assert_all_platform_packages(output: &str) {
     let re = regex::Regex::new(r"(?m)^(\w+)").unwrap();
-    for caps in re.captures_iter(output) {
-        let m = caps.get(1).unwrap().as_str();
+    let matches: Vec<&str> = re
+        .captures_iter(output)
+        .map(|caps| caps.get(1).unwrap().as_str())
+        .collect();
+    if let Some(m) = matches.get(1) {
         assert!(
             PlatformRepository::is_platform_package(m),
             "{} is not a platform package",
@@ -560,7 +565,6 @@ fn assert_all_platform_packages(output: &str) {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_show_platform_only_shows_platform_packages() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -594,7 +598,6 @@ fn test_show_platform_only_shows_platform_packages() {
     assert_all_platform_packages(output.trim());
 }
 
-#[ignore = "blocked: showing platform packages without a composer.json is unsupported - the package lookup errors with \"Package php not found\" instead of listing platform packages. Logic gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_show_platform_works_without_composer_json() {
@@ -747,7 +750,6 @@ zerozero/major 0.0.1 ~ 0.0.2",
     );
 }
 
-#[ignore = "blocked: categorization fixed, but the platform: section is empty because PlatformRepository::get_packages routes to ArrayRepository::initialize (empty) instead of PlatformRepository::initialize, which reads platform constants via the still-todo!() shim runtime::constant()"]
 #[test]
 #[serial]
 fn test_show_all_shows_all_sections() {
@@ -1026,7 +1028,6 @@ fn test_self_and_package_combination() {
     );
 }
 
-#[ignore = "blocked: InstallationManager cannot resolve a \"library\" installer in this context so getInstallPath returns None, and the path line prints \"null\" instead of the empty string PHP emits. Installer-resolution gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_self() {
@@ -1105,7 +1106,6 @@ fn test_not_installed_error() {
     );
 }
 
-#[ignore = "blocked: with --no-dev every installed package is filtered out so nothing is shown (expected \"vendor/package 1.0.0\", got empty). The --no-dev filtering over the installed repository is not yet correct - a logic gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_no_dev_option() {
@@ -1245,7 +1245,6 @@ fn test_not_existing_package_with_no_options() {
     );
 }
 
-#[ignore = "blocked: panics with \"RefCell already borrowed\" at src/repository/handle.rs:124 while resolving --all repositories. Borrow-ownership bug, not an output-format issue."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_all_option() {
@@ -1256,7 +1255,6 @@ fn test_not_existing_package_with_all_option() {
     );
 }
 
-#[ignore = "blocked: panics with \"RefCell already borrowed\" at src/repository/handle.rs:124 while resolving the locked repository. Borrow-ownership bug, not an output-format issue."]
 #[test]
 #[serial]
 fn test_not_existing_package_with_locked_option() {
@@ -1434,7 +1432,6 @@ fn test_specific_package_and_tree_with_json_format() {
     );
 }
 
-#[ignore = "blocked: the wildcard package-name filter does not exclude non-matching packages (vendor/somepackage is still listed). Filtering logic gap, not an output-format issue."]
 #[test]
 #[serial]
 fn test_name_only_prints_no_trailing_whitespace() {

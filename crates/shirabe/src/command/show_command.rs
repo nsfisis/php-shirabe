@@ -16,6 +16,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
+use crate::package::version::version_selector::ShowWarnings;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::repository::ComposerRepository;
@@ -540,18 +541,14 @@ impl Command for ShowCommand {
                     .iter()
                     .map(crate::package::PackageInterfaceHandle::dup)
                     .collect();
-                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                    root_repo.clone(),
+                let new_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    root_repo,
                     RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(
                         cloned,
                     )?),
                 ]));
-                repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                    root_repo,
-                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(
-                        Vec::new(),
-                    )?),
-                ]));
+                installed_repo = new_repo.clone();
+                repos = new_repo;
             } else {
                 let repository_manager = composer_local.get_repository_manager().clone();
                 let repository_manager = repository_manager.borrow();
@@ -619,7 +616,7 @@ impl Command for ShowCommand {
             && !pf.contains('*')
         {
             let (matched_package, vers) = self.get_package(
-                &*installed_repo.borrow(),
+                &installed_repo,
                 &repos,
                 pf,
                 input.borrow().get_argument("version")?,
@@ -686,11 +683,8 @@ impl Command for ShowCommand {
 
             let mut exit_code: i64 = 0;
             if input.borrow().get_option("tree")?.as_bool() == Some(true) {
-                let array_tree = self.generate_package_tree(
-                    package.clone().into(),
-                    &*installed_repo.borrow(),
-                    &repos,
-                );
+                let array_tree =
+                    self.generate_package_tree(package.clone().into(), &installed_repo, &repos);
 
                 if format == "json" {
                     let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -812,7 +806,7 @@ impl Command for ShowCommand {
                 ) {
                     array_tree.push(self.generate_package_tree(
                         package.clone(),
-                        &*installed_repo.borrow(),
+                        &installed_repo,
                         &repos,
                     ));
                 }
@@ -1656,7 +1650,7 @@ impl ShowCommand {
     /// finds a package by name and version if provided
     pub(crate) fn get_package(
         &self,
-        installed_repo: &dyn RepositoryInterface,
+        installed_repo: &RepositoryInterfaceHandle,
         repos: &RepositoryInterfaceHandle,
         name: &str,
         version: PhpMixed,
@@ -2462,7 +2456,7 @@ impl ShowCommand {
     pub(crate) fn generate_package_tree(
         &self,
         package: PackageInterfaceHandle,
-        installed_repo: &dyn RepositoryInterface,
+        installed_repo: &RepositoryInterfaceHandle,
         remote_repos: &RepositoryInterfaceHandle,
     ) -> IndexMap<String, PhpMixed> {
         let requires = {
@@ -2613,7 +2607,7 @@ impl ShowCommand {
         &self,
         name: &str,
         link: &Link,
-        installed_repo: &dyn RepositoryInterface,
+        installed_repo: &RepositoryInterfaceHandle,
         remote_repos: &RepositoryInterfaceHandle,
         packages_in_tree: &[PhpMixed],
     ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
@@ -2817,12 +2811,12 @@ impl ShowCommand {
             }
         }
 
-        let show_warnings_box: Box<dyn Fn(PackageInterfaceHandle) -> bool> =
-            if self.get_io().is_verbose() {
-                Box::new(|_p: PackageInterfaceHandle| -> bool { true })
-            } else {
-                let package_version = package.get_version();
-                Box::new(move |candidate: PackageInterfaceHandle| -> bool {
+        let show_warnings = if self.get_io().is_verbose() {
+            ShowWarnings::Always
+        } else {
+            let package_version = package.get_version();
+            ShowWarnings::Predicate(Box::new(
+                move |candidate: &PackageInterfaceHandle| -> bool {
                     if candidate.get_version().starts_with("dev-")
                         || package_version.starts_with("dev-")
                     {
@@ -2830,11 +2824,9 @@ impl ShowCommand {
                     }
 
                     version_compare(&candidate.get_version(), &package_version, "<=")
-                })
-            };
-        // TODO(phase-c): PHP passes $showWarnings (true or a closure) as the last argument, but the
-        // closure form requires modeling a callable inside PhpMixed; hardcoding true until then.
-        let _ = show_warnings_box;
+                },
+            ))
+        };
         let mut candidate = version_selector.find_best_candidate(
             &name,
             target_version.as_deref(),
@@ -2842,7 +2834,7 @@ impl ShowCommand {
             Some(platform_req_filter),
             0,
             Some(self.get_io().clone()),
-            PhpMixed::Bool(true),
+            show_warnings,
         )?;
         while let Some(ref c) = candidate {
             if let Some(alias) = c.as_alias() {

@@ -12,6 +12,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::archiver::ArchiveManagerInterface;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
+use crate::package::version::version_selector::ShowWarnings;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::repository::CompositeRepository;
@@ -424,7 +425,7 @@ impl ArchiveCommand {
                 None,
                 0,
                 None,
-                shirabe_php_shim::PhpMixed::Bool(true),
+                ShowWarnings::Always,
             )?;
             let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 

@@ -10,6 +10,7 @@ use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
+use crate::package::version::version_selector::ShowWarnings;
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::PlatformRepositoryHandle;
@@ -486,7 +487,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             Some(platform_requirement_filter.clone()),
             0,
             None,
-            shirabe_php_shim::PhpMixed::Null,
+            ShowWarnings::Always,
         )?;
 
         if package.is_none() {
@@ -544,7 +545,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     Some(PlatformRequirementFilterFactory::ignore_all()),
                     0,
                     None,
-                    shirabe_php_shim::PhpMixed::Null,
+                    ShowWarnings::Always,
                 )?;
                 if let Some(candidate) = candidate {
                     return Err(InvalidArgumentException {
@@ -569,7 +570,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 Some(platform_requirement_filter.clone()),
                 RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
                 None,
-                shirabe_php_shim::PhpMixed::Null,
+                ShowWarnings::Always,
             )?;
             if let Some(package) = package_at_unacceptable {
                 // we must first verify if a valid package would be found in a lower priority repository
@@ -580,7 +581,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     Some(PlatformRequirementFilterFactory::ignore_nothing()),
                     RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
                     None,
-                    shirabe_php_shim::PhpMixed::Null,
+                    ShowWarnings::Always,
                 )?;
                 if let Some(all_repos_package) = all_repos_package {
                     return Err(InvalidArgumentException {
@@ -620,7 +621,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     Some(PlatformRequirementFilterFactory::ignore_all()),
                     RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
                     None,
-                    shirabe_php_shim::PhpMixed::Null,
+                    ShowWarnings::Always,
                 )?;
                 if let Some(candidate) = candidate {
                     let mut additional = String::new();
@@ -631,7 +632,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         Some(PlatformRequirementFilterFactory::ignore_all()),
                         0,
                         None,
-                        shirabe_php_shim::PhpMixed::Null,
+                        ShowWarnings::Always,
                     )?;
                     if no_match.is_none() {
                         additional = format!(

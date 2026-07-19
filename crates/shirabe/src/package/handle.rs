@@ -1570,6 +1570,13 @@ impl CompletePackageHandle {
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
         Self::from_complete_package(CompletePackage::new(name, version, pretty_version))
     }
+
+    pub fn set_release_date(&self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
+        match &mut *self.0.borrow_mut() {
+            AnyPackage::CompletePackage(p) => p.set_release_date(release_date),
+            _ => unreachable!("CompletePackageHandle invariant"),
+        }
+    }
 }
 
 impl RootPackageHandle {
@@ -1586,6 +1593,13 @@ impl RootPackageHandle {
     pub fn replace_version(&self, version: String, pretty_version: String) {
         match &mut *self.0.borrow_mut() {
             AnyPackage::RootPackage(p) => p.replace_version(version, pretty_version),
+            _ => unreachable!("RootPackageHandle invariant"),
+        }
+    }
+
+    pub fn set_release_date(&self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
+        match &mut *self.0.borrow_mut() {
+            AnyPackage::RootPackage(p) => p.set_release_date(release_date),
             _ => unreachable!("RootPackageHandle invariant"),
         }
     }
