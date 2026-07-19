@@ -959,7 +959,6 @@ fn warning_provider() -> Vec<(
 }
 
 /// ref: ValidatingArrayLoaderTest::testLoadWarnings
-#[ignore = "license warning cases need the SPDX license-expression grammar (recursive PCRE), not yet ported: spdx_licenses todo!()"]
 #[test]
 fn test_load_warnings() {
     for (cfg, mut expected_warnings, _must_check, _expected_array) in warning_provider() {
@@ -981,7 +980,6 @@ fn test_load_warnings() {
 }
 
 /// ref: ValidatingArrayLoaderTest::testLoadSkipsWarningDataWhenIgnoringErrors
-#[ignore = "must_check license cases need the SPDX license-expression grammar (recursive PCRE), not yet ported: spdx_licenses todo!()"]
 #[test]
 fn test_load_skips_warning_data_when_ignoring_errors() {
     for (mut cfg, _expected_warnings, must_check, expected_array) in warning_provider() {
