@@ -296,8 +296,13 @@ fn test_add_remove_installer() {
 #[test]
 fn test_execute() {
     // TODO(phase-d): a partial mock of InstallationManager (onlyMethods install/update/uninstall)
-    // with expects(once)->with(...) is not reproducible without method-overriding mocks; execute()
-    // also takes the batched download path.
+    // with expects(once)->with(...) is not reproducible without method-overriding mocks: the PHP
+    // test runs the *real* execute() (batched download path included, via NoopInstaller) while
+    // spying on the three per-operation methods it dispatches to. The existing
+    // `InstallationManager::__new_mock` seam cannot serve because it replaces execute() wholesale
+    // (recording operations and skipping the download step, ref InstallationManagerMock), so the
+    // real dispatch logic under test would never run. A per-method spy seam on the real execute()
+    // path would be a design change to the production struct, so the test stays ignored.
     todo!()
 }
 
