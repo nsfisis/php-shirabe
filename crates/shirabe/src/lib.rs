@@ -182,7 +182,10 @@ mod cli_tests {
         run_config => "config",
         run_create_project => "create-project",
         run_depends => "depends",
-        #[ignore = "currently panics"]
+        #[ignore = "DiagnoseCommand::check_platform captures phpinfo() via ob_start()/ob_get_clean(), \
+                    which are todo!() in shirabe-php-shim (PHP output buffering and runtime \
+                    introspection are unmodeled), so the command panics; same root cause as \
+                    tests/command/diagnose_command_test.rs"]
         run_diagnose => "diagnose",
         run_dump_autoload => "dump-autoload",
         run_exec => "exec",
