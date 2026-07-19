@@ -5,6 +5,8 @@
 // Symfony command-registry model), or a runtime define() of COMPOSER_DEV_WARNING_TIME,
 // remain unportable.
 
+#[path = "common/bootstrap.rs"]
+mod bootstrap;
 #[path = "common/test_case.rs"]
 mod test_case;
 

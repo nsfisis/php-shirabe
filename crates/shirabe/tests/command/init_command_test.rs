@@ -400,9 +400,13 @@ fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(PhpMixed, PhpMix
             ],
         ),
         // invalid stability argument
+        //
+        // WORDING NOTE: upstream asserts justinrainbow/json-schema package's message. Shirabe
+        // validates with the `jsonschema` crate instead, whose wording differs by design. See also
+        // composer_schema_test.rs.
         (
             InvalidExpectation::StderrMatches(
-                r"minimum-stability\s+:\s+Does not have a value in the enumeration",
+                r#"minimum-stability\s*:\s*"bogus" is not one of "dev", "alpha" or 4 other candidates"#,
             ),
             vec![opt("--name", "test/pkg"), opt("--stability", "bogus")],
         ),
@@ -424,8 +428,12 @@ fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(PhpMixed, PhpMix
             ],
         ),
         // invalid homepage argument
+        //
+        // WORDING NOTE: upstream asserts justinrainbow/json-schema package's message. Shirabe
+        // validates with the `jsonschema` crate instead, whose wording differs by design. See also
+        // composer_schema_test.rs.
         (
-            InvalidExpectation::StderrMatches(r"homepage\s*:\s*Invalid URL format"),
+            InvalidExpectation::StderrMatches(r#"homepage\s*:\s*"not-a-url" is not a "uri""#),
             vec![opt("--name", "test/pkg"), opt("--homepage", "not-a-url")],
         ),
     ]
@@ -433,8 +441,6 @@ fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(PhpMixed, PhpMix
 
 #[test]
 #[serial]
-#[ignore = "drives InitCommand, which calls get_git_config -> ProcessExecutor::run_process; \
-            that path is not ported (shim is_callable and Process::start/run are todo!())"]
 fn test_run_command_invalid() {
     set_up();
 
@@ -519,8 +525,6 @@ fn test_run_guess_name_from_dir_sanitizes_dir() {
 
 #[test]
 #[serial]
-#[ignore = "drives InitCommand, which calls get_git_config -> ProcessExecutor::run_process; \
-            that path is not ported (shim is_callable and Process::start/run are todo!())"]
 fn test_interactive_run() {
     set_up();
 
@@ -594,8 +598,9 @@ fn test_format_authors() {
 }
 
 #[test]
-#[ignore = "calls get_git_config -> ProcessExecutor::run_process, which is not ported \
-            (shim is_callable and Process::start/run are todo!())"]
+#[ignore = "requires the host's global git config to have user.name/user.email set (Composer's \
+            own CI runs `git config --global user.name/user.email` before the test suite); \
+            fails in environments without that global config"]
 fn test_get_git_config() {
     set_up();
 

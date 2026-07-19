@@ -352,7 +352,6 @@ Lock file operations: 0 installs, 2 updates, 0 removals
 
 #[test]
 #[serial]
-#[ignore = "interactive selection path unported: --interactive requires a TTY and errors with \"--interactive cannot be used in non-interactive terminals.\""]
 fn test_interactive_mode_throws_if_no_package_to_update() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -383,7 +382,11 @@ fn test_interactive_mode_throws_if_no_package_to_update() {
 
 #[test]
 #[serial]
-#[ignore = "interactive selection path unported: --interactive requires a TTY and errors with \"--interactive cannot be used in non-interactive terminals.\""]
+#[ignore = "ConsoleIO::ask_question panics via .expect() on any QuestionHelper validator error \
+            instead of propagating it, so io.select()'s \"No package named ...\" validation \
+            error can't reach app_tester.run() as an Err; fixing this needs IOInterface::ask()/ \
+            select() to return anyhow::Result, which ripples through ~18 ask() and ~4 select() \
+            call sites (see project_console_io_ask_select_panics memory)"]
 fn test_interactive_mode_throws_if_no_package_entered() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [

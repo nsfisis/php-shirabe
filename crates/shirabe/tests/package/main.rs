@@ -1,3 +1,5 @@
+#[path = "../common/bootstrap.rs"]
+mod bootstrap;
 #[path = "../common/config_stub.rs"]
 mod config_stub;
 #[path = "../common/io_stub.rs"]

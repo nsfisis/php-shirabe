@@ -1,5 +1,7 @@
 //! ref: composer/tests/Composer/Test/InstallerTest.php
 
+#[path = "common/bootstrap.rs"]
+mod bootstrap;
 #[path = "common/config_stub.rs"]
 mod config_stub;
 #[path = "common/test_case.rs"]

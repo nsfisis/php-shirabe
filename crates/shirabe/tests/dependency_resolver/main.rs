@@ -1,3 +1,5 @@
+#[path = "../common/bootstrap.rs"]
+mod bootstrap;
 #[path = "../common/test_case.rs"]
 mod test_case;
 
