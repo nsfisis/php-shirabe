@@ -79,7 +79,10 @@ fn test_select() {
         PhpMixed::String("1".to_string()),
         io.select(
             "question".to_string(),
-            vec!["item1".to_string(), "item2".to_string()],
+            PhpMixed::List(vec![
+                PhpMixed::String("item1".to_string()),
+                PhpMixed::String("item2".to_string()),
+            ]),
             PhpMixed::String("1".to_string()),
             PhpMixed::Int(2),
             "foo".to_string(),

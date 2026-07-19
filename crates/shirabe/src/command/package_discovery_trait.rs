@@ -689,7 +689,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             "<error>Could not find package {}.</error>\nPick one of these or leave empty to abort:",
                             name,
                         ),
-                        similar.to_vec(),
+                        PhpMixed::List(
+                            similar.iter().map(|s| PhpMixed::String(s.clone())).collect(),
+                        ),
                         PhpMixed::Bool(false),
                         PhpMixed::Int(1),
                         "No package named \"%s\" is installed.".to_string(),

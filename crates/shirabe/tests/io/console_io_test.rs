@@ -236,7 +236,10 @@ fn test_select() {
     let (console_io, _output) = make_console_io_with_answer("item2\n");
     let result = console_io.select(
         "Select item".to_string(),
-        vec!["item1".to_string(), "item2".to_string()],
+        PhpMixed::List(vec![
+            PhpMixed::String("item1".to_string()),
+            PhpMixed::String("item2".to_string()),
+        ]),
         PhpMixed::String("item1".to_string()),
         PhpMixed::Bool(false),
         "Error message".to_string(),

@@ -209,7 +209,12 @@ impl Command for RunScriptCommand {
             let io = self.get_io();
             let script = io.select(
                 "Script to run: ".to_string(),
-                options.keys().cloned().collect(),
+                PhpMixed::List(
+                    options
+                        .keys()
+                        .map(|k| PhpMixed::String(k.clone()))
+                        .collect(),
+                ),
                 PhpMixed::String(String::new()),
                 PhpMixed::Int(1),
                 "Invalid script name \"%s\"".to_string(),

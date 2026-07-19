@@ -538,13 +538,12 @@ impl IOInterfaceImmutable for ConsoleIO {
     fn select(
         &self,
         question: String,
-        choices: Vec<String>,
+        choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
     ) -> PhpMixed {
-        let choices: PhpMixed = PhpMixed::List(choices.into_iter().map(PhpMixed::String).collect());
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -603,6 +602,10 @@ impl IOInterfaceImmutable for ConsoleIO {
                     .iter()
                     .enumerate()
                     .filter_map(|(i, v)| v.as_string().map(|s| (i.to_string(), s.to_string())))
+                    .collect(),
+                PhpMixed::Array(a) => a
+                    .iter()
+                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
                     .collect(),
                 _ => IndexMap::new(),
             };

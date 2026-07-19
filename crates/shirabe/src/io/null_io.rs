@@ -90,7 +90,7 @@ impl IOInterfaceImmutable for NullIO {
     fn select(
         &self,
         _question: String,
-        _choices: Vec<String>,
+        _choices: PhpMixed,
         default: PhpMixed,
         _attempts: PhpMixed,
         _error_message: String,

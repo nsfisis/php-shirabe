@@ -258,7 +258,7 @@ impl IOInterfaceImmutable for IOMock {
     fn select(
         &self,
         question: String,
-        choices: Vec<String>,
+        choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
         error_message: String,

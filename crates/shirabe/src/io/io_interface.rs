@@ -106,10 +106,13 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
 
     fn ask_and_hide_answer(&self, question: String) -> Option<String>;
 
+    /// PHP `array $choices` may be a list (`PhpMixed::List`) or an associative
+    /// array (`PhpMixed::Array`); list choices resolve to their index, while
+    /// associative choices resolve to their key.
     fn select(
         &self,
         question: String,
-        choices: Vec<String>,
+        choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
         error_message: String,
@@ -301,7 +304,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     fn select(
         &self,
         question: String,
-        choices: Vec<String>,
+        choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
         error_message: String,

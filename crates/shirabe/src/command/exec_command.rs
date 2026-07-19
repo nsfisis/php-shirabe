@@ -118,7 +118,12 @@ impl Command for ExecCommand {
             let io = self.get_io();
             let binary = io.select(
                 "Binary to run: ".to_string(),
-                binaries.clone(),
+                PhpMixed::List(
+                    binaries
+                        .iter()
+                        .map(|b| PhpMixed::String(b.clone()))
+                        .collect(),
+                ),
                 PhpMixed::String(String::new()),
                 PhpMixed::Int(1),
                 "Invalid binary name \"%s\"".to_string(),

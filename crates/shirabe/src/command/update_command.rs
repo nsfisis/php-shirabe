@@ -705,10 +705,12 @@ impl UpdateCommand {
 
         let select_result = io.select(
             "Select packages: (Select more than one value separated by comma) ".to_string(),
-            autocompleter_values
-                .keys()
-                .cloned()
-                .collect::<Vec<String>>(),
+            PhpMixed::List(
+                autocompleter_values
+                    .keys()
+                    .map(|k| PhpMixed::String(k.clone()))
+                    .collect(),
+            ),
             PhpMixed::Bool(false),
             PhpMixed::Int(1),
             "No package named \"%s\" is installed.".to_string(),
