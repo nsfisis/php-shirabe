@@ -21,6 +21,8 @@ use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::input::streamable_input_interface::StreamableInputInterface;
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
+use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
+use shirabe_external_packages::symfony::console::output::console_output_interface::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
@@ -106,13 +108,31 @@ fn test_write() {
     );
 }
 
-#[ignore = "PHP mocks ConsoleOutputInterface so getErrorOutput returns the same mock; a real ConsoleOutput's error StreamOutput writes to php://stderr, which cannot be read back, and the trait offers no seam to inject a BufferedOutput error sink"]
 #[test]
 fn test_write_error() {
-    // TODO(phase-d): PHP mocks ConsoleOutputInterface so getErrorOutput returns the same mock; a
-    // real ConsoleOutput's error StreamOutput writes to php://stderr, which cannot be read back,
-    // and the trait offers no seam to inject a BufferedOutput error sink.
-    todo!()
+    // PHP mocks ConsoleOutputInterface so getErrorOutput() returns the mock itself and expects
+    // write('some information about something', false) once at VERBOSITY_NORMAL. A real
+    // ConsoleOutput's error sink is stderr, which cannot be read back, but ConsoleOutputInterface
+    // includes setErrorOutput; swapping in a BufferedOutput error sink lets the error-routed
+    // write be read back, and writeError only ever reaches the sink returned by getErrorOutput.
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ArrayInput::new(vec![], None).unwrap()),
+    );
+    let console_output = ConsoleOutput::new(None, Some(false), None).unwrap();
+    let error_buffer = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    console_output.set_error_output(error_buffer.clone());
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(console_output));
+    let console_io = ConsoleIO::new(input, output, QuestionHelper::default());
+
+    console_io.write_error3("some information about something", false, NORMAL);
+
+    assert_eq!(
+        "some information about something",
+        error_buffer.borrow().fetch()
+    );
 }
 
 #[ignore = "ConsoleIO::write3 takes a single &str; the test feeds a 2-element array ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed messages array, which the &str signature cannot represent"]
