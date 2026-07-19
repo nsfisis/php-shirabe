@@ -90,7 +90,6 @@ fn test_prepend() {
 }
 
 #[test]
-#[ignore = "create_repository routes to RepositoryManager::create_repository_by_class, which is todo!() (dynamic instantiation by class name not yet ported)"]
 fn test_repo_creation() {
     let SetUp { tmpdir } = set_up();
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
