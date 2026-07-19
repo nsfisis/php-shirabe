@@ -184,10 +184,6 @@ fn test_load_data() {
     }
 }
 
-// Ported and exercising the real whatProvides path, but blocked by an unimplemented
-// production method: building the dev-* alias packages reaches AliasPackage::get_source_type
-// (todo!() in package/alias_package.rs).
-#[ignore = "production todo!(): AliasPackage::get_source_type unimplemented (reached when building dev-* branch aliases)"]
 #[test]
 fn test_what_provides() {
     let (config, _home) = create_config();
