@@ -433,7 +433,14 @@ impl Auditor {
         match format {
             Self::FORMAT_TABLE => {
                 let io_ref = io.borrow();
-                let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>();
+                // PHP: `$io instanceof ConsoleIO`. BufferIO extends ConsoleIO in PHP but is
+                // modeled as composition here, so also unwrap it to its inner ConsoleIO.
+                let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
+                    io_ref
+                        .as_any()
+                        .downcast_ref::<crate::io::buffer_io::BufferIO>()
+                        .map(|buffer_io| &buffer_io.inner)
+                });
                 if io_as_console.is_none() {
                     return Err(InvalidArgumentException {
                         message: format!(
@@ -605,7 +612,14 @@ impl Auditor {
         }
 
         let io_ref = io.borrow();
-        let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>();
+        // PHP: `$io instanceof ConsoleIO`. BufferIO extends ConsoleIO in PHP but is modeled as
+        // composition here, so also unwrap it to its inner ConsoleIO.
+        let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
+            io_ref
+                .as_any()
+                .downcast_ref::<crate::io::buffer_io::BufferIO>()
+                .map(|buffer_io| &buffer_io.inner)
+        });
         if io_as_console.is_none() {
             return Err(InvalidArgumentException {
                 message: format!(

@@ -390,10 +390,6 @@ fn get_repo_set() -> RepositorySet {
 
 /// ref: AuditorTest::testAudit (auditProvider).
 #[test]
-#[ignore = "all 10 cases faithfully ported; the 2 FORMAT_TABLE cases cannot run because \
-            BufferIO does not downcast to ConsoleIO (PHP's `BufferIO extends ConsoleIO` is \
-            modeled as composition in Rust), so the table-rendering path is unreachable and \
-            the whole function stays ignored until the src supports it"]
 fn test_audit() {
     #[derive(Clone)]
     struct Case {
