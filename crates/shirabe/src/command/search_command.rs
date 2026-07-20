@@ -17,7 +17,7 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote, substr};
 
 #[derive(Debug)]
 pub struct SearchCommand {
@@ -230,7 +230,7 @@ impl Command for SearchCommand {
                 };
                 let remaining = width - name_length - warning.len() as i64 - 2;
                 let description = if description.len() as i64 > remaining {
-                    format!("{}...", &description[..(remaining - 3) as usize])
+                    format!("{}...", substr(&description, 0, Some(remaining - 3)))
                 } else {
                     description
                 };
