@@ -1,0 +1,21 @@
+# Disposition of classes that write static properties.
+#   memo-cache  pure memoization; each world computes its own copy
+#   seed-once   copied from the Rust side once at child startup
+#   needs-sync  genuinely shared process state; must not be php-native
+# A class writing statics without an entry here fails the run.
+Composer\Autoload\ClassLoader memo-cache
+Composer\Cache memo-cache
+Composer\Downloader\FileDownloader needs-sync
+Composer\Downloader\ZipDownloader memo-cache
+Composer\InstalledVersions needs-sync
+Composer\Package\Version\VersionParser memo-cache
+Composer\Platform\HhvmDetector memo-cache
+Composer\Repository\PlatformRepository memo-cache
+Composer\Util\ErrorHandler memo-cache
+Composer\Util\Git memo-cache
+Composer\Util\Hg memo-cache
+Composer\Util\Http\ProxyManager memo-cache
+Composer\Util\Platform needs-sync
+Composer\Util\ProcessExecutor seed-once
+Composer\Util\Silencer memo-cache
+Composer\Util\Svn memo-cache

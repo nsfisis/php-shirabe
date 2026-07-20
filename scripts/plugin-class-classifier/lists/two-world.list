@@ -1,0 +1,6 @@
+# Types with independent sibling implementations in each world
+# (docs/dev/plugin-class-classification.md, category two-world).
+# One namespace prefix or exact FQCN per line.
+Composer\Console
+Composer\Command
+Symfony\Component\Console

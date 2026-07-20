@@ -1,0 +1,40 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Shirabe\PluginClassifier\Classifier;
+use Shirabe\PluginClassifier\Lists;
+use Shirabe\PluginClassifier\Report;
+
+$repoRoot = dirname(__DIR__, 2);
+$composerSrc = $repoRoot . '/composer/src/Composer';
+$out = __DIR__ . '/report.json';
+
+foreach (array_slice($argv, 1) as $arg) {
+    if (str_starts_with($arg, '--composer-src=')) {
+        $composerSrc = substr($arg, strlen('--composer-src='));
+    } elseif (str_starts_with($arg, '--out=')) {
+        $out = substr($arg, strlen('--out='));
+    } else {
+        fwrite(STDERR, "usage: classify [--composer-src=DIR] [--out=FILE]\n");
+        exit(2);
+    }
+}
+
+if (!is_dir($composerSrc)) {
+    fwrite(STDERR, "not a directory: $composerSrc\n");
+    exit(2);
+}
+
+$classifier = new Classifier($composerSrc, Lists::load(__DIR__ . '/lists'));
+$classifier->run();
+
+$report = new Report($classifier);
+$report->writeJson($out);
+$report->printSummary();
+
+fwrite(STDERR, "report written to $out\n");
+exit($classifier->violations === [] ? 0 : 1);

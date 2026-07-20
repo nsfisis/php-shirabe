@@ -1,0 +1,15 @@
+{
+    "name": "shirabe/plugin-class-classifier",
+    "description": "Deterministic classifier for Composer classes at the Shirabe plugin boundary",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1",
+        "nikic/php-parser": "^5.0",
+        "jetbrains/phpstorm-stubs": "^2026.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Shirabe\\PluginClassifier\\": "src/"
+        }
+    }
+}
