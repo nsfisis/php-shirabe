@@ -95,7 +95,6 @@ fn test_detailed_format_block_only() {
 }
 
 #[test]
-#[ignore]
 fn test_mixed_formats() {
     let audit_config = audit_config_from(arr(vec![(
         "ignore",

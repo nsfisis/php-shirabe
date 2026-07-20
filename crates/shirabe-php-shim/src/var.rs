@@ -79,7 +79,7 @@ fn serialize_float(f: f64) -> String {
 /// Returns the integer a PHP array key string normalizes to, or None if the key stays a string.
 /// PHP treats a key as an integer only when it is a canonical decimal integer: no leading `+`, no
 /// redundant leading zeros, and within the platform integer range ("-0" is not canonical).
-fn canonical_int_key(key: &str) -> Option<i64> {
+pub fn canonical_int_key(key: &str) -> Option<i64> {
     if key == "0" {
         return Some(0);
     }

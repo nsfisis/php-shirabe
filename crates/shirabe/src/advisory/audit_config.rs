@@ -3,7 +3,7 @@
 use crate::advisory::Auditor;
 use crate::config::Config;
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key};
 
 #[derive(Debug, Clone)]
 pub struct AuditConfig {
@@ -83,7 +83,13 @@ impl AuditConfig {
         for (key, value) in entries {
             let (id, apply, reason) = match value {
                 PhpMixed::String(reason_str) => {
-                    (key.clone(), "all".to_string(), Some(reason_str.clone()))
+                    // TODO(phase-e): PHP's `array` type must be modeled more precisely. This is
+                    // escape hatch.
+                    if canonical_int_key(key).is_some() {
+                        (reason_str.clone(), "all".to_string(), None)
+                    } else {
+                        (key.clone(), "all".to_string(), Some(reason_str.clone()))
+                    }
                 }
                 PhpMixed::Array(detail) => {
                     let apply = detail
