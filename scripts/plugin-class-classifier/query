@@ -1,0 +1,187 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Shirabe\PluginClassifier\VendorPackages;
+
+if ($argc < 2) {
+    fwrite(STDERR, <<<USAGE
+        usage: query <target>...
+
+        <target> is any of:
+          a PHP source file      composer/src/Composer/Util/Git.php
+          a Rust source file     crates/shirabe/src/util/git.rs
+          a class name           Composer\\Util\\Git, Git, git
+
+        Prints the plugin-boundary classification from report.json,
+        generating the report first if it does not exist.
+
+        USAGE);
+    exit(2);
+}
+
+$reportPath = __DIR__ . '/report.json';
+if (!is_file($reportPath)) {
+    fwrite(STDERR, "report.json not found; running classify...\n");
+    exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/classify') . ' > /dev/null', $_, $status);
+    if (!is_file($reportPath)) {
+        fwrite(STDERR, "classify failed to produce report.json (exit $status)\n");
+        exit(1);
+    }
+    if ($status !== 0) {
+        fwrite(STDERR, "note: classify exited with $status (violations present); report was still written\n");
+    }
+}
+
+$report = json_decode(file_get_contents($reportPath), true);
+if (!is_array($report)) {
+    fwrite(STDERR, "cannot parse $reportPath\n");
+    exit(1);
+}
+
+/** @var array<string, array<string, mixed>> */
+$classes = [];
+foreach ($report['classes'] as $row) {
+    $classes[$row['fqcn']] = $row;
+}
+/** @var array<string, array<string, mixed>> */
+$vendorTypes = [];
+foreach ($report['vendorTypes'] as $row) {
+    $vendorTypes[$row['fqcn']] = $row;
+}
+
+/** Path-segment form used to match Rust paths: no underscores, lowercase. */
+function normalizeSegment(string $segment): string
+{
+    return strtolower(str_replace('_', '', $segment));
+}
+
+/** @return list<string> matched FQCNs */
+function resolveTarget(string $target, array $classes): array
+{
+    // Rust source file: match normalized path segments against FQCNs,
+    // because the snake_case mapping is not textually reversible
+    // (io_interface.rs -> IOInterface).
+    if (str_ends_with($target, '.rs')) {
+        $path = preg_replace('#^.*?crates/shirabe/src/#', '', str_replace('\\', '/', $target));
+        $segments = explode('/', substr($path, 0, -strlen('.rs')));
+        $wanted = array_map(normalizeSegment(...), $segments);
+        $matches = [];
+        foreach ($classes as $fqcn => $_) {
+            $fqcnSegments = explode('\\', $fqcn);
+            array_shift($fqcnSegments); // Composer\
+            if (array_map(normalizeSegment(...), $fqcnSegments) === $wanted) {
+                $matches[] = $fqcn;
+            }
+        }
+
+        return $matches;
+    }
+
+    // PHP source file: the path under src/Composer/ is the FQCN.
+    if (str_ends_with($target, '.php')) {
+        $path = str_replace('\\', '/', $target);
+        $pos = strpos($path, 'src/Composer/');
+        if ($pos !== false) {
+            $fqcn = 'Composer\\' . str_replace('/', '\\', substr($path, $pos + strlen('src/Composer/'), -strlen('.php')));
+            if (isset($classes[$fqcn])) {
+                return [$fqcn];
+            }
+        }
+        // Fall back to the basename as a short class name (also covers
+        // vendor files and paths given without src/Composer/).
+        $target = basename($path, '.php');
+    }
+
+    // Class name: exact FQCN first, else case-insensitive, else by short
+    // name (last segment).
+    $name = ltrim($target, '\\');
+    if (isset($classes[$name])) {
+        return [$name];
+    }
+    $matches = [];
+    foreach ($classes as $fqcn => $_) {
+        if (strcasecmp($fqcn, $name) === 0) {
+            $matches[] = $fqcn;
+        }
+    }
+    if ($matches !== []) {
+        return $matches;
+    }
+    foreach ($classes as $fqcn => $_) {
+        $parts = explode('\\', $fqcn);
+        if (strcasecmp(end($parts), $name) === 0) {
+            $matches[] = $fqcn;
+        }
+    }
+
+    return $matches;
+}
+
+function printRow(array $row): void
+{
+    echo $row['fqcn'], "\n";
+    echo '  category:  ', $row['category'];
+    if (isset($row['computedCategory'])) {
+        echo ' (computed: ', $row['computedCategory'], ', overridden)';
+    }
+    echo "\n";
+    echo '  direction: ', $row['direction'] ?? '-', "\n";
+    echo '  reachable: ', $row['reachable'] ? 'yes' : 'no', "\n";
+    foreach ($row['reasons'] as $reason) {
+        echo '  reason:    ', $reason, "\n";
+    }
+    foreach ($row['attributes'] as $key => $value) {
+        echo '  ', $key, ': ', is_array($value) ? implode(', ', $value) : var_export($value, true), "\n";
+    }
+    if (isset($row['methods'])) {
+        $mutators = array_values(array_filter($row['methods'], static fn (array $m) => $m['purity'] === 'mutator'));
+        echo '  methods:   ', count($row['methods']), ' public/protected, ', count($mutators), " mutator\n";
+        foreach ($mutators as $m) {
+            echo '    mutator: ', $m['name'], "\n";
+        }
+    }
+}
+
+$exit = 0;
+foreach (array_slice($argv, 1) as $i => $target) {
+    if ($i > 0) {
+        echo "\n";
+    }
+
+    $matches = resolveTarget($target, $classes);
+    if ($matches !== []) {
+        foreach ($matches as $j => $fqcn) {
+            if ($j > 0) {
+                echo "\n";
+            }
+            printRow($classes[$fqcn]);
+        }
+        continue;
+    }
+
+    // Vendor types: reached ones carry a direction; any other name under a
+    // known vendor prefix classifies at package granularity.
+    $name = ltrim($target, '\\');
+    if (isset($vendorTypes[$name])) {
+        $row = $vendorTypes[$name];
+        echo $row['fqcn'], "\n";
+        echo '  category:  ', $row['category'], ' (vendor package ', $row['package'], ")\n";
+        echo '  direction: ', $row['direction'], "\n";
+        continue;
+    }
+    $vendor = VendorPackages::lookup($name);
+    if ($vendor !== null) {
+        echo $name, "\n";
+        echo '  category:  ', $vendor['category'], ' (vendor package ', $vendor['package'], ", wholesale)\n";
+        continue;
+    }
+
+    fwrite(STDERR, "not found: $target\n");
+    $exit = 1;
+}
+
+exit($exit);

@@ -445,6 +445,26 @@ workflow on a Composer upgrade: run the classifier before updating the
 diff the two files — review only the changed rows. A brand-new class lands
 in a category (or in the violation list) without any human re-derivation.
 
+### Querying a single class
+
+    scripts/plugin-class-classifier/query <target>...
+
+answers "how is this class treated?" for one or more targets, from
+`report.json` (generated on the fly when missing; staleness is not
+checked). A target may be a PHP source file, a Rust source file, or a class
+name — fully qualified or just the short name, case-insensitive:
+
+    query composer/src/Composer/Util/Git.php
+    query crates/shirabe/src/io/io_interface.rs
+    query Locker
+
+Rust paths are resolved by normalized segment matching against the report's
+FQCNs rather than textual case conversion, because the snake_case mapping
+is not reversible for acronyms (`io_interface.rs` → `IOInterface`). Vendor
+class names resolve at package granularity. The output shows category
+(including an overridden category's computed value), direction,
+reachability, reasons, attributes, and the mutator methods.
+
 ### Analysis limits
 
 All conservative:
