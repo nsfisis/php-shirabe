@@ -220,6 +220,11 @@ impl JsonFile {
         hash: PhpMixed,
         options: JsonEncodeOptions,
     ) -> anyhow::Result<()> {
+        let options = JsonEncodeOptions {
+            indent: self.indent.clone(),
+            ..options
+        };
+
         if self.path == "php://memory" {
             file_put_contents(
                 &self.path,
