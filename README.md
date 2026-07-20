@@ -1,5 +1,7 @@
 # Shirabe
 
+![placeholder logo](./logo.svg)
+
 Yet another dependency manager for PHP.
 
 *WORK IN PROGRESS*

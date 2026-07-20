@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Shirabe placeholder logo</title>
+  <rect width="256" height="256" rx="56" fill="#FFFFFF"/>
+  <text x="128" y="190" text-anchor="middle"
+        font-family="'Noto Serif CJK JP','Hiragino Mincho ProN',serif"
+        font-size="168" font-weight="900" fill="#000000">調</text>
+  <text x="193" y="226" text-anchor="middle"
+        font-family="'Noto Serif CJK JP','Hiragino Mincho ProN',serif"
+        font-size="46" font-weight="900" fill="#666666">(仮)</text>
+</svg>
