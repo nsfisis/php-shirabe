@@ -119,7 +119,7 @@ fn test_get_context() {
 
 #[test]
 #[serial_test::serial]
-#[ignore]
+#[ignore = "fix_http_header_field's uasort comparator (ported verbatim, ignores its second argument) is not a valid ordering; Rust's stable sort_by resolves the resulting ties differently than PHP's Zend sort, so the header order diverges from expected"]
 fn test_http_proxy() {
     let _tear_down = TearDown;
     set_up();
@@ -227,7 +227,7 @@ fn test_http_proxy_with_no_proxy_wildcard() {
 
 #[test]
 #[serial_test::serial]
-#[ignore]
+#[ignore = "fix_http_header_field's uasort comparator (ported verbatim, ignores its second argument) is not a valid ordering; Rust's stable sort_by resolves the resulting ties differently than PHP's Zend sort, so the header order diverges from expected"]
 fn test_options_are_preserved() {
     let _tear_down = TearDown;
     set_up();
@@ -275,7 +275,7 @@ fn test_options_are_preserved() {
 
 #[test]
 #[serial_test::serial]
-#[ignore]
+#[ignore = "fix_http_header_field's uasort comparator (ported verbatim, ignores its second argument) is not a valid ordering; Rust's stable sort_by resolves the resulting ties differently than PHP's Zend sort, so the header order diverges from expected"]
 fn test_http_proxy_without_port() {
     let _tear_down = TearDown;
     set_up();
@@ -418,7 +418,7 @@ fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() 
 
 #[test]
 #[serial_test::serial]
-#[ignore]
+#[ignore = "init_options only inserts the 'header' key when 'http' already exists in options; PHP's `$options['http']['header'] = []` auto-vivifies 'http', but the Rust port's `if let Some(PhpMixed::Array(http)) = options.get_mut(\"http\")` guard silently no-ops on an empty options map, leaving 'http' absent"]
 fn test_init_options_does_include_proxy_auth_headers() {
     let _tear_down = TearDown;
     set_up();
@@ -446,7 +446,7 @@ fn test_init_options_does_include_proxy_auth_headers() {
 
 #[test]
 #[serial_test::serial]
-#[ignore]
+#[ignore = "init_options only inserts the 'header' key when 'http' already exists in options; PHP's `$options['http']['header'] = []` auto-vivifies 'http', but the Rust port's `if let Some(PhpMixed::Array(http)) = options.get_mut(\"http\")` guard silently no-ops on an empty options map, leaving 'http' absent"]
 fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
     let _tear_down = TearDown;
     set_up();

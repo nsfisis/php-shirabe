@@ -43,7 +43,6 @@ fn set_env(paths: &[&str]) {
 }
 
 #[test]
-#[ignore]
 fn test_with_no_ini() {
     let paths = [""];
 
@@ -56,7 +55,8 @@ fn test_with_no_ini() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "XdebugHandler::get_all_ini_files() is stubbed to always return [\"\"], ignoring \
+COMPOSER_ORIGINAL_INIS entirely"]
 fn test_with_loaded_ini_only() {
     let paths = ["loaded.ini"];
 
@@ -65,7 +65,8 @@ fn test_with_loaded_ini_only() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "XdebugHandler::get_all_ini_files() is stubbed to always return [\"\"], ignoring \
+COMPOSER_ORIGINAL_INIS entirely"]
 fn test_with_loaded_ini_and_additional() {
     let paths = ["loaded.ini", "one.ini", "two.ini"];
 
@@ -78,7 +79,8 @@ fn test_with_loaded_ini_and_additional() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "XdebugHandler::get_all_ini_files() is stubbed to always return [\"\"], ignoring \
+COMPOSER_ORIGINAL_INIS entirely"]
 fn test_without_loaded_ini_and_additional() {
     let paths = ["", "one.ini", "two.ini"];
 

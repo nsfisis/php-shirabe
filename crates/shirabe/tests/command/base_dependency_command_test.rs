@@ -117,7 +117,6 @@ fn test_exception_when_running_locked_without_lock_file() {
 /// ref: BaseDependencyCommandTest::testExceptionWhenItCouldNotFoundThePackage.
 #[test]
 #[serial]
-#[ignore]
 fn test_exception_when_it_could_not_found_the_package() {
     // caseProvider
     let cases: Vec<(&str, Vec<(&str, PhpMixed)>)> = vec![
@@ -164,7 +163,6 @@ fn test_exception_when_it_could_not_found_the_package() {
 /// ref: BaseDependencyCommandTest::testExceptionWhenPackageWasNotFoundInProject.
 #[test]
 #[serial]
-#[ignore]
 fn test_exception_when_package_was_not_found_in_project() {
     // caseProvider
     let cases: Vec<(&str, Vec<(&str, PhpMixed)>)> = vec![
@@ -287,7 +285,6 @@ fn test_warning_when_dependencies_are_not_installed() {
 /// ref: BaseDependencyCommandTest::testWhyCommandOutputs (caseWhyProvider rolled in).
 #[test]
 #[serial]
-#[ignore]
 fn test_why_command_outputs() {
     // caseWhyProvider: (package, --tree, --recursive, expected_output, expected_status_code)
     let cases: Vec<(&str, bool, bool, &str, i32)> = vec![

@@ -51,7 +51,7 @@ fn test_repository_read() {
     assert_eq!(packages[0].get_type(), "vendor");
 }
 
-#[ignore]
+#[ignore = "InvalidRepositoryException message building calls shirabe_php_shim::var::get_class_err(), which is still todo!()"]
 #[test]
 fn test_corrupted_repository_file() {
     // PHP mocks read() to return the scalar string 'foo'; a real file containing the JSON string
@@ -327,7 +327,7 @@ fn test_repository_writes_installed_php() {
     assert_eq!(expected, actual);
 }
 
-#[ignore]
+#[ignore = "safely_load_installed_versions's pattern uses a PCRE (?(DEFINE)...) recursive grammar the regex crate cannot compile"]
 #[test]
 fn test_safely_load_installed_versions() {
     let fixtures_dir = format!(

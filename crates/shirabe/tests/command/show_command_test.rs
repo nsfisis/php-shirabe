@@ -167,7 +167,6 @@ fn test_show_with_direct_shows_only_root_deps() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_show_outdated_deps() {
     run_show_case(
         input(vec![("command", PhpMixed::from("outdated"))]),
@@ -211,7 +210,6 @@ outdated/major 1.0.0 ~ 2.0.0 from today",
 
 #[test]
 #[serial]
-#[ignore]
 fn test_show_outdated_deps_with_direct_only_show_direct_deps_with_updated() {
     run_show_case(
         input(vec![
@@ -231,7 +229,6 @@ outdated/major 1.0.0 ~ 2.0.0",
 
 #[test]
 #[serial]
-#[ignore]
 fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
     run_show_case(
         input(vec![
@@ -245,7 +242,6 @@ fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_show_outdated_deps_with_major_only() {
     run_show_case(
         input(vec![
@@ -267,7 +263,6 @@ outdated/major 1.0.0 ~ 2.0.0",
 
 #[test]
 #[serial]
-#[ignore]
 fn test_show_outdated_deps_with_minor_only() {
     run_show_case(
         input(vec![
@@ -290,7 +285,6 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 
 #[test]
 #[serial]
-#[ignore]
 fn test_show_outdated_deps_with_patch_only() {
     run_show_case(
         input(vec![
@@ -648,7 +642,6 @@ fn test_show_platform_works_without_composer_json() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_outdated_with_zero_major() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -1271,7 +1264,6 @@ fn test_not_existing_package_with_locked_option() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_not_existing_platform_with_platform_option() {
     run_not_existing_package_case(
         "ext-nonexisting",

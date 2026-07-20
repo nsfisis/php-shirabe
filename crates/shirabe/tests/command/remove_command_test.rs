@@ -86,7 +86,6 @@ fn test_exception_when_running_unused_without_lock_file() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_warning_when_removing_non_existent_package() {
     let tear_down = init_temp_composer(None, None, None, true);
     create_installed_json(&[], &[], true);
@@ -259,7 +258,6 @@ fn test_message_output_when_no_unused_packages_to_remove() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_remove_unused_package() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -325,7 +323,6 @@ fn test_remove_unused_package() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_remove_package_by_name() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -410,7 +407,6 @@ fn test_remove_package_by_name() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_remove_package_by_name_with_dry_run() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -497,7 +493,6 @@ fn test_remove_package_by_name_with_dry_run() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -555,7 +550,6 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -607,7 +601,6 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_remove_packages_by_vendor() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -691,7 +684,6 @@ fn test_remove_packages_by_vendor() {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_remove_packages_by_vendor_with_dry_run() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -969,7 +961,6 @@ fn run_update_inherited_dependencies_flag_case(
 
 #[test]
 #[serial]
-#[ignore]
 fn test_update_inherited_dependencies_flag_is_passed_to_post_remove_installer() {
     // 'update with all dependencies'
     run_update_inherited_dependencies_flag_case(

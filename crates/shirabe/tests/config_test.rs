@@ -413,7 +413,6 @@ fn test_override_github_protocols() {
     );
 }
 
-#[ignore]
 #[test]
 fn test_git_disabled_by_default_in_github_protocols() {
     let mut config = Config::new(false, None);
@@ -445,7 +444,7 @@ fn test_git_disabled_by_default_in_github_protocols() {
     );
 }
 
-#[ignore]
+#[ignore = "shirabe_php_shim::filter::filter_var_url (reqwest::Url::parse) accepts \"git:Department/Repo.git\" as a valid cannot-be-a-base URL, while PHP's FILTER_VALIDATE_URL rejects it; the malformed-URL early-return in prohibit_url_by_config is skipped and the git scheme then hits the secure-http rejection"]
 #[test]
 fn test_allowed_urls_pass() {
     let urls = vec![
@@ -521,7 +520,7 @@ fn test_prohibited_urls_warning_verify_peer() {
         .unwrap();
 }
 
-#[ignore]
+#[ignore = "Config::get's disable-tls/secure-http/use-github-api/lock branch casts via v.as_bool().unwrap_or(false) instead of PhpMixed::to_bool() (PHP's (bool) cast), so a truthy String(\"true\") is read back as false"]
 #[test]
 fn test_disable_tls_can_be_overridden() {
     let mut config = Config::new(true, None);
@@ -548,7 +547,7 @@ fn test_process_timeout() {
     assert_eq!(PhpMixed::Int(0), result);
 }
 
-#[ignore]
+#[ignore = "Config::get's cache-read-only/htaccess-protect branch casts via val.as_bool().unwrap_or_else(|| !val.is_null()) instead of PhpMixed::to_bool() (PHP's (bool) cast), so String(\"0\") from COMPOSER_HTACCESS_PROTECT is read back as true instead of false"]
 #[test]
 #[serial]
 fn test_htaccess_protect() {

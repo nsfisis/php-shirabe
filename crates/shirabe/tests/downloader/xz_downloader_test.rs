@@ -63,7 +63,7 @@ fn get_config(config_options: IndexMap<String, PhpMixed>, use_environment: bool)
 }
 
 #[cfg(all(not(windows), target_pointer_width = "64"))]
-#[ignore]
+#[ignore = "dist_url built from file!(), which yields a workspace-relative path unlike PHP's absolute __FILE__, so the file:// URL never resolves to a real file"]
 #[test]
 fn test_error_messages() {
     let test_dir = set_up();

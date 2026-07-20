@@ -99,7 +99,6 @@ fn test_find_packages() {
 }
 
 #[test]
-#[ignore]
 fn test_automatically_add_aliased_package_but_not_remove() {
     let repo = ArrayRepository::new(vec![]).unwrap();
 

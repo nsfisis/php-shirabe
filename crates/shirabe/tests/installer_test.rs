@@ -343,7 +343,6 @@ fn make_packages_comparable(
 }
 
 #[test]
-#[ignore]
 fn test_installer() {
     let _tear_down = TearDown;
 

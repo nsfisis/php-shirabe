@@ -22,7 +22,6 @@ fn conf(entries: &[(&str, &[&str])]) -> IndexMap<String, PhpMixed> {
 }
 
 #[test]
-#[ignore]
 fn test_update_dist_reference() {
     for (url, expected_url, c, r#ref) in dist_refs_provider() {
         let mut config = Config::new(true, None);

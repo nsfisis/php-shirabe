@@ -172,7 +172,6 @@ fn test_select_newest_picks_latest_stable_with_prefer_stable() {
     assert_eq!(expected, selected);
 }
 
-#[ignore]
 #[test]
 #[serial]
 fn test_select_lowest_with_prefer_dev_over_prerelease() {

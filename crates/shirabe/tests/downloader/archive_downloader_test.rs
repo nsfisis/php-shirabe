@@ -110,7 +110,6 @@ fn provide_urls() -> Vec<&'static str> {
 }
 
 #[test]
-#[ignore]
 fn test_process_url_rewrite_dist() {
     let downloader = get_archive_downloader(None);
 
@@ -148,7 +147,6 @@ fn provide_bitbucket_urls() -> Vec<(&'static str, &'static str)> {
 }
 
 #[test]
-#[ignore]
 fn test_process_url_rewrite_bitbucket_dist() {
     let downloader = get_archive_downloader(None);
 

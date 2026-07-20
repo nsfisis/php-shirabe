@@ -204,7 +204,7 @@ fn test_double_escaped_unicode() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "JsonFile::write never forwards self.indent (set by read()'s detect_indenting) into the encode options, unlike PHP's write() which passes $this->indent to encode()"]
 fn test_preserve_indentation_after_read() {
     let src = fixture_path("tabs.json");
     let dst = fixture_path("tabs2.json");

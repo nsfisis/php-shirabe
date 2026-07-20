@@ -51,7 +51,7 @@ fn test_dev_warning() {
     todo!()
 }
 
-#[ignore]
+#[ignore = "SelfUpdateCommand::execute is intentionally stubbed with a Shirabe-specific \"not available\" message instead of the original Composer wording this test expects"]
 #[test]
 fn test_dev_warning_suppressed_for_self_update() {
     let _tear_down = TearDown;

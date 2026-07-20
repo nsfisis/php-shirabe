@@ -49,7 +49,6 @@ fn link(source: &str, target: &str, description: &str) -> Link {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_installed_packages_with_no_suggestions() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -216,7 +215,6 @@ fn run_suggest_case(has_lock_file: bool, command: &[(&str, PhpMixed)], expected:
 
 #[test]
 #[serial]
-#[ignore]
 fn test_suggest() {
     let t = PhpMixed::from(true);
     let by_package = ("--by-package", t.clone());

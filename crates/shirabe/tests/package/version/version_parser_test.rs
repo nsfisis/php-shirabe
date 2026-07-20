@@ -15,7 +15,10 @@ fn entry(fields: &[(&str, &str)]) -> IndexMap<String, String> {
 }
 
 #[test]
-#[ignore]
+#[ignore = "VersionParser::parse_name_version_pairs uses the PCRE lookaround pattern \
+            {(?<=[a-z0-9_/-])\\*|\\*(?=[a-z0-9_/-])}i, which regex-crate rejects (look-around, \
+            including look-ahead and look-behind, is not supported); not yet converted per \
+            docs/dev/regex-porting.md"]
 fn test_parse_name_version_pairs() {
     for (input, result) in provide_parse_name_version_pairs_data() {
         let version_parser = VersionParser::new();

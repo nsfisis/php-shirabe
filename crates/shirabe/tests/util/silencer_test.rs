@@ -7,7 +7,7 @@ use shirabe_php_shim::{
 
 /// Test succeeds when no warnings are emitted externally, and original level is restored.
 #[test]
-#[ignore]
+#[ignore = "shirabe_php_shim::trigger_error is still todo!() (PHP error subsystem not modeled)"]
 fn test_silencer() {
     let before = error_reporting(None);
 

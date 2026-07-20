@@ -64,7 +64,7 @@ fn test_instantiation() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "not #[serial_test::serial] like test_instantiation; races on the process-wide HTTP_PROXY/etc env vars and the ProxyManager::INSTANCE mutex when run in parallel with the other proxy_manager_test tests, causing spurious PoisonError panics"]
 fn test_get_proxy_for_request_throws_on_bad_proxy_url() {
     let _tear_down = TearDown;
     set_up();
@@ -82,7 +82,7 @@ fn test_get_proxy_for_request_throws_on_bad_proxy_url() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "not #[serial_test::serial] like test_instantiation; races on the process-wide HTTP_PROXY/etc env vars and the ProxyManager::INSTANCE mutex when run in parallel with the other proxy_manager_test tests, causing spurious PoisonError panics"]
 fn test_lowercase_overrides_uppercase() {
     let _tear_down = TearDown;
     set_up();
@@ -129,7 +129,7 @@ fn test_lowercase_overrides_uppercase() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "not #[serial_test::serial] like test_instantiation; races on the process-wide HTTP_PROXY/etc env vars and the ProxyManager::INSTANCE mutex when run in parallel with the other proxy_manager_test tests, causing spurious PoisonError panics"]
 fn test_cgi_proxy_is_only_used_when_no_http_proxy() {
     let _tear_down = TearDown;
     set_up();
@@ -167,7 +167,7 @@ fn test_cgi_proxy_is_only_used_when_no_http_proxy() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "not #[serial_test::serial] like test_instantiation; races on the process-wide HTTP_PROXY/etc env vars and the ProxyManager::INSTANCE mutex when run in parallel with the other proxy_manager_test tests, causing spurious PoisonError panics"]
 fn test_no_http_proxy_does_not_use_https_proxy() {
     let _tear_down = TearDown;
     set_up();
@@ -184,7 +184,7 @@ fn test_no_http_proxy_does_not_use_https_proxy() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "not #[serial_test::serial] like test_instantiation; races on the process-wide HTTP_PROXY/etc env vars and the ProxyManager::INSTANCE mutex when run in parallel with the other proxy_manager_test tests, causing spurious PoisonError panics"]
 fn test_no_https_proxy_does_not_use_http_proxy() {
     let _tear_down = TearDown;
     set_up();
@@ -201,7 +201,7 @@ fn test_no_https_proxy_does_not_use_http_proxy() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "not #[serial_test::serial] like test_instantiation; races on the process-wide HTTP_PROXY/etc env vars and the ProxyManager::INSTANCE mutex when run in parallel with the other proxy_manager_test tests, causing spurious PoisonError panics"]
 fn test_get_proxy_for_request() {
     use indexmap::IndexMap;
     use shirabe_php_shim::PhpMixed;

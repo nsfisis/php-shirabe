@@ -42,7 +42,7 @@ fn test_host_name() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "shirabe_php_shim::chr() lossily re-encodes bytes >= 0x80 as UTF-8 (TODO(phase-d) in its own doc comment); ip_map_to_6's chr(255) filler bytes become 3-byte U+FFFD replacements, corrupting the mapped IPv4-in-IPv6 byte arrays used for comparison"]
 fn test_ip_address() {
     let noproxy = "192.168.1.1, 2001:db8::52:0:1";
 
@@ -55,7 +55,7 @@ fn test_ip_address() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "shirabe_php_shim::chr() lossily re-encodes bytes >= 0x80 as UTF-8 (TODO(phase-d) in its own doc comment); ip_get_mask's chr(255)/chr(0xff^...) calls corrupt the CIDR netmask bytes used in match_range, breaking all prefix-based no_proxy matching"]
 fn test_ip_range() {
     let noproxy = "10.0.0.0/30, 2002:db8:a::45/121";
 

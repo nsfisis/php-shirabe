@@ -12,7 +12,7 @@ fn fixture(name: &str) -> String {
 }
 
 #[test]
-#[ignore]
+#[ignore = "PharData::new() (crates/shirabe-php-shim/src/phar.rs:91) is still todo!(), which Tar::get_composer_json depends on for every fixture"]
 fn test_returns_nullif_the_tar_is_not_found() {
     let result = Tar::get_composer_json(&fixture("invalid.zip")).unwrap();
 
@@ -20,26 +20,26 @@ fn test_returns_nullif_the_tar_is_not_found() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "PharData::new() (crates/shirabe-php-shim/src/phar.rs:91) is still todo!(), which Tar::get_composer_json depends on for every fixture"]
 fn test_returns_null_if_the_tar_is_empty() {
     let result = Tar::get_composer_json(&fixture("empty.tar.gz")).unwrap();
     assert_eq!(None, result);
 }
 
 #[test]
-#[ignore]
+#[ignore = "PharData::new() (crates/shirabe-php-shim/src/phar.rs:91) is still todo!(), which Tar::get_composer_json depends on for every fixture"]
 fn test_throws_exception_if_the_tar_has_no_composer_json() {
     assert!(Tar::get_composer_json(&fixture("nojson.tar.gz")).is_err());
 }
 
 #[test]
-#[ignore]
+#[ignore = "PharData::new() (crates/shirabe-php-shim/src/phar.rs:91) is still todo!(), which Tar::get_composer_json depends on for every fixture"]
 fn test_throws_exception_if_the_composer_json_is_in_a_sub_subfolder() {
     assert!(Tar::get_composer_json(&fixture("subfolders.tar.gz")).is_err());
 }
 
 #[test]
-#[ignore]
+#[ignore = "PharData::new() (crates/shirabe-php-shim/src/phar.rs:91) is still todo!(), which Tar::get_composer_json depends on for every fixture"]
 fn test_returns_composer_json_in_tar_root() {
     let result = Tar::get_composer_json(&fixture("root.tar.gz")).unwrap();
     assert_eq!(
@@ -49,7 +49,7 @@ fn test_returns_composer_json_in_tar_root() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "PharData::new() (crates/shirabe-php-shim/src/phar.rs:91) is still todo!(), which Tar::get_composer_json depends on for every fixture"]
 fn test_returns_composer_json_in_first_folder() {
     let result = Tar::get_composer_json(&fixture("folder.tar.gz")).unwrap();
     assert_eq!(
@@ -59,7 +59,7 @@ fn test_returns_composer_json_in_first_folder() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "PharData::new() (crates/shirabe-php-shim/src/phar.rs:91) is still todo!(), which Tar::get_composer_json depends on for every fixture"]
 fn test_multiple_top_level_dirs_is_invalid() {
     assert!(Tar::get_composer_json(&fixture("multiple.tar.gz")).is_err());
 }

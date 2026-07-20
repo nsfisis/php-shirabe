@@ -4,7 +4,9 @@ use shirabe::util::platform::Platform;
 use shirabe_php_shim::defined;
 
 #[test]
-#[ignore]
+#[ignore = "Preg::replace_callback doesn't set PREG_UNMATCHED_AS_NULL, so the non-participating \
+alternation branch (dvar) is captured as an empty string instead of absent; Platform::expand_path's \
+matches.get(dvar).or_else(pvar) then picks the empty dvar over pvar for the %VAR% form"]
 fn test_expand_path() {
     Platform::put_env("TESTENV", "/home/test");
     assert_eq!(

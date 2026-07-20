@@ -583,7 +583,10 @@ fn test_store_auth_with_prompt_invalid_answer() {
 // same username/password IOStub already returns. Since getAuthentication is a static stub, that
 // looks like "no auth change" and AuthHelper raises a TransportException.
 #[test]
-#[ignore]
+#[ignore = "AuthHelper::prompt_auth_if_needed's in_gitlab_domains/in_github_domains checks call \
+PhpMixed::as_array(), which returns None for PhpMixed::List; Config's default gitlab-domains/\
+github-domains values are PhpMixed::List, so the domain match never fires and no GitLab-specific \
+TransportException is raised"]
 fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
     use crate::io_stub::IOStub;
     use shirabe::downloader::TransportException;
