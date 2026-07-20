@@ -996,31 +996,30 @@ impl ComposerRepository {
                 let spec = spec?;
 
                 // [$response] = $spec;
-                let response = spec
-                    .as_list()
-                    .and_then(|l| l.first())
-                    .cloned()
-                    .unwrap_or(PhpMixed::Null);
-                let response_arr = match response.as_array() {
-                    Some(a) => a.clone(),
-                    None => continue,
+                let response = match spec {
+                    PhpMixed::List(mut l) if !l.is_empty() => l.remove(0),
+                    _ => PhpMixed::Null,
                 };
-                let sec_advs_arr = match response_arr.get("security-advisories") {
-                    Some(PhpMixed::List(l)) => l.clone(),
-                    Some(PhpMixed::Array(a)) => a.values().cloned().collect(),
+                // Takes ownership out of response instead of cloning: response is local to this
+                // iteration's own package metadata and is not read again afterwards.
+                let mut response_arr = match response {
+                    PhpMixed::Array(a) => a,
+                    _ => continue,
+                };
+                let sec_advs_arr = match response_arr.shift_remove("security-advisories") {
+                    Some(PhpMixed::List(l)) => l,
+                    Some(PhpMixed::Array(a)) => a.into_values().collect(),
                     _ => continue,
                 };
 
                 names_found.insert(name.clone(), true);
                 if !sec_advs_arr.is_empty() {
                     let mut entries: Vec<AnySecurityAdvisory> = Vec::new();
-                    for data_mixed in sec_advs_arr.iter() {
-                        if let Some(data) = data_mixed.as_array() {
-                            let data_map: IndexMap<String, PhpMixed> =
-                                data.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                            if let Some(adv) = create(&data_map, &name, &package_constraint_map)? {
-                                entries.push(adv);
-                            }
+                    for data_mixed in sec_advs_arr.into_iter() {
+                        if let PhpMixed::Array(data_map) = data_mixed
+                            && let Some(adv) = create(&data_map, &name, &package_constraint_map)?
+                        {
+                            entries.push(adv);
                         }
                     }
                     advisories.insert(name.clone(), entries);
