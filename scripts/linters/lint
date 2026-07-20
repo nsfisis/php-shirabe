@@ -1,0 +1,38 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Shirabe\Lint\Linters\CargoWorkspaceDependencies;
+use Shirabe\Lint\Linters\ContiguousUseBlock;
+use Shirabe\Lint\Linters\NoBannedUse;
+use Shirabe\Lint\Linters\NoDecorativeSectionComment;
+use Shirabe\Lint\Linters\NoFormatTrailingComma;
+use Shirabe\Lint\Linters\NoModRs;
+use Shirabe\Lint\Linters\NoStdCollectionsMaps;
+use Shirabe\Lint\Linters\NoUseAsAlias;
+use Shirabe\Lint\Linters\SortedDependencies;
+use Shirabe\Lint\Runner;
+
+$rootDir = dirname(__DIR__, 2);
+
+$runner = new Runner($rootDir, [
+    [new CargoWorkspaceDependencies(), []],
+    [new ContiguousUseBlock(), []],
+    [new NoBannedUse(), []],
+    [new NoDecorativeSectionComment(), [
+        'crates/shirabe-semver/src/version_parser.rs',
+    ]],
+    [new NoFormatTrailingComma(), [
+        'crates/shirabe/src/package/loader/root_package_loader.rs',
+        'crates/shirabe-spdx-licenses/src/spdx_licenses.rs',
+    ]],
+    [new NoModRs(), []],
+    [new NoStdCollectionsMaps(), []],
+    [new NoUseAsAlias(), []],
+    [new SortedDependencies(), []],
+]);
+
+exit($runner->run() ? 0 : 1);
