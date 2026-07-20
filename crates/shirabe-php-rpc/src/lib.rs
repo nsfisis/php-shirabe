@@ -1,5 +1,6 @@
 //! Rust-to-PHP RPC over a Unix domain socket. See `docs/dev/php-rpc.md`.
 
+use anyhow::Context as _;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::PhpMixed;
 use std::io::{Read as _, Write as _};
@@ -91,9 +92,11 @@ const GLUE_SCRIPT: &str = include_str!("../php/worker.php");
 
 struct Worker {
     stream: UnixStream,
-    // Kept alive for the process lifetime: the child interpreter and the temp dir holding the socket
-    // and glue script. Neither is dropped because the worker lives in a never-dropped static.
-    _child: std::process::Child,
+    // Also queried for its exit status when a socket read/write fails, to tell a dead worker
+    // apart from a framing bug. Kept alive for the process lifetime along with the temp dir
+    // holding the socket and glue script; neither is dropped because the worker lives in a
+    // never-dropped static.
+    child: std::process::Child,
     _tempdir: tempfile::TempDir,
 }
 
@@ -102,8 +105,22 @@ impl Worker {
         let mut payload = name.as_bytes().to_vec();
         payload.push(0);
         payload.extend_from_slice(arg.as_bytes());
-        write_frame(&mut self.stream, &payload)?;
-        Ok(read_frame(&mut self.stream)?)
+        write_frame(&mut self.stream, &payload).with_context(|| self.worker_state())?;
+        read_frame(&mut self.stream).with_context(|| self.worker_state())
+    }
+
+    /// Describes the PHP worker's current process state, to be attached as `anyhow::Context` to
+    /// an I/O error so a dead worker (crash, OOM kill, ...) can be told apart from a live one
+    /// hitting a framing bug.
+    fn worker_state(&mut self) -> String {
+        match self.child.try_wait() {
+            Ok(Some(status)) => format!("PHP worker process already exited: {status}"),
+            Ok(None) => format!(
+                "PHP worker process (pid {}) is still running",
+                self.child.id()
+            ),
+            Err(wait_err) => format!("failed to check PHP worker process status: {wait_err}"),
+        }
     }
 }
 
@@ -165,7 +182,7 @@ fn spawn_worker() -> anyhow::Result<Worker> {
 
     Ok(Worker {
         stream,
-        _child: child,
+        child,
         _tempdir: tempdir,
     })
 }
@@ -257,6 +274,22 @@ mod tests {
     #[test]
     fn rejects_truncated_string() {
         assert_eq!(parse_serialized_string(b"s:5:\"ab\";"), None);
+    }
+
+    #[test]
+    fn request_error_reports_dead_worker_exit_status() {
+        let mut worker = spawn_worker().expect("failed to spawn PHP worker");
+        worker.child.kill().expect("failed to kill PHP worker");
+        worker.child.wait().expect("failed to reap PHP worker");
+
+        let err = worker
+            .request("defined", "PHP_VERSION")
+            .expect_err("request against a dead worker should fail");
+        let message = format!("{err:#}");
+        assert!(
+            message.contains("PHP worker process already exited"),
+            "unexpected error message: {message}"
+        );
     }
 
     #[test]

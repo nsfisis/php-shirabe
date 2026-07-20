@@ -32,8 +32,8 @@ hyperfine \
   --prepare "rm -rf '$TARGET_DIR-shirabe' '$TARGET_DIR-composer'" \
   --export-json "$OUTDIR/results-$PACKAGE_SLUG.json" \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
-  --ignore-failure \
-  --command-name Shirabe "'$BIN' create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-shirabe'" \
+  --show-output \
+  --command-name Shirabe "RUST_BACKTRACE=1 '$BIN' create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-shirabe'" \
   --command-name Composer "composer create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-composer'"
 
 echo ">> results: $OUTDIR/results-$PACKAGE_SLUG.json" >&2
