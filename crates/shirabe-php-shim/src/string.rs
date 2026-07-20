@@ -1289,12 +1289,6 @@ pub fn ucfirst(s: &str) -> String {
     }
 }
 
-pub fn chr(_value: u8) -> String {
-    // TODO(phase-d): PHP chr() yields a single raw byte; for values >= 0x80 that byte is not valid
-    // UTF-8, so storing it in a Rust String forces a lossy substitution.
-    String::from_utf8_lossy(&[_value]).into_owned()
-}
-
 // Port of PHP's addcslashes: every byte that falls in the (range-expanded) charlist is
 // backslash-escaped, with non-printable bytes rendered as the C escape or a three-digit octal.
 pub fn addcslashes(_string: &str, _charlist: &str) -> String {

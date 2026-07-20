@@ -3,9 +3,9 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists, chr,
+    PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
     empty, explode, filter_var_int_with_range, filter_var_ip, inet_pton, ltrim, parse_url,
-    php_regex, str_pad, str_repeat, stripos, strlen, strpbrk, strpos, substr, substr_count, unpack,
+    php_regex, stripos, strlen, strpbrk, strpos, substr, substr_count, unpack,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -315,26 +315,23 @@ impl NoProxyPattern {
     /// @param int $prefix CIDR prefix-length
     /// @param int $size   Byte size of in_addr
     fn ip_get_mask(&self, prefix: i64, size: i64) -> Vec<u8> {
-        let mut mask = String::new();
+        let mut mask: Vec<u8> = Vec::new();
 
         let ones = (prefix as f64 / 8.0).floor() as i64;
         if ones != 0 {
-            mask = str_repeat(&chr(255), ones as usize);
+            mask.extend(vec![0xffu8; ones as usize]);
         }
 
         let remainder = prefix % 8;
         if remainder != 0 {
-            mask.push_str(&chr(0xff ^ (0xff >> remainder)));
+            mask.push(0xff ^ (0xff >> remainder));
         }
 
-        let mask = str_pad(
-            &mask,
-            size as usize,
-            &chr(0),
-            shirabe_php_shim::STR_PAD_RIGHT,
-        );
+        if (size as usize) > mask.len() {
+            mask.resize(size as usize, 0);
+        }
 
-        self.ip_map_to_6(mask.as_bytes(), size)
+        self.ip_map_to_6(&mask, size)
     }
 
     /// Calculates and returns the network and mask
@@ -389,8 +386,7 @@ impl NoProxyPattern {
                 .get(&i.to_string())
                 .and_then(|v| v.as_int())
                 .unwrap_or(0);
-            // PHP: $net .= chr($ip[$i] & $mask[$i]);
-            net.extend(chr((ip_byte & mask_byte) as u8).as_bytes());
+            net.push((ip_byte & mask_byte) as u8);
         }
 
         Ok((net, netmask))
@@ -404,8 +400,8 @@ impl NoProxyPattern {
     /// @return string Mapped or existing in_addr
     fn ip_map_to_6(&self, binary: &[u8], size: i64) -> Vec<u8> {
         if size == 4 {
-            let mut prefix = str_repeat(&chr(0), 10).into_bytes();
-            prefix.extend(str_repeat(&chr(255), 2).into_bytes());
+            let mut prefix = vec![0u8; 10];
+            prefix.extend(vec![0xffu8; 2]);
             prefix.extend_from_slice(binary);
             return prefix;
         }

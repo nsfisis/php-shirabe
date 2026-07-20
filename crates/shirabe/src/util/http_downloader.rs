@@ -18,9 +18,9 @@ use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, chr,
-    extension_loaded, file_get_contents, function_exists, implode, is_numeric, php_regex,
-    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
+    InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
+    file_get_contents, function_exists, implode, is_numeric, php_regex, rawurldecode,
+    stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -381,11 +381,7 @@ impl HttpDownloader {
     ) -> anyhow::Result<()> {
         let clean_message = |msg: &str| -> anyhow::Result<String> {
             if !io.is_decorated() {
-                return Ok(Preg::replace(
-                    format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"),
-                    "",
-                    msg,
-                ));
+                return Ok(Preg::replace("{\x1b\\[[;\\d]*m}u", "", msg));
             }
 
             Ok(msg.to_string())
