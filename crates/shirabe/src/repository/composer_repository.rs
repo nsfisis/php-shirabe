@@ -1788,47 +1788,55 @@ impl ComposerRepository {
             let version_parser = self.version_parser.clone();
 
             // [$response, $packagesSource] = $spec;
-            let spec_list = spec.as_list().cloned().unwrap_or_default();
-            let response = spec_list.first().cloned().unwrap_or(PhpMixed::Null);
-            let packages_source_val = spec_list.get(1).cloned().unwrap_or(PhpMixed::Null);
+            let mut spec_list = match spec {
+                PhpMixed::List(l) => l,
+                _ => Vec::new(),
+            };
+            let packages_source_val = if spec_list.len() > 1 {
+                spec_list.remove(1)
+            } else {
+                PhpMixed::Null
+            };
+            let response = if !spec_list.is_empty() {
+                spec_list.remove(0)
+            } else {
+                PhpMixed::Null
+            };
             let packages_source: Option<String> =
                 packages_source_val.as_string().map(|s| s.to_string());
             if response.is_null() {
                 continue;
             }
-            let response_arr = match response.as_array() {
-                Some(a) => a.clone(),
-                None => continue,
+            let mut response_arr = match response {
+                PhpMixed::Array(a) => a,
+                _ => continue,
             };
-            let inner_packages = response_arr.get("packages");
-            let versions_mixed = match inner_packages
-                .and_then(|v| v.as_array())
-                .and_then(|a| a.get(&real_name))
-                .cloned()
-            {
-                Some(b) => b,
-                None => continue,
-            };
+            // Takes ownership out of response_arr instead of cloning: response_arr is local to
+            // this iteration and "packages" is not read again afterwards (only "minified" is).
+            let versions_mixed =
+                match response_arr
+                    .shift_remove("packages")
+                    .and_then(|mut v| match &mut v {
+                        PhpMixed::Array(m) => m.shift_remove(&real_name),
+                        _ => None,
+                    }) {
+                    Some(b) => b,
+                    None => continue,
+                };
 
-            let mut versions: Vec<IndexMap<String, PhpMixed>> = match &versions_mixed {
+            let mut versions: Vec<IndexMap<String, PhpMixed>> = match versions_mixed {
                 PhpMixed::List(l) => l
-                    .iter()
-                    .filter_map(|v| {
-                        v.as_array().map(|a| {
-                            a.iter()
-                                .map(|(k, v)| (k.clone(), v.clone()))
-                                .collect::<IndexMap<String, PhpMixed>>()
-                        })
+                    .into_iter()
+                    .filter_map(|v| match v {
+                        PhpMixed::Array(a) => Some(a),
+                        _ => None,
                     })
                     .collect(),
                 PhpMixed::Array(a) => a
-                    .values()
-                    .filter_map(|v| {
-                        v.as_array().map(|a| {
-                            a.iter()
-                                .map(|(k, v)| (k.clone(), v.clone()))
-                                .collect::<IndexMap<String, PhpMixed>>()
-                        })
+                    .into_values()
+                    .filter_map(|v| match v {
+                        PhpMixed::Array(a) => Some(a),
+                        _ => None,
                     })
                     .collect(),
                 _ => continue,
