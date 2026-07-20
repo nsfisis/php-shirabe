@@ -132,10 +132,7 @@ fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
                     .and_then(|v| v.as_string())
                     .unwrap_or("")
                     .to_string(),
-                preferred: m
-                    .get("preferred")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
+                preferred: m.get("preferred").is_some_and(|v| v.to_bool()),
             }),
             _ => None,
         })

@@ -6,6 +6,7 @@ use crate::package::BasePackageHandle;
 use crate::package::STABILITIES;
 use crate::util::Platform;
 use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -31,8 +32,7 @@ impl DefaultPolicy {
             prefer_lowest,
             preferred_versions,
             prefer_dev_over_prerelease: Platform::get_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE")
-                .map(|v| !v.is_empty())
-                .unwrap_or(false),
+                .is_some_and(|v| PhpMixed::String(v).to_bool()),
             preferred_package_result_cache_per_pool: std::cell::RefCell::new(IndexMap::new()),
             sorting_cache_per_pool: std::cell::RefCell::new(IndexMap::new()),
         }

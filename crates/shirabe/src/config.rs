@@ -637,8 +637,7 @@ impl Config {
                 };
 
                 Ok(PhpMixed::Bool(
-                    val.as_string() != Some("false")
-                        && val.as_bool().unwrap_or_else(|| !val.is_null()),
+                    val.as_string() != Some("false") && val.to_bool(),
                 ))
             }
 
@@ -653,7 +652,7 @@ impl Config {
 
                 let v = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                 Ok(PhpMixed::Bool(
-                    v.as_string() != Some("false") && v.as_bool().unwrap_or(false),
+                    v.as_string() != Some("false") && v.to_bool(),
                 ))
             }
 
@@ -1179,8 +1178,8 @@ impl Config {
                 .get("ssl")
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get("verify_peer"));
-            if let Some(v) = verify_peer
-                && v.as_bool() == Some(false)
+            if let Some(v) = verify_peer.and_then(|v| v.as_opt())
+                && !v.to_bool()
             {
                 warning = Some("verify_peer".to_string());
             }
@@ -1189,8 +1188,8 @@ impl Config {
                 .get("ssl")
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get("verify_peer_name"));
-            if let Some(v) = verify_peer_name
-                && v.as_bool() == Some(false)
+            if let Some(v) = verify_peer_name.and_then(|v| v.as_opt())
+                && !v.to_bool()
             {
                 warning = match warning {
                     None => Some("verify_peer_name".to_string()),

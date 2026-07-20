@@ -520,7 +520,6 @@ fn test_prohibited_urls_warning_verify_peer() {
         .unwrap();
 }
 
-#[ignore = "Config::get's disable-tls/secure-http/use-github-api/lock branch casts via v.as_bool().unwrap_or(false) instead of PhpMixed::to_bool() (PHP's (bool) cast), so a truthy String(\"true\") is read back as false"]
 #[test]
 fn test_disable_tls_can_be_overridden() {
     let mut config = Config::new(true, None);
@@ -547,7 +546,6 @@ fn test_process_timeout() {
     assert_eq!(PhpMixed::Int(0), result);
 }
 
-#[ignore = "Config::get's cache-read-only/htaccess-protect branch casts via val.as_bool().unwrap_or_else(|| !val.is_null()) instead of PhpMixed::to_bool() (PHP's (bool) cast), so String(\"0\") from COMPOSER_HTACCESS_PROTECT is read back as true instead of false"]
 #[test]
 #[serial]
 fn test_htaccess_protect() {

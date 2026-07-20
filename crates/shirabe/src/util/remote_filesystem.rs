@@ -194,8 +194,12 @@ impl RemoteFilesystem {
         self.redirects = 1; // The first request counts.
 
         let mut temp_additional_options = additional_options.clone();
-        if let Some(v) = temp_additional_options.get("retry-auth-failure").cloned() {
-            retry_auth_failure = v.as_bool().unwrap_or(true);
+        if let Some(v) = temp_additional_options
+            .get("retry-auth-failure")
+            .and_then(|v| v.as_opt())
+            .cloned()
+        {
+            retry_auth_failure = v.to_bool();
             temp_additional_options.shift_remove("retry-auth-failure");
         }
 

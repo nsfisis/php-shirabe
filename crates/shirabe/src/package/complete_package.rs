@@ -127,11 +127,7 @@ impl CompletePackageInterface for CompletePackage {
     }
 
     fn is_abandoned(&self) -> bool {
-        match &self.abandoned {
-            PhpMixed::Bool(b) => *b,
-            PhpMixed::String(s) => !s.is_empty(),
-            _ => false,
-        }
+        self.abandoned.to_bool()
     }
 
     fn set_abandoned(&mut self, abandoned: PhpMixed) {

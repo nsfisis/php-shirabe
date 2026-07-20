@@ -168,17 +168,20 @@ impl AuditConfig {
 
         let block_insecure = audit_config
             .and_then(|m| m.get("block-insecure"))
-            .and_then(|v| v.as_bool())
+            .and_then(|v| v.as_opt())
+            .map(|v| v.to_bool())
             .unwrap_or(true);
 
         let block_abandoned = audit_config
             .and_then(|m| m.get("block-abandoned"))
-            .and_then(|v| v.as_bool())
+            .and_then(|v| v.as_opt())
+            .map(|v| v.to_bool())
             .unwrap_or(false);
 
         let ignore_unreachable = audit_config
             .and_then(|m| m.get("ignore-unreachable"))
-            .and_then(|v| v.as_bool())
+            .and_then(|v| v.as_opt())
+            .map(|v| v.to_bool())
             .unwrap_or(false);
 
         Ok(Self::new(

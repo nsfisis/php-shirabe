@@ -229,8 +229,8 @@ impl RootPackageLoader {
         real_package.set_stability_flags(stability_flags);
         real_package.set_references(references);
 
-        if let Some(prefer_stable) = config.get("prefer-stable").and_then(|v| v.as_bool()) {
-            real_package.set_prefer_stable(prefer_stable);
+        if let Some(prefer_stable) = config.get("prefer-stable").and_then(|v| v.as_opt()) {
+            real_package.set_prefer_stable(prefer_stable.to_bool());
         }
 
         if let Some(pkg_config) = config.get("config").and_then(|v| v.as_array()) {

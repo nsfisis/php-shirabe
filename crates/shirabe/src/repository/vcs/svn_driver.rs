@@ -15,7 +15,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_key_exists, php_regex, stripos, strrpos, strtr, substr, trim,
+    PhpMixed, RuntimeException, php_regex, stripos, strrpos, strtr, substr, trim,
 };
 
 #[derive(Debug)]
@@ -85,13 +85,8 @@ impl SvnDriver {
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("tags-path").cloned() {
             self.tags_path = v;
         }
-        if array_key_exists("svn-cache-credentials", &self.inner.repo_config) {
-            self.cache_credentials = self
-                .inner
-                .repo_config
-                .get("svn-cache-credentials")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
+        if let Some(v) = self.inner.repo_config.get("svn-cache-credentials") {
+            self.cache_credentials = v.to_bool();
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("package-path").cloned() {
             self.package_path = format!("/{}", trim(&v, Some("/")));

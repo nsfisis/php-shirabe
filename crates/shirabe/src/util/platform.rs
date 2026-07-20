@@ -116,12 +116,10 @@ impl Platform {
                     .unwrap_or("");
                 // Treat HOME as an alias for USERPROFILE on Windows for legacy reasons
                 if Platform::is_windows() && var == "HOME" {
-                    if Platform::get_env("HOME").is_some() {
-                        return format!(
-                            "{}{}",
-                            Platform::get_env("HOME").unwrap_or_default(),
-                            path_part,
-                        );
+                    let home =
+                        Platform::get_env("HOME").filter(|v| PhpMixed::String(v.clone()).to_bool());
+                    if let Some(home) = home {
+                        return format!("{}{}", home, path_part);
                     }
 
                     return format!(
@@ -189,9 +187,7 @@ impl Platform {
                 .ok()
                 .flatten()
                 .unwrap_or_default();
-            if !(ini_get("open_basedir")
-                .map(|s| !s.is_empty())
-                .unwrap_or(false))
+            if !ini_get("open_basedir").is_some_and(|s| PhpMixed::String(s).to_bool())
                 && is_readable("/proc/version")
                 && stripos(&file_contents, "microsoft").is_some()
                 && !Self::is_docker()
@@ -217,10 +213,7 @@ impl Platform {
         }
 
         // cannot check so assume no
-        if ini_get("open_basedir")
-            .map(|s| !s.is_empty())
-            .unwrap_or(false)
-        {
+        if ini_get("open_basedir").is_some_and(|s| PhpMixed::String(s).to_bool()) {
             *cached = Some(false);
             return false;
         }
@@ -274,8 +267,7 @@ impl Platform {
             *use_mb_string = Some(
                 function_exists("mb_strlen")
                     && ini_get("mbstring.func_overload")
-                        .map(|s| !s.is_empty())
-                        .unwrap_or(false),
+                        .is_some_and(|s| PhpMixed::String(s).to_bool()),
             );
         }
 

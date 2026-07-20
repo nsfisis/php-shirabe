@@ -164,12 +164,8 @@ impl VcsDownloader for SvnDownloader {
                 let repo_ref = repo.borrow();
                 if let Some(vcs_repo) = repo_ref.as_any().downcast_ref::<VcsRepository>() {
                     let repo_config = vcs_repo.get_repo_config();
-                    if repo_config.contains_key("svn-cache-credentials")
-                        && let Some(val) = repo_config
-                            .get("svn-cache-credentials")
-                            .and_then(|v| v.as_bool())
-                    {
-                        self.cache_credentials.set(val);
+                    if let Some(val) = repo_config.get("svn-cache-credentials") {
+                        self.cache_credentials.set(val.to_bool());
                     }
                 }
             }

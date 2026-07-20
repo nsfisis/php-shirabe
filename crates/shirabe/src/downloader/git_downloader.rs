@@ -896,8 +896,9 @@ impl VcsDownloader for GitDownloader {
             ];
             let transport_options = package.get_transport_options();
             if let Some(git_opts) = transport_options.get("git").and_then(|v| v.as_array())
-                && let Some(single) = git_opts.get("single_use_clone").and_then(|v| v.as_bool())
-                && single
+                && git_opts
+                    .get("single_use_clone")
+                    .is_some_and(|v| v.to_bool())
             {
                 clone_flags = vec![];
             }

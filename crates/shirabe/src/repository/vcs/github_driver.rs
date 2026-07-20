@@ -160,8 +160,7 @@ impl GitHubDriver {
                 .inner
                 .repo_config
                 .get("no-api")
-                .and_then(|v| v.as_bool())
-                == Some(true)
+                .is_some_and(|v| v.to_bool())
         {
             self.setup_git_driver(&self.inner.url.clone())?;
 
