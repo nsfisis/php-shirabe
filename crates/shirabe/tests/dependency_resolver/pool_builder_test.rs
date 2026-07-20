@@ -621,7 +621,6 @@ fn run_test_pool_builder(
     std::env::set_current_dir(&old_cwd).unwrap();
 }
 
-#[ignore = "PoolBuilder::build_pool never populates skipped_load (PHP populates it at buildPool's lockedPackage loop, incl. its replace targets), so load_package's skipped_load-driven transitive unlock branch never fires; fails partial-update-unfixing-with-replacers-providers.test"]
 #[test]
 fn test_pool_builder() {
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

@@ -162,6 +162,18 @@ impl PoolBuilder {
                 .get_canonical_packages()?
             {
                 if !self.is_update_allowed(locked_package.clone()) {
+                    // remember which packages we skipped loading remote content for in this partial update
+                    self.skipped_load
+                        .entry(locked_package.get_name())
+                        .or_default()
+                        .push(locked_package.clone());
+                    for (_k, link) in &locked_package.get_replaces() {
+                        self.skipped_load
+                            .entry(link.get_target().to_string())
+                            .or_default()
+                            .push(locked_package.clone());
+                    }
+
                     // Path repo packages are never loaded from lock, to force them to always remain in sync
                     // unless symlinking is disabled in which case we probably should rather treat them like
                     // regular packages. We mark them specially so they can be reloaded fully including update propagation
@@ -518,6 +530,13 @@ impl PoolBuilder {
                     let pkg_version = package.get_version().to_string();
                     let pkg_type = package.get_type().to_string();
 
+                    self.loaded_per_repo
+                        .entry(repo_index as i64)
+                        .or_default()
+                        .entry(pkg_name.clone())
+                        .or_default()
+                        .insert(pkg_version.clone(), package.clone());
+
                     let pkg_type_mixed: PhpMixed = pkg_type.clone().into();
                     let ignored_mixed: PhpMixed = self
                         .ignored_types
@@ -542,7 +561,6 @@ impl PoolBuilder {
                     {
                         continue;
                     }
-                    let _ = (pkg_name, pkg_version);
                     let propagate = !self.path_repo_unlocked.contains_key(&package.get_name());
                     self.load_package(request, repositories, package.clone(), propagate)?;
                 }
@@ -907,16 +925,20 @@ impl PoolBuilder {
             request.get_locked_packages().values().cloned().collect();
         for locked_package in &locked_packages {
             if locked_package.as_alias().is_none() && locked_package.get_name() == name {
-                let pkgs: Vec<BasePackageHandle> = self.packages.values().cloned().collect();
-                // PHP uses array_search with strict identity; map to pointer comparison.
-                let index_opt = pkgs.iter().position(|p| p.ptr_eq(locked_package));
+                // PHP: array_search($lockedPackage, $this->packages, true) — identity lookup
+                // that returns the array KEY, not a positional index.
+                let index_opt = self
+                    .packages
+                    .iter()
+                    .find(|(_, p)| p.ptr_eq(locked_package))
+                    .map(|(k, _)| *k);
                 if let Some(index) = index_opt {
                     request.unlock_package(locked_package.clone());
                     self.remove_loaded_package(
                         request,
                         repositories,
                         locked_package.clone(),
-                        index as i64,
+                        index,
                     );
 
                     // make sure that any requirements for this package by other locked or fixed packages are now
