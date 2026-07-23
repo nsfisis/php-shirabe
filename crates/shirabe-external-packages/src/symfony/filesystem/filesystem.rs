@@ -34,7 +34,7 @@ impl Filesystem {
         }
     }
 
-    pub fn copy(
+    fn copy(
         &self,
         origin_file: &str,
         target_file: &str,
@@ -128,7 +128,7 @@ impl Filesystem {
         Ok(())
     }
 
-    pub fn mkdir(&self, dirs: PhpMixed, mode: u32) -> anyhow::Result<()> {
+    fn mkdir(&self, dirs: PhpMixed, mode: u32) -> anyhow::Result<()> {
         for dir in Self::to_iterable(&dirs) {
             if shirabe_php_shim::is_dir(&dir) {
                 continue;
@@ -147,7 +147,7 @@ impl Filesystem {
         Ok(())
     }
 
-    pub fn exists(&self, files: PhpMixed) -> bool {
+    fn exists(&self, files: PhpMixed) -> bool {
         for file in Self::to_iterable(&files) {
             if !shirabe_php_shim::file_exists(&file) {
                 return false;
@@ -156,35 +156,7 @@ impl Filesystem {
         true
     }
 
-    pub fn touch(
-        &self,
-        files: PhpMixed,
-        time: Option<i64>,
-        atime: Option<i64>,
-    ) -> anyhow::Result<()> {
-        for file in Self::to_iterable(&files) {
-            let ok = match time {
-                // PHP: self::box('touch', $file, $time, $atime)
-                Some(t) => match atime {
-                    Some(a) => shirabe_php_shim::touch3(&file, t, a),
-                    None => shirabe_php_shim::touch2(&file, t),
-                },
-                None => shirabe_php_shim::touch(&file),
-            };
-            if !ok {
-                return Err(IOException::new(
-                    format!("Failed to touch \"{}\": ", file),
-                    0,
-                    None,
-                    Some(file.clone()),
-                )
-                .into());
-            }
-        }
-        Ok(())
-    }
-
-    pub fn remove(&self, files: PhpMixed) -> anyhow::Result<()> {
+    fn remove(&self, files: PhpMixed) -> anyhow::Result<()> {
         let files = Self::to_iterable(&files);
         Self::do_remove(files, false)
     }
@@ -251,102 +223,6 @@ impl Filesystem {
         Ok(())
     }
 
-    pub fn chmod(
-        &self,
-        files: PhpMixed,
-        mode: u32,
-        umask: u32,
-        recursive: bool,
-    ) -> anyhow::Result<()> {
-        for file in Self::to_iterable(&files) {
-            if !shirabe_php_shim::chmod(&file, mode & !umask) {
-                return Err(IOException::new(
-                    format!("Failed to chmod file \"{}\": ", file),
-                    0,
-                    None,
-                    Some(file.clone()),
-                )
-                .into());
-            }
-            if recursive && shirabe_php_shim::is_dir(&file) && !shirabe_php_shim::is_link(&file) {
-                let children = Self::dir_children(&file);
-                self.chmod(PhpMixed::List(children), mode, umask, true)?;
-            }
-        }
-        Ok(())
-    }
-
-    // Immediate directory children, matching PHP's new \FilesystemIterator($file) (non-recursive,
-    // skips "." and ".."). Returned as PhpMixed::String list entries for the chmod recursion.
-    fn dir_children(dir: &str) -> Vec<PhpMixed> {
-        match std::fs::read_dir(dir) {
-            Ok(rd) => rd
-                .flatten()
-                .map(|e| PhpMixed::String(e.path().to_string_lossy().into_owned()))
-                .collect(),
-            Err(_) => Vec::new(),
-        }
-    }
-
-    pub fn chown(&self, _files: PhpMixed, _user: PhpMixed, _recursive: bool) -> anyhow::Result<()> {
-        // TODO(phase-d): chown/lchown have no std or existing-shim equivalent (changing a file's
-        // owner needs chown(2), not exposed by std and no libc/syscall crate is available).
-        todo!()
-    }
-
-    pub fn chgrp(
-        &self,
-        _files: PhpMixed,
-        _group: PhpMixed,
-        _recursive: bool,
-    ) -> anyhow::Result<()> {
-        // TODO(phase-d): chgrp/lchgrp have no std or existing-shim equivalent (changing a file's
-        // group needs chown(2)/chgrp, not exposed by std and no libc/syscall crate is available).
-        todo!()
-    }
-
-    pub fn rename(&self, origin: &str, target: &str, override_file: bool) -> anyhow::Result<()> {
-        // we check that target does not exist
-        if !override_file && self.is_readable_instance(target)? {
-            return Err(IOException::new(
-                format!(
-                    "Cannot rename because the target \"{}\" already exists.",
-                    target
-                ),
-                0,
-                None,
-                Some(target.to_string()),
-            )
-            .into());
-        }
-
-        if !shirabe_php_shim::rename(origin, target) {
-            if shirabe_php_shim::is_dir(origin) {
-                // See https://bugs.php.net/54097 & https://php.net/rename#113943
-                let mut options: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
-                options.insert("override".to_string(), PhpMixed::Bool(override_file));
-                options.insert("delete".to_string(), PhpMixed::Bool(override_file));
-                self.mirror(origin, target, None, &options)?;
-                self.remove(PhpMixed::String(origin.to_string()))?;
-                return Ok(());
-            }
-            return Err(IOException::new(
-                format!("Cannot rename \"{}\" to \"{}\": ", origin, target),
-                0,
-                None,
-                Some(target.to_string()),
-            )
-            .into());
-        }
-        Ok(())
-    }
-
-    // Symfony's private isReadable(): like exists() it guards a path-length limit, then defers to
-    // PHP's is_readable().
-    fn is_readable_instance(&self, filename: &str) -> anyhow::Result<bool> {
-        Ok(shirabe_php_shim::is_readable(filename))
-    }
-
     pub fn symlink(
         &self,
         origin_dir: &str,
@@ -373,50 +249,6 @@ impl Filesystem {
         Ok(())
     }
 
-    pub fn hard_link(&self, origin_file: &str, target_files: PhpMixed) -> anyhow::Result<()> {
-        if !self.exists(PhpMixed::String(origin_file.to_string())) {
-            // FileNotFoundException is not modeled in this crate's exception module; surface the
-            // path-only message as an IOException, matching the FileNotFoundException(null,...) form.
-            return Err(IOException::new(
-                format!("File \"{}\" could not be found.", origin_file),
-                0,
-                None,
-                Some(origin_file.to_string()),
-            )
-            .into());
-        }
-
-        if !shirabe_php_shim::is_file(origin_file) {
-            return Err(IOException::new(
-                format!("Origin file \"{}\" is not a file.", origin_file),
-                0,
-                None,
-                None,
-            )
-            .into());
-        }
-
-        for target_file in Self::to_iterable(&target_files) {
-            if shirabe_php_shim::is_file(&target_file) {
-                if Self::fileinode(origin_file) == Self::fileinode(&target_file) {
-                    continue;
-                }
-                self.remove(PhpMixed::String(target_file.clone()))?;
-            }
-
-            if std::fs::hard_link(origin_file, &target_file).is_err() {
-                return Self::link_exception(origin_file, &target_file, "hard");
-            }
-        }
-        Ok(())
-    }
-
-    // PHP fileinode(): the file's inode number, or None on failure.
-    fn fileinode(path: &str) -> Option<u64> {
-        use std::os::unix::fs::MetadataExt;
-        std::fs::metadata(path).ok().map(|m| m.ino())
-    }
-
     fn link_exception(origin: &str, target: &str, link_type: &str) -> anyhow::Result<()> {
         // The Windows error-code-1314 branch never runs on Unix.
         Err(IOException::new(
@@ -431,7 +263,7 @@ impl Filesystem {
         .into())
     }
 
-    pub fn read_link(&self, path: &str) -> String {
+    fn read_link(&self, path: &str) -> String {
         // Symfony's readlink() with $canonicalize = false: returns null if the path is not a link.
         // The Rust signature is non-Option, so the non-link case yields the path's readlink result
         // (empty string on failure) to keep the symlink() caller working.
@@ -449,64 +281,6 @@ impl Filesystem {
             PhpMixed::Null | PhpMixed::Bool(false) => true,
             PhpMixed::String(s) => s.eq_ignore_ascii_case("file"),
             _ => true,
-        }
-    }
-
-    pub fn make_path_relative(&self, end_path: &str, start_path: &str) -> String {
-        // PHP throws InvalidArgumentException when either path is not absolute; that exception type
-        // is not modeled here and callers pass absolute paths, so the guards are omitted.
-
-        // On Unix the Windows separator normalization and drive-letter splitting are no-ops.
-        let split_path = |path: &str| -> Vec<String> {
-            let mut result: Vec<String> = Vec::new();
-            for segment in shirabe_php_shim::trim(path, Some("/")).split('/') {
-                if segment == ".." {
-                    result.pop();
-                } else if segment != "." && !segment.is_empty() {
-                    result.push(segment.to_string());
-                }
-            }
-            result
-        };
-
-        let start_path_arr = split_path(start_path);
-        let end_path_arr = split_path(end_path);
-
-        // Find for which directory the common path stops.
-        let mut index = 0;
-        while index < start_path_arr.len()
-            && index < end_path_arr.len()
-            && start_path_arr[index] == end_path_arr[index]
-        {
-            index += 1;
-        }
-
-        // Determine how deep the start path is relative to the common path.
-        let depth = if start_path_arr.len() == 1 && start_path_arr[0].is_empty() {
-            0
-        } else {
-            start_path_arr.len() - index
-        };
-
-        // Repeated "../" for each level needed to reach the common path.
-        let traverser = "../".repeat(depth);
-
-        let end_path_remainder = end_path_arr[index..].join("/");
-
-        let relative_path = format!(
-            "{}{}",
-            traverser,
-            if !end_path_remainder.is_empty() {
-                format!("{}/", end_path_remainder)
-            } else {
-                String::new()
-            }
-        );
-
-        if relative_path.is_empty() {
-            "./".to_string()
-        } else {
-            relative_path
         }
     }
 
@@ -617,166 +391,5 @@ impl Filesystem {
             }
         }
         Ok(())
-    }
-
-    pub fn is_absolute_path(&self, file: &str) -> bool {
-        if file.is_empty() {
-            return false;
-        }
-        let bytes = file.as_bytes();
-        // strspn($file, '/\\', 0, 1): the first character is a forward or back slash.
-        let leading_slash = matches!(bytes[0], b'/' | b'\\');
-        // Windows drive letter form: "C:\" / "C:/".
-        let drive_letter = file.len() > 3
-            && bytes[0].is_ascii_alphabetic()
-            && bytes[1] == b':'
-            && matches!(bytes[2], b'/' | b'\\');
-        // null !== parse_url($file, PHP_URL_SCHEME): the path has a URL scheme.
-        let scheme = shirabe_php_shim::parse_url(file, shirabe_php_shim::PHP_URL_SCHEME);
-        let has_scheme = !matches!(scheme, PhpMixed::Null | PhpMixed::Bool(false));
-        leading_slash || drive_letter || has_scheme
-    }
-
-    pub fn dump_file(&self, filename: &str, content: &str) -> anyhow::Result<()> {
-        let dir = shirabe_php_shim::dirname(filename);
-
-        if shirabe_php_shim::is_link(filename) {
-            let link_target = self.read_link(filename);
-            if !link_target.is_empty() {
-                // Path::makeAbsolute resolves the link target against the file's directory; the
-                // Symfony Path helper is not ported, so an absolute target is used as-is and a
-                // relative one is joined to the directory.
-                let resolved = if self.is_absolute_path(&link_target) {
-                    link_target
-                } else {
-                    format!("{}/{}", dir, link_target)
-                };
-                return self.dump_file(&resolved, content);
-            }
-        }
-
-        if !shirabe_php_shim::is_dir(&dir) {
-            self.mkdir(PhpMixed::String(dir.clone()), 0o777)?;
-        }
-
-        // Creates a temp file with 0600 access rights when the filesystem supports chmod.
-        let tmp_file = self.temp_nam(&dir, &shirabe_php_shim::basename(filename))?;
-
-        let result: anyhow::Result<()> = (|| {
-            if shirabe_php_shim::file_put_contents(&tmp_file, content.as_bytes()).is_none() {
-                return Err(IOException::new(
-                    format!("Failed to write file \"{}\": ", filename),
-                    0,
-                    None,
-                    Some(filename.to_string()),
-                )
-                .into());
-            }
-
-            let perms = shirabe_php_shim::fileperms(filename);
-            let mode = if perms != 0 {
-                perms as u32
-            } else {
-                0o666 & !shirabe_php_shim::umask()
-            };
-            shirabe_php_shim::chmod(&tmp_file, mode);
-
-            self.rename(&tmp_file, filename, true)
-        })();
-
-        // finally: clean up the temp file if it still exists.
-        if shirabe_php_shim::file_exists(&tmp_file) {
-            shirabe_php_shim::unlink(&tmp_file);
-        }
-
-        result
-    }
-
-    pub fn append_to_file(&self, filename: &str, content: &str) -> anyhow::Result<()> {
-        let dir = shirabe_php_shim::dirname(filename);
-
-        if !shirabe_php_shim::is_dir(&dir) {
-            self.mkdir(PhpMixed::String(dir), 0o777)?;
-        }
-
-        if shirabe_php_shim::file_put_contents3(filename, content, shirabe_php_shim::FILE_APPEND)
-            .is_none()
-        {
-            return Err(IOException::new(
-                format!("Failed to write file \"{}\": ", filename),
-                0,
-                None,
-                Some(filename.to_string()),
-            )
-            .into());
-        }
-        Ok(())
-    }
-
-    pub fn temp_nam(&self, dir: &str, prefix: &str) -> anyhow::Result<String> {
-        // getSchemeAndHierarchy(): with no "scheme://" the scheme is null and the hierarchy is the
-        // whole path, so the local-filesystem branch (empty suffix) always applies here.
-        let (scheme, hierarchy) = Self::get_scheme_and_hierarchy(dir);
-
-        if scheme.is_none() || scheme.as_deref() == Some("file") || scheme.as_deref() == Some("gs")
-        {
-            if let Some(tmp_file) = shirabe_php_shim::tempnam(&hierarchy, prefix) {
-                if let Some(scheme) = &scheme
-                    && scheme != "gs"
-                {
-                    return Ok(format!("{}://{}", scheme, tmp_file));
-                }
-                return Ok(tmp_file);
-            }
-
-            return Err(IOException::new(
-                "A temporary file could not be created: ".to_string(),
-                0,
-                None,
-                None,
-            )
-            .into());
-        }
-
-        Err(IOException::new(
-            "A temporary file could not be created: ".to_string(),
-            0,
-            None,
-            None,
-        )
-        .into())
-    }
-
-    // Gets a (scheme, hierarchy) tuple of a filename (e.g. file:///tmp -> (Some("file"), "/tmp")).
-    fn get_scheme_and_hierarchy(filename: &str) -> (Option<String>, String) {
-        match filename.split_once("://") {
-            Some((scheme, hierarchy)) => (Some(scheme.to_string()), hierarchy.to_string()),
-            None => (None, filename.to_string()),
-        }
-    }
-
-    // The following methods belong to Composer's own Composer\Util\Filesystem, not Symfony's
-    // Filesystem. They were copied into this stub by mistake; every caller resolves to the ported
-    // Composer\Util\Filesystem in crates/shirabe/src/util/filesystem.rs instead. They have no
-    // Symfony semantics, so they are left unimplemented here.
-
-    pub fn is_readable(_path: &str) -> bool {
-        // TODO(phase-d): not a Symfony Filesystem method; see note above.
-        todo!()
-    }
-
-    pub fn is_local_path(_path: &str) -> bool {
-        // TODO(phase-d): not a Symfony Filesystem method; see note above.
-        todo!()
-    }
-
-    pub fn trim_trailing_slash(_path: &str) -> String {
-        // TODO(phase-d): not a Symfony Filesystem method; see note above.
-        todo!()
-    }
-
-    pub fn get_platform_path(_path: &str) -> String {
-        // TODO(phase-d): not a Symfony Filesystem method; see note above.
-        todo!()
     }
 }
