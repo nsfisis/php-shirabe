@@ -5,8 +5,6 @@ use crate::symfony::console::helper::ProgressBar;
 use crate::symfony::console::output::ConsoleOutputInterface;
 use crate::symfony::console::output::OutputInterface;
 use crate::symfony::console::output::output_interface::OUTPUT_NORMAL;
-use crate::symfony::console::style::style_interface::StyleInterface;
-use shirabe_php_shim::PhpMixed;
 
 /// Decorates output to add console style guide helpers.
 #[derive(Debug)]
@@ -21,6 +19,17 @@ impl OutputStyle {
 
     pub fn create_progress_bar(&self, max: i64) -> ProgressBar {
         ProgressBar::new(self.output.clone(), max, 1.0 / 25.0)
+    }
+
+    pub fn new_line(&self, count: i64) {
+        self.output.borrow().write(
+            &[shirabe_php_shim::str_repeat(
+                shirabe_php_shim::PHP_EOL,
+                count as usize,
+            )],
+            false,
+            OUTPUT_NORMAL,
+        );
     }
 
     pub(crate) fn get_error_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
@@ -103,100 +112,5 @@ impl OutputInterface for OutputStyle {
 
     fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>> {
         self.output.borrow().get_formatter()
-    }
-}
-
-impl StyleInterface for OutputStyle {
-    fn title(&mut self, _message: &str) {
-        todo!()
-    }
-
-    fn section(&mut self, _message: &str) {
-        todo!()
-    }
-
-    fn listing(&mut self, _elements: Vec<PhpMixed>) {
-        todo!()
-    }
-
-    fn text(&mut self, _message: PhpMixed) {
-        todo!()
-    }
-
-    fn success(&mut self, _message: PhpMixed) {
-        todo!()
-    }
-
-    fn error(&mut self, _message: PhpMixed) {
-        todo!()
-    }
-
-    fn warning(&mut self, _message: PhpMixed) {
-        todo!()
-    }
-
-    fn note(&mut self, _message: PhpMixed) {
-        todo!()
-    }
-
-    fn caution(&mut self, _message: PhpMixed) {
-        todo!()
-    }
-
-    fn table(&mut self, _headers: Vec<PhpMixed>, _rows: Vec<PhpMixed>) {
-        todo!()
-    }
-
-    fn ask(
-        &mut self,
-        _question: &str,
-        _default: Option<&str>,
-        _validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
-    ) -> PhpMixed {
-        todo!()
-    }
-
-    fn ask_hidden(
-        &mut self,
-        _question: &str,
-        _validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
-    ) -> PhpMixed {
-        todo!()
-    }
-
-    fn confirm(&mut self, _question: &str, _default: bool) -> bool {
-        todo!()
-    }
-
-    fn choice(
-        &mut self,
-        _question: &str,
-        _choices: Vec<PhpMixed>,
-        _default: Option<PhpMixed>,
-    ) -> PhpMixed {
-        todo!()
-    }
-
-    fn new_line(&mut self, count: i64) {
-        self.output.borrow().write(
-            &[shirabe_php_shim::str_repeat(
-                shirabe_php_shim::PHP_EOL,
-                count as usize,
-            )],
-            false,
-            OUTPUT_NORMAL,
-        );
-    }
-
-    fn progress_start(&mut self, _max: i64) {
-        todo!()
-    }
-
-    fn progress_advance(&mut self, _step: i64) {
-        todo!()
-    }
-
-    fn progress_finish(&mut self) {
-        todo!()
     }
 }
