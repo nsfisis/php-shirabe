@@ -310,9 +310,20 @@ final class SourceParser
     }
 
     /**
+     * Native class types that carry a phpstan-only generic payload
+     * (`@phpstan-return PromiseInterface<Process>`). The native signature
+     * names the wrapper, not the payload, so the payload type is invisible
+     * unless the docblock is consulted too — same reason array/iterable/
+     * mixed/object trigger docblock refinement below.
+     */
+    private const GENERIC_WRAPPER_TYPES = [
+        'React\\Promise\\PromiseInterface',
+    ];
+
+    /**
      * Extracts class-like FQCNs from a native type node and reports whether
-     * the type invites docblock refinement (array/iterable/mixed/object or
-     * no type at all).
+     * the type invites docblock refinement (array/iterable/mixed/object,
+     * no type at all, or a generic wrapper type from GENERIC_WRAPPER_TYPES).
      *
      * @return array{0: list<string>, 1: bool}
      */
@@ -337,7 +348,7 @@ final class SourceParser
                     $expandable = true;
                 }
             } elseif ($t instanceof Name) {
-                $name = $t->toString();
+                $name = ltrim($t->toString(), '\\');
                 $lower = strtolower($name);
                 if ($lower === 'self' || $lower === 'static') {
                     $classes[] = $currentClass;
@@ -346,7 +357,10 @@ final class SourceParser
                         $classes[] = $parentClass;
                     }
                 } else {
-                    $classes[] = ltrim($name, '\\');
+                    $classes[] = $name;
+                    if (in_array($name, self::GENERIC_WRAPPER_TYPES, true)) {
+                        $expandable = true;
+                    }
                 }
             }
         };
