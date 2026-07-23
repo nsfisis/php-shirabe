@@ -375,6 +375,21 @@ PHP-locally (or the stub `NewObject` constructor story lands); until the
 user decides, the tool reports them as `unsupported` with the constructing
 site named.
 
+### Process: dual instantiation split by caller
+
+`ProcessExecutor::executeAsync()` resolves its promise with a
+`Symfony\Component\Process\Process` instance, so it may cross the language
+boundary despite being a wholesale-`php-native` vendor class. A `Process`
+can't be reconstructed PHP-side from Rust-generated data because its state
+is stored in a `resource` created by `proc_open()`.
+
+Resolution: split `ProcessExecutor`'s Rust implementation by caller.
+Rust-ported Composer code (`VersionGuesser`, `Git`, …) calls `execute_async()`
+directly and spawns in Rust. A plugin holding a `ProcessExecutor` handle
+(`Loop::getProcessExecutor()`) instead hits the `rust-proxy` stub's RPC entry,
+which forwards the spawn to the PHP child so the real `Process::start()` runs
+there. The plugin gets the genuine object, never a fake one.
+
 ### Package and CompletePackage
 
 They classify as `rust-proxy` mechanically: they carry setters

@@ -37,8 +37,8 @@ pub struct ProcessExecutor {
     /// @var int
     max_jobs: i64,
     /// PHP throttles async jobs through the $jobs queue and $maxJobs; here concurrent
-    /// `execute_async` calls hold a permit for the duration of the child process instead
-    /// (same design as HttpDownloader).
+    /// `execute_async`/`execute_async_php` calls hold a permit for the duration of the
+    /// child process instead (same design as HttpDownloader).
     semaphore: std::rc::Rc<tokio::sync::Semaphore>,
     /// @var bool
     allow_async: bool,
@@ -593,13 +593,18 @@ impl ProcessExecutor {
         }
     }
 
-    /// starts a process on the commandline in async mode
+    /// starts a process on the commandline in async mode, for callers within Rust-ported Composer
+    /// code (i.e. everything except a plugin holding a `ProcessExecutor` RPC handle — see
+    /// `execute_async_php` and docs/dev/plugin-class-classification.md, "Process: dual
+    /// instantiation split by caller"). This is the direct 1:1 port of PHP's `executeAsync()`:
+    /// almost all calls go through here, spawning in Rust with no PHP child involved.
     ///
     /// The returned future does NOT borrow the executor: everything it needs is captured up
     /// front, so callers can drop their `Ref`/`RefMut` on the shared `Rc<RefCell<ProcessExecutor>>`
-    /// before awaiting (`let fut = pe.borrow_mut().execute_async(...); fut.await`). Holding a
-    /// borrow across the await would panic as soon as a sibling future or a sync `execute()` call
-    /// touches the same executor. The max_jobs throttle is enforced by the semaphore.
+    /// before awaiting (`let fut = pe.borrow_mut().execute_async(...); fut.await`). Holding
+    /// a borrow across the await would panic as soon as a sibling future or a sync `execute()`
+    /// call touches the same executor. The max_jobs throttle is enforced by the semaphore, shared
+    /// with `execute_async_php`.
     ///
     /// Takes `&mut self` (unlike the `&self` used while this only read `self.mock`) so the mock
     /// branch can update `error_output`/`capture_output` before returning, mirroring
@@ -697,6 +702,37 @@ impl ProcessExecutor {
             // inspect is_successful() themselves.
             Ok(process)
         })
+    }
+
+    /// Plugin-facing counterpart of `execute_async`. Reached only when the RPC dispatcher
+    /// relays a plugin's `executeAsync()` call made on the `rust-proxy` `ProcessExecutor` stub
+    /// (a plugin obtained the handle via `Loop::getProcessExecutor()`) — see
+    /// docs/dev/plugin-class-classification.md, "Process: dual instantiation split by caller".
+    ///
+    /// A `Symfony\Component\Process\Process` cannot be reconstructed on the Rust side: its state
+    /// (the `proc_open()` resource, the OS pipes) belongs to whichever process calls `start()`,
+    /// and it refuses serialization outright. So unlike `execute_async`, this must not
+    /// spawn in Rust: the real `Process::start()` has to run in the PHP child, and the plugin's
+    /// `.then()` callback must receive that genuine PHP-side object.
+    // TODO(plugin): once the plugin RPC channel exists, acquire a permit from `self.semaphore`
+    // (shared with `execute_async`, so the combined job budget — including any shared cap
+    // with HttpDownloader — stays correct regardless of which path runs a given job), then send
+    // the spawn request to the PHP child over that channel instead of calling `Process::start()`
+    // here. Release the permit on the child's completion notification, not by polling a
+    // Rust-owned process handle. The return type below is provisional: the real deliverable is a
+    // handle to the live PHP-side Process object, not a `shirabe_external_packages` `Process`
+    // value, so this signature will need to change once the RPC plumbing exists.
+    pub fn execute_async_php<C>(
+        &mut self,
+        _command: C,
+        _cwd: Option<&str>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>
+    where
+        C: IntoExecCommand,
+    {
+        todo!(
+            "forward the spawn to the PHP child over the plugin RPC channel and await its completion notification"
+        )
     }
 
     fn output_handler(
