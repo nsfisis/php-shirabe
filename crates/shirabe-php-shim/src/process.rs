@@ -147,8 +147,6 @@ pub enum Descriptor {
     Pipe(String),
     /// `['file', path, mode]`.
     File(String, String),
-    /// `['pty']`.
-    Pty,
     /// An already-opened stream resource used directly as the descriptor.
     Resource(PhpResource),
     /// A descriptor index left unspecified by a sparse PHP descriptorspec; the child inherits the
@@ -224,11 +222,6 @@ pub fn proc_open(
                 std::process::Stdio::from(resource_to_file(resource)?)
             }
             Descriptor::Inherit => std::process::Stdio::inherit(),
-            Descriptor::Pty => {
-                // TODO(phase-d): pty descriptors need a pseudo-terminal (openpty/ioctl); a syscall
-                // crate is intentionally not introduced here.
-                todo!("proc_open: pty descriptors require a pseudo-terminal (syscall)")
-            }
         };
         match fd {
             0 => cmd.stdin(stdio),

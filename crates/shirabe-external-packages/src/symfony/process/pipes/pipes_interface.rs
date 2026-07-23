@@ -19,9 +19,6 @@ pub trait PipesInterface: std::fmt::Debug {
     /// Returns if the current state has open file handles or pipes.
     fn are_open(&self) -> bool;
 
-    /// Returns if pipes are able to read output.
-    fn have_read_support(&self) -> bool;
-
     /// Closes file handles and pipes.
     fn close(&mut self);
 

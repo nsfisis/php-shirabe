@@ -2,7 +2,6 @@
 
 use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::process::exception::logic_exception::LogicException;
-use crate::symfony::process::exception::process_failed_exception::ProcessFailedException;
 use crate::symfony::process::exception::process_signaled_exception::ProcessSignaledException;
 use crate::symfony::process::exception::process_timed_out_exception::ProcessTimedOutException;
 use crate::symfony::process::exception::runtime_exception::RuntimeException;
@@ -45,19 +44,15 @@ pub struct ProcessMock {
 /// start independent PHP processes.
 pub struct Process {
     callback: Option<ProcessCallback>,
-    has_callback: bool,
     commandline: CommandLine,
     cwd: Option<String>,
     env: IndexMap<String, PhpMixed>,
     input: PhpMixed,
     starttime: Option<f64>,
-    last_output_time: Option<f64>,
     timeout: Option<f64>,
-    idle_timeout: Option<f64>,
     exitcode: Option<i64>,
     fallback_status: IndexMap<String, PhpMixed>,
     process_information: Option<IndexMap<String, PhpMixed>>,
-    output_disabled: bool,
     stdout: Option<PhpResource>,
     stderr: Option<PhpResource>,
     process: Option<PhpResource>,
@@ -65,7 +60,6 @@ pub struct Process {
     incremental_output_offset: i64,
     incremental_error_output_offset: i64,
     tty: bool,
-    pty: bool,
     options: IndexMap<String, PhpMixed>,
     use_file_handles: bool,
     process_pipes: Option<Box<dyn PipesInterface>>,
@@ -90,7 +84,6 @@ fn descriptor(items: &[&str]) -> Descriptor {
     match items {
         ["pipe", mode] => Descriptor::Pipe(mode.to_string()),
         ["file", path, mode] => Descriptor::File(path.to_string(), mode.to_string()),
-        ["pty"] => Descriptor::Pty,
         _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }
@@ -120,17 +113,11 @@ impl Process {
     pub const STATUS_STARTED: &'static str = "started";
     pub const STATUS_TERMINATED: &'static str = "terminated";
 
-    pub const STDIN: i64 = 0;
     pub const STDOUT: i64 = 1;
     pub const STDERR: i64 = 2;
 
     // Timeout Precision in seconds.
     pub const TIMEOUT_PRECISION: f64 = 0.2;
-
-    pub const ITER_NON_BLOCKING: i64 = 1;
-    pub const ITER_KEEP_OUTPUT: i64 = 2;
-    pub const ITER_SKIP_OUT: i64 = 4;
-    pub const ITER_SKIP_ERR: i64 = 8;
 
     /// Exit codes translation table.
     fn exit_code_text(code: i64) -> Option<&'static str> {
@@ -186,19 +173,15 @@ impl Process {
 
         Self {
             callback: None,
-            has_callback: false,
             commandline: CommandLine::Array(Vec::new()),
             cwd: None,
             env: IndexMap::new(),
             input: PhpMixed::Null,
             starttime: None,
-            last_output_time: None,
             timeout: None,
-            idle_timeout: None,
             exitcode: None,
             fallback_status: IndexMap::new(),
             process_information: None,
-            output_disabled: false,
             stdout: None,
             stderr: None,
             process: None,
@@ -206,7 +189,6 @@ impl Process {
             incremental_output_offset: 0,
             incremental_error_output_offset: 0,
             tty: false,
-            pty: false,
             options,
             use_file_handles: false,
             process_pipes: None,
@@ -264,7 +246,6 @@ impl Process {
         this.set_input(input)?;
         this.set_timeout(timeout)?;
         this.use_file_handles = shirabe_php_shim::DIRECTORY_SEPARATOR == "\\";
-        this.pty = false;
 
         Ok(this)
     }
@@ -283,22 +264,6 @@ impl Process {
         Ok(process)
     }
 
-    pub fn __sleep(&self) -> anyhow::Result<Vec<String>> {
-        Err(shirabe_php_shim::BadMethodCallException {
-            message: "Cannot serialize Symfony\\Component\\Process\\Process".to_string(),
-            code: 0,
-        }
-        .into())
-    }
-
-    pub fn __wakeup(&self) -> anyhow::Result<()> {
-        Err(shirabe_php_shim::BadMethodCallException {
-            message: "Cannot unserialize Symfony\\Component\\Process\\Process".to_string(),
-            code: 0,
-        }
-        .into())
-    }
-
     /// Runs the process.
     pub fn run(
         &mut self,
@@ -308,19 +273,6 @@ impl Process {
         self.start(callback, env)?;
 
         self.wait(None)
-    }
-
-    /// Runs the process and throws if it exits with a non-zero exit code.
-    pub fn must_run(
-        &mut self,
-        callback: Option<UserCallback>,
-        env: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<&mut Self> {
-        if 0 != self.run(callback, env)? {
-            return Err(ProcessFailedException::new(self)?.into());
-        }
-
-        Ok(self)
     }
 
     /// Starts the process and returns after writing the input to STDIN.
@@ -335,10 +287,7 @@ impl Process {
 
         self.reset_process_data();
         self.starttime = Some(shirabe_php_shim::microtime());
-        self.last_output_time = self.starttime;
-        let has_callback = callback.is_some();
         self.callback = Some(self.build_callback(callback));
-        self.has_callback = has_callback;
         let mut descriptors = self.get_descriptors();
 
         if !self.env.is_empty() {
@@ -452,22 +401,6 @@ impl Process {
         Ok(())
     }
 
-    /// Restarts the process. The process is cloned before being started.
-    pub fn restart(
-        &mut self,
-        callback: Option<UserCallback>,
-        env: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<Process> {
-        if self.is_running() {
-            return Err(RuntimeException::new("Process is already running.".to_string()).into());
-        }
-
-        let mut process = self.clone_process();
-        process.start(callback, env)?;
-
-        Ok(process)
-    }
-
     /// Waits for the process to terminate.
     pub fn wait(&mut self, callback: Option<UserCallback>) -> anyhow::Result<i64> {
         self.require_process_is_started("wait")?;
@@ -475,13 +408,6 @@ impl Process {
         self.update_status(false);
 
         if let Some(callback) = callback {
-            if !self.process_pipes.as_ref().unwrap().have_read_support() {
-                self.stop(0.0, None);
-                return Err(LogicException::new(
-                    "Pass the callback to the \"Process::start\" method or call enableOutput to use a callback with \"Process::wait\".".to_string(),
-                )
-                .into());
-            }
             self.callback = Some(self.build_callback(Some(callback)));
         }
 
@@ -522,63 +448,6 @@ impl Process {
         Ok(self.exitcode.unwrap_or(0))
     }
 
-    /// Waits until the callback returns true.
-    pub fn wait_until(&mut self, callback: UserCallback) -> anyhow::Result<bool> {
-        self.require_process_is_started("waitUntil")?;
-        self.update_status(false);
-
-        if !self.process_pipes.as_ref().unwrap().have_read_support() {
-            self.stop(0.0, None);
-            return Err(LogicException::new(
-                "Pass the callback to the \"Process::start\" method or call enableOutput to use a callback with \"Process::waitUntil\".".to_string(),
-            )
-            .into());
-        }
-        let mut callback = self.build_callback(Some(callback));
-
-        let mut ready = false;
-        loop {
-            self.check_timeout()?;
-            let running = if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
-                self.is_running()
-            } else {
-                self.process_pipes.as_ref().unwrap().are_open()
-            };
-            let output = self.process_pipes.as_mut().unwrap().read_and_write(
-                running,
-                shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" || !running,
-            );
-
-            for (r#type, data) in output {
-                if r#type != 3 {
-                    let r = callback(
-                        self,
-                        if Self::STDOUT == r#type {
-                            Self::OUT
-                        } else {
-                            Self::ERR
-                        },
-                        &data,
-                    );
-                    ready = r || ready;
-                } else if !self.fallback_status.contains_key("signaled") {
-                    self.fallback_status.insert(
-                        "exitcode".to_string(),
-                        PhpMixed::Int(data.trim().parse().unwrap_or(0)),
-                    );
-                }
-            }
-            if ready {
-                return Ok(true);
-            }
-            if !running {
-                return Ok(false);
-            }
-
-            shirabe_php_shim::usleep(1000);
-        }
-    }
-
     /// Returns the Pid (process identifier), if applicable.
     pub fn get_pid(&mut self) -> Option<i64> {
         if self.is_running() {
@@ -589,51 +458,6 @@ impl Process {
         } else {
             None
         }
-    }
-
-    /// Sends a POSIX signal to the process.
-    pub fn signal(&mut self, signal: i64) -> anyhow::Result<&mut Self> {
-        self.do_signal(signal, true)?;
-
-        Ok(self)
-    }
-
-    /// Disables fetching output and error output from the underlying process.
-    pub fn disable_output(&mut self) -> anyhow::Result<&mut Self> {
-        if self.is_running() {
-            return Err(RuntimeException::new(
-                "Disabling output while the process is running is not possible.".to_string(),
-            )
-            .into());
-        }
-        if self.idle_timeout.is_some() {
-            return Err(LogicException::new(
-                "Output cannot be disabled while an idle timeout is set.".to_string(),
-            )
-            .into());
-        }
-
-        self.output_disabled = true;
-
-        Ok(self)
-    }
-
-    /// Enables fetching output and error output from the underlying process.
-    pub fn enable_output(&mut self) -> anyhow::Result<&mut Self> {
-        if self.is_running() {
-            return Err(RuntimeException::new(
-                "Enabling output while the process is running is not possible.".to_string(),
-            )
-            .into());
-        }
-
-        self.output_disabled = false;
-
-        Ok(self)
-    }
-
-    pub fn is_output_disabled(&self) -> bool {
-        self.output_disabled
     }
 
     /// Returns the current output of the process (STDOUT).
@@ -650,102 +474,6 @@ impl Process {
         )
     }
 
-    /// Returns the output incrementally.
-    pub fn get_incremental_output(&mut self) -> anyhow::Result<String> {
-        self.read_pipes_for_output("getIncrementalOutput", false)?;
-
-        let latest = shirabe_php_shim::stream_get_contents3(
-            self.stdout.as_ref().unwrap(),
-            -1,
-            self.incremental_output_offset,
-        );
-        self.incremental_output_offset =
-            shirabe_php_shim::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
-
-        Ok(latest.unwrap_or_default())
-    }
-
-    /// Returns an iterator to the output of the process, with the output type as keys.
-    ///
-    /// PHP returns a `\Generator`; lacking generators, this collects the yielded chunks eagerly.
-    pub fn get_iterator(&mut self, flags: i64) -> anyhow::Result<Vec<(String, String)>> {
-        self.read_pipes_for_output("getIterator", false)?;
-
-        let clear_output = (Self::ITER_KEEP_OUTPUT & flags) == 0;
-        let blocking = (Self::ITER_NON_BLOCKING & flags) == 0;
-        let yield_out = (Self::ITER_SKIP_OUT & flags) == 0;
-        let yield_err = (Self::ITER_SKIP_ERR & flags) == 0;
-
-        let mut yields = Vec::new();
-        while self.callback.is_some()
-            || (yield_out && !shirabe_php_shim::feof(self.stdout.as_ref().unwrap()))
-            || (yield_err && !shirabe_php_shim::feof(self.stderr.as_ref().unwrap()))
-        {
-            let mut got_out = false;
-            let mut got_err = false;
-
-            if yield_out {
-                let out = shirabe_php_shim::stream_get_contents3(
-                    self.stdout.as_ref().unwrap(),
-                    -1,
-                    self.incremental_output_offset,
-                )
-                .unwrap_or_default();
-
-                if !out.is_empty() {
-                    got_out = true;
-                    if clear_output {
-                        self.clear_output();
-                    } else {
-                        self.incremental_output_offset =
-                            shirabe_php_shim::ftell(self.stdout.as_ref().unwrap()).unwrap_or(0);
-                    }
-
-                    yields.push((Self::OUT.to_string(), out));
-                }
-            }
-
-            if yield_err {
-                let err = shirabe_php_shim::stream_get_contents3(
-                    self.stderr.as_ref().unwrap(),
-                    -1,
-                    self.incremental_error_output_offset,
-                )
-                .unwrap_or_default();
-
-                if !err.is_empty() {
-                    got_err = true;
-                    if clear_output {
-                        self.clear_error_output();
-                    } else {
-                        self.incremental_error_output_offset =
-                            shirabe_php_shim::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
-                    }
-
-                    yields.push((Self::ERR.to_string(), err));
-                }
-            }
-
-            if !blocking && !got_out && !got_err {
-                yields.push((Self::OUT.to_string(), String::new()));
-            }
-
-            self.check_timeout()?;
-            self.read_pipes_for_output("getIterator", blocking)?;
-        }
-
-        Ok(yields)
-    }
-
-    /// Clears the process output.
-    pub fn clear_output(&mut self) -> &mut Self {
-        shirabe_php_shim::ftruncate(self.stdout.as_ref().unwrap(), 0);
-        shirabe_php_shim::fseek(self.stdout.as_ref().unwrap(), 0, shirabe_php_shim::SEEK_SET);
-        self.incremental_output_offset = 0;
-
-        self
-    }
-
     /// Returns the current error output of the process (STDERR).
     pub fn get_error_output(&mut self) -> anyhow::Result<String> {
         if let Some(mock) = &self.mock {
@@ -758,30 +486,6 @@ impl Process {
             shirabe_php_shim::stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0)
                 .unwrap_or_default(),
         )
-    }
-
-    /// Returns the errorOutput incrementally.
-    pub fn get_incremental_error_output(&mut self) -> anyhow::Result<String> {
-        self.read_pipes_for_output("getIncrementalErrorOutput", false)?;
-
-        let latest = shirabe_php_shim::stream_get_contents3(
-            self.stderr.as_ref().unwrap(),
-            -1,
-            self.incremental_error_output_offset,
-        );
-        self.incremental_error_output_offset =
-            shirabe_php_shim::ftell(self.stderr.as_ref().unwrap()).unwrap_or(0);
-
-        Ok(latest.unwrap_or_default())
-    }
-
-    /// Clears the process error output.
-    pub fn clear_error_output(&mut self) -> &mut Self {
-        shirabe_php_shim::ftruncate(self.stderr.as_ref().unwrap(), 0);
-        shirabe_php_shim::fseek(self.stderr.as_ref().unwrap(), 0, shirabe_php_shim::SEEK_SET);
-        self.incremental_error_output_offset = 0;
-
-        self
     }
 
     /// Returns the exit code returned by the process.
@@ -811,18 +515,6 @@ impl Process {
         self.get_exit_code() == Some(0)
     }
 
-    /// Returns true if the child process has been terminated by an uncaught signal.
-    pub fn has_been_signaled(&mut self) -> anyhow::Result<bool> {
-        self.require_process_is_terminated("hasBeenSignaled")?;
-
-        Ok(self
-            .process_information
-            .as_ref()
-            .and_then(|i| i.get("signaled"))
-            .map(shirabe_php_shim::php_truthy)
-            .unwrap_or(false))
-    }
-
     /// Returns the number of the signal that caused the child process to terminate.
     pub fn get_term_signal(&mut self) -> anyhow::Result<i64> {
         self.require_process_is_terminated("getTermSignal")?;
@@ -840,30 +532,6 @@ impl Process {
         }
 
         Ok(termsig.unwrap_or(0))
-    }
-
-    /// Returns true if the child process has been stopped by a signal.
-    pub fn has_been_stopped(&mut self) -> anyhow::Result<bool> {
-        self.require_process_is_terminated("hasBeenStopped")?;
-
-        Ok(self
-            .process_information
-            .as_ref()
-            .and_then(|i| i.get("stopped"))
-            .map(shirabe_php_shim::php_truthy)
-            .unwrap_or(false))
-    }
-
-    /// Returns the number of the signal that caused the child process to stop.
-    pub fn get_stop_signal(&mut self) -> anyhow::Result<i64> {
-        self.require_process_is_terminated("getStopSignal")?;
-
-        Ok(self
-            .process_information
-            .as_ref()
-            .and_then(|i| i.get("stopsig"))
-            .and_then(|v| v.as_int())
-            .unwrap_or(0))
     }
 
     /// Checks if the process is currently running.
@@ -891,13 +559,6 @@ impl Process {
         self.update_status(false);
 
         Self::STATUS_TERMINATED == self.status
-    }
-
-    /// Gets the process status (one of: ready, started, terminated).
-    pub fn get_status(&mut self) -> String {
-        self.update_status(false);
-
-        self.status.clone()
     }
 
     /// Stops the process.
@@ -935,8 +596,6 @@ impl Process {
 
     /// Adds a line to the STDOUT stream.
     pub fn add_output(&mut self, line: &str) {
-        self.last_output_time = Some(shirabe_php_shim::microtime());
-
         let stdout = self.stdout.as_ref().unwrap();
         shirabe_php_shim::fseek(stdout, 0, shirabe_php_shim::SEEK_END);
         shirabe_php_shim::fwrite(stdout, line, Some(line.len() as i64));
@@ -949,8 +608,6 @@ impl Process {
 
     /// Adds a line to the STDERR stream.
     pub fn add_error_output(&mut self, line: &str) {
-        self.last_output_time = Some(shirabe_php_shim::microtime());
-
         let stderr = self.stderr.as_ref().unwrap();
         shirabe_php_shim::fseek(stderr, 0, shirabe_php_shim::SEEK_END);
         shirabe_php_shim::fwrite(stderr, line, Some(line.len() as i64));
@@ -959,11 +616,6 @@ impl Process {
             self.incremental_error_output_offset,
             shirabe_php_shim::SEEK_SET,
         );
-    }
-
-    /// Gets the last output time in seconds.
-    pub fn get_last_output_time(&self) -> Option<f64> {
-        self.last_output_time
     }
 
     /// Gets the command line to be executed.
@@ -983,28 +635,9 @@ impl Process {
         self.timeout
     }
 
-    /// Gets the process idle timeout in seconds (max. time since last output).
-    pub fn get_idle_timeout(&self) -> Option<f64> {
-        self.idle_timeout
-    }
-
     /// Sets the process timeout (max. runtime) in seconds.
     pub fn set_timeout(&mut self, timeout: Option<f64>) -> anyhow::Result<&mut Self> {
         self.timeout = self.validate_timeout(timeout)?;
-
-        Ok(self)
-    }
-
-    /// Sets the process idle timeout (max. time since last output) in seconds.
-    pub fn set_idle_timeout(&mut self, timeout: Option<f64>) -> anyhow::Result<&mut Self> {
-        if timeout.is_some() && self.output_disabled {
-            return Err(LogicException::new(
-                "Idle timeout cannot be set while the output is disabled.".to_string(),
-            )
-            .into());
-        }
-
-        self.idle_timeout = self.validate_timeout(timeout)?;
 
         Ok(self)
     }
@@ -1035,18 +668,6 @@ impl Process {
         self.tty
     }
 
-    /// Sets PTY mode.
-    pub fn set_pty(&mut self, bool: bool) -> &mut Self {
-        self.pty = bool;
-
-        self
-    }
-
-    /// Returns PTY state.
-    pub fn is_pty(&self) -> bool {
-        self.pty
-    }
-
     /// Gets the working directory.
     pub fn get_working_directory(&self) -> Option<String> {
         if self.cwd.is_none() {
@@ -1058,28 +679,11 @@ impl Process {
         self.cwd.clone()
     }
 
-    /// Sets the current working directory.
-    pub fn set_working_directory(&mut self, cwd: &str) -> &mut Self {
-        self.cwd = Some(cwd.to_string());
-
-        self
-    }
-
-    /// Gets the environment variables.
-    pub fn get_env(&self) -> &IndexMap<String, PhpMixed> {
-        &self.env
-    }
-
     /// Sets the environment variables.
     pub fn set_env(&mut self, env: IndexMap<String, PhpMixed>) -> &mut Self {
         self.env = env;
 
         self
-    }
-
-    /// Gets the Process input.
-    pub fn get_input(&self) -> &PhpMixed {
-        &self.input
     }
 
     /// Sets the input.
@@ -1108,64 +712,7 @@ impl Process {
         {
             self.stop(0.0, None);
 
-            return Err(ProcessTimedOutException::new(
-                self,
-                ProcessTimedOutException::TYPE_GENERAL,
-            )
-            .into());
-        }
-
-        if let Some(idle_timeout) = self.idle_timeout
-            && idle_timeout < shirabe_php_shim::microtime() - self.last_output_time.unwrap_or(0.0)
-        {
-            self.stop(0.0, None);
-
-            return Err(
-                ProcessTimedOutException::new(self, ProcessTimedOutException::TYPE_IDLE).into(),
-            );
-        }
-
-        Ok(())
-    }
-
-    pub fn get_start_time(&self) -> anyhow::Result<f64> {
-        if !self.is_started() {
-            return Err(LogicException::new(
-                "Start time is only available after process start.".to_string(),
-            )
-            .into());
-        }
-
-        Ok(self.starttime.unwrap())
-    }
-
-    /// Defines options to pass to the underlying proc_open().
-    pub fn set_options(&mut self, options: IndexMap<String, PhpMixed>) -> anyhow::Result<()> {
-        if self.is_running() {
-            return Err(RuntimeException::new(
-                "Setting options while the process is running is not possible.".to_string(),
-            )
-            .into());
-        }
-
-        let default_options = self.options.clone();
-        let existing_options = [
-            "blocking_pipes",
-            "create_process_group",
-            "create_new_console",
-        ];
-
-        for (key, value) in options {
-            if !existing_options.contains(&key.as_str()) {
-                self.options = default_options;
-                return Err(LogicException::new(format!(
-                    "Invalid option \"{}\" passed to \"Symfony\\Component\\Process\\Process::setOptions()\". Supported options are \"{}\".",
-                    key,
-                    existing_options.join("\", \"")
-                ))
-                .into());
-            }
-            self.options.insert(key, value);
+            return Err(ProcessTimedOutException::new(self).into());
         }
 
         Ok(())
@@ -1193,46 +740,15 @@ impl Process {
         })
     }
 
-    /// Returns whether PTY is supported on the current operating system.
-    pub fn is_pty_supported() -> bool {
-        static RESULT: OnceLock<bool> = OnceLock::new();
-
-        *RESULT.get_or_init(|| {
-            if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
-                return false;
-            }
-
-            let mut pipes = IndexMap::new();
-            shirabe_php_shim::proc_open(
-                "echo 1 >/dev/null",
-                &[
-                    descriptor(&["pty"]),
-                    descriptor(&["pty"]),
-                    descriptor(&["pty"]),
-                ],
-                &mut pipes,
-                None,
-                None,
-                None,
-            )
-            .is_ok()
-        })
-    }
-
     /// Creates the descriptors needed by the proc_open.
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
         // TODO(plugin): $this->input instanceof \Iterator -> rewind() is not modeled.
         if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
-            self.process_pipes = Some(Box::new(WindowsPipes::new(
-                self.input.clone(),
-                !self.output_disabled || self.has_callback,
-            )));
+            self.process_pipes = Some(Box::new(WindowsPipes::new(self.input.clone())));
         } else {
             self.process_pipes = Some(Box::new(UnixPipes::new(
                 Some(self.is_tty()),
-                self.is_pty(),
                 self.input.clone(),
-                !self.output_disabled || self.has_callback,
             )));
         }
 
@@ -1242,17 +758,6 @@ impl Process {
     /// Builds up the callback used by wait().
     fn build_callback(&self, callback: Option<UserCallback>) -> ProcessCallback {
         let mut callback = callback;
-        if self.output_disabled {
-            return Box::new(
-                move |_this: &mut Process, r#type: &str, data: &str| -> bool {
-                    match callback.as_mut() {
-                        Some(cb) => cb(r#type, data),
-                        None => false,
-                    }
-                },
-            );
-        }
-
         let out = Self::OUT;
 
         Box::new(
@@ -1355,10 +860,6 @@ impl Process {
 
     /// Reads pipes for the freshest output.
     fn read_pipes_for_output(&mut self, caller: &str, blocking: bool) -> anyhow::Result<()> {
-        if self.output_disabled {
-            return Err(LogicException::new("Output has been disabled.".to_string()).into());
-        }
-
         self.require_process_is_started(caller)?;
 
         self.update_status(blocking);
@@ -1790,40 +1291,10 @@ impl Process {
         }
         result
     }
-
-    /// Clone the process configuration, mirroring PHP `clone $this` followed by `__clone`
-    /// (which calls resetProcessData). Runtime state is reset, not copied.
-    fn clone_process(&self) -> Process {
-        let mut process = Self::empty();
-        process.has_callback = self.has_callback;
-        process.commandline = self.commandline.clone();
-        process.cwd = self.cwd.clone();
-        process.env = self.env.clone();
-        process.input = self.input.clone();
-        process.timeout = self.timeout;
-        process.idle_timeout = self.idle_timeout;
-        process.output_disabled = self.output_disabled;
-        process.tty = self.tty;
-        process.pty = self.pty;
-        process.options = self.options.clone();
-        process.use_file_handles = self.use_file_handles;
-        process
-    }
 }
 
 impl Drop for Process {
     fn drop(&mut self) {
-        if self
-            .options
-            .get("create_new_console")
-            .map(shirabe_php_shim::php_truthy)
-            .unwrap_or(false)
-        {
-            if let Some(p) = self.process_pipes.as_mut() {
-                p.close();
-            }
-        } else {
-            self.stop(0.0, None);
-        }
+        self.stop(0.0, None);
     }
 }

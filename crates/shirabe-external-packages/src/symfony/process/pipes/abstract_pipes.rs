@@ -101,8 +101,4 @@ impl AbstractPipes {
 
         None
     }
-
-    pub fn handle_error(&mut self, _type: i64, msg: String) {
-        self.last_error = Some(msg);
-    }
 }

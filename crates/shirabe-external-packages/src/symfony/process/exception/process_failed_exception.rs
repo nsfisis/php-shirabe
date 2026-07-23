@@ -29,13 +29,11 @@ impl ProcessFailedException {
             process.get_working_directory().unwrap_or_default(),
         );
 
-        if !process.is_output_disabled() {
-            error += &format!(
-                "\n\nOutput:\n================\n{}\n\nError Output:\n================\n{}",
-                process.get_output()?,
-                process.get_error_output()?,
-            );
-        }
+        error += &format!(
+            "\n\nOutput:\n================\n{}\n\nError Output:\n================\n{}",
+            process.get_output()?,
+            process.get_error_output()?,
+        );
 
         Ok(Self {
             message: error,

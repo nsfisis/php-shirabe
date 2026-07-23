@@ -25,16 +25,6 @@ impl ExecutableFinder {
         Self { suffixes: vec![] }
     }
 
-    /// Replaces default suffixes of executable.
-    pub fn set_suffixes(&mut self, suffixes: Vec<String>) {
-        self.suffixes = suffixes;
-    }
-
-    /// Adds new possible suffix to check for executable.
-    pub fn add_suffix(&mut self, suffix: &str) {
-        self.suffixes.push(suffix.to_string());
-    }
-
     pub fn find(&self, name: &str, default: Option<&str>, extra_dirs: &[String]) -> Option<String> {
         // windows built-in commands that are present in cmd.exe should not be resolved using PATH as they do not exist as exes
         if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\"

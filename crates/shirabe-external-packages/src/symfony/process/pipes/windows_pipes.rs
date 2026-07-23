@@ -13,11 +13,10 @@ pub struct WindowsPipes {
     file_handles: IndexMap<i64, PhpResource>,
     lock_handles: IndexMap<i64, PhpResource>,
     read_bytes: IndexMap<i64, i64>,
-    have_read_support: bool,
 }
 
 impl WindowsPipes {
-    pub fn new(_input: PhpMixed, _have_read_support: bool) -> Self {
+    pub fn new(_input: PhpMixed) -> Self {
         // Windows-only path: never constructed on POSIX (DIRECTORY_SEPARATOR is "/").
         todo!()
     }
@@ -40,10 +39,6 @@ impl PipesInterface for WindowsPipes {
 
     fn read_and_write(&mut self, _blocking: bool, _close: bool) -> IndexMap<i64, String> {
         todo!()
-    }
-
-    fn have_read_support(&self) -> bool {
-        self.have_read_support
     }
 
     fn are_open(&self) -> bool {

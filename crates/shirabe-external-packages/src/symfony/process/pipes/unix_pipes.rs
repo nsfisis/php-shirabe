@@ -11,22 +11,13 @@ use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
 pub struct UnixPipes {
     inner: AbstractPipes,
     tty_mode: Option<bool>,
-    pty_mode: bool,
-    have_read_support: bool,
 }
 
 impl UnixPipes {
-    pub fn new(
-        tty_mode: Option<bool>,
-        pty_mode: bool,
-        input: PhpMixed,
-        have_read_support: bool,
-    ) -> Self {
+    pub fn new(tty_mode: Option<bool>, input: PhpMixed) -> Self {
         Self {
             inner: AbstractPipes::new(input),
             tty_mode,
-            pty_mode,
-            have_read_support,
         }
     }
 }
@@ -35,36 +26,17 @@ fn descriptor(items: &[&str]) -> Descriptor {
     match items {
         ["pipe", mode] => Descriptor::Pipe(mode.to_string()),
         ["file", path, mode] => Descriptor::File(path.to_string(), mode.to_string()),
-        ["pty"] => Descriptor::Pty,
         _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }
 
 impl PipesInterface for UnixPipes {
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
-        if !self.have_read_support {
-            let nullstream =
-                shirabe_php_shim::fopen("/dev/null", "c").expect("fopen('/dev/null') failed");
-            return vec![
-                descriptor(&["pipe", "r"]),
-                Descriptor::Resource(nullstream.clone()),
-                Descriptor::Resource(nullstream),
-            ];
-        }
-
         if self.tty_mode == Some(true) {
             return vec![
                 descriptor(&["file", "/dev/tty", "r"]),
                 descriptor(&["file", "/dev/tty", "w"]),
                 descriptor(&["file", "/dev/tty", "w"]),
-            ];
-        }
-
-        if self.pty_mode && Process::is_pty_supported() {
-            return vec![
-                descriptor(&["pty"]),
-                descriptor(&["pty"]),
-                descriptor(&["pty"]),
             ];
         }
 
@@ -144,10 +116,6 @@ impl PipesInterface for UnixPipes {
         }
 
         read
-    }
-
-    fn have_read_support(&self) -> bool {
-        self.have_read_support
     }
 
     fn are_open(&self) -> bool {
