@@ -468,11 +468,6 @@ pub fn php_require(_file: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn r#eval(_code: &str) -> PhpMixed {
-    // TODO(phase-d): `eval` runs arbitrary PHP source at runtime; there is no PHP interpreter.
-    todo!()
-}
-
 pub fn memory_get_usage() -> i64 {
     // TODO(phase-d): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
     0

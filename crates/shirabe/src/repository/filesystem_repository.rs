@@ -22,8 +22,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_flip, dirname, r#eval, file_get_contents, get_class_err, get_debug_type, in_array,
-    is_array, is_null, is_string, ksort, php_regex, realpath, str_repeat, trim, usort, var_export,
+    array_flip, dirname, file_get_contents, get_class_err, get_debug_type, in_array, is_array,
+    is_null, is_string, ksort, php_regex, realpath, str_repeat, trim, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -346,37 +346,10 @@ impl FilesystemRepository {
     /// As we load the file from vendor dir during bootstrap, we need to make sure it contains only expected code before executing it
     ///
     /// @internal
-    pub fn safely_load_installed_versions(path: &str) -> bool {
-        // PHP: @file_get_contents($path)
-        let installed_versions_data = Silencer::call(|| Ok(file_get_contents(path)))
-            .ok()
-            .flatten();
-        let pattern = "{(?(DEFINE)\n   (?<number>  -? \\s*+ \\d++ (?:\\.\\d++)? )\n   (?<boolean> true | false | null )\n   (?<strings> (?&string) (?: \\s*+ \\. \\s*+ (?&string))*+ )\n   (?<string>  (?: \" (?:[^\"\\\\$]*+ | \\\\ [\"\\\\0] )* \" | ' (?:[^'\\\\]*+ | \\\\ ['\\\\] )* ' ) )\n   (?<array>   array\\( \\s*+ (?: (?:(?&number)|(?&strings)) \\s*+ => \\s*+ (?: (?:__DIR__ \\s*+ \\. \\s*+)? (?&strings) | (?&value) ) \\s*+, \\s*+ )*+  \\s*+ \\) )\n   (?<value>   (?: (?&number) | (?&boolean) | (?&strings) | (?&array) ) )\n)\n^<\\?php\\s++return\\s++(?&array)\\s*+;$}ix";
-        if let Some(data) = installed_versions_data {
-            let mixed = PhpMixed::String(data.clone());
-            if is_string(&mixed) && Preg::is_match(pattern, &trim(&data, None)) {
-                let replaced = Preg::replace(
-                    php_regex!(r#"{=>\s*+__DIR__\s*+\.\s*+(['\"])}"#),
-                    &format!(
-                        "=> {} . $1",
-                        var_export(&PhpMixed::String(dirname(path)), true),
-                    ),
-                    &data,
-                );
-                let evaluated = r#eval(&format!("?>{}", replaced));
-                InstalledVersions::reload(
-                    evaluated
-                        .as_array()
-                        .cloned()
-                        .map(|m| m.into_iter().collect())
-                        .unwrap_or_default(),
-                );
-
-                return true;
-            }
-        }
-
-        false
+    pub fn safely_load_installed_versions(_path: &str) -> bool {
+        // TODO(php-runtime): call `InstalledVersions::reload()` in PHP runtime process, not in
+        // Rust.
+        true
     }
 
     /// @param array<mixed> $array
