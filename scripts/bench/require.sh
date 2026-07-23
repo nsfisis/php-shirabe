@@ -4,6 +4,9 @@ set -euo pipefail
 
 REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 BIN="$REPO_ROOT/target/release/shirabe"
+COMPOSER_BIN="$REPO_ROOT/composer/bin/composer"
+
+source "$REPO_ROOT/scripts/bench/lib.sh"
 
 PACKAGE="monolog/monolog"
 for arg in "$@"; do
@@ -19,6 +22,8 @@ if ! command -v hyperfine >/dev/null 2>&1; then
 fi
 
 cargo build --manifest-path "$REPO_ROOT/Cargo.toml" --release --bin shirabe
+
+apply_http3_workaround
 
 OUTDIR="${TMPDIR:-/tmp}/shirabe-bench-require-$$"
 mkdir -p "$OUTDIR"
@@ -41,8 +46,8 @@ hyperfine \
   --export-json "$OUTDIR/results-$PACKAGE_SLUG.json" \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
   --ignore-failure \
-  "'$BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-shirabe' '$PACKAGE'" \
-  "composer require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-composer' '$PACKAGE'"
+  --command-name Shirabe "RUST_BACKTRACE=1 '$BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-shirabe' '$PACKAGE'" \
+  --command-name Composer "'$COMPOSER_BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-composer' '$PACKAGE'"
 
 echo ">> results: $OUTDIR/results-$PACKAGE_SLUG.json" >&2
 echo ">>          $OUTDIR/results-$PACKAGE_SLUG.md" >&2

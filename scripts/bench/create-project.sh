@@ -4,6 +4,9 @@ set -euo pipefail
 
 REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 BIN="$REPO_ROOT/target/release/shirabe"
+COMPOSER_BIN="$REPO_ROOT/composer/bin/composer"
+
+source "$REPO_ROOT/scripts/bench/lib.sh"
 
 PACKAGE="laravel/laravel"
 for arg in "$@"; do
@@ -20,6 +23,8 @@ fi
 
 cargo build --manifest-path "$REPO_ROOT/Cargo.toml" --release --bin shirabe
 
+apply_http3_workaround
+
 OUTDIR="${TMPDIR:-/tmp}/shirabe-bench-create-project-$$"
 mkdir -p "$OUTDIR"
 cd "$OUTDIR"
@@ -34,7 +39,7 @@ hyperfine \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
   --show-output \
   --command-name Shirabe "RUST_BACKTRACE=1 '$BIN' create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-shirabe'" \
-  --command-name Composer "composer create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-composer'"
+  --command-name Composer "'$COMPOSER_BIN' create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-composer'"
 
 echo ">> results: $OUTDIR/results-$PACKAGE_SLUG.json" >&2
 echo ">>          $OUTDIR/results-$PACKAGE_SLUG.md" >&2
