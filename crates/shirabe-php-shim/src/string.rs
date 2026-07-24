@@ -1183,7 +1183,7 @@ pub fn strip_tags(_str: &str) -> String {
                                 state = 0;
                             }
                         }
-                        _ => {}
+                        _ => out.push(c),
                     }
                 }
             }
