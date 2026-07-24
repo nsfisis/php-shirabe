@@ -856,13 +856,28 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         .as_array()
         .cloned()
         .unwrap_or_default();
-    let composer = Factory::__create_mock(
+    let composer_result = Factory::__create_mock(
         io.clone(),
         Some(LocalConfigInput::Data(composer_data)),
         DisablePlugins::None,
         false,
-    )
-    .unwrap();
+    );
+    // PHP's PHPUnit::expectException wraps the whole rest of the test method, so an exception
+    // expected from the fixture can come from composer construction itself, not just the later
+    // install/update run; check for that here since Rust has no equivalent ambient wrapper.
+    if is_exception && let Err(e) = &composer_result {
+        let normalized = case.expect.replace('\n', shirabe_php_shim::PHP_EOL);
+        let normalized = normalized.trim_end();
+        let err = format!("{}", e);
+        assert!(
+            err.contains(normalized),
+            "expected exception message containing:\n{}\n--- got ---\n{}",
+            normalized,
+            err
+        );
+        return;
+    }
+    let composer = composer_result.unwrap();
 
     // installed.json mock: a real JsonFile over a temp file holding $installed, wrapped in the
     // no-op InstalledFilesystemRepositoryMock.
@@ -1411,7 +1426,7 @@ pool_optimizer_test! {
     pool_optimizer_install_prefers_repos_over_package_versions => "install-prefers-repos-over-package-versions.test";
     pool_optimizer_install_reference => "install-reference.test";
     pool_optimizer_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
-    pool_optimizer_install_self_from_root => "install-self-from-root.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_install_self_from_root => "install-self-from-root.test";
     pool_optimizer_install_simple => "install-simple.test";
     pool_optimizer_install_without_lock => "install-without-lock.test";
     pool_optimizer_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
@@ -1601,7 +1616,7 @@ raw_pool_test! {
     raw_pool_install_prefers_repos_over_package_versions => "install-prefers-repos-over-package-versions.test";
     raw_pool_install_reference => "install-reference.test";
     raw_pool_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
-    raw_pool_install_self_from_root => "install-self-from-root.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_install_self_from_root => "install-self-from-root.test";
     raw_pool_install_simple => "install-simple.test";
     raw_pool_install_without_lock => "install-without-lock.test";
     raw_pool_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
