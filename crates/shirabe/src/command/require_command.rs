@@ -53,7 +53,7 @@ pub struct RequireCommand {
     lock: std::cell::RefCell<String>,
     /// contents before modification if the lock file exists
     lock_backup: std::cell::RefCell<Option<String>>,
-    dependency_resolution_completed: std::cell::Cell<bool>,
+    dependency_resolution_completed: std::rc::Rc<std::cell::Cell<bool>>,
     repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
     repository_sets:
         std::cell::RefCell<IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
@@ -76,7 +76,7 @@ impl RequireCommand {
             composer_backup: std::cell::RefCell::new(String::new()),
             lock: std::cell::RefCell::new(String::new()),
             lock_backup: std::cell::RefCell::new(None),
-            dependency_resolution_completed: std::cell::Cell::new(false),
+            dependency_resolution_completed: std::rc::Rc::new(std::cell::Cell::new(false)),
             repos: std::cell::RefCell::new(None),
             repository_sets: std::cell::RefCell::new(IndexMap::new()),
         };
@@ -759,14 +759,13 @@ impl RequireCommand {
         self.dependency_resolution_completed.set(false);
         // PHP: $composer->getEventDispatcher()->addListener(InstallerEvents::PRE_OPERATIONS_EXEC,
         //   function () use (&$dependencyResolutionCompleted) { $dependencyResolutionCompleted = true; }, 10000);
-        // TODO(phase-c): the event dispatcher's Callable::Closure is a placeholder variant that
-        // stores no actual closure, so the listener that flips dependency_resolution_completed
-        // cannot be registered. Resolving needs the closure model (Callable holding an Rc<dyn Fn>)
-        // plus dependency_resolution_completed shared (Rc<RefCell<bool>>) into both the listener
-        // and this command.
+        let dependency_resolution_completed = self.dependency_resolution_completed.clone();
         composer.get_event_dispatcher().borrow_mut().add_listener(
             InstallerEvents::PRE_OPERATIONS_EXEC,
-            crate::event_dispatcher::Callable::Closure,
+            crate::event_dispatcher::Callable::Closure(std::rc::Rc::new(move |_event| {
+                dependency_resolution_completed.set(true);
+                PhpMixed::Null
+            })),
             10000,
         );
 

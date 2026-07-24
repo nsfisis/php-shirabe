@@ -58,10 +58,10 @@ fn test_require_throws_if_none_matches() {
 
 #[test]
 #[serial]
-#[ignore = "the prior RefCell re-entrancy panic is fixed; now fails on the pre-operations-exec \
-            listener dispatch with \"Subscriber ?::? for event pre-operations-exec is not \
-            callable\" (event_dispatcher.rs TODO(plugin): is_callable/invoke for non-string \
-            callables is unimplemented)"]
+#[ignore = "the pre-operations-exec listener bug is fixed; now fails with \"RefCell already \
+            borrowed\" at console_io.rs:366 (ConsoleIO::ask_question, reached via \
+            ask_confirmation from RequireCommand::update_requirements_after_resolution) — a \
+            re-entrant IO RefCell borrow, unrelated to event dispatching"]
 fn test_require_warns_if_resolved_to_feature_branch() {
     let composer_json = serde_json::json!({
         "repositories": {
@@ -266,10 +266,11 @@ Using version 1.1.0 for required/pkg",
 
 #[test]
 #[serial]
-#[ignore = "the prior RefCell re-entrancy panic is fixed; now fails on the pre-operations-exec \
-            listener dispatch with \"Subscriber ?::? for event pre-operations-exec is not \
-            callable\" (event_dispatcher.rs TODO(plugin): is_callable/invoke for non-string \
-            callables is unimplemented)"]
+#[ignore = "the pre-operations-exec listener bug is fixed; now fails on the first data-provider \
+            case ('warn once for missing ext but a lower package matches') because the \
+            \"<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar \
+            ^1 which is missing from your platform.</warning>\" message is never emitted — a \
+            distinct, unimplemented require_command warning path unrelated to event dispatching"]
 fn test_require() {
     for (label, composer_json, command, expected) in provide_require() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);

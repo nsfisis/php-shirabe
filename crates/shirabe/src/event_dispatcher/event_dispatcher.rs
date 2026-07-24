@@ -34,16 +34,34 @@ use shirabe_php_shim::{
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
 /// "Class::method"), a `[object|string, method]` pair, or a `\Closure`.
 ///
-/// TODO(plugin): Subscriber- and Closure-based listeners come from plugins and are not
+/// TODO(plugin): Subscriber-based (`ArrayCallable`) listeners come from plugins and are not
 /// implemented yet — only the string forms used by composer.json `scripts` work here.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Callable {
     String(String),
     /// `[$className_or_object, $methodName]` array callable. The first element is represented
     /// here as `PhpMixed` to keep parity with PHP's loose typing.
     ArrayCallable(Box<PhpMixed>, String),
-    /// PHP `\Closure` placeholder.
-    Closure,
+    /// PHP `\Closure`, invoked with the event exactly like `$callable($event)` in
+    /// `EventDispatcher::doDispatch`. Today this is only produced by Composer's own commands
+    /// registering an inline listener on themselves (e.g. `RequireCommand`'s
+    /// `dependencyResolutionCompleted` tracker) — Plugin-supplied closures remain out of scope
+    /// pending Plugin API.
+    Closure(std::rc::Rc<dyn Fn(&dyn EventInterface) -> PhpMixed>),
+}
+
+impl std::fmt::Debug for Callable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Callable::String(s) => f.debug_tuple("String").field(s).finish(),
+            Callable::ArrayCallable(first, method) => f
+                .debug_tuple("ArrayCallable")
+                .field(first)
+                .field(method)
+                .finish(),
+            Callable::Closure(_) => f.write_str("Closure(..)"),
+        }
+    }
 }
 
 /// The Event Dispatcher.
@@ -326,7 +344,16 @@ impl EventDispatcher {
                 }
             );
             let is_string_callable = matches!(callable, Callable::String(_));
-            if !is_string_callable {
+            if let Callable::Closure(ref closure) = callable {
+                let _ = self.make_autoloader(event, &callable);
+                // Closures are always callable in PHP (is_callable() returns true for any \Closure),
+                // so the is_callable()/RuntimeException branch below never applies here.
+                r#return = if matches!(closure(event), PhpMixed::Bool(false)) {
+                    1
+                } else {
+                    0
+                };
+            } else if !is_string_callable {
                 // TODO(plugin): non-string callable handling — verify is_callable, invoke,
                 // and replicate the get_class / write_error / is_callable error path from PHP.
                 let _ = self.make_autoloader(event, &callable);
