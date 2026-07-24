@@ -609,6 +609,18 @@ fn read_test_file(
     data
 }
 
+/// PHP truthiness of a `json_decode`d value, used to replicate `if ($expectLock)` checks.
+fn php_json_truthy(v: &serde_json::Value) -> bool {
+    match v {
+        serde_json::Value::Null => false,
+        serde_json::Value::Bool(b) => *b,
+        serde_json::Value::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
+        serde_json::Value::String(s) => !s.is_empty() && s != "0",
+        serde_json::Value::Array(a) => !a.is_empty(),
+        serde_json::Value::Object(o) => !o.is_empty(),
+    }
+}
+
 fn collect_test_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
@@ -689,10 +701,22 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
 
         let run = test_data["RUN"].clone();
 
+        // PHP: `$expectLock === 'false' ? false : JsonFile::parseJson(...)`, then branches on
+        // truthiness (`if ($expectLock)` / `elseif ($expectLock === false)`). A bare `false`
+        // literal parses to the JSON boolean false, which is falsy either way, so both paths
+        // collapse to the same outcome; mirror that by checking truthiness of the parsed value
+        // rather than the raw string (the section's trailing newline defeats a literal "false"
+        // string comparison when it is the file's last section).
         let expect_lock = match test_data.get("EXPECT-LOCK").filter(|s| !s.is_empty()) {
             None => ExpectLock::Unset,
-            Some(s) if s == "false" => ExpectLock::Never,
-            Some(s) => ExpectLock::Json(serde_json::from_str(s).unwrap()),
+            Some(s) => {
+                let parsed: serde_json::Value = serde_json::from_str(s).unwrap();
+                if php_json_truthy(&parsed) {
+                    ExpectLock::Json(parsed)
+                } else {
+                    ExpectLock::Never
+                }
+            }
         };
 
         let expect_installed = test_data
@@ -1369,7 +1393,7 @@ pool_optimizer_test! {
     pool_optimizer_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
     pool_optimizer_install_self_from_root => "install-self-from-root.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_install_simple => "install-simple.test";
-    pool_optimizer_install_without_lock => "install-without-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_install_without_lock => "install-without-lock.test";
     pool_optimizer_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
     pool_optimizer_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
     pool_optimizer_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
@@ -1491,7 +1515,7 @@ pool_optimizer_test! {
     pool_optimizer_update_to_empty_from_blank => "update-to-empty-from-blank.test";
     pool_optimizer_update_to_empty_from_locked => "update-to-empty-from-locked.test";
     pool_optimizer_update_with_all_dependencies => "update-with-all-dependencies.test";
-    pool_optimizer_update_without_lock => "update-without-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_update_without_lock => "update-without-lock.test";
     pool_optimizer_updating_dev_from_lock_removes_old_deps => "updating-dev-from-lock-removes-old-deps.test";
     pool_optimizer_updating_dev_updates_url_and_reference => "updating-dev-updates-url-and-reference.test";
 }
@@ -1559,7 +1583,7 @@ raw_pool_test! {
     raw_pool_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
     raw_pool_install_self_from_root => "install-self-from-root.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_install_simple => "install-simple.test";
-    raw_pool_install_without_lock => "install-without-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_install_without_lock => "install-without-lock.test";
     raw_pool_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
     raw_pool_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
     raw_pool_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
@@ -1681,7 +1705,7 @@ raw_pool_test! {
     raw_pool_update_to_empty_from_blank => "update-to-empty-from-blank.test";
     raw_pool_update_to_empty_from_locked => "update-to-empty-from-locked.test";
     raw_pool_update_with_all_dependencies => "update-with-all-dependencies.test";
-    raw_pool_update_without_lock => "update-without-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_update_without_lock => "update-without-lock.test";
     raw_pool_updating_dev_from_lock_removes_old_deps => "updating-dev-from-lock-removes-old-deps.test";
     raw_pool_updating_dev_updates_url_and_reference => "updating-dev-updates-url-and-reference.test";
 }
