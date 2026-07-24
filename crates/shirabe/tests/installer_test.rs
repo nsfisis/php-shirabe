@@ -1399,10 +1399,10 @@ pool_optimizer_test! {
     pool_optimizer_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
     pool_optimizer_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
-    pool_optimizer_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test";
     pool_optimizer_partial_update_from_lock_with_root_alias => "partial-update-from-lock-with-root-alias.test";
     pool_optimizer_partial_update_from_lock => "partial-update-from-lock.test";
-    pool_optimizer_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test";
     pool_optimizer_partial_update_keeps_older_dep_if_still_required_with_provide => "partial-update-keeps-older-dep-if-still-required-with-provide.test";
     pool_optimizer_partial_update_keeps_older_dep_if_still_required => "partial-update-keeps-older-dep-if-still-required.test";
     pool_optimizer_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
@@ -1589,10 +1589,10 @@ raw_pool_test! {
     raw_pool_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
     raw_pool_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
-    raw_pool_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test";
     raw_pool_partial_update_from_lock_with_root_alias => "partial-update-from-lock-with-root-alias.test";
     raw_pool_partial_update_from_lock => "partial-update-from-lock.test";
-    raw_pool_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test";
     raw_pool_partial_update_keeps_older_dep_if_still_required_with_provide => "partial-update-keeps-older-dep-if-still-required-with-provide.test";
     raw_pool_partial_update_keeps_older_dep_if_still_required => "partial-update-keeps-older-dep-if-still-required.test";
     raw_pool_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";

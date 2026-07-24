@@ -14,8 +14,8 @@ use crate::package::CompleteAliasPackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::version::StabilityFilter;
-use crate::repository::CanonicalPackagesTrait;
 use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
@@ -159,7 +159,7 @@ impl PoolBuilder {
                 .get_locked_repository()
                 .unwrap()
                 .borrow_mut()
-                .get_canonical_packages()?
+                .get_packages()?
             {
                 if !self.is_update_allowed(locked_package.clone()) {
                     // remember which packages we skipped loading remote content for in this partial update
@@ -815,7 +815,7 @@ impl PoolBuilder {
                 .get_locked_repository()
                 .unwrap()
                 .borrow_mut()
-                .get_canonical_packages()?
+                .get_packages()?
             {
                 if Preg::is_match3(&pattern_regexp, &package.get_name(), None) {
                     continue 'outer;

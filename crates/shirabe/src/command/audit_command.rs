@@ -8,7 +8,6 @@ use crate::command::base_command::base_command_initialize;
 use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
-use crate::repository::CanonicalPackagesTrait;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
@@ -265,7 +264,7 @@ impl AuditCommand {
                     .as_bool()
                     .unwrap_or(false),
             )?;
-            return locked_repo.borrow_mut().get_canonical_packages();
+            return locked_repo.borrow_mut().get_packages();
         }
 
         let root_pkg = composer.get_package();
