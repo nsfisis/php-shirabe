@@ -1288,459 +1288,55 @@ fn php_mixed_map_to_json(map: &IndexMap<String, PhpMixed>) -> serde_json::Value 
     serde_json::to_value(map).unwrap_or(serde_json::Value::Null)
 }
 
-/// One generated #[test] fn per fixture in installer-slow/, run with COMPOSER_POOL_OPTIMIZER=0.
-macro_rules! slow_test {
-    ($($ident:ident => $file:literal $(, ignore = $reason:literal)? ;)*) => {
-        $(
-            #[test]
-            #[serial]
-            $(#[ignore = $reason])?
-            fn $ident() {
-                let _tear_down = TearDown::new();
-                Platform::clear_env("COMPOSER_FUND");
-                Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
-                let cases = load_integration_tests("installer-slow/");
-                let case = cases
-                    .iter()
-                    .find(|c| c.file == $file)
-                    .unwrap_or_else(|| panic!("fixture not found: {}", $file));
-                let expect_output = case.expect_output.clone();
-                do_test_integration(case, expect_output.as_deref());
-            }
-        )*
-    };
+#[test]
+#[serial]
+fn test_slow_integration() {
+    let _tear_down = TearDown::new();
+    for case in load_integration_tests("installer-slow/") {
+        if case.file == "github-issues-7665.test" {
+            // TODO(phase-d): upstream Composer defect (composer/composer#12111), not a porting
+            // bug. Problem::getPrettyString breaks RULE_LEARNED sort ties with
+            // getSortableString() <=> getSortableString(), which compares numerically when both
+            // sides are numeric strings and by byte otherwise, so it is not transitive. Those
+            // sortable strings are SAT-solver literal ids assigned sequentially while rules are
+            // generated, so their values shift with the pool's total package count, including
+            // platform packages that Installer::createPlatformRepo() derives from the real
+            // ambient PHP runtime, which Composer's own test suite never mocks. This fixture's
+            // expected order is therefore brittle to whichever extensions happen to be loaded on
+            // the machine that generates or runs it. Nothing to fix on the Rust side.
+            continue;
+        }
+        Platform::clear_env("COMPOSER_FUND");
+        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
+        let expect_output = case.expect_output.clone();
+        do_test_integration(&case, expect_output.as_deref());
+    }
 }
 
-/// One generated #[test] fn per fixture in installer/, run with COMPOSER_POOL_OPTIMIZER=1.
-macro_rules! pool_optimizer_test {
-    ($($ident:ident => $file:literal $(, ignore = $reason:literal)? ;)*) => {
-        $(
-            #[test]
-            #[serial]
-            $(#[ignore = $reason])?
-            fn $ident() {
-                let _tear_down = TearDown::new();
-                Platform::clear_env("COMPOSER_FUND");
-                Platform::put_env("COMPOSER_POOL_OPTIMIZER", "1");
-                let cases = load_integration_tests("installer/");
-                let case = cases
-                    .iter()
-                    .find(|c| c.file == $file)
-                    .unwrap_or_else(|| panic!("fixture not found: {}", $file));
-                let expect_output = case
-                    .expect_output_optimized
-                    .clone()
-                    .filter(|s| !s.is_empty())
-                    .or_else(|| case.expect_output.clone());
-                do_test_integration(case, expect_output.as_deref());
-            }
-        )*
-    };
+#[test]
+#[serial]
+fn test_integration_with_pool_optimizer() {
+    let _tear_down = TearDown::new();
+    for case in load_integration_tests("installer/") {
+        Platform::clear_env("COMPOSER_FUND");
+        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "1");
+        let expect_output = case
+            .expect_output_optimized
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or_else(|| case.expect_output.clone());
+        do_test_integration(&case, expect_output.as_deref());
+    }
 }
 
-/// One generated #[test] fn per fixture in installer/, run with COMPOSER_POOL_OPTIMIZER=0.
-macro_rules! raw_pool_test {
-    ($($ident:ident => $file:literal $(, ignore = $reason:literal)? ;)*) => {
-        $(
-            #[test]
-            #[serial]
-            $(#[ignore = $reason])?
-            fn $ident() {
-                let _tear_down = TearDown::new();
-                Platform::clear_env("COMPOSER_FUND");
-                Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
-                let cases = load_integration_tests("installer/");
-                let case = cases
-                    .iter()
-                    .find(|c| c.file == $file)
-                    .unwrap_or_else(|| panic!("fixture not found: {}", $file));
-                let expect_output = case.expect_output.clone();
-                do_test_integration(case, expect_output.as_deref());
-            }
-        )*
-    };
-}
-
-slow_test! {
-    slow_github_issues_7665 => "github-issues-7665.test", ignore = "TODO(phase-d): upstream Composer defect (composer/composer#12111), not a porting bug. Problem::getPrettyString breaks RULE_LEARNED sort ties with getSortableString() <=> getSortableString(), which compares numerically when both sides are numeric strings and by byte otherwise, so it is not transitive. Those sortable strings are SAT-solver literal ids assigned sequentially while rules are generated, so their values shift with the pool's total package count, including platform packages that Installer::createPlatformRepo() derives from the real ambient PHP runtime, which Composer's own test suite never mocks. This fixture's expected order is therefore brittle to whichever extensions happen to be loaded on the machine that generates or runs it. Nothing to fix on the Rust side.";
-}
-
-pool_optimizer_test! {
-    pool_optimizer_abandoned_listed => "abandoned-listed.test";
-    pool_optimizer_alias_in_complex_constraints => "alias-in-complex-constraints.test";
-    pool_optimizer_alias_in_lock => "alias-in-lock.test";
-    pool_optimizer_alias_in_lock2 => "alias-in-lock2.test";
-    pool_optimizer_alias_on_unloadable_package => "alias-on-unloadable-package.test";
-    pool_optimizer_alias_solver_problems => "alias-solver-problems.test";
-    pool_optimizer_alias_solver_problems2 => "alias-solver-problems2.test";
-    pool_optimizer_alias_with_reference => "alias-with-reference.test";
-    pool_optimizer_aliased_priority_conflicting => "aliased-priority-conflicting.test";
-    pool_optimizer_aliased_priority => "aliased-priority.test";
-    pool_optimizer_aliases_with_require_dev => "aliases-with-require-dev.test";
-    pool_optimizer_broken_deps_do_not_replace => "broken-deps-do-not-replace.test";
-    pool_optimizer_circular_dependency_errors => "circular-dependency-errors.test";
-    pool_optimizer_circular_dependency => "circular-dependency.test";
-    pool_optimizer_circular_dependency2 => "circular-dependency2.test";
-    pool_optimizer_conflict_against_provided_by_dep_package_works => "conflict-against-provided-by-dep-package-works.test";
-    pool_optimizer_conflict_against_provided_package_works => "conflict-against-provided-package-works.test";
-    pool_optimizer_conflict_against_replaced_by_dep_package_problem => "conflict-against-replaced-by-dep-package-problem.test";
-    pool_optimizer_conflict_against_replaced_package_problem => "conflict-against-replaced-package-problem.test";
-    pool_optimizer_conflict_between_dependents => "conflict-between-dependents.test";
-    pool_optimizer_conflict_between_root_and_dependent => "conflict-between-root-and-dependent.test";
-    pool_optimizer_conflict_downgrade_nested => "conflict-downgrade-nested.test";
-    pool_optimizer_conflict_downgrade => "conflict-downgrade.test";
-    pool_optimizer_conflict_on_root_with_alias_prevents_update_if_not_required => "conflict-on-root-with-alias-prevents-update-if-not-required.test";
-    pool_optimizer_conflict_with_alias_in_lock_does_prevents_install => "conflict-with-alias-in-lock-does-prevents-install.test";
-    pool_optimizer_conflict_with_alias_prevents_update_if_not_required => "conflict-with-alias-prevents-update-if-not-required.test";
-    pool_optimizer_conflict_with_alias_prevents_update => "conflict-with-alias-prevents-update.test";
-    pool_optimizer_conflict_with_all_dependencies_option_dont_recommend_to_use_it => "conflict-with-all-dependencies-option-dont-recommend-to-use-it.test";
-    pool_optimizer_deduplicate_solver_problems => "deduplicate-solver-problems.test";
-    pool_optimizer_disjunctive_multi_constraints => "disjunctive-multi-constraints.test";
-    pool_optimizer_full_update_minimal_changes => "full-update-minimal-changes.test";
-    pool_optimizer_github_issues_4319 => "github-issues-4319.test";
-    pool_optimizer_github_issues_4795_2 => "github-issues-4795-2.test";
-    pool_optimizer_github_issues_4795 => "github-issues-4795.test";
-    pool_optimizer_github_issues_7051 => "github-issues-7051.test";
-    pool_optimizer_github_issues_8902 => "github-issues-8902.test";
-    pool_optimizer_github_issues_8903 => "github-issues-8903.test";
-    pool_optimizer_github_issues_9012 => "github-issues-9012.test";
-    pool_optimizer_github_issues_9290 => "github-issues-9290.test";
-    pool_optimizer_hint_main_rename => "hint-main-rename.test";
-    pool_optimizer_install_aliased_alias => "install-aliased-alias.test";
-    pool_optimizer_install_branch_alias_composer_repo => "install-branch-alias-composer-repo.test";
-    pool_optimizer_install_dev_using_dist => "install-dev-using-dist.test";
-    pool_optimizer_install_dev => "install-dev.test";
-    pool_optimizer_install_forces_reinstall_if_abandon_changes => "install-forces-reinstall-if-abandon-changes.test";
-    pool_optimizer_install_from_incomplete_lock_with_ignore => "install-from-incomplete-lock-with-ignore.test";
-    pool_optimizer_install_from_incomplete_lock => "install-from-incomplete-lock.test";
-    pool_optimizer_install_from_lock_removes_package => "install-from-lock-removes-package.test";
-    pool_optimizer_install_funding_notice_env => "install-funding-notice-env.test";
-    pool_optimizer_install_funding_notice_not_displayed_env => "install-funding-notice-not-displayed-env.test";
-    pool_optimizer_install_funding_notice => "install-funding-notice.test";
-    pool_optimizer_install_ignore_platform_package_requirement_list => "install-ignore-platform-package-requirement-list.test";
-    pool_optimizer_install_ignore_platform_package_requirement_wildcard => "install-ignore-platform-package-requirement-wildcard.test";
-    pool_optimizer_install_ignore_platform_package_requirements => "install-ignore-platform-package-requirements.test";
-    pool_optimizer_install_missing_alias_from_lock => "install-missing-alias-from-lock.test";
-    pool_optimizer_install_overridden_platform_packages => "install-overridden-platform-packages.test";
-    pool_optimizer_install_package_and_its_provider_skips_original => "install-package-and-its-provider-skips-original.test";
-    pool_optimizer_install_prefers_repos_over_package_versions => "install-prefers-repos-over-package-versions.test";
-    pool_optimizer_install_reference => "install-reference.test";
-    pool_optimizer_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
-    pool_optimizer_install_self_from_root => "install-self-from-root.test";
-    pool_optimizer_install_simple => "install-simple.test";
-    pool_optimizer_install_without_lock => "install-without-lock.test";
-    pool_optimizer_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
-    pool_optimizer_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
-    pool_optimizer_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
-    pool_optimizer_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test";
-    pool_optimizer_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
-    pool_optimizer_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test";
-    pool_optimizer_partial_update_from_lock_with_root_alias => "partial-update-from-lock-with-root-alias.test";
-    pool_optimizer_partial_update_from_lock => "partial-update-from-lock.test";
-    pool_optimizer_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test";
-    pool_optimizer_partial_update_keeps_older_dep_if_still_required_with_provide => "partial-update-keeps-older-dep-if-still-required-with-provide.test";
-    pool_optimizer_partial_update_keeps_older_dep_if_still_required => "partial-update-keeps-older-dep-if-still-required.test";
-    pool_optimizer_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test";
-    pool_optimizer_partial_update_security_advisory_matching_locked_dep_with_dependencies => "partial-update-security-advisory-matching-locked-dep-with-dependencies.test";
-    pool_optimizer_partial_update_security_advisory_matching_locked_dep => "partial-update-security-advisory-matching-locked-dep.test";
-    pool_optimizer_partial_update_with_dependencies_provide => "partial-update-with-dependencies-provide.test";
-    pool_optimizer_partial_update_with_dependencies_replace => "partial-update-with-dependencies-replace.test";
-    pool_optimizer_partial_update_with_deps_warns_root => "partial-update-with-deps-warns-root.test";
-    pool_optimizer_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test";
-    pool_optimizer_partial_update_without_lock => "partial-update-without-lock.test";
-    pool_optimizer_platform_ext_solver_problems => "platform-ext-solver-problems.test";
-    pool_optimizer_plugins_are_installed_first => "plugins-are-installed-first.test";
-    pool_optimizer_prefer_lowest_branches => "prefer-lowest-branches.test";
-    pool_optimizer_problems_reduce_versions => "problems-reduce-versions.test";
-    pool_optimizer_provider_can_coexist_with_other_version_of_provided => "provider-can-coexist-with-other-version-of-provided.test";
-    pool_optimizer_provider_conflicts => "provider-conflicts.test";
-    pool_optimizer_provider_conflicts2 => "provider-conflicts2.test";
-    pool_optimizer_provider_conflicts3 => "provider-conflicts3.test";
-    pool_optimizer_provider_dev_require_can_satisfy_require => "provider-dev-require-can-satisfy-require.test";
-    pool_optimizer_provider_gets_picked_together_with_other_version_of_provided_conflict => "provider-gets-picked-together-with-other-version-of-provided-conflict.test";
-    pool_optimizer_provider_gets_picked_together_with_other_version_of_provided_indirect => "provider-gets-picked-together-with-other-version-of-provided-indirect.test";
-    pool_optimizer_provider_gets_picked_together_with_other_version_of_provided => "provider-gets-picked-together-with-other-version-of-provided.test";
-    pool_optimizer_provider_packages_can_be_installed_if_selected => "provider-packages-can-be-installed-if-selected.test";
-    pool_optimizer_provider_packages_can_be_installed_together_with_provided_if_both_installable => "provider-packages-can-be-installed-together-with-provided-if-both-installable.test";
-    pool_optimizer_provider_packages_can_not_be_installed_unless_selected => "provider-packages-can-not-be-installed-unless-selected.test";
-    pool_optimizer_provider_satisfies_its_own_requirement => "provider-satisfies-its-own-requirement.test";
-    pool_optimizer_remove_deletes_unused_deps => "remove-deletes-unused-deps.test";
-    pool_optimizer_remove_does_nothing_if_removal_requires_update_of_dep => "remove-does-nothing-if-removal-requires-update-of-dep.test";
-    pool_optimizer_replace_alias => "replace-alias.test";
-    pool_optimizer_replace_priorities => "replace-priorities.test";
-    pool_optimizer_replace_range_require_single_version => "replace-range-require-single-version.test";
-    pool_optimizer_replace_root_require => "replace-root-require.test";
-    pool_optimizer_replaced_packages_should_not_be_installed_when_installing_from_lock => "replaced-packages-should-not-be-installed-when-installing-from-lock.test";
-    pool_optimizer_replaced_packages_should_not_be_installed => "replaced-packages-should-not-be-installed.test";
-    pool_optimizer_replacer_satisfies_its_own_requirement => "replacer-satisfies-its-own-requirement.test";
-    pool_optimizer_repositories_priorities => "repositories-priorities.test";
-    pool_optimizer_repositories_priorities2 => "repositories-priorities2.test";
-    pool_optimizer_repositories_priorities3 => "repositories-priorities3.test";
-    pool_optimizer_repositories_priorities4 => "repositories-priorities4.test";
-    pool_optimizer_repositories_priorities5 => "repositories-priorities5.test";
-    pool_optimizer_root_alias_change_with_circular_dep => "root-alias-change-with-circular-dep.test";
-    pool_optimizer_root_alias_gets_loaded_for_locked_pkgs => "root-alias-gets-loaded-for-locked-pkgs.test";
-    pool_optimizer_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test";
-    pool_optimizer_solver_problem_with_hash_in_branch => "solver-problem-with-hash-in-branch.test";
-    pool_optimizer_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test";
-    pool_optimizer_solver_problems => "solver-problems.test";
-    pool_optimizer_suggest_installed => "suggest-installed.test";
-    pool_optimizer_suggest_prod_nolock => "suggest-prod-nolock.test";
-    pool_optimizer_suggest_prod => "suggest-prod.test";
-    pool_optimizer_suggest_replaced => "suggest-replaced.test";
-    pool_optimizer_suggest_uninstalled => "suggest-uninstalled.test";
-    pool_optimizer_unbounded_conflict_does_not_match_default_branch_with_branch_alias => "unbounded-conflict-does-not-match-default-branch-with-branch-alias.test";
-    pool_optimizer_unbounded_conflict_does_not_match_default_branch_with_numeric_branch => "unbounded-conflict-does-not-match-default-branch-with-numeric-branch.test";
-    pool_optimizer_unbounded_conflict_matches_default_branch => "unbounded-conflict-matches-default-branch.test";
-    pool_optimizer_update_abandoned_package_required_but_blocked_via_audit_config => "update-abandoned-package-required-but-blocked-via-audit-config.test";
-    pool_optimizer_update_alias_lock => "update-alias-lock.test";
-    pool_optimizer_update_alias_lock2 => "update-alias-lock2.test";
-    pool_optimizer_update_alias => "update-alias.test";
-    pool_optimizer_update_all_dry_run => "update-all-dry-run.test";
-    pool_optimizer_update_all => "update-all.test";
-    pool_optimizer_update_allow_list_locked_require => "update-allow-list-locked-require.test";
-    pool_optimizer_update_allow_list_minimal_changes => "update-allow-list-minimal-changes.test";
-    pool_optimizer_update_allow_list_patterns_with_all_dependencies => "update-allow-list-patterns-with-all-dependencies.test";
-    pool_optimizer_update_allow_list_patterns_with_dependencies => "update-allow-list-patterns-with-dependencies.test";
-    pool_optimizer_update_allow_list_patterns_with_root_dependencies => "update-allow-list-patterns-with-root-dependencies.test";
-    pool_optimizer_update_allow_list_patterns_without_dependencies => "update-allow-list-patterns-without-dependencies.test";
-    pool_optimizer_update_allow_list_patterns => "update-allow-list-patterns.test";
-    pool_optimizer_update_allow_list_reads_lock => "update-allow-list-reads-lock.test";
-    pool_optimizer_update_allow_list_removes_unused => "update-allow-list-removes-unused.test";
-    pool_optimizer_update_allow_list_require_new_replace => "update-allow-list-require-new-replace.test";
-    pool_optimizer_update_allow_list_warns_non_existing_patterns => "update-allow-list-warns-non-existing-patterns.test";
-    pool_optimizer_update_allow_list_with_dependencies_alias => "update-allow-list-with-dependencies-alias.test";
-    pool_optimizer_update_allow_list_with_dependencies_new_requirement => "update-allow-list-with-dependencies-new-requirement.test";
-    pool_optimizer_update_allow_list_with_dependencies_require_new_replace_mutual => "update-allow-list-with-dependencies-require-new-replace-mutual.test";
-    pool_optimizer_update_allow_list_with_dependencies_require_new_replace => "update-allow-list-with-dependencies-require-new-replace.test";
-    pool_optimizer_update_allow_list_with_dependencies_require_new => "update-allow-list-with-dependencies-require-new.test";
-    pool_optimizer_update_allow_list_with_dependencies => "update-allow-list-with-dependencies.test";
-    pool_optimizer_update_allow_list_with_dependency_conflict => "update-allow-list-with-dependency-conflict.test";
-    pool_optimizer_update_allow_list => "update-allow-list.test";
-    pool_optimizer_update_changes_url => "update-changes-url.test";
-    pool_optimizer_update_dev_ignores_providers => "update-dev-ignores-providers.test";
-    pool_optimizer_update_dev_packages_updates_repo_url => "update-dev-packages-updates-repo-url.test";
-    pool_optimizer_update_dev_to_new_ref_picks_up_changes => "update-dev-to-new-ref-picks-up-changes.test";
-    pool_optimizer_update_downgrades_unstable_packages => "update-downgrades-unstable-packages.test";
-    pool_optimizer_update_ignore_platform_package_requirement_list_upper_bounds => "update-ignore-platform-package-requirement-list-upper-bounds.test";
-    pool_optimizer_update_ignore_platform_package_requirement_list => "update-ignore-platform-package-requirement-list.test";
-    pool_optimizer_update_ignore_platform_package_requirement_wildcard => "update-ignore-platform-package-requirement-wildcard.test";
-    pool_optimizer_update_ignore_platform_package_requirements => "update-ignore-platform-package-requirements.test";
-    pool_optimizer_update_installed_alias_dry_run => "update-installed-alias-dry-run.test";
-    pool_optimizer_update_installed_alias => "update-installed-alias.test";
-    pool_optimizer_update_installed_reference_dry_run => "update-installed-reference-dry-run.test";
-    pool_optimizer_update_installed_reference => "update-installed-reference.test";
-    pool_optimizer_update_mirrors_changes_url => "update-mirrors-changes-url.test";
-    pool_optimizer_update_mirrors_fails_with_new_req => "update-mirrors-fails-with-new-req.test";
-    pool_optimizer_update_no_dev_still_resolves_dev => "update-no-dev-still-resolves-dev.test";
-    pool_optimizer_update_no_install => "update-no-install.test";
-    pool_optimizer_update_package_present_in_lock_but_not_at_all_in_remote => "update-package-present-in-lock-but-not-at-all-in-remote.test";
-    pool_optimizer_update_package_present_in_lock_but_not_in_remote_due_to_min_stability => "update-package-present-in-lock-but-not-in-remote-due-to-min-stability.test";
-    pool_optimizer_update_package_present_in_lock_but_not_in_remote => "update-package-present-in-lock-but-not-in-remote.test";
-    pool_optimizer_update_package_present_in_lower_repo_prio_but_not_main_due_to_min_stability => "update-package-present-in-lower-repo-prio-but-not-main-due-to-min-stability.test";
-    pool_optimizer_update_picks_up_change_of_vcs_type => "update-picks-up-change-of-vcs-type.test";
-    pool_optimizer_update_prefer_lowest_stable => "update-prefer-lowest-stable.test";
-    pool_optimizer_update_reference_picks_latest => "update-reference-picks-latest.test";
-    pool_optimizer_update_reference => "update-reference.test";
-    pool_optimizer_update_removes_unused_locked_dep => "update-removes-unused-locked-dep.test";
-    pool_optimizer_update_requiring_decision_reverts_and_learning_positive_literals => "update-requiring-decision-reverts-and-learning-positive-literals.test";
-    pool_optimizer_update_security_advisory_matching_direct_dependency => "update-security-advisory-matching-direct-dependency.test";
-    pool_optimizer_update_security_advisory_matching_indirect_dependency => "update-security-advisory-matching-indirect-dependency.test";
-    pool_optimizer_update_syncs_outdated => "update-syncs-outdated.test";
-    pool_optimizer_update_to_empty_from_blank => "update-to-empty-from-blank.test";
-    pool_optimizer_update_to_empty_from_locked => "update-to-empty-from-locked.test";
-    pool_optimizer_update_with_all_dependencies => "update-with-all-dependencies.test";
-    pool_optimizer_update_without_lock => "update-without-lock.test";
-    pool_optimizer_updating_dev_from_lock_removes_old_deps => "updating-dev-from-lock-removes-old-deps.test";
-    pool_optimizer_updating_dev_updates_url_and_reference => "updating-dev-updates-url-and-reference.test";
-}
-
-raw_pool_test! {
-    raw_pool_abandoned_listed => "abandoned-listed.test";
-    raw_pool_alias_in_complex_constraints => "alias-in-complex-constraints.test";
-    raw_pool_alias_in_lock => "alias-in-lock.test";
-    raw_pool_alias_in_lock2 => "alias-in-lock2.test";
-    raw_pool_alias_on_unloadable_package => "alias-on-unloadable-package.test";
-    raw_pool_alias_solver_problems => "alias-solver-problems.test";
-    raw_pool_alias_solver_problems2 => "alias-solver-problems2.test";
-    raw_pool_alias_with_reference => "alias-with-reference.test";
-    raw_pool_aliased_priority_conflicting => "aliased-priority-conflicting.test";
-    raw_pool_aliased_priority => "aliased-priority.test";
-    raw_pool_aliases_with_require_dev => "aliases-with-require-dev.test";
-    raw_pool_broken_deps_do_not_replace => "broken-deps-do-not-replace.test";
-    raw_pool_circular_dependency_errors => "circular-dependency-errors.test";
-    raw_pool_circular_dependency => "circular-dependency.test";
-    raw_pool_circular_dependency2 => "circular-dependency2.test";
-    raw_pool_conflict_against_provided_by_dep_package_works => "conflict-against-provided-by-dep-package-works.test";
-    raw_pool_conflict_against_provided_package_works => "conflict-against-provided-package-works.test";
-    raw_pool_conflict_against_replaced_by_dep_package_problem => "conflict-against-replaced-by-dep-package-problem.test";
-    raw_pool_conflict_against_replaced_package_problem => "conflict-against-replaced-package-problem.test";
-    raw_pool_conflict_between_dependents => "conflict-between-dependents.test";
-    raw_pool_conflict_between_root_and_dependent => "conflict-between-root-and-dependent.test";
-    raw_pool_conflict_downgrade_nested => "conflict-downgrade-nested.test";
-    raw_pool_conflict_downgrade => "conflict-downgrade.test";
-    raw_pool_conflict_on_root_with_alias_prevents_update_if_not_required => "conflict-on-root-with-alias-prevents-update-if-not-required.test";
-    raw_pool_conflict_with_alias_in_lock_does_prevents_install => "conflict-with-alias-in-lock-does-prevents-install.test";
-    raw_pool_conflict_with_alias_prevents_update_if_not_required => "conflict-with-alias-prevents-update-if-not-required.test";
-    raw_pool_conflict_with_alias_prevents_update => "conflict-with-alias-prevents-update.test";
-    raw_pool_conflict_with_all_dependencies_option_dont_recommend_to_use_it => "conflict-with-all-dependencies-option-dont-recommend-to-use-it.test";
-    raw_pool_deduplicate_solver_problems => "deduplicate-solver-problems.test";
-    raw_pool_disjunctive_multi_constraints => "disjunctive-multi-constraints.test";
-    raw_pool_full_update_minimal_changes => "full-update-minimal-changes.test";
-    raw_pool_github_issues_4319 => "github-issues-4319.test";
-    raw_pool_github_issues_4795_2 => "github-issues-4795-2.test";
-    raw_pool_github_issues_4795 => "github-issues-4795.test";
-    raw_pool_github_issues_7051 => "github-issues-7051.test";
-    raw_pool_github_issues_8902 => "github-issues-8902.test";
-    raw_pool_github_issues_8903 => "github-issues-8903.test";
-    raw_pool_github_issues_9012 => "github-issues-9012.test";
-    raw_pool_github_issues_9290 => "github-issues-9290.test";
-    raw_pool_hint_main_rename => "hint-main-rename.test";
-    raw_pool_install_aliased_alias => "install-aliased-alias.test";
-    raw_pool_install_branch_alias_composer_repo => "install-branch-alias-composer-repo.test";
-    raw_pool_install_dev_using_dist => "install-dev-using-dist.test";
-    raw_pool_install_dev => "install-dev.test";
-    raw_pool_install_forces_reinstall_if_abandon_changes => "install-forces-reinstall-if-abandon-changes.test";
-    raw_pool_install_from_incomplete_lock_with_ignore => "install-from-incomplete-lock-with-ignore.test";
-    raw_pool_install_from_incomplete_lock => "install-from-incomplete-lock.test";
-    raw_pool_install_from_lock_removes_package => "install-from-lock-removes-package.test";
-    raw_pool_install_funding_notice_env => "install-funding-notice-env.test";
-    raw_pool_install_funding_notice_not_displayed_env => "install-funding-notice-not-displayed-env.test";
-    raw_pool_install_funding_notice => "install-funding-notice.test";
-    raw_pool_install_ignore_platform_package_requirement_list => "install-ignore-platform-package-requirement-list.test";
-    raw_pool_install_ignore_platform_package_requirement_wildcard => "install-ignore-platform-package-requirement-wildcard.test";
-    raw_pool_install_ignore_platform_package_requirements => "install-ignore-platform-package-requirements.test";
-    raw_pool_install_missing_alias_from_lock => "install-missing-alias-from-lock.test";
-    raw_pool_install_overridden_platform_packages => "install-overridden-platform-packages.test";
-    raw_pool_install_package_and_its_provider_skips_original => "install-package-and-its-provider-skips-original.test";
-    raw_pool_install_prefers_repos_over_package_versions => "install-prefers-repos-over-package-versions.test";
-    raw_pool_install_reference => "install-reference.test";
-    raw_pool_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
-    raw_pool_install_self_from_root => "install-self-from-root.test";
-    raw_pool_install_simple => "install-simple.test";
-    raw_pool_install_without_lock => "install-without-lock.test";
-    raw_pool_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
-    raw_pool_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
-    raw_pool_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
-    raw_pool_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test";
-    raw_pool_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
-    raw_pool_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test";
-    raw_pool_partial_update_from_lock_with_root_alias => "partial-update-from-lock-with-root-alias.test";
-    raw_pool_partial_update_from_lock => "partial-update-from-lock.test";
-    raw_pool_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test";
-    raw_pool_partial_update_keeps_older_dep_if_still_required_with_provide => "partial-update-keeps-older-dep-if-still-required-with-provide.test";
-    raw_pool_partial_update_keeps_older_dep_if_still_required => "partial-update-keeps-older-dep-if-still-required.test";
-    raw_pool_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test";
-    raw_pool_partial_update_security_advisory_matching_locked_dep_with_dependencies => "partial-update-security-advisory-matching-locked-dep-with-dependencies.test";
-    raw_pool_partial_update_security_advisory_matching_locked_dep => "partial-update-security-advisory-matching-locked-dep.test";
-    raw_pool_partial_update_with_dependencies_provide => "partial-update-with-dependencies-provide.test";
-    raw_pool_partial_update_with_dependencies_replace => "partial-update-with-dependencies-replace.test";
-    raw_pool_partial_update_with_deps_warns_root => "partial-update-with-deps-warns-root.test";
-    raw_pool_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test";
-    raw_pool_partial_update_without_lock => "partial-update-without-lock.test";
-    raw_pool_platform_ext_solver_problems => "platform-ext-solver-problems.test";
-    raw_pool_plugins_are_installed_first => "plugins-are-installed-first.test";
-    raw_pool_prefer_lowest_branches => "prefer-lowest-branches.test";
-    raw_pool_problems_reduce_versions => "problems-reduce-versions.test";
-    raw_pool_provider_can_coexist_with_other_version_of_provided => "provider-can-coexist-with-other-version-of-provided.test";
-    raw_pool_provider_conflicts => "provider-conflicts.test";
-    raw_pool_provider_conflicts2 => "provider-conflicts2.test";
-    raw_pool_provider_conflicts3 => "provider-conflicts3.test";
-    raw_pool_provider_dev_require_can_satisfy_require => "provider-dev-require-can-satisfy-require.test";
-    raw_pool_provider_gets_picked_together_with_other_version_of_provided_conflict => "provider-gets-picked-together-with-other-version-of-provided-conflict.test";
-    raw_pool_provider_gets_picked_together_with_other_version_of_provided_indirect => "provider-gets-picked-together-with-other-version-of-provided-indirect.test";
-    raw_pool_provider_gets_picked_together_with_other_version_of_provided => "provider-gets-picked-together-with-other-version-of-provided.test";
-    raw_pool_provider_packages_can_be_installed_if_selected => "provider-packages-can-be-installed-if-selected.test";
-    raw_pool_provider_packages_can_be_installed_together_with_provided_if_both_installable => "provider-packages-can-be-installed-together-with-provided-if-both-installable.test";
-    raw_pool_provider_packages_can_not_be_installed_unless_selected => "provider-packages-can-not-be-installed-unless-selected.test";
-    raw_pool_provider_satisfies_its_own_requirement => "provider-satisfies-its-own-requirement.test";
-    raw_pool_remove_deletes_unused_deps => "remove-deletes-unused-deps.test";
-    raw_pool_remove_does_nothing_if_removal_requires_update_of_dep => "remove-does-nothing-if-removal-requires-update-of-dep.test";
-    raw_pool_replace_alias => "replace-alias.test";
-    raw_pool_replace_priorities => "replace-priorities.test";
-    raw_pool_replace_range_require_single_version => "replace-range-require-single-version.test";
-    raw_pool_replace_root_require => "replace-root-require.test";
-    raw_pool_replaced_packages_should_not_be_installed_when_installing_from_lock => "replaced-packages-should-not-be-installed-when-installing-from-lock.test";
-    raw_pool_replaced_packages_should_not_be_installed => "replaced-packages-should-not-be-installed.test";
-    raw_pool_replacer_satisfies_its_own_requirement => "replacer-satisfies-its-own-requirement.test";
-    raw_pool_repositories_priorities => "repositories-priorities.test";
-    raw_pool_repositories_priorities2 => "repositories-priorities2.test";
-    raw_pool_repositories_priorities3 => "repositories-priorities3.test";
-    raw_pool_repositories_priorities4 => "repositories-priorities4.test";
-    raw_pool_repositories_priorities5 => "repositories-priorities5.test";
-    raw_pool_root_alias_change_with_circular_dep => "root-alias-change-with-circular-dep.test";
-    raw_pool_root_alias_gets_loaded_for_locked_pkgs => "root-alias-gets-loaded-for-locked-pkgs.test";
-    raw_pool_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test";
-    raw_pool_solver_problem_with_hash_in_branch => "solver-problem-with-hash-in-branch.test";
-    raw_pool_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test";
-    raw_pool_solver_problems => "solver-problems.test";
-    raw_pool_suggest_installed => "suggest-installed.test";
-    raw_pool_suggest_prod_nolock => "suggest-prod-nolock.test";
-    raw_pool_suggest_prod => "suggest-prod.test";
-    raw_pool_suggest_replaced => "suggest-replaced.test";
-    raw_pool_suggest_uninstalled => "suggest-uninstalled.test";
-    raw_pool_unbounded_conflict_does_not_match_default_branch_with_branch_alias => "unbounded-conflict-does-not-match-default-branch-with-branch-alias.test";
-    raw_pool_unbounded_conflict_does_not_match_default_branch_with_numeric_branch => "unbounded-conflict-does-not-match-default-branch-with-numeric-branch.test";
-    raw_pool_unbounded_conflict_matches_default_branch => "unbounded-conflict-matches-default-branch.test";
-    raw_pool_update_abandoned_package_required_but_blocked_via_audit_config => "update-abandoned-package-required-but-blocked-via-audit-config.test";
-    raw_pool_update_alias_lock => "update-alias-lock.test";
-    raw_pool_update_alias_lock2 => "update-alias-lock2.test";
-    raw_pool_update_alias => "update-alias.test";
-    raw_pool_update_all_dry_run => "update-all-dry-run.test";
-    raw_pool_update_all => "update-all.test";
-    raw_pool_update_allow_list_locked_require => "update-allow-list-locked-require.test";
-    raw_pool_update_allow_list_minimal_changes => "update-allow-list-minimal-changes.test";
-    raw_pool_update_allow_list_patterns_with_all_dependencies => "update-allow-list-patterns-with-all-dependencies.test";
-    raw_pool_update_allow_list_patterns_with_dependencies => "update-allow-list-patterns-with-dependencies.test";
-    raw_pool_update_allow_list_patterns_with_root_dependencies => "update-allow-list-patterns-with-root-dependencies.test";
-    raw_pool_update_allow_list_patterns_without_dependencies => "update-allow-list-patterns-without-dependencies.test";
-    raw_pool_update_allow_list_patterns => "update-allow-list-patterns.test";
-    raw_pool_update_allow_list_reads_lock => "update-allow-list-reads-lock.test";
-    raw_pool_update_allow_list_removes_unused => "update-allow-list-removes-unused.test";
-    raw_pool_update_allow_list_require_new_replace => "update-allow-list-require-new-replace.test";
-    raw_pool_update_allow_list_warns_non_existing_patterns => "update-allow-list-warns-non-existing-patterns.test";
-    raw_pool_update_allow_list_with_dependencies_alias => "update-allow-list-with-dependencies-alias.test";
-    raw_pool_update_allow_list_with_dependencies_new_requirement => "update-allow-list-with-dependencies-new-requirement.test";
-    raw_pool_update_allow_list_with_dependencies_require_new_replace_mutual => "update-allow-list-with-dependencies-require-new-replace-mutual.test";
-    raw_pool_update_allow_list_with_dependencies_require_new_replace => "update-allow-list-with-dependencies-require-new-replace.test";
-    raw_pool_update_allow_list_with_dependencies_require_new => "update-allow-list-with-dependencies-require-new.test";
-    raw_pool_update_allow_list_with_dependencies => "update-allow-list-with-dependencies.test";
-    raw_pool_update_allow_list_with_dependency_conflict => "update-allow-list-with-dependency-conflict.test";
-    raw_pool_update_allow_list => "update-allow-list.test";
-    raw_pool_update_changes_url => "update-changes-url.test";
-    raw_pool_update_dev_ignores_providers => "update-dev-ignores-providers.test";
-    raw_pool_update_dev_packages_updates_repo_url => "update-dev-packages-updates-repo-url.test";
-    raw_pool_update_dev_to_new_ref_picks_up_changes => "update-dev-to-new-ref-picks-up-changes.test";
-    raw_pool_update_downgrades_unstable_packages => "update-downgrades-unstable-packages.test";
-    raw_pool_update_ignore_platform_package_requirement_list_upper_bounds => "update-ignore-platform-package-requirement-list-upper-bounds.test";
-    raw_pool_update_ignore_platform_package_requirement_list => "update-ignore-platform-package-requirement-list.test";
-    raw_pool_update_ignore_platform_package_requirement_wildcard => "update-ignore-platform-package-requirement-wildcard.test";
-    raw_pool_update_ignore_platform_package_requirements => "update-ignore-platform-package-requirements.test";
-    raw_pool_update_installed_alias_dry_run => "update-installed-alias-dry-run.test";
-    raw_pool_update_installed_alias => "update-installed-alias.test";
-    raw_pool_update_installed_reference_dry_run => "update-installed-reference-dry-run.test";
-    raw_pool_update_installed_reference => "update-installed-reference.test";
-    raw_pool_update_mirrors_changes_url => "update-mirrors-changes-url.test";
-    raw_pool_update_mirrors_fails_with_new_req => "update-mirrors-fails-with-new-req.test";
-    raw_pool_update_no_dev_still_resolves_dev => "update-no-dev-still-resolves-dev.test";
-    raw_pool_update_no_install => "update-no-install.test";
-    raw_pool_update_package_present_in_lock_but_not_at_all_in_remote => "update-package-present-in-lock-but-not-at-all-in-remote.test";
-    raw_pool_update_package_present_in_lock_but_not_in_remote_due_to_min_stability => "update-package-present-in-lock-but-not-in-remote-due-to-min-stability.test";
-    raw_pool_update_package_present_in_lock_but_not_in_remote => "update-package-present-in-lock-but-not-in-remote.test";
-    raw_pool_update_package_present_in_lower_repo_prio_but_not_main_due_to_min_stability => "update-package-present-in-lower-repo-prio-but-not-main-due-to-min-stability.test";
-    raw_pool_update_picks_up_change_of_vcs_type => "update-picks-up-change-of-vcs-type.test";
-    raw_pool_update_prefer_lowest_stable => "update-prefer-lowest-stable.test";
-    raw_pool_update_reference_picks_latest => "update-reference-picks-latest.test";
-    raw_pool_update_reference => "update-reference.test";
-    raw_pool_update_removes_unused_locked_dep => "update-removes-unused-locked-dep.test";
-    raw_pool_update_requiring_decision_reverts_and_learning_positive_literals => "update-requiring-decision-reverts-and-learning-positive-literals.test";
-    raw_pool_update_security_advisory_matching_direct_dependency => "update-security-advisory-matching-direct-dependency.test";
-    raw_pool_update_security_advisory_matching_indirect_dependency => "update-security-advisory-matching-indirect-dependency.test";
-    raw_pool_update_syncs_outdated => "update-syncs-outdated.test";
-    raw_pool_update_to_empty_from_blank => "update-to-empty-from-blank.test";
-    raw_pool_update_to_empty_from_locked => "update-to-empty-from-locked.test";
-    raw_pool_update_with_all_dependencies => "update-with-all-dependencies.test";
-    raw_pool_update_without_lock => "update-without-lock.test";
-    raw_pool_updating_dev_from_lock_removes_old_deps => "updating-dev-from-lock-removes-old-deps.test";
-    raw_pool_updating_dev_updates_url_and_reference => "updating-dev-updates-url-and-reference.test";
+#[test]
+#[serial]
+fn test_integration_with_raw_pool() {
+    let _tear_down = TearDown::new();
+    for case in load_integration_tests("installer/") {
+        Platform::clear_env("COMPOSER_FUND");
+        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
+        let expect_output = case.expect_output.clone();
+        do_test_integration(&case, expect_output.as_deref());
+    }
 }
