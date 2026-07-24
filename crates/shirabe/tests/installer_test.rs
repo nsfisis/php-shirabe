@@ -1331,7 +1331,7 @@ pool_optimizer_test! {
     pool_optimizer_conflict_downgrade_nested => "conflict-downgrade-nested.test";
     pool_optimizer_conflict_downgrade => "conflict-downgrade.test";
     pool_optimizer_conflict_on_root_with_alias_prevents_update_if_not_required => "conflict-on-root-with-alias-prevents-update-if-not-required.test";
-    pool_optimizer_conflict_with_alias_in_lock_does_prevents_install => "conflict-with-alias-in-lock-does-prevents-install.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_conflict_with_alias_in_lock_does_prevents_install => "conflict-with-alias-in-lock-does-prevents-install.test";
     pool_optimizer_conflict_with_alias_prevents_update_if_not_required => "conflict-with-alias-prevents-update-if-not-required.test";
     pool_optimizer_conflict_with_alias_prevents_update => "conflict-with-alias-prevents-update.test";
     pool_optimizer_conflict_with_all_dependencies_option_dont_recommend_to_use_it => "conflict-with-all-dependencies-option-dont-recommend-to-use-it.test";
@@ -1521,7 +1521,7 @@ raw_pool_test! {
     raw_pool_conflict_downgrade_nested => "conflict-downgrade-nested.test";
     raw_pool_conflict_downgrade => "conflict-downgrade.test";
     raw_pool_conflict_on_root_with_alias_prevents_update_if_not_required => "conflict-on-root-with-alias-prevents-update-if-not-required.test";
-    raw_pool_conflict_with_alias_in_lock_does_prevents_install => "conflict-with-alias-in-lock-does-prevents-install.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_conflict_with_alias_in_lock_does_prevents_install => "conflict-with-alias-in-lock-does-prevents-install.test";
     raw_pool_conflict_with_alias_prevents_update_if_not_required => "conflict-with-alias-prevents-update-if-not-required.test";
     raw_pool_conflict_with_alias_prevents_update => "conflict-with-alias-prevents-update.test";
     raw_pool_conflict_with_all_dependencies_option_dont_recommend_to_use_it => "conflict-with-all-dependencies-option-dont-recommend-to-use-it.test";

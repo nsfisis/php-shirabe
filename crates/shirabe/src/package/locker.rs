@@ -350,8 +350,9 @@ impl Locker {
             .to_string())
     }
 
-    /// @return array<string, string>
-    pub fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    /// @return array<string, int> despite the upstream `@return array<string, string>` docblock;
+    /// the values are BasePackage::STABILITIES ints, written verbatim by set_lock_data.
+    pub fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -359,7 +360,7 @@ impl Locker {
             .and_then(|v| match v {
                 PhpMixed::Array(m) => Some(
                     m.iter()
-                        .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                        .map(|(k, v)| (k.clone(), v.as_int().unwrap_or(0)))
                         .collect(),
                 ),
                 _ => None,
@@ -1016,7 +1017,7 @@ pub trait LockerInterface: std::fmt::Debug {
     fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>>;
     fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> anyhow::Result<Vec<Link>>;
     fn get_minimum_stability(&mut self) -> anyhow::Result<String>;
-    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, String>>;
+    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>>;
     fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>>;
     fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>>;
     fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>>;
@@ -1084,7 +1085,7 @@ impl LockerInterface for Locker {
         self.get_minimum_stability()
     }
 
-    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>> {
         self.get_stability_flags()
     }
 

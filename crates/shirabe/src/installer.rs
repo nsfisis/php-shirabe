@@ -1373,16 +1373,10 @@ impl Installer {
                 .borrow_mut()
                 .get_minimum_stability()
                 .unwrap_or_else(|_| String::new());
-            // locker stores stability flags as stringified ints; recover the int form here.
             stability_flags = self
                 .locker
                 .borrow_mut()
                 .get_stability_flags()
-                .map(|m| {
-                    m.into_iter()
-                        .map(|(k, v)| (k, v.parse::<i64>().unwrap_or(0)))
-                        .collect()
-                })
                 .unwrap_or_default();
 
             let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
