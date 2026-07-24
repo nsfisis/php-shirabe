@@ -134,9 +134,7 @@ impl SolverProblemsException {
             paths.remove(0);
         }
 
-        let mut unique_extensions: Vec<String> = missing_extensions.to_vec();
-        unique_extensions.sort();
-        unique_extensions.dedup();
+        let unique_extensions = shirabe_php_shim::array_unique(missing_extensions);
         let ignore_extensions_arguments: String = unique_extensions
             .iter()
             .map(|ext| format!("--ignore-platform-req={}", ext))

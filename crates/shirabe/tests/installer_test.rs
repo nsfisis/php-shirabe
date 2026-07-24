@@ -1522,7 +1522,7 @@ pool_optimizer_test! {
     pool_optimizer_update_dev_packages_updates_repo_url => "update-dev-packages-updates-repo-url.test";
     pool_optimizer_update_dev_to_new_ref_picks_up_changes => "update-dev-to-new-ref-picks-up-changes.test";
     pool_optimizer_update_downgrades_unstable_packages => "update-downgrades-unstable-packages.test";
-    pool_optimizer_update_ignore_platform_package_requirement_list_upper_bounds => "update-ignore-platform-package-requirement-list-upper-bounds.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_update_ignore_platform_package_requirement_list_upper_bounds => "update-ignore-platform-package-requirement-list-upper-bounds.test";
     pool_optimizer_update_ignore_platform_package_requirement_list => "update-ignore-platform-package-requirement-list.test";
     pool_optimizer_update_ignore_platform_package_requirement_wildcard => "update-ignore-platform-package-requirement-wildcard.test";
     pool_optimizer_update_ignore_platform_package_requirements => "update-ignore-platform-package-requirements.test";
@@ -1712,7 +1712,7 @@ raw_pool_test! {
     raw_pool_update_dev_packages_updates_repo_url => "update-dev-packages-updates-repo-url.test";
     raw_pool_update_dev_to_new_ref_picks_up_changes => "update-dev-to-new-ref-picks-up-changes.test";
     raw_pool_update_downgrades_unstable_packages => "update-downgrades-unstable-packages.test";
-    raw_pool_update_ignore_platform_package_requirement_list_upper_bounds => "update-ignore-platform-package-requirement-list-upper-bounds.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_update_ignore_platform_package_requirement_list_upper_bounds => "update-ignore-platform-package-requirement-list-upper-bounds.test";
     raw_pool_update_ignore_platform_package_requirement_list => "update-ignore-platform-package-requirement-list.test";
     raw_pool_update_ignore_platform_package_requirement_wildcard => "update-ignore-platform-package-requirement-wildcard.test";
     raw_pool_update_ignore_platform_package_requirements => "update-ignore-platform-package-requirements.test";
