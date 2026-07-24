@@ -71,13 +71,7 @@ impl ArrayDumper {
             {
                 source.insert(
                     "mirrors".to_string(),
-                    PhpMixed::Array(
-                        mirrors
-                            .into_iter()
-                            .enumerate()
-                            .map(|(i, m)| (i.to_string(), mirror_to_php(m)))
-                            .collect(),
-                    ),
+                    PhpMixed::List(mirrors.into_iter().map(mirror_to_php).collect()),
                 );
             }
             data.insert("source".to_string(), PhpMixed::Array(source));
@@ -104,13 +98,7 @@ impl ArrayDumper {
             {
                 dist.insert(
                     "mirrors".to_string(),
-                    PhpMixed::Array(
-                        mirrors
-                            .into_iter()
-                            .enumerate()
-                            .map(|(i, m)| (i.to_string(), mirror_to_php(m)))
-                            .collect(),
-                    ),
+                    PhpMixed::List(mirrors.into_iter().map(mirror_to_php).collect()),
                 );
             }
             data.insert("dist".to_string(), PhpMixed::Array(dist));

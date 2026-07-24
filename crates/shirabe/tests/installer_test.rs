@@ -1515,7 +1515,7 @@ pool_optimizer_test! {
     pool_optimizer_update_installed_alias => "update-installed-alias.test";
     pool_optimizer_update_installed_reference_dry_run => "update-installed-reference-dry-run.test";
     pool_optimizer_update_installed_reference => "update-installed-reference.test";
-    pool_optimizer_update_mirrors_changes_url => "update-mirrors-changes-url.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_update_mirrors_changes_url => "update-mirrors-changes-url.test";
     pool_optimizer_update_mirrors_fails_with_new_req => "update-mirrors-fails-with-new-req.test";
     pool_optimizer_update_no_dev_still_resolves_dev => "update-no-dev-still-resolves-dev.test";
     pool_optimizer_update_no_install => "update-no-install.test";
@@ -1705,7 +1705,7 @@ raw_pool_test! {
     raw_pool_update_installed_alias => "update-installed-alias.test";
     raw_pool_update_installed_reference_dry_run => "update-installed-reference-dry-run.test";
     raw_pool_update_installed_reference => "update-installed-reference.test";
-    raw_pool_update_mirrors_changes_url => "update-mirrors-changes-url.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_update_mirrors_changes_url => "update-mirrors-changes-url.test";
     raw_pool_update_mirrors_fails_with_new_req => "update-mirrors-fails-with-new-req.test";
     raw_pool_update_no_dev_still_resolves_dev => "update-no-dev-still-resolves-dev.test";
     raw_pool_update_no_install => "update-no-install.test";
