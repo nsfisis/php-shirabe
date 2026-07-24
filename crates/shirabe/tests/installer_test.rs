@@ -1362,7 +1362,7 @@ macro_rules! raw_pool_test {
 }
 
 slow_test! {
-    slow_github_issues_7665 => "github-issues-7665.test", ignore = "TODO(phase-d): unknown reason. Needs further investigation.";
+    slow_github_issues_7665 => "github-issues-7665.test", ignore = "TODO(phase-d): upstream Composer defect (composer/composer#12111), not a porting bug. Problem::getPrettyString breaks RULE_LEARNED sort ties with getSortableString() <=> getSortableString(), which compares numerically when both sides are numeric strings and by byte otherwise, so it is not transitive. Those sortable strings are SAT-solver literal ids assigned sequentially while rules are generated, so their values shift with the pool's total package count, including platform packages that Installer::createPlatformRepo() derives from the real ambient PHP runtime, which Composer's own test suite never mocks. This fixture's expected order is therefore brittle to whichever extensions happen to be loaded on the machine that generates or runs it. Nothing to fix on the Rust side.";
 }
 
 pool_optimizer_test! {
