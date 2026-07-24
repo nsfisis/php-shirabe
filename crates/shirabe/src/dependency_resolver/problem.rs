@@ -13,9 +13,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, php_regex, phpversion,
-    spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos, strtolower, substr,
-    substr_count, version_compare,
+    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, loosely_compare,
+    php_regex, phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
+    strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -119,8 +119,13 @@ impl Problem {
                 return rule2_prio.cmp(&rule1_prio);
             }
 
-            self.get_sortable_string(pool, &rule1.borrow())
-                .cmp(&self.get_sortable_string(pool, &rule2.borrow()))
+            // PHP: getSortableString(...) <=> getSortableString(...). RULE_LEARNED keys are
+            // '-'-joined literal ids (e.g. "-95"), which PHP's <=> compares numerically when both
+            // sides are numeric strings rather than byte-by-byte.
+            loosely_compare(
+                &self.get_sortable_string(pool, &rule1.borrow()),
+                &self.get_sortable_string(pool, &rule2.borrow()),
+            )
         });
 
         Self::format_deduplicated_rules(

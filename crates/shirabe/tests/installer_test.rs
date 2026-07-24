@@ -1362,7 +1362,7 @@ macro_rules! raw_pool_test {
 }
 
 slow_test! {
-    slow_github_issues_7665 => "github-issues-7665.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    slow_github_issues_7665 => "github-issues-7665.test", ignore = "TODO(phase-d): unknown reason. Needs further investigation.";
 }
 
 pool_optimizer_test! {
@@ -1590,7 +1590,7 @@ raw_pool_test! {
     raw_pool_github_issues_4319 => "github-issues-4319.test";
     raw_pool_github_issues_4795_2 => "github-issues-4795-2.test";
     raw_pool_github_issues_4795 => "github-issues-4795.test";
-    raw_pool_github_issues_7051 => "github-issues-7051.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_github_issues_7051 => "github-issues-7051.test";
     raw_pool_github_issues_8902 => "github-issues-8902.test";
     raw_pool_github_issues_8903 => "github-issues-8903.test";
     raw_pool_github_issues_9012 => "github-issues-9012.test";
@@ -1645,7 +1645,7 @@ raw_pool_test! {
     raw_pool_provider_can_coexist_with_other_version_of_provided => "provider-can-coexist-with-other-version-of-provided.test";
     raw_pool_provider_conflicts => "provider-conflicts.test";
     raw_pool_provider_conflicts2 => "provider-conflicts2.test";
-    raw_pool_provider_conflicts3 => "provider-conflicts3.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_provider_conflicts3 => "provider-conflicts3.test";
     raw_pool_provider_dev_require_can_satisfy_require => "provider-dev-require-can-satisfy-require.test";
     raw_pool_provider_gets_picked_together_with_other_version_of_provided_conflict => "provider-gets-picked-together-with-other-version-of-provided-conflict.test";
     raw_pool_provider_gets_picked_together_with_other_version_of_provided_indirect => "provider-gets-picked-together-with-other-version-of-provided-indirect.test";

@@ -185,6 +185,27 @@ pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
     }
 }
 
+/// Approximates PHP's `<=>` for two strings: if both are numeric strings, compare numerically
+/// (as PHP does), otherwise fall back to a byte-wise comparison.
+///
+/// TODO: this only covers the string/string case of PHP's loose comparison. PHP's `<=>` has many
+/// more special-cased rules across other operand type combinations (bool, array, null, object,
+/// numeric-string-vs-non-numeric-string, ...). Extend this if a new caller needs those.
+pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {
+    if is_numeric_string(a) && is_numeric_string(b) {
+        match (a.trim().parse::<i64>(), b.trim().parse::<i64>()) {
+            (Ok(na), Ok(nb)) => na.cmp(&nb),
+            _ => {
+                let na: f64 = a.trim().parse().unwrap_or(0.0);
+                let nb: f64 = b.trim().parse().unwrap_or(0.0);
+                na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal)
+            }
+        }
+    } else {
+        a.cmp(b)
+    }
+}
+
 pub fn instance_of<T>(_value: &PhpMixed) -> bool {
     // TODO(phase-d): PHP `instanceof` needs the runtime class of the value, which PhpMixed::Object
     // does not carry.
