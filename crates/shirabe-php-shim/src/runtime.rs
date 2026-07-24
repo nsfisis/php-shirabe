@@ -162,6 +162,7 @@ pub fn extension_loaded(name: &str) -> bool {
             | "intl"
             | "mbstring"
             | "openssl"
+            | "pcre"
             | "zip"
             | "zlib"
     )

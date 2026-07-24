@@ -13,6 +13,14 @@ $dispatch = [
     'curl_version' => static fn($arg) => function_exists('curl_version') ? (curl_version()['version'] ?? null) : null,
     'phpversion' => static fn($name) => phpversion($name),
     'get_loaded_extensions' => static fn($arg) => implode(',', get_loaded_extensions()),
+    'get_all_ini_files' => static function ($arg) {
+        $paths = [(string) php_ini_loaded_file()];
+        $scanned = php_ini_scanned_files();
+        if ($scanned !== false) {
+            $paths = array_merge($paths, array_map('trim', explode(',', $scanned)));
+        }
+        return implode(',', $paths);
+    },
     'extension_info' => static function ($name) {
         if (!extension_loaded($name)) {
             return '';

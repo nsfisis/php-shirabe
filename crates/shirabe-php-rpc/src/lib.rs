@@ -88,6 +88,18 @@ pub fn get_loaded_extensions() -> Vec<String> {
     }
 }
 
+/// `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` (minus the `self::$name` branch,
+/// which is unreachable since this port never constructs an XdebugHandler): `[(string)
+/// php_ini_loaded_file()]` merged with the trimmed, comma-split `php_ini_scanned_files()` list
+/// when scanning is active. Paths are joined with `,` on the PHP side and split back here; real
+/// ini paths never contain a comma (same assumption `get_loaded_extensions` makes).
+pub fn get_all_ini_files() -> Vec<String> {
+    match call("get_all_ini_files", "") {
+        PhpMixed::String(s) => s.split(',').map(|s| s.to_string()).collect(),
+        other => panic!("PHP RPC: `get_all_ini_files` did not return a string: {other:?}"),
+    }
+}
+
 const GLUE_SCRIPT: &str = include_str!("../php/worker.php");
 
 struct Worker {

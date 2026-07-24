@@ -1396,7 +1396,7 @@ pool_optimizer_test! {
     pool_optimizer_install_without_lock => "install-without-lock.test";
     pool_optimizer_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
     pool_optimizer_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
-    pool_optimizer_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
     pool_optimizer_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
     pool_optimizer_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
@@ -1413,7 +1413,7 @@ pool_optimizer_test! {
     pool_optimizer_partial_update_with_deps_warns_root => "partial-update-with-deps-warns-root.test";
     pool_optimizer_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_partial_update_without_lock => "partial-update-without-lock.test";
-    pool_optimizer_platform_ext_solver_problems => "platform-ext-solver-problems.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_platform_ext_solver_problems => "platform-ext-solver-problems.test";
     pool_optimizer_plugins_are_installed_first => "plugins-are-installed-first.test";
     pool_optimizer_prefer_lowest_branches => "prefer-lowest-branches.test";
     pool_optimizer_problems_reduce_versions => "problems-reduce-versions.test";
@@ -1447,8 +1447,8 @@ pool_optimizer_test! {
     pool_optimizer_root_alias_gets_loaded_for_locked_pkgs => "root-alias-gets-loaded-for-locked-pkgs.test";
     pool_optimizer_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test";
     pool_optimizer_solver_problem_with_hash_in_branch => "solver-problem-with-hash-in-branch.test";
-    pool_optimizer_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
-    pool_optimizer_solver_problems => "solver-problems.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test";
+    pool_optimizer_solver_problems => "solver-problems.test";
     pool_optimizer_suggest_installed => "suggest-installed.test";
     pool_optimizer_suggest_prod_nolock => "suggest-prod-nolock.test";
     pool_optimizer_suggest_prod => "suggest-prod.test";
@@ -1586,7 +1586,7 @@ raw_pool_test! {
     raw_pool_install_without_lock => "install-without-lock.test";
     raw_pool_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
     raw_pool_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
-    raw_pool_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
     raw_pool_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
     raw_pool_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
@@ -1603,7 +1603,7 @@ raw_pool_test! {
     raw_pool_partial_update_with_deps_warns_root => "partial-update-with-deps-warns-root.test";
     raw_pool_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_partial_update_without_lock => "partial-update-without-lock.test";
-    raw_pool_platform_ext_solver_problems => "platform-ext-solver-problems.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_platform_ext_solver_problems => "platform-ext-solver-problems.test";
     raw_pool_plugins_are_installed_first => "plugins-are-installed-first.test";
     raw_pool_prefer_lowest_branches => "prefer-lowest-branches.test";
     raw_pool_problems_reduce_versions => "problems-reduce-versions.test";
@@ -1637,8 +1637,8 @@ raw_pool_test! {
     raw_pool_root_alias_gets_loaded_for_locked_pkgs => "root-alias-gets-loaded-for-locked-pkgs.test";
     raw_pool_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test";
     raw_pool_solver_problem_with_hash_in_branch => "solver-problem-with-hash-in-branch.test";
-    raw_pool_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
-    raw_pool_solver_problems => "solver-problems.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test";
+    raw_pool_solver_problems => "solver-problems.test";
     raw_pool_suggest_installed => "suggest-installed.test";
     raw_pool_suggest_prod_nolock => "suggest-prod-nolock.test";
     raw_pool_suggest_prod => "suggest-prod.test";

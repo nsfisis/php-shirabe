@@ -1,13 +1,15 @@
 //! ref: composer/src/Composer/Util/IniHelper.php
 
-use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
-
 pub struct IniHelper;
 
 impl IniHelper {
     /// Returns an array of php.ini locations with at least one entry.
     pub fn get_all() -> Vec<String> {
-        XdebugHandler::get_all_ini_files()
+        // PHP: XdebugHandler::getAllIniFiles(). shirabe_external_packages::XdebugHandler's port
+        // of that method can't reach the PHP RPC bridge (shirabe-php-rpc already depends on
+        // shirabe-external-packages, so the reverse dependency would cycle), so query the real
+        // PHP runtime's loaded/scanned ini files here instead.
+        shirabe_php_rpc::get_all_ini_files()
     }
 
     /// Describes the location of the loaded php.ini file(s).
