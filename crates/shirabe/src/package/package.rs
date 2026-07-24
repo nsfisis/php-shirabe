@@ -424,9 +424,27 @@ impl Package {
             )
         {
             self.set_dist_reference(Some(reference.clone()));
-            self.set_dist_url(Some(Preg::replace(
-                php_regex!("{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i"),
-                &reference,
+            // Regex pattern compatibility:
+            // The `regex` crate has no look-around, so `(?<=/|sha=)[a-f0-9]{40}(?=/|$)` is
+            // rewritten to capture the boundary delimiters instead of asserting them, and the
+            // callback re-emits them around the replaced reference. Unlike the zero-width
+            // lookaround, the capturing version consumes its boundary delimiter, so two 40-hex
+            // SHAs sharing a single `/` between them would not both match; harmless here since a
+            // dist URL never carries more than one SHA reference.
+            self.set_dist_url(Some(Preg::replace_callback(
+                php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
+                |m: &indexmap::IndexMap<
+                    shirabe_external_packages::composer::pcre::CaptureKey,
+                    String,
+                >|
+                 -> String {
+                    let get = |i: usize| -> String {
+                        m.get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(i))
+                            .cloned()
+                            .unwrap_or_default()
+                    };
+                    format!("{}{}{}", get(1), reference, get(2))
+                },
                 &self.get_dist_url().unwrap_or_default(),
             )));
         } else if self.get_dist_reference().is_some() {

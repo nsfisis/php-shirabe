@@ -1502,7 +1502,7 @@ pool_optimizer_test! {
     pool_optimizer_update_allow_list_with_dependencies => "update-allow-list-with-dependencies.test";
     pool_optimizer_update_allow_list_with_dependency_conflict => "update-allow-list-with-dependency-conflict.test";
     pool_optimizer_update_allow_list => "update-allow-list.test";
-    pool_optimizer_update_changes_url => "update-changes-url.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_update_changes_url => "update-changes-url.test";
     pool_optimizer_update_dev_ignores_providers => "update-dev-ignores-providers.test";
     pool_optimizer_update_dev_packages_updates_repo_url => "update-dev-packages-updates-repo-url.test";
     pool_optimizer_update_dev_to_new_ref_picks_up_changes => "update-dev-to-new-ref-picks-up-changes.test";
@@ -1692,7 +1692,7 @@ raw_pool_test! {
     raw_pool_update_allow_list_with_dependencies => "update-allow-list-with-dependencies.test";
     raw_pool_update_allow_list_with_dependency_conflict => "update-allow-list-with-dependency-conflict.test";
     raw_pool_update_allow_list => "update-allow-list.test";
-    raw_pool_update_changes_url => "update-changes-url.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_update_changes_url => "update-changes-url.test";
     raw_pool_update_dev_ignores_providers => "update-dev-ignores-providers.test";
     raw_pool_update_dev_packages_updates_repo_url => "update-dev-packages-updates-repo-url.test";
     raw_pool_update_dev_to_new_ref_picks_up_changes => "update-dev-to-new-ref-picks-up-changes.test";
