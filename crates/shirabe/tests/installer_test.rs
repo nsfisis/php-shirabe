@@ -57,18 +57,37 @@ use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, PhpMixed, php_regex};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 
-// The chdir back to prevCwd (cwd management) and removeDirectory of tempComposerHome (a
-// path produced by the unported install pipeline) are not ported; only the env clears are.
+// removeDirectory of tempComposerHome (a path produced by the unported install pipeline) is not
+// ported; the cwd management (setUp's chdir(__DIR__) / tearDown's chdir($this->prevCwd)) and the
+// env clears are.
 fn tear_down() {
     Platform::clear_env("COMPOSER_POOL_OPTIMIZER");
     Platform::clear_env("COMPOSER_FUND");
 }
 
-struct TearDown;
+/// `#[serial]` on every test constructing this makes the process-wide chdir safe: serial_test's
+/// unnamed lock is shared across the whole binary, so no two tests holding one of these can run
+/// concurrently.
+struct TearDown {
+    prev_cwd: std::path::PathBuf,
+}
+
+impl TearDown {
+    fn new() -> Self {
+        let prev_cwd = std::env::current_dir().unwrap();
+        let test_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../composer/tests/Composer/Test")
+            .canonicalize()
+            .unwrap();
+        std::env::set_current_dir(&test_dir).unwrap();
+        Self { prev_cwd }
+    }
+}
 
 impl Drop for TearDown {
     fn drop(&mut self) {
         tear_down();
+        std::env::set_current_dir(&self.prev_cwd).unwrap();
     }
 }
 
@@ -344,8 +363,9 @@ fn make_packages_comparable(
 }
 
 #[test]
+#[serial]
 fn test_installer() {
-    let _tear_down = TearDown;
+    let _tear_down = TearDown::new();
 
     for case in provide_installer() {
         let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
@@ -1261,7 +1281,7 @@ macro_rules! slow_test {
             #[serial]
             $(#[ignore = $reason])?
             fn $ident() {
-                let _tear_down = TearDown;
+                let _tear_down = TearDown::new();
                 Platform::clear_env("COMPOSER_FUND");
                 Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
                 let cases = load_integration_tests("installer-slow/");
@@ -1284,7 +1304,7 @@ macro_rules! pool_optimizer_test {
             #[serial]
             $(#[ignore = $reason])?
             fn $ident() {
-                let _tear_down = TearDown;
+                let _tear_down = TearDown::new();
                 Platform::clear_env("COMPOSER_FUND");
                 Platform::put_env("COMPOSER_POOL_OPTIMIZER", "1");
                 let cases = load_integration_tests("installer/");
@@ -1311,7 +1331,7 @@ macro_rules! raw_pool_test {
             #[serial]
             $(#[ignore = $reason])?
             fn $ident() {
-                let _tear_down = TearDown;
+                let _tear_down = TearDown::new();
                 Platform::clear_env("COMPOSER_FUND");
                 Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
                 let cases = load_integration_tests("installer/");
@@ -1397,7 +1417,7 @@ pool_optimizer_test! {
     pool_optimizer_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
     pool_optimizer_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
     pool_optimizer_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
-    pool_optimizer_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test";
     pool_optimizer_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
     pool_optimizer_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test";
     pool_optimizer_partial_update_from_lock_with_root_alias => "partial-update-from-lock-with-root-alias.test";
@@ -1405,13 +1425,13 @@ pool_optimizer_test! {
     pool_optimizer_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test";
     pool_optimizer_partial_update_keeps_older_dep_if_still_required_with_provide => "partial-update-keeps-older-dep-if-still-required-with-provide.test";
     pool_optimizer_partial_update_keeps_older_dep_if_still_required => "partial-update-keeps-older-dep-if-still-required.test";
-    pool_optimizer_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test";
     pool_optimizer_partial_update_security_advisory_matching_locked_dep_with_dependencies => "partial-update-security-advisory-matching-locked-dep-with-dependencies.test";
     pool_optimizer_partial_update_security_advisory_matching_locked_dep => "partial-update-security-advisory-matching-locked-dep.test";
     pool_optimizer_partial_update_with_dependencies_provide => "partial-update-with-dependencies-provide.test";
     pool_optimizer_partial_update_with_dependencies_replace => "partial-update-with-dependencies-replace.test";
     pool_optimizer_partial_update_with_deps_warns_root => "partial-update-with-deps-warns-root.test";
-    pool_optimizer_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test";
     pool_optimizer_partial_update_without_lock => "partial-update-without-lock.test";
     pool_optimizer_platform_ext_solver_problems => "platform-ext-solver-problems.test";
     pool_optimizer_plugins_are_installed_first => "plugins-are-installed-first.test";
@@ -1587,7 +1607,7 @@ raw_pool_test! {
     raw_pool_load_replaced_package_if_replacer_dropped => "load-replaced-package-if-replacer-dropped.test";
     raw_pool_outdated_lock_file_fails_install => "outdated-lock-file-fails-install.test";
     raw_pool_outdated_lock_file_with_new_platform_reqs_fails => "outdated-lock-file-with-new-platform-reqs-fails.test";
-    raw_pool_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_partial_update_always_updates_symlinked_path_repos => "partial-update-always-updates-symlinked-path-repos.test";
     raw_pool_partial_update_downgrades_non_allow_listed_unstable => "partial-update-downgrades-non-allow-listed-unstable.test";
     raw_pool_partial_update_forces_dev_reference_from_lock_for_non_updated_packages => "partial-update-forces-dev-reference-from-lock-for-non-updated-packages.test";
     raw_pool_partial_update_from_lock_with_root_alias => "partial-update-from-lock-with-root-alias.test";
@@ -1595,13 +1615,13 @@ raw_pool_test! {
     raw_pool_partial_update_installs_from_lock_even_missing => "partial-update-installs-from-lock-even-missing.test";
     raw_pool_partial_update_keeps_older_dep_if_still_required_with_provide => "partial-update-keeps-older-dep-if-still-required-with-provide.test";
     raw_pool_partial_update_keeps_older_dep_if_still_required => "partial-update-keeps-older-dep-if-still-required.test";
-    raw_pool_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_partial_update_loads_root_aliases_for_path_repos => "partial-update-loads-root-aliases-for-path-repos.test";
     raw_pool_partial_update_security_advisory_matching_locked_dep_with_dependencies => "partial-update-security-advisory-matching-locked-dep-with-dependencies.test";
     raw_pool_partial_update_security_advisory_matching_locked_dep => "partial-update-security-advisory-matching-locked-dep.test";
     raw_pool_partial_update_with_dependencies_provide => "partial-update-with-dependencies-provide.test";
     raw_pool_partial_update_with_dependencies_replace => "partial-update-with-dependencies-replace.test";
     raw_pool_partial_update_with_deps_warns_root => "partial-update-with-deps-warns-root.test";
-    raw_pool_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_partial_update_with_symlinked_path_repos => "partial-update-with-symlinked-path-repos.test";
     raw_pool_partial_update_without_lock => "partial-update-without-lock.test";
     raw_pool_platform_ext_solver_problems => "platform-ext-solver-problems.test";
     raw_pool_plugins_are_installed_first => "plugins-are-installed-first.test";
