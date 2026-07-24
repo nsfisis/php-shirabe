@@ -79,6 +79,15 @@ pub struct ProviderListingEntry {
 
 #[derive(Debug)]
 pub struct ComposerRepository {
+    // TODO(phase-c): PHP's ArrayRepository methods that aren't overridden here (findPackage,
+    // findPackages, count, hasPackage) call $this->getPackages(), which virtual-dispatches back
+    // to ComposerRepository::getPackages() (see its "embedded inheritance does not dispatch back
+    // to the wrapper" comment below, and the identical guard in load_packages()). Composition
+    // doesn't get that dispatch for free: self.inner.find_package()/find_packages()/count()/
+    // has_package() below call ArrayRepository::initialize() (a no-op stub) instead, and will
+    // silently see an empty package list if called before get_packages()/load_packages() has
+    // run once on this instance. Not yet known to be hit by any test; audit call sites and add
+    // the same `if !self.inner.is_initialized() { self.initialize()?; }` guard where needed.
     inner: ArrayRepository,
     /// Weak reference to the outermost repository handle wrapping this `ComposerRepository`,
     /// injected via `set_self_handle`. Used to wire package -> repository back-references.
@@ -592,6 +601,13 @@ impl ComposerRepository {
         let has_providers = self.has_providers()?;
 
         if !has_providers && !self.has_partial_packages()? && self.lazy_providers_url.is_none() {
+            // PHP relies on ArrayRepository::loadPackages() invoking the virtual getPackages()
+            // (which in turn invokes the virtual initialize()), both overridden by
+            // ComposerRepository. Embedded inheritance does not dispatch back to the wrapper, so
+            // initialize the wrapper explicitly before delegating; see get_packages() above.
+            if !self.inner.is_initialized() {
+                self.initialize()?;
+            }
             let inner_result = self.inner.load_packages(
                 package_name_map,
                 acceptable_stabilities,

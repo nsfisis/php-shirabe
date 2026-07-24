@@ -1392,7 +1392,7 @@ pool_optimizer_test! {
     pool_optimizer_github_issues_9290 => "github-issues-9290.test";
     pool_optimizer_hint_main_rename => "hint-main-rename.test";
     pool_optimizer_install_aliased_alias => "install-aliased-alias.test";
-    pool_optimizer_install_branch_alias_composer_repo => "install-branch-alias-composer-repo.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_install_branch_alias_composer_repo => "install-branch-alias-composer-repo.test";
     pool_optimizer_install_dev_using_dist => "install-dev-using-dist.test";
     pool_optimizer_install_dev => "install-dev.test";
     pool_optimizer_install_forces_reinstall_if_abandon_changes => "install-forces-reinstall-if-abandon-changes.test";
@@ -1582,7 +1582,7 @@ raw_pool_test! {
     raw_pool_github_issues_9290 => "github-issues-9290.test";
     raw_pool_hint_main_rename => "hint-main-rename.test";
     raw_pool_install_aliased_alias => "install-aliased-alias.test";
-    raw_pool_install_branch_alias_composer_repo => "install-branch-alias-composer-repo.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_install_branch_alias_composer_repo => "install-branch-alias-composer-repo.test";
     raw_pool_install_dev_using_dist => "install-dev-using-dist.test";
     raw_pool_install_dev => "install-dev.test";
     raw_pool_install_forces_reinstall_if_abandon_changes => "install-forces-reinstall-if-abandon-changes.test";
