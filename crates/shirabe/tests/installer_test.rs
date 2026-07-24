@@ -862,7 +862,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         io.clone(),
         None,
     )));
-    let contents = serde_json::to_string(&case.composer).unwrap();
+    // Must match the encoding used for the lock's auto-computed "hash" field in
+    // load_integration_tests (PHP: `json_encode($composerConfig)`, i.e. options=0 with slashes
+    // escaped), or the freshness check spuriously fails on any composer.json containing "/"
+    // (e.g. any vendor/package name).
+    let contents =
+        JsonFile::encode_with_options(&case.composer, shirabe::json::JsonEncodeOptions::none());
     let locker = Locker::new(io.clone(), lock_json, locker_im, &contents, process);
     composer
         .borrow_mut()
@@ -1347,8 +1352,8 @@ pool_optimizer_test! {
     pool_optimizer_install_dev_using_dist => "install-dev-using-dist.test";
     pool_optimizer_install_dev => "install-dev.test";
     pool_optimizer_install_forces_reinstall_if_abandon_changes => "install-forces-reinstall-if-abandon-changes.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
-    pool_optimizer_install_from_incomplete_lock_with_ignore => "install-from-incomplete-lock-with-ignore.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
-    pool_optimizer_install_from_incomplete_lock => "install-from-incomplete-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_install_from_incomplete_lock_with_ignore => "install-from-incomplete-lock-with-ignore.test";
+    pool_optimizer_install_from_incomplete_lock => "install-from-incomplete-lock.test";
     pool_optimizer_install_from_lock_removes_package => "install-from-lock-removes-package.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_install_funding_notice_env => "install-funding-notice-env.test";
     pool_optimizer_install_funding_notice_not_displayed_env => "install-funding-notice-not-displayed-env.test";
@@ -1361,7 +1366,7 @@ pool_optimizer_test! {
     pool_optimizer_install_package_and_its_provider_skips_original => "install-package-and-its-provider-skips-original.test";
     pool_optimizer_install_prefers_repos_over_package_versions => "install-prefers-repos-over-package-versions.test";
     pool_optimizer_install_reference => "install-reference.test";
-    pool_optimizer_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
     pool_optimizer_install_self_from_root => "install-self-from-root.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_install_simple => "install-simple.test";
     pool_optimizer_install_without_lock => "install-without-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
@@ -1414,15 +1419,15 @@ pool_optimizer_test! {
     pool_optimizer_repositories_priorities3 => "repositories-priorities3.test";
     pool_optimizer_repositories_priorities4 => "repositories-priorities4.test";
     pool_optimizer_repositories_priorities5 => "repositories-priorities5.test";
-    pool_optimizer_root_alias_change_with_circular_dep => "root-alias-change-with-circular-dep.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_root_alias_change_with_circular_dep => "root-alias-change-with-circular-dep.test";
     pool_optimizer_root_alias_gets_loaded_for_locked_pkgs => "root-alias-gets-loaded-for-locked-pkgs.test";
-    pool_optimizer_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test";
     pool_optimizer_solver_problem_with_hash_in_branch => "solver-problem-with-hash-in-branch.test";
     pool_optimizer_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_solver_problems => "solver-problems.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
     pool_optimizer_suggest_installed => "suggest-installed.test";
     pool_optimizer_suggest_prod_nolock => "suggest-prod-nolock.test";
-    pool_optimizer_suggest_prod => "suggest-prod.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=1";
+    pool_optimizer_suggest_prod => "suggest-prod.test";
     pool_optimizer_suggest_replaced => "suggest-replaced.test";
     pool_optimizer_suggest_uninstalled => "suggest-uninstalled.test";
     pool_optimizer_unbounded_conflict_does_not_match_default_branch_with_branch_alias => "unbounded-conflict-does-not-match-default-branch-with-branch-alias.test";
@@ -1537,8 +1542,8 @@ raw_pool_test! {
     raw_pool_install_dev_using_dist => "install-dev-using-dist.test";
     raw_pool_install_dev => "install-dev.test";
     raw_pool_install_forces_reinstall_if_abandon_changes => "install-forces-reinstall-if-abandon-changes.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
-    raw_pool_install_from_incomplete_lock_with_ignore => "install-from-incomplete-lock-with-ignore.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
-    raw_pool_install_from_incomplete_lock => "install-from-incomplete-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_install_from_incomplete_lock_with_ignore => "install-from-incomplete-lock-with-ignore.test";
+    raw_pool_install_from_incomplete_lock => "install-from-incomplete-lock.test";
     raw_pool_install_from_lock_removes_package => "install-from-lock-removes-package.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_install_funding_notice_env => "install-funding-notice-env.test";
     raw_pool_install_funding_notice_not_displayed_env => "install-funding-notice-not-displayed-env.test";
@@ -1551,7 +1556,7 @@ raw_pool_test! {
     raw_pool_install_package_and_its_provider_skips_original => "install-package-and-its-provider-skips-original.test";
     raw_pool_install_prefers_repos_over_package_versions => "install-prefers-repos-over-package-versions.test";
     raw_pool_install_reference => "install-reference.test";
-    raw_pool_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_install_security_advisory_matching_dependency => "install-security-advisory-matching-dependency.test";
     raw_pool_install_self_from_root => "install-self-from-root.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_install_simple => "install-simple.test";
     raw_pool_install_without_lock => "install-without-lock.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
@@ -1604,15 +1609,15 @@ raw_pool_test! {
     raw_pool_repositories_priorities3 => "repositories-priorities3.test";
     raw_pool_repositories_priorities4 => "repositories-priorities4.test";
     raw_pool_repositories_priorities5 => "repositories-priorities5.test";
-    raw_pool_root_alias_change_with_circular_dep => "root-alias-change-with-circular-dep.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_root_alias_change_with_circular_dep => "root-alias-change-with-circular-dep.test";
     raw_pool_root_alias_gets_loaded_for_locked_pkgs => "root-alias-gets-loaded-for-locked-pkgs.test";
-    raw_pool_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_root_requirements_do_not_affect_locked_versions => "root-requirements-do-not-affect-locked-versions.test";
     raw_pool_solver_problem_with_hash_in_branch => "solver-problem-with-hash-in-branch.test";
     raw_pool_solver_problems_with_disabled_platform => "solver-problems-with-disabled-platform.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_solver_problems => "solver-problems.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
     raw_pool_suggest_installed => "suggest-installed.test";
     raw_pool_suggest_prod_nolock => "suggest-prod-nolock.test";
-    raw_pool_suggest_prod => "suggest-prod.test", ignore = "TODO(phase-d): known-failing fixture under COMPOSER_POOL_OPTIMIZER=0";
+    raw_pool_suggest_prod => "suggest-prod.test";
     raw_pool_suggest_replaced => "suggest-replaced.test";
     raw_pool_suggest_uninstalled => "suggest-uninstalled.test";
     raw_pool_unbounded_conflict_does_not_match_default_branch_with_branch_alias => "unbounded-conflict-does-not-match-default-branch-with-branch-alias.test";
