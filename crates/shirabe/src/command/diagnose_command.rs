@@ -1004,7 +1004,11 @@ impl DiagnoseCommand {
         repo_set.add_repository(composer_repo_as_repo)?;
 
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-            std::cell::RefCell::new(BufferIO::new(String::new(), 0, None)?),
+            std::cell::RefCell::new(BufferIO::new(
+                String::new(),
+                shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL,
+                None,
+            )?),
         );
         let result = match auditor.audit(
             &io,
