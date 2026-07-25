@@ -19,7 +19,7 @@ impl InstallerInterface for NoopInstaller {
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
-        repo.has_package(package.clone())
+        repo.has_package(package)
     }
 
     async fn download(
@@ -76,7 +76,7 @@ impl InstallerInterface for NoopInstaller {
             .into());
         }
 
-        repo.remove_package(initial.clone());
+        repo.remove_package(initial);
         if !repo.has_package(target.clone()) {
             repo.add_package(PackageInterfaceHandle::dup(&target));
         }
@@ -97,7 +97,7 @@ impl InstallerInterface for NoopInstaller {
             }
             .into());
         }
-        repo.remove_package(package.clone());
+        repo.remove_package(package);
 
         Ok(None)
     }

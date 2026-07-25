@@ -607,7 +607,7 @@ impl AutoloadGenerator {
         if check_platform {
             platform_check_content = self.get_platform_check(
                 &package_map,
-                config.get("platform-check").clone(),
+                config.get("platform-check"),
                 dev_package_names,
             );
             if platform_check_content.is_none() {
@@ -631,7 +631,7 @@ impl AutoloadGenerator {
             &self.get_autoload_real_file(
                 true,
                 include_path_file_contents.is_some(),
-                target_dir_loader.clone(),
+                target_dir_loader,
                 include_files_file_contents.is_some(),
                 &vendor_path_code,
                 &app_base_dir_code,
@@ -828,11 +828,8 @@ impl AutoloadGenerator {
         // sorted (i.e. dependents first) for files to ensure that dependencies are loaded/available once a file is included
         let files = self.parse_autoloads_type(&sorted_package_map, "files", root_package.clone());
         // using sorted here but it does not really matter as all are excluded equally
-        let exclude = self.parse_autoloads_type(
-            &sorted_package_map,
-            "exclude-from-classmap",
-            root_package.clone(),
-        );
+        let exclude =
+            self.parse_autoloads_type(&sorted_package_map, "exclude-from-classmap", root_package);
 
         psr0.sort_by(|k1, _, k2, _| k2.cmp(k1));
         psr4.sort_by(|k1, _, k2, _| k2.cmp(k1));
@@ -1961,12 +1958,7 @@ class ComposerStaticInit{}
                 }
             }
         }
-        add(
-            root_package.clone().into(),
-            &packages,
-            &mut include,
-            &replaced_by,
-        );
+        add(root_package.into(), &packages, &mut include, &replaced_by);
 
         package_map
             .into_iter()

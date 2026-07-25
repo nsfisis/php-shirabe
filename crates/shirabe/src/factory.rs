@@ -261,7 +261,7 @@ impl Factory {
 
         // load global config
         let global_config_path = format!("{}/config.json", config.get_str("home")?);
-        let mut file = JsonFile::new(global_config_path.clone(), None, io.clone())?;
+        let mut file = JsonFile::new(global_config_path, None, io.clone())?;
         if file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
@@ -316,7 +316,7 @@ impl Factory {
 
         // load global auth file
         let auth_file_path = format!("{}/auth.json", config.get_str("home")?);
-        let mut auth_file = JsonFile::new(auth_file_path.clone(), None, io.clone())?;
+        let mut auth_file = JsonFile::new(auth_file_path, None, io.clone())?;
         if auth_file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
@@ -707,7 +707,7 @@ impl Factory {
                         composer.get_package().clone(),
                         Some(&process),
                     );
-                    composer.set_repository_manager(rm.clone());
+                    composer.set_repository_manager(rm);
 
                     // initialize installation manager
                     let im = std::rc::Rc::new(std::cell::RefCell::new(
@@ -731,8 +731,7 @@ impl Factory {
                         composer_full.set_download_manager(dm.clone());
 
                         // initialize autoload generator
-                        let generator =
-                            AutoloadGenerator::new(dispatcher.clone(), Some(io.clone()));
+                        let generator = AutoloadGenerator::new(dispatcher, Some(io.clone()));
                         composer_full.set_autoload_generator(std::rc::Rc::new(
                             std::cell::RefCell::new(generator),
                         ));
@@ -779,9 +778,9 @@ impl Factory {
                                     None,
                                     Some(io.clone()),
                                 )?,
-                                im.clone(),
+                                im,
                                 &file_get_contents(composer_file_path).unwrap_or_default(),
-                                process.clone(),
+                                process,
                             );
                             composer_full
                                 .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
@@ -795,9 +794,9 @@ impl Factory {
                             let locker = Locker::new(
                                 io.clone(),
                                 JsonFile::new(Platform::get_dev_null(), None, Some(io.clone()))?,
-                                im.clone(),
+                                im,
                                 &lock_contents,
-                                process.clone(),
+                                process,
                             );
                             composer_full
                                 .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
@@ -1197,8 +1196,8 @@ impl Factory {
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
-                cache.clone(),
-                fs.clone(),
+                cache,
+                fs,
                 process.clone(),
             ))),
         );
@@ -1509,8 +1508,7 @@ impl Factory {
                 );
                 http_downloader_options.insert("ssl".to_string(), PhpMixed::Array(ssl_map));
             }
-            http_downloader_options =
-                array_replace_recursive(http_downloader_options, options.clone());
+            http_downloader_options = array_replace_recursive(http_downloader_options, options);
         }
         let http_downloader_result: anyhow::Result<HttpDownloader> = Ok(HttpDownloader::new(
             io.clone(),
@@ -1576,7 +1574,7 @@ impl Factory {
         }
         Self::validate_json_schema(
             io,
-            ValidateJsonInput::Data(auth_data.clone()),
+            ValidateJsonInput::Data(auth_data),
             JsonFile::AUTH_SCHEMA,
             Some("COMPOSER_AUTH"),
         )?;

@@ -184,7 +184,7 @@ impl InstallationManager {
             .iter()
             .position(|installer| installer.supports(&r#type));
         if let Some(index) = index {
-            self.cache.borrow_mut().insert(r#type.clone(), index);
+            self.cache.borrow_mut().insert(r#type, index);
             return Ok(self.installers[index].clone());
         }
 
@@ -208,14 +208,12 @@ impl InstallationManager {
 
         if let Some(alias) = package.as_alias() {
             let alias_of: PackageInterfaceHandle = alias.get_alias_of().into();
-            return Ok(
-                repo.has_package(package.clone()) && self.is_package_installed(repo, alias_of)?
-            );
+            return Ok(repo.has_package(package) && self.is_package_installed(repo, alias_of)?);
         }
 
         Ok(self
             .get_installer(&package.get_type())?
-            .is_installed(repo, package.clone()))
+            .is_installed(repo, package))
     }
 
     /// Install binary for the given package.
@@ -778,7 +776,7 @@ impl InstallationManager {
     ) {
         let package = operation.get_package();
 
-        repo.remove_package(package.clone().into());
+        repo.remove_package(package.into());
     }
 
     /// Returns the installation path of a package
@@ -924,7 +922,7 @@ impl InstallationManager {
                 .borrow_mut()
                 .entry(notification_url)
                 .or_default()
-                .push(package.clone());
+                .push(package);
         }
     }
 

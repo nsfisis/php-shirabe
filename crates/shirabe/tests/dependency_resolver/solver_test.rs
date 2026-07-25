@@ -329,7 +329,7 @@ fn test_solver_install_same_package_from_different_repositories() {
     let foo1 = get_package("foo", "1");
     let foo2 = get_package("foo", "1");
     repo1.add_package(foo1.clone()).unwrap();
-    repo2.add_package(foo2.clone()).unwrap();
+    repo2.add_package(foo2).unwrap();
 
     repo_set
         .add_repository(RepositoryInterfaceHandle::new(repo1))
@@ -362,7 +362,7 @@ fn test_solver_install_with_deps() {
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b.clone()).unwrap();
     let new_package_b = get_package("B", "1.1");
-    fixtures.repo.add_package(new_package_b.clone()).unwrap();
+    fixtures.repo.add_package(new_package_b).unwrap();
 
     package_a
         .as_complete_package()
@@ -404,13 +404,13 @@ fn test_solver_install_honours_not_equal_operator() {
     let package_a = get_package("A", "1.0");
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_b = get_package("B", "1.0");
-    fixtures.repo.add_package(package_b.clone()).unwrap();
+    fixtures.repo.add_package(package_b).unwrap();
     let new_package_b11 = get_package("B", "1.1");
     fixtures.repo.add_package(new_package_b11.clone()).unwrap();
     let new_package_b12 = get_package("B", "1.2");
-    fixtures.repo.add_package(new_package_b12.clone()).unwrap();
+    fixtures.repo.add_package(new_package_b12).unwrap();
     let new_package_b13 = get_package("B", "1.3");
-    fixtures.repo.add_package(new_package_b13.clone()).unwrap();
+    fixtures.repo.add_package(new_package_b13).unwrap();
 
     package_a
         .as_complete_package()
@@ -585,7 +585,7 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
         vec![
             ExpectedJob::Single {
                 job: "install",
-                package: php80.clone(),
+                package: php80,
             },
             ExpectedJob::Single {
                 job: "install",
@@ -595,7 +595,7 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
     );
 
     // now we flip the requirements around: we request "ext-foobar" before "php"
-    let mut request = Request::new(Some(fixtures.repo_locked.clone()));
+    let mut request = Request::new(Some(fixtures.repo_locked));
     request.require_name("ourcustom/ext-foobar", None).unwrap();
     request.require_name("ourcustom/PHP", None).unwrap();
 
@@ -620,7 +620,7 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
  {
     let fixtures = set_up();
     let php74 = get_package("ourcustom/PHP", "7.4");
-    fixtures.repo.add_package(php74.clone()).unwrap();
+    fixtures.repo.add_package(php74).unwrap();
     let php80 = get_package("ourcustom/PHP", "8.0");
     fixtures.repo.add_package(php80.clone()).unwrap();
     // note we are inserting this one into the repo first, unlike in the previous test
@@ -689,7 +689,7 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
     );
 
     // unlike in the previous test, the order of requirements no longer matters now
-    let mut request = Request::new(Some(fixtures.repo_locked.clone()));
+    let mut request = Request::new(Some(fixtures.repo_locked));
     request.require_name("ourcustom/ext-foobar", None).unwrap();
     request.require_name("ourcustom/PHP", None).unwrap();
 
@@ -716,7 +716,7 @@ fn test_solver_fix_locked() {
     fixtures.repo_locked.add_package(package_a.clone()).unwrap();
 
     let mut request = fixtures.request;
-    request.fix_package(package_a.clone());
+    request.fix_package(package_a);
 
     check_solver_result(
         fixtures.repo_set,
@@ -735,7 +735,7 @@ fn test_solver_fix_locked_with_alternative() {
     fixtures.repo_locked.add_package(package_a.clone()).unwrap();
 
     let mut request = fixtures.request;
-    request.fix_package(package_a.clone());
+    request.fix_package(package_a);
 
     check_solver_result(
         fixtures.repo_set,
@@ -770,7 +770,7 @@ fn test_solver_update_does_only_update() {
         )]));
 
     let mut request = fixtures.request;
-    request.fix_package(package_a.clone());
+    request.fix_package(package_a);
     request
         .require_name("B", Some(get_version_constraint("=", "1.1.0.0")))
         .unwrap();
@@ -899,11 +899,11 @@ fn test_solver_update_only_updates_selected_package() {
     let package_a_newer = get_package("A", "1.1");
     fixtures.repo.add_package(package_a_newer.clone()).unwrap();
     let package_b_newer = get_package("B", "1.1");
-    fixtures.repo.add_package(package_b_newer.clone()).unwrap();
+    fixtures.repo.add_package(package_b_newer).unwrap();
 
     let mut request = fixtures.request;
     request.require_name("A", None).unwrap();
-    request.fix_package(package_b.clone());
+    request.fix_package(package_b);
 
     check_solver_result(
         fixtures.repo_set,
@@ -1019,7 +1019,7 @@ fn test_solver_all_jobs() {
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b.clone()).unwrap();
     let new_package_b = get_package("B", "1.1");
-    fixtures.repo.add_package(new_package_b.clone()).unwrap();
+    fixtures.repo.add_package(new_package_b).unwrap();
     let package_c = get_package("C", "1.1");
     fixtures.repo.add_package(package_c.clone()).unwrap();
     fixtures.repo.add_package(get_package("D", "1.0")).unwrap();
@@ -1074,9 +1074,9 @@ fn test_solver_three_alternative_require_and_conflict() {
     let middle_package_b = get_package("B", "1.0");
     fixtures.repo.add_package(middle_package_b.clone()).unwrap();
     let new_package_b = get_package("B", "1.1");
-    fixtures.repo.add_package(new_package_b.clone()).unwrap();
+    fixtures.repo.add_package(new_package_b).unwrap();
     let old_package_b = get_package("B", "0.9");
-    fixtures.repo.add_package(old_package_b.clone()).unwrap();
+    fixtures.repo.add_package(old_package_b).unwrap();
     package_a
         .as_complete_package()
         .unwrap()
@@ -1170,7 +1170,7 @@ fn test_install_one_of_two_alternatives() {
     let package_a = get_package("A", "1.0");
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_b = get_package("A", "1.0");
-    fixtures.repo.add_package(package_b.clone()).unwrap();
+    fixtures.repo.add_package(package_b).unwrap();
 
     let mut request = fixtures.request;
     request.require_name("A", None).unwrap();
@@ -1337,7 +1337,7 @@ fn test_skip_replaced_package_if_replacer_is_selected() {
     let package_q = get_package("Q", "1.0");
     fixtures.repo.add_package(package_q.clone()).unwrap();
     let package_b = get_package("B", "1.0");
-    fixtures.repo.add_package(package_b.clone()).unwrap();
+    fixtures.repo.add_package(package_b).unwrap();
     package_a
         .as_complete_package()
         .unwrap()
@@ -1509,7 +1509,7 @@ fn test_install_circular_require() {
     let package_a = get_package("A", "1.0");
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_b1 = get_package("B", "0.9");
-    fixtures.repo.add_package(package_b1.clone()).unwrap();
+    fixtures.repo.add_package(package_b1).unwrap();
     let package_b2 = get_package("B", "1.1");
     fixtures.repo.add_package(package_b2.clone()).unwrap();
     package_a
@@ -1675,7 +1675,7 @@ fn test_use_replacer_if_necessary() {
     let package_a = get_package("A", "1.0");
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_b = get_package("B", "1.0");
-    fixtures.repo.add_package(package_b.clone()).unwrap();
+    fixtures.repo.add_package(package_b).unwrap();
     let package_d = get_package("D", "1.0");
     fixtures.repo.add_package(package_d.clone()).unwrap();
     let package_d2 = get_package("D", "1.1");
@@ -1779,11 +1779,11 @@ fn test_use_replacer_if_necessary() {
 fn test_issue265() {
     let fixtures = set_up();
     let package_a1 = get_package("A", "2.0.999999-dev");
-    fixtures.repo.add_package(package_a1.clone()).unwrap();
+    fixtures.repo.add_package(package_a1).unwrap();
     let package_a2 = get_package("A", "2.1-dev");
-    fixtures.repo.add_package(package_a2.clone()).unwrap();
+    fixtures.repo.add_package(package_a2).unwrap();
     let package_a3 = get_package("A", "2.2-dev");
-    fixtures.repo.add_package(package_a3.clone()).unwrap();
+    fixtures.repo.add_package(package_a3).unwrap();
     let package_b1 = get_package("B", "2.0.10");
     fixtures.repo.add_package(package_b1.clone()).unwrap();
     let package_b2 = get_package("B", "2.0.9");
@@ -1898,7 +1898,7 @@ fn test_conflict_result_empty() {
     let package_a = get_package("A", "1.0");
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_b = get_package("B", "1.0");
-    fixtures.repo.add_package(package_b.clone()).unwrap();
+    fixtures.repo.add_package(package_b).unwrap();
     package_a
         .as_complete_package()
         .unwrap()
@@ -1955,7 +1955,7 @@ fn test_unsatisfiable_requires() {
     let package_a = get_package("A", "1.0");
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_b = get_package("B", "1.0");
-    fixtures.repo.add_package(package_b.clone()).unwrap();
+    fixtures.repo.add_package(package_b).unwrap();
 
     package_a
         .as_complete_package()
@@ -2093,11 +2093,11 @@ fn test_require_mismatch_exception() {
 fn test_learn_literals_with_sorted_rule_literals() {
     let fixtures = set_up();
     let package_twig2 = get_package("twig/twig", "2.0");
-    fixtures.repo.add_package(package_twig2.clone()).unwrap();
+    fixtures.repo.add_package(package_twig2).unwrap();
     let package_twig16 = get_package("twig/twig", "1.6");
     fixtures.repo.add_package(package_twig16.clone()).unwrap();
     let package_twig15 = get_package("twig/twig", "1.5");
-    fixtures.repo.add_package(package_twig15.clone()).unwrap();
+    fixtures.repo.add_package(package_twig15).unwrap();
     let package_symfony = get_package("symfony/symfony", "2.0");
     fixtures.repo.add_package(package_symfony.clone()).unwrap();
     let package_twig_bridge = get_package("symfony/twig-bridge", "2.0");
@@ -2158,7 +2158,7 @@ fn test_learn_literals_with_sorted_rule_literals() {
 fn test_install_recursive_alias_dependencies() {
     let fixtures = set_up();
     let package_a = get_package("A", "1.0");
-    fixtures.repo.add_package(package_a.clone()).unwrap();
+    fixtures.repo.add_package(package_a).unwrap();
     let package_b = get_package("B", "2.0");
     fixtures.repo.add_package(package_b.clone()).unwrap();
     let package_a2 = get_package("A", "2.0");
@@ -2363,13 +2363,13 @@ fn test_learn_positive_literal() {
     let package_f1 = get_package("F", "1.0");
     fixtures.repo.add_package(package_f1.clone()).unwrap();
     let package_f2 = get_package("F", "2.0");
-    fixtures.repo.add_package(package_f2.clone()).unwrap();
+    fixtures.repo.add_package(package_f2).unwrap();
     let package_g1 = get_package("G", "1.0");
-    fixtures.repo.add_package(package_g1.clone()).unwrap();
+    fixtures.repo.add_package(package_g1).unwrap();
     let package_g2 = get_package("G", "2.0");
     fixtures.repo.add_package(package_g2.clone()).unwrap();
     let package_g3 = get_package("G", "3.0");
-    fixtures.repo.add_package(package_g3.clone()).unwrap();
+    fixtures.repo.add_package(package_g3).unwrap();
 
     package_a
         .as_complete_package()

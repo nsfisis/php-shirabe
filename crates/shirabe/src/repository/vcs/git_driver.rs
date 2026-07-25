@@ -438,7 +438,7 @@ impl GitDriver {
         ))));
         let mut git_util = GitUtil::new(
             io.clone(),
-            config.clone(),
+            config,
             process.clone(),
             std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
         );

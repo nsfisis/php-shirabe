@@ -210,7 +210,7 @@ impl Command for AuditCommand {
                 &abandoned,
                 ignore_severities,
                 ignore_unreachable,
-                audit_config.ignore_abandoned_for_audit.clone(),
+                audit_config.ignore_abandoned_for_audit,
             )?
             .min(255))
     }

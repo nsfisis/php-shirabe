@@ -110,8 +110,8 @@ fn test_transaction_generation_and_sorting() {
     let dl_modifying_plugin2_dep = get_package("x/downloads-modifying2-dep", "1.0.0");
     let dl_modifying_plugin2 = get_package("x/downloads-modifying2", "1.0.0");
     let result_packages = vec![
-        package_a.clone(),
-        package_a_alias.clone(),
+        package_a,
+        package_a_alias,
         package_b_new.clone(),
         package_d.clone(),
         package_f.clone(),
@@ -216,67 +216,67 @@ fn test_transaction_generation_and_sorting() {
     let expected_operations = vec![
         OperationEntry::Job {
             job: "uninstall".to_string(),
-            package: package_c.clone(),
+            package: package_c,
         },
         OperationEntry::Job {
             job: "uninstall".to_string(),
-            package: package_e.clone(),
+            package: package_e,
         },
         OperationEntry::Job {
             job: "markAliasUninstalled".to_string(),
-            package: package_e_alias.clone(),
+            package: package_e_alias,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: dl_modifying_plugin.clone(),
+            package: dl_modifying_plugin,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: dl_modifying_plugin2_dep.clone(),
+            package: dl_modifying_plugin2_dep,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: dl_modifying_plugin2.clone(),
+            package: dl_modifying_plugin2,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: plugin.clone(),
+            package: plugin,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: plugin2_dep.clone(),
+            package: plugin2_dep,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: plugin2.clone(),
+            package: plugin2,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: package_a0_first.clone(),
+            package: package_a0_first,
         },
         OperationEntry::Update {
-            from: package_b.clone(),
-            to: package_b_new.clone(),
+            from: package_b,
+            to: package_b_new,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: package_g.clone(),
+            package: package_g,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: package_f.clone(),
+            package: package_f,
         },
         OperationEntry::Job {
             job: "markAliasInstalled".to_string(),
-            package: package_f_alias2.clone(),
+            package: package_f_alias2,
         },
         OperationEntry::Job {
             job: "markAliasInstalled".to_string(),
-            package: package_f_alias1.clone(),
+            package: package_f_alias1,
         },
         OperationEntry::Job {
             job: "install".to_string(),
-            package: package_d.clone(),
+            package: package_d,
         },
     ];
 

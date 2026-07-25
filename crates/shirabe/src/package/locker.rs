@@ -831,11 +831,8 @@ impl Locker {
 
                     let no_show_signature_flags =
                         GitUtil::get_no_show_signature_flags(&self.process);
-                    let mut args: Vec<String> = vec![
-                        "-n1".to_string(),
-                        "--format=%ct".to_string(),
-                        source_ref.clone(),
-                    ];
+                    let mut args: Vec<String> =
+                        vec!["-n1".to_string(), "--format=%ct".to_string(), source_ref];
                     args.extend(no_show_signature_flags);
                     let command = GitUtil::build_rev_list_command(&self.process, args);
                     let mut output = PhpMixed::Null;
@@ -866,7 +863,7 @@ impl Locker {
                             PhpMixed::String("--template".to_string()),
                             PhpMixed::String("{date|hgdate}".to_string()),
                             PhpMixed::String("-r".to_string()),
-                            PhpMixed::String(source_ref.clone()),
+                            PhpMixed::String(source_ref),
                         ]),
                         &mut output,
                         path.as_deref(),

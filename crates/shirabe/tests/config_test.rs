@@ -506,7 +506,7 @@ fn test_prohibited_urls_warning_verify_peer() {
         .unwrap();
 
     let mut config = Config::new(false, None);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let mut repo_options: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_options.insert(
         "ssl".to_string(),

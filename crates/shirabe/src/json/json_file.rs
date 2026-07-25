@@ -228,7 +228,7 @@ impl JsonFile {
         if self.path == "php://memory" {
             file_put_contents(
                 &self.path,
-                Self::encode_with_options(&hash, options.clone()).as_bytes(),
+                Self::encode_with_options(&hash, options).as_bytes(),
             );
 
             return Ok(());
@@ -469,7 +469,7 @@ impl JsonFile {
 
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
-            let indent_owned = options.indent.clone();
+            let indent_owned = options.indent;
             return Preg::replace_callback(
                 php_regex!(r"#^ {4,}#m"),
                 move |m: &indexmap::IndexMap<

@@ -40,7 +40,7 @@ fn test_capture_authentication_params_from_url() {
         .with("gitlab-domains", PhpMixed::Array(IndexMap::new()))
         .build_shared();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
     let fs = HttpDownloader::new(io, config, IndexMap::new(), false);

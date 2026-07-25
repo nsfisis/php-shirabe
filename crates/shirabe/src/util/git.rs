@@ -243,7 +243,7 @@ impl Git {
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m3) {
                     self.io.borrow_mut().set_authentication(
-                        m3.clone(),
+                        m3,
                         rawurldecode(&m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()),
                         Some(rawurldecode(
                             &m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
@@ -701,7 +701,6 @@ impl Git {
                             .ask(
                                 "      Username: ".to_string(),
                                 default_username
-                                    .clone()
                                     .map(PhpMixed::String)
                                     .unwrap_or(PhpMixed::Null),
                             )

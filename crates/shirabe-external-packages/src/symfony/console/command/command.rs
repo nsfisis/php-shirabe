@@ -747,7 +747,7 @@ impl Command for CommandData {
         let replacements = [
             name.clone().unwrap_or_default(),
             if is_single_command {
-                php_self.clone()
+                php_self
             } else {
                 format!("{} {}", php_self, name.unwrap_or_default())
             },

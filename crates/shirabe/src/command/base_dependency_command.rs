@@ -240,7 +240,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         let has_constraint = text_constraint != "*";
         let constraint: Option<AnyConstraint> = if has_constraint {
             let version_parser = VersionParser::new();
-            Some(version_parser.parse_constraints(&text_constraint)?.clone())
+            Some(version_parser.parse_constraints(&text_constraint)?)
         } else {
             None
         };

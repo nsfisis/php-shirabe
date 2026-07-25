@@ -1025,7 +1025,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         }));
     }
     application
-        .add(install.clone() as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)
+        .add(install as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)
         .unwrap();
 
     let update = std::rc::Rc::new(std::cell::RefCell::new(CommandData::new(Some(
@@ -1066,7 +1066,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                 PhpMixed::Null,
             )
             .unwrap();
-        let installer_cl = installer.clone();
+        let installer_cl = installer;
         let composer_cl = composer.clone();
         let run_result_cl = run_result.clone();
         update_ref.set_code(Box::new(move |input, _output| {
@@ -1128,7 +1128,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         }));
     }
     application
-        .add(update.clone() as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)
+        .add(update as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>)
         .unwrap();
 
     assert!(

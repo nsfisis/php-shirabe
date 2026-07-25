@@ -131,7 +131,7 @@ impl ClassLoader {
     pub fn add(&mut self, prefix: &str, paths: Vec<String>, prepend: bool) {
         if prefix.is_empty() {
             if prepend {
-                let mut new_dirs = paths.clone();
+                let mut new_dirs = paths;
                 new_dirs.append(&mut self.fallback_dirs_psr0);
                 self.fallback_dirs_psr0 = new_dirs;
             } else {
@@ -142,14 +142,14 @@ impl ClassLoader {
         }
 
         let first = prefix.chars().next().unwrap_or('\0').to_string();
-        let entry = self.prefixes_psr0.entry(first.clone()).or_default();
+        let entry = self.prefixes_psr0.entry(first).or_default();
         if !entry.contains_key(prefix) {
             entry.insert(prefix.to_string(), paths);
             return;
         }
         let existing = entry.get_mut(prefix).unwrap();
         if prepend {
-            let mut new_dirs = paths.clone();
+            let mut new_dirs = paths;
             new_dirs.append(existing);
             *existing = new_dirs;
         } else {
@@ -170,7 +170,7 @@ impl ClassLoader {
         if prefix.is_empty() {
             // Register directories for the root namespace.
             if prepend {
-                let mut new_dirs = paths.clone();
+                let mut new_dirs = paths;
                 new_dirs.append(&mut self.fallback_dirs_psr4);
                 self.fallback_dirs_psr4 = new_dirs;
             } else {
@@ -196,7 +196,7 @@ impl ClassLoader {
         } else if prepend {
             // Prepend directories for an already registered namespace.
             let existing = self.prefix_dirs_psr4.get_mut(prefix).unwrap();
-            let mut new_dirs = paths.clone();
+            let mut new_dirs = paths;
             new_dirs.append(existing);
             *existing = new_dirs;
         } else {

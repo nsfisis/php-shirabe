@@ -307,7 +307,7 @@ impl Command for InitCommand {
             );
         }
 
-        file_obj.write(PhpMixed::Array(options_for_encode.clone()))?;
+        file_obj.write(PhpMixed::Array(options_for_encode))?;
         let validate_result = file_obj.validate_schema(JsonFile::LAX_SCHEMA, None);
         if let Err(e) = validate_result {
             // try to downcast to JsonValidationException
@@ -590,7 +590,7 @@ impl Command for InitCommand {
             let description = io.ask(
                 format!(
                     "Description [<comment>{}</comment>]: ",
-                    description.clone().unwrap_or_default()
+                    description.unwrap_or_default()
                 ),
                 description_default
                     .map(PhpMixed::String)
@@ -653,7 +653,7 @@ impl Command for InitCommand {
             let minimum_stability_value = io.ask_and_validate(
                 format!(
                     "Minimum Stability [<comment>{}</comment>]: ",
-                    minimum_stability.clone().unwrap_or_default()
+                    minimum_stability.unwrap_or_default()
                 ),
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     if value.is_null() {
@@ -756,7 +756,7 @@ impl Command for InitCommand {
             // prepare to resolve dependencies
             let repos = self.get_repos();
             let preferred_stability =
-                if let Some(s) = minimum_stability_default.clone().filter(|s| !s.is_empty()) {
+                if let Some(s) = minimum_stability_default.filter(|s| !s.is_empty()) {
                     s
                 } else {
                     "stable".to_string()
@@ -882,7 +882,7 @@ impl Command for InitCommand {
                     return Err(InvalidArgumentException {
                         message: format!(
                             "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
-                            value_or_default.clone(),
+                            value_or_default,
                         ),
                         code: 0,
                     }

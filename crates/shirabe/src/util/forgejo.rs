@@ -46,10 +46,8 @@ impl Forgejo {
         self.io.write_error3(&url, true, io_interface::NORMAL);
         let (local_auth_name, has_local_auth, auth_name): (String, bool, String) = {
             let cfg = self.config.borrow();
-            let local = cfg
-                .get_local_auth_config_source()
-                .map(|s| s.get_name().to_string());
-            let auth = cfg.get_auth_config_source().get_name().to_string();
+            let local = cfg.get_local_auth_config_source().map(|s| s.get_name());
+            let auth = cfg.get_auth_config_source().get_name();
             (local.clone().unwrap_or_default(), local.is_some(), auth)
         };
         let local_prefix = if has_local_auth {
@@ -150,8 +148,8 @@ impl Forgejo {
                 .remove_config_setting(&setting_key)?;
         }
         let value = shirabe_php_shim::PhpMixed::Array(indexmap::indexmap! {
-            "username".to_string() => username.clone().into(),
-            "token".to_string() => token.clone().into(),
+            "username".to_string() => username.into(),
+            "token".to_string() => token.into(),
         });
         if store_in_local_auth_config && has_local_auth {
             let mut cfg = self.config.borrow_mut();

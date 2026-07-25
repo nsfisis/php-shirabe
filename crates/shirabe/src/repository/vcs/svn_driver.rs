@@ -268,7 +268,7 @@ impl SvnDriver {
                 (identifier.clone(), String::new())
             }
         } else {
-            (identifier.clone(), String::new())
+            (identifier, String::new())
         };
 
         let output: String = match self.execute(
@@ -308,7 +308,7 @@ impl SvnDriver {
                 (identifier.clone(), String::new())
             }
         } else {
-            (identifier.clone(), String::new())
+            (identifier, String::new())
         };
 
         let output = self.execute(
@@ -500,7 +500,7 @@ impl SvnDriver {
                 "info".to_string(),
                 "--non-interactive".to_string(),
                 "--".to_string(),
-                url.clone(),
+                url,
             ],
             &mut ignored_output,
             None,

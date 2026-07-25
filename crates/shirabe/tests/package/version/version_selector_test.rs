@@ -99,7 +99,7 @@ fn test_latest_version_is_returned() {
     let package1 = get_package("foo/bar", "1.2.1");
     let package2 = get_package("foo/bar", "1.2.2");
     let package3 = get_package("foo/bar", "1.2.0");
-    let packages = vec![package1.clone(), package2.clone(), package3.clone()];
+    let packages = vec![package1, package2.clone(), package3];
 
     let mut repository_set = MockRepositorySet::new();
     repository_set
@@ -143,12 +143,7 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
         "php".to_string(),
         require_link(package_name, "php", ">=5.6"),
     )]));
-    let packages = vec![
-        package0.clone(),
-        package1.clone(),
-        package2.clone(),
-        package3.clone(),
-    ];
+    let packages = vec![package0, package1.clone(), package2, package3.clone()];
 
     let mut repository_set = MockRepositorySet::new();
     repository_set
@@ -369,7 +364,7 @@ fn test_most_stable_version_is_returned() {
 
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "1.1.0-beta");
-    let packages = vec![package1.clone(), package2.clone()];
+    let packages = vec![package1.clone(), package2];
 
     let mut repository_set = MockRepositorySet::new();
     repository_set
@@ -393,7 +388,7 @@ fn test_most_stable_version_is_returned_regardless_of_order() {
 
     let package1 = get_package("foo/bar", "2.x-dev");
     let package2 = get_package("foo/bar", "2.0.0-beta3");
-    let packages = vec![package1.clone(), package2.clone()];
+    let packages = vec![package1, package2.clone()];
     let reversed: Vec<PackageInterfaceHandle> = packages.iter().rev().cloned().collect();
 
     let mut repository_set = MockRepositorySet::new();
@@ -431,7 +426,7 @@ fn test_highest_version_is_returned() {
 
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "1.1.0-beta");
-    let packages = vec![package1.clone(), package2.clone()];
+    let packages = vec![package1, package2.clone()];
 
     let mut repository_set = MockRepositorySet::new();
     repository_set
@@ -456,7 +451,7 @@ fn test_highest_version_matching_stability_is_returned() {
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "1.1.0-beta");
     let package3 = get_package("foo/bar", "1.2.0-alpha");
-    let packages = vec![package1.clone(), package2.clone(), package3.clone()];
+    let packages = vec![package1, package2.clone(), package3];
 
     let mut repository_set = MockRepositorySet::new();
     repository_set
@@ -480,7 +475,7 @@ fn test_most_stable_unstable_version_is_returned() {
 
     let package2 = get_package("foo/bar", "1.1.0-beta");
     let package3 = get_package("foo/bar", "1.2.0-alpha");
-    let packages = vec![package2.clone(), package3.clone()];
+    let packages = vec![package2.clone(), package3];
 
     let mut repository_set = MockRepositorySet::new();
     repository_set
@@ -511,7 +506,7 @@ fn test_default_branch_alias_is_never_returned() {
         VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
     )
     .into();
-    let packages = vec![package.clone(), package2_alias.clone()];
+    let packages = vec![package, package2_alias];
 
     let mut repository_set = MockRepositorySet::new();
     repository_set
@@ -628,7 +623,7 @@ fn test_find_recommended_require_version() {
             "foo/bar",
         ),
         // ext in sync with php
-        (php_version.clone(), "*", None, "ext-filter"),
+        (php_version, "*", None, "ext-filter"),
         // ext versioned individually
         ("3.0.5".to_string(), "^3.0", None, "ext-xdebug"),
     ];

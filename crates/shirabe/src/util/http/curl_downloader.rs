@@ -644,7 +644,7 @@ impl CurlDownloader {
         {
             if !parse_url(&location_header, shirabe_php_shim::PHP_URL_SCHEME).is_null() {
                 // Absolute URL; e.g. https://example.com/composer
-                target_url = location_header.clone();
+                target_url = location_header;
             } else if !parse_url(&location_header, shirabe_php_shim::PHP_URL_HOST).is_null() {
                 // Scheme relative; e.g. //example.com/foo
                 target_url = format!(

@@ -230,8 +230,7 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     required_package.__set_requires(requires);
     let nested_package = get_package("nested/req", "1.1.0");
 
-    let packages: Vec<PackageInterfaceHandle> =
-        vec![required_package.clone(), nested_package.clone()];
+    let packages: Vec<PackageInterfaceHandle> = vec![required_package, nested_package];
     create_installed_json(&packages, &[], true);
     create_composer_lock(&packages, &[]);
 
@@ -281,7 +280,7 @@ fn test_remove_unused_package() {
     let extraneous_package = get_package("not/req", "1.0.0");
 
     create_installed_json(std::slice::from_ref(&required_package), &[], true);
-    create_composer_lock(&[required_package.clone(), extraneous_package.clone()], &[]);
+    create_composer_lock(&[required_package, extraneous_package], &[]);
 
     let mut app_tester = get_application_tester();
     let status_code = app_tester
@@ -348,8 +347,7 @@ fn test_remove_package_by_name() {
     root_req_package.__set_type("metapackage".to_string());
     root_another_package.__set_type("metapackage".to_string());
 
-    let packages: Vec<PackageInterfaceHandle> =
-        vec![root_req_package.clone(), root_another_package.clone()];
+    let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
     create_composer_lock(&packages, &[]);
 
@@ -430,8 +428,7 @@ fn test_remove_package_by_name_with_dry_run() {
     root_req_package.__set_type("metapackage".to_string());
     root_another_package.__set_type("metapackage".to_string());
 
-    let packages: Vec<PackageInterfaceHandle> =
-        vec![root_req_package.clone(), root_another_package.clone()];
+    let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
     create_composer_lock(&packages, &[]);
 
@@ -517,8 +514,7 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     root_req_package.__set_type("metapackage".to_string());
     root_another_package.__set_type("metapackage".to_string());
 
-    let packages: Vec<PackageInterfaceHandle> =
-        vec![root_req_package.clone(), root_another_package.clone()];
+    let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
     create_composer_lock(&packages, &[]);
 
@@ -624,11 +620,8 @@ fn test_remove_packages_by_vendor() {
     let root_another_package = get_package("root/another", "1.0.0");
     let another_req_package = get_package("another/req", "1.0.0");
 
-    let packages: Vec<PackageInterfaceHandle> = vec![
-        root_req_package.clone(),
-        root_another_package.clone(),
-        another_req_package.clone(),
-    ];
+    let packages: Vec<PackageInterfaceHandle> =
+        vec![root_req_package, root_another_package, another_req_package];
     create_installed_json(&packages, &[], true);
     create_composer_lock(&packages, &[]);
 
@@ -707,11 +700,8 @@ fn test_remove_packages_by_vendor_with_dry_run() {
     let root_another_package = get_package("root/another", "1.0.0");
     let another_req_package = get_package("another/req", "1.0.0");
 
-    let packages: Vec<PackageInterfaceHandle> = vec![
-        root_req_package.clone(),
-        root_another_package.clone(),
-        another_req_package.clone(),
-    ];
+    let packages: Vec<PackageInterfaceHandle> =
+        vec![root_req_package, root_another_package, another_req_package];
     create_installed_json(&packages, &[], true);
     create_composer_lock(&packages, &[]);
 

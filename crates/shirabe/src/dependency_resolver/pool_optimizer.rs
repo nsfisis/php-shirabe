@@ -605,7 +605,7 @@ impl PoolOptimizer {
                     let version_str = package_index
                         .get(require)
                         .and_then(|m| m.get(&id))
-                        .map(|p| p.get_version().to_string());
+                        .map(|p| p.get_version());
                     if let Some(version_str) = version_str
                         && !CompilingMatcher::r#match(
                             link_constraint,

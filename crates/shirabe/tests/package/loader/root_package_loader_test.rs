@@ -123,8 +123,7 @@ fn test_stability_flags_parsing() {
         Some(io.clone()),
     );
 
-    let mut loader =
-        RootPackageLoader::new(manager, config.clone(), None, Some(Box::new(guesser)), None);
+    let mut loader = RootPackageLoader::new(manager, config, None, Some(Box::new(guesser)), None);
 
     let mut data = IndexMap::new();
     data.insert(
@@ -209,8 +208,7 @@ fn test_no_version_is_visible_in_pretty_version() {
     );
     let guesser = VersionGuesser::new(config.clone(), process, VersionParser::new(), None);
 
-    let mut loader =
-        RootPackageLoader::new(manager, config.clone(), None, Some(Box::new(guesser)), None);
+    let mut loader = RootPackageLoader::new(manager, config, None, Some(Box::new(guesser)), None);
 
     let package = loader
         .load(IndexMap::new(), "Composer\\Package\\RootPackage", None)
@@ -246,13 +244,8 @@ fn test_pretty_version_for_root_package_in_version_branch() {
             }))
         });
 
-    let mut loader = RootPackageLoader::new(
-        manager,
-        config.clone(),
-        None,
-        Some(Box::new(version_guesser)),
-        None,
-    );
+    let mut loader =
+        RootPackageLoader::new(manager, config, None, Some(Box::new(version_guesser)), None);
 
     let package = loader
         .load(IndexMap::new(), "Composer\\Package\\RootPackage", None)
@@ -284,8 +277,7 @@ fn test_feature_branch_pretty_version() {
     let (process, _guard) = get_process_executor_mock(expectations, true, MockHandler::default());
     let guesser = VersionGuesser::new(config.clone(), process, VersionParser::new(), None);
 
-    let mut loader =
-        RootPackageLoader::new(manager, config.clone(), None, Some(Box::new(guesser)), None);
+    let mut loader = RootPackageLoader::new(manager, config, None, Some(Box::new(guesser)), None);
 
     let mut data = IndexMap::new();
     data.insert(
@@ -323,8 +315,7 @@ fn test_non_feature_branch_pretty_version() {
     let (process, _guard) = get_process_executor_mock(expectations, true, MockHandler::default());
     let guesser = VersionGuesser::new(config.clone(), process, VersionParser::new(), None);
 
-    let mut loader =
-        RootPackageLoader::new(manager, config.clone(), None, Some(Box::new(guesser)), None);
+    let mut loader = RootPackageLoader::new(manager, config, None, Some(Box::new(guesser)), None);
 
     let mut data = IndexMap::new();
     data.insert(

@@ -141,7 +141,7 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>)
             false,
         )
         .unwrap();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(test_path.path())));
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());

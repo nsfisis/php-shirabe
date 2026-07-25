@@ -92,7 +92,7 @@ fn test_username_password_authentication_flow() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     assert!(
@@ -139,7 +139,7 @@ fn test_username_password_failure() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     let err = gitlab

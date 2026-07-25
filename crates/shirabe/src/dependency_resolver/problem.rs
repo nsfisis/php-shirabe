@@ -634,12 +634,7 @@ impl Problem {
                     .iter()
                     .filter(|p| {
                         root_reqs[package_name].matches(
-                            &SimpleConstraint::new(
-                                "==".to_string(),
-                                p.get_version().to_string(),
-                                None,
-                            )
-                            .into(),
+                            &SimpleConstraint::new("==".to_string(), p.get_version(), None).into(),
                         )
                     })
                     .collect();
@@ -678,12 +673,8 @@ impl Problem {
                         .iter()
                         .filter(|p| {
                             temp_reqs[&name].matches(
-                                &SimpleConstraint::new(
-                                    "==".to_string(),
-                                    p.get_version().to_string(),
-                                    None,
-                                )
-                                .into(),
+                                &SimpleConstraint::new("==".to_string(), p.get_version(), None)
+                                    .into(),
                             )
                         })
                         .collect();
@@ -719,19 +710,14 @@ impl Problem {
             if let Some(ref lp) = locked_package {
                 let fixed_constraint = AnyConstraint::from(SimpleConstraint::new(
                     "==".to_string(),
-                    lp.get_version().to_string(),
+                    lp.get_version(),
                     None,
                 ));
                 let filtered: Vec<&BasePackageHandle> = packages
                     .iter()
                     .filter(|p| {
                         fixed_constraint.matches(
-                            &SimpleConstraint::new(
-                                "==".to_string(),
-                                p.get_version().to_string(),
-                                None,
-                            )
-                            .into(),
+                            &SimpleConstraint::new("==".to_string(), p.get_version(), None).into(),
                         )
                     })
                     .collect();
@@ -1080,7 +1066,7 @@ impl Problem {
             let entry = prepared
                 .entry(pkg_name.clone())
                 .or_insert_with(|| PreparedEntry {
-                    name: package.get_pretty_name().to_string(),
+                    name: package.get_pretty_name(),
                     versions: IndexMap::new(),
                 });
             entry.name = package.get_pretty_name().to_string();
@@ -1200,7 +1186,7 @@ impl Problem {
                 }
             }
 
-            let mut version: String = selected.get_pretty_version().to_string();
+            let mut version: String = selected.get_pretty_version();
             let extra = selected.get_extra();
             if selected.as_complete().is_some()
                 && extra.contains_key("config.platform")

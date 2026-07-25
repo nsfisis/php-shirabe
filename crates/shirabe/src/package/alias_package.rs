@@ -59,7 +59,7 @@ impl AliasPackage {
     pub fn new(alias_of: PackageHandle, version: String, pretty_version: String) -> Self {
         let alias_name = alias_of.get_name();
 
-        let stability = VersionParser::parse_stability(&version).to_string();
+        let stability = VersionParser::parse_stability(&version);
         let dev = stability == "dev";
 
         let mut this = Self {
@@ -132,7 +132,7 @@ impl AliasPackage {
         // for self.version requirements, we use the original package's branch name instead, to avoid leaking the magic dev-master-alias to users
         let mut pretty_version = self.pretty_version.clone();
         if pretty_version == VersionParser::DEFAULT_BRANCH_ALIAS {
-            pretty_version = self.alias_of.get_pretty_version().to_string();
+            pretty_version = self.alias_of.get_pretty_version();
         }
 
         if in_array(

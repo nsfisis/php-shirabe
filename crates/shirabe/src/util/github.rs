@@ -114,9 +114,8 @@ impl GitHub {
         let (local_name, auth_name): (Option<String>, String) = {
             let cfg = self.config.borrow();
             (
-                cfg.get_local_auth_config_source()
-                    .map(|c| c.get_name().to_string()),
-                cfg.get_auth_config_source().get_name().to_string(),
+                cfg.get_local_auth_config_source().map(|c| c.get_name()),
+                cfg.get_auth_config_source().get_name(),
             )
         };
         let prefix = local_name

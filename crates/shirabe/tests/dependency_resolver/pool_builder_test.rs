@@ -539,7 +539,7 @@ fn run_test_pool_builder(
         }
     }
 
-    let mut request = Request::new(Some(locked_repo.clone()));
+    let mut request = Request::new(Some(locked_repo));
     for (package, constraint) in request_map["require"].as_array().unwrap() {
         request
             .require_name(

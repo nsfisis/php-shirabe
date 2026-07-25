@@ -292,7 +292,7 @@ impl ConfigValidator {
             None,
             array_loader_validation_flags,
         );
-        let mut manifest_for_load = manifest.clone();
+        let mut manifest_for_load = manifest;
         if !manifest_for_load.contains_key("version") {
             manifest_for_load.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
         }

@@ -757,7 +757,7 @@ impl PoolBuilder {
                     if name_owned != package.get_name() {
                         format!("{} (via replace of {})", package.get_name(), name_owned)
                     } else {
-                        package.get_name().to_string()
+                        package.get_name()
                     }
                 },
                 &self.skipped_load[name],

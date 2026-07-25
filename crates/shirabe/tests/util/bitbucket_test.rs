@@ -573,7 +573,7 @@ fn test_authorize_oauth_without_available_git_config_token() {
         },
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let time = time();
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
@@ -590,7 +590,7 @@ fn test_authorize_oauth_with_available_git_config_token() {
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let time = time();
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();

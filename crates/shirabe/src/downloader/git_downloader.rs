@@ -426,13 +426,13 @@ impl GitDownloader {
         }
 
         let mut command1: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
-        command1.extend(force.clone());
+        command1.extend(force);
         command1.extend(vec![git_ref.clone(), "--".to_string()]);
         let command2 = vec![
             "git".to_string(),
             "reset".to_string(),
             "--hard".to_string(),
-            git_ref.clone(),
+            git_ref,
             "--".to_string(),
         ];
         {
@@ -827,7 +827,7 @@ impl VcsDownloader for GitDownloader {
                 io_interface::NORMAL,
             );
             self.inner.io.write_error3(
-                &format!("    Cloning to cache at {}", cache_path.clone()),
+                &format!("    Cloning to cache at {}", cache_path),
                 true,
                 io_interface::DEBUG,
             );
@@ -909,7 +909,7 @@ impl VcsDownloader for GitDownloader {
                         "git".to_string(),
                         "clone".to_string(),
                         "--no-checkout".to_string(),
-                        cache_path.clone(),
+                        cache_path,
                         path.clone(),
                     ];
                     base.extend(clone_flags);
@@ -1054,7 +1054,7 @@ impl VcsDownloader for GitDownloader {
             .unwrap_or(false);
         if has_cached {
             msg = format!("Checking out {} from cache", self.get_short_hash(&r#ref));
-            remote_url = cache_path.clone();
+            remote_url = cache_path;
         } else {
             msg = format!("Checking out {}", self.get_short_hash(&r#ref));
             remote_url = "%url%".to_string();
@@ -1092,7 +1092,7 @@ impl VcsDownloader for GitDownloader {
                     "set-url".to_string(),
                     "composer".to_string(),
                     "--".to_string(),
-                    remote_url.clone(),
+                    remote_url,
                 ],
                 vec![
                     "git".to_string(),

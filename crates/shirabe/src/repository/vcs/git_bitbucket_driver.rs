@@ -363,7 +363,7 @@ impl GitBitbucketDriver {
                                         self.owner.clone(),
                                         self.repository.clone(),
                                         hash,
-                                        label.clone(),
+                                        label,
                                     )),
                                 );
                             }

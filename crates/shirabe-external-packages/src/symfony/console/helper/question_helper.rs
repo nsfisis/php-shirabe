@@ -483,7 +483,7 @@ impl QuestionHelper {
 
                     if c.as_deref() == Some("\n") {
                         output.borrow().write(
-                            &[c.clone().unwrap_or_default()],
+                            &[c.unwrap_or_default()],
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );

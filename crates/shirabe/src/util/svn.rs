@@ -168,7 +168,7 @@ impl Svn {
 
         let error_output = self.process.borrow().get_error_output().to_string();
         let full_output = trim(
-            &implode("\n", &[output.clone().unwrap_or_default(), error_output]),
+            &implode("\n", &[output.unwrap_or_default(), error_output]),
             None,
         );
 

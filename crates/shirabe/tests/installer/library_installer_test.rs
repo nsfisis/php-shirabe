@@ -446,7 +446,7 @@ fn test_ensure_binaries_installed() {
     binary_installer.expect_remove_binaries().times(0);
     // PHP asserts installBinaries is called once with ($package, getInstallPath, false).
     let expected_package = package.clone();
-    let expected_install_path = expected_path.clone();
+    let expected_install_path = expected_path;
     binary_installer
         .expect_install_binaries()
         .times(1)
@@ -458,7 +458,7 @@ fn test_ensure_binaries_installed() {
         .returning(|_, _, _| ());
     library.__set_binary_installer(std::rc::Rc::new(std::cell::RefCell::new(binary_installer)));
 
-    library.ensure_binaries_presence(package.clone());
+    library.ensure_binaries_presence(package);
 
     tear_down(&mut setup);
 }

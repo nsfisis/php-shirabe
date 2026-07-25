@@ -98,7 +98,7 @@ impl VersionSelector {
         };
         let mut candidates = self.repository_set.borrow().find_packages(
             &strtolower(package_name),
-            constraint.clone(),
+            constraint,
             repo_set_flags,
         )?;
 
@@ -273,7 +273,7 @@ impl VersionSelector {
             }
         }
 
-        let version = package.get_version().to_string();
+        let version = package.get_version();
         if !package.is_dev() {
             return self.transform_version(
                 &version,
@@ -299,7 +299,7 @@ impl VersionSelector {
             }
         }
 
-        Ok(package.get_pretty_version().to_string())
+        Ok(package.get_pretty_version())
     }
 
     fn transform_version(

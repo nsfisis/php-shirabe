@@ -173,7 +173,7 @@ impl Installer {
             io,
             config,
             package: package.clone(),
-            fixed_root_package: package.clone(),
+            fixed_root_package: package,
             download_manager,
             repository_manager,
             locker,
@@ -1338,8 +1338,8 @@ impl Installer {
 
         let requires: IndexMap<String, AnyConstraint>;
         if for_update {
-            minimum_stability = self.package.get_minimum_stability().to_string();
-            stability_flags = self.package.get_stability_flags().clone();
+            minimum_stability = self.package.get_minimum_stability();
+            stability_flags = self.package.get_stability_flags();
 
             // Convert Link map merge into ConstraintInterface map for use later
             let mut req_links: IndexMap<String, Link> = IndexMap::new();
@@ -1392,8 +1392,7 @@ impl Installer {
                 constraint = filter
                     .filter_constraint(&req, constraint, false)
                     .unwrap_or_else(|_| {
-                        SimpleConstraint::new("=".to_string(), String::new().to_string(), None)
-                            .into()
+                        SimpleConstraint::new("=".to_string(), String::new(), None).into()
                     });
             }
             root_requires.insert(req, constraint);
@@ -1422,7 +1421,7 @@ impl Installer {
             &minimum_stability,
             stability_flags,
             root_aliases_input,
-            self.package.get_references().clone(),
+            self.package.get_references(),
             root_requires,
             self.temporary_constraints.clone(),
         );

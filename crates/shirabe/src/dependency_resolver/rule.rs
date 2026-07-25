@@ -146,7 +146,7 @@ impl Rule {
                 _ => None,
             },
             r if r == RULE_FIXED => match self.get_reason_data() {
-                ReasonData::Fixed { package } => Some(package.get_name().to_string()),
+                ReasonData::Fixed { package } => Some(package.get_name()),
                 _ => None,
             },
             r if r == RULE_PACKAGE_REQUIRES => match self.get_reason_data() {
@@ -216,12 +216,7 @@ impl Rule {
                             return true;
                         }
                         if !link.get_constraint().matches(
-                            &SimpleConstraint::new(
-                                "=".to_string(),
-                                p.get_version().to_string(),
-                                None,
-                            )
-                            .into(),
+                            &SimpleConstraint::new("=".to_string(), p.get_version(), None).into(),
                         ) {
                             return true;
                         }
@@ -256,12 +251,7 @@ impl Rule {
                             return true;
                         }
                         if !constraint.matches(
-                            &SimpleConstraint::new(
-                                "=".to_string(),
-                                p.get_version().to_string(),
-                                None,
-                            )
-                            .into(),
+                            &SimpleConstraint::new("=".to_string(), p.get_version(), None).into(),
                         ) {
                             return true;
                         }
@@ -475,7 +465,7 @@ impl Rule {
                     requires.push(pool.literal_to_package(*literal));
                 }
 
-                let text = link.get_pretty_string(source_package.clone());
+                let text = link.get_pretty_string(source_package);
                 if !requires.is_empty() {
                     format!(
                         "{} -> satisfiable by {}.",

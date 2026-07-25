@@ -304,10 +304,7 @@ impl InputDefinition {
             let negated_name = format!("no-{}", option.get_name());
             if self.options.contains_key(&negated_name) {
                 return Err(LogicException(shirabe_php_shim::LogicException {
-                    message: format!(
-                        "An option named \"{}\" already exists.",
-                        negated_name.clone(),
-                    ),
+                    message: format!("An option named \"{}\" already exists.", negated_name),
                     code: 0,
                 })
                 .into());

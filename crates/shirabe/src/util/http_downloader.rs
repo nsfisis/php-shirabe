@@ -126,13 +126,7 @@ impl HttpDownloader {
         };
 
         let rfs = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            RemoteFilesystem::new(
-                io.clone(),
-                config.clone(),
-                options.clone(),
-                disable_tls,
-                None,
-            ),
+            RemoteFilesystem::new(io.clone(), config.clone(), options, disable_tls, None),
         )));
 
         let mut max_jobs: i64 = 12;

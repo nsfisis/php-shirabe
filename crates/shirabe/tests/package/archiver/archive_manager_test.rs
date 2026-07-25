@@ -55,9 +55,9 @@ impl TestCase {
             "git",
             std::rc::Rc::new(std::cell::RefCell::new(GitDownloader::new(
                 io.clone(),
-                config.clone(),
-                Some(process.clone()),
-                Some(fs.clone()),
+                config,
+                Some(process),
+                Some(fs),
             ))),
         );
         let dm = std::rc::Rc::new(std::cell::RefCell::new(dm));

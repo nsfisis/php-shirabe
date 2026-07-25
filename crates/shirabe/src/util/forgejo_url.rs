@@ -65,7 +65,7 @@ impl ForgejoUrl {
         Some(Self::new(
             m[3].clone(),
             m[4].clone(),
-            origin_url.clone(),
+            origin_url,
             format!("https://{}/repos/{}/{}", api_base, m[3], m[4]),
         ))
     }

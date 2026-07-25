@@ -49,9 +49,9 @@ impl HomeCommand {
         let mut url: Option<String> = support
             .get("source")
             .cloned()
-            .or_else(|| package.get_source_url().map(|s| s.to_string()));
+            .or_else(|| package.get_source_url());
         if url.as_deref().is_none_or(|s| s.is_empty()) || show_homepage {
-            url = package.get_homepage().map(|s| s.to_string());
+            url = package.get_homepage();
         }
 
         let url = match url {
@@ -198,7 +198,7 @@ impl Command for HomeCommand {
             io.write_error("No package specified, opening homepage for the root package");
             let composer_rc = self.require_composer(None, None)?;
             let composer_ref = crate::composer::composer_full(&composer_rc);
-            vec![composer_ref.get_package().get_name().to_string()]
+            vec![composer_ref.get_package().get_name()]
         } else {
             packages
         };

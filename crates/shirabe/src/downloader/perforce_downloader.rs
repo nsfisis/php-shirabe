@@ -116,7 +116,7 @@ impl VcsDownloader for PerforceDownloader {
         path: &str,
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let source_ref = package.get_source_reference().map(|s| s.to_string());
+        let source_ref = package.get_source_reference();
         let label = self.get_label_from_source_reference(source_ref.clone().unwrap_or_default());
 
         self.inner.io.write_error(&format!(
@@ -127,7 +127,7 @@ impl VcsDownloader for PerforceDownloader {
         {
             let mut perforce = self.perforce.borrow_mut();
             let perforce = perforce.as_mut().unwrap();
-            perforce.set_stream(&source_ref.clone().unwrap_or_default());
+            perforce.set_stream(&source_ref.unwrap_or_default());
             perforce.p4_login();
             perforce.write_p4_client_spec();
             perforce.connect_client();

@@ -151,7 +151,7 @@ impl DownloadManager {
                     "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
                     shirabe_php_shim::get_class_obj(&*downloader.borrow()),
                     downloader_installation_source,
-                    installation_source.clone().unwrap_or_default(),
+                    installation_source.unwrap_or_default(),
                     package,
                 ),
                 code: 0,
@@ -521,8 +521,7 @@ impl DownloadManager {
 
         // reverse sources in case dist is the preferred source for this package
         if !self.prefer_source
-            && (self.prefer_dist
-                || "dist" == self.resolve_package_install_preference(package.clone()))
+            && (self.prefer_dist || "dist" == self.resolve_package_install_preference(package))
         {
             sources = array_reverse(&sources, false);
         }

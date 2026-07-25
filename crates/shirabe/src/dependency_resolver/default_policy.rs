@@ -99,7 +99,7 @@ impl DefaultPolicy {
 
     pub(crate) fn prune_to_best_version(&self, pool: &Pool, literals: Vec<i64>) -> Vec<i64> {
         if let Some(ref preferred_versions) = self.preferred_versions {
-            let name = pool.literal_to_package(literals[0]).get_name().to_string();
+            let name = pool.literal_to_package(literals[0]).get_name();
             if let Some(preferred_version) = preferred_versions.get(&name) {
                 let best_literals: Vec<i64> = literals
                     .iter()
@@ -174,8 +174,8 @@ impl DefaultPolicy {
 impl PolicyInterface for DefaultPolicy {
     fn version_compare(&self, a: BasePackageHandle, b: BasePackageHandle, operator: &str) -> bool {
         if self.prefer_stable {
-            let stab_a = a.get_stability().to_string();
-            let stab_b = b.get_stability().to_string();
+            let stab_a = a.get_stability();
+            let stab_b = b.get_stability();
             if stab_a != stab_b {
                 let (mut stab_a, mut stab_b) = (stab_a, stab_b);
                 if self.prefer_lowest
@@ -198,17 +198,15 @@ impl PolicyInterface for DefaultPolicy {
         if (a.is_dev() && a.get_version().starts_with("dev-"))
             || (b.is_dev() && b.get_version().starts_with("dev-"))
         {
-            let constraint =
-                SimpleConstraint::new(operator.to_string(), b.get_version().to_string(), None);
-            let version =
-                SimpleConstraint::new("==".to_string(), a.get_version().to_string(), None);
+            let constraint = SimpleConstraint::new(operator.to_string(), b.get_version(), None);
+            let version = SimpleConstraint::new("==".to_string(), a.get_version(), None);
             return constraint.match_specific(&version, true);
         }
 
         CompilingMatcher::r#match(
-            &SimpleConstraint::new(operator.to_string(), b.get_version().to_string(), None).into(),
+            &SimpleConstraint::new(operator.to_string(), b.get_version(), None).into(),
             SimpleConstraint::OP_EQ,
-            a.get_version().to_string(),
+            a.get_version(),
         )
     }
 

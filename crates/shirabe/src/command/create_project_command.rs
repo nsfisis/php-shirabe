@@ -336,7 +336,7 @@ impl CreateProjectCommand {
                 &config,
                 package_name,
                 platform_requirement_filter.clone(),
-                directory.clone(),
+                directory,
                 package_version,
                 stability,
                 prefer_source,
@@ -948,7 +948,7 @@ impl CreateProjectCommand {
         let _ = mkdir(&directory, 0o777, true);
         let mut signal_handler: Option<SignalHandler> = None;
         if let Some(real_dir) = realpath(&directory) {
-            let real_dir_clone = real_dir.clone();
+            let real_dir_clone = real_dir;
             let io_for_signal = io.clone();
             signal_handler = Some(SignalHandler::create(
                 vec![
@@ -994,7 +994,7 @@ impl CreateProjectCommand {
         dm.borrow_mut().set_prefer_source(prefer_source);
         dm.borrow_mut().set_prefer_dist(prefer_dist);
 
-        let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs.clone());
+        let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs);
         let installation_manager = composer.get_installation_manager().clone();
         let mut im = installation_manager.borrow_mut();
         im.set_output_progress(!no_progress);

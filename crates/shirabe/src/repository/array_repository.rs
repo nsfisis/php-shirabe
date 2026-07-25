@@ -59,7 +59,7 @@ impl ArrayRepository {
             FindPackageConstraint::Constraint(c) => c,
             FindPackageConstraint::String(s) => {
                 let version_parser = VersionParser::new();
-                version_parser.parse_constraints(&s).unwrap().clone()
+                version_parser.parse_constraints(&s).unwrap()
             }
         };
 
@@ -93,7 +93,7 @@ impl ArrayRepository {
             Some(FindPackageConstraint::Constraint(c)) => Some(c),
             Some(FindPackageConstraint::String(s)) => {
                 let version_parser = VersionParser::new();
-                Some(version_parser.parse_constraints(&s).unwrap().clone())
+                Some(version_parser.parse_constraints(&s).unwrap())
             }
         };
 
@@ -144,11 +144,7 @@ impl ArrayRepository {
         let aliased_package: Option<PackageHandle> =
             package.as_alias().map(|alias| alias.get_alias_of());
 
-        self.packages
-            .borrow_mut()
-            .as_mut()
-            .unwrap()
-            .push(package.clone());
+        self.packages.borrow_mut().as_mut().unwrap().push(package);
 
         if let Some(aliased_package) = aliased_package {
             // PHP: if ($aliasedPackage->getRepository() === null) $this->addPackage($aliasedPackage);

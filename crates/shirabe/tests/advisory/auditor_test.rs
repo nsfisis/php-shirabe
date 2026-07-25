@@ -988,7 +988,7 @@ fn test_audit_with_ignore_unreachable() {
             .audit(
                 &io,
                 &repo_set,
-                packages.clone(),
+                packages,
                 Auditor::FORMAT_JSON,
                 false,
                 IndexMap::new(),

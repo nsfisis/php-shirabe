@@ -69,8 +69,8 @@ impl StatusCommand {
             });
         let mut guesser = VersionGuesser::new(
             composer.get_config(),
-            process_executor.clone(),
-            parser.clone(),
+            process_executor,
+            parser,
             Some(io.clone()),
         );
         let dumper = ArrayDumper::new();
@@ -117,8 +117,8 @@ impl StatusCommand {
                     .is_some()
             {
                 let previous_ref = match package.get_installation_source().as_deref() {
-                    Some("source") => package.get_source_reference().map(|s| s.to_string()),
-                    Some("dist") => package.get_dist_reference().map(|s| s.to_string()),
+                    Some("source") => package.get_source_reference(),
+                    Some("dist") => package.get_dist_reference(),
                     _ => None,
                 };
 

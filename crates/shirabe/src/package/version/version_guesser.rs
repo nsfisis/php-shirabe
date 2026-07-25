@@ -414,7 +414,7 @@ impl VersionGuesser {
 
             if VersionParser::DEFAULT_BRANCH_ALIAS == version {
                 return Ok(Some(VersionData {
-                    version: Some(version.clone()),
+                    version: Some(version),
                     commit: None,
                     pretty_version: Some(format!("dev-{}", branch)),
                     feature_version: None,

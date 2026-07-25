@@ -199,7 +199,7 @@ impl LockTransaction {
             return present_package.clone();
         }
 
-        package.clone()
+        package
     }
 
     pub fn get_aliases(

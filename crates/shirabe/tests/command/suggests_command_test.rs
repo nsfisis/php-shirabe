@@ -221,7 +221,7 @@ fn test_suggest() {
     let by_suggestion = ("--by-suggestion", t.clone());
     let no_dev = ("--no-dev", t.clone());
     let all = ("--all", t.clone());
-    let list = ("--list", t.clone());
+    let list = ("--list", t);
 
     // 'with lockfile, show suggested' / 'without lockfile, show suggested'
     let basic = "vendor1/package1 suggests:

@@ -66,8 +66,7 @@ impl PluginManager {
             .borrow()
             .get_config()
             .borrow()
-            .get("allow-plugins")
-            .clone();
+            .get("allow-plugins");
         let locker = composer_rc.borrow().get_locker().clone();
         let mut locker = locker.borrow_mut();
         let allow_plugin_rules =
@@ -81,7 +80,6 @@ impl PluginManager {
                         .get_config()
                         .borrow_mut()
                         .get("allow-plugins")
-                        .clone()
                 })
                 .unwrap_or(PhpMixed::Bool(false)),
             None,
@@ -232,8 +230,7 @@ impl PluginManager {
             let current_plugin_api_constraint = SimpleConstraint::new(
                 "==".to_string(),
                 self.version_parser
-                    .normalize(&current_plugin_api_version, None)?
-                    .to_string(),
+                    .normalize(&current_plugin_api_version, None)?,
                 None,
             );
 
@@ -859,8 +856,7 @@ impl PluginManager {
                 .upgrade()
                 .expect("PluginManager must not outlive Composer")
                 .borrow()
-                .get_config()
-                .clone();
+                .get_config();
 
             self.io.write_error(&format!("<warning>{}{} contains a Composer plugin which is currently not in your allow-plugins config. See https://getcomposer.org/allow-plugins</warning>",
                 package,
@@ -893,8 +889,7 @@ impl PluginManager {
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == "y" || answer_str == "n" {
-                            let allow_plugins_value =
-                                config.borrow_mut().get("allow-plugins").clone();
+                            let allow_plugins_value = config.borrow_mut().get("allow-plugins");
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
                                 allow_plugins.insert(package.to_string(), PhpMixed::Bool(allow));

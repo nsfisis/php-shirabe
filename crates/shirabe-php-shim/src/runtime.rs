@@ -515,7 +515,7 @@ pub fn globals_set(_name: &str, _value: PhpMixed) {
 
 pub fn clone<T: Clone>(_value: T) -> T {
     // PHP's `clone` makes a (shallow) copy of an object; Rust's Clone is the closest equivalent.
-    _value.clone()
+    _value
 }
 
 pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {

@@ -120,7 +120,7 @@ impl InstalledRepository {
         let mut root_package: Option<BasePackageHandle> = None;
         for package in self.inner.get_packages()? {
             if package.as_root().is_some() {
-                root_package = Some(package.clone());
+                root_package = Some(package);
                 break;
             }
         }

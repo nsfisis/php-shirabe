@@ -33,7 +33,7 @@ impl InstallerInterface for MetapackageInstaller {
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
-        repo.has_package(package.clone())
+        repo.has_package(package)
     }
 
     async fn download(
@@ -103,7 +103,7 @@ impl InstallerInterface for MetapackageInstaller {
         );
 
         let mut repo = repo.borrow_mut();
-        repo.remove_package(initial.clone());
+        repo.remove_package(initial);
         repo.add_package(PackageInterfaceHandle::dup(&target));
 
         Ok(None)
@@ -128,7 +128,7 @@ impl InstallerInterface for MetapackageInstaller {
             io_interface::NORMAL,
         );
 
-        repo.borrow_mut().remove_package(package.clone());
+        repo.borrow_mut().remove_package(package);
 
         Ok(None)
     }

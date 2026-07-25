@@ -44,7 +44,7 @@ impl TlsHelper {
             if let Some(matcher) = matcher
                 && matcher(&hostname)
             {
-                *cn = Some(names.cn.clone());
+                *cn = Some(names.cn);
 
                 return true;
             }

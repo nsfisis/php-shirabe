@@ -48,7 +48,7 @@ fn test_default_values_are_as_expected() {
         .with("disable-tls", PhpMixed::Bool(true))
         .build_shared();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     Factory::create_http_downloader(io, &config, IndexMap::new()).unwrap();
 }
 

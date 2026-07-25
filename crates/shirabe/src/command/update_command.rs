@@ -206,12 +206,12 @@ impl Command for UpdateCommand {
         let root_package = composer.get_package();
         root_package.set_references(RootPackageLoader::extract_references(
             &reqs,
-            root_package.get_references().clone(),
+            root_package.get_references(),
         ));
         root_package.set_stability_flags(RootPackageLoader::extract_stability_flags(
             &reqs,
             &root_package.get_minimum_stability(),
-            root_package.get_stability_flags().clone(),
+            root_package.get_stability_flags(),
         ));
 
         let parser = VersionParser::new();
@@ -478,7 +478,7 @@ impl Command for UpdateCommand {
             )
             .set_optimize_autoloader(optimize)
             .set_class_map_authoritative(authoritative)
-            .set_apcu_autoloader(apcu, apcu_prefix.clone())
+            .set_apcu_autoloader(apcu, apcu_prefix)
             .set_update(true)
             .set_install(
                 !input
@@ -766,9 +766,9 @@ impl UpdateCommand {
             .collect();
         let mut repository_set = RepositorySet::new(
             &composer.get_package().get_minimum_stability(),
-            composer.get_package().get_stability_flags().clone(),
+            composer.get_package().get_stability_flags(),
             root_aliases,
-            composer.get_package().get_references().clone(),
+            composer.get_package().get_references(),
             IndexMap::new(),
             IndexMap::new(),
         );

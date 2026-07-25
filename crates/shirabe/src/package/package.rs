@@ -71,7 +71,7 @@ pub struct Package {
 impl Package {
     /// Creates a new in memory package.
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
-        let stability = VersionParser::parse_stability(&version).to_string();
+        let stability = VersionParser::parse_stability(&version);
         let dev = stability == "dev";
         Self {
             id: -1,
@@ -459,7 +459,7 @@ impl Package {
         self.version = version;
         self.pretty_version = pretty_version;
 
-        self.stability = VersionParser::parse_stability(&self.version).to_string();
+        self.stability = VersionParser::parse_stability(&self.version);
         self.dev = self.stability == "dev";
     }
 

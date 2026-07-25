@@ -284,7 +284,7 @@ impl RemoteFilesystem {
                 } else {
                     "Reading "
                 },
-                Url::sanitize(orig_file_url.clone()),
+                Url::sanitize(orig_file_url),
                 using_proxy
             ),
             true,

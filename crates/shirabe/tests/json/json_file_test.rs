@@ -402,7 +402,7 @@ fn test_custom_schema_validation_lax() {
     )
     .unwrap();
 
-    let json = JsonFile::new(file.clone(), None, None).unwrap();
+    let json = JsonFile::new(file, None, None).unwrap();
 
     json.validate_schema(JsonFile::LAX_SCHEMA, Some(&schema))
         .unwrap();
@@ -422,7 +422,7 @@ fn test_custom_schema_validation_strict() {
     )
     .unwrap();
 
-    let json = JsonFile::new(file.clone(), None, None).unwrap();
+    let json = JsonFile::new(file, None, None).unwrap();
 
     json.validate_schema(JsonFile::STRICT_SCHEMA, Some(&schema))
         .unwrap();

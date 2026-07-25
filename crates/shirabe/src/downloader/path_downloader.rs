@@ -64,12 +64,12 @@ impl PathDownloader {
         let mut guesser = VersionGuesser::new(
             self.inner.config.clone(),
             self.inner.process.clone(),
-            parser.clone(),
+            parser,
             Some(self.inner.io.borrow().clone()),
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package.clone());
+        let package_config = dumper.dump(package);
         let package_version = guesser.guess_version(&package_config, &path);
         if let Ok(Some(version)) = package_version {
             return version.commit;
@@ -332,7 +332,7 @@ impl DownloaderInterface for PathDownloader {
                 self.inner.io.borrow().write_error3(
                     &format!(
                         "  - {}{}",
-                        InstallOperation::format(package.clone(), false),
+                        InstallOperation::format(package, false),
                         appendix
                     ),
                     true,

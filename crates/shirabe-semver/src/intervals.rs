@@ -315,8 +315,8 @@ impl Intervals {
         if constraint.is_match_all() {
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
-                    Interval::from_zero().clone(),
-                    Interval::until_positive_infinity().clone(),
+                    Interval::from_zero(),
+                    Interval::until_positive_infinity(),
                 )],
                 branches: Interval::any_dev(),
             });
@@ -515,8 +515,8 @@ impl Intervals {
             // really defined for branches
             if op == "!=" {
                 intervals.push(Interval::new(
-                    Interval::from_zero().clone(),
-                    Interval::until_positive_infinity().clone(),
+                    Interval::from_zero(),
+                    Interval::until_positive_infinity(),
                 ));
                 branches = DevConstraintSet {
                     names: vec![constraint.get_version().to_string()],
@@ -537,7 +537,7 @@ impl Intervals {
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
                     constraint.clone(),
-                    Interval::until_positive_infinity().clone(),
+                    Interval::until_positive_infinity(),
                 )],
                 branches: Interval::no_dev(),
             });
@@ -545,10 +545,7 @@ impl Intervals {
         if op.starts_with('<') {
             // < & <=
             return Ok(IntervalCollection {
-                numeric: vec![Interval::new(
-                    Interval::from_zero().clone(),
-                    constraint.clone(),
-                )],
+                numeric: vec![Interval::new(Interval::from_zero(), constraint.clone())],
                 branches: Interval::no_dev(),
             });
         }
@@ -557,7 +554,7 @@ impl Intervals {
             return Ok(IntervalCollection {
                 numeric: vec![
                     Interval::new(
-                        Interval::from_zero().clone(),
+                        Interval::from_zero(),
                         SimpleConstraint::new(
                             "<".to_string(),
                             constraint.get_version().to_string(),
@@ -570,7 +567,7 @@ impl Intervals {
                             constraint.get_version().to_string(),
                             None,
                         ),
-                        Interval::until_positive_infinity().clone(),
+                        Interval::until_positive_infinity(),
                     ),
                 ],
                 branches: Interval::any_dev(),

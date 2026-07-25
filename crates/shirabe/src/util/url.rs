@@ -103,11 +103,7 @@ impl Url {
                 &format!("$1/{}", r#ref),
                 &url,
             );
-        } else if in_array(
-            PhpMixed::String(host.clone()),
-            &config.get("gitlab-domains"),
-            true,
-        ) {
+        } else if in_array(PhpMixed::String(host), &config.get("gitlab-domains"), true) {
             url = Preg::replace(
                 php_regex!(
                     r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i"

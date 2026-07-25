@@ -57,7 +57,7 @@ impl ArchiveManager {
         package: CompletePackageInterfaceHandle,
     ) -> anyhow::Result<IndexMap<String, String>> {
         let base_name = match package.get_archive_name() {
-            Some(name) => name.to_string(),
+            Some(name) => name,
             None => Preg::replace(php_regex!("#[^a-z0-9-_]#i"), "-", &package.get_name()),
         };
 
@@ -69,20 +69,14 @@ impl ArchiveManager {
             if Preg::is_match(php_regex!("{^[a-f0-9]{40}$}"), dist_ref) {
                 parts.insert("dist_reference".to_string(), dist_ref.to_string());
                 if let Some(dist_type) = package.get_dist_type() {
-                    parts.insert("dist_type".to_string(), dist_type.to_string());
+                    parts.insert("dist_type".to_string(), dist_type);
                 }
             } else {
-                parts.insert(
-                    "version".to_string(),
-                    package.get_pretty_version().to_string(),
-                );
+                parts.insert("version".to_string(), package.get_pretty_version());
                 parts.insert("dist_reference".to_string(), dist_ref.to_string());
             }
         } else {
-            parts.insert(
-                "version".to_string(),
-                package.get_pretty_version().to_string(),
-            );
+            parts.insert("version".to_string(), package.get_pretty_version());
         }
 
         if let Some(source_reference) = package.get_source_reference() {
@@ -128,10 +122,7 @@ impl ArchiveManager {
 
         let mut usable_archiver_idx: Option<usize> = None;
         for (i, archiver) in self.archivers.iter().enumerate() {
-            if archiver.supports(
-                format.clone(),
-                package.get_source_type().map(|s| s.to_string()),
-            ) {
+            if archiver.supports(format.clone(), package.get_source_type()) {
                 usable_archiver_idx = Some(i);
                 break;
             }

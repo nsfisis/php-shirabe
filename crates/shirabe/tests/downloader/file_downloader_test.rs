@@ -348,7 +348,7 @@ fn test_downgrade_shows_appropriate_message() {
         },
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let downloader = FileDownloader::new(
         io,
         config,

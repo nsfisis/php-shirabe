@@ -299,7 +299,7 @@ impl ArchiveCommand {
                     None,
                 )?;
                 let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-                    http_downloader.clone(),
+                    http_downloader,
                     Some(process),
                 )));
                 owned_archive_manager =
@@ -365,7 +365,7 @@ impl ArchiveCommand {
             let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![local_repo];
             repos.extend(repository_manager.get_repositories().iter().cloned());
             repo = CompositeRepository::new(repos);
-            min_stability = composer.get_package().get_minimum_stability().to_string();
+            min_stability = composer.get_package().get_minimum_stability();
         } else {
             let default_repos = RepositoryFactory::default_repos_with_default_manager(io.clone())?;
             let repo_names: Vec<String> = default_repos.keys().cloned().collect();
@@ -410,7 +410,7 @@ impl ArchiveCommand {
         let parser = VersionParser::new();
         let constraint: Option<shirabe_semver::constraint::AnyConstraint> = match version.as_deref()
         {
-            Some(v) => Some(parser.parse_constraints(v)?.clone()),
+            Some(v) => Some(parser.parse_constraints(v)?),
             None => None,
         };
         let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0)?;

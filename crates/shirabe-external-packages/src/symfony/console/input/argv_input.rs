@@ -148,7 +148,7 @@ impl ArgvInput {
             if !self.inner.definition.has_shortcut(&name_i) {
                 let encoding = shirabe_php_shim::mb_detect_encoding(name, None, true);
                 let bad = match encoding {
-                    None => name_i.clone(),
+                    None => name_i,
                     Some(encoding) => {
                         shirabe_php_shim::mb_substr(name, i, Some(1), Some(&encoding))
                     }
@@ -269,7 +269,7 @@ impl ArgvInput {
             {
                 format!(
                     "No arguments expected for \"{}\" command, got \"{}\".",
-                    symfony_command_name.clone().unwrap(),
+                    symfony_command_name.unwrap(),
                     token,
                 )
             } else {

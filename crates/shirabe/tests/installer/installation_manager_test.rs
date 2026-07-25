@@ -358,7 +358,7 @@ fn test_install() {
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
     manager.add_installer(Box::new(installer));
 
-    let operation = InstallOperation::new(package.clone());
+    let operation = InstallOperation::new(package);
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     run(manager.install(
@@ -393,7 +393,7 @@ fn test_update_with_equal_types() {
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
     manager.add_installer(Box::new(installer));
 
-    let operation = UpdateOperation::new(initial.clone(), target.clone());
+    let operation = UpdateOperation::new(initial, target);
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     run(manager.update(
@@ -438,7 +438,7 @@ fn test_update_with_not_equal_types() {
     manager.add_installer(Box::new(lib_installer));
     manager.add_installer(Box::new(bundle_installer));
 
-    let operation = UpdateOperation::new(initial.clone(), target.clone());
+    let operation = UpdateOperation::new(initial, target);
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     run(manager.update(
@@ -469,7 +469,7 @@ fn test_uninstall() {
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
     manager.add_installer(Box::new(installer));
 
-    let operation = UninstallOperation::new(package.clone());
+    let operation = UninstallOperation::new(package);
 
     let mut repository = InstalledArrayRepository::new().unwrap();
     run(manager.uninstall(

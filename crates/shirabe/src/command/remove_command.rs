@@ -268,10 +268,7 @@ impl Command for RemoveCommand {
                 }
             }
 
-            let unused: Vec<String> = locked_packages
-                .iter()
-                .map(|p| p.get_name().to_string())
-                .collect();
+            let unused: Vec<String> = locked_packages.iter().map(|p| p.get_name()).collect();
             packages.extend(unused);
 
             if packages.is_empty() {
@@ -485,11 +482,8 @@ impl Command for RemoveCommand {
         if dry_run {
             let root_package = composer.get_package();
             let mut links: IndexMap<String, IndexMap<String, _>> = IndexMap::new();
-            links.insert("require".to_string(), root_package.get_requires().clone());
-            links.insert(
-                "require-dev".to_string(),
-                root_package.get_dev_requires().clone(),
-            );
+            links.insert("require".to_string(), root_package.get_requires());
+            links.insert("require-dev".to_string(), root_package.get_dev_requires());
             for (link_type, names) in &to_remove {
                 for name in names {
                     if let Some(section) = links.get_mut(link_type.as_str()) {

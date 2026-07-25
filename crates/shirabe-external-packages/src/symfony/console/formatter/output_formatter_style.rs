@@ -25,7 +25,7 @@ impl OutputFormatterStyle {
             .filter(|s| !s.is_empty())
             .unwrap_or("")
             .to_string();
-        let color = Color::new(&foreground, &background, &options.clone()).unwrap();
+        let color = Color::new(&foreground, &background, &options).unwrap();
         Self {
             color,
             foreground,

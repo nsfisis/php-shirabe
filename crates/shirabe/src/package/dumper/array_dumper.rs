@@ -32,39 +32,30 @@ impl ArrayDumper {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert(
             "name".to_string(),
-            PhpMixed::String(package.get_pretty_name().to_string()),
+            PhpMixed::String(package.get_pretty_name()),
         );
         data.insert(
             "version".to_string(),
-            PhpMixed::String(package.get_pretty_version().to_string()),
+            PhpMixed::String(package.get_pretty_version()),
         );
         data.insert(
             "version_normalized".to_string(),
-            PhpMixed::String(package.get_version().to_string()),
+            PhpMixed::String(package.get_version()),
         );
 
         if let Some(target_dir) = package.get_target_dir() {
-            data.insert(
-                "target-dir".to_string(),
-                PhpMixed::String(target_dir.to_string()),
-            );
+            data.insert("target-dir".to_string(), PhpMixed::String(target_dir));
         }
 
         if let Some(source_type) = package.get_source_type() {
             let mut source = IndexMap::new();
-            source.insert(
-                "type".to_string(),
-                PhpMixed::String(source_type.to_string()),
-            );
+            source.insert("type".to_string(), PhpMixed::String(source_type));
             source.insert(
                 "url".to_string(),
                 PhpMixed::String(package.get_source_url().unwrap_or_default()),
             );
             if let Some(reference) = package.get_source_reference() {
-                source.insert(
-                    "reference".to_string(),
-                    PhpMixed::String(reference.to_string()),
-                );
+                source.insert("reference".to_string(), PhpMixed::String(reference));
             }
             if let Some(mirrors) = package.get_source_mirrors()
                 && !mirrors.is_empty()
@@ -79,19 +70,16 @@ impl ArrayDumper {
 
         if let Some(dist_type) = package.get_dist_type() {
             let mut dist: IndexMap<String, PhpMixed> = IndexMap::new();
-            dist.insert("type".to_string(), PhpMixed::String(dist_type.to_string()));
+            dist.insert("type".to_string(), PhpMixed::String(dist_type));
             dist.insert(
                 "url".to_string(),
                 PhpMixed::String(package.get_dist_url().unwrap_or_default()),
             );
             if let Some(reference) = package.get_dist_reference() {
-                dist.insert(
-                    "reference".to_string(),
-                    PhpMixed::String(reference.to_string()),
-                );
+                dist.insert("reference".to_string(), PhpMixed::String(reference));
             }
             if let Some(shasum) = package.get_dist_sha1_checksum() {
-                dist.insert("shasum".to_string(), PhpMixed::String(shasum.to_string()));
+                dist.insert("shasum".to_string(), PhpMixed::String(shasum));
             }
             if let Some(mirrors) = package.get_dist_mirrors()
                 && !mirrors.is_empty()
@@ -122,7 +110,7 @@ impl ArrayDumper {
 
         let suggests = package.get_suggests();
         if !suggests.is_empty() {
-            let mut sorted_suggests = suggests.clone();
+            let mut sorted_suggests = suggests;
             sorted_suggests.sort_keys();
             data.insert(
                 "suggest".to_string(),
@@ -156,7 +144,7 @@ impl ArrayDumper {
         }
         let pkg_type = package.get_type();
         if !pkg_type.is_empty() {
-            data.insert("type".to_string(), PhpMixed::String(pkg_type.to_string()));
+            data.insert("type".to_string(), PhpMixed::String(pkg_type));
         }
         let extra = package.get_extra();
         if !extra.is_empty() {
@@ -168,7 +156,7 @@ impl ArrayDumper {
         if let Some(installation_source) = package.get_installation_source() {
             data.insert(
                 "installation-source".to_string(),
-                PhpMixed::String(installation_source.to_string()),
+                PhpMixed::String(installation_source),
             );
         }
         let autoload = package.get_autoload();
@@ -188,7 +176,7 @@ impl ArrayDumper {
         if let Some(notification_url) = package.get_notification_url() {
             data.insert(
                 "notification-url".to_string(),
-                PhpMixed::String(notification_url.to_string()),
+                PhpMixed::String(notification_url),
             );
         }
         let include_paths = package.get_include_paths();
@@ -217,10 +205,7 @@ impl ArrayDumper {
                     .entry("archive".to_string())
                     .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
                 if let PhpMixed::Array(archive) = entry {
-                    archive.insert(
-                        "name".to_string(),
-                        PhpMixed::String(archive_name.to_string()),
-                    );
+                    archive.insert("name".to_string(), PhpMixed::String(archive_name));
                 }
             }
             let archive_excludes = complete_pkg.get_archive_excludes();
@@ -282,16 +267,10 @@ impl ArrayDumper {
                 );
             }
             if let Some(description) = complete_pkg.get_description() {
-                data.insert(
-                    "description".to_string(),
-                    PhpMixed::String(description.to_string()),
-                );
+                data.insert("description".to_string(), PhpMixed::String(description));
             }
             if let Some(homepage) = complete_pkg.get_homepage() {
-                data.insert(
-                    "homepage".to_string(),
-                    PhpMixed::String(homepage.to_string()),
-                );
+                data.insert("homepage".to_string(), PhpMixed::String(homepage));
             }
             let mut keywords = complete_pkg.get_keywords();
             if !keywords.is_empty() {
@@ -336,7 +315,7 @@ impl ArrayDumper {
             if complete_pkg.is_abandoned() {
                 let abandoned_value = complete_pkg
                     .get_replacement_package()
-                    .map(|r| PhpMixed::String(r.to_string()))
+                    .map(PhpMixed::String)
                     .unwrap_or(PhpMixed::Bool(true));
                 data.insert("abandoned".to_string(), abandoned_value);
             }
@@ -347,7 +326,7 @@ impl ArrayDumper {
             if !minimum_stability.is_empty() {
                 data.insert(
                     "minimum-stability".to_string(),
-                    PhpMixed::String(minimum_stability.to_string()),
+                    PhpMixed::String(minimum_stability),
                 );
             }
         }

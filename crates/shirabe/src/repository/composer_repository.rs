@@ -2807,10 +2807,7 @@ impl ComposerRepository {
                         .collect();
                 }
 
-                let mut response = self
-                    .http_downloader
-                    .borrow_mut()
-                    .get(&filename, options.clone())?;
+                let mut response = self.http_downloader.borrow_mut().get(&filename, options)?;
                 let mut json = response.get_body().unwrap_or("").to_string();
                 if let Some(sha256_val) = sha256
                     && sha256_val != hash("sha256", &json)
@@ -3431,7 +3428,7 @@ impl RepositoryInterface for ComposerRepository {
         let name = strtolower(name);
         let constraint: AnyConstraint = match constraint {
             crate::repository::FindPackageConstraint::String(s) => {
-                self.version_parser.parse_constraints(&s)?.clone()
+                self.version_parser.parse_constraints(&s)?
             }
             crate::repository::FindPackageConstraint::Constraint(c) => c,
         };
@@ -3505,7 +3502,7 @@ impl RepositoryInterface for ComposerRepository {
         let constraint: Option<AnyConstraint> = match constraint {
             None => None,
             Some(crate::repository::FindPackageConstraint::String(s)) => {
-                Some(self.version_parser.parse_constraints(&s)?.clone())
+                Some(self.version_parser.parse_constraints(&s)?)
             }
             Some(crate::repository::FindPackageConstraint::Constraint(c)) => Some(c),
         };

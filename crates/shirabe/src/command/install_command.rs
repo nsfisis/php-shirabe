@@ -236,7 +236,7 @@ impl Command for InstallCommand {
             )
             .set_optimize_autoloader(optimize)
             .set_class_map_authoritative(authoritative)
-            .set_apcu_autoloader(apcu, apcu_prefix.clone())
+            .set_apcu_autoloader(apcu, apcu_prefix)
             .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?)
             .set_audit_config(
                 self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,

@@ -45,7 +45,7 @@ impl ChoiceQuestion {
         this.inner.set_validator(Some(validator));
         // setAutocompleterValues never throws for an array argument.
         this.inner
-            .set_autocompleter_values(Some(PhpMixed::Array(choices.clone())))
+            .set_autocompleter_values(Some(PhpMixed::Array(choices)))
             .expect("autocompleter cannot be set on a hidden question during construction");
 
         Ok(this)
@@ -145,7 +145,7 @@ impl ChoiceQuestion {
                     .map(PhpMixed::String)
                     .collect()
             } else {
-                vec![selected.clone()]
+                vec![selected]
             };
 
             let mut selected_choices = selected_choices;

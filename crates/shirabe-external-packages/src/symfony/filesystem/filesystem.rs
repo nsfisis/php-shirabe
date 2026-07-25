@@ -149,7 +149,7 @@ impl Filesystem {
                     format!("Failed to create \"{}\": ", dir),
                     0,
                     None,
-                    Some(dir.clone()),
+                    Some(dir),
                 )
                 .into());
             }
@@ -357,7 +357,7 @@ impl Filesystem {
                 ),
                 0,
                 None,
-                Some(origin_dir.clone()),
+                Some(origin_dir),
             )
             .into());
         }
@@ -439,7 +439,7 @@ impl Filesystem {
                     format!("Unable to guess \"{}\" file type.", pathname),
                     0,
                     None,
-                    Some(pathname.clone()),
+                    Some(pathname),
                 )
                 .into());
             }

@@ -97,7 +97,7 @@ impl Versions {
         let stored_channel = if Preg::is_match(php_regex!(r"{^\d+$}D"), &channel) {
             "stable".to_string()
         } else {
-            channel.clone()
+            channel
         };
 
         let previously_stored: Option<String> = if std::path::Path::new(&channel_file).exists() {

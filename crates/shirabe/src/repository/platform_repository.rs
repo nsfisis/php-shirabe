@@ -298,11 +298,8 @@ impl PlatformRepository {
         })
         .unwrap_or(PhpMixed::Bool(false));
         if has_inet6 || !matches!(inet_pton_check, PhpMixed::Bool(false)) {
-            let mut php_ipv6 = CompletePackage::new(
-                "php-ipv6".to_string(),
-                version.clone(),
-                pretty_version.clone(),
-            );
+            let mut php_ipv6 =
+                CompletePackage::new("php-ipv6".to_string(), version, pretty_version);
             php_ipv6.set_description("The PHP interpreter, with IPv6 support".to_string());
             self.add_package(CompletePackageHandle::from_complete_package(php_ipv6).into())?;
         }
@@ -1700,7 +1697,7 @@ impl PlatformRepository {
                 Link::new(
                     "ext-uuid".to_string(),
                     "lib-uuid".to_string(),
-                    SimpleConstraint::new("=".to_string(), version.to_string(), None).into(),
+                    SimpleConstraint::new("=".to_string(), version, None).into(),
                     Some(Link::TYPE_REPLACE.to_string()),
                     ext.get_pretty_version().to_string(),
                 ),

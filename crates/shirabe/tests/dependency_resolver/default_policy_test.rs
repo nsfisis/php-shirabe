@@ -505,10 +505,7 @@ fn test_select_local_repos_first() {
     package_a_alias_important.set_root_package_alias(true);
 
     fixtures.repo.add_package(package_a).unwrap();
-    fixtures
-        .repo
-        .add_package(package_a_alias.clone().into())
-        .unwrap();
+    fixtures.repo.add_package(package_a_alias.into()).unwrap();
     repo_important.add_package(package_a_important).unwrap();
     repo_important
         .add_package(package_a_alias_important.clone().into())

@@ -103,7 +103,7 @@ impl Command for DiagnoseCommand {
         let config: std::rc::Rc<std::cell::RefCell<Config>>;
         if let Some(ref mut c) = composer {
             let c = crate::composer::composer_full(c);
-            config = c.get_config().clone();
+            config = c.get_config();
 
             let command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
@@ -187,7 +187,7 @@ impl Command for DiagnoseCommand {
             crate::repository::FindPackageConstraint::String("*".to_string()),
         )?
         .unwrap();
-        let mut php_version = php_pkg.get_pretty_version().to_string();
+        let mut php_version = php_pkg.get_pretty_version();
         if let Some(cp) = php_pkg.as_complete()
             && str_contains(&cp.get_description().unwrap_or_default(), "overridden")
         {
@@ -986,11 +986,8 @@ impl DiagnoseCommand {
         if version != "@package_version@" {
             let version_parser = VersionParser::new();
             let normalized_version = version_parser.normalize(&version, None)?;
-            let root_pkg = RootPackage::new(
-                "composer/composer".to_string(),
-                normalized_version,
-                version.clone(),
-            );
+            let root_pkg =
+                RootPackage::new("composer/composer".to_string(), normalized_version, version);
             packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
         }
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();

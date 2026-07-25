@@ -121,7 +121,7 @@ impl TextDescriptor {
             if option.is_negatable() {
                 format!("--{0}|--no-{0}", option.get_name().to_string())
             } else {
-                format!("--{0}{1}", option.get_name(), value.clone())
+                format!("--{0}{1}", option.get_name(), value)
             }
         );
 

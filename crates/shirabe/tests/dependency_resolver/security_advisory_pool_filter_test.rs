@@ -75,7 +75,7 @@ fn test_filter_packages_by_advisories() {
 
     let pool = Pool::new(
         vec![
-            package.clone(),
+            package,
             expected_package1.clone(),
             expected_package2.clone(),
         ],
@@ -323,7 +323,7 @@ fn test_dont_filter_packages_with_abandoned_package() {
     let pool = Pool::new(
         vec![
             expected_package.clone(),
-            abandoned_package.clone(),
+            abandoned_package,
             ignore_abandoned_package.clone(),
         ],
         vec![],

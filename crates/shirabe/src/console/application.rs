@@ -612,7 +612,7 @@ impl Application {
             Err(_) => return PhpMixed::Bool(false),
         };
 
-        config.get("use-parent-dir").clone()
+        config.get("use-parent-dir")
     }
 
     fn is_running_as_root(&self) -> bool {
@@ -917,7 +917,7 @@ impl Application {
                     namespace,
                     self.get_abbreviation_suggestions(&namespaces),
                 ),
-                namespaces.clone(),
+                namespaces,
                 0,
             ))
             .into());
@@ -1951,11 +1951,7 @@ impl ApplicationHandle {
             io.write_error3(
                 &format!(
                     "Changed CWD to {}",
-                    if !cwd.is_empty() {
-                        cwd.clone()
-                    } else {
-                        nwd.clone()
-                    }
+                    if !cwd.is_empty() { cwd } else { nwd.clone() }
                 ),
                 true,
                 io_interface::DEBUG,
@@ -2414,7 +2410,7 @@ impl ApplicationHandle {
                                     // instantiation; reading/overriding its
                                     // name/description requires the typed SymfonyCommand model that
                                     // the Symfony stub does not yet provide.
-                                    let _ = description.clone();
+                                    let _ = description;
                                     let _ = &mut cmd;
                                     cmd
                                 } else {
@@ -2425,7 +2421,7 @@ impl ApplicationHandle {
                                     // command registry is modelled.
                                     let _ = ScriptAliasCommand::new(
                                         script.clone(),
-                                        Some(description.clone()),
+                                        Some(description),
                                         aliases,
                                     );
                                     PhpMixed::Null

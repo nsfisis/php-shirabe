@@ -224,7 +224,7 @@ impl DownloaderInterface for FileDownloader {
             // TODO(plugin): dispatch PreFileDownloadEvent and apply its custom cache key / processed url.
             urls[0] = url.clone();
 
-            let checksum = package.get_dist_sha1_checksum().map(|s| s.to_string());
+            let checksum = package.get_dist_sha1_checksum();
             let cache_key = url.cache_key.clone();
 
             // use from cache if it is present and has a valid checksum or we have no checksum to check against
@@ -263,7 +263,7 @@ impl DownloaderInterface for FileDownloader {
                     self.last_cache_writes
                         .lock()
                         .unwrap()
-                        .insert(package.get_name().to_string(), cache_key.clone());
+                        .insert(package.get_name(), cache_key.clone());
                 }
             } else {
                 if output {
@@ -297,15 +297,15 @@ impl DownloaderInterface for FileDownloader {
                         DOWNLOAD_METADATA
                             .lock()
                             .unwrap()
-                            .insert(package.get_name().to_string(), file_size);
+                            .insert(package.get_name(), file_size);
 
                         if Platform::get_env("GITHUB_ACTIONS").is_some()
                             && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
                         {
-                            RESPONSE_HEADERS.lock().unwrap().insert(
-                                package.get_name().to_string(),
-                                response.get_headers().clone(),
-                            );
+                            RESPONSE_HEADERS
+                                .lock()
+                                .unwrap()
+                                .insert(package.get_name(), response.get_headers().clone());
                         }
 
                         if let Some(cache) = self.cache.as_ref()
@@ -314,7 +314,7 @@ impl DownloaderInterface for FileDownloader {
                             self.last_cache_writes
                                 .lock()
                                 .unwrap()
-                                .insert(package.get_name().to_string(), cache_key.clone());
+                                .insert(package.get_name(), cache_key.clone());
                             cache.borrow_mut().copy_from(&cache_key, &file_name);
                         }
 
@@ -479,7 +479,7 @@ impl DownloaderInterface for FileDownloader {
             path.to_string(),
             format!("{}/{}", vendor_dir, first_segment),
             format!("{}/composer/", vendor_dir),
-            vendor_dir.clone(),
+            vendor_dir,
         ];
 
         if let Some(paths) = self

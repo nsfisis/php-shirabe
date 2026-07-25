@@ -136,12 +136,8 @@ impl GitLabDriver {
             "https".to_string()
         };
         let port = match_.get(&CaptureKey::ByName("port".to_string())).cloned();
-        let origin = Self::determine_origin(
-            &configured_domains,
-            guessed_domain,
-            &mut url_parts,
-            port.clone(),
-        );
+        let origin =
+            Self::determine_origin(&configured_domains, guessed_domain, &mut url_parts, port);
         let origin = match origin {
             Some(o) => o,
             None => {

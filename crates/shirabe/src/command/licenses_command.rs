@@ -249,19 +249,13 @@ impl Command for LicensesCommand {
                 }
 
                 let mut output_map: IndexMap<String, PhpMixed> = IndexMap::new();
-                output_map.insert(
-                    "name".to_string(),
-                    PhpMixed::String(root.get_pretty_name().clone()),
-                );
+                output_map.insert("name".to_string(), PhpMixed::String(root.get_pretty_name()));
                 output_map.insert(
                     "version".to_string(),
-                    PhpMixed::String(
-                        root.get_full_pretty_version(
-                            true,
-                            crate::package::DisplayMode::SourceRefIfDev,
-                        )
-                        .clone(),
-                    ),
+                    PhpMixed::String(root.get_full_pretty_version(
+                        true,
+                        crate::package::DisplayMode::SourceRefIfDev,
+                    )),
                 );
                 let root_licenses = root.get_license();
                 output_map.insert(

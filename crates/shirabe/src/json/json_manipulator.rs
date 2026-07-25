@@ -676,13 +676,13 @@ impl JsonManipulator {
         if decoded.as_array().and_then(|a| a.get(main_node)).is_none() {
             if let Some(ref sub) = sub_name {
                 let mut inner: IndexMap<String, PhpMixed> = IndexMap::new();
-                inner.insert(sub.clone(), value.clone());
+                inner.insert(sub.clone(), value);
                 let mut outer: IndexMap<String, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned.clone(), PhpMixed::Array(inner));
+                outer.insert(name_owned, PhpMixed::Array(inner));
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             } else {
                 let mut outer: IndexMap<String, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned.clone(), value.clone());
+                outer.insert(name_owned, value);
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             }
 
@@ -717,14 +717,14 @@ impl JsonManipulator {
         );
         if let Some(cm) = child {
             let content_str = children[cm.value_pos..cm.value_end].to_string();
-            let mut value_local = value.clone();
-            if sub_name.is_some() {
+            let mut value_local = value;
+            if let Some(sub_name) = sub_name {
                 let mut cur_val = json_decode(&content_str, true).unwrap_or(PhpMixed::Null);
                 if !is_array(&cur_val) {
                     cur_val = PhpMixed::Array(IndexMap::new());
                 }
                 if let Some(arr) = cur_val.as_array_mut() {
-                    arr.insert(sub_name.clone().unwrap(), value_local.clone());
+                    arr.insert(sub_name, value_local.clone());
                 }
                 value_local = cur_val;
             }
@@ -754,7 +754,7 @@ impl JsonManipulator {
                     .unwrap_or_default();
                 let content_present = leading_match.get("content").is_some();
                 if content_present {
-                    let mut value_local = value.clone();
+                    let mut value_local = value;
                     if let Some(ref sub) = sub_name {
                         let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
                         wrap.insert(sub.clone(), value_local.clone());
@@ -780,7 +780,7 @@ impl JsonManipulator {
                             &children,
                         );
                     } else {
-                        whitespace = leading_space.clone();
+                        whitespace = leading_space;
                         children = Preg::replace(
                             format!("#^{{{}#", whitespace),
                             &addcslashes(
@@ -799,7 +799,7 @@ impl JsonManipulator {
                         );
                     }
                 } else {
-                    let mut value_local = value.clone();
+                    let mut value_local = value;
                     if let Some(ref sub) = sub_name {
                         let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
                         wrap.insert(sub.clone(), value_local.clone());
@@ -1084,7 +1084,7 @@ impl JsonManipulator {
                         &children,
                     );
                 } else {
-                    whitespace = leading_whitespace.clone();
+                    whitespace = leading_whitespace;
                     children = Preg::replace(
                         format!("#^\\[{}#", whitespace),
                         &addcslashes(

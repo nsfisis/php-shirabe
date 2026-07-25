@@ -231,7 +231,7 @@ impl ProcessExecutor {
             process = Process::from_shell_commandline(
                 &command_str,
                 cwd,
-                env.clone(),
+                env,
                 PhpMixed::Null,
                 Some(Self::get_timeout() as f64),
             )?;
@@ -419,7 +419,7 @@ impl ProcessExecutor {
         };
 
         let mut mock = self.mock.as_ref().unwrap().borrow_mut();
-        mock.log.push(command_string.clone());
+        mock.log.push(command_string);
 
         let matched = mock
             .expectations

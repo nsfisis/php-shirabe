@@ -130,7 +130,7 @@ impl VersionParser {
             return Ok(true);
         }
 
-        let sorted = Semver::sort(vec![normalized_to.clone(), normalized_from.clone()])?;
+        let sorted = Semver::sort(vec![normalized_to, normalized_from.clone()])?;
 
         Ok(sorted[0] == normalized_from)
     }

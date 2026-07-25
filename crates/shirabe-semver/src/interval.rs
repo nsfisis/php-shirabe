@@ -36,10 +36,7 @@ impl Interval {
     }
 
     pub fn any() -> Self {
-        Self::new(
-            Self::from_zero().clone(),
-            Self::until_positive_infinity().clone(),
-        )
+        Self::new(Self::from_zero(), Self::until_positive_infinity())
     }
 
     pub fn any_dev() -> DevConstraintSet {

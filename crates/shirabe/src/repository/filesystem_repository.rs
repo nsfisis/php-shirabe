@@ -460,7 +460,7 @@ impl FilesystemRepository {
             "root".to_string(),
             PhpMixed::Array(
                 self.dump_root_package(
-                    current_root.clone(),
+                    current_root,
                     install_paths,
                     dev_mode,
                     repo_dir,
@@ -602,11 +602,7 @@ impl FilesystemRepository {
             // PHP: ($package->getSourceReference() ?: $package->getDistReference()) ?: null;
             let source = package.get_source_reference().unwrap_or_default();
             let dist = package.get_dist_reference().unwrap_or_default();
-            let combined = if !source.is_empty() {
-                source.to_string()
-            } else {
-                dist.to_string()
-            };
+            let combined = if !source.is_empty() { source } else { dist };
             reference = if combined.is_empty() {
                 None
             } else {
@@ -630,11 +626,11 @@ impl FilesystemRepository {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert(
             "pretty_version".to_string(),
-            PhpMixed::String(package.get_pretty_version().to_string()),
+            PhpMixed::String(package.get_pretty_version()),
         );
         data.insert(
             "version".to_string(),
-            PhpMixed::String(package.get_version().to_string()),
+            PhpMixed::String(package.get_version()),
         );
         data.insert(
             "reference".to_string(),
@@ -643,10 +639,7 @@ impl FilesystemRepository {
                 None => PhpMixed::Null,
             },
         );
-        data.insert(
-            "type".to_string(),
-            PhpMixed::String(package.get_type().to_string()),
-        );
+        data.insert("type".to_string(), PhpMixed::String(package.get_type()));
         data.insert(
             "install_path".to_string(),
             match install_path {
@@ -687,10 +680,7 @@ impl FilesystemRepository {
         );
 
         let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
-        result.insert(
-            "name".to_string(),
-            PhpMixed::String(package.get_name().to_string()),
-        );
+        result.insert("name".to_string(), PhpMixed::String(package.get_name()));
         result.insert(
             "pretty_version".to_string(),
             data.get("pretty_version")

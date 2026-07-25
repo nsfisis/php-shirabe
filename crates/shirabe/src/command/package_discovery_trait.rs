@@ -207,9 +207,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         // Collect existing packages
         let composer = self.try_composer(None, None);
         let composer_ref = composer.as_ref().map(|c| c.borrow_partial());
-        let repository_manager = composer_ref
-            .as_ref()
-            .map(|c| c.get_repository_manager().clone());
+        let repository_manager = composer_ref.as_ref().map(|c| c.get_repository_manager());
         let repository_manager_ref = repository_manager.as_ref().map(|rm| rm.borrow());
         let installed_repo = repository_manager_ref
             .as_ref()
@@ -553,7 +551,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             "Package {} has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
                             name,
                             self.get_platform_exception_details(
-                                candidate.clone(),
+                                candidate,
                                 platform_repo,
                             )?,
                         ),
@@ -606,7 +604,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     message: format!(
                         "Could not find a version of package {} matching your minimum-stability ({}). Require it with an explicit version constraint allowing its desired stability.",
                         name,
-                        effective_minimum_stability.clone(),
+                        effective_minimum_stability,
                     ),
                     code: 0,
                 }
@@ -649,7 +647,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             "Could not find package {} in any version matching your PHP version, PHP extensions and Composer version{}{}",
                             name,
                             self.get_platform_exception_details(
-                                candidate.clone(),
+                                candidate,
                                 platform_repo,
                             )?,
                             additional,
@@ -741,11 +739,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         let package = package.unwrap();
         Ok((
-            package.get_pretty_name().to_string(),
+            package.get_pretty_name(),
             if fixed {
-                package.get_pretty_version().to_string()
+                package.get_pretty_version()
             } else {
-                version_selector.find_recommended_require_version(package.clone())?
+                version_selector.find_recommended_require_version(package)?
             },
         ))
     }

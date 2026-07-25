@@ -725,10 +725,7 @@ fn test_private_repository_no_interaction() {
     {
         let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
-        config_section.insert(
-            "cache-vcs-dir".to_string(),
-            PhpMixed::String(cache_vcs_dir.clone()),
-        );
+        config_section.insert("cache-vcs-dir".to_string(), PhpMixed::String(cache_vcs_dir));
         top.insert("config".to_string(), PhpMixed::Array(config_section));
         config.borrow_mut().merge(&top, Config::SOURCE_UNKNOWN);
     }

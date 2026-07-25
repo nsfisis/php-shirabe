@@ -650,7 +650,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                                 v.as_array().unwrap().clone()
                             } else {
                                 let mut m = IndexMap::new();
-                                m.insert("0".to_string(), v.clone());
+                                m.insert("0".to_string(), v);
                                 m
                             };
 

@@ -294,7 +294,7 @@ impl Perforce {
                     let field1 = fields.get(1).cloned().unwrap_or_default();
                     let index = strpos(&field1, " ");
                     let value = match index {
-                        None => field1.clone(),
+                        None => field1,
                         Some(idx) => substr(&field1, 0, Some(idx as i64)),
                     };
                     let value = trim(&value, None);

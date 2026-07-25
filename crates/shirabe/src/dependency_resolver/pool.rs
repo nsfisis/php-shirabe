@@ -321,7 +321,7 @@ impl Pool {
                 || CompilingMatcher::r#match(
                     constraint.unwrap(),
                     SimpleConstraint::OP_EQ,
-                    candidate_version.to_string(),
+                    candidate_version,
                 );
         }
 

@@ -73,7 +73,7 @@ impl SymfonyQuestionHelper {
                     &choices
                         .get(&default.to_string())
                         .cloned()
-                        .unwrap_or(default.clone())
+                        .unwrap_or(default)
                         .to_string(),
                 )
                 .unwrap(),

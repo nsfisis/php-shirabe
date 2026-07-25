@@ -790,7 +790,7 @@ impl EventDispatcher {
                         if exit_code != 0 {
                             self.io.write_error3(&format!(
                                 "<error>Script {} handling the {} event returned with error code {}</error>",
-                                callable_str.clone(),
+                                callable_str,
                                 event.get_name(),
                                 exit_code
                             ), true, crate::io::QUIET);

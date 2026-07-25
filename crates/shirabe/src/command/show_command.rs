@@ -372,7 +372,7 @@ impl Command for ShowCommand {
             repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
             ]));
-            single_package = Some(package.clone().into());
+            single_package = Some(package.into());
         } else if input.borrow().get_option("platform")?.as_bool() == Some(true) {
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 platform_repo.clone().into(),
@@ -497,7 +497,7 @@ impl Command for ShowCommand {
             let new_repo =
                 RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle]));
             installed_repo = new_repo.clone();
-            repos = new_repo.clone();
+            repos = new_repo;
         } else {
             // --installed / default case
             let composer_local_owned;
@@ -853,7 +853,7 @@ impl Command for ShowCommand {
             input.borrow_mut().set_option("path", PhpMixed::Bool(false));
         }
 
-        for repo in RepositoryUtils::flatten_repositories(repos.clone(), true) {
+        for repo in RepositoryUtils::flatten_repositories(repos, true) {
             let r#type = if Self::same_repository(&repo, &platform_repo) {
                 "platform"
             } else if locked_repo
@@ -2028,7 +2028,7 @@ impl ShowCommand {
         let mut json: IndexMap<String, PhpMixed> = IndexMap::new();
         json.insert(
             "name".to_string(),
-            PhpMixed::String(package.get_pretty_name().to_string()),
+            PhpMixed::String(package.get_pretty_name()),
         );
         json.insert(
             "description".to_string(),
@@ -2040,10 +2040,7 @@ impl ShowCommand {
             .map(PhpMixed::String)
             .collect();
         json.insert("keywords".to_string(), PhpMixed::List(keywords));
-        json.insert(
-            "type".to_string(),
-            PhpMixed::String(package.get_type().to_string()),
-        );
+        json.insert("type".to_string(), PhpMixed::String(package.get_type()));
         json.insert(
             "homepage".to_string(),
             match package.get_homepage() {
@@ -2068,7 +2065,7 @@ impl ShowCommand {
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
             json.insert(
                 "latest".to_string(),
-                PhpMixed::String(latest.get_pretty_version().to_string()),
+                PhpMixed::String(latest.get_pretty_version()),
             );
             latest
         } else {
@@ -2148,7 +2145,7 @@ impl ShowCommand {
             json.insert(
                 "replacement".to_string(),
                 match c.get_replacement_package() {
-                    Some(rp) => PhpMixed::String(rp.to_string()),
+                    Some(rp) => PhpMixed::String(rp),
                     None => PhpMixed::Null,
                 },
             );
@@ -2460,7 +2457,7 @@ impl ShowCommand {
         remote_repos: &RepositoryInterfaceHandle,
     ) -> IndexMap<String, PhpMixed> {
         let requires = {
-            let mut r: IndexMap<String, Link> = package.get_requires().clone();
+            let mut r: IndexMap<String, Link> = package.get_requires();
             r.sort_keys();
             r
         };
@@ -2505,11 +2502,11 @@ impl ShowCommand {
         let mut tree: IndexMap<String, PhpMixed> = IndexMap::new();
         tree.insert(
             "name".to_string(),
-            PhpMixed::String(package.get_pretty_name().to_string()),
+            PhpMixed::String(package.get_pretty_name()),
         );
         tree.insert(
             "version".to_string(),
-            PhpMixed::String(package.get_pretty_version().to_string()),
+            PhpMixed::String(package.get_pretty_version()),
         );
         tree.insert(
             "description".to_string(),
@@ -2620,7 +2617,7 @@ impl ShowCommand {
         };
         let (package, _) = self.get_package(installed_repo, remote_repos, name, version_arg)?;
         if let Some(package) = package {
-            let mut requires = package.get_requires().clone();
+            let mut requires = package.get_requires();
             requires.sort_keys();
             for (require_name, require) in requires.iter() {
                 let mut current_tree = packages_in_tree.to_vec();
@@ -2687,7 +2684,7 @@ impl ShowCommand {
             return Ok("up-to-date".to_string());
         }
 
-        let mut constraint = package.get_version().to_string();
+        let mut constraint = package.get_version();
         if !constraint.starts_with("dev-") {
             constraint = format!("^{}", constraint);
         }
@@ -2734,10 +2731,7 @@ impl ShowCommand {
         let composer_ref = crate::composer::composer_full(composer);
         let mut version_selector =
             VersionSelector::new(repo_set, Some(&mut *platform_repo.borrow_mut()))?;
-        let mut stability = composer_ref
-            .get_package()
-            .get_minimum_stability()
-            .to_string();
+        let mut stability = composer_ref.get_package().get_minimum_stability();
         let flags = composer_ref.get_package().get_stability_flags();
         if let Some(flag_value) = flags.get(&name) {
             let key_map: IndexMap<String, String> = base_package::STABILITIES
@@ -2750,9 +2744,9 @@ impl ShowCommand {
             }
         }
 
-        let mut best_stability = stability.clone();
+        let mut best_stability = stability;
         if composer_ref.get_package().get_prefer_stable() {
-            best_stability = package.get_stability().to_string();
+            best_stability = package.get_stability();
         }
 
         let mut target_version: Option<String> = None;
@@ -2855,7 +2849,7 @@ impl ShowCommand {
         if self.repository_set.borrow().is_none() {
             let mut rs = RepositorySet::new(
                 &composer.get_package().get_minimum_stability(),
-                composer.get_package().get_stability_flags().clone(),
+                composer.get_package().get_stability_flags(),
                 Vec::new(),
                 IndexMap::new(),
                 IndexMap::new(),

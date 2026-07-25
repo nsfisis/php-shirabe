@@ -298,7 +298,7 @@ impl Command for RequireCommand {
         let preferred_stability = if composer.get_package().get_prefer_stable() {
             "stable".to_string()
         } else {
-            composer.get_package().get_minimum_stability().to_string()
+            composer.get_package().get_minimum_stability()
         };
 
         // Hoist argument computations into locals so no borrow of `input` is held across the
@@ -808,15 +808,13 @@ impl RequireCommand {
             root_package.set_dev_requires(links["require-dev"].clone());
 
             // extract stability flags & references as they weren't present when loading the unmodified composer.json
-            let references = RootPackageLoader::extract_references(
-                requirements,
-                root_package.get_references().clone(),
-            );
+            let references =
+                RootPackageLoader::extract_references(requirements, root_package.get_references());
             root_package.set_references(references);
             let stability_flags = RootPackageLoader::extract_stability_flags(
                 requirements,
                 &root_package.get_minimum_stability(),
-                root_package.get_stability_flags().clone(),
+                root_package.get_stability_flags(),
             );
             root_package.set_stability_flags(stability_flags);
         }
@@ -970,7 +968,7 @@ impl RequireCommand {
             .set_dev_mode(update_dev_mode)
             .set_optimize_autoloader(optimize)
             .set_class_map_authoritative(authoritative)
-            .set_apcu_autoloader(apcu, apcu_prefix.clone())
+            .set_apcu_autoloader(apcu, apcu_prefix)
             .set_update(true)
             .set_install(
                 !input

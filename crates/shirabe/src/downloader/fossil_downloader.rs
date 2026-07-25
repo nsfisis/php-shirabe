@@ -138,10 +138,7 @@ impl VcsDownloader for FossilDownloader {
                 "fossil".to_string(),
                 "update".to_string(),
                 "--".to_string(),
-                package
-                    .get_source_reference()
-                    .unwrap_or_default()
-                    .to_string(),
+                package.get_source_reference().unwrap_or_default(),
             ],
             real_path,
             &mut output,
@@ -190,10 +187,7 @@ impl VcsDownloader for FossilDownloader {
                 "fossil".to_string(),
                 "up".to_string(),
                 "--".to_string(),
-                target
-                    .get_source_reference()
-                    .unwrap_or_default()
-                    .to_string(),
+                target.get_source_reference().unwrap_or_default(),
             ],
             real_path,
             &mut output,

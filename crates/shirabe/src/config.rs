@@ -596,7 +596,7 @@ impl Config {
                     let raw = if matches!(val, PhpMixed::Bool(false)) {
                         self.config.get(key).cloned().unwrap_or(PhpMixed::Null)
                     } else {
-                        val.clone()
+                        val
                     };
                     return Ok(PhpMixed::Int(intval(&raw).max(0)));
                 }
@@ -1122,10 +1122,7 @@ impl Config {
             if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
                 if scheme.as_deref() == Some("svn") {
                     if in_array(
-                        hostname
-                            .clone()
-                            .map(PhpMixed::String)
-                            .unwrap_or(PhpMixed::Null),
+                        hostname.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
                         &self.get_with_flags("secure-svn-domains", 0)?,
                         true,
                     ) {

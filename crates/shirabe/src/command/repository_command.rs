@@ -336,7 +336,7 @@ impl Command for RepositoryCommand {
                         .unwrap()
                         .insert_repository(
                             name.as_deref().unwrap(),
-                            repo_config.clone(),
+                            repo_config,
                             reference_name,
                             offset,
                         )?;
@@ -352,7 +352,7 @@ impl Command for RepositoryCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_repository(name.as_deref().unwrap(), repo_config.clone(), append)?;
+                    .add_repository(name.as_deref().unwrap(), repo_config, append)?;
                 Ok(0)
             }
             "remove" | "rm" | "delete" => {

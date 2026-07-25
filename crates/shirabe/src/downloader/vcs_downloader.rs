@@ -57,14 +57,14 @@ impl VcsDownloaderBase {
         let mut guesser = VersionGuesser::new(
             self.config.clone(),
             self.process.clone(),
-            parser.clone(),
+            parser,
             Some(self.io.clone()),
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package.clone());
+        let package_config = dumper.dump(package);
         if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
-            return package_version.commit.clone();
+            return package_version.commit;
         }
 
         None
@@ -415,15 +415,15 @@ pub trait VcsDownloader:
         let guesser = VersionGuesser::new(
             self.config().clone(),
             self.process().clone(),
-            parser.clone(),
+            parser,
             Some(self.io().clone()),
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package.clone());
+        let package_config = dumper.dump(package);
         let mut guesser = guesser;
         if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
-            return package_version.commit.clone();
+            return package_version.commit;
         }
 
         None

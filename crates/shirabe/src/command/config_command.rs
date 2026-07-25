@@ -737,7 +737,7 @@ impl Command for ConfigCommand {
             if 1 == values.len() {
                 let value = strtolower(&values[0]);
                 if boolean_validator(&PhpMixed::String(value.clone())) {
-                    if !boolean_normalizer(&PhpMixed::String(value.clone()))
+                    if !boolean_normalizer(&PhpMixed::String(value))
                         .as_bool()
                         .unwrap_or(false)
                     {

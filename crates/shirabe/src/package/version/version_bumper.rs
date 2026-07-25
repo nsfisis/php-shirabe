@@ -26,11 +26,11 @@ impl VersionBumper {
             return Ok(pretty_constraint);
         }
 
-        let mut version = package.get_version().to_string();
+        let mut version = package.get_version();
         if version.starts_with("dev-") {
             let loader = ArrayLoader::new(Some(parser.clone()), false);
             let dumper = ArrayDumper::new();
-            let dumped = dumper.dump(package.clone());
+            let dumped = dumper.dump(package);
             let extra = loader.get_branch_alias(&dumped)?;
 
             if extra.is_none() || extra.as_deref() == Some(VersionParser::DEFAULT_BRANCH_ALIAS) {

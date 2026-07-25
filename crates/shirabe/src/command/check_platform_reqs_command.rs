@@ -244,7 +244,7 @@ impl Command for CheckPlatformReqsCommand {
                     "<info>Checking {}platform requirements for packages in the vendor dir</info>",
                     if no_dev { "non-dev " } else { "" }
                 ));
-                local_repo.clone()
+                local_repo
             }
         };
 
