@@ -266,11 +266,6 @@ Using version 1.1.0 for required/pkg",
 
 #[test]
 #[serial]
-#[ignore = "the pre-operations-exec listener bug is fixed; now fails on the first data-provider \
-            case ('warn once for missing ext but a lower package matches') because the \
-            \"<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar \
-            ^1 which is missing from your platform.</warning>\" message is never emitted — a \
-            distinct, unimplemented require_command warning path unrelated to event dispatching"]
 fn test_require() {
     for (label, composer_json, command, expected) in provide_require() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);

@@ -484,7 +484,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             preferred_stability,
             Some(platform_requirement_filter.clone()),
             0,
-            None,
+            Some(io.clone()),
             ShowWarnings::Always,
         )?;
 
