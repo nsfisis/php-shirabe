@@ -46,11 +46,12 @@ Checking github.com rate limit: "
 
 #[test]
 #[serial]
-#[ignore = "shirabe_php_shim::OPENSSL_VERSION_NUMBER is a hardcoded stub (0), which always trips \
-            check_platform's `< 0x1000100f` TLSv1.1/1.2 support check regardless of the real \
-            linked OpenSSL, forcing a non-zero exit code; diagnose also checks live http/https \
-            connectivity to packagist and the github.com rate limit (as the PHP original does), \
-            so the test additionally requires real network access"]
+#[ignore = "check_composer_audit locates Composer's own vendor/composer/installed.json through a \
+            literal relative path standing in for PHP's __DIR__, so it is never found from the \
+            temporary working directory this test runs in; diagnose then reports a warning and \
+            exits non-zero. diagnose also checks live http/https connectivity to packagist and \
+            the github.com rate limit (as the PHP original does), so the test additionally \
+            requires real network access"]
 fn test_cmd_success() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({

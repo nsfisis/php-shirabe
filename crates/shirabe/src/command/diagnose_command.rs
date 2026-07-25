@@ -34,18 +34,14 @@ use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
-    INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT,
-    PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD, PhpMixed, defined,
-    disk_free_space, extension_loaded, file_exists, filter_var_boolean, function_exists,
-    get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
-    is_array, is_string, php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos,
-    strstr, strtolower, trim, version_compare,
+    InvalidArgumentException, PHP_EOL, PhpMixed, disk_free_space, file_exists, filter_var_boolean,
+    get_class_err, hash, implode, is_array, is_string, php_regex, rtrim, str_contains, str_replace,
+    str_starts_with, strpos, strstr, strstr3, strtolower, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -200,19 +196,20 @@ impl Command for DiagnoseCommand {
 
         io.write(&format!("PHP version: <comment>{}</comment>", php_version));
 
-        if defined("PHP_BINARY") {
+        let diagnostics = shirabe_php_rpc::get_diagnostics();
+
+        if let Some(php_binary) = &diagnostics.php_binary {
             io.write(&format!(
                 "PHP binary path: <comment>{}</comment>",
-                PHP_BINARY
+                php_binary
             ));
         }
 
         io.write(&format!(
             "OpenSSL version: {}",
-            if defined("OPENSSL_VERSION_TEXT") {
-                format!("<comment>{}</comment>", OPENSSL_VERSION_TEXT)
-            } else {
-                "<error>missing</error>".to_string()
+            match &diagnostics.openssl_version_text {
+                Some(text) => format!("<comment>{}</comment>", text),
+                None => "<error>missing</error>".to_string(),
             }
         ));
         io.write(&format!("curl version: {}", self.get_curl_version()));
@@ -238,7 +235,7 @@ impl Command for DiagnoseCommand {
 
         io.write(&format!(
             "zip: {}, {}, {}{}",
-            if extension_loaded("zip") {
+            if diagnostics.extension_loaded("zip") {
                 "<comment>extension present</comment>"
             } else {
                 "<comment>extension not loaded</comment>"
@@ -253,7 +250,7 @@ impl Command for DiagnoseCommand {
             } else {
                 "<comment>7-Zip not available</comment>".to_string()
             },
-            if (has_system_7zip || has_system_unzip) && !function_exists("proc_open") {
+            if (has_system_7zip || has_system_unzip) && !diagnostics.function_exists("proc_open") {
                 ", <warning>proc_open is disabled or not present, unzip/7-z will not be usable</warning>"
             } else {
                 ""
@@ -505,7 +502,7 @@ impl DiagnoseCommand {
     }
 
     fn check_git(&self) -> String {
-        if !function_exists("proc_open") {
+        if !shirabe_php_rpc::get_diagnostics().function_exists("proc_open") {
             return "<comment>proc_open is not available, git cannot be used</comment>".to_string();
         }
 
@@ -834,7 +831,7 @@ impl DiagnoseCommand {
     }
 
     fn check_disk_space(&self, config: &Config) -> PhpMixed {
-        if !function_exists("disk_free_space") {
+        if !shirabe_php_rpc::get_diagnostics().function_exists("disk_free_space") {
             return PhpMixed::Bool(true);
         }
 
@@ -1046,7 +1043,7 @@ impl DiagnoseCommand {
     }
 
     fn get_curl_version(&self) -> String {
-        if extension_loaded("curl") {
+        if shirabe_php_rpc::get_diagnostics().extension_loaded("curl") {
             if !HttpDownloader::is_curl_enabled() {
                 return "<error>disabled via disable_functions, using php streams fallback, which reduces performance</error>".to_string();
             }
@@ -1124,68 +1121,76 @@ impl DiagnoseCommand {
         let mut ini_message = format!("{}{}{}", PHP_EOL, PHP_EOL, IniHelper::get_message());
         ini_message.push_str(&format!("{}If you can not modify the ini file, you can also run `php -d option=value` to modify ini values on the fly. You can use -d multiple times.", PHP_EOL));
 
+        let diagnostics = shirabe_php_rpc::get_diagnostics();
+
         let mut errors: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut warnings: IndexMap<String, PhpMixed> = IndexMap::new();
 
-        if !function_exists("json_decode") {
+        if !diagnostics.function_exists("json_decode") {
             errors.insert("json".to_string(), PhpMixed::Bool(true));
         }
 
-        if !extension_loaded("Phar") {
+        if !diagnostics.extension_loaded("Phar") {
             errors.insert("phar".to_string(), PhpMixed::Bool(true));
         }
 
-        if !extension_loaded("filter") {
+        if !diagnostics.extension_loaded("filter") {
             errors.insert("filter".to_string(), PhpMixed::Bool(true));
         }
 
-        if !extension_loaded("hash") {
+        if !diagnostics.extension_loaded("hash") {
             errors.insert("hash".to_string(), PhpMixed::Bool(true));
         }
 
-        if !extension_loaded("iconv") && !extension_loaded("mbstring") {
+        if !diagnostics.extension_loaded("iconv") && !diagnostics.extension_loaded("mbstring") {
             errors.insert("iconv_mbstring".to_string(), PhpMixed::Bool(true));
         }
 
-        if !filter_var_boolean(ini_get("allow_url_fopen").as_deref().unwrap_or("")) {
+        if !filter_var_boolean(diagnostics.ini_get("allow_url_fopen").unwrap_or("")) {
             errors.insert("allow_url_fopen".to_string(), PhpMixed::Bool(true));
         }
 
-        if extension_loaded("ionCube Loader") && ioncube_loader_iversion() < 40009 {
+        if diagnostics.extension_loaded("ionCube Loader")
+            && diagnostics.ioncube_loader_iversion < 40009
+        {
             errors.insert(
                 "ioncube".to_string(),
-                PhpMixed::String(ioncube_loader_version()),
+                PhpMixed::String(diagnostics.ioncube_loader_version.clone()),
             );
         }
 
-        if PHP_VERSION_ID < 70205 {
-            errors.insert("php".to_string(), PhpMixed::String(PHP_VERSION.to_string()));
+        if diagnostics.php_version_id < 70205 {
+            errors.insert(
+                "php".to_string(),
+                PhpMixed::String(diagnostics.php_version.clone()),
+            );
         }
 
-        if !extension_loaded("openssl") {
+        if !diagnostics.extension_loaded("openssl") {
             errors.insert("openssl".to_string(), PhpMixed::Bool(true));
         }
 
-        if extension_loaded("openssl") && OPENSSL_VERSION_NUMBER < 0x1000100f {
+        if diagnostics.extension_loaded("openssl")
+            && diagnostics.openssl_version_number < 0x1000100f
+        {
             warnings.insert("openssl_version".to_string(), PhpMixed::Bool(true));
         }
 
-        if !defined("HHVM_VERSION")
-            && !extension_loaded("apcu")
-            && filter_var_boolean(ini_get("apc.enable_cli").as_deref().unwrap_or(""))
+        if !diagnostics.has_hhvm_version
+            && !diagnostics.extension_loaded("apcu")
+            && filter_var_boolean(diagnostics.ini_get("apc.enable_cli").unwrap_or(""))
         {
             warnings.insert("apc_cli".to_string(), PhpMixed::Bool(true));
         }
 
-        if !extension_loaded("zlib") {
+        if !diagnostics.extension_loaded("zlib") {
             warnings.insert("zlib".to_string(), PhpMixed::Bool(true));
         }
 
-        let phpinfo_str = shirabe_php_rpc::get_phpinfo(INFO_GENERAL);
         let mut phpinfo_match: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
             php_regex!("{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"),
-            &phpinfo_str,
+            &diagnostics.phpinfo_general,
             Some(&mut phpinfo_match),
         ) {
             let configure = phpinfo_match
@@ -1203,27 +1208,29 @@ impl DiagnoseCommand {
             }
         }
 
-        if filter_var_boolean(ini_get("xdebug.profiler_enabled").as_deref().unwrap_or("")) {
+        if filter_var_boolean(diagnostics.ini_get("xdebug.profiler_enabled").unwrap_or("")) {
             warnings.insert("xdebug_profile".to_string(), PhpMixed::Bool(true));
-        } else if XdebugHandler::is_xdebug_active() {
+        } else if diagnostics.xdebug_active {
+            // PHP: XdebugHandler::isXdebugActive(). As with IniHelper::get_all, the port of that
+            // method in shirabe_external_packages cannot reach the PHP RPC bridge (the dependency
+            // would cycle), so the real runtime is queried through the diagnose payload instead.
             warnings.insert("xdebug_loaded".to_string(), PhpMixed::Bool(true));
         }
 
-        if defined("PHP_WINDOWS_VERSION_BUILD")
-            && (version_compare(PHP_VERSION, "7.2.23", "<")
-                || (version_compare(PHP_VERSION, "7.3.0", ">=")
-                    && version_compare(PHP_VERSION, "7.3.10", "<")))
+        if diagnostics.has_php_windows_version_build
+            && (version_compare(&diagnostics.php_version, "7.2.23", "<")
+                || (version_compare(&diagnostics.php_version, "7.3.0", ">=")
+                    && version_compare(&diagnostics.php_version, "7.3.10", "<")))
         {
-            let _ = PHP_WINDOWS_VERSION_BUILD;
             warnings.insert(
                 "onedrive".to_string(),
-                PhpMixed::String(PHP_VERSION.to_string()),
+                PhpMixed::String(diagnostics.php_version.clone()),
             );
         }
 
-        if extension_loaded("uopz")
-            && !(filter_var_boolean(ini_get("uopz.disable").as_deref().unwrap_or(""))
-                || filter_var_boolean(ini_get("uopz.exit").as_deref().unwrap_or("")))
+        if diagnostics.extension_loaded("uopz")
+            && !(filter_var_boolean(diagnostics.ini_get("uopz.disable").unwrap_or(""))
+                || filter_var_boolean(diagnostics.ini_get("uopz.exit").unwrap_or("")))
         {
             warnings.insert("uopz".to_string(), PhpMixed::Bool(true));
         }
@@ -1325,13 +1332,16 @@ impl DiagnoseCommand {
                     ),
                     "openssl_version" => {
                         // Attempt to parse version number out, fallback to whole string value.
+                        let openssl_version_text =
+                            diagnostics.openssl_version_text.clone().unwrap_or_default();
                         let openssl_trimmed = trim(
-                            &strstr(OPENSSL_VERSION_TEXT, " ").unwrap_or_default(),
+                            &strstr(&openssl_version_text, " ").unwrap_or_default(),
                             Some(" \t\n\r\0\u{0B}"),
                         );
-                        let mut openssl_version = strstr(&openssl_trimmed, " ").unwrap_or_default();
+                        let mut openssl_version =
+                            strstr3(&openssl_trimmed, " ", true).unwrap_or_default();
                         if openssl_version.is_empty() {
-                            openssl_version = OPENSSL_VERSION_TEXT.to_string();
+                            openssl_version = openssl_version_text;
                         }
 
                         format!(
@@ -1401,12 +1411,9 @@ impl DiagnoseCommand {
 
     /// Check if allow_url_fopen is ON
     fn check_connectivity(&self) -> PhpMixed {
-        if !ini_get("allow_url_fopen")
-            .as_deref()
-            .and_then(|s| s.parse::<bool>().ok())
-            .unwrap_or(false)
-            && ini_get("allow_url_fopen").as_deref() != Some("1")
-        {
+        // PHP: if (!ini_get('allow_url_fopen')) — a missing setting, "" and "0" are all falsey.
+        let allow_url_fopen = shirabe_php_rpc::get_diagnostics().ini_get("allow_url_fopen");
+        if !allow_url_fopen.is_some_and(|value| !value.is_empty() && value != "0") {
             return PhpMixed::String(
                 "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>".to_string(),
             );

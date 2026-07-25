@@ -2122,6 +2122,7 @@ name = "shirabe-php-rpc"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "indexmap",
  "shirabe-external-packages",
  "shirabe-php-shim",
  "tempfile",

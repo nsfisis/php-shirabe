@@ -380,6 +380,16 @@ pub fn strstr(haystack: &str, needle: &str) -> Option<String> {
     haystack.find(needle).map(|i| haystack[i..].to_string())
 }
 
+pub fn strstr3(haystack: &str, needle: &str, before_needle: bool) -> Option<String> {
+    haystack.find(needle).map(|i| {
+        if before_needle {
+            haystack[..i].to_string()
+        } else {
+            haystack[i..].to_string()
+        }
+    })
+}
+
 /// PHP's default trim character mask: " \t\n\r\0\x0B".
 const PHP_TRIM_DEFAULT_CHARS: &[u8] = b" \t\n\r\0\x0B";
 

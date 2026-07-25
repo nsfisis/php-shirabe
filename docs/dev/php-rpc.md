@@ -10,12 +10,12 @@ system PHP as a child process and asks it for runtime information over a Unix do
 
 The crate supports exactly one interaction pattern, and nothing else:
 
-> Rust calls a named PHP function, passing a single string argument, and receives a single scalar
+> Rust calls a named PHP function, passing a single string argument, and receives a single value
 > back.
 
 - Rust to PHP only. PHP never calls back into Rust.
 - Exactly one argument, and it must be a string.
-- Scalar return values only (string / int / float / bool / null).
+- Return values are scalars (string / int / float / bool / null) or arrays of them.
 - Every failure `panic!`s: a PHP exception (not currently possible — the glue script never lets
   one escape), a serialization/deserialization failure, a missing PHP function, a crashed child,
   etc. None are handled as recoverable errors. This is not the final design — a future revision
@@ -35,8 +35,7 @@ Reuse the existing `PhpExecutableFinder` class to resolve the PHP binary.
   - Request payload: the PHP function name as raw bytes, followed by a `\0` byte and the string
     argument (function names are static literals and never contain `\0`, so the first `\0`
     unambiguously separates name from argument).
-  - Response payload: `serialize()` of the function's return value — any of `N;` (null), `b:0/1;`
-    (bool), `i:<n>;` (int), `d:<f>;` (float), or `s:<len>:"<bytes>";` (string).
+  - Response payload: `serialize()` of the function's return value.
 
 The PHP worker is a single read-eval-respond loop: read a framed function name and argument, call
 the matching entry in a fixed dispatch table (`defined`, `constant`), send back

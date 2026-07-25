@@ -1,11 +1,12 @@
 //! Rust-to-PHP RPC over a Unix domain socket. See `docs/dev/php-rpc.md`.
 
 use anyhow::Context as _;
+use indexmap::IndexMap;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::PhpMixed;
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 /// PHP `\PHP_VERSION`.
@@ -59,11 +60,152 @@ pub fn get_extension_info(name: &str) -> String {
     }
 }
 
-/// PHP `phpinfo($what)` output, captured via `ob_start()`/`ob_get_clean()`.
-pub fn get_phpinfo(what: i64) -> String {
-    match call("phpinfo", &what.to_string()) {
-        PhpMixed::String(s) => s,
-        other => panic!("PHP RPC: `phpinfo` did not return a string: {other:?}"),
+/// Everything the `diagnose` command needs to know about the PHP runtime, fetched in a single
+/// round trip because the command would otherwise probe the same runtime dozens of times.
+#[derive(Debug)]
+pub struct Diagnostics {
+    pub php_version: String,
+    pub php_version_id: i64,
+    /// `None` when `PHP_BINARY` is undefined.
+    pub php_binary: Option<String>,
+    /// `None` when `OPENSSL_VERSION_TEXT` is undefined.
+    pub openssl_version_text: Option<String>,
+    /// `0` when `OPENSSL_VERSION_NUMBER` is undefined.
+    pub openssl_version_number: i64,
+    pub has_hhvm_version: bool,
+    pub has_php_windows_version_build: bool,
+    /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()`.
+    pub xdebug_active: bool,
+    /// `0` when the ionCube loader is not loaded.
+    pub ioncube_loader_iversion: i64,
+    /// Empty when the ionCube loader is not loaded.
+    pub ioncube_loader_version: String,
+    /// `phpinfo(INFO_GENERAL)` output, captured via `ob_start()`/`ob_get_clean()`.
+    pub phpinfo_general: String,
+    extensions: IndexMap<String, bool>,
+    functions: IndexMap<String, bool>,
+    ini_settings: IndexMap<String, Option<String>>,
+}
+
+impl Diagnostics {
+    /// PHP `extension_loaded($name)`. Only the extensions the worker probes can be asked about;
+    /// any other name is a bug in the caller, not a missing extension.
+    pub fn extension_loaded(&self, name: &str) -> bool {
+        *self.extensions.get(name).unwrap_or_else(|| {
+            panic!("PHP RPC: extension `{name}` is not probed by the diagnose payload")
+        })
+    }
+
+    /// PHP `function_exists($name)`. See [`Diagnostics::extension_loaded`] for the fixed probe set.
+    pub fn function_exists(&self, name: &str) -> bool {
+        *self.functions.get(name).unwrap_or_else(|| {
+            panic!("PHP RPC: function `{name}` is not probed by the diagnose payload")
+        })
+    }
+
+    /// PHP `ini_get($option)`, with PHP's `false` (no such setting) mapped to `None`. See
+    /// [`Diagnostics::extension_loaded`] for the fixed probe set.
+    pub fn ini_get(&self, option: &str) -> Option<&str> {
+        self.ini_settings
+            .get(option)
+            .unwrap_or_else(|| {
+                panic!("PHP RPC: ini setting `{option}` is not probed by the diagnose payload")
+            })
+            .as_deref()
+    }
+}
+
+static DIAGNOSTICS: OnceLock<Diagnostics> = OnceLock::new();
+
+/// PHP runtime information for the `diagnose` command. The worker is queried once per process;
+/// subsequent calls reuse the cached payload.
+pub fn get_diagnostics() -> &'static Diagnostics {
+    DIAGNOSTICS.get_or_init(|| {
+        let payload = call("diagnose", "");
+        let payload = payload
+            .as_array()
+            .unwrap_or_else(|| panic!("PHP RPC: `diagnose` did not return an array: {payload:?}"));
+
+        Diagnostics {
+            php_version: string_field(payload, "php_version"),
+            php_version_id: int_field(payload, "php_version_id"),
+            php_binary: nullable_string_field(payload, "php_binary"),
+            openssl_version_text: nullable_string_field(payload, "openssl_version_text"),
+            openssl_version_number: int_field(payload, "openssl_version_number"),
+            has_hhvm_version: bool_field(payload, "has_hhvm_version"),
+            has_php_windows_version_build: bool_field(payload, "has_php_windows_version_build"),
+            xdebug_active: bool_field(payload, "xdebug_active"),
+            ioncube_loader_iversion: int_field(payload, "ioncube_loader_iversion"),
+            ioncube_loader_version: string_field(payload, "ioncube_loader_version"),
+            phpinfo_general: string_field(payload, "phpinfo_general"),
+            extensions: map_field(payload, "extensions")
+                .iter()
+                .map(|(name, value)| (name.clone(), as_bool(value, name)))
+                .collect(),
+            functions: map_field(payload, "functions")
+                .iter()
+                .map(|(name, value)| (name.clone(), as_bool(value, name)))
+                .collect(),
+            ini_settings: map_field(payload, "ini")
+                .iter()
+                .map(|(name, value)| (name.clone(), as_nullable_string(value, name)))
+                .collect(),
+        }
+    })
+}
+
+fn field<'a>(payload: &'a IndexMap<String, PhpMixed>, key: &str) -> &'a PhpMixed {
+    payload
+        .get(key)
+        .unwrap_or_else(|| panic!("PHP RPC: `diagnose` payload has no `{key}` entry"))
+}
+
+fn string_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> String {
+    match field(payload, key) {
+        PhpMixed::String(s) => s.clone(),
+        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not a string: {other:?}"),
+    }
+}
+
+fn nullable_string_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> Option<String> {
+    as_nullable_string(field(payload, key), key)
+}
+
+fn int_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> i64 {
+    match field(payload, key) {
+        PhpMixed::Int(n) => *n,
+        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not an int: {other:?}"),
+    }
+}
+
+fn bool_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> bool {
+    as_bool(field(payload, key), key)
+}
+
+fn map_field<'a>(
+    payload: &'a IndexMap<String, PhpMixed>,
+    key: &str,
+) -> &'a IndexMap<String, PhpMixed> {
+    match field(payload, key) {
+        PhpMixed::Array(map) => map,
+        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not an array: {other:?}"),
+    }
+}
+
+fn as_bool(value: &PhpMixed, key: &str) -> bool {
+    match value {
+        PhpMixed::Bool(b) => *b,
+        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not a bool: {other:?}"),
+    }
+}
+
+fn as_nullable_string(value: &PhpMixed, key: &str) -> Option<String> {
+    match value {
+        PhpMixed::String(s) => Some(s.clone()),
+        PhpMixed::Null => None,
+        other => {
+            panic!("PHP RPC: `diagnose` payload entry `{key}` is not a string or null: {other:?}")
+        }
     }
 }
 
@@ -77,26 +219,28 @@ pub fn phpversion(extension: &str) -> Option<String> {
 }
 
 /// PHP `get_loaded_extensions()`.
-///
-/// Extension names are joined with `,` on the PHP side and split back here; real
-/// extension names never contain a comma.
 pub fn get_loaded_extensions() -> Vec<String> {
-    match call("get_loaded_extensions", "") {
-        PhpMixed::String(s) if s.is_empty() => Vec::new(),
-        PhpMixed::String(s) => s.split(',').map(|s| s.to_string()).collect(),
-        other => panic!("PHP RPC: `get_loaded_extensions` did not return a string: {other:?}"),
-    }
+    string_list(call("get_loaded_extensions", ""), "get_loaded_extensions")
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` (minus the `self::$name` branch,
 /// which is unreachable since this port never constructs an XdebugHandler): `[(string)
 /// php_ini_loaded_file()]` merged with the trimmed, comma-split `php_ini_scanned_files()` list
-/// when scanning is active. Paths are joined with `,` on the PHP side and split back here; real
-/// ini paths never contain a comma (same assumption `get_loaded_extensions` makes).
+/// when scanning is active.
 pub fn get_all_ini_files() -> Vec<String> {
-    match call("get_all_ini_files", "") {
-        PhpMixed::String(s) => s.split(',').map(|s| s.to_string()).collect(),
-        other => panic!("PHP RPC: `get_all_ini_files` did not return a string: {other:?}"),
+    string_list(call("get_all_ini_files", ""), "get_all_ini_files")
+}
+
+fn string_list(value: PhpMixed, name: &str) -> Vec<String> {
+    match value {
+        PhpMixed::List(items) => items
+            .into_iter()
+            .map(|item| match item {
+                PhpMixed::String(s) => s,
+                other => panic!("PHP RPC: `{name}` returned a non-string element: {other:?}"),
+            })
+            .collect(),
+        other => panic!("PHP RPC: `{name}` did not return a list: {other:?}"),
     }
 }
 
@@ -151,7 +295,7 @@ fn call(name: &str, arg: &str) -> PhpMixed {
     let payload = guard
         .request(name, arg)
         .unwrap_or_else(|e| panic!("PHP RPC: request `{name}` failed: {e:#}"));
-    parse_serialized_scalar(&payload).unwrap_or_else(|| {
+    parse_serialized_value(&payload).unwrap_or_else(|| {
         panic!("PHP RPC: request `{name}` returned an unparseable payload: {payload:?}")
     })
 }
@@ -214,41 +358,108 @@ fn read_frame(stream: &mut UnixStream) -> std::io::Result<Vec<u8>> {
     Ok(payload)
 }
 
-/// Parse the `s:<len>:"<bytes>";` form; only strings are needed here, so other forms are rejected.
-fn parse_serialized_string(payload: &[u8]) -> Option<String> {
-    let rest = payload.strip_prefix(b"s:")?;
-    let colon = rest.iter().position(|&b| b == b':')?;
-    let len: usize = std::str::from_utf8(&rest[..colon]).ok()?.parse().ok()?;
-    let after = rest.get(colon + 1..)?;
-    let bytes = after.strip_prefix(b"\"")?.get(..len)?;
-    Some(String::from_utf8_lossy(bytes).into_owned())
+/// Parse a whole `serialize()` payload, rejecting trailing garbage.
+fn parse_serialized_value(payload: &[u8]) -> Option<PhpMixed> {
+    let mut pos = 0;
+    let value = parse_value(payload, &mut pos)?;
+    (pos == payload.len()).then_some(value)
 }
 
-/// Parse any of PHP's scalar/null `serialize()` forms: `N;`, `b:0/1;`, `i:<n>;`, `d:<f>;`,
-/// `s:<len>:"<bytes>";`.
-fn parse_serialized_scalar(payload: &[u8]) -> Option<PhpMixed> {
-    if payload == b"N;" {
-        return Some(PhpMixed::Null);
-    }
-    if let Some(rest) = payload.strip_prefix(b"b:") {
-        return match rest.strip_suffix(b";")? {
+/// Parse one `serialize()` value starting at `pos`, advancing it past the value: `N;`, `b:0/1;`,
+/// `i:<n>;`, `d:<f>;`, `s:<len>:"<bytes>";`, `a:<count>:{<key><value>...}`.
+fn parse_value(payload: &[u8], pos: &mut usize) -> Option<PhpMixed> {
+    let tag = payload.get(*pos..*pos + 2)?;
+    *pos += 2;
+    match tag {
+        b"N;" => Some(PhpMixed::Null),
+        b"b:" => match take_until(payload, pos, b';')? {
             b"0" => Some(PhpMixed::Bool(false)),
             b"1" => Some(PhpMixed::Bool(true)),
             _ => None,
+        },
+        b"i:" => parse_int(take_until(payload, pos, b';')?).map(PhpMixed::Int),
+        b"d:" => std::str::from_utf8(take_until(payload, pos, b';')?)
+            .ok()?
+            .parse()
+            .ok()
+            .map(PhpMixed::Float),
+        b"s:" => parse_string_body(payload, pos).map(PhpMixed::String),
+        b"a:" => parse_array_body(payload, pos),
+        _ => None,
+    }
+}
+
+/// Parse the `<len>:"<bytes>";` tail of a serialized string.
+fn parse_string_body(payload: &[u8], pos: &mut usize) -> Option<String> {
+    let len: usize = std::str::from_utf8(take_until(payload, pos, b':')?)
+        .ok()?
+        .parse()
+        .ok()?;
+    if payload.get(*pos) != Some(&b'"') {
+        return None;
+    }
+    *pos += 1;
+    let bytes = payload.get(*pos..*pos + len)?;
+    *pos += len;
+    if payload.get(*pos..*pos + 2) != Some(b"\";") {
+        return None;
+    }
+    *pos += 2;
+    Some(String::from_utf8_lossy(bytes).into_owned())
+}
+
+/// Parse the `<count>:{<key><value>...}` tail of a serialized array. An array whose keys are
+/// exactly `0..count` maps to `PhpMixed::List`, matching how PHP renders such an array as a JSON
+/// list; anything else maps to `PhpMixed::Array` with the keys stringified.
+fn parse_array_body(payload: &[u8], pos: &mut usize) -> Option<PhpMixed> {
+    let count: usize = std::str::from_utf8(take_until(payload, pos, b':')?)
+        .ok()?
+        .parse()
+        .ok()?;
+    if payload.get(*pos) != Some(&b'{') {
+        return None;
+    }
+    *pos += 1;
+
+    let mut entries: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut is_list = true;
+    for index in 0..count {
+        let key = match parse_value(payload, pos)? {
+            PhpMixed::Int(n) => {
+                is_list &= n == index as i64;
+                n.to_string()
+            }
+            PhpMixed::String(s) => {
+                is_list = false;
+                s
+            }
+            _ => return None,
         };
+        entries.insert(key, parse_value(payload, pos)?);
     }
-    if let Some(rest) = payload.strip_prefix(b"i:") {
-        let s = std::str::from_utf8(rest.strip_suffix(b";")?).ok()?;
-        return s.parse().ok().map(PhpMixed::Int);
+
+    if payload.get(*pos) != Some(&b'}') {
+        return None;
     }
-    if let Some(rest) = payload.strip_prefix(b"d:") {
-        let s = std::str::from_utf8(rest.strip_suffix(b";")?).ok()?;
-        return s.parse().ok().map(PhpMixed::Float);
-    }
-    if payload.starts_with(b"s:") {
-        return parse_serialized_string(payload).map(PhpMixed::String);
-    }
-    None
+    *pos += 1;
+
+    Some(if is_list {
+        PhpMixed::List(entries.into_values().collect())
+    } else {
+        PhpMixed::Array(entries)
+    })
+}
+
+/// Return the bytes from `pos` up to the next `terminator`, advancing `pos` past it.
+fn take_until<'a>(payload: &'a [u8], pos: &mut usize, terminator: u8) -> Option<&'a [u8]> {
+    let end = *pos + payload.get(*pos..)?.iter().position(|&b| b == terminator)?;
+    let bytes = &payload[*pos..end];
+    *pos = end + 1;
+    Some(bytes)
+}
+
+fn parse_int(bytes: &[u8]) -> Option<i64> {
+    std::str::from_utf8(bytes).ok()?.parse().ok()
 }
 
 #[cfg(test)]
@@ -258,34 +469,35 @@ mod tests {
     #[test]
     fn parses_string_scalar() {
         assert_eq!(
-            parse_serialized_string(b"s:5:\"8.5.7\";").as_deref(),
-            Some("8.5.7"),
+            parse_serialized_value(b"s:5:\"8.5.7\";"),
+            Some(PhpMixed::String("8.5.7".to_string())),
         );
     }
 
     #[test]
     fn parses_empty_string() {
-        assert_eq!(parse_serialized_string(b"s:0:\"\";").as_deref(), Some(""));
+        assert_eq!(
+            parse_serialized_value(b"s:0:\"\";"),
+            Some(PhpMixed::String(String::new())),
+        );
     }
 
     #[test]
     fn parses_string_with_embedded_quote() {
         assert_eq!(
-            parse_serialized_string(b"s:3:\"a\"b\";").as_deref(),
-            Some("a\"b"),
+            parse_serialized_value(b"s:3:\"a\"b\";"),
+            Some(PhpMixed::String("a\"b".to_string())),
         );
     }
 
     #[test]
-    fn rejects_non_string_scalars() {
-        assert_eq!(parse_serialized_string(b"i:42;"), None);
-        assert_eq!(parse_serialized_string(b"N;"), None);
-        assert_eq!(parse_serialized_string(b"b:1;"), None);
+    fn rejects_truncated_string() {
+        assert_eq!(parse_serialized_value(b"s:5:\"ab\";"), None);
     }
 
     #[test]
-    fn rejects_truncated_string() {
-        assert_eq!(parse_serialized_string(b"s:5:\"ab\";"), None);
+    fn rejects_trailing_garbage() {
+        assert_eq!(parse_serialized_value(b"i:42;i:43;"), None);
     }
 
     #[test]
@@ -306,51 +518,141 @@ mod tests {
 
     #[test]
     fn rejects_non_numeric_length() {
-        assert_eq!(parse_serialized_string(b"s:x:\"ab\";"), None);
+        assert_eq!(parse_serialized_value(b"s:x:\"ab\";"), None);
     }
 
     #[test]
     fn parses_scalar_null() {
-        assert_eq!(parse_serialized_scalar(b"N;"), Some(PhpMixed::Null));
+        assert_eq!(parse_serialized_value(b"N;"), Some(PhpMixed::Null));
     }
 
     #[test]
     fn parses_scalar_bool() {
-        assert_eq!(
-            parse_serialized_scalar(b"b:0;"),
-            Some(PhpMixed::Bool(false))
-        );
-        assert_eq!(parse_serialized_scalar(b"b:1;"), Some(PhpMixed::Bool(true)));
+        assert_eq!(parse_serialized_value(b"b:0;"), Some(PhpMixed::Bool(false)));
+        assert_eq!(parse_serialized_value(b"b:1;"), Some(PhpMixed::Bool(true)));
     }
 
     #[test]
     fn parses_scalar_int() {
-        assert_eq!(parse_serialized_scalar(b"i:8;"), Some(PhpMixed::Int(8)));
-        assert_eq!(parse_serialized_scalar(b"i:-1;"), Some(PhpMixed::Int(-1)));
+        assert_eq!(parse_serialized_value(b"i:8;"), Some(PhpMixed::Int(8)));
+        assert_eq!(parse_serialized_value(b"i:-1;"), Some(PhpMixed::Int(-1)));
     }
 
     #[test]
     fn parses_scalar_float() {
         assert_eq!(
-            parse_serialized_scalar(b"d:1.5;"),
+            parse_serialized_value(b"d:1.5;"),
             Some(PhpMixed::Float(1.5))
         );
     }
 
     #[test]
-    fn parses_scalar_string() {
+    fn rejects_malformed_scalar() {
+        assert_eq!(parse_serialized_value(b"b:2;"), None);
+        assert_eq!(parse_serialized_value(b"i:x;"), None);
+        assert_eq!(parse_serialized_value(b"d:x;"), None);
+        assert_eq!(parse_serialized_value(b"garbage"), None);
+    }
+
+    #[test]
+    fn parses_list_array() {
         assert_eq!(
-            parse_serialized_scalar(b"s:5:\"8.5.7\";"),
-            Some(PhpMixed::String("8.5.7".to_string())),
+            parse_serialized_value(b"a:2:{i:0;s:1:\"a\";i:1;i:7;}"),
+            Some(PhpMixed::List(vec![
+                PhpMixed::String("a".to_string()),
+                PhpMixed::Int(7),
+            ])),
         );
     }
 
     #[test]
-    fn rejects_malformed_scalar() {
-        assert_eq!(parse_serialized_scalar(b"b:2;"), None);
-        assert_eq!(parse_serialized_scalar(b"i:x;"), None);
-        assert_eq!(parse_serialized_scalar(b"d:x;"), None);
-        assert_eq!(parse_serialized_scalar(b"garbage"), None);
+    fn parses_empty_array_as_list() {
+        assert_eq!(
+            parse_serialized_value(b"a:0:{}"),
+            Some(PhpMixed::List(vec![]))
+        );
+    }
+
+    #[test]
+    fn parses_keyed_array() {
+        let expected: IndexMap<String, PhpMixed> = [
+            ("zip".to_string(), PhpMixed::Bool(true)),
+            ("apcu".to_string(), PhpMixed::Null),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            parse_serialized_value(b"a:2:{s:3:\"zip\";b:1;s:4:\"apcu\";N;}"),
+            Some(PhpMixed::Array(expected)),
+        );
+    }
+
+    #[test]
+    fn parses_nested_array() {
+        let inner: IndexMap<String, PhpMixed> = [("curl".to_string(), PhpMixed::Bool(false))]
+            .into_iter()
+            .collect();
+        let expected: IndexMap<String, PhpMixed> = [
+            ("extensions".to_string(), PhpMixed::Array(inner)),
+            ("php_version_id".to_string(), PhpMixed::Int(80500)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            parse_serialized_value(
+                b"a:2:{s:10:\"extensions\";a:1:{s:4:\"curl\";b:0;}s:14:\"php_version_id\";i:80500;}"
+            ),
+            Some(PhpMixed::Array(expected)),
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_array() {
+        // Count larger than the number of entries.
+        assert_eq!(parse_serialized_value(b"a:2:{i:0;i:1;}"), None);
+        // Missing closing brace.
+        assert_eq!(parse_serialized_value(b"a:1:{i:0;i:1;"), None);
+        // Non-scalar key.
+        assert_eq!(parse_serialized_value(b"a:1:{N;i:1;}"), None);
+    }
+
+    #[test]
+    fn queries_string_lists_when_php_available() {
+        if PhpExecutableFinder::new().find(false).is_none() {
+            // No PHP in this environment; the worker cannot start.
+            return;
+        }
+
+        let extensions = get_loaded_extensions();
+        assert!(
+            extensions.iter().any(|extension| extension == "Core"),
+            "expected the Core extension among {extensions:?}",
+        );
+
+        // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
+        // string when no php.ini is loaded.
+        assert!(!get_all_ini_files().is_empty());
+    }
+
+    #[test]
+    fn queries_diagnostics_when_php_available() {
+        if PhpExecutableFinder::new().find(false).is_none() {
+            // No PHP in this environment; the worker cannot start.
+            return;
+        }
+
+        let diagnostics = get_diagnostics();
+        assert_eq!(diagnostics.php_version, get_php_version());
+        assert!(diagnostics.php_version_id >= 70205);
+        let php_binary = get_php_binary();
+        assert_eq!(diagnostics.php_binary.as_deref(), Some(php_binary.as_str()));
+        assert!(diagnostics.function_exists("json_decode"));
+        assert!(!diagnostics.extension_loaded("ionCube Loader"));
+        assert!(
+            diagnostics.phpinfo_general.contains("PHP Version"),
+            "expected phpinfo(INFO_GENERAL) output, got: {}",
+            diagnostics.phpinfo_general,
+        );
     }
 
     #[test]
