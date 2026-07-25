@@ -23,9 +23,9 @@ use shirabe_php_shim::{
 #[derive(serde::Serialize)]
 struct AuditJsonReport<'a> {
     #[serde(serialize_with = "serialize_advisories_field")]
-    advisories: &'a IndexMap<String, Vec<AnySecurityAdvisory>>,
+    advisories: &'a IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     #[serde(rename = "ignored-advisories", skip_serializing_if = "Option::is_none")]
-    ignored_advisories: Option<&'a IndexMap<String, Vec<AnySecurityAdvisory>>>,
+    ignored_advisories: Option<&'a IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
     #[serde(
         rename = "unreachable-repositories",
         skip_serializing_if = "Option::is_none"
@@ -55,7 +55,7 @@ where
 }
 
 fn serialize_advisories_field<S>(
-    map: &&IndexMap<String, Vec<AnySecurityAdvisory>>,
+    map: &&IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     serializer: S,
 ) -> anyhow::Result<S::Ok, S::Error>
 where
@@ -197,7 +197,7 @@ impl Auditor {
         let error_or_warn = if warning_only { "warning" } else { "error" };
         if affected_packages_count > 0 || !ignored_advisories.is_empty() {
             let passes: Vec<(
-                &IndexMap<String, Vec<AnySecurityAdvisory>>,
+                &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
                 String,
             )> = vec![
                 (
@@ -263,7 +263,7 @@ impl Auditor {
     /// @return bool
     pub fn needs_complete_advisory_load(
         &self,
-        advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         ignore_list: &IndexMap<String, Option<String>>,
     ) -> bool {
         if advisories.is_empty() {
@@ -271,15 +271,15 @@ impl Auditor {
         }
 
         // no partial advisories present
-        let advisories_values: Vec<&Vec<AnySecurityAdvisory>> = advisories.values().collect();
-        if array_all(
-            &advisories_values,
-            |pkg_advisories: &&Vec<AnySecurityAdvisory>| {
-                array_all(pkg_advisories, |advisory: &AnySecurityAdvisory| {
+        let advisories_values: Vec<_> = advisories.values().collect();
+        if array_all(&advisories_values, |pkg_advisories| {
+            array_all(
+                pkg_advisories,
+                |advisory: &std::rc::Rc<AnySecurityAdvisory>| {
                     advisory.as_security_advisory().is_some()
-                })
-            },
-        ) {
+                },
+            )
+        }) {
             return false;
         }
 
@@ -321,7 +321,7 @@ impl Auditor {
 
     pub fn process_advisories(
         &self,
-        all_advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,
+        all_advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         ignore_list: &IndexMap<String, Option<String>>,
         ignored_severities: &IndexMap<String, Option<String>>,
     ) -> ProcessAdvisoriesResult {
@@ -332,8 +332,9 @@ impl Auditor {
             };
         }
 
-        let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
-        let mut ignored: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+        let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+            IndexMap::new();
+        let mut ignored: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
         let mut ignore_reason: Option<String> = None;
 
         for (package, pkg_advisories) in all_advisories {
@@ -394,7 +395,9 @@ impl Auditor {
                 // and in that case we do not need to cast the object.
                 let advisory = if advisory.as_security_advisory().is_some() {
                     let full = advisory.as_security_advisory().unwrap();
-                    AnySecurityAdvisory::Ignored(full.to_ignored_advisory(ignore_reason.clone()))
+                    std::rc::Rc::new(AnySecurityAdvisory::Ignored(
+                        full.to_ignored_advisory(ignore_reason.clone()),
+                    ))
                 } else {
                     advisory
                 };
@@ -412,7 +415,7 @@ impl Auditor {
     /// @return array{int, int} Count of affected packages and total count of advisories
     fn count_advisories(
         &self,
-        advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> (i64, i64) {
         let mut count: i64 = 0;
         for package_advisories in advisories.values() {
@@ -427,7 +430,7 @@ impl Auditor {
     fn output_advisories(
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         format: &str,
     ) -> anyhow::Result<()> {
         match format {
@@ -473,7 +476,7 @@ impl Auditor {
     fn output_advisories_table(
         &self,
         io: &ConsoleIO,
-        advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> anyhow::Result<()> {
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
@@ -534,7 +537,7 @@ impl Auditor {
     fn output_advisories_plain(
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> anyhow::Result<()> {
         let mut error: Vec<String> = vec![];
         let mut first_advisory = true;
@@ -745,6 +748,6 @@ impl Auditor {
 
 #[derive(Debug)]
 pub struct ProcessAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,
-    pub ignored_advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+    pub ignored_advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
 }

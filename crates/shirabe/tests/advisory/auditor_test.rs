@@ -34,11 +34,11 @@ fn constraint(operator: &str, version: &str) -> shirabe_semver::constraint::AnyC
     SimpleConstraint::new(operator.to_string(), version.to_string(), None).into()
 }
 
-fn full_advisory() -> AnySecurityAdvisory {
+fn full_advisory() -> std::rc::Rc<AnySecurityAdvisory> {
     let mut source: IndexMap<String, String> = IndexMap::new();
     source.insert("name".to_string(), "foo".to_string());
     source.insert("remoteId".to_string(), "remoteID".to_string());
-    AnySecurityAdvisory::Full(SecurityAdvisory::new(
+    std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
         "foo/bar".to_string(),
         "123".to_string(),
         constraint("=", "1.0.0.0"),
@@ -48,14 +48,14 @@ fn full_advisory() -> AnySecurityAdvisory {
         None,
         None,
         None,
-    ))
+    )))
 }
 
-fn full_advisory_with_id(advisory_id: &str) -> AnySecurityAdvisory {
+fn full_advisory_with_id(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> {
     let mut source: IndexMap<String, String> = IndexMap::new();
     source.insert("name".to_string(), "foo".to_string());
     source.insert("remoteId".to_string(), "remoteID".to_string());
-    AnySecurityAdvisory::Full(SecurityAdvisory::new(
+    std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
         "foo/bar".to_string(),
         advisory_id.to_string(),
         constraint("=", "1.0.0.0"),
@@ -65,15 +65,15 @@ fn full_advisory_with_id(advisory_id: &str) -> AnySecurityAdvisory {
         None,
         None,
         None,
-    ))
+    )))
 }
 
-fn partial_advisory(advisory_id: &str) -> AnySecurityAdvisory {
-    AnySecurityAdvisory::Partial(PartialSecurityAdvisory::new(
+fn partial_advisory(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> {
+    std::rc::Rc::new(AnySecurityAdvisory::Partial(PartialSecurityAdvisory::new(
         "foo/bar".to_string(),
         advisory_id.to_string(),
         constraint("=", "1.0.0.0"),
-    ))
+    )))
 }
 
 fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<String, Option<String>> {
@@ -91,7 +91,7 @@ enum AdvisorySource {
     /// Mirrors `AuditorTest::getMockAdvisories()` filtered by the package constraint map.
     Table,
     /// Returns a fixed advisory map regardless of the request (reachable repo).
-    Fixed(IndexMap<String, Vec<AnySecurityAdvisory>>),
+    Fixed(IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>),
     /// Throws a `TransportException`, simulating an unreachable repository.
     Unreachable(String),
 }
@@ -120,12 +120,13 @@ impl AdvisoryProviderInterface for MockAdvisoryRepository {
                 advisories: advisories.clone(),
             }),
             AdvisorySource::Table => {
-                let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+                let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                    IndexMap::new();
                 for (package, list) in mock_advisories() {
                     let Some(constraint) = package_constraint_map.get(&package) else {
                         continue;
                     };
-                    let filtered: Vec<AnySecurityAdvisory> = list
+                    let filtered: Vec<std::rc::Rc<AnySecurityAdvisory>> = list
                         .into_iter()
                         .filter(|advisory| advisory.affected_versions().matches(constraint))
                         .collect();
@@ -202,8 +203,8 @@ impl RepositoryInterface for MockAdvisoryRepository {
 
 /// ref: AuditorTest::getMockAdvisories. All entries carry full data so they load as
 /// `SecurityAdvisory` (never partial) regardless of `allowPartialAdvisories`.
-fn mock_advisories() -> IndexMap<String, Vec<AnySecurityAdvisory>> {
-    let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+fn mock_advisories() -> IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> {
+    let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
     advisories.insert(
         "vendor1/package1".to_string(),
         vec![
@@ -352,11 +353,11 @@ fn mock_advisory(
     remote_id: &str,
     reported_at: &str,
     severity: &str,
-) -> AnySecurityAdvisory {
+) -> std::rc::Rc<AnySecurityAdvisory> {
     let mut source: IndexMap<String, String> = IndexMap::new();
     source.insert("name".to_string(), source_name.to_string());
     source.insert("remoteId".to_string(), remote_id.to_string());
-    AnySecurityAdvisory::Full(SecurityAdvisory::new(
+    std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
         package_name.to_string(),
         advisory_id.to_string(),
         VersionParser.parse_constraints(affected_versions).unwrap(),
@@ -366,7 +367,7 @@ fn mock_advisory(
         Some(cve.to_string()),
         Some(link.to_string()),
         Some(severity.to_string()),
-    ))
+    )))
 }
 
 /// ref: AuditorTest::getRepoSet. Real `RepositorySet` holding a single repository whose advisory
@@ -854,11 +855,11 @@ fn test_audit_with_ignore_unreachable() {
             .to_string();
 
     let make_repo_set = || {
-        let mut fixed: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+        let mut fixed: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
         fixed.insert(
             "vendor1/package1".to_string(),
             vec![
-                AnySecurityAdvisory::Full(SecurityAdvisory::new(
+                std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
                     "vendor1/package1".to_string(),
                     "CVE-2023-12345".to_string(),
                     constraint("=", "3.0.0.0"),
@@ -873,8 +874,8 @@ fn test_audit_with_ignore_unreachable() {
                     Some("CVE-2023-12345".to_string()),
                     Some("https://example.com/advisory/1".to_string()),
                     Some("medium".to_string()),
-                )),
-                AnySecurityAdvisory::Full(SecurityAdvisory::new(
+                ))),
+                std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
                     "vendor1/package1".to_string(),
                     "CVE-2023-67890".to_string(),
                     constraint("=", "3.0.0.0"),
@@ -889,7 +890,7 @@ fn test_audit_with_ignore_unreachable() {
                     Some("CVE-2023-67890".to_string()),
                     Some("https://example.com/advisory/3".to_string()),
                     Some("high".to_string()),
-                )),
+                ))),
             ],
         );
 
@@ -1106,7 +1107,7 @@ fn test_audit_with_ignore_severity() {
 #[test]
 fn test_needs_complete_advisory_load() {
     let cases: Vec<(
-        IndexMap<String, Vec<AnySecurityAdvisory>>,
+        IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         IndexMap<String, Option<String>>,
         bool,
     )> = vec![
@@ -1121,7 +1122,8 @@ fn test_needs_complete_advisory_load() {
         // packagist filters are IDs so work fine with partial advisories/2
         (
             {
-                let mut m: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                    IndexMap::new();
                 m.insert(
                     "vendor1/package1".to_string(),
                     vec![full_advisory(), partial_advisory("1234")],
@@ -1140,7 +1142,8 @@ fn test_needs_complete_advisory_load() {
         // no advisories no need to load any further/2
         (
             {
-                let mut m: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                    IndexMap::new();
                 m.insert("vendor1/package1".to_string(), vec![]);
                 m
             },
@@ -1150,7 +1153,8 @@ fn test_needs_complete_advisory_load() {
         // CVE filter or other non-packagist ones might need to fully load for safety if partial advisories are present
         (
             {
-                let mut m: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                    IndexMap::new();
                 m.insert(
                     "vendor1/package1".to_string(),
                     vec![full_advisory(), partial_advisory("1234")],
@@ -1163,7 +1167,8 @@ fn test_needs_complete_advisory_load() {
         // filter does not trigger load if all advisories are fully loaded
         (
             {
-                let mut m: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                    IndexMap::new();
                 m.insert("vendor1/package1".to_string(), vec![full_advisory()]);
                 m.insert(
                     "vendor1/package2".to_string(),

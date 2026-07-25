@@ -920,7 +920,7 @@ impl ComposerRepository {
             });
         }
 
-        let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+        let mut advisories = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
 
         let api_url = self
@@ -943,7 +943,7 @@ impl ComposerRepository {
         let create = |data: &IndexMap<String, PhpMixed>,
                       name: &str,
                       package_constraint_map: &IndexMap<String, AnyConstraint>|
-         -> anyhow::Result<Option<AnySecurityAdvisory>> {
+         -> anyhow::Result<Option<std::rc::Rc<AnySecurityAdvisory>>> {
             let advisory = PartialSecurityAdvisory::create(name, data, &parser)?;
             let is_full = matches!(advisory, AnySecurityAdvisory::Full(_));
             if !allow_partial_advisories && !is_full {
@@ -971,7 +971,7 @@ impl ComposerRepository {
                 return Ok(None);
             }
 
-            Ok(Some(advisory))
+            Ok(Some(std::rc::Rc::new(advisory)))
         };
 
         if self
@@ -1030,7 +1030,7 @@ impl ComposerRepository {
 
                 names_found.insert(name.clone(), true);
                 if !sec_advs_arr.is_empty() {
-                    let mut entries: Vec<AnySecurityAdvisory> = Vec::new();
+                    let mut entries: Vec<std::rc::Rc<AnySecurityAdvisory>> = Vec::new();
                     for data_mixed in sec_advs_arr.into_iter() {
                         if let PhpMixed::Array(data_map) = data_mixed
                             && let Some(adv) = create(&data_map, &name, &package_constraint_map)?
@@ -1112,7 +1112,7 @@ impl ComposerRepository {
                     None => continue,
                 };
                 if !list.is_empty() {
-                    let mut entries: Vec<AnySecurityAdvisory> = Vec::new();
+                    let mut entries: Vec<std::rc::Rc<AnySecurityAdvisory>> = Vec::new();
                     for data_mixed in list.iter() {
                         if let Some(data) = data_mixed.as_array() {
                             let data_map: IndexMap<String, PhpMixed> =
@@ -1128,10 +1128,11 @@ impl ComposerRepository {
             }
         }
 
-        let advisories_filtered: IndexMap<String, Vec<AnySecurityAdvisory>> = advisories
-            .into_iter()
-            .filter(|(_, adv)| !adv.is_empty())
-            .collect();
+        let advisories_filtered: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+            advisories
+                .into_iter()
+                .filter(|(_, adv)| !adv.is_empty())
+                .collect();
 
         Ok(SecurityAdvisoryResult {
             names_found: names_found.keys().cloned().collect(),

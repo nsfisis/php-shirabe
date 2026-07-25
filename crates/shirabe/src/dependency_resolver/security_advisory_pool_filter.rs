@@ -87,7 +87,7 @@ impl SecurityAdvisoryPoolFilter {
         let mut packages: Vec<BasePackageHandle> = vec![];
         let mut security_removed_versions: IndexMap<
             String,
-            IndexMap<String, Vec<AnySecurityAdvisory>>,
+            IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         > = IndexMap::new();
         let mut abandoned_removed_versions: IndexMap<String, IndexMap<String, String>> =
             IndexMap::new();
@@ -144,13 +144,13 @@ impl SecurityAdvisoryPoolFilter {
     fn get_matching_advisories(
         &self,
         package: BasePackageHandle,
-        advisory_map: &IndexMap<String, Vec<AnySecurityAdvisory>>,
-    ) -> Vec<AnySecurityAdvisory> {
+        advisory_map: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+    ) -> Vec<std::rc::Rc<AnySecurityAdvisory>> {
         if package.is_dev() {
             return vec![];
         }
 
-        let mut matching_advisories: Vec<AnySecurityAdvisory> = vec![];
+        let mut matching_advisories = vec![];
         for package_name in package.get_names(false) {
             if !advisory_map.contains_key(&package_name) {
                 continue;

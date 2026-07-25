@@ -7,7 +7,7 @@ use shirabe_semver::constraint::AnyConstraint;
 #[derive(Debug)]
 pub struct SecurityAdvisoryResult {
     pub names_found: Vec<String>,
-    pub advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
 }
 
 pub trait AdvisoryProviderInterface {

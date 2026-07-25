@@ -211,7 +211,7 @@ impl AdvisoryProviderInterface for PackageRepository {
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         let parser = VersionParser::new();
 
-        let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+        let mut advisories = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
             let Some(package_constraint) = package_constraint_map.get(package_name) else {
                 continue;
@@ -221,7 +221,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                 PhpMixed::List(list) => list,
                 _ => continue,
             };
-            let mut items: Vec<AnySecurityAdvisory> = Vec::new();
+            let mut items: Vec<std::rc::Rc<AnySecurityAdvisory>> = Vec::new();
             for data in list {
                 let data_map: IndexMap<String, PhpMixed> = match data {
                     PhpMixed::Array(m) => m.clone(),
@@ -249,13 +249,13 @@ impl AdvisoryProviderInterface for PackageRepository {
                     continue;
                 }
 
-                items.push(advisory);
+                items.push(std::rc::Rc::new(advisory));
             }
             advisories.insert(package_name.clone(), items);
         }
 
         let names_found: Vec<String> = advisories.keys().cloned().collect();
-        let advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = advisories
+        let advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = advisories
             .into_iter()
             .filter(|(_, adv)| !adv.is_empty())
             .collect();

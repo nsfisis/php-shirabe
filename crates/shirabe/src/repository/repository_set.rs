@@ -363,8 +363,9 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
         unreachable_repos: &mut Vec<String>,
-    ) -> anyhow::Result<IndexMap<String, Vec<AnySecurityAdvisory>>> {
-        let mut repo_advisories: Vec<IndexMap<String, Vec<AnySecurityAdvisory>>> = vec![];
+    ) -> anyhow::Result<IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>> {
+        let mut repo_advisories: Vec<IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>> =
+            vec![];
         for repository in &self.repositories {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let mut repo_ref = repository.borrow_mut();
@@ -403,7 +404,8 @@ impl RepositorySet {
             }
         }
 
-        let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+        let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+            IndexMap::new();
         for repo in repo_advisories {
             for (name, list) in repo {
                 advisories.entry(name).or_default().extend(list);
@@ -672,6 +674,6 @@ impl RepositorySetInterface for RepositorySet {
 
 #[derive(Debug)]
 pub struct SecurityAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     pub unreachable_repos: Vec<String>,
 }
