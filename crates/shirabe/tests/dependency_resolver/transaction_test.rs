@@ -2,6 +2,7 @@
 
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use indexmap::IndexMap;
+use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::dependency_resolver::transaction::Transaction;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
@@ -62,15 +63,15 @@ impl PartialEq for OperationEntry {
 fn check_transaction_operations(transaction: &Transaction, expected: Vec<OperationEntry>) {
     let mut result: Vec<OperationEntry> = vec![];
     for operation in transaction.get_operations() {
-        if let Some(update) = operation.as_update_operation() {
+        if let AnyOperation::Update(update) = operation {
             result.push(OperationEntry::Update {
                 from: update.get_initial_package(),
                 to: update.get_target_package(),
             });
         } else {
             result.push(OperationEntry::Job {
-                job: operation.get_operation_type(),
-                package: operation.get_package(),
+                job: operation.get_operation_type().to_string(),
+                package: operation.get_target_package(),
             });
         }
     }

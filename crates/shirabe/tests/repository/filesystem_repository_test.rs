@@ -3,7 +3,7 @@
 use crate::test_case::{get_alias_package, get_package};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::dependency_resolver::operation::OperationInterface;
+use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::installed_versions::InstalledVersions;
 use shirabe::installer::{InstallationManagerInterface, InstallerInterface};
 use shirabe::io::IOInterface;
@@ -106,7 +106,7 @@ mockall::mock! {
         fn execute(
             &mut self,
             repo: &mut dyn InstalledRepositoryInterface,
-            operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+            operations: Vec<AnyOperation>,
             dev_mode: bool,
             run_scripts: bool,
             download_only: bool,

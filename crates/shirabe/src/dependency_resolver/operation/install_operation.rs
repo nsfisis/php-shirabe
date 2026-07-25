@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/InstallOperation.php
 
-use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InstallOperation {
     pub(crate) package: PackageInterfaceHandle,
 }
@@ -16,6 +15,10 @@ impl InstallOperation {
 
     pub fn get_package(&self) -> PackageInterfaceHandle {
         self.package.clone()
+    }
+
+    pub fn show(&self, lock: bool) -> String {
+        Self::format(self.package.clone(), lock)
     }
 
     pub fn format(package: PackageInterfaceHandle, lock: bool) -> String {
@@ -30,28 +33,6 @@ impl InstallOperation {
 
 impl SolverOperation for InstallOperation {
     const TYPE: &'static str = "install";
-}
-
-impl OperationInterface for InstallOperation {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn get_operation_type(&self) -> String {
-        Self::TYPE.to_string()
-    }
-
-    fn show(&self, lock: bool) -> String {
-        Self::format(self.package.clone(), lock)
-    }
-
-    fn as_install_operation(&self) -> Option<&InstallOperation> {
-        Some(self)
-    }
-
-    fn get_package(&self) -> PackageInterfaceHandle {
-        self.package.clone()
-    }
 }
 
 impl std::fmt::Display for InstallOperation {

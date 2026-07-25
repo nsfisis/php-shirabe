@@ -1,11 +1,10 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/UpdateOperation.php
 
-use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UpdateOperation {
     pub(crate) initial_package: PackageInterfaceHandle,
     pub(crate) target_package: PackageInterfaceHandle,
@@ -25,6 +24,14 @@ impl UpdateOperation {
 
     pub fn get_target_package(&self) -> PackageInterfaceHandle {
         self.target_package.clone()
+    }
+
+    pub fn show(&self, lock: bool) -> String {
+        Self::format(
+            self.initial_package.clone(),
+            self.target_package.clone(),
+            lock,
+        )
     }
 
     pub fn format(
@@ -76,28 +83,6 @@ impl UpdateOperation {
 
 impl SolverOperation for UpdateOperation {
     const TYPE: &'static str = "update";
-}
-
-impl OperationInterface for UpdateOperation {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn get_operation_type(&self) -> String {
-        Self::TYPE.to_string()
-    }
-
-    fn show(&self, lock: bool) -> String {
-        Self::format(
-            self.initial_package.clone(),
-            self.target_package.clone(),
-            lock,
-        )
-    }
-
-    fn as_update_operation(&self) -> Option<&UpdateOperation> {
-        Some(self)
-    }
 }
 
 impl std::fmt::Display for UpdateOperation {

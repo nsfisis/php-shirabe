@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Installer/PackageEvent.php
 
 use crate::composer::ComposerWeakHandle;
-use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::io::IOInterface;
@@ -16,8 +16,8 @@ pub struct PackageEvent {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: bool,
     local_repo: Box<dyn RepositoryInterface>,
-    operations: Vec<std::rc::Rc<dyn OperationInterface>>,
-    operation: std::rc::Rc<dyn OperationInterface>,
+    operations: Vec<AnyOperation>,
+    operation: AnyOperation,
 }
 
 impl PackageEvent {
@@ -27,8 +27,8 @@ impl PackageEvent {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
         local_repo: Box<dyn RepositoryInterface>,
-        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
-        operation: std::rc::Rc<dyn OperationInterface>,
+        operations: Vec<AnyOperation>,
+        operation: AnyOperation,
     ) -> Self {
         Self {
             inner: Event::new(event_name, vec![], IndexMap::new()),
@@ -61,12 +61,12 @@ impl PackageEvent {
         self.local_repo.as_ref()
     }
 
-    pub fn get_operations(&self) -> &Vec<std::rc::Rc<dyn OperationInterface>> {
+    pub fn get_operations(&self) -> &Vec<AnyOperation> {
         &self.operations
     }
 
-    pub fn get_operation(&self) -> &dyn OperationInterface {
-        self.operation.as_ref()
+    pub fn get_operation(&self) -> &AnyOperation {
+        &self.operation
     }
 }
 

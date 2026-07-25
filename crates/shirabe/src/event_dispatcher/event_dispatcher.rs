@@ -4,7 +4,7 @@ use crate::autoload::ClassLoader;
 use crate::composer::PartialComposerHandle;
 use crate::composer::PartialComposerWeakHandle;
 use crate::dependency_resolver::Transaction;
-use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::event_dispatcher::EventSubscriberInterface;
@@ -205,8 +205,8 @@ impl EventDispatcher {
         event_name: &str,
         dev_mode: bool,
         local_repo: Box<dyn RepositoryInterface>,
-        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
-        operation: std::rc::Rc<dyn OperationInterface>,
+        operations: Vec<AnyOperation>,
+        operation: AnyOperation,
     ) -> anyhow::Result<i64> {
         let composer = self.composer();
         assert!(

@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/Transaction.php
 
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
 use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
-use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::dependency_resolver::operation::UpdateOperation;
 use crate::package::AliasPackageHandle;
@@ -21,7 +21,7 @@ use shirabe_php_shim::{
 #[derive(Debug, Clone)]
 pub struct Transaction {
     /// @var OperationInterface[]
-    pub(crate) operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+    pub(crate) operations: Vec<AnyOperation>,
 
     /// Packages present at the beginning of the transaction
     /// @var PackageInterface[]
@@ -64,7 +64,7 @@ impl Transaction {
         this
     }
 
-    pub fn get_operations(&self) -> &Vec<std::rc::Rc<dyn OperationInterface>> {
+    pub fn get_operations(&self) -> &Vec<AnyOperation> {
         &self.operations
     }
 
@@ -108,8 +108,8 @@ impl Transaction {
     }
 
     /// @return OperationInterface[]
-    pub(crate) fn calculate_operations(&mut self) -> Vec<std::rc::Rc<dyn OperationInterface>> {
-        let mut operations: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+    pub(crate) fn calculate_operations(&mut self) -> Vec<AnyOperation> {
+        let mut operations: Vec<AnyOperation> = vec![];
 
         let mut present_package_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         let mut remove_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
@@ -163,7 +163,7 @@ impl Transaction {
                     if present_alias_map.contains(&alias_key) {
                         remove_alias_map.shift_remove(&alias_key);
                     } else {
-                        operations.push(std::rc::Rc::new(MarkAliasInstalledOperation::new(alias)));
+                        operations.push(MarkAliasInstalledOperation::new(alias).into());
                     }
                 } else if let Some(source) = present_package_map.get(&package.get_name()).cloned() {
                     // do we need to update?
@@ -187,14 +187,12 @@ impl Transaction {
                         || package.get_source_reference() != present.get_source_reference()
                         || abandoned_or_replacement_changed
                     {
-                        operations.push(std::rc::Rc::new(UpdateOperation::new(
-                            source.clone(),
-                            package.clone(),
-                        )));
+                        operations
+                            .push(UpdateOperation::new(source.clone(), package.clone()).into());
                     }
                     remove_map.shift_remove(&package.get_name());
                 } else {
-                    operations.push(std::rc::Rc::new(InstallOperation::new(package.clone())));
+                    operations.push(InstallOperation::new(package.clone()).into());
                     remove_map.shift_remove(&package.get_name());
                 }
             }
@@ -202,16 +200,10 @@ impl Transaction {
 
         for (_name, package) in remove_map {
             // PHP: array_unshift($operations, new Operation\UninstallOperation($package));
-            array_unshift(
-                &mut operations,
-                std::rc::Rc::new(UninstallOperation::new(package))
-                    as std::rc::Rc<dyn OperationInterface>,
-            );
+            array_unshift(&mut operations, UninstallOperation::new(package).into());
         }
         for (_name_version, package) in remove_alias_map {
-            operations.push(std::rc::Rc::new(MarkAliasUninstalledOperation::new(
-                package,
-            )));
+            operations.push(MarkAliasUninstalledOperation::new(package).into());
         }
 
         let operations = self.move_plugins_to_front(operations);
@@ -279,29 +271,22 @@ impl Transaction {
     ///
     /// @param  OperationInterface[] $operations
     /// @return OperationInterface[] reordered operation list
-    fn move_plugins_to_front(
-        &self,
-        mut operations: Vec<std::rc::Rc<dyn OperationInterface>>,
-    ) -> Vec<std::rc::Rc<dyn OperationInterface>> {
-        let mut dl_modifying_plugins_no_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
-        let mut dl_modifying_plugins_with_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+    fn move_plugins_to_front(&self, mut operations: Vec<AnyOperation>) -> Vec<AnyOperation> {
+        let mut dl_modifying_plugins_no_deps: Vec<AnyOperation> = vec![];
+        let mut dl_modifying_plugins_with_deps: Vec<AnyOperation> = vec![];
         let mut dl_modifying_plugin_requires: Vec<String> = vec![];
-        let mut plugins_no_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
-        let mut plugins_with_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+        let mut plugins_no_deps: Vec<AnyOperation> = vec![];
+        let mut plugins_with_deps: Vec<AnyOperation> = vec![];
         let mut plugin_requires: Vec<String> = vec![];
 
         let mut to_remove: Vec<usize> = vec![];
         for idx in (0..operations.len()).rev() {
             let op = &operations[idx];
 
-            let package: PackageInterfaceHandle = if let Some(install_op) =
-                op.as_ref().as_any().downcast_ref::<InstallOperation>()
-            {
-                install_op.get_package().clone()
-            } else if let Some(update_op) = op.as_ref().as_any().downcast_ref::<UpdateOperation>() {
-                update_op.get_target_package().clone()
-            } else {
-                continue;
+            let package: PackageInterfaceHandle = match op {
+                AnyOperation::Install(install_op) => install_op.get_package(),
+                AnyOperation::Update(update_op) => update_op.get_target_package(),
+                _ => continue,
             };
 
             let extra = package.get_extra();
@@ -373,7 +358,7 @@ impl Transaction {
         }
 
         // PHP: array_merge($dlModifyingPluginsNoDeps, $dlModifyingPluginsWithDeps, $pluginsNoDeps, $pluginsWithDeps, $operations)
-        let mut result: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+        let mut result: Vec<AnyOperation> = vec![];
         result.extend(dl_modifying_plugins_no_deps);
         result.extend(dl_modifying_plugins_with_deps);
         result.extend(plugins_no_deps);
@@ -387,23 +372,14 @@ impl Transaction {
     ///
     /// @param  OperationInterface[] $operations
     /// @return OperationInterface[] reordered operation list
-    fn move_uninstalls_to_front(
-        &self,
-        mut operations: Vec<std::rc::Rc<dyn OperationInterface>>,
-    ) -> Vec<std::rc::Rc<dyn OperationInterface>> {
-        let mut uninst_ops: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+    fn move_uninstalls_to_front(&self, mut operations: Vec<AnyOperation>) -> Vec<AnyOperation> {
+        let mut uninst_ops: Vec<AnyOperation> = vec![];
         let mut to_remove: Vec<usize> = vec![];
         for (idx, op) in operations.iter().enumerate() {
-            let is_uninstall = op
-                .as_ref()
-                .as_any()
-                .downcast_ref::<UninstallOperation>()
-                .is_some()
-                || op
-                    .as_ref()
-                    .as_any()
-                    .downcast_ref::<MarkAliasUninstalledOperation>()
-                    .is_some();
+            let is_uninstall = matches!(
+                op,
+                AnyOperation::Uninstall(_) | AnyOperation::MarkAliasUninstalled(_)
+            );
             if is_uninstall {
                 uninst_ops.push(op.clone());
                 to_remove.push(idx);
@@ -415,7 +391,7 @@ impl Transaction {
             operations.remove(idx);
         }
 
-        let mut result: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+        let mut result: Vec<AnyOperation> = vec![];
         result.extend(uninst_ops);
         result.extend(operations);
         result

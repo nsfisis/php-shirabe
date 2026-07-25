@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/LocalRepoTransaction.php
 
 use super::Transaction;
-use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::repository::InstalledRepositoryInterface;
 use crate::repository::RepositoryInterface;
 
@@ -23,7 +23,7 @@ impl LocalRepoTransaction {
         })
     }
 
-    pub fn get_operations(&self) -> &Vec<std::rc::Rc<dyn OperationInterface>> {
+    pub fn get_operations(&self) -> &Vec<AnyOperation> {
         self.inner.get_operations()
     }
 

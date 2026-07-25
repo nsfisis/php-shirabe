@@ -4,6 +4,7 @@ use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
+use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::dependency_resolver::pool::Pool;
 use shirabe::dependency_resolver::request::Request;
 use shirabe::dependency_resolver::solver_problems_exception::SolverProblemsException;
@@ -140,7 +141,7 @@ fn check_solver_result_repo_set(
     let mut result_readable: Vec<(String, String)> = Vec::new();
     let mut result_ids: Vec<(String, Vec<usize>)> = Vec::new();
     for operation in transaction.get_operations() {
-        if let Some(update) = operation.as_update_operation() {
+        if let AnyOperation::Update(update) = operation {
             let from = update.get_initial_package();
             let to = update.get_target_package();
             result_readable.push((
@@ -149,15 +150,14 @@ fn check_solver_result_repo_set(
             ));
             result_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
         } else {
-            let op_type = operation.get_operation_type();
-            let job = match op_type.as_str() {
+            let job = match operation.get_operation_type() {
                 "markAliasInstalled" => "markAliasInstalled",
                 "markAliasUninstalled" => "markAliasUninstalled",
                 "uninstall" => "remove",
                 "install" => "install",
                 other => panic!("Unexpected operation: {}", other),
             };
-            let package = operation.get_package();
+            let package = operation.get_target_package();
             result_readable.push((job.to_string(), package.get_unique_name()));
             result_ids.push((job.to_string(), vec![package.ptr_id()]));
         }
@@ -2521,7 +2521,7 @@ fn test_learn_positive_literal() {
     ];
     let mut result: Vec<(String, String)> = Vec::new();
     for operation in transaction.get_operations() {
-        if let Some(update) = operation.as_update_operation() {
+        if let AnyOperation::Update(update) = operation {
             result.push((
                 "update".to_string(),
                 format!(
@@ -2535,9 +2535,9 @@ fn test_learn_positive_literal() {
             let job = if op_type == "uninstall" {
                 "remove".to_string()
             } else {
-                op_type
+                op_type.to_string()
             };
-            result.push((job, operation.get_package().get_unique_name()));
+            result.push((job, operation.get_target_package().get_unique_name()));
         }
     }
     assert_eq!(expected, result);

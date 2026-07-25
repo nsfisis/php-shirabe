@@ -6,8 +6,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::Transaction;
-use crate::dependency_resolver::operation::InstallOperation;
-use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::io::IOInterfaceImmutable;
 use crate::package::base_package;
@@ -175,7 +174,7 @@ impl Command for ReinstallCommand {
 
         let mut install_order = indexmap::IndexMap::new();
         for (index, op) in install_operations.iter().enumerate() {
-            if let Some(install_op) = op.as_any().downcast_ref::<InstallOperation>()
+            if let AnyOperation::Install(install_op) = op
                 && install_op.get_package().as_alias().is_none()
             {
                 install_order.insert(install_op.get_package().get_name(), index);
@@ -241,10 +240,8 @@ impl Command for ReinstallCommand {
             indexmap::IndexMap::new(),
         );
 
-        let uninstall_operations: Vec<std::rc::Rc<dyn OperationInterface>> = uninstall_operations
-            .into_iter()
-            .map(|op| std::rc::Rc::new(op) as std::rc::Rc<dyn OperationInterface>)
-            .collect();
+        let uninstall_operations: Vec<AnyOperation> =
+            uninstall_operations.into_iter().map(Into::into).collect();
         {
             let mut local_repo_ref = local_repo.borrow_mut();
             let repo = local_repo_ref

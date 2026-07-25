@@ -1002,7 +1002,7 @@ impl CreateProjectCommand {
         let mut installed_repo = InstalledArrayRepository::new()?;
         im.execute(
             &mut installed_repo,
-            vec![std::rc::Rc::new(InstallOperation::new(package.clone()))],
+            vec![InstallOperation::new(package.clone()).into()],
             true,
             true,
             false,

@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Installer/InstallationManager.php
 
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
 use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
-use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::dependency_resolver::operation::UpdateOperation;
 use crate::downloader::FileDownloader;
@@ -240,7 +240,7 @@ impl InstallationManager {
     pub fn execute(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        operations: Vec<AnyOperation>,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
@@ -253,18 +253,16 @@ impl InstallationManager {
             let _ = (dev_mode, run_scripts, download_only);
             for operation in operations {
                 let trace = shirabe_php_shim::strip_tags(&operation.to_string());
-                match operation.get_operation_type().as_str() {
-                    "install" => {
-                        let op = operation.as_install_operation().expect("install operation");
+                match operation {
+                    AnyOperation::Install(op) => {
                         let package = op.get_package();
                         mock.installed.push(package.clone());
                         mock.trace.push(trace);
                         repo.add_package(PackageInterfaceHandle::dup(&package));
                     }
-                    "update" => {
-                        let op = operation.as_update_operation().expect("update operation");
-                        let initial = op.get_initial_package().clone();
-                        let target = op.get_target_package().clone();
+                    AnyOperation::Update(op) => {
+                        let initial = op.get_initial_package();
+                        let target = op.get_target_package();
                         mock.updated.push((initial.clone(), target.clone()));
                         mock.trace.push(trace);
                         repo.remove_package(initial);
@@ -272,38 +270,26 @@ impl InstallationManager {
                             repo.add_package(PackageInterfaceHandle::dup(&target));
                         }
                     }
-                    "uninstall" => {
-                        let op = operation
-                            .as_uninstall_operation()
-                            .expect("uninstall operation");
+                    AnyOperation::Uninstall(op) => {
                         let package = op.get_package();
                         mock.uninstalled.push(package.clone());
                         mock.trace.push(trace);
                         repo.remove_package(package);
                     }
-                    "markAliasInstalled" => {
-                        let op = operation
-                            .as_any()
-                            .downcast_ref::<MarkAliasInstalledOperation>()
-                            .expect("markAliasInstalled operation");
-                        let package = op.get_package();
-                        mock.installed.push(package.clone().into());
+                    AnyOperation::MarkAliasInstalled(op) => {
+                        let package: PackageInterfaceHandle = op.get_package().into();
+                        mock.installed.push(package.clone());
                         mock.trace.push(trace);
-                        if !repo.has_package(package.clone().into()) {
-                            repo.add_package(PackageInterfaceHandle::dup(&package.into()));
+                        if !repo.has_package(package.clone()) {
+                            repo.add_package(PackageInterfaceHandle::dup(&package));
                         }
                     }
-                    "markAliasUninstalled" => {
-                        let op = operation
-                            .as_any()
-                            .downcast_ref::<MarkAliasUninstalledOperation>()
-                            .expect("markAliasUninstalled operation");
-                        let package = op.get_package();
-                        mock.uninstalled.push(package.clone().into());
+                    AnyOperation::MarkAliasUninstalled(op) => {
+                        let package: PackageInterfaceHandle = op.get_package().into();
+                        mock.uninstalled.push(package.clone());
                         mock.trace.push(trace);
-                        repo.remove_package(package.into());
+                        repo.remove_package(package);
                     }
-                    other => panic!("unknown operation type: {}", other),
                 }
             }
             return Ok(());
@@ -333,7 +319,7 @@ impl InstallationManager {
             }),
         );
 
-        let all_operations: Vec<std::rc::Rc<dyn OperationInterface>> = operations.clone();
+        let all_operations: Vec<AnyOperation> = operations.clone();
 
         // The concurrent operation chains share the repository; each chain borrows it only in
         // synchronous sections, never across an await.
@@ -343,18 +329,15 @@ impl InstallationManager {
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
-            let mut batches: Vec<IndexMap<i64, std::rc::Rc<dyn OperationInterface>>> = vec![];
-            let mut batch: IndexMap<i64, std::rc::Rc<dyn OperationInterface>> = IndexMap::new();
+            let mut batches: Vec<IndexMap<i64, AnyOperation>> = vec![];
+            let mut batch: IndexMap<i64, AnyOperation> = IndexMap::new();
             for (index, operation) in operations.into_iter().enumerate() {
                 let index = index as i64;
-                let package: Option<PackageInterfaceHandle> =
-                    if let Some(update) = operation.as_update_operation() {
-                        Some(update.get_target_package())
-                    } else {
-                        operation
-                            .as_install_operation()
-                            .map(|install| install.get_package())
-                    };
+                let package: Option<PackageInterfaceHandle> = match &operation {
+                    AnyOperation::Update(update) => Some(update.get_target_package()),
+                    AnyOperation::Install(install) => Some(install.get_package()),
+                    _ => None,
+                };
                 if let Some(package) = package
                     && package.get_type() == "composer-plugin"
                 {
@@ -423,7 +406,7 @@ impl InstallationManager {
     async fn download_and_execute_batch(
         &self,
         repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
-        operations: IndexMap<i64, std::rc::Rc<dyn OperationInterface>>,
+        operations: IndexMap<i64, AnyOperation>,
         cleanup_promises: &mut IndexMap<
             i64,
             Box<
@@ -435,7 +418,7 @@ impl InstallationManager {
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
-        all_operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        all_operations: Vec<AnyOperation>,
     ) -> anyhow::Result<()> {
         let mut promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
@@ -445,24 +428,15 @@ impl InstallationManager {
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything at this stage
-            if !["update", "install", "uninstall"].contains(&op_type.as_str()) {
+            if !["update", "install", "uninstall"].contains(&op_type) {
                 continue;
             }
 
-            let package: PackageInterfaceHandle;
-            let initial_package: Option<PackageInterfaceHandle>;
-            if op_type == "update" {
-                // @var UpdateOperation $operation
-                let update_op = operation
-                    .as_update_operation()
-                    .expect("op_type == \"update\" implies UpdateOperation");
-                package = update_op.get_target_package();
-                initial_package = Some(update_op.get_initial_package());
-            } else {
-                // @var InstallOperation|MarkAliasInstalledOperation|MarkAliasUninstalledOperation|UninstallOperation $operation
-                package = operation.get_package();
-                initial_package = None;
-            }
+            let package = operation.get_target_package();
+            let initial_package: Option<PackageInterfaceHandle> = match operation {
+                AnyOperation::Update(update_op) => Some(update_op.get_initial_package()),
+                _ => None,
+            };
             let installer = self.get_installer(&package.get_type())?;
 
             // PHP: $cleanupPromises[$index] = static function () use ($opType, $installer, $package, $initialPackage) {
@@ -474,7 +448,6 @@ impl InstallationManager {
                 >,
             > = {
                 let installer = installer.clone();
-                let op_type = op_type.clone();
                 let package = package.clone();
                 let initial_package = initial_package.clone();
                 Box::new(move || {
@@ -488,14 +461,13 @@ impl InstallationManager {
                     }
 
                     let installer = installer.clone();
-                    let op_type = op_type.clone();
                     let package = package.clone();
                     let initial_package = initial_package.clone();
                     let fut: std::pin::Pin<
                         Box<dyn std::future::Future<Output = anyhow::Result<()>>>,
                     > = Box::pin(async move {
                         installer
-                            .cleanup(&op_type, package, initial_package)
+                            .cleanup(op_type, package, initial_package)
                             .await
                             .map(|_| ())
                     });
@@ -530,17 +502,14 @@ impl InstallationManager {
 
         // execute operations in batches to make sure every plugin is installed in the
         // right order and activated before the packages depending on it are installed
-        let mut batches: Vec<IndexMap<i64, std::rc::Rc<dyn OperationInterface>>> = vec![];
-        let mut batch: IndexMap<i64, std::rc::Rc<dyn OperationInterface>> = IndexMap::new();
+        let mut batches: Vec<IndexMap<i64, AnyOperation>> = vec![];
+        let mut batch: IndexMap<i64, AnyOperation> = IndexMap::new();
         for (index, operation) in operations {
-            let package: Option<PackageInterfaceHandle> =
-                if let Some(update) = operation.as_update_operation() {
-                    Some(update.get_target_package())
-                } else {
-                    operation
-                        .as_install_operation()
-                        .map(|install| install.get_package())
-                };
+            let package: Option<PackageInterfaceHandle> = match &operation {
+                AnyOperation::Update(update) => Some(update.get_target_package()),
+                AnyOperation::Install(install) => Some(install.get_package()),
+                _ => None,
+            };
             if let Some(package) = package {
                 let pkg_type = package.get_type();
                 if pkg_type == "composer-plugin" || pkg_type == "composer-installer" {
@@ -579,7 +548,7 @@ impl InstallationManager {
     async fn execute_batch(
         &self,
         repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
-        operations: IndexMap<i64, std::rc::Rc<dyn OperationInterface>>,
+        operations: IndexMap<i64, AnyOperation>,
         cleanup_promises: &IndexMap<
             i64,
             Box<
@@ -590,7 +559,7 @@ impl InstallationManager {
         >,
         dev_mode: bool,
         run_scripts: bool,
-        all_operations: &[std::rc::Rc<dyn OperationInterface>],
+        all_operations: &[AnyOperation],
     ) -> anyhow::Result<()> {
         let mut promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
@@ -600,7 +569,7 @@ impl InstallationManager {
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything
-            if !["update", "install", "uninstall"].contains(&op_type.as_str()) {
+            if !["update", "install", "uninstall"].contains(&op_type) {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
                     self.io.write_error3(
@@ -609,23 +578,11 @@ impl InstallationManager {
                         io_interface::NORMAL,
                     );
                 }
-                match op_type.as_str() {
-                    "markAliasInstalled" => {
-                        let op = operation
-                            .as_any()
-                            .downcast_ref::<MarkAliasInstalledOperation>()
-                            .expect(
-                                "op_type == \"markAliasInstalled\" implies MarkAliasInstalledOperation",
-                            );
+                match &operation {
+                    AnyOperation::MarkAliasInstalled(op) => {
                         self.mark_alias_installed(&mut **repo.borrow_mut(), op);
                     }
-                    "markAliasUninstalled" => {
-                        let op = operation
-                            .as_any()
-                            .downcast_ref::<MarkAliasUninstalledOperation>()
-                            .expect(
-                                "op_type == \"markAliasUninstalled\" implies MarkAliasUninstalledOperation",
-                            );
+                    AnyOperation::MarkAliasUninstalled(op) => {
                         self.mark_alias_uninstalled(&mut **repo.borrow_mut(), op);
                     }
                     _ => {}
@@ -634,20 +591,13 @@ impl InstallationManager {
                 continue;
             }
 
-            let package: PackageInterfaceHandle;
-            let initial_package: Option<PackageInterfaceHandle>;
-            if op_type == "update" {
-                let update_op = operation
-                    .as_update_operation()
-                    .expect("op_type == \"update\" implies UpdateOperation");
-                package = update_op.get_target_package();
-                initial_package = Some(update_op.get_initial_package());
-            } else {
-                package = operation.get_package();
-                initial_package = None;
-            }
+            let package = operation.get_target_package();
+            let initial_package: Option<PackageInterfaceHandle> = match &operation {
+                AnyOperation::Update(update_op) => Some(update_op.get_initial_package()),
+                _ => None,
+            };
 
-            let event_name = match op_type.as_str() {
+            let event_name = match op_type {
                 "install" => PackageEvents::PRE_PACKAGE_INSTALL,
                 "update" => PackageEvents::PRE_PACKAGE_UPDATE,
                 "uninstall" => PackageEvents::PRE_PACKAGE_UNINSTALL,
@@ -658,13 +608,7 @@ impl InstallationManager {
                 // TODO(phase-c): dispatch_package_event takes Box<dyn RepositoryInterface>/Vec<Box<...>>
                 // but we hold a RefCell'd &mut dyn here. Needs structural rework (likely shared Rc
                 // on repo and ops).
-                let _ = (
-                    event_name,
-                    dev_mode,
-                    &repo,
-                    &all_operations,
-                    operation.as_ref(),
-                );
+                let _ = (event_name, dev_mode, &repo, &all_operations, &operation);
             }
 
             let installer = self.get_installer(&package.get_type())?;
@@ -679,29 +623,23 @@ impl InstallationManager {
             promises.push(Box::pin(async move {
                 let chain_result: anyhow::Result<()> = async {
                     installer
-                        .prepare(&op_type, package.clone(), initial_package.clone())
+                        .prepare(op_type, package.clone(), initial_package.clone())
                         .await?;
 
-                    match op_type.as_str() {
-                        "install" => {
-                            let op = operation
-                                .as_install_operation()
-                                .expect("op_type == \"install\" implies InstallOperation");
+                    match &operation {
+                        AnyOperation::Install(op) => {
                             self.install(repo, op).await?;
                         }
-                        "update" => {
-                            let op = operation
-                                .as_update_operation()
-                                .expect("op_type == \"update\" implies UpdateOperation");
+                        AnyOperation::Update(op) => {
                             self.update(repo, op).await?;
                         }
-                        "uninstall" => {
-                            let op = operation
-                                .as_uninstall_operation()
-                                .expect("op_type == \"uninstall\" implies UninstallOperation");
+                        AnyOperation::Uninstall(op) => {
                             self.uninstall(repo, op).await?;
                         }
-                        _ => unreachable!("op_type is one of install/update/uninstall"),
+                        AnyOperation::MarkAliasInstalled(_)
+                        | AnyOperation::MarkAliasUninstalled(_) => {
+                            unreachable!("alias operations were skipped above")
+                        }
                     }
 
                     if let Some(cleanup) = cleanup_promises.get(&index)
@@ -718,7 +656,7 @@ impl InstallationManager {
                 if let Err(e) = chain_result {
                     self.io.write_error(&format!(
                         "    <error>{} of {} failed</error>",
-                        shirabe_php_shim::ucfirst(&op_type),
+                        shirabe_php_shim::ucfirst(op_type),
                         package.get_pretty_name()
                     ));
                     return Err(e);
@@ -727,7 +665,7 @@ impl InstallationManager {
                 // PHP: ->then(fn() => $repo->write($devMode, $this)) persists the repository after each op.
                 repo.borrow_mut().write(dev_mode, self);
 
-                let event_name_post = match op_type.as_str() {
+                let event_name_post = match op_type {
                     "install" => PackageEvents::POST_PACKAGE_INSTALL,
                     "update" => PackageEvents::POST_PACKAGE_UPDATE,
                     "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
@@ -1087,7 +1025,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     fn execute(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        operations: Vec<AnyOperation>,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
@@ -1129,7 +1067,7 @@ impl InstallationManagerInterface for InstallationManager {
     fn execute(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        operations: Vec<AnyOperation>,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
