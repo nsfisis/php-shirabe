@@ -297,6 +297,7 @@ impl RepositorySet {
 
     /// @param PackageInterface[] $packages
     /// @return ($allowPartialAdvisories is true ? array{advisories: array<string, array<PartialSecurityAdvisory|SecurityAdvisory>>, unreachableRepos: array<string>} : array{advisories: array<string, array<SecurityAdvisory>>, unreachableRepos: array<string>})
+    #[tracing::instrument(skip_all)]
     pub fn get_matching_security_advisories(
         &self,
         packages: Vec<PackageInterfaceHandle>,

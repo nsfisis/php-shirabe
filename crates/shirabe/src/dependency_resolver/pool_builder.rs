@@ -126,6 +126,7 @@ impl PoolBuilder {
         self.allowed_types = types;
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn build_pool(
         &mut self,
         repositories: Vec<RepositoryInterfaceHandle>,
@@ -428,6 +429,7 @@ impl PoolBuilder {
         self.loaded_packages.shift_remove(name);
     }
 
+    #[tracing::instrument(skip_all)]
     fn load_packages_marked_for_loading(
         &mut self,
         request: &mut Request,

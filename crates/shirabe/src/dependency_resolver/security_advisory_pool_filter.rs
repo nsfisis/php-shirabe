@@ -26,6 +26,7 @@ impl SecurityAdvisoryPoolFilter {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn filter(
         &self,
         pool: Pool,

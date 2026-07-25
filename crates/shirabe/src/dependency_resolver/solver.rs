@@ -220,6 +220,7 @@ impl Solver {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn solve(
         &mut self,
         request: &Request,

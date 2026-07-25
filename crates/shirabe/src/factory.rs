@@ -424,6 +424,7 @@ impl Factory {
     }
 
     /// Creates a Composer instance
+    #[tracing::instrument(skip_all)]
     pub fn create_composer(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,

@@ -192,6 +192,7 @@ impl ArrayLoader {
     /// @param array<array<mixed>> $versions
     ///
     /// @return list<CompletePackage|CompleteAliasPackage>
+    #[tracing::instrument(skip_all)]
     pub fn load_packages(
         &self,
         versions: Vec<IndexMap<String, PhpMixed>>,

@@ -129,6 +129,7 @@ impl PlatformRepository {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
 

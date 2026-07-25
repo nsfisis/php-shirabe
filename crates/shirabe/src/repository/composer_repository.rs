@@ -1707,6 +1707,7 @@ impl ComposerRepository {
     }
 
     /// @param packageNames array of package name => ConstraintInterface|null - if a constraint is provided, only packages matching it will be loaded
+    #[tracing::instrument(skip_all)]
     fn load_async_packages(
         &mut self,
         mut package_names: IndexMap<String, Option<AnyConstraint>>,
@@ -1951,6 +1952,7 @@ impl ComposerRepository {
         })
     }
 
+    #[tracing::instrument(skip_all)]
     async fn start_cached_async_download(
         &self,
         file_name: &str,
@@ -2659,6 +2661,7 @@ impl ComposerRepository {
         Ok(packages)
     }
 
+    #[tracing::instrument(skip_all)]
     fn create_packages(
         &mut self,
         packages: Vec<IndexMap<String, PhpMixed>>,

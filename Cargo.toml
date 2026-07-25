@@ -36,6 +36,8 @@ sha1 = "0.11.0"
 sha2 = "0.11.0"
 tempfile = "3.27.0"
 tokio = { version = "1.52.3", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 twox-hash = "2.1.2"
 url = "2.5.8"
 zip = "8.6.0"

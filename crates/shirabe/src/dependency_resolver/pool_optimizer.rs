@@ -57,6 +57,7 @@ impl PoolOptimizer {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn optimize(&mut self, request: &Request, pool: &Pool) -> Pool {
         self.prepare(request, pool);
 
@@ -81,6 +82,7 @@ impl PoolOptimizer {
         optimized_pool
     }
 
+    #[tracing::instrument(skip_all)]
     fn prepare(&mut self, request: &Request, pool: &Pool) {
         let mut irremovable_package_constraint_groups: IndexMap<String, Vec<AnyConstraint>> =
             IndexMap::new();
@@ -184,6 +186,7 @@ impl PoolOptimizer {
     }
 
     /// @return Pool Optimized pool
+    #[tracing::instrument(skip_all)]
     fn apply_removals_to_pool(&self, pool: &Pool) -> Pool {
         let mut packages: Vec<BasePackageHandle> = vec![];
         let mut removed_versions: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
@@ -211,6 +214,7 @@ impl PoolOptimizer {
         )
     }
 
+    #[tracing::instrument(skip_all)]
     fn optimize_by_identical_dependencies(&mut self, _request: &Request, pool: &Pool) {
         let mut identical_definitions_per_package: IndexMap<
             String,
@@ -536,6 +540,7 @@ impl PoolOptimizer {
     /// Use the list of locked packages to constrain the loaded packages
     /// This will reduce packages with significant numbers of historical versions to a smaller number
     /// and reduce the resulting rule set that is generated
+    #[tracing::instrument(skip_all)]
     fn optimize_impossible_packages_away(&mut self, request: &Request, pool: &Pool) {
         if request.get_locked_packages().is_empty() {
             return;

@@ -216,6 +216,7 @@ impl Installer {
     }
 
     /// Run installation (or update)
+    #[tracing::instrument(skip_all)]
     pub fn run(&mut self) -> anyhow::Result<i64> {
         // Disable GC to save CPU cycles, as the dependency solver can create hundreds of thousands
         // of PHP objects, the GC can spend quite some time walking the tree of references looking
@@ -560,6 +561,7 @@ impl Installer {
         Ok(0)
     }
 
+    #[tracing::instrument(skip_all)]
     pub(crate) fn do_update(
         &mut self,
         local_repo: crate::repository::RepositoryInterfaceHandle,

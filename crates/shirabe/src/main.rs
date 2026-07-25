@@ -1,6 +1,32 @@
 //! ref: composer/bin/composer
 
 use shirabe_php_shim::{PHP_ENV, PHP_SERVER};
+use std::io::IsTerminal as _;
+
+/// Initialize a tracing subscriber from the environment variable `$SHIRABE_TRACING`.
+fn init_tracing() {
+    let Ok(directives) = std::env::var("SHIRABE_TRACING") else {
+        return;
+    };
+    if directives.is_empty() {
+        return;
+    }
+
+    let env_filter = match tracing_subscriber::EnvFilter::builder().parse(&directives) {
+        Ok(env_filter) => env_filter,
+        Err(e) => {
+            eprintln!("SHIRABE_TRACING: invalid filter directives {directives:?}: {e}");
+            return;
+        }
+    };
+
+    tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .with_writer(std::io::stderr)
+        .with_ansi(std::io::stderr().is_terminal())
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+        .init();
+}
 
 fn main() {
     // TODO(phase-c): PHP: `$xdebug = new XdebugHandler('Composer'); $xdebug->check(); unset($xdebug);`
@@ -27,6 +53,8 @@ fn main() {
         .build()
         .expect("failed to build the top-level tokio runtime");
     let _runtime_guard = runtime.enter();
+
+    init_tracing();
 
     let result = shirabe::run(std::env::args().collect());
     let exit_code = match result {

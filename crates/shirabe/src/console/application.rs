@@ -1891,6 +1891,7 @@ impl ApplicationHandle {
         self.base_run(input, output)
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn do_run(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
