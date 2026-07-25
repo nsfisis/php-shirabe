@@ -75,17 +75,20 @@ impl CodePointString {
         Self { string }
     }
 
+    /// `to_encoding` is `""` for PHP's `null`.
     pub fn to_byte_string(&self, to_encoding: &str) -> String {
-        // The source is always valid UTF-8, so PHP's `toByteString` returns the string verbatim
-        // whenever the target is null/UTF-8 (the only encodings reached here). The
-        // mb_convert_encoding/iconv path applies only to non-UTF-8 targets, which do not occur.
+        // A CodePointString is an AbstractUnicodeString, so PHP's `$fromEncoding` is always
+        // 'UTF-8' and the string is returned verbatim for a null/UTF-8 target.
         if matches!(to_encoding, "" | "utf8" | "utf-8" | "UTF8" | "UTF-8") {
             return self.string.clone();
         }
 
-        // TODO(phase-d): converting to a non-UTF-8 target encoding needs mb_convert_encoding/iconv,
-        // unreachable for Shirabe's UTF-8-only output.
-        todo!()
+        // PHP falls back to iconv() only when mb_convert_encoding() rejects the target encoding.
+        shirabe_php_shim::mb_convert_encoding(
+            self.string.clone().into_bytes(),
+            to_encoding,
+            "UTF-8",
+        )
     }
 }
 
