@@ -576,7 +576,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     name,
                     None,
                     preferred_stability,
-                    Some(PlatformRequirementFilterFactory::ignore_nothing()),
+                    Some(platform_requirement_filter.clone()),
                     RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
                     None,
                     ShowWarnings::Always,
