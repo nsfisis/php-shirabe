@@ -581,16 +581,11 @@ impl Application {
         Ok(definition)
     }
 
-    fn get_plugin_commands(&mut self) -> anyhow::Result<Vec<Box<dyn SymfonyCommand>>> {
+    fn get_plugin_commands(
+        &mut self,
+    ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
         // TODO(plugin): plugin command discovery is part of the plugin API
-        let commands: Vec<Box<dyn SymfonyCommand>> = vec![];
-
-        // TODO(phase-c): discovering plugin-provided commands walks the PluginManager and
-        // downcasts each plugin's CommandProvider capability — this is the Plugin API surface,
-        // which is intentionally unimplemented (see TODO(plugin) above). Returns an empty list
-        // until the plugin capability model exists.
-
-        Ok(commands)
+        Ok(vec![])
     }
 
     /// Get the working directory at startup time
@@ -2144,7 +2139,7 @@ impl ApplicationHandle {
             match (|| -> anyhow::Result<()> {
                 let plugin_commands = application.borrow_mut().get_plugin_commands()?;
                 for command in plugin_commands {
-                    let cmd_name = command.get_name().unwrap_or_default();
+                    let cmd_name = command.borrow().get_name().unwrap_or_default();
                     if application.borrow_mut().has(&cmd_name) {
                         // TODO(plugin): PHP uses get_class($command) for the skipped-command class
                         // name. Plugin command discovery (get_plugin_commands) is unimplemented, so
@@ -2152,11 +2147,7 @@ impl ApplicationHandle {
                         let cls = String::new();
                         io.write_error(&format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
                     } else {
-                        // Compatibility layer for symfony/console <7.4
-                        // TODO(phase-c): registering a plugin command needs the Symfony
-                        // Application's typed add()/addCommand(); the external-package stub keeps
-                        // its registry as PhpMixed/todo!() per the "Symfony stays todo!()" policy.
-                        let _ = command;
+                        self.add(command)?;
                     }
                 }
                 Ok(())
