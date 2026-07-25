@@ -1052,9 +1052,51 @@ impl DiagnoseCommand {
                 return "<error>disabled via disable_functions, using php streams fallback, which reduces performance</error>".to_string();
             }
 
-            // TODO(phase-d): Shirabe does not use cURL, we will consider what should be shown here
-            // later.
-            return "TODO: curl_version()".to_string();
+            let version = shirabe_php_rpc::get_diagnostics()
+                .curl
+                .as_ref()
+                .expect("the diagnose payload carries curl details while the extension is loaded");
+            let libz_version = version
+                .libz_version
+                .as_deref()
+                .filter(|v| !v.is_empty())
+                .unwrap_or("missing");
+            let brotli_version = version
+                .brotli_version
+                .as_deref()
+                .filter(|v| !v.is_empty())
+                .unwrap_or("missing");
+            let ssl_version = version
+                .ssl_version
+                .as_deref()
+                .filter(|v| !v.is_empty())
+                .unwrap_or("missing");
+            let has_zstd = match (version.features, version.version_zstd) {
+                (Some(features), Some(zstd)) => features & zstd != 0,
+                _ => false,
+            };
+            let mut http_versions = "1.0, 1.1".to_string();
+            if let (Some(features), Some(http2)) = (version.features, version.version_http2)
+                && version.has_http_version_2_0
+                && http2 & features != 0
+            {
+                http_versions.push_str(", 2");
+            }
+            if let (Some(features), Some(http3)) = (version.features, version.version_http3)
+                && features & http3 != 0
+            {
+                http_versions.push_str(", 3");
+            }
+
+            return format!(
+                "<comment>{}</comment> libz <comment>{}</comment> brotli <comment>{}</comment> zstd <comment>{}</comment> ssl <comment>{}</comment> HTTP <comment>{}</comment>",
+                version.version,
+                libz_version,
+                brotli_version,
+                if has_zstd { "supported" } else { "missing" },
+                ssl_version,
+                http_versions,
+            );
         }
 
         "<error>missing, using php streams fallback, which reduces performance</error>".to_string()

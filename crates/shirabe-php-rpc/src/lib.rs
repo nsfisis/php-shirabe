@@ -60,6 +60,21 @@ pub fn get_extension_info(name: &str) -> String {
     }
 }
 
+/// `curl_version()`, together with the `CURL_*` constants the `diagnose` command consults. Every
+/// `Option` field is `None` when the corresponding array key or constant is absent.
+#[derive(Debug)]
+pub struct Curl {
+    pub version: String,
+    pub libz_version: Option<String>,
+    pub brotli_version: Option<String>,
+    pub ssl_version: Option<String>,
+    pub features: Option<i64>,
+    pub version_zstd: Option<i64>,
+    pub version_http2: Option<i64>,
+    pub has_http_version_2_0: bool,
+    pub version_http3: Option<i64>,
+}
+
 /// Everything the `diagnose` command needs to know about the PHP runtime, fetched in a single
 /// round trip because the command would otherwise probe the same runtime dozens of times.
 #[derive(Debug)]
@@ -82,6 +97,8 @@ pub struct Diagnostics {
     pub ioncube_loader_version: String,
     /// `phpinfo(INFO_GENERAL)` output, captured via `ob_start()`/`ob_get_clean()`.
     pub phpinfo_general: String,
+    /// `None` when the curl extension is not loaded.
+    pub curl: Option<Curl>,
     extensions: IndexMap<String, bool>,
     functions: IndexMap<String, bool>,
     ini_settings: IndexMap<String, Option<String>>,
@@ -138,6 +155,7 @@ pub fn get_diagnostics() -> &'static Diagnostics {
             ioncube_loader_iversion: int_field(payload, "ioncube_loader_iversion"),
             ioncube_loader_version: string_field(payload, "ioncube_loader_version"),
             phpinfo_general: string_field(payload, "phpinfo_general"),
+            curl: curl_field(payload, "curl"),
             extensions: map_field(payload, "extensions")
                 .iter()
                 .map(|(name, value)| (name.clone(), as_bool(value, name)))
@@ -197,6 +215,38 @@ fn as_bool(value: &PhpMixed, key: &str) -> bool {
         PhpMixed::Bool(b) => *b,
         other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not a bool: {other:?}"),
     }
+}
+
+fn nullable_int_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> Option<i64> {
+    match field(payload, key) {
+        PhpMixed::Int(n) => Some(*n),
+        PhpMixed::Null => None,
+        other => {
+            panic!("PHP RPC: `diagnose` payload entry `{key}` is not an int or null: {other:?}")
+        }
+    }
+}
+
+fn curl_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> Option<Curl> {
+    let curl = match field(payload, key) {
+        PhpMixed::Null => return None,
+        PhpMixed::Array(map) => map,
+        other => {
+            panic!("PHP RPC: `diagnose` payload entry `{key}` is not an array or null: {other:?}")
+        }
+    };
+
+    Some(Curl {
+        version: string_field(curl, "version"),
+        libz_version: nullable_string_field(curl, "libz_version"),
+        brotli_version: nullable_string_field(curl, "brotli_version"),
+        ssl_version: nullable_string_field(curl, "ssl_version"),
+        features: nullable_int_field(curl, "features"),
+        version_zstd: nullable_int_field(curl, "version_zstd"),
+        version_http2: nullable_int_field(curl, "version_http2"),
+        has_http_version_2_0: bool_field(curl, "has_http_version_2_0"),
+        version_http3: nullable_int_field(curl, "version_http3"),
+    })
 }
 
 fn as_nullable_string(value: &PhpMixed, key: &str) -> Option<String> {

@@ -99,6 +99,24 @@ $dispatch = [
             $ini[$setting] = $value === false ? null : $value;
         }
 
+        // curl_version() only exists while the extension is loaded; DiagnoseCommand reads these
+        // details only after its own extension_loaded('curl') check.
+        $curl = null;
+        if (extension_loaded('curl')) {
+            $version = curl_version();
+            $curl = [
+                'version' => (string) ($version['version'] ?? ''),
+                'libz_version' => $version['libz_version'] ?? null,
+                'brotli_version' => $version['brotli_version'] ?? null,
+                'ssl_version' => $version['ssl_version'] ?? null,
+                'features' => $version['features'] ?? null,
+                'version_zstd' => defined('CURL_VERSION_ZSTD') ? CURL_VERSION_ZSTD : null,
+                'version_http2' => defined('CURL_VERSION_HTTP2') ? CURL_VERSION_HTTP2 : null,
+                'has_http_version_2_0' => defined('CURL_HTTP_VERSION_2_0'),
+                'version_http3' => defined('CURL_VERSION_HTTP3') ? CURL_VERSION_HTTP3 : null,
+            ];
+        }
+
         ob_start();
         phpinfo(INFO_GENERAL);
         $phpinfo = (string) ob_get_clean();
@@ -115,6 +133,7 @@ $dispatch = [
             'ioncube_loader_iversion' => extension_loaded('ionCube Loader') ? ioncube_loader_iversion() : 0,
             'ioncube_loader_version' => extension_loaded('ionCube Loader') ? ioncube_loader_version() : '',
             'phpinfo_general' => $phpinfo,
+            'curl' => $curl,
             'extensions' => $extensions,
             'functions' => $functions,
             'ini' => $ini,
