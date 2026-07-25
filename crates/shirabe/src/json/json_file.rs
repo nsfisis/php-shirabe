@@ -83,25 +83,17 @@ impl JsonFile {
 
     pub const INDENT_DEFAULT: &'static str = "    ";
 
-    /// build.rs copies the Composer schema files into a res/ directory next to the
-    /// executable; this resolves that path via the running executable's location.
-    ///
-    /// TODO(phase-f): this on-disk layout is hard to distribute. Embed the schema with
-    /// include_str! and extract it to a temporary file at runtime instead.
-    pub fn composer_schema_path() -> std::path::PathBuf {
-        Self::schema_res_path("composer-schema.json")
-    }
+    /// PHP points these at Composer's res/ directory; here the schemas are embedded in the
+    /// binary and SchemaRetriever resolves these URIs back to the constants below. The res/
+    /// path segment matters: composer-lock-schema.json reaches the composer schema through the
+    /// relative reference "./composer-schema.json", which must resolve to COMPOSER_SCHEMA_PATH.
+    pub const COMPOSER_SCHEMA_PATH: &'static str = "shirabe:///res/composer-schema.json";
+    pub const LOCK_SCHEMA_PATH: &'static str = "shirabe:///res/composer-lock-schema.json";
 
-    /// See composer_schema_path.
-    pub fn lock_schema_path() -> std::path::PathBuf {
-        Self::schema_res_path("composer-lock-schema.json")
-    }
-
-    fn schema_res_path(filename: &str) -> std::path::PathBuf {
-        let exe = std::env::current_exe().expect("failed to resolve current executable path");
-        let dir = exe.parent().expect("executable has no parent directory");
-        dir.join("res").join(filename)
-    }
+    pub const COMPOSER_SCHEMA_JSON: &'static str =
+        include_str!("../../../../composer/res/composer-schema.json");
+    const LOCK_SCHEMA_JSON: &'static str =
+        include_str!("../../../../composer/res/composer-lock-schema.json");
 
     /// Initializes json file reader/parser.
     ///
@@ -348,18 +340,17 @@ impl JsonFile {
         schema_file: Option<&str>,
     ) -> anyhow::Result<bool> {
         let mut is_composer_schema_file = false;
-        let schema_file = match schema_file {
-            Some(f) => f.into(),
+        let mut schema_file = match schema_file {
+            Some(f) => f.to_string(),
             None => {
                 if schema == Self::LOCK_SCHEMA {
-                    Self::lock_schema_path()
+                    Self::LOCK_SCHEMA_PATH.to_string()
                 } else {
                     is_composer_schema_file = true;
-                    Self::composer_schema_path()
+                    Self::COMPOSER_SCHEMA_PATH.to_string()
                 }
             }
         };
-        let mut schema_file = schema_file.to_string_lossy().into_owned();
 
         // Prepend with file:// only when not using a special schema already (e.g. in the phar)
         if strpos(&schema_file, "://").is_none() {
@@ -379,7 +370,7 @@ impl JsonFile {
         };
 
         if schema == Self::STRICT_SCHEMA && is_composer_schema_file {
-            schema_data = json_decode(&file_get_contents(&schema_file).unwrap_or_default(), false)?;
+            schema_data = json_decode(Self::COMPOSER_SCHEMA_JSON, false)?;
             if let PhpMixed::Object(map) = &mut schema_data {
                 map.insert("additionalProperties".to_string(), PhpMixed::Bool(false));
                 map.insert(
@@ -407,7 +398,7 @@ impl JsonFile {
         let schema_value = serde_json::to_value(&schema_data)?;
         let data_value = serde_json::to_value(data)?;
         let validator = jsonschema::options()
-            .with_retriever(FileRetriever)
+            .with_retriever(SchemaRetriever)
             .build(&schema_value)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
 
@@ -594,14 +585,22 @@ impl JsonFile {
 }
 
 #[derive(Debug)]
-struct FileRetriever;
+struct SchemaRetriever;
 
-impl jsonschema::Retrieve for FileRetriever {
+impl jsonschema::Retrieve for SchemaRetriever {
     fn retrieve(
         &self,
         uri: &jsonschema::Uri<String>,
     ) -> anyhow::Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
         match uri.scheme().as_str() {
+            "shirabe" => {
+                let contents = match uri.path().as_str() {
+                    "/res/composer-schema.json" => JsonFile::COMPOSER_SCHEMA_JSON,
+                    "/res/composer-lock-schema.json" => JsonFile::LOCK_SCHEMA_JSON,
+                    path => return Err(format!("Unknown embedded resource {path}").into()),
+                };
+                Ok(serde_json::from_str(contents)?)
+            }
             "file" => {
                 let file = std::fs::File::open(uri.path().as_str())?;
                 Ok(serde_json::from_reader(std::io::BufReader::new(file))?)

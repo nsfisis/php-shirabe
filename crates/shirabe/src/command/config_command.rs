@@ -23,9 +23,9 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
-    escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array, is_array,
-    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, php_regex, str_replace, strpos,
-    strtolower, system, touch, var_export,
+    escapeshellcmd, exec, explode, file_exists, implode, in_array, is_array, is_bool, is_dir,
+    is_numeric, is_object, is_string, json_encode, php_regex, str_replace, strpos, strtolower,
+    system, touch, var_export,
 };
 use shirabe_semver::VersionParser;
 
@@ -431,10 +431,7 @@ impl Command for ConfigCommand {
                 // ensure we get {} output for properties which are objects
                 if value.as_array().map(|a| a.is_empty()).unwrap_or(false) {
                     let schema = JsonFile::parse_json(
-                        Some(
-                            &file_get_contents(JsonFile::composer_schema_path())
-                                .unwrap_or_default(),
-                        ),
+                        Some(JsonFile::COMPOSER_SCHEMA_JSON),
                         Some("composer.schema.json"),
                     )?;
                     let type_value = schema
