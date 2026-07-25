@@ -599,17 +599,18 @@ impl Command for RequireCommand {
         let result = match do_update_result {
             Ok(result) => {
                 let final_result = if result == 0 && (requirements_to_guess.len() as i64) > 0 {
+                    let fixed = input
+                        .borrow()
+                        .get_option("fixed")?
+                        .as_bool()
+                        .unwrap_or(false);
                     self.update_requirements_after_resolution(
                         &requirements_to_guess,
                         require_key,
                         remove_key,
                         sort_packages,
                         dry_run,
-                        input
-                            .borrow()
-                            .get_option("fixed")?
-                            .as_bool()
-                            .unwrap_or(false),
+                        fixed,
                     )?
                 } else {
                     result
