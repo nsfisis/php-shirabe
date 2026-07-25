@@ -4,6 +4,7 @@ use crate::composer::pcre::preg::Preg;
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::runtime_exception::RuntimeException;
 use crate::symfony::console::formatter::output_formatter::OutputFormatter;
+use crate::symfony::console::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
 use crate::symfony::console::helper::helper::Helper;
 use crate::symfony::console::helper::table_cell::{TableCell, TableCellOption};
 use crate::symfony::console::helper::table_cell_style::TableCellStyle;
@@ -924,11 +925,11 @@ impl Table {
                     && Helper::width(&self.remove_decoration(&cell.to_php_string()))
                         > self.column_max_widths[&column]
                 {
-                    // TODO(phase-b): formatAndWrap requires a WrappableOutputFormatterInterface;
-                    // downcasting dyn OutputFormatterInterface to it needs concrete knowledge.
-                    let _ = colspan;
-                    let wrapped: Option<String> = todo!();
-                    cell = Cell::Value(wrapped.unwrap_or_default());
+                    let wrapped = self.format_and_wrap(
+                        &cell.to_php_string(),
+                        self.column_max_widths[&column] * colspan,
+                    );
+                    cell = Cell::Value(wrapped);
                 }
                 let cell_str = cell.to_php_string();
                 if shirabe_php_shim::strstr(&cell_str, "\n").is_none() {
@@ -1387,6 +1388,22 @@ impl Table {
         // The sole OutputFormatterInterface implementor in this port is OutputFormatter, which
         // implements WrappableOutputFormatterInterface, so the instanceof check always holds.
         true
+    }
+
+    /// `setColumnMaxWidth` guarantees the formatter is a `WrappableOutputFormatterInterface`, and
+    /// `OutputFormatter` is the sole implementor in this port, so `instanceof` reduces to this
+    /// downcast.
+    fn format_and_wrap(&self, string: &str, width: i64) -> String {
+        let formatter = self.output.borrow().get_formatter();
+        let mut formatter = formatter.borrow_mut();
+        let formatter = formatter
+            .as_any_mut()
+            .downcast_mut::<OutputFormatter>()
+            .expect("formatter must be a WrappableOutputFormatterInterface");
+        formatter
+            .format_and_wrap(Some(string), width)
+            .unwrap()
+            .unwrap_or_default()
     }
 
     /// PHP `Helper::removeDecoration($this->output->getFormatter(), $string)`.

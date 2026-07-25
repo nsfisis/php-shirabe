@@ -3,7 +3,7 @@
 use crate::symfony::console::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 
 /// Formatter interface for console output.
-pub trait OutputFormatterInterface {
+pub trait OutputFormatterInterface: shirabe_php_shim::AsAny {
     /// Sets the decorated flag.
     fn set_decorated(&mut self, decorated: bool);
 
