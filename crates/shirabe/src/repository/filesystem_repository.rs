@@ -17,13 +17,11 @@ use crate::repository::WritableArrayRepository;
 use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
 use crate::util::Filesystem;
 use crate::util::Platform;
-use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_flip, dirname, file_get_contents, get_class_err, get_debug_type, in_array, is_array,
-    is_null, is_string, ksort, php_regex, realpath, str_repeat, trim, usort, var_export,
+    array_flip, dirname, get_class_err, get_debug_type, in_array, is_array, is_null, is_string,
+    ksort, realpath, str_repeat, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
