@@ -1036,10 +1036,12 @@ impl RemoteFilesystem {
                 .unwrap_or(false);
 
             if decode {
-                let decoded = zlib_decode(result.as_deref().unwrap_or(""));
+                let decoded = zlib_decode(result.as_deref().unwrap_or("").as_bytes());
 
                 result = match decoded {
-                    Some(d) => Some(d),
+                    // TODO(phase-e): byte-string semantics — the response body travels through
+                    // RemoteFilesystem as a String; from_utf8_lossy can corrupt binary payloads
+                    Some(d) => Some(String::from_utf8_lossy(&d).into_owned()),
                     None => {
                         return Err(anyhow::anyhow!(TransportException::new(
                             "Failed to decode zlib stream".to_string(),

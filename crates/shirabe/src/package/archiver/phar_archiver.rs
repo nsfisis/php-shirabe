@@ -73,11 +73,11 @@ impl ArchiverInterface for PharArchiver {
                 FilesystemIterator::KEY_AS_PATHNAME | FilesystemIterator::CURRENT_AS_FILEINFO,
                 "",
                 *formats.get(format.as_str()).unwrap_or(&Phar::TAR),
-            );
+            )?;
             let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
             let mut files_only = ArchivableFilesFilter::new(Box::new(files));
-            phar.build_from_iterator(&mut files_only, &sources);
-            files_only.add_empty_dir(&phar, &sources);
+            phar.build_from_iterator(&mut files_only, &sources)?;
+            files_only.add_empty_dir(&phar, &sources)?;
 
             if !file_exists(&target) {
                 let target = format!("{}.{}", filename, format);
@@ -137,7 +137,7 @@ impl ArchiverInterface for PharArchiver {
 
                 unlink(&target);
 
-                phar.compress(compress_algo);
+                phar.compress(compress_algo)?;
 
                 let target = format!("{}.{}", filename, format);
                 return Ok(target);

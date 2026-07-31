@@ -19,8 +19,10 @@ shirabe-spdx-licenses = { path = "crates/shirabe-spdx-licenses" }
 anyhow = "1.0.102"
 async-trait = "0.1.89"
 base64 = "0.22.1"
+bzip2 = "0.6.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 fastrand = "2.4.1"
+flate2 = "1.1.9"
 futures = "0.3.32"
 indexmap = { version = "2.14.0", features = ["serde"] }
 jsonschema = { version = "0.46.6", default-features = false }
@@ -35,6 +37,7 @@ serde_urlencoded = "0.7.1"
 serial_test = "3.5.0"
 sha1 = "0.11.0"
 sha2 = "0.11.0"
+tar = "0.4.46"
 tempfile = "3.27.0"
 tokio = { version = "1.52.3", features = ["full"] }
 tracing = "0.1.44"

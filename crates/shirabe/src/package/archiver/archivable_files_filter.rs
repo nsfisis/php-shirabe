@@ -24,11 +24,12 @@ impl ArchivableFilesFilter {
         true
     }
 
-    pub fn add_empty_dir(&self, phar: &PharData, sources: &str) {
+    pub fn add_empty_dir(&self, phar: &PharData, sources: &str) -> anyhow::Result<()> {
         for filepath in &self.dirs {
             let localname = filepath.replace(&format!("{}/", sources), "");
-            phar.add_empty_dir(&localname);
+            phar.add_empty_dir(&localname)?;
         }
+        Ok(())
     }
 }
 

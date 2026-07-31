@@ -7,7 +7,7 @@ pub struct Tar;
 
 impl Tar {
     pub fn get_composer_json(path_to_archive: &str) -> anyhow::Result<Option<String>> {
-        let phar = PharData::new(path_to_archive.to_string());
+        let phar = PharData::new(path_to_archive.to_string())?;
 
         if !phar.valid() {
             return Ok(None);
@@ -16,9 +16,20 @@ impl Tar {
         Ok(Some(Self::extract_composer_json_from_folder(&phar)?))
     }
 
+    /// The content bytes are decoded strictly: a composer.json that is not valid
+    /// UTF-8 could never survive the JSON parsing that follows in PHP either.
+    fn content_to_string(content: Vec<u8>) -> anyhow::Result<String> {
+        String::from_utf8(content).map_err(|_| {
+            anyhow::anyhow!(RuntimeException {
+                message: "composer.json in the archive is not valid UTF-8".to_string(),
+                code: 0,
+            })
+        })
+    }
+
     fn extract_composer_json_from_folder(phar: &PharData) -> anyhow::Result<String> {
         if let Some(file) = phar.get("composer.json") {
-            return Ok(file.get_content());
+            return Self::content_to_string(file.get_content());
         }
 
         let mut top_level_paths: IndexMap<String, bool> = IndexMap::new();
@@ -49,7 +60,7 @@ impl Tar {
         if !top_level_paths.is_empty()
             && let Some(file) = phar.get(&composer_json_path)
         {
-            return Ok(file.get_content());
+            return Self::content_to_string(file.get_content());
         }
 
         Err(anyhow::anyhow!(RuntimeException {

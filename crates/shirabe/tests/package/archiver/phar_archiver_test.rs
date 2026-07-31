@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/PharArchiverTest.php
 
+use serial_test::serial;
 use shirabe::package::archiver::{ArchiverInterface, PharArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::{Filesystem, Platform};
@@ -63,8 +64,9 @@ impl ArchiverTestCase {
     }
 }
 
-#[ignore = "PharArchiver::archive builds the archive via PharData, which is todo!() in the php-shim"]
+#[ignore = "the excludes passed here make BaseExcludeFilter::generate_pattern emit look-ahead regexes ((?=$|/) and Glob's (?=[^\\.])) that the regex crate cannot compile"]
 #[test]
+#[serial]
 fn test_tar_archive() {
     let mut test_case = ArchiverTestCase::set_up();
 
@@ -98,8 +100,8 @@ fn test_tar_archive() {
         .unwrap();
 }
 
-#[ignore = "PharArchiver::archive builds the archive via PharData, which is todo!() in the php-shim"]
 #[test]
+#[serial]
 fn test_zip_archive() {
     let mut test_case = ArchiverTestCase::set_up();
 

@@ -50,14 +50,15 @@ impl GzipDownloader {
     }
 
     fn extract_using_ext(&self, file: &str, target_filepath: &str) {
-        let archive_file = gzopen(file, "rb");
+        // PHP does not check the gzopen result either; gzread(false, ...) is a fatal TypeError.
+        let archive_file = gzopen(file, "rb").unwrap();
         let target_file = fopen(target_filepath, "wb").unwrap();
         loop {
             let string = gzread(archive_file.clone(), 4096);
             if string.is_empty() {
                 break;
             }
-            fwrite(&target_file, &string, Some(Platform::strlen(&string)));
+            fwrite(&target_file, &string, Some(string.len() as i64));
         }
         gzclose(archive_file);
         fclose(&target_file);

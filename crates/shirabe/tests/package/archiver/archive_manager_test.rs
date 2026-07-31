@@ -166,12 +166,8 @@ fn test_unknown_format() {
 }
 
 // ref: ArchiveManagerTest::testArchiveTar / testArchiveCustomFileName.
-//
-// These drive ArchiveManager::archive end-to-end for the 'tar' format, which dispatches to
-// PharArchiver::archive. That builds the archive via PharData, whose build_from_iterator is
-// todo!() in the php-shim, so the archiving path cannot run yet.
 #[test]
-#[ignore = "needs PharData tar archiving (new_with_format/build_from_iterator are todo!() in the php-shim) for ArchiveManager::archive('tar', ...)"]
+#[ignore = "ArchiveManager::archive always passes buildExcludePatterns' glob excludes (e.g. 'name-*.zip'), which BaseExcludeFilter::generate_pattern turns into look-ahead regexes the regex crate cannot compile"]
 fn test_archive_tar() {
     if !git_is_executable() {
         return;
@@ -208,7 +204,7 @@ fn test_archive_tar() {
 }
 
 #[test]
-#[ignore = "needs PharData tar archiving (new_with_format/build_from_iterator are todo!() in the php-shim) for ArchiveManager::archive('tar', ...)"]
+#[ignore = "ArchiveManager::archive always passes buildExcludePatterns' glob excludes (e.g. 'name-*.zip'), which BaseExcludeFilter::generate_pattern turns into look-ahead regexes the regex crate cannot compile"]
 fn test_archive_custom_file_name() {
     if !git_is_executable() {
         return;

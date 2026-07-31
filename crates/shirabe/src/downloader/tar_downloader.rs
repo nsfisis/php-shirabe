@@ -61,8 +61,8 @@ impl ArchiveDownloader for TarDownloader {
         file: &str,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let archive = PharData::new(file.to_string());
-        archive.extract_to(path, None, true);
+        let archive = PharData::new(file.to_string())?;
+        archive.extract_to(path, None, true)?;
 
         Ok(None)
     }

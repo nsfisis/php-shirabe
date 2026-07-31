@@ -329,8 +329,8 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
 
 /// PHP `fwrite()`. `length` caps the number of bytes written (`None` = whole string).
 /// Returns the byte count written, or `None` for PHP's `false`-on-failure.
-pub fn fwrite(stream: &PhpResource, data: &str, length: Option<i64>) -> Option<i64> {
-    let bytes = data.as_bytes();
+pub fn fwrite(stream: &PhpResource, data: impl AsRef<[u8]>, length: Option<i64>) -> Option<i64> {
+    let bytes = data.as_ref();
     let bytes = match length {
         Some(l) if l >= 0 => &bytes[..(l as usize).min(bytes.len())],
         _ => bytes,

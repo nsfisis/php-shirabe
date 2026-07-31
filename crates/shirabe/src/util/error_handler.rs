@@ -125,7 +125,7 @@ impl ErrorHandler {
         }
 
         if output_even_without_io {
-            fwrite(&STDERR, &format!("Warning: {}{}", message, PHP_EOL), None);
+            fwrite(&STDERR, format!("Warning: {}{}", message, PHP_EOL), None);
         }
     }
 }

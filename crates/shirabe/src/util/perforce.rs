@@ -417,12 +417,12 @@ impl Perforce {
     pub fn write_client_spec_to_file(&mut self, spec: &PhpResource) {
         fwrite(
             spec,
-            &format!("Client: {}{}{}", self.get_client(), PHP_EOL, PHP_EOL),
+            format!("Client: {}{}{}", self.get_client(), PHP_EOL, PHP_EOL),
             None,
         );
         fwrite(
             spec,
-            &format!(
+            format!(
                 "Update: {}{}{}",
                 date("Y/m/d H:i:s", None),
                 PHP_EOL,
@@ -432,12 +432,12 @@ impl Perforce {
         );
         fwrite(
             spec,
-            &format!("Access: {}{}", date("Y/m/d H:i:s", None), PHP_EOL),
+            format!("Access: {}{}", date("Y/m/d H:i:s", None), PHP_EOL),
             None,
         );
         fwrite(
             spec,
-            &format!(
+            format!(
                 "Owner:  {}{}{}",
                 self.get_user().unwrap_or_default(),
                 PHP_EOL,
@@ -445,10 +445,10 @@ impl Perforce {
             ),
             None,
         );
-        fwrite(spec, &format!("Description:{}", PHP_EOL), None);
+        fwrite(spec, format!("Description:{}", PHP_EOL), None);
         fwrite(
             spec,
-            &format!(
+            format!(
                 "  Created by {} from composer.{}{}",
                 self.get_user().unwrap_or_default(),
                 PHP_EOL,
@@ -458,12 +458,12 @@ impl Perforce {
         );
         fwrite(
             spec,
-            &format!("Root: {}{}{}", self.get_path(), PHP_EOL, PHP_EOL),
+            format!("Root: {}{}{}", self.get_path(), PHP_EOL, PHP_EOL),
             None,
         );
         fwrite(
             spec,
-            &format!(
+            format!(
                 "Options:  noallwrite noclobber nocompress unlocked modtime rmdir{}{}",
                 PHP_EOL, PHP_EOL
             ),
@@ -471,20 +471,16 @@ impl Perforce {
         );
         fwrite(
             spec,
-            &format!("SubmitOptions:  revertunchanged{}{}", PHP_EOL, PHP_EOL),
+            format!("SubmitOptions:  revertunchanged{}{}", PHP_EOL, PHP_EOL),
             None,
         );
-        fwrite(
-            spec,
-            &format!("LineEnd:  local{}{}", PHP_EOL, PHP_EOL),
-            None,
-        );
+        fwrite(spec, format!("LineEnd:  local{}{}", PHP_EOL, PHP_EOL), None);
         if self.is_stream() {
-            fwrite(spec, &format!("Stream:{}", PHP_EOL), None);
+            fwrite(spec, format!("Stream:{}", PHP_EOL), None);
             let stream_clone = self.p4_stream.clone().unwrap_or_default();
             fwrite(
                 spec,
-                &format!(
+                format!(
                     "  {}{}",
                     self.get_stream_without_label(&stream_clone),
                     PHP_EOL
@@ -496,7 +492,7 @@ impl Perforce {
             let client = self.get_client();
             fwrite(
                 spec,
-                &format!("View:  {}/...  //{}/... {}", stream, client, PHP_EOL),
+                format!("View:  {}/...  //{}/... {}", stream, client, PHP_EOL),
                 None,
             );
         }

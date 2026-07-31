@@ -142,7 +142,7 @@ impl BufferIO {
         };
 
         for input in inputs {
-            fwrite(&stream, &format!("{}{}", input, PHP_EOL), None);
+            fwrite(&stream, format!("{}{}", input, PHP_EOL), None);
         }
 
         rewind(&stream);
