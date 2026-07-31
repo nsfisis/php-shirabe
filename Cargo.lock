@@ -2145,10 +2145,15 @@ dependencies = [
  "serde_urlencoded",
  "sha1",
  "sha2 0.11.0",
+ "shirabe-php-src",
  "tempfile",
  "twox-hash",
  "zip",
 ]
+
+[[package]]
+name = "shirabe-php-src"
+version = "0.0.1"
 
 [[package]]
 name = "shirabe-semver"

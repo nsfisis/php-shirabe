@@ -13,6 +13,7 @@ use Shirabe\Lint\Linters\NoFormatTrailingComma;
 use Shirabe\Lint\Linters\NoModRs;
 use Shirabe\Lint\Linters\NoStdCollectionsMaps;
 use Shirabe\Lint\Linters\NoUseAsAlias;
+use Shirabe\Lint\Linters\PhpSrcDerivationBoundary;
 use Shirabe\Lint\Linters\SortedDependencies;
 use Shirabe\Lint\Runner;
 
@@ -32,6 +33,7 @@ $runner = new Runner($rootDir, [
     [new NoModRs(), []],
     [new NoStdCollectionsMaps(), []],
     [new NoUseAsAlias(), []],
+    [new PhpSrcDerivationBoundary(), []],
     [new SortedDependencies(), []],
 ]);
 

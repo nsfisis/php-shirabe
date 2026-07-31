@@ -1,5 +1,8 @@
 use crate::PhpMixed;
 use indexmap::IndexMap;
+pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
+use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};
+use shirabe_php_src::standard::strnatcmp::strnatcmp_ex;
 
 pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
     // PHP returns the subject unchanged when the search string is empty, whereas Rust's
@@ -223,147 +226,6 @@ pub fn strnatcmp(s1: &str, s2: &str) -> i64 {
     strnatcmp_ex(s1.as_bytes(), s2.as_bytes(), false)
 }
 
-// Port of PHP's strnatcmp_ex (ext/standard/strnatcmp.c). Operating on byte
-// slices, an out-of-range index reads as 0, reproducing the NUL terminator that
-// the C implementation relies on.
-fn strnatcmp_ex(a: &[u8], b: &[u8], fold_case: bool) -> i64 {
-    let a_len = a.len();
-    let b_len = b.len();
-    if a_len == 0 || b_len == 0 {
-        return match a_len.cmp(&b_len) {
-            std::cmp::Ordering::Less => -1,
-            std::cmp::Ordering::Greater => 1,
-            std::cmp::Ordering::Equal => 0,
-        };
-    }
-
-    let mut ap = 0usize;
-    let mut bp = 0usize;
-    let mut leading = true;
-    loop {
-        let mut ca = natcmp_at(a, ap);
-        let mut cb = natcmp_at(b, bp);
-
-        // Skip over leading zeros.
-        while leading && ca == b'0' && natcmp_at(a, ap + 1).is_ascii_digit() {
-            ap += 1;
-            ca = natcmp_at(a, ap);
-        }
-        while leading && cb == b'0' && natcmp_at(b, bp + 1).is_ascii_digit() {
-            bp += 1;
-            cb = natcmp_at(b, bp);
-        }
-        leading = false;
-
-        // Skip consecutive whitespace.
-        while natcmp_is_space(ca) {
-            ap += 1;
-            ca = natcmp_at(a, ap);
-        }
-        while natcmp_is_space(cb) {
-            bp += 1;
-            cb = natcmp_at(b, bp);
-        }
-
-        // Process a run of digits.
-        if ca.is_ascii_digit() && cb.is_ascii_digit() {
-            let fractional = ca == b'0' || cb == b'0';
-            let result = if fractional {
-                natcmp_compare_left(a, &mut ap, b, &mut bp)
-            } else {
-                natcmp_compare_right(a, &mut ap, b, &mut bp)
-            };
-            if result != 0 {
-                return result;
-            }
-        }
-
-        if ap == a_len && bp == b_len {
-            return 0;
-        } else if ap == a_len {
-            return -1;
-        } else if bp == b_len {
-            return 1;
-        }
-
-        if fold_case {
-            ca = natcmp_at(a, ap).to_ascii_uppercase();
-            cb = natcmp_at(b, bp).to_ascii_uppercase();
-        } else {
-            ca = natcmp_at(a, ap);
-            cb = natcmp_at(b, bp);
-        }
-
-        if ca < cb {
-            return -1;
-        } else if ca > cb {
-            return 1;
-        }
-
-        ap += 1;
-        bp += 1;
-    }
-}
-
-fn natcmp_at(s: &[u8], i: usize) -> u8 {
-    if i < s.len() { s[i] } else { 0 }
-}
-
-fn natcmp_is_space(c: u8) -> bool {
-    matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r')
-}
-
-// Compare two right-aligned numbers: the longest run of digits wins; failing
-// that, the first differing digit decides, but only once magnitudes are known
-// equal (tracked in `bias`).
-fn natcmp_compare_right(a: &[u8], ap: &mut usize, b: &[u8], bp: &mut usize) -> i64 {
-    let mut bias = 0i64;
-    loop {
-        let ca = natcmp_at(a, *ap);
-        let cb = natcmp_at(b, *bp);
-        let a_digit = ca.is_ascii_digit();
-        let b_digit = cb.is_ascii_digit();
-        if !a_digit && !b_digit {
-            return bias;
-        } else if !a_digit {
-            return -1;
-        } else if !b_digit {
-            return 1;
-        } else if ca < cb {
-            if bias == 0 {
-                bias = -1;
-            }
-        } else if ca > cb && bias == 0 {
-            bias = 1;
-        }
-        *ap += 1;
-        *bp += 1;
-    }
-}
-
-// Compare two left-aligned numbers: the first differing digit decides.
-fn natcmp_compare_left(a: &[u8], ap: &mut usize, b: &[u8], bp: &mut usize) -> i64 {
-    loop {
-        let ca = natcmp_at(a, *ap);
-        let cb = natcmp_at(b, *bp);
-        let a_digit = ca.is_ascii_digit();
-        let b_digit = cb.is_ascii_digit();
-        if !a_digit && !b_digit {
-            return 0;
-        } else if !a_digit {
-            return -1;
-        } else if !b_digit {
-            return 1;
-        } else if ca < cb {
-            return -1;
-        } else if ca > cb {
-            return 1;
-        }
-        *ap += 1;
-        *bp += 1;
-    }
-}
-
 pub fn strcspn(string: &str, characters: &str) -> usize {
     let set = characters.as_bytes();
     let mut count = 0;
@@ -392,29 +254,6 @@ pub fn strstr3(haystack: &str, needle: &str, before_needle: bool) -> Option<Stri
 
 /// PHP's default trim character mask: " \t\n\r\0\x0B".
 const PHP_TRIM_DEFAULT_CHARS: &[u8] = b" \t\n\r\0\x0B";
-
-/// Build the set of bytes to strip from a PHP trim `$characters` argument,
-/// expanding `a..b` range syntax as PHP does.
-fn php_trim_mask(chars: &[u8]) -> [bool; 256] {
-    let mut mask = [false; 256];
-    let mut i = 0;
-    while i < chars.len() {
-        if i + 3 < chars.len() && chars[i + 1] == b'.' && chars[i + 2] == b'.' {
-            let start = chars[i];
-            let end = chars[i + 3];
-            if start <= end {
-                for b in start..=end {
-                    mask[b as usize] = true;
-                }
-                i += 4;
-                continue;
-            }
-        }
-        mask[chars[i] as usize] = true;
-        i += 1;
-    }
-    mask
-}
 
 pub fn rtrim(s: &str, chars: Option<&str>) -> String {
     let mask = php_trim_mask(
@@ -1159,87 +998,6 @@ fn php_to_float(v: &PhpMixed) -> f64 {
     }
 }
 
-// Port of PHP's php_strip_tags without the allowed-tags parameter (which this signature omits).
-// State: 0 = text, 1 = inside a tag, 2 = inside an HTML comment, 3 = inside `<? ... ?>` / `<! ...`.
-// TODO(phase-d): this omits allowed-tags handling and the tag-depth counter, so it can diverge from
-// PHP on malformed markup (unterminated comments/quotes, nested `<`).
-pub fn strip_tags(_str: &str) -> String {
-    let bytes = _str.as_bytes();
-    let n = bytes.len();
-    let mut out: Vec<u8> = Vec::with_capacity(n);
-    let mut state: u8 = 0;
-    // Quote char while inside a quoted attribute value, or 0.
-    let mut in_q: u8 = 0;
-    let mut i = 0;
-    while i < n {
-        let c = bytes[i];
-        match c {
-            b'<' => {
-                if in_q == 0 {
-                    if state == 0 && i + 1 < n && bytes[i + 1].is_ascii_whitespace() {
-                        // PHP keeps "< " (a `<` followed by whitespace) as literal text.
-                        out.push(c);
-                    } else if state == 0 {
-                        state = 1;
-                    }
-                }
-            }
-            b'>' => {
-                if in_q == 0 {
-                    match state {
-                        1 | 3 => state = 0,
-                        2 => {
-                            if i >= 2 && bytes[i - 1] == b'-' && bytes[i - 2] == b'-' {
-                                state = 0;
-                            }
-                        }
-                        _ => out.push(c),
-                    }
-                }
-            }
-            b'"' | b'\'' => {
-                if state == 1 {
-                    if in_q == 0 {
-                        in_q = c;
-                    } else if in_q == c && !(i > 0 && bytes[i - 1] == b'\\') {
-                        in_q = 0;
-                    }
-                } else if state == 0 {
-                    out.push(c);
-                }
-            }
-            b'!' => {
-                if state == 1 && i > 0 && bytes[i - 1] == b'<' {
-                    state = 3;
-                } else if state == 0 {
-                    out.push(c);
-                }
-            }
-            b'?' => {
-                if state == 1 && i > 0 && bytes[i - 1] == b'<' {
-                    state = 3;
-                } else if state == 0 {
-                    out.push(c);
-                }
-            }
-            b'-' => {
-                if state == 3 && i >= 2 && bytes[i - 1] == b'-' && bytes[i - 2] == b'!' {
-                    state = 2;
-                } else if state == 0 {
-                    out.push(c);
-                }
-            }
-            _ => {
-                if state == 0 {
-                    out.push(c);
-                }
-            }
-        }
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 pub fn html_entity_decode(_s: &str) -> String {
     // TODO(phase-d): only numeric entities and the most common named entities (the HTML 4.01 markup
     // set PHP enables by default) are decoded; the full named-entity table is not ported.
@@ -1297,36 +1055,6 @@ pub fn ucfirst(s: &str) -> String {
         None => String::new(),
         Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str()),
     }
-}
-
-// Port of PHP's addcslashes: every byte that falls in the (range-expanded) charlist is
-// backslash-escaped, with non-printable bytes rendered as the C escape or a three-digit octal.
-pub fn addcslashes(_string: &str, _charlist: &str) -> String {
-    let mask = php_trim_mask(_charlist.as_bytes());
-    let mut out: Vec<u8> = Vec::with_capacity(_string.len());
-    for &c in _string.as_bytes() {
-        if mask[c as usize] {
-            if !(32..=126).contains(&c) {
-                out.push(b'\\');
-                match c {
-                    b'\n' => out.push(b'n'),
-                    b'\t' => out.push(b't'),
-                    b'\r' => out.push(b'r'),
-                    0x07 => out.push(b'a'),
-                    0x0B => out.push(b'v'),
-                    0x08 => out.push(b'b'),
-                    0x0C => out.push(b'f'),
-                    _ => out.extend_from_slice(format!("{:03o}", c).as_bytes()),
-                }
-            } else {
-                out.push(b'\\');
-                out.push(c);
-            }
-        } else {
-            out.push(c);
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn php_strip_whitespace(path: &str) -> String {
@@ -1487,92 +1215,17 @@ pub fn byte_at(s: &str, i: usize) -> u8 {
     s.as_bytes().get(i).copied().unwrap_or(0)
 }
 
-// Port of PHP's stripcslashes: the inverse of addcslashes, decoding C escape sequences including
-// octal (\ooo) and hex (\xHH).
-pub fn stripcslashes(_s: &str) -> String {
-    let bytes = _s.as_bytes();
-    let n = bytes.len();
-    let mut out: Vec<u8> = Vec::with_capacity(n);
-    let mut i = 0;
-    while i < n {
-        if bytes[i] == b'\\' && i + 1 < n {
-            i += 1;
-            match bytes[i] {
-                b'n' => {
-                    out.push(b'\n');
-                    i += 1;
-                }
-                b'r' => {
-                    out.push(b'\r');
-                    i += 1;
-                }
-                b'a' => {
-                    out.push(0x07);
-                    i += 1;
-                }
-                b't' => {
-                    out.push(b'\t');
-                    i += 1;
-                }
-                b'v' => {
-                    out.push(0x0B);
-                    i += 1;
-                }
-                b'b' => {
-                    out.push(0x08);
-                    i += 1;
-                }
-                b'f' => {
-                    out.push(0x0C);
-                    i += 1;
-                }
-                b'\\' => {
-                    out.push(b'\\');
-                    i += 1;
-                }
-                b'x' => {
-                    if i + 1 < n && bytes[i + 1].is_ascii_hexdigit() {
-                        let mut val: u8 = 0;
-                        let mut count = 0;
-                        i += 1;
-                        while i < n && count < 2 && bytes[i].is_ascii_hexdigit() {
-                            val = val.wrapping_mul(16) + hex_digit_value(bytes[i]).unwrap();
-                            i += 1;
-                            count += 1;
-                        }
-                        out.push(val);
-                    } else {
-                        out.push(b'x');
-                        i += 1;
-                    }
-                }
-                b'0'..=b'7' => {
-                    let mut val: u8 = 0;
-                    let mut count = 0;
-                    while i < n && count < 3 && (b'0'..=b'7').contains(&bytes[i]) {
-                        val = val.wrapping_mul(8).wrapping_add(bytes[i] - b'0');
-                        i += 1;
-                        count += 1;
-                    }
-                    out.push(val);
-                }
-                other => {
-                    out.push(other);
-                    i += 1;
-                }
-            }
-        } else {
-            out.push(bytes[i]);
-            i += 1;
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 pub fn wordwrap(_s: &str, _width: i64, _break_str: &str, _cut: bool) -> String {
-    // TODO(phase-d): an exact byte-for-byte port of php_string_wordwrap (with its lastspace/cut
-    // bookkeeping) is intricate; left unported as it has no current callers.
-    todo!()
+    // PHP throws a ValueError for either argument combination before reaching the wrapping loop.
+    assert!(
+        !_break_str.is_empty(),
+        "wordwrap(): Argument #3 ($break) must not be empty"
+    );
+    assert!(
+        !(_width == 0 && _cut),
+        "wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0"
+    );
+    php_wordwrap(_s, _width, _break_str, _cut)
 }
 
 pub fn levenshtein(string1: &str, string2: &str) -> i64 {

@@ -13,6 +13,7 @@ shirabe-external-packages = { path = "crates/shirabe-external-packages" }
 shirabe-metadata-minifier = { path = "crates/shirabe-metadata-minifier" }
 shirabe-php-rpc = { path = "crates/shirabe-php-rpc" }
 shirabe-php-shim = { path = "crates/shirabe-php-shim" }
+shirabe-php-src = { path = "crates/shirabe-php-src" }
 shirabe-semver = { path = "crates/shirabe-semver" }
 shirabe-spdx-licenses = { path = "crates/shirabe-spdx-licenses" }
 anyhow = "1.0.102"

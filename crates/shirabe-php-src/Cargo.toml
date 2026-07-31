@@ -1,0 +1,8 @@
+[package]
+name = "shirabe-php-src"
+version.workspace = true
+edition.workspace = true
+license = "BSD-3-Clause AND Zlib"
+
+[lints]
+workspace = true

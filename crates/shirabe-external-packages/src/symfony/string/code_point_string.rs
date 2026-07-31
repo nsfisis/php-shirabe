@@ -42,7 +42,7 @@ impl CodePointString {
         let mut j: usize = 0;
         // PHP seeds both `$b` and `$i` at -1; mirror with signed indices.
         let mut i: i64 = -1;
-        let mask = php_wordwrap(&mask, width, "#", cut);
+        let mask = shirabe_php_shim::wordwrap(&mask, width, "#", cut);
         let mask_bytes = mask.as_bytes();
 
         let mut b: i64 = -1;
@@ -90,85 +90,4 @@ impl CodePointString {
             "UTF-8",
         )
     }
-}
-
-/// Port of PHP's built-in `wordwrap()` (`PHP_FUNCTION(wordwrap)` in ext/standard/string.c).
-/// Byte-based, matching PHP's single-byte/multi-byte break and cut handling.
-fn php_wordwrap(text: &str, linelength: i64, breakchar: &str, docut: bool) -> String {
-    let text = text.as_bytes();
-    let breakchar = breakchar.as_bytes();
-    let textlen = text.len() as i64;
-    let breaklen = breakchar.len() as i64;
-
-    if textlen == 0 {
-        return String::new();
-    }
-
-    let mut laststart: i64 = 0;
-    let mut lastspace: i64 = 0;
-
-    // Special case for a single-character break that needs no extra storage.
-    if breaklen == 1 && !docut {
-        let mut out = text.to_vec();
-        let mut current = 0i64;
-        while current < textlen {
-            let c = out[current as usize];
-            if c == breakchar[0] {
-                laststart = current + 1;
-                lastspace = current + 1;
-            } else if c == b' ' {
-                if current - laststart >= linelength {
-                    out[current as usize] = breakchar[0];
-                    laststart = current + 1;
-                }
-                lastspace = current;
-            } else if current - laststart >= linelength && laststart != lastspace {
-                out[lastspace as usize] = breakchar[0];
-                laststart = lastspace + 1;
-            }
-            current += 1;
-        }
-        return String::from_utf8_lossy(&out).into_owned();
-    }
-
-    // Multiple character line break or forced cut.
-    let mut out: Vec<u8> = Vec::new();
-    let mut current = 0i64;
-    while current < textlen {
-        // When we hit an existing break, copy to the new buffer and fix up laststart/lastspace.
-        if text[current as usize] == breakchar[0]
-            && current + breaklen < textlen
-            && &text[current as usize..(current + breaklen) as usize] == breakchar
-        {
-            out.extend_from_slice(&text[laststart as usize..(current + breaklen) as usize]);
-            current += breaklen - 1;
-            laststart = current + 1;
-            lastspace = current + 1;
-        } else if text[current as usize] == b' ' {
-            if current - laststart >= linelength {
-                out.extend_from_slice(&text[laststart as usize..current as usize]);
-                out.extend_from_slice(breakchar);
-                laststart = current + 1;
-            }
-            lastspace = current;
-        } else if current - laststart >= linelength && docut && laststart >= lastspace {
-            out.extend_from_slice(&text[laststart as usize..current as usize]);
-            out.extend_from_slice(breakchar);
-            laststart = current;
-            lastspace = current;
-        } else if current - laststart >= linelength && laststart < lastspace {
-            out.extend_from_slice(&text[laststart as usize..lastspace as usize]);
-            out.extend_from_slice(breakchar);
-            laststart = lastspace + 1;
-            lastspace += 1;
-        }
-        current += 1;
-    }
-
-    // Copy over any stragglers.
-    if laststart != current {
-        out.extend_from_slice(&text[laststart as usize..current as usize]);
-    }
-
-    String::from_utf8_lossy(&out).into_owned()
 }
