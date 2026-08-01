@@ -213,7 +213,7 @@ impl crate::downloader::ChangeReportInterface for PathDownloader {
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
-        self.inner.get_local_changes(package, path)
+        self.inner.base_get_local_changes(self, package, path)
     }
 }
 
@@ -493,7 +493,10 @@ impl DownloaderInterface for PathDownloader {
         target: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.inner.update(initial, target, path).await
+        let appendix = self.get_install_operation_appendix(target.clone(), path)?;
+        self.inner
+            .base_update(self, &appendix, initial, target, path)
+            .await
     }
 
     async fn remove(

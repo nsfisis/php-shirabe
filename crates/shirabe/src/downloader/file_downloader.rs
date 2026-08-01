@@ -569,15 +569,9 @@ impl DownloaderInterface for FileDownloader {
         target: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.borrow().write_error(&format!(
-            "  - {}{}",
-            UpdateOperation::format(initial.clone(), target.clone(), false),
-            self.get_install_operation_appendix(target.clone(), path)
-        ));
-
-        // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
-        let _ = self.remove(initial, path, false).await?;
-        self.install(target, path, false).await
+        let appendix = self.get_install_operation_appendix(target.clone(), path);
+        self.base_update(self, &appendix, initial, target, path)
+            .await
     }
 
     /// @inheritDoc
@@ -614,6 +608,23 @@ impl ChangeReportInterface for FileDownloader {
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
+        self.base_get_local_changes(self, package, path)
+    }
+}
+
+impl FileDownloader {
+    /// Shared body of `ChangeReportInterface::get_local_changes`.
+    ///
+    /// PHP's `getLocalChanges` calls `$this->download()` / `$this->install()`, which late-bind
+    /// to the concrete downloader class (e.g. `ArchiveDownloader::install` extracts the archive
+    /// instead of copying the dist file). The Rust port embeds the parent class as `inner`, so
+    /// delegating downloaders must pass themselves as `this` to preserve that dispatch.
+    pub(crate) fn base_get_local_changes(
+        &self,
+        this: &dyn DownloaderInterface,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<Option<String>> {
         let prev_io = std::mem::replace(
             &mut *self.io.borrow_mut(),
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
@@ -634,13 +645,13 @@ impl ChangeReportInterface for FileDownloader {
                     .remove_directory(format!("{}_compare", target_dir))?;
             }
 
-            sync_executor::block_on(self.download(
+            sync_executor::block_on(this.download(
                 package.clone(),
                 &format!("{}_compare", target_dir),
                 None,
                 false,
             ))?;
-            sync_executor::block_on(self.install(
+            sync_executor::block_on(this.install(
                 package.clone(),
                 &format!("{}_compare", target_dir),
                 false,
@@ -683,6 +694,28 @@ impl ChangeReportInterface for FileDownloader {
         } else {
             None
         })
+    }
+
+    /// Shared body of `DownloaderInterface::update`; see `base_get_local_changes` for why the
+    /// concrete downloader is threaded in as `this`. The appendix is computed by the caller
+    /// because `getInstallOperationAppendix` is protected and not part of `DownloaderInterface`.
+    pub(crate) async fn base_update(
+        &self,
+        this: &dyn DownloaderInterface,
+        install_operation_appendix: &str,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        self.io.borrow().write_error(&format!(
+            "  - {}{}",
+            UpdateOperation::format(initial.clone(), target.clone(), false),
+            install_operation_appendix
+        ));
+
+        // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
+        let _ = this.remove(initial, path, false).await?;
+        this.install(target, path, false).await
     }
 }
 
