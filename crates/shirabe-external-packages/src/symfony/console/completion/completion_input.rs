@@ -57,7 +57,10 @@ impl CompletionInput {
     }
 
     pub fn bind(&mut self, definition: &InputDefinition) -> anyhow::Result<()> {
-        self.inner.bind(definition)?;
+        self.inner
+            .base_bind(definition, |argv, token, parse_options| {
+                Ok(CompletionInput::parse_token(argv, token, parse_options))
+            })?;
 
         let relevant_token = self.get_relevant_token();
         if "-" == &relevant_token[0..1] {
@@ -203,8 +206,11 @@ impl CompletionInput {
         self.inner.get_first_argument()
     }
 
-    pub(crate) fn parse_token(&mut self, token: &str, parse_options: bool) -> bool {
-        match self.inner.parse_token(token, parse_options) {
+    /// PHP `CompletionInput::parseToken` (called back from `ArgvInput::base_bind`). Takes the
+    /// embedded ArgvInput instead of `&mut self` because the parse loop already holds the
+    /// exclusive borrow of it.
+    fn parse_token(inner: &mut ArgvInput, token: &str, parse_options: bool) -> bool {
+        match inner.parse_token(token, parse_options) {
             Ok(value) => return value,
             Err(_e) => {
                 // suppress errors, completed input is almost never valid

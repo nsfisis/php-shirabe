@@ -76,21 +76,37 @@ impl ArgvInput {
     }
 
     pub fn bind(&mut self, definition: &InputDefinition) -> anyhow::Result<()> {
+        self.base_bind(definition, ArgvInput::parse_token)
+    }
+
+    /// Shared body of `bind` (PHP `Input::bind`). PHP's `$this->parse()` ends in
+    /// `$this->parseToken()`, which late-binds to `CompletionInput::parseToken`; `parseToken`
+    /// is protected and not part of any trait, so the concrete implementation is threaded in
+    /// as a callback taking the embedded ArgvInput.
+    pub(crate) fn base_bind(
+        &mut self,
+        definition: &InputDefinition,
+        parse_token: impl FnMut(&mut ArgvInput, &str, bool) -> anyhow::Result<bool>,
+    ) -> anyhow::Result<()> {
         self.inner.arguments = IndexMap::new();
         self.inner.options = IndexMap::new();
         self.inner.definition = definition.clone();
 
-        self.parse()?;
+        self.base_parse(parse_token)?;
 
         Ok(())
     }
 
-    fn parse(&mut self) -> anyhow::Result<()> {
+    /// Shared body of `parse`; see `base_bind` for why `parse_token` is a parameter.
+    fn base_parse(
+        &mut self,
+        mut parse_token: impl FnMut(&mut ArgvInput, &str, bool) -> anyhow::Result<bool>,
+    ) -> anyhow::Result<()> {
         let mut parse_options = true;
         self.parsed = self.tokens.clone();
         while !self.parsed.is_empty() {
             let token = self.parsed.remove(0);
-            parse_options = self.parse_token(&token, parse_options)?;
+            parse_options = parse_token(self, &token, parse_options)?;
         }
         Ok(())
     }
