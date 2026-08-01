@@ -22,9 +22,9 @@ impl GitExcludeFilter {
                 .lines()
                 .map(|l| l.to_string())
                 .collect();
-            let patterns = filter.inner.parse_lines(lines, |line| {
-                GitExcludeFilter::parse_git_attributes_line_static(line)
-            });
+            let patterns = filter
+                .inner
+                .parse_lines(lines, Self::parse_git_attributes_line_static);
             filter.inner.exclude_patterns.extend(patterns);
         }
 
