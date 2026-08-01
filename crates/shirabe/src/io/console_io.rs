@@ -13,6 +13,7 @@ use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::helper::ProgressBar;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
+use shirabe_external_packages::symfony::console::helper::QuestionHelperInterface;
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::ConsoleOutput;

@@ -1,10 +1,11 @@
 //! ref: composer/vendor/symfony/console/Helper/SymfonyQuestionHelper.php
 
 use crate::symfony::console::formatter::output_formatter::OutputFormatter;
-use crate::symfony::console::helper::question_helper::QuestionHelper;
+use crate::symfony::console::helper::question_helper::{QuestionHelper, QuestionHelperInterface};
 use crate::symfony::console::output::output_interface;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use crate::symfony::console::question::QuestionInterface;
+use crate::symfony::console::style::style_interface::StyleInterface;
 use crate::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_php_shim::PhpMixed;
 use std::ops::{Deref, DerefMut};
@@ -20,7 +21,26 @@ impl SymfonyQuestionHelper {
         Self::default()
     }
 
-    pub(crate) fn write_prompt(
+    fn get_eof_shortcut(&self) -> String {
+        if shirabe_php_shim::php_os_family() == "Windows" {
+            return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".to_string();
+        }
+
+        "<comment>Ctrl+D</comment>".to_string()
+    }
+}
+
+impl QuestionHelperInterface for SymfonyQuestionHelper {
+    fn inner(&self) -> &QuestionHelper {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut QuestionHelper {
+        &mut self.inner
+    }
+
+    /// {@inheritdoc}
+    fn write_prompt(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
@@ -108,35 +128,23 @@ impl SymfonyQuestionHelper {
             .write(&[prompt], false, output_interface::OUTPUT_NORMAL);
     }
 
-    pub(crate) fn write_error(
+    /// {@inheritdoc}
+    fn write_error(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         error: &shirabe_php_shim::Exception,
     ) {
-        let is_symfony_style = {
-            let borrowed = output.borrow();
-            (*borrowed)
-                .as_any()
-                .downcast_ref::<SymfonyStyle>()
-                .is_some()
-        };
-        if is_symfony_style {
-            // $output->newLine(); $output->error($error->getMessage());
-            // SymfonyStyle's newLine()/error() require mutable access to the
-            // concrete type; mutable downcasting through the trait object is
-            // resolved in a later phase.
-            todo!("SymfonyStyle newLine()/error() require &mut SymfonyStyle");
+        {
+            let mut borrowed = output.borrow_mut();
+            if let Some(style) = (*borrowed).as_any_mut().downcast_mut::<SymfonyStyle>() {
+                style.new_line(1);
+                style.error(PhpMixed::String(error.message.clone()));
+
+                return;
+            }
         }
 
         self.inner.write_error(output, error);
-    }
-
-    fn get_eof_shortcut(&self) -> String {
-        if shirabe_php_shim::php_os_family() == "Windows" {
-            return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".to_string();
-        }
-
-        "<comment>Ctrl+D</comment>".to_string()
     }
 }
 

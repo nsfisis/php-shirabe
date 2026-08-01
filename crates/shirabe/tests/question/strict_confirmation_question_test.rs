@@ -1,7 +1,9 @@
 //! ref: composer/tests/Composer/Test/Question/StrictConfirmationQuestionTest.php
 
 use shirabe::question::StrictConfirmationQuestion;
-use shirabe_external_packages::symfony::console::helper::question_helper::QuestionHelper;
+use shirabe_external_packages::symfony::console::helper::question_helper::{
+    QuestionHelper, QuestionHelperInterface,
+};
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::streamable_input_interface::StreamableInputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;

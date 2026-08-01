@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php
 
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::symfony::console::exception::runtime_exception::RuntimeException;
 use crate::symfony::console::formatter::OutputFormatter;
 use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::helper::Helper;
@@ -9,6 +8,8 @@ use crate::symfony::console::helper::ProgressBar;
 use crate::symfony::console::helper::SymfonyQuestionHelper;
 use crate::symfony::console::helper::Table;
 use crate::symfony::console::helper::TableCell;
+use crate::symfony::console::helper::TableSeparator;
+use crate::symfony::console::helper::question_helper::QuestionHelperInterface;
 use crate::symfony::console::helper::table::{Cell, Row};
 use crate::symfony::console::input::InputInterface;
 use crate::symfony::console::output::ConsoleOutputInterface;
@@ -38,6 +39,16 @@ pub struct SymfonyStyle {
 }
 
 pub const MAX_LINE_LENGTH: i64 = 120;
+
+/// A `definition_list` entry. PHP types it as `string|array|TableSeparator`; any other type is
+/// rejected with an `InvalidArgumentException` (a `LogicException`), which this enum makes
+/// unrepresentable.
+#[derive(Debug)]
+pub enum DefinitionListItem {
+    String(String),
+    Array(indexmap::IndexMap<String, PhpMixed>),
+    TableSeparator(TableSeparator),
+}
 
 impl SymfonyStyle {
     pub fn new(
@@ -126,11 +137,11 @@ impl SymfonyStyle {
     }
 
     /// Formats a horizontal table.
-    pub fn horizontal_table(&mut self, headers: Vec<PhpMixed>, rows: Vec<PhpMixed>) {
+    pub fn horizontal_table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) {
         self.create_table()
             .set_horizontal(true)
-            .set_headers(headers.into_iter().map(Cell::from).collect())
-            .set_rows(rows.into_iter().map(Row::from).collect())
+            .set_headers(headers)
+            .set_rows(rows)
             .render();
 
         self.new_line(1);
@@ -142,76 +153,66 @@ impl SymfonyStyle {
     /// * 'A title'
     /// * ['key' => 'value']
     /// * new TableSeparator()
-    pub fn definition_list(&mut self, list: Vec<PhpMixed>) {
-        let mut headers: Vec<PhpMixed> = Vec::new();
-        let mut row: Vec<PhpMixed> = Vec::new();
+    pub fn definition_list(&mut self, list: Vec<DefinitionListItem>) {
+        let mut headers: Vec<Cell> = Vec::new();
+        let mut row: Vec<Cell> = Vec::new();
         for value in list {
-            if Self::is_table_separator(&value) {
-                headers.push(value.clone());
-                row.push(value);
-                continue;
-            }
-            if shirabe_php_shim::is_string(&value) {
-                // TODO: store a `TableCell` (with colspan => 2) into the mixed array.
-                let _table_cell = TableCell::new(&Self::php_string(&value), {
-                    let mut options = indexmap::IndexMap::new();
-                    options.insert(
-                        "colspan".to_string(),
-                        crate::symfony::console::helper::table_cell::TableCellOption::Int(2),
-                    );
-                    options
-                });
-                let _ = _table_cell;
-                todo!();
-            }
-            if !shirabe_php_shim::is_array(&value) {
-                // TODO(plugin): recoverable error path.
-                let _ = InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: "Value should be an array, string, or an instance of TableSeparator."
-                        .to_string(),
-                    code: 0,
-                });
-                todo!()
-            }
-            // $headers[] = key($value); $row[] = current($value);
-            let (first_key, first_value) = match &value {
-                PhpMixed::Array(entries) => (
-                    entries
+            match value {
+                DefinitionListItem::TableSeparator(separator) => {
+                    headers.push(Cell::Separator(separator.clone()));
+                    row.push(Cell::Separator(separator));
+                }
+                DefinitionListItem::String(value) => {
+                    headers.push(Cell::Cell(
+                        TableCell::new(&value, {
+                            let mut options = indexmap::IndexMap::new();
+                            options.insert(
+                                "colspan".to_string(),
+                                crate::symfony::console::helper::table_cell::TableCellOption::Int(
+                                    2,
+                                ),
+                            );
+                            options
+                        })
+                        .expect("colspan is a valid TableCell option"),
+                    ));
+                    row.push(Cell::Null);
+                }
+                DefinitionListItem::Array(value) => {
+                    // $headers[] = key($value); $row[] = current($value);
+                    let first_key = value
                         .keys()
                         .next()
                         .map(|k| PhpMixed::String(k.clone()))
-                        .unwrap_or(PhpMixed::Null),
-                    entries
+                        .unwrap_or(PhpMixed::Null);
+                    let first_value = value
                         .values()
                         .next()
                         .cloned()
-                        .unwrap_or(PhpMixed::Bool(false)),
-                ),
-                PhpMixed::List(items) => (
-                    if items.is_empty() {
-                        PhpMixed::Null
-                    } else {
-                        PhpMixed::Int(0)
-                    },
-                    items.first().cloned().unwrap_or(PhpMixed::Bool(false)),
-                ),
-                _ => unreachable!("value is an array past the is_array guard"),
-            };
-            headers.push(first_key);
-            row.push(first_value);
+                        .unwrap_or(PhpMixed::Bool(false));
+                    headers.push(Cell::from(first_key));
+                    row.push(Cell::from(first_value));
+                }
+            }
         }
 
-        self.horizontal_table(headers, vec![PhpMixed::List(row.into_iter().collect())]);
+        self.horizontal_table(headers, vec![Row::Cells(row)]);
     }
 
+    /// @see ProgressBar::iterate()
+    ///
+    /// PHP returns a generator (`yield from`); this port evaluates eagerly, following
+    /// `ProgressBar::iterate`.
     pub fn progress_iterate(
         &mut self,
-        _iterable: Vec<PhpMixed>,
-        _max: Option<i64>,
-    ) -> Vec<PhpMixed> {
-        // TODO(phase-c/d): PHP uses `yield from`; porting the generator semantics of
-        // ProgressBar::iterate() requires a streaming design not yet in place.
-        todo!()
+        iterable: Vec<(PhpMixed, PhpMixed)>,
+        max: Option<i64>,
+    ) -> anyhow::Result<Vec<(PhpMixed, PhpMixed)>> {
+        let yielded = self.create_progress_bar(0).iterate(iterable, max)?;
+
+        self.new_line(2);
+
+        Ok(yielded)
     }
 
     pub fn ask_question(&mut self, question: &impl QuestionInterface) -> PhpMixed {
@@ -223,7 +224,9 @@ impl SymfonyStyle {
             self.question_helper = Some(SymfonyQuestionHelper::new());
         }
 
-        // TODO(plugin): pass `self` as the OutputInterface to the question helper.
+        // TODO(phase-c): PHP passes `$this` as the OutputInterface, so SymfonyQuestionHelper's
+        // write_error renders through SymfonyStyle::error; SymfonyStyle is not an OutputInterface
+        // trait object here, so the raw output is passed instead.
         let answer = {
             let input = self.input.clone();
             let mut input = input.borrow_mut();
@@ -253,15 +256,14 @@ impl SymfonyStyle {
     }
 
     pub fn create_table(&mut self) -> Table {
-        // TODO(plugin): ConsoleOutputInterface::section() requires runtime type info.
-        let output = if Self::is_console_output_interface(&self.output) {
-            Self::as_console_output_interface(&self.output)
-                .unwrap()
-                .borrow()
-                .section() as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>
-        } else {
-            self.output.clone()
-        };
+        let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
+            if Self::is_console_output_interface(&self.output) {
+                Self::as_console_output_interface(&self.output)
+                    .unwrap()
+                    .section()
+            } else {
+                self.output.clone()
+            };
         let mut style = Table::get_style_definition("symfony-style-guide".to_string())
             .expect("style definition lookup")
             .expect("undefined style definition");
@@ -290,16 +292,12 @@ impl SymfonyStyle {
     }
 
     fn get_progress_bar(&mut self) -> &mut ProgressBar {
-        if self.progress_bar.is_none() {
-            // TODO(plugin): recoverable error path.
-            let _ = RuntimeException(shirabe_php_shim::RuntimeException {
-                message: "The ProgressBar is not started.".to_string(),
-                code: 0,
-            });
-            todo!()
-        }
-
-        self.progress_bar.as_mut().unwrap()
+        // PHP throws RuntimeException('The ProgressBar is not started.'). Reaching this without a
+        // prior progress_start() call is a caller bug, and the StyleInterface signatures carry no
+        // Result, so panic.
+        self.progress_bar
+            .as_mut()
+            .expect("The ProgressBar is not started.")
     }
 
     fn auto_prepend_block(&mut self) {
@@ -447,16 +445,15 @@ impl SymfonyStyle {
             .is_some()
     }
 
+    /// PHP casts to `ConsoleOutputInterface`; `ConsoleOutput` being its only implementor, a
+    /// borrow of the concrete type serves as the cast result.
     fn as_console_output_interface(
-        _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Option<std::rc::Rc<std::cell::RefCell<dyn ConsoleOutputInterface>>> {
-        todo!()
-    }
-
-    // TODO(phase-c/d): `PhpMixed` cannot carry a `TableSeparator` object, so the
-    // `$value instanceof TableSeparator` check has no faithful representation yet.
-    fn is_table_separator(_value: &PhpMixed) -> bool {
-        todo!()
+        output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> Option<std::cell::Ref<'_, ConsoleOutput>> {
+        std::cell::Ref::filter_map(output.borrow(), |output| {
+            output.as_any().downcast_ref::<ConsoleOutput>()
+        })
+        .ok()
     }
 
     fn php_string(value: &PhpMixed) -> String {

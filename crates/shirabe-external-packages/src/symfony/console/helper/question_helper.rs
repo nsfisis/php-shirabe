@@ -35,13 +35,22 @@ static STTY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(
 /// self::$stdinIsInteractive
 static STDIN_IS_INTERACTIVE: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
 
-impl QuestionHelper {
+/// PHP dispatches `$this->writePrompt()` / `$this->writeError()` virtually, and
+/// `SymfonyQuestionHelper` overrides both protected methods. The embedded-super port expresses
+/// that late binding as a trait: the template methods are provided here and reach the overridable
+/// hooks through `Self`, while `inner()` reaches the base-class state. PHP has no such interface;
+/// the invented name follows the `QuestionInterface` precedent.
+pub trait QuestionHelperInterface {
+    fn inner(&self) -> &QuestionHelper;
+
+    fn inner_mut(&mut self) -> &mut QuestionHelper;
+
     /// Asks a question to the user.
     ///
     /// @return mixed The user answer
     ///
     /// @throws RuntimeException If there is no data to read in the input stream
-    pub fn ask(
+    fn ask(
         &mut self,
         input: &mut dyn InputInterface,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -60,13 +69,13 @@ impl QuestionHelper {
         }
 
         if !input.is_interactive() {
-            return Ok(Ok(self.get_default_answer(question)));
+            return Ok(Ok(self.inner().get_default_answer(question)));
         }
 
         if let Some(streamable) = input.as_streamable()
             && let Some(stream) = streamable.get_stream()
         {
-            self.input_stream = Some(stream);
+            self.inner_mut().input_stream = Some(stream);
         }
 
         let result: anyhow::Result<Result<PhpMixed, MissingInputException>> = (|| {
@@ -85,7 +94,7 @@ impl QuestionHelper {
             Err(exception) => {
                 input.set_interactive(false);
 
-                let fallback_output = self.get_default_answer(question);
+                let fallback_output = self.inner().get_default_answer(question);
                 if matches!(fallback_output, PhpMixed::Null) {
                     return Ok(Err(exception));
                 }
@@ -95,16 +104,7 @@ impl QuestionHelper {
         }
     }
 
-    pub fn get_name(&self) -> String {
-        "question".to_string()
-    }
-
-    /// Prevents usage of stty.
-    pub fn disable_stty() {
-        STTY.store(false, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Asks the question to the user.
+    /// Asks the question to the user (PHP private; on the trait so it can late-bind the hooks).
     ///
     /// @return mixed
     ///
@@ -117,6 +117,7 @@ impl QuestionHelper {
         self.write_prompt(std::rc::Rc::clone(&output), question);
 
         let input_stream = self
+            .inner()
             .input_stream
             .clone()
             .unwrap_or_else(shirabe_php_shim::stdin);
@@ -132,12 +133,15 @@ impl QuestionHelper {
             // The autocompleter callback yields an iterable (Option here); PHP
             // treats a null result as an empty list of suggestions.
             let callback = move |input: &str| callback(input).unwrap_or_default();
-            let autocomplete = self.autocomplete(
+            let autocomplete = match self.inner().autocomplete(
                 std::rc::Rc::clone(&output),
                 question,
                 &input_stream,
                 &callback,
-            );
+            ) {
+                Ok(value) => value,
+                Err(exception) => return Ok(Err(exception)),
+            };
             ret = PhpMixed::String(if question.is_trimmable() {
                 shirabe_php_shim::trim(&autocomplete, None)
             } else {
@@ -146,7 +150,7 @@ impl QuestionHelper {
         } else {
             let mut r: PhpMixed = PhpMixed::Bool(false);
             if question.is_hidden() {
-                match self.get_hidden_response(
+                match self.inner().get_hidden_response(
                     std::rc::Rc::clone(&output),
                     &input_stream,
                     question.is_trimmable(),
@@ -176,7 +180,7 @@ impl QuestionHelper {
                     shirabe_php_shim::stream_set_blocking(&input_stream, true);
                 }
 
-                let read = self.read_input(&input_stream, question);
+                let read = self.inner().read_input(&input_stream, question);
 
                 if !shirabe_php_shim::boolval(&is_blocked) {
                     shirabe_php_shim::stream_set_blocking(&input_stream, false);
@@ -219,6 +223,99 @@ impl QuestionHelper {
         }
 
         Ok(Ok(ret))
+    }
+
+    /// Validates an attempt (PHP private; on the trait so it can late-bind the hooks).
+    ///
+    /// @param callable $interviewer A callable that will ask for a question and return the result
+    ///
+    /// @return mixed The validated response
+    ///
+    /// @throws \Exception In case the max number of attempts has been reached and no valid response has been given
+    fn validate_attempts(
+        &self,
+        interviewer: &dyn Fn() -> anyhow::Result<Result<PhpMixed, MissingInputException>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        question: &impl QuestionInterface,
+    ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
+        let mut error: Option<shirabe_php_shim::Exception> = None;
+        let mut attempts = question.get_max_attempts();
+
+        loop {
+            // while (null === $attempts || $attempts--)
+            match attempts {
+                None => {}
+                Some(0) => break,
+                Some(n) => attempts = Some(n - 1),
+            }
+
+            if let Some(ref error) = error {
+                self.write_error(std::rc::Rc::clone(&output), error);
+            }
+
+            let interviewed = match interviewer()? {
+                Ok(value) => value,
+                Err(missing) => return Ok(Err(missing)),
+            };
+
+            match question.get_validator().unwrap()(Some(interviewed)) {
+                Ok(value) => return Ok(Ok(value)),
+                Err(e) => {
+                    // PHP: `catch (RuntimeException $e) { throw $e; } catch (\Exception $error) {}`.
+                    // The validator return type is fixed to InvalidArgumentException here, so the
+                    // RuntimeException rethrow branch is statically unreachable; record the error
+                    // and retry.
+                    error = Some(shirabe_php_shim::Exception {
+                        message: e.0.message.clone(),
+                        code: e.0.code,
+                    });
+                }
+            }
+        }
+
+        // throw $error;
+        Err(anyhow::Error::msg(
+            error.map(|e| e.message).unwrap_or_default(),
+        ))
+    }
+
+    /// Outputs the question prompt (PHP protected; the overridable hook).
+    fn write_prompt(
+        &self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        question: &impl QuestionInterface,
+    ) {
+        self.inner().write_prompt(output, question);
+    }
+
+    /// Outputs an error message (PHP protected; the overridable hook).
+    fn write_error(
+        &self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        error: &shirabe_php_shim::Exception,
+    ) {
+        self.inner().write_error(output, error);
+    }
+}
+
+impl QuestionHelperInterface for QuestionHelper {
+    fn inner(&self) -> &QuestionHelper {
+        self
+    }
+
+    fn inner_mut(&mut self) -> &mut QuestionHelper {
+        self
+    }
+}
+
+impl QuestionHelper {
+    pub fn get_name(&self) -> String {
+        "question".to_string()
+    }
+
+    /// Prevents usage of stty.
+    pub fn disable_stty() {
+        STTY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// @return mixed
@@ -344,7 +441,7 @@ impl QuestionHelper {
         question: &impl QuestionInterface,
         input_stream: &shirabe_php_shim::PhpResource,
         autocomplete: &dyn Fn(&str) -> Vec<PhpMixed>,
-    ) -> String {
+    ) -> Result<String, MissingInputException> {
         let cursor = Cursor::new(std::rc::Rc::clone(&output), Some(input_stream.clone()));
 
         let mut full_choice = String::new();
@@ -400,10 +497,12 @@ impl QuestionHelper {
                     && matches!(question.get_default(), PhpMixed::Null))
             {
                 shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
-                // throw new MissingInputException('Aborted.');
-                // autocomplete() returns string in PHP; this throw aborts the
-                // whole read. Faithful exception propagation is resolved later.
-                todo!("MissingInputException('Aborted.') thrown inside autocomplete");
+                return Err(MissingInputException(RuntimeException(
+                    shirabe_php_shim::RuntimeException {
+                        message: "Aborted.".to_string(),
+                        code: 0,
+                    },
+                )));
             } else if c.as_deref() == Some("\u{7f}") {
                 // Backspace Character
                 if 0 == num_matches && 0 != i {
@@ -570,7 +669,7 @@ impl QuestionHelper {
         // Reset stty so it behaves normally again
         shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
 
-        full_choice
+        Ok(full_choice)
     }
 
     fn most_recently_entered_value(&self, entered: &str) -> String {
@@ -669,60 +768,6 @@ impl QuestionHelper {
             .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
 
         Ok(Ok(value))
-    }
-
-    /// Validates an attempt.
-    ///
-    /// @param callable $interviewer A callable that will ask for a question and return the result
-    ///
-    /// @return mixed The validated response
-    ///
-    /// @throws \Exception In case the max number of attempts has been reached and no valid response has been given
-    fn validate_attempts(
-        &self,
-        interviewer: &dyn Fn() -> anyhow::Result<Result<PhpMixed, MissingInputException>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        question: &impl QuestionInterface,
-    ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
-        let mut error: Option<shirabe_php_shim::Exception> = None;
-        let mut attempts = question.get_max_attempts();
-
-        loop {
-            // while (null === $attempts || $attempts--)
-            match attempts {
-                None => {}
-                Some(0) => break,
-                Some(n) => attempts = Some(n - 1),
-            }
-
-            if let Some(ref error) = error {
-                self.write_error(std::rc::Rc::clone(&output), error);
-            }
-
-            let interviewed = match interviewer()? {
-                Ok(value) => value,
-                Err(missing) => return Ok(Err(missing)),
-            };
-
-            match question.get_validator().unwrap()(Some(interviewed)) {
-                Ok(value) => return Ok(Ok(value)),
-                Err(e) => {
-                    // PHP: `catch (RuntimeException $e) { throw $e; } catch (\Exception $error) {}`.
-                    // The validator return type is fixed to InvalidArgumentException here, so the
-                    // RuntimeException rethrow branch is statically unreachable; record the error
-                    // and retry.
-                    error = Some(shirabe_php_shim::Exception {
-                        message: e.0.message.clone(),
-                        code: e.0.code,
-                    });
-                }
-            }
-        }
-
-        // throw $error;
-        Err(anyhow::Error::msg(
-            error.map(|e| e.message).unwrap_or_default(),
-        ))
     }
 
     fn is_interactive_input(&self, input_stream: &shirabe_php_shim::PhpResource) -> bool {
@@ -871,10 +916,14 @@ impl QuestionHelper {
     }
 }
 
-// PHP `__FILE__` magic constant. The shim's `file()` is PHP's file() function,
-// not the magic constant, and there is no `__FILE__` shim yet (see report).
+/// PHP `__FILE__` magic constant. The executing code lives in the Shirabe binary itself, which is
+/// the closest analogue for a native executable; it never carries the `phar:` scheme, so the
+/// phar-relocation branch in `get_hidden_response` correctly never triggers.
 fn magic_file() -> String {
-    todo!("magic_file: shim needs a __FILE__ magic-constant equivalent")
+    std::env::current_exe()
+        .expect("current executable path")
+        .display()
+        .to_string()
 }
 
 impl HelperInterface for QuestionHelper {

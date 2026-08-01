@@ -41,7 +41,6 @@ impl OutputStyle {
 
         Self::as_console_output_interface(&self.output)
             .unwrap()
-            .borrow()
             .get_error_output()
     }
 
@@ -55,10 +54,18 @@ impl OutputStyle {
             .is_some()
     }
 
+    /// PHP casts to `ConsoleOutputInterface`; `ConsoleOutput` being its only implementor, a
+    /// borrow of the concrete type serves as the cast result.
     fn as_console_output_interface(
-        _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Option<std::rc::Rc<std::cell::RefCell<dyn ConsoleOutputInterface>>> {
-        todo!()
+        output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> Option<std::cell::Ref<'_, crate::symfony::console::output::console_output::ConsoleOutput>>
+    {
+        std::cell::Ref::filter_map(output.borrow(), |output| {
+            output
+                .as_any()
+                .downcast_ref::<crate::symfony::console::output::console_output::ConsoleOutput>()
+        })
+        .ok()
     }
 }
 
