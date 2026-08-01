@@ -46,12 +46,6 @@ Checking github.com rate limit: "
 
 #[test]
 #[serial]
-#[ignore = "check_composer_audit locates Composer's own vendor/composer/installed.json through a \
-            literal relative path standing in for PHP's __DIR__, so it is never found from the \
-            temporary working directory this test runs in; diagnose then reports a warning and \
-            exits non-zero. diagnose also checks live http/https connectivity to packagist and \
-            the github.com rate limit (as the PHP original does), so the test additionally \
-            requires real network access"]
 fn test_cmd_success() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
