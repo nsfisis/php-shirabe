@@ -148,7 +148,7 @@ impl FilterRepository {
 }
 
 impl RepositoryInterface for FilterRepository {
-    fn count(&self) -> anyhow::Result<usize> {
+    fn count(&mut self) -> anyhow::Result<usize> {
         if self.repo.count()? > 0 {
             Ok(self
                 .repo
@@ -161,7 +161,7 @@ impl RepositoryInterface for FilterRepository {
         }
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         self.repo.has_package(package)
     }
 

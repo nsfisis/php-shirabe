@@ -241,32 +241,32 @@ impl InstallerInterface for LibraryInstaller {
 
     fn is_installed(
         &self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> bool {
-        if !repo.has_package(package.clone()) {
-            return false;
+    ) -> anyhow::Result<bool> {
+        if !repo.has_package(package.clone())? {
+            return Ok(false);
         }
 
         let install_path = self.get_install_path(package).unwrap();
 
         if Filesystem::is_readable(&install_path) {
-            return true;
+            return Ok(true);
         }
 
         if Platform::is_windows() && self.filesystem.borrow_mut().is_junction(&install_path) {
-            return true;
+            return Ok(true);
         }
 
         if is_link(&install_path) {
             if realpath(&install_path).is_none() {
-                return false;
+                return Ok(false);
             }
 
-            return true;
+            return Ok(true);
         }
 
-        false
+        Ok(false)
     }
 
     async fn download(
@@ -322,7 +322,9 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package.clone()).unwrap();
 
         // remove the binaries if it appears the package files are missing
-        if !Filesystem::is_readable(&download_path) && repo.borrow().has_package(package.clone()) {
+        if !Filesystem::is_readable(&download_path)
+            && repo.borrow_mut().has_package(package.clone())?
+        {
             self.binary_installer
                 .borrow_mut()
                 .remove_binaries(package.clone());
@@ -335,7 +337,7 @@ impl InstallerInterface for LibraryInstaller {
             .borrow_mut()
             .install_binaries(package.clone(), &install_path, true);
         let mut repo = repo.borrow_mut();
-        if !repo.has_package(package.clone()) {
+        if !repo.has_package(package.clone())? {
             repo.add_package(PackageInterfaceHandle::dup(&package));
         }
 
@@ -348,7 +350,7 @@ impl InstallerInterface for LibraryInstaller {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.borrow().has_package(initial.clone()) {
+        if !repo.borrow_mut().has_package(initial.clone())? {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -369,7 +371,7 @@ impl InstallerInterface for LibraryInstaller {
             .install_binaries(target.clone(), &install_path, true);
         let mut repo = repo.borrow_mut();
         repo.remove_package(initial.clone());
-        if !repo.has_package(target.clone()) {
+        if !repo.has_package(target.clone())? {
             repo.add_package(PackageInterfaceHandle::dup(&target));
         }
 
@@ -381,7 +383,7 @@ impl InstallerInterface for LibraryInstaller {
         repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.borrow().has_package(package.clone()) {
+        if !repo.borrow_mut().has_package(package.clone())? {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,

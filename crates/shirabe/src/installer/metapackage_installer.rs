@@ -30,9 +30,9 @@ impl InstallerInterface for MetapackageInstaller {
 
     fn is_installed(
         &self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         repo.has_package(package)
     }
 
@@ -85,7 +85,7 @@ impl InstallerInterface for MetapackageInstaller {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.borrow().has_package(initial.clone()) {
+        if !repo.borrow_mut().has_package(initial.clone())? {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -114,7 +114,7 @@ impl InstallerInterface for MetapackageInstaller {
         repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.borrow().has_package(package.clone()) {
+        if !repo.borrow_mut().has_package(package.clone())? {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,

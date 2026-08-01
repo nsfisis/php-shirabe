@@ -30,7 +30,7 @@ fn test_install() {
     ))
     .unwrap();
 
-    assert!(repository.has_package(package));
+    assert!(repository.has_package(package).unwrap());
 }
 
 #[test]
@@ -50,8 +50,8 @@ fn test_update() {
     ))
     .unwrap();
 
-    assert!(!repository.has_package(initial.clone()));
-    assert!(repository.has_package(target.clone()));
+    assert!(!repository.has_package(initial.clone()).unwrap());
+    assert!(repository.has_package(target.clone()).unwrap());
 
     // Updating again, with the initial package no longer installed, fails.
     assert!(
@@ -81,7 +81,7 @@ fn test_uninstall() {
     ))
     .unwrap();
 
-    assert!(!repository.has_package(package.clone()));
+    assert!(!repository.has_package(package.clone()).unwrap());
 
     // Uninstalling again, with the package no longer installed, fails.
     assert!(

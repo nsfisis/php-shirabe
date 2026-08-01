@@ -768,7 +768,7 @@ impl Command for ShowCommand {
                 self.print_package_info_as_json(
                     package.clone(),
                     &versions_map,
-                    &*installed_repo.borrow(),
+                    &mut *installed_repo.borrow_mut(),
                     latest_package,
                 )?;
             } else {
@@ -1696,7 +1696,7 @@ impl ShowCommand {
             }
 
             // select an exact match if it is in the installed repo and no specific version was required
-            if version.is_null() && installed_repo.has_package(p.clone()) {
+            if version.is_null() && installed_repo.has_package(p.clone())? {
                 matched_package = Some(p.clone());
             }
 
@@ -1766,7 +1766,7 @@ impl ShowCommand {
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let is_installed_package = !PlatformRepository::is_platform_package(&package.get_name())
-            && installed_repo.has_package(package.clone().into());
+            && installed_repo.has_package(package.clone().into())?;
 
         self.get_io().write(&format!(
             "<info>name</info>     : {}",
@@ -2022,7 +2022,7 @@ impl ShowCommand {
         &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &dyn RepositoryInterface,
+        installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let mut json: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -2113,7 +2113,7 @@ impl ShowCommand {
         }
 
         if !PlatformRepository::is_platform_package(&package.get_name())
-            && installed_repo.has_package(package.clone().into())
+            && installed_repo.has_package(package.clone().into())?
         {
             let composer = self.require_composer(None, None)?;
             let installation_manager = composer.borrow_partial().get_installation_manager();

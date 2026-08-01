@@ -144,10 +144,10 @@ impl AdvisoryProviderInterface for MockAdvisoryRepository {
 }
 
 impl RepositoryInterface for MockAdvisoryRepository {
-    fn count(&self) -> anyhow::Result<usize> {
+    fn count(&mut self) -> anyhow::Result<usize> {
         unimplemented!("not used by Auditor")
     }
-    fn has_package(&self, _package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, _package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         unimplemented!("not used by Auditor")
     }
     fn find_package(

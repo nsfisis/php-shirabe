@@ -198,22 +198,21 @@ impl InstallationManager {
     /// Checks whether provided package is installed in one of the registered installers.
     pub fn is_package_installed(
         &self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         // For testing only (ref InstallationManagerMock::isPackageInstalled).
         if self.mock.is_some() {
-            return Ok(repo.has_package(package));
+            return repo.has_package(package);
         }
 
         if let Some(alias) = package.as_alias() {
             let alias_of: PackageInterfaceHandle = alias.get_alias_of().into();
-            return Ok(repo.has_package(package) && self.is_package_installed(repo, alias_of)?);
+            return Ok(repo.has_package(package)? && self.is_package_installed(repo, alias_of)?);
         }
 
-        Ok(self
-            .get_installer(&package.get_type())?
-            .is_installed(repo, package))
+        self.get_installer(&package.get_type())?
+            .is_installed(repo, package)
     }
 
     /// Install binary for the given package.
@@ -264,7 +263,7 @@ impl InstallationManager {
                         mock.updated.push((initial.clone(), target.clone()));
                         mock.trace.push(trace);
                         repo.remove_package(initial);
-                        if !repo.has_package(target.clone()) {
+                        if !repo.has_package(target.clone())? {
                             repo.add_package(PackageInterfaceHandle::dup(&target));
                         }
                     }
@@ -278,7 +277,7 @@ impl InstallationManager {
                         let package: PackageInterfaceHandle = op.get_package().into();
                         mock.installed.push(package.clone());
                         mock.trace.push(trace);
-                        if !repo.has_package(package.clone()) {
+                        if !repo.has_package(package.clone())? {
                             repo.add_package(PackageInterfaceHandle::dup(&package));
                         }
                     }
@@ -578,7 +577,7 @@ impl InstallationManager {
                 }
                 match &operation {
                     AnyOperation::MarkAliasInstalled(op) => {
-                        self.mark_alias_installed(&mut **repo.borrow_mut(), op);
+                        self.mark_alias_installed(&mut **repo.borrow_mut(), op)?;
                     }
                     AnyOperation::MarkAliasUninstalled(op) => {
                         self.mark_alias_uninstalled(&mut **repo.borrow_mut(), op);
@@ -760,12 +759,14 @@ impl InstallationManager {
         &self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &MarkAliasInstalledOperation,
-    ) {
+    ) -> anyhow::Result<()> {
         let package = operation.get_package();
 
-        if !repo.has_package(package.clone().into()) {
+        if !repo.has_package(package.clone().into())? {
             repo.add_package(crate::package::PackageInterfaceHandle::dup(&package.into()));
         }
+
+        Ok(())
     }
 
     /// Executes markAlias operation.
@@ -1016,7 +1017,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     fn disable_plugins(&mut self);
     fn is_package_installed(
         &mut self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool>;
     fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
@@ -1052,7 +1053,7 @@ impl InstallationManagerInterface for InstallationManager {
 
     fn is_package_installed(
         &mut self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         InstallationManager::is_package_installed(self, repo, package)

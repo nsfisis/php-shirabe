@@ -16,9 +16,9 @@ impl InstallerInterface for NoopInstaller {
 
     fn is_installed(
         &self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         repo.has_package(package)
     }
 
@@ -54,7 +54,7 @@ impl InstallerInterface for NoopInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
-        if !repo.has_package(package.clone()) {
+        if !repo.has_package(package.clone())? {
             repo.add_package(PackageInterfaceHandle::dup(&package));
         }
 
@@ -68,7 +68,7 @@ impl InstallerInterface for NoopInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
-        if !repo.has_package(initial.clone()) {
+        if !repo.has_package(initial.clone())? {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -77,7 +77,7 @@ impl InstallerInterface for NoopInstaller {
         }
 
         repo.remove_package(initial);
-        if !repo.has_package(target.clone()) {
+        if !repo.has_package(target.clone())? {
             repo.add_package(PackageInterfaceHandle::dup(&target));
         }
 
@@ -90,7 +90,7 @@ impl InstallerInterface for NoopInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
-        if !repo.has_package(package.clone()) {
+        if !repo.has_package(package.clone())? {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,

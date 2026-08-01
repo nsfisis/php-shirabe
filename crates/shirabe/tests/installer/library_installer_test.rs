@@ -200,19 +200,31 @@ fn test_is_installed() {
     let package = get_package("test/pkg", "1.0.0");
 
     let mut repository = InstalledArrayRepository::new().unwrap();
-    assert!(!library.is_installed(&repository, package.clone()));
+    assert!(
+        !library
+            .is_installed(&mut repository, package.clone())
+            .unwrap()
+    );
 
     // package being in repo is not enough to be installed
     repository.add_package(package.clone()).unwrap();
-    assert!(!library.is_installed(&repository, package.clone()));
+    assert!(
+        !library
+            .is_installed(&mut repository, package.clone())
+            .unwrap()
+    );
 
     // package being in repo and vendor/pkg/foo dir present means it is seen as installed
     let pkg_dir = format!("{}/{}", setup.vendor_dir, package.get_pretty_name());
     fs::create_dir_all(&pkg_dir).unwrap();
-    assert!(library.is_installed(&repository, package.clone()));
+    assert!(
+        library
+            .is_installed(&mut repository, package.clone())
+            .unwrap()
+    );
 
     repository.remove_package(package.clone()).unwrap();
-    assert!(!library.is_installed(&repository, package));
+    assert!(!library.is_installed(&mut repository, package).unwrap());
 
     tear_down(&mut setup);
 }
@@ -249,7 +261,7 @@ fn test_install() {
     .unwrap();
 
     // PHP asserts repository->addPackage was called once with $package.
-    assert!(repository.has_package(package));
+    assert!(repository.has_package(package).unwrap());
 
     assert!(
         std::path::Path::new(&setup.vendor_dir).exists(),
@@ -317,8 +329,8 @@ fn test_update() {
     );
     assert!(!std::path::Path::new(&old_target_dir).exists());
 
-    assert!(!repository.has_package(initial.clone()));
-    assert!(repository.has_package(target.clone()));
+    assert!(!repository.has_package(initial.clone()).unwrap());
+    assert!(repository.has_package(target.clone()).unwrap());
 
     assert!(
         std::path::Path::new(&setup.vendor_dir).exists(),
@@ -379,7 +391,7 @@ fn test_uninstall() {
     ))
     .unwrap();
 
-    assert!(!repository.has_package(package.clone()));
+    assert!(!repository.has_package(package.clone()).unwrap());
 
     // Uninstalling again, with the package no longer installed, fails.
     assert!(

@@ -13,16 +13,16 @@ fn array_repo(packages: Vec<PackageInterfaceHandle>) -> RepositoryInterfaceHandl
 
 #[test]
 fn test_has_package() {
-    let repo = CompositeRepository::new(vec![
+    let mut repo = CompositeRepository::new(vec![
         array_repo(vec![get_package("foo", "1")]),
         array_repo(vec![get_package("bar", "1")]),
     ]);
 
-    assert!(repo.has_package(get_package("foo", "1")));
-    assert!(repo.has_package(get_package("bar", "1")));
+    assert!(repo.has_package(get_package("foo", "1")).unwrap());
+    assert!(repo.has_package(get_package("bar", "1")).unwrap());
 
-    assert!(!repo.has_package(get_package("foo", "2")));
-    assert!(!repo.has_package(get_package("bar", "2")));
+    assert!(!repo.has_package(get_package("foo", "2")).unwrap());
+    assert!(!repo.has_package(get_package("bar", "2")).unwrap());
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn test_add_repository() {
 
 #[test]
 fn test_count() {
-    let repo = CompositeRepository::new(vec![
+    let mut repo = CompositeRepository::new(vec![
         array_repo(vec![get_package("foo", "1")]),
         array_repo(vec![get_package("bar", "1")]),
     ]);

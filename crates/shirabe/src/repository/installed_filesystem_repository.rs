@@ -113,11 +113,11 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
 }
 
 impl RepositoryInterface for InstalledFilesystemRepository {
-    fn count(&self) -> anyhow::Result<usize> {
+    fn count(&mut self) -> anyhow::Result<usize> {
         self.inner.count()
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         self.inner.has_package(package)
     }
     fn find_package(

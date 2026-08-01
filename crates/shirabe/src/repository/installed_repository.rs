@@ -376,7 +376,7 @@ impl InstalledRepository {
 }
 
 impl RepositoryInterface for InstalledRepository {
-    fn count(&self) -> anyhow::Result<usize> {
+    fn count(&mut self) -> anyhow::Result<usize> {
         self.inner.count()
     }
 
@@ -390,7 +390,7 @@ impl RepositoryInterface for InstalledRepository {
         format!("installed repo ({})", names.join(", "))
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         self.inner.has_package(package)
     }
 

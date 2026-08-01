@@ -60,7 +60,7 @@ impl CompositeRepository {
 }
 
 impl RepositoryInterface for CompositeRepository {
-    fn count(&self) -> anyhow::Result<usize> {
+    fn count(&mut self) -> anyhow::Result<usize> {
         let mut total = 0;
         for repository in &self.repositories {
             total += repository.count()?;
@@ -78,13 +78,13 @@ impl RepositoryInterface for CompositeRepository {
         format!("composite repo ({})", names.join(", "))
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         for repository in &self.repositories {
-            if repository.has_package(package.clone()) {
-                return true;
+            if repository.has_package(package.clone())? {
+                return Ok(true);
             }
         }
-        false
+        Ok(false)
     }
 
     fn find_package(

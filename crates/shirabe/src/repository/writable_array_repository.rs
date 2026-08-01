@@ -31,6 +31,11 @@ impl WritableArrayRepository {
         self.dev_mode
     }
 
+    /// See `ArrayRepository::base_count`; kept on `&self` for `is_fresh` callers.
+    pub(crate) fn base_count(&self) -> usize {
+        self.inner.base_count()
+    }
+
     pub fn set_dev_package_names(&mut self, dev_package_names: Vec<String>) {
         self.dev_package_names = dev_package_names;
     }
@@ -124,11 +129,11 @@ impl WritableArrayRepository {
 }
 
 impl RepositoryInterface for WritableArrayRepository {
-    fn count(&self) -> anyhow::Result<usize> {
+    fn count(&mut self) -> anyhow::Result<usize> {
         self.inner.count()
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         self.inner.has_package(package)
     }
 

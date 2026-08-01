@@ -75,10 +75,10 @@ impl InstallerInterface for MockInstaller {
 
     fn is_installed(
         &self,
-        _repo: &dyn InstalledRepositoryInterface,
+        _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
-    ) -> bool {
-        false
+    ) -> anyhow::Result<bool> {
+        Ok(false)
     }
 
     async fn download(
@@ -175,10 +175,10 @@ impl InstallerInterface for BinaryInstaller {
 
     fn is_installed(
         &self,
-        _repo: &dyn InstalledRepositoryInterface,
+        _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
-    ) -> bool {
-        false
+    ) -> anyhow::Result<bool> {
+        Ok(false)
     }
 
     async fn download(

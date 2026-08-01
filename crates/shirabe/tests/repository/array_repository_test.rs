@@ -48,7 +48,7 @@ fn reprs(results: &[SearchResult]) -> Vec<(String, Option<String>, Abandoned)> {
 
 #[test]
 fn test_add_package() {
-    let repo = ArrayRepository::new(vec![]).unwrap();
+    let mut repo = ArrayRepository::new(vec![]).unwrap();
     repo.add_package(get_package("foo", "1")).unwrap();
 
     assert_eq!(1, repo.count().unwrap());
@@ -74,12 +74,12 @@ fn test_remove_package() {
 
 #[test]
 fn test_has_package() {
-    let repo = ArrayRepository::new(vec![]).unwrap();
+    let mut repo = ArrayRepository::new(vec![]).unwrap();
     repo.add_package(get_package("foo", "1")).unwrap();
     repo.add_package(get_package("bar", "2")).unwrap();
 
-    assert!(repo.has_package(get_package("foo", "1")));
-    assert!(!repo.has_package(get_package("bar", "1")));
+    assert!(repo.has_package(get_package("foo", "1")).unwrap());
+    assert!(!repo.has_package(get_package("bar", "1")).unwrap());
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn test_find_packages() {
 
 #[test]
 fn test_automatically_add_aliased_package_but_not_remove() {
-    let repo = ArrayRepository::new(vec![]).unwrap();
+    let mut repo = ArrayRepository::new(vec![]).unwrap();
 
     let package = get_package("foo", "1");
     let alias = get_alias_package(&package, "2");
@@ -108,8 +108,8 @@ fn test_automatically_add_aliased_package_but_not_remove() {
     repo.add_package(alias.clone()).unwrap();
 
     assert_eq!(2, repo.count().unwrap());
-    assert!(repo.has_package(get_package("foo", "1")));
-    assert!(repo.has_package(get_package("foo", "2")));
+    assert!(repo.has_package(get_package("foo", "1")).unwrap());
+    assert!(repo.has_package(get_package("foo", "2")).unwrap());
 
     repo.remove_package(alias);
 

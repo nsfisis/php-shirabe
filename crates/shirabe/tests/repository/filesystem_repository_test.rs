@@ -99,7 +99,7 @@ mockall::mock! {
         fn disable_plugins(&mut self);
         fn is_package_installed(
             &mut self,
-            repo: &dyn InstalledRepositoryInterface,
+            repo: &mut dyn InstalledRepositoryInterface,
             package: PackageInterfaceHandle,
         ) -> anyhow::Result<bool>;
         fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);

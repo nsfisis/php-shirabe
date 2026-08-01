@@ -84,7 +84,7 @@ impl RepositoryInterfaceHandle {
     }
 
     pub fn count(&self) -> anyhow::Result<usize> {
-        self.0.borrow().count()
+        self.0.borrow_mut().count()
     }
 
     pub fn get_repo_name(&self) -> String {
@@ -95,8 +95,8 @@ impl RepositoryInterfaceHandle {
         self.0.borrow_mut().get_packages()
     }
 
-    pub fn has_package(&self, package: PackageInterfaceHandle) -> bool {
-        self.0.borrow().has_package(package)
+    pub fn has_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
+        self.0.borrow_mut().has_package(package)
     }
 
     pub fn find_package(

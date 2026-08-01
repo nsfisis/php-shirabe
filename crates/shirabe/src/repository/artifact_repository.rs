@@ -247,16 +247,13 @@ impl RepositoryInterface for ArtifactRepository {
     // The structural methods are inherited from ArrayRepository in PHP, where the lazy directory
     // scan is driven by the overridden initialize(). Here each one first ensures that scan has
     // happened (see ensure_initialized), then delegates to the inner ArrayRepository.
-    fn count(&self) -> anyhow::Result<usize> {
+    fn count(&mut self) -> anyhow::Result<usize> {
         self.ensure_initialized()?;
         self.inner.count()
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
-        // TODO(phase-d): hasPackage returns bool and cannot surface an initialization error; a
-        // failed scan leaves the inner repository with whatever packages were added before the
-        // failure.
-        let _ = self.ensure_initialized();
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
+        self.ensure_initialized()?;
         self.inner.has_package(package)
     }
 

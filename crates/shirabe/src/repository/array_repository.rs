@@ -205,6 +205,16 @@ impl ArrayRepository {
         *self.packages.borrow_mut() = Some(vec![]);
     }
 
+    /// Shared body of `RepositoryInterface::count`, kept on `&self` for `get_repo_name` (PHP's
+    /// `getRepoName` also triggers lazy initialization through `count()`).
+    pub(crate) fn base_count(&self) -> usize {
+        if self.packages.borrow().is_none() {
+            self.initialize();
+        }
+
+        self.packages.borrow().as_ref().unwrap().len()
+    }
+
     /// Resets the packages cache so the next access re-runs `initialize`.
     pub(crate) fn reset_packages(&self) {
         *self.packages.borrow_mut() = None;
@@ -217,16 +227,12 @@ impl ArrayRepository {
 
 impl RepositoryInterface for ArrayRepository {
     /// Returns the number of packages in this repository
-    fn count(&self) -> anyhow::Result<usize> {
-        if self.packages.borrow().is_none() {
-            self.initialize();
-        }
-
-        Ok(self.packages.borrow().as_ref().unwrap().len())
+    fn count(&mut self) -> anyhow::Result<usize> {
+        Ok(self.base_count())
     }
 
     fn get_repo_name(&self) -> String {
-        let count = self.count().expect("ArrayRepository::count is infallible");
+        let count = self.base_count();
         format!(
             "array repo (defining {} package{})",
             count,
@@ -409,7 +415,7 @@ impl RepositoryInterface for ArrayRepository {
         Ok(matches.into_values().collect())
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         if self.package_map.borrow().is_none() {
             let mut map: IndexMap<String, BasePackageHandle> = IndexMap::new();
             for repo_package in self.get_packages_internal() {
@@ -418,11 +424,12 @@ impl RepositoryInterface for ArrayRepository {
             *self.package_map.borrow_mut() = Some(map);
         }
 
-        self.package_map
+        Ok(self
+            .package_map
             .borrow()
             .as_ref()
             .unwrap()
-            .contains_key(&package.get_unique_name())
+            .contains_key(&package.get_unique_name()))
     }
 
     fn get_providers(

@@ -79,9 +79,9 @@ impl InstallerInterface for PluginInstaller {
 
     fn is_installed(
         &self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         self.inner.is_installed(repo, package)
     }
 

@@ -12,9 +12,9 @@ pub trait InstallerInterface: std::fmt::Debug {
 
     fn is_installed(
         &self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
-    ) -> bool;
+    ) -> anyhow::Result<bool>;
 
     async fn download(
         &self,

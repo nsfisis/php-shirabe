@@ -52,9 +52,13 @@ pub const SEARCH_NAME: i64 = 1;
 pub const SEARCH_VENDOR: i64 = 2;
 
 pub trait RepositoryInterface: std::fmt::Debug {
-    fn count(&self) -> anyhow::Result<usize>;
+    // count/has_package take &mut self (and has_package returns Result) because PHP's
+    // ArrayRepository::count()/hasPackage() late-bind $this->initialize() to the concrete
+    // repository class, which lazily loads packages and can throw; lazy repositories need the
+    // same guard here (see FilesystemRepository/PlatformRepository/ComposerRepository).
+    fn count(&mut self) -> anyhow::Result<usize>;
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool;
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool>;
 
     fn find_package(
         &mut self,

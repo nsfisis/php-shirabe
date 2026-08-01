@@ -716,11 +716,15 @@ impl FilesystemRepository {
 }
 
 impl RepositoryInterface for FilesystemRepository {
-    fn count(&self) -> anyhow::Result<usize> {
+    // PHP's ArrayRepository::count()/hasPackage() call $this->initialize(), which
+    // virtual-dispatches to FilesystemRepository::initialize(); the guard restores that.
+    fn count(&mut self) -> anyhow::Result<usize> {
+        self.ensure_initialized()?;
         self.inner.count()
     }
 
-    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+    fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
+        self.ensure_initialized()?;
         self.inner.has_package(package)
     }
 

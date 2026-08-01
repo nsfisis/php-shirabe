@@ -39,10 +39,10 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     fn is_installed(
         &self,
-        _repo: &dyn InstalledRepositoryInterface,
+        _repo: &mut dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
-    ) -> bool {
-        true
+    ) -> anyhow::Result<bool> {
+        Ok(true)
     }
 
     async fn download(
