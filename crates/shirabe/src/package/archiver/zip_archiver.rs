@@ -6,7 +6,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, ZipArchive, class_exists, fileperms, method_exists, pack, realpath,
+    PhpMixed, RuntimeException, ZipArchive, class_exists, fileperms, method_exists, realpath,
 };
 use std::path::PathBuf;
 
@@ -93,19 +93,15 @@ impl ArchiverInterface for ZipArchiver {
             if zip.close() {
                 if !std::path::Path::new(&target).exists() {
                     // create minimal valid ZIP file (Empty Central Directory + End of Central Directory record)
-                    let eocd = pack(
-                        "VvvvvVVv",
-                        &[
-                            PhpMixed::Int(0x06054b50), // End of central directory signature
-                            PhpMixed::Int(0),          // Number of this disk
-                            PhpMixed::Int(0),          // Disk where central directory starts
-                            PhpMixed::Int(0), // Number of central directory records on this disk
-                            PhpMixed::Int(0), // Total number of central directory records
-                            PhpMixed::Int(0), // Size of central directory (bytes)
-                            PhpMixed::Int(0), // Offset of start of central directory
-                            PhpMixed::Int(0), // Comment length
-                        ],
-                    );
+                    let mut eocd = Vec::with_capacity(22);
+                    eocd.extend_from_slice(&0x06054b50u32.to_le_bytes()); // End of central directory signature
+                    eocd.extend_from_slice(&0u16.to_le_bytes()); // Number of this disk
+                    eocd.extend_from_slice(&0u16.to_le_bytes()); // Disk where central directory starts
+                    eocd.extend_from_slice(&0u16.to_le_bytes()); // Number of central directory records on this disk
+                    eocd.extend_from_slice(&0u16.to_le_bytes()); // Total number of central directory records
+                    eocd.extend_from_slice(&0u32.to_le_bytes()); // Size of central directory (bytes)
+                    eocd.extend_from_slice(&0u32.to_le_bytes()); // Offset of start of central directory
+                    eocd.extend_from_slice(&0u16.to_le_bytes()); // Comment length
                     std::fs::write(&target, &eocd)?;
                 }
 

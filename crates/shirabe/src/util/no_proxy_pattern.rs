@@ -5,7 +5,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
     empty, explode, filter_var_int_with_range, filter_var_ip, inet_pton, ltrim, parse_url,
-    php_regex, stripos, strlen, strpbrk, strpos, substr, substr_count, unpack,
+    php_regex, stripos, strlen, strpbrk, strpos, substr, substr_count,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -151,60 +151,38 @@ impl NoProxyPattern {
 
     /// Returns true if the target ip is in the network range
     pub(crate) fn match_range(&self, network: &IpData, target: &IpData) -> anyhow::Result<bool> {
-        let net = unpack("C*", &network.ip);
-        let mask = unpack("C*", network.netmask.as_deref().unwrap_or_default());
-        let ip = unpack("C*", &target.ip);
-        let net = match net {
-            Some(n) => n,
-            None => {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Could not parse network IP {}",
-                        String::from_utf8_lossy(&network.ip)
-                    ),
-                    code: 0,
-                }
-                .into());
+        let net = network.ip.as_slice();
+        let mask = network.netmask.as_deref().unwrap_or_default();
+        let ip = target.ip.as_slice();
+        if net.is_empty() {
+            return Err(RuntimeException {
+                message: format!(
+                    "Could not parse network IP {}",
+                    String::from_utf8_lossy(net)
+                ),
+                code: 0,
             }
-        };
-        let mask = match mask {
-            Some(m) => m,
-            None => {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Could not parse netmask {}",
-                        String::from_utf8_lossy(network.netmask.as_deref().unwrap_or_default())
-                    ),
-                    code: 0,
-                }
-                .into());
+            .into());
+        }
+        if mask.is_empty() {
+            return Err(RuntimeException {
+                message: format!("Could not parse netmask {}", String::from_utf8_lossy(mask)),
+                code: 0,
             }
-        };
-        let ip = match ip {
-            Some(i) => i,
-            None => {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Could not parse target IP {}",
-                        String::from_utf8_lossy(&target.ip)
-                    ),
-                    code: 0,
-                }
-                .into());
+            .into());
+        }
+        if ip.is_empty() {
+            return Err(RuntimeException {
+                message: format!("Could not parse target IP {}", String::from_utf8_lossy(ip)),
+                code: 0,
             }
-        };
+            .into());
+        }
 
-        // PHP: for ($i = 1; $i < 17; ++$i)
-        for i in 1..17 {
-            let net_byte = net
-                .get(&i.to_string())
-                .and_then(|v| v.as_int())
-                .unwrap_or(0);
-            let mask_byte = mask
-                .get(&i.to_string())
-                .and_then(|v| v.as_int())
-                .unwrap_or(0);
-            let ip_byte = ip.get(&i.to_string()).and_then(|v| v.as_int()).unwrap_or(0);
+        for i in 0..16 {
+            let net_byte = net.get(i).copied().unwrap_or(0);
+            let mask_byte = mask.get(i).copied().unwrap_or(0);
+            let ip_byte = ip.get(i).copied().unwrap_or(0);
             if (net_byte & mask_byte) != (ip_byte & mask_byte) {
                 return Ok(false);
             }
@@ -350,43 +328,32 @@ impl NoProxyPattern {
         let netmask = self.ip_get_mask(prefix, size);
 
         // Get the network from the address and mask
-        let mask = unpack("C*", &netmask);
-        let ip = unpack("C*", range_ip);
-        let mut net: Vec<u8> = vec![];
-        let mask = match mask {
-            Some(m) => m,
-            None => {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Could not parse netmask {}",
-                        String::from_utf8_lossy(&netmask)
-                    ),
-                    code: 0,
-                }
-                .into());
+        if netmask.is_empty() {
+            return Err(RuntimeException {
+                message: format!(
+                    "Could not parse netmask {}",
+                    String::from_utf8_lossy(&netmask)
+                ),
+                code: 0,
             }
-        };
-        let ip = match ip {
-            Some(i) => i,
-            None => {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Could not parse range IP {}",
-                        String::from_utf8_lossy(range_ip)
-                    ),
-                    code: 0,
-                }
-                .into());
+            .into());
+        }
+        if range_ip.is_empty() {
+            return Err(RuntimeException {
+                message: format!(
+                    "Could not parse range IP {}",
+                    String::from_utf8_lossy(range_ip)
+                ),
+                code: 0,
             }
-        };
+            .into());
+        }
 
-        for i in 1..17 {
-            let ip_byte = ip.get(&i.to_string()).and_then(|v| v.as_int()).unwrap_or(0);
-            let mask_byte = mask
-                .get(&i.to_string())
-                .and_then(|v| v.as_int())
-                .unwrap_or(0);
-            net.push((ip_byte & mask_byte) as u8);
+        let mut net: Vec<u8> = Vec::with_capacity(16);
+        for i in 0..16 {
+            let ip_byte = range_ip.get(i).copied().unwrap_or(0);
+            let mask_byte = netmask.get(i).copied().unwrap_or(0);
+            net.push(ip_byte & mask_byte);
         }
 
         Ok((net, netmask))

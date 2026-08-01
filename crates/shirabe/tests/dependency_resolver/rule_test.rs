@@ -7,7 +7,7 @@ use shirabe::dependency_resolver::{
 };
 use shirabe::package::Link;
 use shirabe::repository::RepositorySet;
-use shirabe_php_shim::{PHP_VERSION_ID, hash_raw, unpack};
+use shirabe_php_shim::{PHP_VERSION_ID, hash_raw};
 use shirabe_semver::constraint::MatchAllConstraint;
 
 fn root_require_reason() -> ReasonData {
@@ -35,12 +35,9 @@ fn test_get_hash() {
         "sha1"
     };
     let binary = hash_raw(algo, "123");
-    let hash = unpack("ihash", &binary).unwrap();
+    let hash = i32::from_ne_bytes(binary[..4].try_into().unwrap()) as i64;
 
-    assert_eq!(
-        hash.get("hash").unwrap().as_int(),
-        rule.get_hash().unwrap().as_int()
-    );
+    assert_eq!(Some(hash), rule.get_hash().unwrap().as_int());
 }
 
 #[test]

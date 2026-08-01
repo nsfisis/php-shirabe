@@ -57,19 +57,8 @@ impl MultiConflictRule {
             "sha1"
         };
         let binary = hash_raw(algo, &format!("c:{}", joined));
-        let data = shirabe_php_shim::unpack("ihash", &binary);
-        match data {
-            Some(map) => {
-                if let Some(val) = map.get("hash") {
-                    Ok(val.as_int().unwrap_or(0))
-                } else {
-                    Err(RuntimeException {
-                        message: format!("Failed unpacking: {}", joined),
-                        code: 0,
-                    }
-                    .into())
-                }
-            }
+        match binary.get(..4) {
+            Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
             None => Err(RuntimeException {
                 message: format!("Failed unpacking: {}", joined),
                 code: 0,
