@@ -421,24 +421,6 @@ pub fn mb_convert_variables(_to: &str, _from: &str, _vars: &mut Vec<String>) -> 
     Some(_from.to_string())
 }
 
-pub fn iconv(_in_charset: &str, _out_charset: &str, _string: &str) -> Option<String> {
-    let from = canonical_encoding(_in_charset);
-    // The output charset may carry a "//TRANSLIT" / "//IGNORE" suffix.
-    let to_base = _out_charset.split("//").next().unwrap_or(_out_charset);
-    let to = canonical_encoding(to_base);
-    // ASCII is a subset of UTF-8, so any conversion among ASCII/UTF-8 that targets UTF-8 is a
-    // byte-level no-op.
-    if to == "UTF-8" && matches!(from.as_str(), "UTF-8" | "ASCII") {
-        return Some(_string.to_string());
-    }
-    if to == "ASCII" && from == "ASCII" {
-        return Some(_string.to_string());
-    }
-    // TODO(phase-d): general iconv conversion needs encoding tables and //TRANSLIT///IGNORE handling
-    // for non-UTF-8 targets, which have not been ported yet.
-    todo!("iconv {} -> {}", from, to)
-}
-
 /// Resolve PHP array_slice/substr-style (offset, length) into a `[start, end)`
 /// pair of indices, honouring negative offsets and lengths.
 fn php_slice_bounds(len: i64, offset: i64, length: Option<i64>) -> (usize, usize) {

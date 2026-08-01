@@ -7,7 +7,6 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::IOInterfaceMutable;
 use crate::io::io_interface;
 use crate::question::StrictConfirmationQuestion;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -25,8 +24,8 @@ use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
 use shirabe_external_packages::symfony::console::question::Question;
 use shirabe_external_packages::symfony::console::question::QuestionInterface;
 use shirabe_php_shim::{
-    PhpMixed, array_search, function_exists, implode, in_array, is_array, is_string,
-    mb_check_encoding, mb_convert_encoding, microtime, str_repeat, strip_tags, strlen,
+    PhpMixed, array_search, implode, in_array, is_array, is_string, microtime, str_repeat,
+    strip_tags, strlen,
 };
 
 /// The Input/Output helper.
@@ -313,28 +312,10 @@ impl ConsoleIO {
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'
+    // TODO(phase-c): PHP sanitizes invalid byte sequences here, but `&str` is always valid UTF-8
+    // so this is a no-op for now. The codebase does not yet strictly distinguish `Vec<u8>` from
+    // `String`; once it does, this should take `&[u8]` and lossily convert it to `String`.
     fn ensure_valid_utf8(string: &str) -> String {
-        // Quick check: if string is already valid UTF-8, return as-is
-        if function_exists("mb_check_encoding") && mb_check_encoding(string, "UTF-8") {
-            return string.to_string();
-        }
-
-        // Use mb_convert_encoding to replace invalid sequences with '?'
-        // This makes it visible when data quality issues occur
-        if function_exists("mb_convert_encoding") {
-            return mb_convert_encoding(string.as_bytes().to_vec(), "UTF-8", "UTF-8");
-        }
-
-        // Fallback to iconv if mbstring unavailable
-        if function_exists("iconv") {
-            let cleaned =
-                Silencer::call(|| Ok(shirabe_php_shim::iconv("UTF-8", "UTF-8//TRANSLIT", string)));
-            if let Ok(Some(c)) = cleaned {
-                return c;
-            }
-        }
-
-        // Last resort: return as-is (should never happen - Composer requires mbstring OR iconv)
         string.to_string()
     }
 
