@@ -715,7 +715,7 @@ impl UpdateCommand {
             PhpMixed::Int(1),
             "No package named \"%s\" is installed.".to_string(),
             true,
-        );
+        )?;
         let packages: Vec<String> = match select_result {
             PhpMixed::List(l) => l
                 .into_iter()

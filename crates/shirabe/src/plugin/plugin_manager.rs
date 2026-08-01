@@ -875,7 +875,7 @@ impl PluginManager {
                 let answer = self.io.ask(
                     format!("Do you trust \"<fg=green;options=bold>{}</>\" to execute code and wish to enable it now? (writes \"allow-plugins\" to composer.json) [<comment>y,n,d,?</comment>] ", package),
                     PhpMixed::String(default.to_string()),
-                );
+                )?;
                 let answer_str = answer.as_string().unwrap_or("");
                 match answer_str {
                     "y" | "n" | "d" => {

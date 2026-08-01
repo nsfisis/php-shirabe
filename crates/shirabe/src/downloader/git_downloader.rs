@@ -1265,7 +1265,7 @@ impl VcsDownloader for GitDownloader {
                         if update { "s," } else { "" }
                     ),
                     PhpMixed::String("?".to_string()),
-                )
+                )?
                 .as_string()
                 .map(|s| s.to_string());
             let mut do_help = false;

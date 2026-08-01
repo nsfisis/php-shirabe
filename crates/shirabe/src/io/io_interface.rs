@@ -92,7 +92,10 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     }
     fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
 
-    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed;
+    /// PHP: `@throws \RuntimeException If there is no data to read in the input stream`.
+    /// `QuestionHelper::ask` exceptions (validator errors, `MissingInputException`) propagate
+    /// to the caller, hence the `anyhow::Result` return type.
+    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed>;
 
     fn ask_confirmation(&self, question: String, default: bool) -> bool;
 
@@ -109,6 +112,10 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     /// PHP `array $choices` may be a list (`PhpMixed::List`) or an associative
     /// array (`PhpMixed::Array`); list choices resolve to their index, while
     /// associative choices resolve to their key.
+    ///
+    /// PHP: `@throws \InvalidArgumentException` — the `ChoiceQuestion` validator error
+    /// propagates to the caller once `$attempts` is exhausted, hence the `anyhow::Result`
+    /// return type.
     fn select(
         &self,
         question: String,
@@ -117,7 +124,7 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
-    ) -> PhpMixed;
+    ) -> anyhow::Result<PhpMixed>;
 
     fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>>;
 
@@ -278,7 +285,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
             .overwrite_error4(message, newline, size, verbosity)
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed {
+    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         self.borrow().ask(question, default)
     }
 
@@ -309,7 +316,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
-    ) -> PhpMixed {
+    ) -> anyhow::Result<PhpMixed> {
         self.borrow().select(
             question,
             choices,

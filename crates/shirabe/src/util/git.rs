@@ -703,7 +703,7 @@ impl Git {
                                 default_username
                                     .map(PhpMixed::String)
                                     .unwrap_or(PhpMixed::Null),
-                            )
+                            )?
                             .as_string()
                             .map(|s| s.to_string()),
                     );

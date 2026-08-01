@@ -186,7 +186,7 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
         self.inner
             .overwrite_error4(message, newline, size, verbosity)
     }
-    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed {
+    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         self.inner.ask(question, default)
     }
     fn ask_confirmation(&self, question: String, default: bool) -> bool {
@@ -213,7 +213,7 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
-    ) -> PhpMixed {
+    ) -> anyhow::Result<PhpMixed> {
         self.inner.select(
             question,
             choices,

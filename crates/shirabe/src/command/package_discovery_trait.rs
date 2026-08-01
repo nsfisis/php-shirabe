@@ -227,7 +227,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         let io = self.get_io();
         loop {
-            let package_input = io.ask("Search for a package: ".to_string(), PhpMixed::Null);
+            let package_input = io.ask("Search for a package: ".to_string(), PhpMixed::Null)?;
             let mut package = match package_input.as_string() {
                 Some(s) => s.to_string(),
                 None => break,
@@ -694,7 +694,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         PhpMixed::Int(1),
                         "No package named \"%s\" is installed.".to_string(),
                         false,
-                    );
+                    )?;
                     if let Some(idx_str) = result_mixed.as_string()
                         && let Ok(idx) = idx_str.parse::<usize>()
                         && let Some(selected) = similar.get(idx)

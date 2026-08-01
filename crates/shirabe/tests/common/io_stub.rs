@@ -217,8 +217,8 @@ impl IOInterfaceImmutable for IOStub {
     ) {
     }
 
-    fn ask(&self, _question: String, default: PhpMixed) -> PhpMixed {
-        self.ask.clone().unwrap_or(default)
+    fn ask(&self, _question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        Ok(self.ask.clone().unwrap_or(default))
     }
     fn ask_confirmation(&self, _question: String, default: bool) -> bool {
         self.ask_confirmation.unwrap_or(default)
@@ -251,8 +251,8 @@ impl IOInterfaceImmutable for IOStub {
         _attempts: PhpMixed,
         _error_message: String,
         _multiselect: bool,
-    ) -> PhpMixed {
-        default
+    ) -> anyhow::Result<PhpMixed> {
+        Ok(default)
     }
 
     fn get_authentications(

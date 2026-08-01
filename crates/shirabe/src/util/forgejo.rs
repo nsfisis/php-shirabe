@@ -80,7 +80,7 @@ impl Forgejo {
 
         let username = self
             .io
-            .ask("Username: ".to_string(), shirabe_php_shim::PhpMixed::Null)
+            .ask("Username: ".to_string(), shirabe_php_shim::PhpMixed::Null)?
             .as_string()
             .map(|s| s.trim().to_string())
             .unwrap_or_default();

@@ -168,7 +168,7 @@ impl AuthHelper {
                     "After authorizing your token, confirm that you would like to retry the request"
                         .to_string(),
                     PhpMixed::Null,
-                );
+                )?;
 
                 return Ok(PromptAuthResult {
                     retry: true,
@@ -420,7 +420,9 @@ impl AuthHelper {
                 true,
                 io_interface::NORMAL,
             );
-            let username = self.io.ask("      Username: ".to_string(), PhpMixed::Null);
+            let username = self
+                .io
+                .ask("      Username: ".to_string(), PhpMixed::Null)?;
             let password = self.io.ask_and_hide_answer("      Password: ".to_string());
             self.io.borrow_mut().set_authentication(
                 origin.to_string(),

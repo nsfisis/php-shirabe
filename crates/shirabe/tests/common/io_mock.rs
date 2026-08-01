@@ -224,7 +224,7 @@ impl IOInterfaceImmutable for IOMock {
             .overwrite_error4(message, newline, size, verbosity)
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed {
+    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         self.inner
             .ask(format!("{}{}", trim_eol(&question), PHP_EOL), default)
     }
@@ -249,10 +249,13 @@ impl IOInterfaceImmutable for IOMock {
     fn ask_and_hide_answer(&self, question: String) -> Option<String> {
         // Do not hide the answer in tests because that blocks on Windows with
         // hiddeninput.exe, so PHP delegates to `ask` rather than the hidden variant.
-        let result = self.inner.ask(
-            format!("{}{}", trim_eol(&question), PHP_EOL),
-            PhpMixed::Null,
-        );
+        let result = self
+            .inner
+            .ask(
+                format!("{}{}", trim_eol(&question), PHP_EOL),
+                PhpMixed::Null,
+            )
+            .expect("QuestionHelper::ask raised an error");
         result.as_string().map(|s| s.to_string())
     }
     fn select(
@@ -263,7 +266,7 @@ impl IOInterfaceImmutable for IOMock {
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
-    ) -> PhpMixed {
+    ) -> anyhow::Result<PhpMixed> {
         self.inner.select(
             format!("{}{}", trim_eol(&question), PHP_EOL),
             choices,

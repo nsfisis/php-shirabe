@@ -184,7 +184,7 @@ fn test_generate_p4_command() {
 fn test_query_p4_user_with_user_already_set() {
     let mut perforce = create_new_perforce_with_windows_flag(true);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
     assert_eq!(Some(TEST_P4USER.to_string()), perforce.get_user());
 }
 
@@ -205,7 +205,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
     assert_eq!(
         Some("TEST_P4VARIABLE_USER".to_string()),
         perforce.get_user()
@@ -229,7 +229,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_not_windows_os() {
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
     assert_eq!(
         Some("TEST_P4VARIABLE_USER".to_string()),
         perforce.get_user()
@@ -248,7 +248,7 @@ fn test_query_p4_user_queries_for_user() {
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
     assert_eq!(Some("TEST_QUERY_USER".to_string()), perforce.get_user());
 }
 
@@ -270,7 +270,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
 }
 
 #[test]
@@ -294,7 +294,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
 }
 
 #[test]
@@ -315,7 +315,7 @@ fn test_query_p4_user_escapes_injection_on_windows() {
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
 }
 
 #[test]
@@ -335,7 +335,7 @@ fn test_query_p4_user_escapes_injection_on_unix() {
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
 
-    perforce.query_p4_user();
+    perforce.query_p4_user().unwrap();
 }
 
 #[test]

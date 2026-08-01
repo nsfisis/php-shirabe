@@ -419,7 +419,7 @@ impl GitLab {
     }
 
     fn create_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
-        let username = match self.io.ask("Username: ".to_string(), PhpMixed::Null) {
+        let username = match self.io.ask("Username: ".to_string(), PhpMixed::Null)? {
             PhpMixed::String(s) => s,
             _ => String::new(),
         };

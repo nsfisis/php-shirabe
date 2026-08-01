@@ -128,7 +128,7 @@ impl Command for ExecCommand {
                 PhpMixed::Int(1),
                 "Invalid binary name \"%s\"".to_string(),
                 false,
-            );
+            )?;
 
             if let Some(idx) = binary.as_int() {
                 input.borrow_mut().set_argument(

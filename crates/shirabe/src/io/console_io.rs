@@ -338,18 +338,17 @@ impl ConsoleIO {
     /// Delegates to `QuestionHelper::ask`.
     ///
     /// PHP: `$helper->ask($this->input, $this->getErrorOutput(), $question)`.
-    /// `QuestionHelper::ask` surfaces PHP exceptions; ConsoleIO does not catch them, so an
-    /// unrecoverable error here is a PHP fatal. The double `Result` is collapsed: the outer
-    /// `anyhow::Result` (fatal) and the inner `MissingInputException` (unhandled, hence also fatal
-    /// in PHP) both abort.
-    fn ask_question(&self, question: &impl QuestionInterface) -> PhpMixed {
+    /// `QuestionHelper::ask` surfaces PHP exceptions; ConsoleIO does not catch them, they
+    /// propagate to the caller. The double `Result` is flattened: the inner
+    /// `MissingInputException` is wrapped with its concrete type preserved so that
+    /// `Application`'s `instanceof ExceptionInterface` downcast still recognizes it.
+    fn ask_question(&self, question: &impl QuestionInterface) -> anyhow::Result<PhpMixed> {
         let error_output = self.get_error_output();
         let mut question_helper = self.question_helper.borrow_mut();
         let mut input = self.input.borrow_mut();
         question_helper
-            .ask(&mut *input, error_output, question)
-            .expect("QuestionHelper::ask raised a fatal error")
-            .expect("QuestionHelper::ask returned no input")
+            .ask(&mut *input, error_output, question)?
+            .map_err(anyhow::Error::new)
     }
 }
 
@@ -426,7 +425,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         );
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed {
+    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -441,6 +440,9 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.ask_question(&question)
     }
 
+    // TODO(phase-c): ask_confirmation and ask_and_hide_answer still collapse ask_question
+    // errors with .expect() instead of propagating them; extending Result propagation to
+    // them is a further IOInterface signature change that has not been decided yet.
     fn ask_confirmation(&self, question: String, default: bool) -> bool {
         let sanitized = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
@@ -453,7 +455,9 @@ impl IOInterfaceImmutable for ConsoleIO {
             "/^no?$/i".to_string(),
         );
 
-        let result = self.ask_question(&question);
+        let result = self
+            .ask_question(&question)
+            .expect("QuestionHelper::ask raised an error");
         result.as_bool().unwrap_or(false)
     }
 
@@ -499,7 +503,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             .set_max_attempts(attempts)
             .map_err(|e| anyhow::anyhow!(e.0.message))?;
 
-        Ok(self.ask_question(&question))
+        self.ask_question(&question)
     }
 
     fn ask_and_hide_answer(&self, question: String) -> Option<String> {
@@ -513,7 +517,9 @@ impl IOInterfaceImmutable for ConsoleIO {
             .set_hidden(true)
             .expect("a freshly constructed question has no autocompleter");
 
-        let result = self.ask_question(&question);
+        let result = self
+            .ask_question(&question)
+            .expect("QuestionHelper::ask raised an error");
         result.as_string().map(|s| s.to_string())
     }
 
@@ -525,7 +531,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
-    ) -> PhpMixed {
+    ) -> anyhow::Result<PhpMixed> {
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -563,7 +569,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         question.set_error_message(error_message);
         question.set_multiselect(multiselect);
 
-        let result: PhpMixed = self.ask_question(&question);
+        let result: PhpMixed = self.ask_question(&question)?;
 
         // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
         let choice_keys: Vec<String> = match &choices {
@@ -574,7 +580,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         let is_assoc =
             !choice_keys.is_empty() && choice_keys.iter().any(|k| k.parse::<i64>().is_err());
         if is_assoc {
-            return result;
+            return Ok(result);
         }
 
         if !is_array(&result) {
@@ -591,7 +597,9 @@ impl IOInterfaceImmutable for ConsoleIO {
                     .collect(),
                 _ => IndexMap::new(),
             };
-            return PhpMixed::String(array_search(&result_str, &haystack).unwrap_or_default());
+            return Ok(PhpMixed::String(
+                array_search(&result_str, &haystack).unwrap_or_default(),
+            ));
         }
 
         let mut results: Vec<String> = vec![];
@@ -611,7 +619,9 @@ impl IOInterfaceImmutable for ConsoleIO {
             }
         }
 
-        PhpMixed::List(results.into_iter().map(PhpMixed::String).collect())
+        Ok(PhpMixed::List(
+            results.into_iter().map(PhpMixed::String).collect(),
+        ))
     }
 
     fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {

@@ -214,7 +214,7 @@ impl Command for RunScriptCommand {
                 PhpMixed::Int(1),
                 "Invalid script name \"%s\"".to_string(),
                 false,
-            );
+            )?;
 
             input.borrow_mut().set_argument("script", script)?;
 

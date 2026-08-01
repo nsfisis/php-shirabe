@@ -595,7 +595,7 @@ impl Command for InitCommand {
                 description_default
                     .map(PhpMixed::String)
                     .unwrap_or(PhpMixed::Null),
-            );
+            )?;
             input.borrow_mut().set_option("description", description);
 
             let author = input
@@ -701,7 +701,7 @@ impl Command for InitCommand {
                 type_str
             ),
             type_val,
-        );
+        )?;
             if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
                 type_value = PhpMixed::Null;
             }
@@ -734,7 +734,7 @@ impl Command for InitCommand {
                     license.clone().unwrap_or_default()
                 ),
                 license.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
-            );
+            )?;
             let spdx = SpdxLicenses::new();
             if !license.is_null()
                 && !spdx.validate(license.as_string().unwrap_or(""))

@@ -173,7 +173,7 @@ impl Command for CreateProjectCommand {
             );
             input
                 .borrow_mut()
-                .set_argument("directory", io.ask(prompt, PhpMixed::Null));
+                .set_argument("directory", io.ask(prompt, PhpMixed::Null)?);
         }
 
         let repository_opt = input.borrow().get_option("repository")?;

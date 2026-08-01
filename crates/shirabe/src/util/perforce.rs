@@ -253,18 +253,18 @@ impl Perforce {
         self.p4_user = user;
     }
 
-    pub fn query_p4_user(&mut self) {
+    pub fn query_p4_user(&mut self) -> anyhow::Result<()> {
         let _ = self.get_user();
         if strlen(&self.p4_user.clone().unwrap_or_default()) > 0 {
-            return;
+            return Ok(());
         }
         self.p4_user = self.get_p4_variable("P4USER");
         if strlen(&self.p4_user.clone().unwrap_or_default()) > 0 {
-            return;
+            return Ok(());
         }
         self.p4_user = self
             .io
-            .ask("Enter P4 User:".to_string(), PhpMixed::Null)
+            .ask("Enter P4 User:".to_string(), PhpMixed::Null)?
             .as_string()
             .map(|s| s.to_string());
         let command = if self.windows_flag {
@@ -280,6 +280,8 @@ impl Perforce {
             )
         };
         self.execute_command(PhpMixed::String(command));
+
+        Ok(())
     }
 
     pub(crate) fn get_p4_variable(&mut self, name: &str) -> Option<String> {
@@ -554,7 +556,7 @@ impl Perforce {
     }
 
     pub fn p4_login(&mut self) -> anyhow::Result<()> {
-        self.query_p4_user();
+        self.query_p4_user()?;
         if !self.is_logged_in()? {
             let password = self.query_p4_password();
             if self.windows_flag {

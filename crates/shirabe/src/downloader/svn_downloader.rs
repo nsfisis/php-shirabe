@@ -308,7 +308,7 @@ impl VcsDownloader for SvnDownloader {
                 .ask(
                     "    <info>Discard changes [y,n,v,?]?</info> ".to_string(),
                     PhpMixed::String("?".to_string()),
-                )
+                )?
                 .as_string()
             {
                 Some("y") => {

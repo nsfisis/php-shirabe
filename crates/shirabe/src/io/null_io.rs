@@ -65,8 +65,8 @@ impl IOInterfaceImmutable for NullIO {
     ) {
     }
 
-    fn ask(&self, _question: String, default: PhpMixed) -> PhpMixed {
-        default
+    fn ask(&self, _question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        Ok(default)
     }
 
     fn ask_confirmation(&self, _question: String, default: bool) -> bool {
@@ -95,8 +95,8 @@ impl IOInterfaceImmutable for NullIO {
         _attempts: PhpMixed,
         _error_message: String,
         _multiselect: bool,
-    ) -> PhpMixed {
-        default
+    ) -> anyhow::Result<PhpMixed> {
+        Ok(default)
     }
 
     fn get_authentications(

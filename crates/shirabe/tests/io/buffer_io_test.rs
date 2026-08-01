@@ -19,9 +19,11 @@ fn test_set_user_inputs() {
     assert!(!buffer_io.ask_confirmation("Now please say no!".to_string(), true));
     assert_eq!(
         PhpMixed::String("default".to_string()),
-        buffer_io.ask(
-            "Empty string last".to_string(),
-            PhpMixed::String("default".to_string())
-        )
+        buffer_io
+            .ask(
+                "Empty string last".to_string(),
+                PhpMixed::String("default".to_string())
+            )
+            .unwrap()
     );
 }

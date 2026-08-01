@@ -196,7 +196,9 @@ fn test_ask() {
     // PHP asserts QuestionHelper::ask receives a Question. Behaviorally, an interactive input whose
     // stream yields the answer makes ConsoleIO::ask return that answer.
     let (console_io, _output) = make_console_io_with_answer("answer\n");
-    let result = console_io.ask("Why?".to_string(), PhpMixed::String("default".to_string()));
+    let result = console_io
+        .ask("Why?".to_string(), PhpMixed::String("default".to_string()))
+        .unwrap();
     assert_eq!(PhpMixed::String("answer".to_string()), result);
 }
 
@@ -247,7 +249,7 @@ fn test_select() {
     );
     assert_eq!(
         PhpMixed::List(vec![PhpMixed::String("1".to_string())]),
-        result
+        result.unwrap()
     );
 }
 

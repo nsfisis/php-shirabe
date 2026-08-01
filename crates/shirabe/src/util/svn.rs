@@ -234,7 +234,7 @@ impl Svn {
         self.credentials = Some(SvnCredentials {
             username: self
                 .io
-                .ask("Username: ".to_string(), PhpMixed::String("".to_string()))
+                .ask("Username: ".to_string(), PhpMixed::String("".to_string()))?
                 .as_string()
                 .unwrap_or("")
                 .to_string(),

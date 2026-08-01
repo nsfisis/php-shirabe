@@ -45,6 +45,7 @@ fn test_ask() {
     assert_eq!(
         PhpMixed::String("foo".to_string()),
         io.ask("bar".to_string(), PhpMixed::String("foo".to_string()))
+            .unwrap()
     );
 }
 
@@ -88,5 +89,6 @@ fn test_select() {
             "foo".to_string(),
             true
         )
+        .unwrap()
     );
 }
