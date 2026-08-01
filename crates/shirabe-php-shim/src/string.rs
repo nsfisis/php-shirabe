@@ -598,12 +598,6 @@ fn hex_digit_value(b: u8) -> Option<u8> {
     }
 }
 
-pub fn sscanf(_subject: &str, _format: &str, _a: &mut i64, _b: &mut i64) -> i64 {
-    // TODO(phase-d): a general sscanf format-string parser is not ported; this specialized two-int
-    // overload has no current callers.
-    todo!()
-}
-
 pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
     let fb = _format.as_bytes();
     let mut out = String::new();
