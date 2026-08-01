@@ -876,10 +876,11 @@ pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
                 }
                 (s, false)
             }
-            // TODO(phase-d): %e/%E/%g/%G are not ported; their exponent formatting differs from
-            // Rust's default float formatting and an exact PHP match has not been implemented.
-            b'e' | b'E' | b'g' | b'G' => todo!("sprintf conversion %{}", spec as char),
-            _ => todo!("sprintf conversion %{}", spec as char),
+            // Intentionally unsupported: no Composer format string uses these, and PHP's
+            // exponent formatting differs from Rust's default float formatting.
+            _ => {
+                panic!("Unsupported sprintf() format specifier: %{}", spec as char)
+            }
         };
 
         out.push_str(&sprintf_pad(core, width, left, pad, numeric));
