@@ -167,7 +167,6 @@ fn test_unknown_format() {
 
 // ref: ArchiveManagerTest::testArchiveTar / testArchiveCustomFileName.
 #[test]
-#[ignore = "ArchiveManager::archive always passes buildExcludePatterns' glob excludes (e.g. 'name-*.zip'), which BaseExcludeFilter::generate_pattern turns into look-ahead regexes the regex crate cannot compile"]
 fn test_archive_tar() {
     if !git_is_executable() {
         return;
@@ -204,7 +203,6 @@ fn test_archive_tar() {
 }
 
 #[test]
-#[ignore = "ArchiveManager::archive always passes buildExcludePatterns' glob excludes (e.g. 'name-*.zip'), which BaseExcludeFilter::generate_pattern turns into look-ahead regexes the regex crate cannot compile"]
 fn test_archive_custom_file_name() {
     if !git_is_executable() {
         return;

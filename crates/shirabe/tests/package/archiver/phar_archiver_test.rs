@@ -64,7 +64,6 @@ impl ArchiverTestCase {
     }
 }
 
-#[ignore = "the excludes passed here make BaseExcludeFilter::generate_pattern emit look-ahead regexes ((?=$|/) and Glob's (?=[^\\.])) that the regex crate cannot compile"]
 #[test]
 #[serial]
 fn test_tar_archive() {

@@ -16,7 +16,7 @@ fn provide_patterns() -> Vec<(&'static str, Option<(String, bool, bool)>)> {
         (
             "app/config/parameters.yml export-ignore",
             Some((
-                r"{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}".to_string(),
+                r"{app/config/parameters\.yml(?:$|/)}".to_string(),
                 false,
                 false,
             )),
@@ -24,7 +24,7 @@ fn provide_patterns() -> Vec<(&'static str, Option<(String, bool, bool)>)> {
         (
             "app/config/parameters.yml -export-ignore",
             Some((
-                r"{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}".to_string(),
+                r"{app/config/parameters\.yml(?:$|/)}".to_string(),
                 true,
                 false,
             )),

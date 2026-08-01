@@ -105,9 +105,6 @@ fn assert_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder, expect
     assert_eq!(expected_files, actual_files);
 }
 
-// The manual exclude patterns (e.g. `.*`, `prefixC.*`) compile, via ComposerExcludeFilter, to
-// look-ahead regexes like `(?=[^\.])...(?=$|/)`, which the regex crate cannot compile.
-#[ignore = "ComposerExcludeFilter builds look-ahead regexes the regex crate does not support"]
 #[test]
 fn test_manual_excludes() {
     let set_up = set_up();
@@ -211,15 +208,26 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
     files
 }
 
-// Faithful port, but blocked at runtime by the same look-ahead regex limitation as
-// test_manual_excludes: the finder applies .gitattributes export-ignore rules through
-// BaseExcludeFilter::generate_pattern, which builds `(?=$|/)` patterns the regex crate cannot
-// compile. It additionally requires a `git` executable (PHP guards with skipIfNotExecutable).
-#[ignore = "finder applies .gitattributes rules via BaseExcludeFilter::generate_pattern, whose \
-            (?=$|/) look-ahead regexes the regex crate cannot compile (same blocker as \
-            test_manual_excludes); also requires a git executable"]
+/// PHP's `skipIfNotExecutable('git')`.
+fn git_is_executable() -> bool {
+    Process::from_shell_commandline(
+        "git --version",
+        None,
+        None,
+        PhpMixed::Bool(false),
+        Some(60.0),
+    )
+    .and_then(|mut p| p.run(None, IndexMap::new()))
+    .map(|code| code == 0)
+    .unwrap_or(false)
+}
+
 #[test]
 fn test_git_excludes() {
+    if !git_is_executable() {
+        return;
+    }
+
     let set_up = set_up();
 
     file_put_contents(

@@ -59,14 +59,14 @@ impl BaseExcludeFilterBase {
 
         let rule = rule.trim_matches('/');
 
-        let glob_regex = Glob::to_regex(rule, true, true);
-        let rule_regex = &glob_regex[2..glob_regex.len() - 2];
+        // Regex pattern compatibility:
+        // PHP strips the delimiters/anchors off Glob::toRegex output and appends the
+        // `(?=$|/)` look-ahead, which the regex crate cannot compile. The boundary has
+        // to participate in Glob's no-dot union expansion, so it is woven into the
+        // body by to_regex_dir_boundary instead of being appended here.
+        let rule_regex = Glob::to_regex_dir_boundary(rule, true, true);
 
-        (
-            format!("{{{}{}(?=$|/)}}", pattern, rule_regex),
-            negate,
-            false,
-        )
+        (format!("{{{}{}}}", pattern, rule_regex), negate, false)
     }
 }
 
