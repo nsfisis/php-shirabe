@@ -15,9 +15,8 @@ use shirabe_external_packages::symfony::process::exception::ProcessSignaledExcep
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
-    call_user_func, escapeshellarg, explode, implode, in_array, is_array, is_dir, is_numeric,
-    is_string, php_regex, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower,
-    strtr_array, substr_replace, trim,
+    escapeshellarg, explode, implode, in_array, is_array, is_dir, is_numeric, is_string, php_regex,
+    rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -1204,10 +1203,3 @@ impl ToTimeoutSeconds for PhpMixed {
         self.as_int().unwrap_or(0)
     }
 }
-
-// Suppress unused-import warnings.
-#[allow(dead_code)]
-const _USE_PARITY: () = {
-    let _ = call_user_func::<PhpMixed>;
-    let _ = sprintf;
-};

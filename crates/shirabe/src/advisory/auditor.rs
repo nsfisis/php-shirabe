@@ -16,7 +16,7 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, get_class, sprintf, str_starts_with,
+    array_keys, array_reduce, get_class, str_starts_with,
 };
 
 /// Shape of the `--format=json` audit output.
@@ -198,22 +198,13 @@ impl Auditor {
         if affected_packages_count > 0 || !ignored_advisories.is_empty() {
             let passes: Vec<(
                 &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-                String,
+                &str,
+                &str,
             )> = vec![
-                (
-                    &ignored_advisories,
-                    "<info>Found %d ignored security vulnerability advisor%s affecting %d package%s%s</info>"
-                        .to_string(),
-                ),
-                (
-                    &advisories,
-                    format!(
-                        "<{ew}>Found %d security vulnerability advisor%s affecting %d package%s%s</{ew}>",
-                        ew = error_or_warn
-                    ),
-                ),
+                (&ignored_advisories, "info", "ignored "),
+                (&advisories, error_or_warn, ""),
             ];
-            for (advisories_to_output, message) in passes {
+            for (advisories_to_output, tag, ignored) in passes {
                 let (pkg_count, total_advisory_count) = self.count_advisories(advisories_to_output);
                 if pkg_count > 0 {
                     let plurality = if total_advisory_count == 1 {
@@ -223,15 +214,8 @@ impl Auditor {
                     };
                     let pkg_plurality = if pkg_count == 1 { "" } else { "s" };
                     let punctuation = if format == "summary" { "." } else { ":" };
-                    io.write_error(&sprintf(
-                        &message,
-                        &[
-                            PhpMixed::Int(total_advisory_count),
-                            PhpMixed::String(plurality.to_string()),
-                            PhpMixed::Int(pkg_count),
-                            PhpMixed::String(pkg_plurality.to_string()),
-                            PhpMixed::String(punctuation.to_string()),
-                        ],
+                    io.write_error(&format!(
+                        "<{tag}>Found {total_advisory_count} {ignored}security vulnerability advisor{plurality} affecting {pkg_count} package{pkg_plurality}{punctuation}</{tag}>"
                     ));
                     self.output_advisories(io, advisories_to_output, format)?;
                 }
