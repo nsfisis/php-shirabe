@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/BumpCommand.php
 
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputArgument;
@@ -332,15 +333,15 @@ impl BumpCommand {
 
 impl Command for BumpCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_root_requirement() for `packages` argument
         self.set_name("bump")?;
         self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions");
         self.set_definition(&[
-            InputArgument::new(
+            InputArgument::new5(
                 "packages",
                 Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                 "Optional package name(s) to restrict which packages are bumped.",
                 None,
+                self.suggest_root_requirement(),
             )
             .unwrap()
             .into(),
@@ -434,6 +435,14 @@ impl Command for BumpCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

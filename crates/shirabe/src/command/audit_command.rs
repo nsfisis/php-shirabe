@@ -7,6 +7,7 @@ use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
 use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
+use crate::console::input::SuggestedValues;
 use crate::io::IOInterfaceImmutable;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
@@ -83,12 +84,18 @@ impl Command for AuditCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new(
+            InputOption::new6(
                 "ignore-severity",
                 None,
                 Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED),
                 "Ignore advisories of a certain severity level.",
                 Some(PhpMixed::Array(indexmap::IndexMap::new())),
+                SuggestedValues::List(vec![
+                    "low".to_string(),
+                    "medium".to_string(),
+                    "high".to_string(),
+                    "critical".to_string(),
+                ]),
             )
             .unwrap()
             .into(),
@@ -221,6 +228,14 @@ impl Command for AuditCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

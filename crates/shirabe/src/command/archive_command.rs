@@ -1,11 +1,13 @@
 //! ref: composer/src/Composer/Command/ArchiveCommand.php
 
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::console::input::SuggestedValues;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -80,13 +82,12 @@ impl ArchiveCommand {
 
 impl Command for ArchiveCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_available_package(99) for `package` argument
         self.set_name("archive")?;
         self.set_description("Creates an archive of this composer package");
         self.set_definition(&[
-            InputArgument::new("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None).unwrap().into(),
+            InputArgument::new5("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
-            InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None).unwrap().into(),
+            InputOption::new6("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
             InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
             InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
             InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),
@@ -212,6 +213,14 @@ impl Command for ArchiveCommand {
             return Ok(());
         }
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

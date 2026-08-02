@@ -2,9 +2,11 @@
 
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::console::input::SuggestedValues;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
@@ -37,11 +39,10 @@ impl OutdatedCommand {
 
 impl Command for OutdatedCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_installed_package(false, false) for `package` argument and `--ignore` option
         self.set_name("outdated")?;
         self.set_description("Shows a list of installed packages that have updates available, including their latest version");
         self.set_definition(&[
-            InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None).unwrap().into(),
+            InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("outdated", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None).unwrap().into(),
         InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show all installed packages with their latest versions", None).unwrap().into(),
         InputOption::new("locked", None, Some(InputOption::VALUE_NONE), "Shows updates for packages from the lock file, regardless of what is currently in vendor dir", None).unwrap().into(),
@@ -51,8 +52,8 @@ impl Command for OutdatedCommand {
         InputOption::new("minor-only", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("patch-only", Some(PhpMixed::String("p".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("sort-by-age", Some(PhpMixed::String("A".to_string())), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None).unwrap().into(),
-        InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string()))).unwrap().into(),
-        InputOption::new("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None).unwrap().into(),
+        InputOption::new6("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string())), SuggestedValues::List(vec!["json".to_string(), "text".to_string()])).unwrap().into(),
+        InputOption::new6("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None).unwrap().into(),
         InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
         InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
@@ -228,6 +229,14 @@ impl Command for OutdatedCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/ProhibitsCommand.php
 
 use crate::command::BaseDependencyCommand;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputArgument;
@@ -47,16 +48,16 @@ impl BaseDependencyCommand for ProhibitsCommand {
 
 impl Command for ProhibitsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_available_package() for `package` argument
         self.set_name("prohibits")?;
         self.set_aliases(vec!["why-not".to_string()])?;
         self.set_description("Shows which packages prevent the given package from being installed");
         self.set_definition(&[
-            InputArgument::new(
+            InputArgument::new5(
                 <Self as BaseDependencyCommand>::ARGUMENT_PACKAGE,
                 Some(InputArgument::REQUIRED),
                 "Package to inspect",
                 None,
+                self.suggest_available_package(99),
             )
             .unwrap()
             .into(),
@@ -118,6 +119,14 @@ impl Command for ProhibitsCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

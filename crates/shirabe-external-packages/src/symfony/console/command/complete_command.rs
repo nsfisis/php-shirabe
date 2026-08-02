@@ -332,7 +332,8 @@ impl Command for CompleteCommand {
                     );
                 }
                 Some(command) => {
-                    command.borrow().merge_application_definition(false);
+                    // PHP: $command->mergeApplicationDefinition() — $mergeArgs defaults to true.
+                    command.borrow().merge_application_definition(true);
                     completion_input.bind(&command.borrow().get_definition())?;
 
                     if CompletionInput::TYPE_OPTION_NAME == completion_input.get_completion_type() {

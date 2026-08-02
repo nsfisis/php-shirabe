@@ -118,12 +118,27 @@ impl Command for RunScriptCommand {
         self.set_aliases(vec!["run".to_string()])?;
         self.set_description("Runs the scripts defined in composer.json");
         self.set_definition(&[
-            // TODO(cli-completion): script-name completion was provided via a closure suggesting runtime script names
-            InputArgument::new(
+            // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
+            // extra ones the caller passes).
+            InputArgument::new5(
                 "script",
                 Some(InputArgument::OPTIONAL),
                 "Script name to run.",
                 None,
+                crate::console::input::SuggestedValues::Closure(Box::new(
+                    |this, _input, _suggestions| {
+                        let this = this
+                            .as_any()
+                            .downcast_ref::<RunScriptCommand>()
+                            .expect("the script suggestions are bound to RunScriptCommand");
+                        // PHP: array_map(fn ($script) => $script['name'], $this->getScripts())
+                        Ok(this
+                            .get_scripts()?
+                            .into_iter()
+                            .map(|(name, _description)| name)
+                            .collect())
+                    },
+                )),
             )
             .unwrap()
             .into(),
@@ -328,6 +343,14 @@ impl Command for RunScriptCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

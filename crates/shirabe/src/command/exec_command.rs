@@ -77,11 +77,19 @@ impl Command for ExecCommand {
         self.set_description("Executes a vendored binary/script");
         self.set_definition(&[
             InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
-            // TODO(cli-completion): suggest installed binary names (via get_binaries) for `binary` argument
-            InputArgument::new("binary",
+            // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
+            // extra ones the caller passes).
+            InputArgument::new5("binary",
             Some(InputArgument::OPTIONAL),
             "The binary to run, e.g. phpunit",
-            None).unwrap().into(),
+            None,
+            crate::console::input::SuggestedValues::Closure(Box::new(|this, _input, _suggestions| {
+                let this = this
+                    .as_any()
+                    .downcast_ref::<ExecCommand>()
+                    .expect("the binary suggestions are bound to ExecCommand");
+                this.get_binaries(false)
+            }))).unwrap().into(),
             InputArgument::new("args",
             Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
             "Arguments to pass to the binary. Use <info>--</info> to separate from composer arguments",
@@ -243,6 +251,14 @@ impl Command for ExecCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

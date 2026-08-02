@@ -8,6 +8,7 @@ use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::factory::Factory;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::json::JsonEncodeOptions;
@@ -85,7 +86,6 @@ impl ConfigCommand {
 
 impl Command for ConfigCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_setting_keys() for `setting-key` argument
         self.set_name("config")?;
         self.set_description("Sets config options");
         self.set_definition(&[
@@ -100,7 +100,7 @@ impl Command for ConfigCommand {
         InputOption::new("merge", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "Merge the setting value with the current value, to be used with extra.* or audit.ignore[-abandoned] keys in combination with --json", None).unwrap().into(),
         InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lowest priority) to the existing ones instead of prepending it (highest priority)", None).unwrap().into(),
         InputOption::new("source", None, Some(InputOption::VALUE_NONE), "Display where the config value is loaded from", None).unwrap().into(),
-        InputArgument::new("setting-key", None, "Setting key", None).unwrap().into(),
+        InputArgument::new5("setting-key", None, "Setting key", None, self.suggest_setting_keys()).unwrap().into(),
         InputArgument::new("setting-value", Some(InputArgument::IS_ARRAY), "Setting value", None).unwrap().into(),
             ]);
         self.set_help(
@@ -1273,6 +1273,14 @@ impl Command for ConfigCommand {
         .into())
     }
 
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
+    }
+
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(
         base_command_data,
         "Composer\\Command\\ConfigCommand"
@@ -1536,7 +1544,123 @@ impl ConfigCommand {
         }
     }
 
-    // TODO(cli-completion): fn suggest_setting_keys(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String>>
+    /// Suggest setting-keys, while taking given options in account.
+    fn suggest_setting_keys(&self) -> crate::console::input::SuggestedValues {
+        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
+            if input.get_option("list")?.to_bool()
+                || input.get_option("editor")?.to_bool()
+                || input.get_option("auth")?.to_bool()
+            {
+                return Ok(vec![]);
+            }
+
+            let this = this
+                .as_any()
+                .downcast_ref::<ConfigCommand>()
+                .expect("suggestSettingKeys is bound to ConfigCommand");
+            // PHP passes the CompletionInput itself; the accessors only read from it, so a
+            // clone behind a fresh handle is equivalent.
+            let input_handle: std::rc::Rc<
+                std::cell::RefCell<
+                    dyn shirabe_external_packages::symfony::console::input::InputInterface,
+                >,
+            > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
+
+            // initialize configuration
+            let mut config = Factory::create_config(None, None)?;
+
+            // load configuration
+            let mut config_file = JsonFile::new(
+                this.get_composer_config_file(input_handle.clone(), &config)?,
+                None,
+                None,
+            )?;
+            if config_file.exists() {
+                let path = config_file.get_path().to_string();
+                let data = config_file.read()?.as_array().cloned().unwrap_or_default();
+                config.merge(&data, &path);
+            }
+
+            // load auth-configuration
+            let mut auth_config_file = JsonFile::new(
+                this.get_auth_config_file(input_handle.clone(), &config)?,
+                None,
+                None,
+            )?;
+            if auth_config_file.exists() {
+                let path = auth_config_file.get_path().to_string();
+                let mut data = IndexMap::new();
+                data.insert("config".to_string(), auth_config_file.read()?);
+                config.merge(&data, &path);
+            }
+
+            // collect all configuration setting-keys
+            let raw_config = config.raw();
+            let mut keys = flatten_setting_keys(
+                raw_config.get("config").cloned().unwrap_or(PhpMixed::Null),
+                "",
+            );
+            keys.extend(flatten_setting_keys(
+                raw_config
+                    .get("repositories")
+                    .cloned()
+                    .unwrap_or(PhpMixed::Null),
+                "repositories.",
+            ));
+
+            // if unsetting …
+            if input.get_option("unset")?.to_bool() {
+                // … keep only the currently customized setting-keys …
+                let sources = [
+                    config_file.get_path().to_string(),
+                    auth_config_file.get_path().to_string(),
+                ];
+                keys.retain(|key| sources.contains(&config.get_source_of_value(key)));
+
+            // … else if showing or setting a value …
+            } else {
+                // … add all configurable package-properties, no matter if it exist
+                keys.extend(
+                    Self::CONFIGURABLE_PACKAGE_PROPERTIES
+                        .iter()
+                        .map(|property| property.to_string()),
+                );
+
+                // it would be nice to distinguish between showing and setting
+                // a value, but that makes the implementation much more complex
+                // and partially impossible because symfony's implementation
+                // does not complete arguments followed by other arguments
+            }
+
+            // add all existing configurable package-properties
+            if config_file.exists() {
+                let properties: IndexMap<String, PhpMixed> = config_file
+                    .read()?
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(key, _)| {
+                        Self::CONFIGURABLE_PACKAGE_PROPERTIES.contains(&key.as_str())
+                    })
+                    .collect();
+
+                keys.extend(flatten_setting_keys(PhpMixed::Array(properties), ""));
+            }
+
+            // filter settings-keys by completion value
+            let completion_value = input.get_completion_value();
+
+            if !completion_value.is_empty() {
+                keys.retain(|key| key.starts_with(&completion_value));
+            }
+
+            keys.sort();
+
+            keys.dedup();
+            Ok(keys)
+        }))
+    }
 }
 
 // PHP signature: function ($val): bool / ($val) -> bool/string
@@ -2196,9 +2320,6 @@ fn flatten_setting_keys(config: PhpMixed, prefix: &str) -> Vec<String> {
     }
     merged
 }
-
-// TODO(cli-completion): get_composer_config_file_static / get_auth_config_file_static helpers
-// were only used by suggest_setting_keys; dropped along with completion support.
 
 // PHP key($value) — first key of an array
 fn key_first_key(value: &PhpMixed) -> Option<String> {

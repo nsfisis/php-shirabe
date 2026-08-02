@@ -2,6 +2,7 @@
 
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
@@ -132,16 +133,16 @@ impl HomeCommand {
 
 impl Command for HomeCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_installed_package() for `packages` argument
         self.set_name("browse")?;
         self.set_aliases(vec!["home".to_string()])?;
         self.set_description("Opens the package's repository URL or homepage in your browser");
         self.set_definition(&[
-            InputArgument::new(
+            InputArgument::new5(
                 "packages",
                 Some(InputArgument::IS_ARRAY),
                 "Package(s) to browse to.",
                 None,
+                self.suggest_installed_package(true, false),
             )
             .unwrap()
             .into(),
@@ -258,6 +259,14 @@ impl Command for HomeCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

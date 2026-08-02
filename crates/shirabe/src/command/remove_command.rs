@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/RemoveCommand.php
 
 use crate::advisory::Auditor;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::config::ConfigSourceInterface;
@@ -47,15 +48,15 @@ impl RemoveCommand {
 
 impl Command for RemoveCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_root_requirement() for `packages` argument
         self.set_name("remove")?;
         self.set_aliases(vec!["rm".to_string(), "uninstall".to_string()])?;
         self.set_description("Removes a package from the require or require-dev");
         self.set_definition(&[
-                InputArgument::new("packages",
+                InputArgument::new5("packages",
             Some(InputArgument::IS_ARRAY),
             "Packages that should be removed.",
-            None).unwrap().into(),
+            None,
+            self.suggest_root_requirement()).unwrap().into(),
         InputOption::new("dev",
         None,
         Some(InputOption::VALUE_NONE),
@@ -709,6 +710,14 @@ impl Command for RemoveCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

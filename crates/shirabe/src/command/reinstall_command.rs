@@ -2,6 +2,7 @@
 
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
@@ -45,13 +46,12 @@ impl ReinstallCommand {
 
 impl Command for ReinstallCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_prefer_install / suggest_installed_package_types / suggest_installed_package
         self.set_name("reinstall")?;
         self.set_description("Uninstalls and reinstalls the given package names");
         self.set_definition(&[
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-            InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
+            InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
             InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
@@ -60,8 +60,8 @@ impl Command for ReinstallCommand {
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
             InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
-            InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None).unwrap().into(),
-            InputArgument::new("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None).unwrap().into(),
+            InputOption::new6("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None, self.suggest_installed_package_types(false)).unwrap().into(),
+            InputArgument::new5("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         ]);
         self.set_help(
             "The <info>reinstall</info> command looks up installed packages by name,\n\
@@ -355,6 +355,14 @@ impl Command for ReinstallCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

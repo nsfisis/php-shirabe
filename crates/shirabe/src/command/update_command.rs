@@ -2,6 +2,7 @@
 
 use crate::advisory::Auditor;
 use crate::command::BumpCommand;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
@@ -62,16 +63,15 @@ impl UpdateCommand {
 
 impl Command for UpdateCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_installed_package(false, true) / suggest_prefer_install
         self.set_name("update")?;
         self.set_aliases(vec!["u".to_string(), "upgrade".to_string()])?;
         self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file");
         self.set_definition(&[
-            InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None).unwrap().into(),
+            InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None, self.suggest_installed_package(false, true)).unwrap().into(),
             InputOption::new("with", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Temporary version constraint to add, e.g. foo/bar:1.0.0 or foo/bar=1.0.0", None).unwrap().into(),
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-            InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
+            InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
             InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
             InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Enables installation of require-dev packages (enabled by default, only present for BC).", None).unwrap().into(),
             InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None).unwrap().into(),
@@ -98,7 +98,7 @@ impl Command for UpdateCommand {
             InputOption::new("patch-only", None, Some(InputOption::VALUE_NONE), "Only allow patch version updates for currently installed dependencies.", None).unwrap().into(),
             InputOption::new("interactive", Some(PhpMixed::String("i".to_string())), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
             InputOption::new("root-reqs", None, Some(InputOption::VALUE_NONE), "Restricts the update to your first degree dependencies.", None).unwrap().into(),
-            InputOption::new("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(PhpMixed::Bool(false))).unwrap().into(),
+            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(PhpMixed::Bool(false)), crate::console::input::SuggestedValues::List(vec!["dev".to_string(), "no-dev".to_string(), "all".to_string()])).unwrap().into(),
         ]);
         self.set_help(
             "The <info>update</info> command reads the composer.json file from the\n\
@@ -576,6 +576,14 @@ impl Command for UpdateCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

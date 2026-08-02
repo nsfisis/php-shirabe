@@ -11,6 +11,9 @@ use crate::util::Platform;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
+use shirabe_external_packages::symfony::console::completion::completion_suggestions::{
+    CompletionSuggestions, StringOrSuggestion,
+};
 use shirabe_external_packages::symfony::console::input::ArgvInput;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -40,8 +43,6 @@ impl GlobalCommand {
             .expect("GlobalCommand::configure uses static, valid metadata");
         command
     }
-
-    // TODO(cli-completion): pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions)
 
     // TODO remove for Symfony 6+ as it is then in the interface.
     // Mirrors PHP's `method_exists($input, '__toString')` guard followed by
@@ -149,6 +150,72 @@ impl Command for GlobalCommand {
 
     fn is_proxy_command(&self) -> bool {
         true
+    }
+
+    fn complete(
+        &self,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        let application = self
+            .get_application()
+            .expect("a proxy command is always attached to its application");
+        if input.must_suggest_argument_values_for("command-name") {
+            // The application borrow must be dropped before suggest_values (harmless) and
+            // before any command re-entry below.
+            let values: Vec<StringOrSuggestion> = {
+                let mut app_ref = application.borrow_mut();
+                let app = app_ref
+                    .as_any_mut()
+                    .downcast_mut::<Application>()
+                    .expect("shirabe always installs its own Application");
+                app.all(None)?
+                    .values()
+                    // PHP: $command->isHidden() ? null : $command->getName(), then
+                    // array_filter drops the nulls.
+                    .filter(|command| !command.borrow().is_hidden())
+                    .filter_map(|command| command.borrow().get_name())
+                    .map(StringOrSuggestion::String)
+                    .collect()
+            };
+            suggestions.suggest_values(values);
+
+            return Ok(());
+        }
+
+        let command_name = input.get_argument("command-name")?.to_string();
+        let has = {
+            let mut app_ref = application.borrow_mut();
+            let app = app_ref
+                .as_any_mut()
+                .downcast_mut::<Application>()
+                .expect("shirabe always installs its own Application");
+            app.has(&command_name)
+        };
+        if has {
+            let prepared = self.prepare_subcommand_input(
+                std::rc::Rc::new(std::cell::RefCell::new(input.clone())),
+                true,
+            )?;
+            let mut input = CompletionInput::from_string(&prepared.to_string(), 2)?;
+            let command = {
+                let mut app_ref = application.borrow_mut();
+                let app = app_ref
+                    .as_any_mut()
+                    .downcast_mut::<Application>()
+                    .expect("shirabe always installs its own Application");
+                app.find(&command_name)?
+            };
+            command.borrow().merge_application_definition(true);
+
+            {
+                let command_ref = command.borrow();
+                let definition = command_ref.get_definition();
+                input.bind(&definition)?;
+            }
+            command.borrow().complete(&input, suggestions)?;
+        }
+        Ok(())
     }
 
     fn run(

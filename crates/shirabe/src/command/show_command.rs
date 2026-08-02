@@ -1,10 +1,12 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php
 
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::console::input::SuggestedValues;
 use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::PolicyInterface;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
@@ -84,9 +86,6 @@ impl Command for ShowCommand {
         self.set_name("show")?;
         self.set_aliases(vec!["info".to_string()])?;
         self.set_description("Shows information about packages");
-        // TODO(cli-completion): the package/ignore suggestion closures (suggestPackageBasedOnMode /
-        // suggestInstalledPackage) and the format option's allowed-value list are dropped, matching
-        // the InputArgument/InputOption API which does not yet carry completion metadata.
         let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
             InputOption::new(
                 name,
@@ -99,11 +98,12 @@ impl Command for ShowCommand {
             .into()
         };
         self.set_definition(&[
-            InputArgument::new(
+            InputArgument::new5(
                 "package",
                 Some(InputArgument::OPTIONAL),
                 "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.",
                 None,
+                self.suggest_package_based_on_mode(),
             )
             .unwrap()
             .into(),
@@ -134,12 +134,13 @@ impl Command for ShowCommand {
                 Some("o"),
                 "Show the latest version but only for packages that are outdated",
             ),
-            InputOption::new(
+            InputOption::new6(
                 "ignore",
                 None,
                 Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
                 "Ignore specified package(s). Can contain wildcards (*). Use it with the --outdated option if you don't want to be informed about new versions of some packages.",
                 None,
+                self.suggest_installed_package(false, false),
             )
             .unwrap()
             .into(),
@@ -173,12 +174,13 @@ impl Command for ShowCommand {
                 None,
                 "Return a non-zero exit code when there are outdated packages",
             ),
-            InputOption::new(
+            InputOption::new6(
                 "format",
                 Some(PhpMixed::String("f".to_string())),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
                 Some(PhpMixed::String("text".to_string())),
+                SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
             )
             .unwrap()
             .into(),
@@ -1441,6 +1443,14 @@ impl Command for ShowCommand {
         base_command_initialize(self, input, output)
     }
 
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
+    }
+
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(
         base_command_data,
         "Composer\\Command\\ShowCommand"
@@ -1456,7 +1466,27 @@ impl BaseCommand for ShowCommand {
 }
 
 impl ShowCommand {
-    // TODO(cli-completion): pub fn suggest_package_based_on_mode(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String>>
+    /// PHP: protected function suggestPackageBasedOnMode(): \Closure
+    pub(crate) fn suggest_package_based_on_mode(&self) -> crate::console::input::SuggestedValues {
+        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, suggestions| {
+            if input.get_option("available")?.to_bool() || input.get_option("all")?.to_bool() {
+                return this.suggest_available_package_incl_platform().call(
+                    this,
+                    input,
+                    suggestions,
+                );
+            }
+
+            if input.get_option("platform")?.to_bool() {
+                return this
+                    .suggest_platform_package()
+                    .call(this, input, suggestions);
+            }
+
+            this.suggest_installed_package(false, false)
+                .call(this, input, suggestions)
+        }))
+    }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn print_packages(

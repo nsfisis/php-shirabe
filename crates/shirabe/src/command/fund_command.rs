@@ -3,6 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
+use crate::console::input::SuggestedValues;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package::{self};
@@ -83,12 +84,13 @@ impl Command for FundCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("fund")?;
         self.set_description("Discover how to help fund the maintenance of your dependencies");
-        self.set_definition(&[InputOption::new(
+        self.set_definition(&[InputOption::new6(
             "format",
             Some(PhpMixed::String("f".to_string())),
             Some(InputOption::VALUE_REQUIRED),
             "Format of the output: text or json",
             Some(PhpMixed::String("text".to_string())),
+            SuggestedValues::List(vec!["text".to_string(), "json".to_string()]),
         )
         .unwrap()
         .into()]);
@@ -221,6 +223,14 @@ impl Command for FundCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

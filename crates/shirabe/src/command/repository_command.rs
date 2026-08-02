@@ -119,13 +119,79 @@ impl RepositoryCommand {
         }
     }
 
-    // TODO(cli-completion): fn suggest_type_for_add()
-    // TODO(cli-completion): fn suggest_repo_names(&self)
+    /// PHP: private function suggestTypeForAdd(): \Closure (a static closure — `this` unused)
+    fn suggest_type_for_add(&self) -> crate::console::input::SuggestedValues {
+        crate::console::input::SuggestedValues::Closure(Box::new(|_this, input, _suggestions| {
+            if input.get_argument("action")?.to_string() == "add" {
+                return Ok(vec![
+                    "composer".to_string(),
+                    "vcs".to_string(),
+                    "artifact".to_string(),
+                    "path".to_string(),
+                ]);
+            }
+
+            Ok(vec![])
+        }))
+    }
+
+    fn suggest_repo_names(&self) -> crate::console::input::SuggestedValues {
+        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
+            let action = input.get_argument("action")?.to_string();
+            if ["enable", "disable"].contains(&action.as_str()) {
+                return Ok(vec!["packagist.org".to_string()]);
+            }
+
+            if !["remove", "set-url", "get-url"].contains(&action.as_str()) {
+                return Ok(vec![]);
+            }
+
+            let this = this
+                .as_any()
+                .downcast_ref::<RepositoryCommand>()
+                .expect("suggestRepoNames is bound to RepositoryCommand");
+            // PHP passes the CompletionInput itself; the accessors only read from it, so a
+            // clone behind a fresh handle is equivalent.
+            let input_handle: std::rc::Rc<
+                std::cell::RefCell<
+                    dyn shirabe_external_packages::symfony::console::input::InputInterface,
+                >,
+            > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
+            let config = crate::factory::Factory::create_config(None, None)?;
+            let mut config_file = JsonFile::new(
+                this.get_composer_config_file(input_handle, &config)?,
+                None,
+                None,
+            )?;
+
+            let data = config_file.read()?;
+            let mut repos: Vec<String> = vec![];
+
+            if let Some(repositories) = data.as_array().and_then(|d| d.get("repositories")) {
+                if let Some(list) = repositories.as_list() {
+                    for repo in list {
+                        if let Some(name) = repo.as_array().and_then(|r| r.get("name")) {
+                            repos.push(name.to_string());
+                        }
+                    }
+                } else if let Some(map) = repositories.as_array() {
+                    for repo in map.values() {
+                        if let Some(name) = repo.as_array().and_then(|r| r.get("name")) {
+                            repos.push(name.to_string());
+                        }
+                    }
+                }
+            }
+
+            repos.sort();
+
+            Ok(repos)
+        }))
+    }
 }
 
 impl Command for RepositoryCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_repo_names() / suggest_type_for_add()
         self.set_name("repository")?;
         self.set_aliases(vec!["repo".to_string()])?;
         self.set_description("Manages repositories");
@@ -157,45 +223,58 @@ impl Command for RepositoryCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new(
+            InputOption::new6(
                 "before",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
                 "When adding a repository, insert it before the given repository name",
                 None,
+                self.suggest_repo_names(),
             )
             .unwrap()
             .into(),
-            InputOption::new(
+            InputOption::new6(
                 "after",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
                 "When adding a repository, insert it after the given repository name",
                 None,
+                self.suggest_repo_names(),
             )
             .unwrap()
             .into(),
-            InputArgument::new(
+            InputArgument::new5(
                 "action",
                 Some(InputArgument::OPTIONAL),
                 "Action to perform: list, add, remove, set-url, get-url, enable, disable",
                 Some(PhpMixed::String("list".to_string())),
+                crate::console::input::SuggestedValues::List(vec![
+                    "list".to_string(),
+                    "add".to_string(),
+                    "remove".to_string(),
+                    "set-url".to_string(),
+                    "get-url".to_string(),
+                    "enable".to_string(),
+                    "disable".to_string(),
+                ]),
             )
             .unwrap()
             .into(),
-            InputArgument::new(
+            InputArgument::new5(
                 "name",
                 Some(InputArgument::OPTIONAL),
                 "Repository name (or special name packagist.org for enable/disable)",
                 None,
+                self.suggest_repo_names(),
             )
             .unwrap()
             .into(),
-            InputArgument::new(
+            InputArgument::new5(
                 "arg1",
                 Some(InputArgument::OPTIONAL),
                 "Type for add, or new URL for set-url, or JSON config for add",
                 None,
+                self.suggest_type_for_add(),
             )
             .unwrap()
             .into(),
@@ -499,6 +578,14 @@ impl Command for RepositoryCommand {
         <Self as crate::command::base_config_command::BaseConfigCommand>::initialize(
             self, input, output,
         )
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

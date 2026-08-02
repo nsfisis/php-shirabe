@@ -3,6 +3,7 @@
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::BaseDependencyCommand;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
@@ -48,16 +49,16 @@ impl BaseDependencyCommand for DependsCommand {
 
 impl Command for DependsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_installed_package(true, true) for `package` argument
         self.set_name("depends")?;
         self.set_aliases(vec!["why".to_string()])?;
         self.set_description("Shows which packages cause the given package to be installed");
         self.set_definition(&[
-            InputArgument::new(
+            InputArgument::new5(
                 crate::command::ARGUMENT_PACKAGE,
                 Some(InputArgument::REQUIRED),
                 "Package to inspect",
                 None,
+                self.suggest_installed_package(true, true),
             )
             .unwrap()
             .into(),
@@ -111,6 +112,14 @@ impl Command for DependsCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(

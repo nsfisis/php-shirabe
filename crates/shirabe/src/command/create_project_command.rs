@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/CreateProjectCommand.php
 
 use crate::advisory::Auditor;
+use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::config::Config;
@@ -78,17 +79,16 @@ impl CreateProjectCommand {
 
 impl Command for CreateProjectCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(cli-completion): suggest_prefer_install / suggest_available_package
         self.set_name("create-project")?;
         self.set_description("Creates new project from a package into given directory");
         self.set_definition(&[
-                InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None).unwrap().into(),
+                InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
                 InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
                 InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
                 InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
                 InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
                 InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
+                InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
                 InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories to look the package up, either by URL or using JSON arrays", None).unwrap().into(),
                 InputOption::new("repository-url", None, Some(InputOption::VALUE_REQUIRED), "DEPRECATED: Use --repository instead.", None).unwrap().into(),
                 InputOption::new("add-repository", None, Some(InputOption::VALUE_NONE), "Add the custom repository in the composer.json. If a lock file is present it will be deleted and an update will be run instead of install.", None).unwrap().into(),
@@ -260,6 +260,14 @@ impl Command for CreateProjectCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(
