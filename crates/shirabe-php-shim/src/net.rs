@@ -35,10 +35,27 @@ pub fn inet_pton(host: &str) -> Option<Vec<u8>> {
     }
 }
 
+thread_local! {
+    // PHP records the response headers of the most recent HTTP stream wrapper request
+    // (the engine-side storage behind `$http_response_header` and, since PHP 8.4, the
+    // http_get_last_response_headers()/http_clear_last_response_headers() pair).
+    static LAST_RESPONSE_HEADERS: std::cell::RefCell<Option<Vec<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+// Engine-side hook with no PHP userland counterpart: the HTTP stream layer must call this
+// after each request, like PHP's http wrapper populating `$http_response_header`. No stream
+// layer performs HTTP requests yet (see the TODO(phase-c) in util/remote_filesystem.rs), so
+// until then the store stays empty and the getter below returns None, which matches PHP
+// before any HTTP stream request was made.
+pub fn http_record_last_response_headers(headers: Vec<String>) {
+    LAST_RESPONSE_HEADERS.with(|h| *h.borrow_mut() = Some(headers));
+}
+
 pub fn http_get_last_response_headers() -> Option<Vec<String>> {
-    todo!()
+    LAST_RESPONSE_HEADERS.with(|h| h.borrow().clone())
 }
 
 pub fn http_clear_last_response_headers() {
-    todo!()
+    LAST_RESPONSE_HEADERS.with(|h| *h.borrow_mut() = None);
 }

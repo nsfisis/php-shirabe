@@ -369,6 +369,8 @@ pub fn mb_check_encoding(_value: &str, _encoding: &str) -> bool {
     match _encoding.to_ascii_uppercase().replace('-', "").as_str() {
         // A Rust &str is, by construction, valid UTF-8.
         "UTF8" => true,
+        "ASCII" | "USASCII" => _value.is_ascii(),
+        // Other encodings need the mbstring validation tables, which have not been ported.
         _ => todo!(),
     }
 }
