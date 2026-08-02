@@ -90,8 +90,8 @@ impl RepositoryInterface for LockArrayRepository {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> String {
-        "lock repo".to_string()
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok("lock repo".to_string())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -52,7 +52,7 @@ impl FilterRepository {
                     return Err(InvalidArgumentException {
                         message: format!(
                             r#""only" key for repository {} should be an array"#,
-                            repo.get_repo_name()
+                            repo.get_repo_name()?
                         ),
                         code: 0,
                     }
@@ -82,7 +82,7 @@ impl FilterRepository {
                     return Err(InvalidArgumentException {
                         message: format!(
                             r#""exclude" key for repository {} should be an array"#,
-                            repo.get_repo_name()
+                            repo.get_repo_name()?
                         ),
                         code: 0,
                     }
@@ -94,7 +94,7 @@ impl FilterRepository {
             return Err(InvalidArgumentException {
                 message: format!(
                     r#"Only one of "only" and "exclude" can be specified for repository {}"#,
-                    repo.get_repo_name()
+                    repo.get_repo_name()?
                 ),
                 code: 0,
             }
@@ -109,7 +109,7 @@ impl FilterRepository {
                     return Err(InvalidArgumentException {
                         message: format!(
                             r#""canonical" key for repository {} should be a boolean"#,
-                            repo.get_repo_name()
+                            repo.get_repo_name()?
                         ),
                         code: 0,
                     }
@@ -260,7 +260,7 @@ impl RepositoryInterface for FilterRepository {
         Ok(result)
     }
 
-    fn get_repo_name(&self) -> String {
+    fn get_repo_name(&self) -> anyhow::Result<String> {
         self.repo.get_repo_name()
     }
 

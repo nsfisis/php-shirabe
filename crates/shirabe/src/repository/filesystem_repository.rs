@@ -38,7 +38,9 @@ pub struct FilesystemRepository {
     /// @var Filesystem
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var bool|null
-    dev_mode: Option<bool>,
+    // Cell so that initialize() can stay `&self` (late-bound initialization out of shared
+    // contexts such as getRepoName).
+    dev_mode: std::cell::Cell<Option<bool>>,
 }
 
 impl FilesystemRepository {
@@ -67,24 +69,27 @@ impl FilesystemRepository {
             dump_versions,
             root_package,
             filesystem,
-            dev_mode: None,
+            dev_mode: std::cell::Cell::new(None),
         })
     }
 
     /// @return bool|null true if dev requirements were installed, false if --no-dev was used, null if yet unknown
     pub fn get_dev_mode(&self) -> Option<bool> {
-        self.dev_mode
+        self.dev_mode.get()
     }
 
     pub fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
         self.inner.set_self_handle(weak);
     }
 
-    pub fn get_repo_name(&self) -> String {
+    pub fn get_repo_name(&self) -> anyhow::Result<String> {
+        // PHP: ArrayRepository::getRepoName() counts through the late-bound $this->initialize(),
+        // which resolves to FilesystemRepository::initialize (reading the file).
+        self.ensure_initialized()?;
         self.inner.get_repo_name()
     }
 
-    fn ensure_initialized(&mut self) -> anyhow::Result<()> {
+    fn ensure_initialized(&self) -> anyhow::Result<()> {
         if !self.inner.is_initialized() {
             self.initialize()?;
         }
@@ -92,7 +97,7 @@ impl FilesystemRepository {
     }
 
     /// Initializes repository (reads file, or remote address).
-    pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
+    pub(crate) fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
 
         if !self.file.exists() {
@@ -124,7 +129,7 @@ impl FilesystemRepository {
                     self.inner.set_dev_package_names(dev_names);
                 }
                 if let Some(dev) = m.get("dev") {
-                    self.dev_mode = dev.as_bool();
+                    self.dev_mode.set(dev.as_bool());
                 }
             }
 
@@ -203,7 +208,7 @@ impl FilesystemRepository {
         self.inner.set_dev_package_names(dev_package_names);
     }
 
-    pub fn get_dev_package_names(&self) -> &Vec<String> {
+    pub fn get_dev_package_names(&self) -> Vec<String> {
         self.inner.get_dev_package_names()
     }
 
@@ -281,6 +286,7 @@ impl FilesystemRepository {
                 &PhpMixed::List(
                     self.inner
                         .dev_package_names
+                        .borrow()
                         .iter()
                         .map(|s| PhpMixed::String(s.clone()))
                         .collect(),
@@ -436,6 +442,7 @@ impl FilesystemRepository {
         let dev_packages = array_flip(&PhpMixed::List(
             self.inner
                 .dev_package_names
+                .borrow()
                 .iter()
                 .map(|s| PhpMixed::String(s.clone()))
                 .collect(),
@@ -793,8 +800,8 @@ impl RepositoryInterface for FilesystemRepository {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> String {
-        self.inner.get_repo_name()
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        FilesystemRepository::get_repo_name(self)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

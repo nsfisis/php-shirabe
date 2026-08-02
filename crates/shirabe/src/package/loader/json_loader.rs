@@ -23,7 +23,7 @@ impl JsonLoader {
 
     pub fn load(&self, json: JsonLoaderInput) -> anyhow::Result<PackageInterfaceHandle> {
         let config = match json {
-            JsonLoaderInput::File(mut json_file) => json_file.read()?,
+            JsonLoaderInput::File(json_file) => json_file.read()?,
             JsonLoaderInput::String(ref s) if Path::new(s).exists() => {
                 let contents = std::fs::read_to_string(s)?;
                 JsonFile::parse_json(Some(&contents), Some(s))?

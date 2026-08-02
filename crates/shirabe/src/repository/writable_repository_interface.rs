@@ -21,5 +21,5 @@ pub trait WritableRepositoryInterface: RepositoryInterface {
 
     fn set_dev_package_names(&mut self, dev_package_names: Vec<String>);
 
-    fn get_dev_package_names(&self) -> &Vec<String>;
+    fn get_dev_package_names(&self) -> Vec<String>;
 }

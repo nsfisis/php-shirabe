@@ -1651,15 +1651,20 @@ impl ComposerRepository {
             Url::sanitize(self.get_packages_json_url())
         );
         for package in self.create_packages(repo_data, Some(source))? {
-            self.add_package(package);
+            self.add_package(package)?;
         }
         Ok(())
     }
 
     /// Adds a new package to the repository
-    pub fn add_package(&mut self, package: BasePackageHandle) {
+    pub fn add_package(&mut self, package: BasePackageHandle) -> anyhow::Result<()> {
         self.configure_package_transport_options(package.clone());
-        self.inner.add_package(package);
+        // PHP: ArrayRepository::addPackage() calls the late-bound $this->initialize(), which
+        // resolves to ComposerRepository::initialize (loading the root file).
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
+        self.inner.add_package(package)
     }
 
     /// Forwards the outermost handle's weak to the inner `ArrayRepository` so that packages added
@@ -3425,11 +3430,25 @@ impl RepositoryInterface for ComposerRepository {
         self.inner.count()
     }
 
+    // PHP's ArrayRepository::hasPackage() builds its packageMap from the late-bound
+    // $this->getPackages(), which resolves to ComposerRepository::getPackages() — throwing a
+    // LogicException on lazy/provider repos and loading everything on available-packages repos.
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
-        if !self.inner.is_initialized() {
-            self.initialize()?;
+        if self.inner.package_map.borrow().is_none() {
+            let mut map: IndexMap<String, BasePackageHandle> = IndexMap::new();
+            for repo_package in ComposerRepository::get_packages(self)? {
+                map.insert(repo_package.get_unique_name(), repo_package);
+            }
+            *self.inner.package_map.borrow_mut() = Some(map);
         }
-        self.inner.has_package(package)
+
+        Ok(self
+            .inner
+            .package_map
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .contains_key(&package.get_unique_name()))
     }
 
     /// @inheritDoc
@@ -3671,8 +3690,8 @@ impl RepositoryInterface for ComposerRepository {
             .collect())
     }
 
-    fn get_repo_name(&self) -> String {
-        ComposerRepository::get_repo_name(self)
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok(ComposerRepository::get_repo_name(self))
     }
 
     fn as_advisory_provider(&self) -> Option<&dyn crate::repository::AdvisoryProviderInterface> {

@@ -382,7 +382,7 @@ fn test_inconsistent_require_keys() {
             app_tester.get_display()
         );
 
-        let mut composer_content =
+        let composer_content =
             JsonFile::new(format!("{}/composer.json", dir.display()), None, None).unwrap();
         let content = composer_content.read().unwrap();
         let content: serde_json::Value =

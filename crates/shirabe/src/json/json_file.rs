@@ -72,7 +72,9 @@ pub struct JsonFile {
     /// @var ?IOInterface
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @var string
-    indent: String,
+    // RefCell so that read() can stay `&self`: PHP's late-bound repository initialize()
+    // chains (getRepoName -> count -> initialize -> file read) run from shared contexts.
+    indent: std::cell::RefCell<String>,
 }
 
 impl JsonFile {
@@ -116,7 +118,7 @@ impl JsonFile {
             path,
             http_downloader,
             io,
-            indent: Self::INDENT_DEFAULT.to_string(),
+            indent: std::cell::RefCell::new(Self::INDENT_DEFAULT.to_string()),
         })
     }
 
@@ -134,7 +136,7 @@ impl JsonFile {
     /// @throws ParsingException
     /// @throws \RuntimeException
     /// @return mixed
-    pub fn read(&mut self) -> anyhow::Result<PhpMixed> {
+    pub fn read(&self) -> anyhow::Result<PhpMixed> {
         let json: Option<String> = match (|| -> anyhow::Result<Option<String>> {
             if let Some(http_downloader) = &self.http_downloader {
                 Ok(http_downloader
@@ -198,7 +200,7 @@ impl JsonFile {
             }
         };
 
-        self.indent = Self::detect_indenting(Some(&json));
+        *self.indent.borrow_mut() = Self::detect_indenting(Some(&json));
 
         Self::parse_json(Some(&json), Some(&self.path))
     }
@@ -213,7 +215,7 @@ impl JsonFile {
         options: JsonEncodeOptions,
     ) -> anyhow::Result<()> {
         let options = JsonEncodeOptions {
-            indent: self.indent.clone(),
+            indent: self.indent.borrow().clone(),
             ..options
         };
 

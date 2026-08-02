@@ -589,10 +589,12 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             all_repos_package
                                 .get_repository()
                                 .map(|r| r.get_repo_name())
+                                .transpose()?
                                 .unwrap_or_default(),
                             package
                                 .get_repository()
                                 .map(|r| r.get_repo_name())
+                                .transpose()?
                                 .unwrap_or_default(),
                         ),
                         code: 0,

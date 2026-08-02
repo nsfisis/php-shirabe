@@ -873,7 +873,7 @@ impl Installer {
                 {
                     let operation_pkg = operation.get_target_package();
                     if let Some(repo) = operation_pkg.get_repository() {
-                        source_repo = format!(" from {}", repo.get_repo_name());
+                        source_repo = format!(" from {}", repo.get_repo_name()?);
                     }
                 }
                 self.io

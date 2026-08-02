@@ -209,7 +209,7 @@ fn test_preserve_indentation_after_read() {
     let dst = fixture_path("tabs2.json");
     std::fs::copy(&src, &dst).unwrap();
 
-    let mut json_file = JsonFile::new(dst.to_str().unwrap().to_string(), None, None).unwrap();
+    let json_file = JsonFile::new(dst.to_str().unwrap().to_string(), None, None).unwrap();
     let _data = json_file.read().unwrap();
     let mut hash: IndexMap<String, PhpMixed> = IndexMap::new();
     hash.insert("foo".to_string(), PhpMixed::String("baz".to_string()));

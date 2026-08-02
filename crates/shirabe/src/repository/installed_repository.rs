@@ -367,8 +367,12 @@ impl InstalledRepository {
                 || repository.is::<RootPackageRepository>()
                 || repository.is::<PlatformRepository>(),
             "An InstalledRepository can not contain a repository of type {} ({})",
-            repository.get_repo_name(),
-            repository.get_repo_name()
+            repository
+                .get_repo_name()
+                .expect("getRepoName failed while reporting an invalid repository"),
+            repository
+                .get_repo_name()
+                .expect("getRepoName failed while reporting an invalid repository")
         );
 
         self.inner.add_repository(repository);
@@ -380,14 +384,14 @@ impl RepositoryInterface for InstalledRepository {
         self.inner.count()
     }
 
-    fn get_repo_name(&self) -> String {
+    fn get_repo_name(&self) -> anyhow::Result<String> {
         let names: Vec<String> = self
             .inner
             .get_repositories()
             .iter()
             .map(|repo| repo.get_repo_name())
-            .collect();
-        format!("installed repo ({})", names.join(", "))
+            .collect::<anyhow::Result<_>>()?;
+        Ok(format!("installed repo ({})", names.join(", ")))
     }
 
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {

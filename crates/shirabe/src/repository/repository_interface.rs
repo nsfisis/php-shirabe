@@ -94,7 +94,10 @@ pub trait RepositoryInterface: std::fmt::Debug {
         package_name: String,
     ) -> anyhow::Result<IndexMap<String, ProviderInfo>>;
 
-    fn get_repo_name(&self) -> String;
+    // PHP's getRepoName() can throw: ArrayRepository::getRepoName() counts through the
+    // late-bound $this->initialize(), which is fallible in subclasses that read files
+    // (FilesystemRepository, PackageRepository).
+    fn get_repo_name(&self) -> anyhow::Result<String>;
 
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         None

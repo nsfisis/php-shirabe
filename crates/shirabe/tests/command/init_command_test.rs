@@ -23,7 +23,7 @@ fn default_authors() -> serde_json::Value {
 /// `serde_json::Value` so the comparison ignores object key order (matching PHPUnit's `assertEquals`
 /// on arrays) while staying order-sensitive for lists.
 fn read_composer_json(dir: &std::path::Path) -> serde_json::Value {
-    let mut file = JsonFile::new(
+    let file = JsonFile::new(
         dir.join("composer.json").to_string_lossy().to_string(),
         None,
         None,

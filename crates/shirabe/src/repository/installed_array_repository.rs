@@ -28,8 +28,8 @@ impl InstalledArrayRepository {
         })
     }
 
-    pub fn get_repo_name(&self) -> String {
-        format!("installed {}", self.inner.get_repo_name())
+    pub fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok(format!("installed {}", self.inner.get_repo_name()?))
     }
 }
 
@@ -73,7 +73,7 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
         self.inner.set_dev_package_names(dev_package_names);
     }
 
-    fn get_dev_package_names(&self) -> &Vec<String> {
+    fn get_dev_package_names(&self) -> Vec<String> {
         self.inner.get_dev_package_names()
     }
 }
@@ -131,8 +131,8 @@ impl RepositoryInterface for InstalledArrayRepository {
     ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
-    fn get_repo_name(&self) -> String {
-        format!("installed {}", self.inner.get_repo_name())
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok(format!("installed {}", self.inner.get_repo_name()?))
     }
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         None

@@ -13,7 +13,9 @@ use shirabe_semver::constraint::AnyConstraint;
 #[derive(Debug)]
 pub struct WritableArrayRepository {
     inner: ArrayRepository,
-    pub(crate) dev_package_names: Vec<String>,
+    // RefCell so that FilesystemRepository::initialize can stay `&self` (late-bound
+    // initialization out of shared contexts such as getRepoName).
+    pub(crate) dev_package_names: std::cell::RefCell<Vec<String>>,
     dev_mode: Option<bool>,
 }
 
@@ -21,7 +23,7 @@ impl WritableArrayRepository {
     pub fn new(packages: Vec<crate::package::PackageInterfaceHandle>) -> anyhow::Result<Self> {
         Ok(Self {
             inner: ArrayRepository::new(packages)?,
-            dev_package_names: Vec::new(),
+            dev_package_names: std::cell::RefCell::new(Vec::new()),
             dev_mode: None,
         })
     }
@@ -36,12 +38,12 @@ impl WritableArrayRepository {
         self.inner.base_count()
     }
 
-    pub fn set_dev_package_names(&mut self, dev_package_names: Vec<String>) {
-        self.dev_package_names = dev_package_names;
+    pub fn set_dev_package_names(&self, dev_package_names: Vec<String>) {
+        *self.dev_package_names.borrow_mut() = dev_package_names;
     }
 
-    pub fn get_dev_package_names(&self) -> &Vec<String> {
-        &self.dev_package_names
+    pub fn get_dev_package_names(&self) -> Vec<String> {
+        self.dev_package_names.borrow().clone()
     }
 
     pub fn write(
@@ -66,7 +68,7 @@ impl WritableArrayRepository {
     }
 
     pub fn add_package(
-        &mut self,
+        &self,
         package: crate::package::PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         self.inner.add_package(package)
@@ -84,7 +86,7 @@ impl WritableArrayRepository {
         Ok(())
     }
 
-    pub fn initialize(&mut self) -> anyhow::Result<()> {
+    pub fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
         Ok(())
     }
@@ -123,8 +125,8 @@ impl WritableArrayRepository {
         self.inner.get_packages()
     }
 
-    pub fn get_repo_name(&self) -> String {
-        self.inner.get_repo_name()
+    pub fn get_repo_name(&self) -> anyhow::Result<String> {
+        RepositoryInterface::get_repo_name(&self.inner)
     }
 }
 
@@ -188,7 +190,7 @@ impl RepositoryInterface for WritableArrayRepository {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> String {
+    fn get_repo_name(&self) -> anyhow::Result<String> {
         self.inner.get_repo_name()
     }
 

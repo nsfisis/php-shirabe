@@ -69,13 +69,13 @@ impl RepositoryInterface for CompositeRepository {
         Ok(total)
     }
 
-    fn get_repo_name(&self) -> String {
+    fn get_repo_name(&self) -> anyhow::Result<String> {
         let names: Vec<String> = self
             .repositories
             .iter()
             .map(|r| r.get_repo_name())
-            .collect();
-        format!("composite repo ({})", names.join(", "))
+            .collect::<anyhow::Result<_>>()?;
+        Ok(format!("composite repo ({})", names.join(", ")))
     }
 
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {

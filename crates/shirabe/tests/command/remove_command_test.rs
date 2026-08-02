@@ -26,7 +26,7 @@ fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
 
 /// Read a JSON file in the CWD and decode it to a `serde_json::Value`.
 fn read_json_file(path: &str) -> serde_json::Value {
-    let mut json = JsonFile::new(path.to_string(), None, None).unwrap();
+    let json = JsonFile::new(path.to_string(), None, None).unwrap();
     let read = json.read().unwrap();
     serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap()
 }

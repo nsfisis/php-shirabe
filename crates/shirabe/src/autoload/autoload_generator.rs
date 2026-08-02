@@ -123,7 +123,7 @@ impl AutoloadGenerator {
             // we assume no-dev mode if no vendor dir is present or it is too old to contain dev information
             self.dev_mode = Some(false);
 
-            let mut installed_json = JsonFile::new(
+            let installed_json = JsonFile::new(
                 format!(
                     "{}/composer/installed.json",
                     config.get("vendor-dir").as_string().unwrap_or("")
@@ -608,7 +608,7 @@ impl AutoloadGenerator {
             platform_check_content = self.get_platform_check(
                 &package_map,
                 config.get("platform-check"),
-                dev_package_names,
+                &dev_package_names,
             );
             if platform_check_content.is_none() {
                 check_platform = false;

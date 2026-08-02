@@ -165,7 +165,7 @@ impl RepositoryCommand {
                 >,
             > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
             let config = crate::factory::Factory::create_config(None, None)?;
-            let mut config_file = JsonFile::new(
+            let config_file = JsonFile::new(
                 this.get_composer_config_file(input_handle, &config)?,
                 None,
                 None,

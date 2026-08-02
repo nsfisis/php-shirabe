@@ -100,14 +100,20 @@ impl PlatformRepository {
                 },
             );
         }
-        Ok(Self {
-            inner: ArrayRepository::new(packages)?,
+        // PHP: parent::__construct($packages) runs after the overrides are set, and the parent
+        // ctor's $this->addPackage() calls late-bind to PlatformRepository::addPackage.
+        let mut this = Self {
+            inner: ArrayRepository::new(vec![])?,
             version_parser: None,
             overrides: overrides_map,
             disabled_packages: IndexMap::new(),
             runtime,
             hhvm_detector,
-        })
+        };
+        for package in packages {
+            this.add_package(package)?;
+        }
+        Ok(this)
     }
 
     pub fn get_repo_name(&self) -> String {
@@ -1541,6 +1547,9 @@ impl PlatformRepository {
                 return Ok(());
             }
 
+            // PHP: $this->findPackage() reaches ArrayRepository::findPackage, whose
+            // getPackages() call late-binds to PlatformRepository::initialize.
+            self.ensure_initialized()?;
             let overrider = self.inner.find_package(
                 &name,
                 crate::repository::FindPackageConstraint::String("*".to_string()),
@@ -1583,7 +1592,9 @@ impl PlatformRepository {
             return Ok(());
         }
 
-        self.inner.add_package(package);
+        // PHP: parent::addPackage() calls the late-bound $this->initialize() before pushing.
+        self.ensure_initialized()?;
+        self.inner.add_package(package)?;
         Ok(())
     }
 
@@ -1611,6 +1622,8 @@ impl PlatformRepository {
         extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
         package.inner.set_extra(extra);
         let package = CompletePackageHandle::from_complete_package(package);
+        // PHP: parent::addPackage() calls the late-bound $this->initialize() before pushing.
+        self.ensure_initialized()?;
         self.inner.add_package(package.clone().into())?;
 
         if package.get_name() == "php" {
@@ -1934,8 +1947,8 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> String {
-        PlatformRepository::get_repo_name(self)
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok(PlatformRepository::get_repo_name(self))
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

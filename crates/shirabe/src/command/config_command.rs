@@ -1569,7 +1569,7 @@ impl ConfigCommand {
             let mut config = Factory::create_config(None, None)?;
 
             // load configuration
-            let mut config_file = JsonFile::new(
+            let config_file = JsonFile::new(
                 this.get_composer_config_file(input_handle.clone(), &config)?,
                 None,
                 None,
@@ -1581,7 +1581,7 @@ impl ConfigCommand {
             }
 
             // load auth-configuration
-            let mut auth_config_file = JsonFile::new(
+            let auth_config_file = JsonFile::new(
                 this.get_auth_config_file(input_handle.clone(), &config)?,
                 None,
                 None,

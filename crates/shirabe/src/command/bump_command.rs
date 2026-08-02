@@ -72,7 +72,7 @@ impl BumpCommand {
             return Ok(Self::ERROR_GENERIC);
         }
 
-        let mut composer_json = JsonFile::new(composer_json_path.clone(), None, None)?;
+        let composer_json = JsonFile::new(composer_json_path.clone(), None, None)?;
         let contents = match file_get_contents(composer_json.get_path()) {
             Some(c) => c,
             None => {

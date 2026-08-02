@@ -907,7 +907,7 @@ impl Problem {
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
             if !all_repos_packages.is_empty() {
-                return Ok(Self::compute_check_for_lower_prio_repo(
+                return Self::compute_check_for_lower_prio_repo(
                     pool,
                     is_verbose,
                     package_name,
@@ -915,7 +915,7 @@ impl Problem {
                     &all_repos_packages,
                     "minimum-stability",
                     constraint,
-                ));
+                );
             }
 
             return Ok((
@@ -950,7 +950,7 @@ impl Problem {
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
             if !all_repos_packages.is_empty() {
-                return Ok(Self::compute_check_for_lower_prio_repo(
+                return Self::compute_check_for_lower_prio_repo(
                     pool,
                     is_verbose,
                     package_name,
@@ -958,7 +958,7 @@ impl Problem {
                     &all_repos_packages,
                     "constraint",
                     constraint,
-                ));
+                );
             }
 
             let mut suffix = String::new();
@@ -1267,7 +1267,7 @@ impl Problem {
         all_repos_packages: &Vec<BasePackageHandle>,
         reason: &str,
         constraint: Option<&AnyConstraint>,
-    ) -> (String, String) {
+    ) -> anyhow::Result<(String, String)> {
         let mut next_repo_packages: Vec<BasePackageHandle> = Vec::new();
         let mut next_repo: Option<crate::repository::RepositoryInterfaceHandle> = None;
         for package in all_repos_packages {
@@ -1289,7 +1289,7 @@ impl Problem {
         if !higher_repo_packages.is_empty() {
             let top_package = higher_repo_packages.first().unwrap();
             if top_package.as_root().is_some() {
-                return (
+                return Ok((
                     format!(
                         "- Root composer.json requires {}{}, it is ",
                         package_name,
@@ -1304,11 +1304,11 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        next_repo.get_repo_name(),
+                        next_repo.get_repo_name()?,
                         top_package.get_pretty_name(),
                         top_package.get_pretty_version()
                     ),
-                );
+                ));
             }
         }
 
@@ -1339,7 +1339,7 @@ impl Problem {
                 }
             }
 
-            return (
+            return Ok((
                 format!(
                     "- Root composer.json requires {}{}, ",
                     package_name,
@@ -1359,10 +1359,10 @@ impl Problem {
                     if singular { "is" } else { "are" },
                     suggestion
                 ),
-            );
+            ));
         }
 
-        (
+        Ok((
             format!(
                 "- Root composer.json requires {}{}, it is ",
                 package_name,
@@ -1377,7 +1377,7 @@ impl Problem {
                     constraint,
                     false
                 ),
-                next_repo.get_repo_name(),
+                next_repo.get_repo_name()?,
                 Self::get_package_list(
                     higher_repo_packages,
                     is_verbose,
@@ -1389,10 +1389,11 @@ impl Problem {
                     .first()
                     .and_then(|p| p.get_repository())
                     .map(|r| r.get_repo_name())
+                    .transpose()?
                     .unwrap_or_default(),
                 reason
             ),
-        )
+        ))
     }
 
     /// Turns a constraint into text usable in a sentence describing a request

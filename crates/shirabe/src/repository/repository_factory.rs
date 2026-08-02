@@ -40,7 +40,7 @@ impl RepositoryFactory {
             .unwrap_or("");
 
         if extension == "json" {
-            let mut json = JsonFile::new(
+            let json = JsonFile::new(
                 repository.to_string(),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
                     Factory::create_http_downloader(io.clone(), config, IndexMap::new())?,

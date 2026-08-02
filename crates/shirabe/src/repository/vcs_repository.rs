@@ -1120,8 +1120,8 @@ impl RepositoryInterface for VcsRepository {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> String {
-        VcsRepository::get_repo_name(self)
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok(VcsRepository::get_repo_name(self))
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

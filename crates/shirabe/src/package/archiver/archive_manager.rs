@@ -182,7 +182,7 @@ impl ArchiveManager {
 
             let composer_json_path = format!("{}/composer.json", source_path);
             if file_exists(&composer_json_path) {
-                let mut json_file = JsonFile::new(composer_json_path, None, None)?;
+                let json_file = JsonFile::new(composer_json_path, None, None)?;
                 let json_data = json_file.read()?;
                 if let Some(archive) = json_data.get("archive") {
                     if let Some(name) = archive.get("name").and_then(|v| v.as_string())

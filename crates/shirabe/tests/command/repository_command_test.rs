@@ -7,7 +7,7 @@ use shirabe_php_shim::PhpMixed;
 
 /// Read the composer.json in the CWD and decode it.
 fn read_composer_json() -> serde_json::Value {
-    let mut json = JsonFile::new("./composer.json".to_string(), None, None).unwrap();
+    let json = JsonFile::new("./composer.json".to_string(), None, None).unwrap();
     let read = json.read().unwrap();
     serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap()
 }

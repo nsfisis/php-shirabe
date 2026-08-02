@@ -85,8 +85,8 @@ impl RepositoryInterface for RootPackageRepository {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> String {
-        RootPackageRepository::get_repo_name(self)
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok(RootPackageRepository::get_repo_name(self))
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -231,13 +231,13 @@ impl RepositoryInterface for ArrayRepository {
         Ok(self.base_count())
     }
 
-    fn get_repo_name(&self) -> String {
+    fn get_repo_name(&self) -> anyhow::Result<String> {
         let count = self.base_count();
-        format!(
+        Ok(format!(
             "array repo (defining {} package{})",
             count,
             if count > 1 { "s" } else { "" },
-        )
+        ))
     }
 
     fn load_packages(

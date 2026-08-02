@@ -83,13 +83,16 @@ impl PackageRepository {
         Ok(Ok(()))
     }
 
-    pub fn get_repo_name(&self) -> String {
+    pub fn get_repo_name(&self) -> anyhow::Result<String> {
         use crate::repository::RepositoryInterface;
-        Preg::replace(
+        // PHP: parent::getRepoName() counts through the late-bound $this->initialize(),
+        // which resolves to PackageRepository::initialize (loading the config packages).
+        self.ensure_initialized()?;
+        Ok(Preg::replace(
             php_regex!(r"{^array }"),
             "package ",
-            &self.inner.get_repo_name(),
-        )
+            &self.inner.get_repo_name()?,
+        ))
     }
 
     // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to load
@@ -175,7 +178,7 @@ impl RepositoryInterface for PackageRepository {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> String {
+    fn get_repo_name(&self) -> anyhow::Result<String> {
         PackageRepository::get_repo_name(self)
     }
 
@@ -235,7 +238,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                         message: format!(
                             "Advisory for {} could not be loaded as a full advisory from {}\n{}",
                             package_name,
-                            self.get_repo_name(),
+                            self.get_repo_name()?,
                             var_export(data, true)
                         ),
                         code: 0,

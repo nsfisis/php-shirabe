@@ -190,8 +190,8 @@ impl RepositoryInterface for MockAdvisoryRepository {
     ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         unimplemented!("not used by Auditor")
     }
-    fn get_repo_name(&self) -> String {
-        "mock advisory repo".to_string()
+    fn get_repo_name(&self) -> anyhow::Result<String> {
+        Ok("mock advisory repo".to_string())
     }
     fn as_advisory_provider_mut(&mut self) -> Option<&mut dyn AdvisoryProviderInterface> {
         Some(self)

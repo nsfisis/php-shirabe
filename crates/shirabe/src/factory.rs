@@ -261,7 +261,7 @@ impl Factory {
 
         // load global config
         let global_config_path = format!("{}/config.json", config.get_str("home")?);
-        let mut file = JsonFile::new(global_config_path, None, io.clone())?;
+        let file = JsonFile::new(global_config_path, None, io.clone())?;
         if file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
@@ -316,7 +316,7 @@ impl Factory {
 
         // load global auth file
         let auth_file_path = format!("{}/auth.json", config.get_str("home")?);
-        let mut auth_file = JsonFile::new(auth_file_path, None, io.clone())?;
+        let auth_file = JsonFile::new(auth_file_path, None, io.clone())?;
         if auth_file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
@@ -460,7 +460,7 @@ impl Factory {
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
 
-            let mut file = JsonFile::new(path.clone(), None, Some(io.clone()))?;
+            let file = JsonFile::new(path.clone(), None, Some(io.clone()))?;
 
             if !file.exists() {
                 let message = if path == "./composer.json" || path == "composer.json" {
@@ -535,7 +535,7 @@ impl Factory {
                 false,
             )));
 
-            let mut local_auth_file = JsonFile::new(
+            let local_auth_file = JsonFile::new(
                 format!(
                     "{}/auth.json",
                     dirname(&realpath(composer_file_path).unwrap_or_default())

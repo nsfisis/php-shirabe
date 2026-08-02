@@ -87,7 +87,7 @@ impl RepositoryInterfaceHandle {
         self.0.borrow_mut().count()
     }
 
-    pub fn get_repo_name(&self) -> String {
+    pub fn get_repo_name(&self) -> anyhow::Result<String> {
         self.0.borrow().get_repo_name()
     }
 
@@ -181,7 +181,7 @@ impl RepositoryInterfaceHandle {
         self.0
             .borrow()
             .as_installed_repository_interface()
-            .map(|r| r.get_dev_package_names().clone())
+            .map(|r| r.get_dev_package_names())
             .unwrap_or_default()
     }
 

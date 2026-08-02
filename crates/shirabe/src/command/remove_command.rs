@@ -285,7 +285,7 @@ impl Command for RemoveCommand {
 
         let file = Factory::get_composer_file()?;
 
-        let mut json_file = JsonFile::new(file.clone(), None, None)?;
+        let json_file = JsonFile::new(file.clone(), None, None)?;
         let composer_data = json_file.read()?;
         let composer_backup = std::fs::read_to_string(json_file.get_path())?;
 
