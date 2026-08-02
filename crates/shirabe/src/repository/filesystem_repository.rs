@@ -179,10 +179,18 @@ impl FilesystemRepository {
     }
 
     pub fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        // PHP: ArrayRepository::addPackage() calls the late-bound $this->initialize(), which must
+        // resolve to FilesystemRepository::initialize (reading the file). Without this guard the
+        // inner ArrayRepository would self-initialize to an empty array and the file would never
+        // be read (and a later write() would truncate it to just the added packages).
+        self.ensure_initialized()?;
         self.inner.add_package(package)
     }
 
     pub fn remove_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        // PHP: ArrayRepository::removePackage() iterates the late-bound $this->getPackages(),
+        // which initializes through FilesystemRepository::initialize first.
+        self.ensure_initialized()?;
         self.inner.remove_package(package)
     }
 
