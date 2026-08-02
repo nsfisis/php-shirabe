@@ -860,6 +860,12 @@ impl ComposerRepository {
             return Ok(results);
         }
 
+        // PHP's ArrayRepository::search() calls $this->getPackages(), which
+        // virtual-dispatches to ComposerRepository::initialize(); the guard restores that
+        // (same guard as in count()).
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
         let inner_results = self.inner.search(query, mode, None)?;
         let converted: Vec<IndexMap<String, PhpMixed>> = inner_results
             .into_iter()
@@ -1220,7 +1226,16 @@ impl ComposerRepository {
             }
         }
 
-        if self.inner.count()? > 0 {
+        // PHP checks the raw $this->packages property (`if ($this->packages)`); going through
+        // count() would run ArrayRepository::initialize() and freeze the initialization flag,
+        // so the root file would never be loaded afterwards.
+        if self
+            .inner
+            .packages
+            .borrow()
+            .as_ref()
+            .is_some_and(|p| !p.is_empty())
+        {
             for (k, v) in self.inner.get_providers(package_name.to_string())? {
                 let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(v.name));
@@ -3484,6 +3499,12 @@ impl RepositoryInterface for ComposerRepository {
             return Ok(None);
         }
 
+        // PHP's ArrayRepository::findPackage() calls $this->getPackages(), which
+        // virtual-dispatches to ComposerRepository::initialize(); the guard restores that
+        // (same guard as in count()).
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
         self.inner.find_package(
             &name,
             crate::repository::FindPackageConstraint::Constraint(constraint),
@@ -3554,6 +3575,12 @@ impl RepositoryInterface for ComposerRepository {
             return Ok(vec![]);
         }
 
+        // PHP's ArrayRepository::findPackages() calls $this->getPackages(), which
+        // virtual-dispatches to ComposerRepository::initialize(); the guard restores that
+        // (same guard as in count()).
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
         self.inner.find_packages(
             &name,
             constraint.map(crate::repository::FindPackageConstraint::Constraint),
