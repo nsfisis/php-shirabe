@@ -35,7 +35,7 @@ pub fn substr_count(haystack: &str, needle: &str) -> i64 {
 }
 
 // Byte-based, matching PHP's substr_replace.
-// TODO(phase-d): PHP accepts negative $start/$length (counting from the end); this signature takes
+// TODO(phase-c): PHP accepts negative $start/$length (counting from the end); this signature takes
 // usize and therefore cannot express those cases.
 pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) -> String {
     let bytes = string.as_bytes();
@@ -833,7 +833,7 @@ fn php_to_float(v: &PhpMixed) -> f64 {
 }
 
 pub fn html_entity_decode(_s: &str) -> String {
-    // TODO(phase-d): only numeric entities and the most common named entities (the HTML 4.01 markup
+    // TODO(phase-c): only numeric entities and the most common named entities (the HTML 4.01 markup
     // set PHP enables by default) are decoded; the full named-entity table is not ported.
     let chars: Vec<char> = _s.chars().collect();
     let mut out = String::with_capacity(_s.len());
@@ -1031,7 +1031,7 @@ pub fn php_strip_whitespace(path: &str) -> String {
 
 pub fn hexdec(_s: &str) -> i64 {
     // PHP hexdec() ignores characters outside [0-9A-Fa-f].
-    // TODO(phase-d): PHP promotes the result to float on overflow; this i64 return wraps instead.
+    // TODO(phase-c): PHP promotes the result to float on overflow; this i64 return wraps instead.
     let mut acc: u64 = 0;
     for &b in _s.as_bytes() {
         let d = match b {
@@ -1134,7 +1134,7 @@ pub fn uniqid(_prefix: &str, _more_entropy: bool) -> String {
         now.subsec_micros()
     );
     if _more_entropy {
-        // TODO(phase-d): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
+        // TODO(phase-c): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
         // not reproducible against PHP (it is non-deterministic in PHP too).
         format!("{}.{:.8}", base, fastrand::f64() * 10.0)
     } else {

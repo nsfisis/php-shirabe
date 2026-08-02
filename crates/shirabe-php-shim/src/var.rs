@@ -52,14 +52,14 @@ fn serialize_into(out: &mut String, value: &PhpMixed) {
             }
             out.push('}');
         }
-        // TODO(phase-d): object serialization needs the PHP class name and the property
+        // TODO(php-runtime): object serialization needs the PHP class name and the property
         // visibility name-mangling ("O:len:\"Class\":n:{...}"), which PhpMixed::Object does not
         // carry.
         PhpMixed::Object(_) => todo!(),
     }
 }
 
-// TODO(phase-d): PHP's serialize uses serialize_precision (-1 => shortest round-trip), which Rust's
+// TODO(phase-c): PHP's serialize uses serialize_precision (-1 => shortest round-trip), which Rust's
 // default float formatting also produces, but the two differ on scientific-notation spelling (PHP
 // "1.0E+20" vs Rust "1e20") for very large/small magnitudes.
 fn serialize_float(f: f64) -> String {
@@ -124,7 +124,7 @@ pub fn is_callable(value: &PhpMixed) -> bool {
     match value {
         // Scalars and null are never callable in PHP.
         PhpMixed::Null | PhpMixed::Bool(_) | PhpMixed::Int(_) | PhpMixed::Float(_) => false,
-        // TODO(phase-d): PHP is_callable() checks whether a string names an existing function, or an
+        // TODO(php-runtime): PHP is_callable() checks whether a string names an existing function, or an
         // array/object resolves to a method/__invoke. PhpMixed has no callable variant and the shim
         // has no function/method registry, so callability of these cannot be determined.
         _ => todo!(),
@@ -136,7 +136,7 @@ pub fn is_object(_value: &PhpMixed) -> bool {
 }
 
 pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> bool {
-    // TODO(phase-d): requires runtime class information (the object's class and its ancestry), which
+    // TODO(php-runtime): requires runtime class information (the object's class and its ancestry), which
     // PhpMixed::Object does not carry.
     todo!()
 }
@@ -151,7 +151,7 @@ pub fn is_null(_value: &PhpMixed) -> bool {
 
 pub fn is_iterable(value: &PhpMixed) -> bool {
     // PHP is_iterable() is true for arrays and Traversable objects.
-    // TODO(phase-d): PhpMixed::Object cannot report whether it implements Traversable, so an
+    // TODO(php-runtime): PhpMixed::Object cannot report whether it implements Traversable, so an
     // iterable object is conservatively treated as non-iterable here.
     matches!(value, PhpMixed::List(_) | PhpMixed::Array(_))
 }
@@ -188,7 +188,7 @@ pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
 /// Approximates PHP's `<=>` for two strings: if both are numeric strings, compare numerically
 /// (as PHP does), otherwise fall back to a byte-wise comparison.
 ///
-/// TODO: this only covers the string/string case of PHP's loose comparison. PHP's `<=>` has many
+/// TODO(phase-c): this only covers the string/string case of PHP's loose comparison. PHP's `<=>` has many
 /// more special-cased rules across other operand type combinations (bool, array, null, object,
 /// numeric-string-vs-non-numeric-string, ...). Extend this if a new caller needs those.
 pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {
@@ -207,24 +207,24 @@ pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 pub fn instance_of<T>(_value: &PhpMixed) -> bool {
-    // TODO(phase-d): PHP `instanceof` needs the runtime class of the value, which PhpMixed::Object
+    // TODO(php-runtime): PHP `instanceof` needs the runtime class of the value, which PhpMixed::Object
     // does not carry.
     todo!()
 }
 
 pub fn is_subclass_of(_object_or_class: &PhpMixed, _class_name: &str, _allow_string: bool) -> bool {
-    // TODO(phase-d): requires runtime class ancestry, which PhpMixed::Object does not carry.
+    // TODO(php-runtime): requires runtime class ancestry, which PhpMixed::Object does not carry.
     todo!()
 }
 
 pub fn get_class(_object: &PhpMixed) -> String {
-    // TODO(phase-d): PhpMixed::Object carries no class name; there is no runtime class to report.
+    // TODO(php-runtime): PhpMixed::Object carries no class name; there is no runtime class to report.
     todo!()
 }
 
 // Overload accepting an `anyhow::Error` (PHP's `get_class($e)` is commonly used on exceptions).
 pub fn get_class_err(_e: &anyhow::Error) -> String {
-    // TODO(phase-d): PHP returns the exception's class name. anyhow::Error carries the concrete
+    // TODO(phase-c): PHP returns the exception's class name. anyhow::Error carries the concrete
     // exception type, but mapping each ported exception struct to its PHP class name is not yet
     // wired up (cf. php_exception_get_code which downcasts case by case).
     todo!()
@@ -234,7 +234,7 @@ pub fn get_class_err(_e: &anyhow::Error) -> String {
 /// class name; in Rust we don't have a runtime class name, so this stub is left
 /// as `todo!()`.
 pub fn get_class_obj<T: ?Sized>(_object: &T) -> String {
-    // TODO(phase-d): PHP returns the object's class name; Rust has no runtime class name for an
+    // TODO(php-runtime): PHP returns the object's class name; Rust has no runtime class name for an
     // arbitrary `T` (the static type path is not the PHP class name).
     todo!()
 }
@@ -247,7 +247,7 @@ pub fn get_debug_type(value: &PhpMixed) -> String {
         PhpMixed::Float(_) => "float".to_string(),
         PhpMixed::String(_) => "string".to_string(),
         PhpMixed::List(_) | PhpMixed::Array(_) => "array".to_string(),
-        // TODO(phase-d): PHP returns the object's class name; PhpMixed::Object carries none.
+        // TODO(php-runtime): PHP returns the object's class name; PhpMixed::Object carries none.
         PhpMixed::Object(_) => todo!(),
     }
 }
@@ -259,7 +259,7 @@ pub fn get_debug_type_obj<T>(_value: &T) -> String {
 }
 
 pub fn instantiate_class(_class: &str, _args: Vec<PhpMixed>) -> PhpMixed {
-    // TODO(phase-d): instantiating a class by name needs a runtime class registry (reflection),
+    // TODO(php-runtime): instantiating a class by name needs a runtime class registry (reflection),
     // which the shim does not provide.
     todo!()
 }
@@ -274,7 +274,7 @@ pub fn php_to_string(value: &PhpMixed) -> String {
         PhpMixed::String(s) => s.clone(),
         // PHP renders any array as the literal string "Array".
         PhpMixed::List(_) | PhpMixed::Array(_) => "Array".to_string(),
-        // TODO(phase-d): PHP casts an object to string via its __toString() method; PhpMixed::Object
+        // TODO(php-runtime): PHP casts an object to string via its __toString() method; PhpMixed::Object
         // carries no class/method information to dispatch to.
         PhpMixed::Object(_) => todo!(),
     }
@@ -447,7 +447,7 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
             var_export_indent(out, level);
             out.push(')');
         }
-        // TODO(phase-d): PHP renders objects as "\Class::__set_state(array(...))"; PhpMixed::Object
+        // TODO(php-runtime): PHP renders objects as "\Class::__set_state(array(...))"; PhpMixed::Object
         // carries no class name.
         PhpMixed::Object(_) => todo!(),
     }

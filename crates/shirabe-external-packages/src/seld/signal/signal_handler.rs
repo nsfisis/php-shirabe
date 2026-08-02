@@ -3,7 +3,7 @@
 #[derive(Debug)]
 pub struct SignalHandler;
 
-// TODO(phase-d): disable signal handler at all for now.
+// TODO(phase-c): disable signal handler at all for now.
 impl SignalHandler {
     pub const SIGINT: &'static str = "SIGINT";
     pub const SIGTERM: &'static str = "SIGTERM";

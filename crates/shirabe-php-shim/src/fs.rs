@@ -765,7 +765,7 @@ pub fn chmod(_path: &str, _mode: u32) -> bool {
 pub fn fileperms(_path: &str) -> i64 {
     use std::os::unix::fs::MetadataExt;
     // PHP returns the full st_mode (file type bits included).
-    // TODO(phase-d): PHP returns false on error; this i64 signature reports 0 instead.
+    // TODO(phase-c): PHP returns false on error; this i64 signature reports 0 instead.
     std::fs::metadata(_path)
         .map(|m| m.mode() as i64)
         .unwrap_or(0)
@@ -852,7 +852,7 @@ pub fn file_put_contents(_path: &str, _data: &[u8]) -> Option<i64> {
 }
 
 pub fn file_put_contents3(_filename: &str, _data: &str, _flags: i64) -> Option<i64> {
-    // TODO(phase-d): the LOCK_EX and FILE_USE_INCLUDE_PATH flags are ignored; only FILE_APPEND is
+    // TODO(phase-c): the LOCK_EX and FILE_USE_INCLUDE_PATH flags are ignored; only FILE_APPEND is
     // honored.
     let append = _flags & FILE_APPEND != 0;
     let mut opts = std::fs::OpenOptions::new();
@@ -886,7 +886,7 @@ pub fn file_get_contents5(
     _offset: i64,
     _length: Option<i64>,
 ) -> Option<String> {
-    // TODO(phase-d): the stream $context and FILE_USE_INCLUDE_PATH are ignored; only $offset and
+    // TODO(phase-c): the stream $context and FILE_USE_INCLUDE_PATH are ignored; only $offset and
     // $length are applied (to the file read from the local filesystem).
     // PHP supports the file:// stream wrapper; strip it to read the local file.
     let path = _path.strip_prefix("file://").unwrap_or(_path);
@@ -1025,7 +1025,7 @@ pub fn sys_get_temp_dir() -> String {
 
 pub fn tempnam(_dir: &str, _prefix: &str) -> Option<String> {
     use std::os::unix::fs::PermissionsExt;
-    // TODO(phase-d): PHP falls back to the system temp dir when $dir is not writable; that fallback
+    // TODO(phase-c): PHP falls back to the system temp dir when $dir is not writable; that fallback
     // is not implemented here.
     for _ in 0..1000 {
         let name = format!("{}{:08x}", _prefix, fastrand::u32(..));
@@ -1048,7 +1048,7 @@ pub fn tempnam(_dir: &str, _prefix: &str) -> Option<String> {
 
 // A directory-handle resource. This is a distinct resource kind from the byte streams modeled by
 // PhpResource; readdir/closedir have no callers yet, so it only records the opened path.
-// TODO(phase-d): give it real readdir/closedir behavior (cursor over the entries) when needed.
+// TODO(phase-c): give it real readdir/closedir behavior (cursor over the entries) when needed.
 #[derive(Debug)]
 pub struct PhpDirHandle {
     pub path: std::path::PathBuf,

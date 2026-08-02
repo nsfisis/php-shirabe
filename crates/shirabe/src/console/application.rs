@@ -164,7 +164,7 @@ impl Application {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
-        // TODO(phase-d): Composer registers shutdown function that reports special message for
+        // TODO(php-runtime): Composer registers shutdown function that reports special message for
         // OOM. In Shirabe, limit of memory allocation has effect only on PHP side so that the
         // corresponding shutdown function should be registered in PHP runtime, not here.
         // if (!$shutdownRegistered) { ... }
@@ -1264,7 +1264,7 @@ impl Application {
             // PHP rewrites `@anonymous\0` markers via class_exists/get_parent_class/class_implements.
             // Rust error messages never carry PHP's anonymous-class marker and those reflection
             // primitives have no Rust equivalent, so the branch is unreachable here.
-            // TODO(review): port the @anonymous rewrite if it ever becomes relevant.
+            // TODO(phase-c): port the @anonymous rewrite if it ever becomes relevant.
 
             let width = if self.terminal.get_width() != 0 {
                 self.terminal.get_width() - 1
@@ -1290,7 +1290,7 @@ impl Application {
             if !throwable_is_exception_interface(e)
                 || output_interface::VERBOSITY_VERBOSE <= verbosity
             {
-                // TODO(review): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
+                // TODO(phase-c): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
                 // the 'n/a' fallback PHP itself uses when they are unavailable. The real source
                 // location cannot be reproduced (it would be a Rust path, not Composer's PHP path).
                 messages.push(format!(
@@ -2520,7 +2520,7 @@ impl ApplicationHandle {
                     if e.downcast_ref::<TransportException>().is_some() {
                         // PHP: ReflectionProperty $reflProp = new \ReflectionProperty($e, 'code');
                         //      $reflProp->setValue($e, Installer::ERROR_TRANSPORT_EXCEPTION);
-                        // TODO: reflection-based mutation of the existing exception is not portable;
+                        // TODO(phase-c): reflection-based mutation of the existing exception is not portable;
                         // we surface the rewritten code via a fresh TransportException at the call site.
                         let _ = Installer::ERROR_TRANSPORT_EXCEPTION;
                     }
@@ -2590,7 +2590,7 @@ impl ApplicationHandle {
             Some(output) => output,
         };
 
-        // TODO: PHP installs a temporary `set_exception_handler($renderException)` and cooperates
+        // TODO(php-runtime): PHP installs a temporary `set_exception_handler($renderException)` and cooperates
         // with Symfony's ErrorHandler to keep/restore it. PHP's process-global exception handler
         // stack has no Rust equivalent; the rendering itself is invoked directly in the catch
         // branch below. Review needed for the handler save/restore dance.
@@ -2636,7 +2636,7 @@ impl ApplicationHandle {
 
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
-                // TODO(review): anyhow::Error has no PHP-style getCode(); the exit code derived
+                // TODO(phase-c): anyhow::Error has no PHP-style getCode(); the exit code derived
                 // from the exception's `code` field needs the downcast strategy decided.
                 let exit_code = shirabe_php_shim::php_exception_get_code(&e);
                 if shirabe_php_shim::is_numeric_string(&exit_code.to_string()) {
@@ -2846,7 +2846,7 @@ impl ApplicationHandle {
 
         if !application.borrow().signals_to_dispatch_event.is_empty() {
             // $commandSignals = $command instanceof SignalableCommandInterface ? $command->getSubscribedSignals() : []
-            // TODO(review): SymfonyCommand is not a SignalableCommandInterface here; downcast needed.
+            // TODO(phase-c): SymfonyCommand is not a SignalableCommandInterface here; downcast needed.
             let command_signals: Vec<i64> = Vec::new();
             let _ = std::marker::PhantomData::<dyn SignalableCommandInterface>;
 
@@ -2860,7 +2860,7 @@ impl ApplicationHandle {
                 }
 
                 if Terminal::has_stty_available() {
-                    // TODO: registers SIGINT/SIGTERM handlers that restore the stty mode via
+                    // TODO(phase-c): registers SIGINT/SIGTERM handlers that restore the stty mode via
                     // shell_exec('stty ...'). pcntl signal handlers have no faithful Rust
                     // equivalent in Phase A.
                     let _stty_mode = shirabe_php_shim::shell_exec("stty -g");
@@ -3005,7 +3005,7 @@ fn throwable_get_code(e: &(dyn std::error::Error + 'static)) -> i64 {
 /// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
 /// is verbose. PHP returns the exception's fully-qualified class name; Rust has no runtime FQCN, so
 /// this maps the enumerable exception types to their PHP class names and falls back to `Exception`.
-/// TODO(review): the fully-qualified name (e.g. `Composer\...`) cannot be reproduced faithfully.
+/// TODO(phase-c): the fully-qualified name (e.g. `Composer\...`) cannot be reproduced faithfully.
 fn throwable_debug_type(e: &(dyn std::error::Error + 'static)) -> String {
     let name = if e
         .downcast_ref::<shirabe_php_shim::RuntimeException>()

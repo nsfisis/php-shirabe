@@ -61,7 +61,7 @@ impl CommandData {
     pub const DEFAULT_DESCRIPTION: Option<&'static str> = None;
 
     pub fn get_default_name() -> Option<String> {
-        // TODO(review): PHP uses ReflectionClass to read the #[AsCommand] attribute
+        // TODO(phase-c): PHP uses ReflectionClass to read the #[AsCommand] attribute
         // and ReflectionProperty to check that `$defaultName` is declared on the late-static
         // class itself (not inherited). Reflection-based late static binding cannot be
         // reproduced in Phase A; human review needed for the porting strategy.
@@ -69,7 +69,7 @@ impl CommandData {
     }
 
     pub fn get_default_description() -> Option<String> {
-        // TODO(review): same Reflection/late-static-binding concern as get_default_name().
+        // TODO(phase-c): same Reflection/late-static-binding concern as get_default_name().
         todo!()
     }
 
@@ -429,7 +429,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
         self.initialize(input.clone(), output.clone())?;
 
         if let Some(process_title) = self.get_process_title() {
-            // TODO: PHP probes for cli_set_process_title / setproctitle availability.
+            // TODO(phase-c): PHP probes for cli_set_process_title / setproctitle availability.
             if shirabe_php_shim::function_exists("cli_set_process_title") {
                 if !shirabe_php_shim::cli_set_process_title(&process_title) {
                     if shirabe_php_shim::PHP_OS == "Darwin" {
@@ -874,7 +874,7 @@ impl Command for CommandData {
         &self,
         code: Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>,
     ) {
-        // TODO: PHP rebinds an unbound Closure's $this to the command instance via
+        // TODO(php-runtime): PHP rebinds an unbound Closure's $this to the command instance via
         // ReflectionFunction/Closure::bind. Rust closures have no `$this` rebinding;
         // the closure is stored as-is.
         *self.code.borrow_mut() = Some(code);

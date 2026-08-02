@@ -597,7 +597,7 @@ pub fn php_regex_anchored(pattern: &str) -> bool {
 /// compiles to a per-call-site cached `&'static regex::Regex`, instead of going through the
 /// runtime `PATTERN_CACHE` lookup by string key. Expands to a `(&'static regex::Regex, bool)`
 /// tuple, ready to pass straight into any `preg_*` function.
-// TODO: `$php_pattern` is still translated from PHP delimiter/modifier syntax at runtime (on
+// TODO(phase-e): `$php_pattern` is still translated from PHP delimiter/modifier syntax at runtime (on
 // first use at each call site). Once call sites pass native `regex`-crate syntax directly, drop
 // this wrapper and call `regex_macro::regex!` directly.
 #[macro_export]

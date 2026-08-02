@@ -14,7 +14,7 @@ use crate::util::r#loop::Loop;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::php_regex;
 
-// TODO: change this information to Shirabe version.
+// TODO(phase-c): change this information to Shirabe version.
 pub const VERSION: &str = "2.9.7";
 pub const BRANCH_ALIAS_VERSION: &str = "";
 pub const RELEASE_DATE: &str = "2026-04-14 13:31:52";

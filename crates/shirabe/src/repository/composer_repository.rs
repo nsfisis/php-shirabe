@@ -982,7 +982,7 @@ impl ComposerRepository {
             // then does a single `$this->loop->wait($promises)`; mirror that here by polling all
             // downloads concurrently via FuturesOrdered (submission order preserved) before doing
             // any of the per-name response processing below.
-            // TODO(phase-c-promise): the fan-out below is structurally concurrent, but each
+            // TODO(phase-c): the fan-out below is structurally concurrent, but each
             // `start_cached_async_download` future still resolves through `HttpDownloader::add`'s
             // `curl_runtime()`/`sync_executor::block_on` bridge, so real I/O overlap does not happen
             // yet (see util/loop.rs::wait). That only changes once a single top-level Runtime
@@ -1770,7 +1770,7 @@ impl ComposerRepository {
         // does a single `$this->loop->wait($promises)`; mirror that here by polling all downloads
         // concurrently via FuturesOrdered (submission order preserved) before doing any of the
         // per-name response processing below.
-        // TODO(phase-c-promise): the fan-out below is structurally concurrent, but each
+        // TODO(phase-c): the fan-out below is structurally concurrent, but each
         // `start_cached_async_download` future still resolves through `HttpDownloader::add`'s
         // `curl_runtime()`/`sync_executor::block_on` bridge, so real I/O overlap does not happen yet
         // (see util/loop.rs::wait). That only changes once a single top-level Runtime replaces those

@@ -153,7 +153,7 @@ fn hex_digit_value(b: u8) -> Option<u8> {
 ///
 /// The allowed-tags parameter is omitted from this signature.
 /// State: 0 = text, 1 = inside a tag, 2 = inside an HTML comment, 3 = inside `<? ... ?>` / `<!`.
-/// TODO(phase-d): this omits allowed-tags handling and the tag-depth counter, so it can diverge
+/// TODO(phase-c): this omits allowed-tags handling and the tag-depth counter, so it can diverge
 /// from PHP on malformed markup (unterminated comments/quotes, nested `<`).
 pub fn strip_tags(_str: &str) -> String {
     let bytes = _str.as_bytes();

@@ -248,7 +248,7 @@ impl ZipArchive {
     }
 
     pub fn set_external_attributes_name(&self, _name: &str, _opsys: i64, _attr: i64) -> bool {
-        // TODO(phase-d): PHP's setExternalAttributesName mutates an already-added
+        // TODO(phase-c): PHP's setExternalAttributesName mutates an already-added
         // entry's external attributes (e.g. Unix permissions) after addFile. The
         // `zip` crate fixes external attributes at start_file time via FileOptions
         // and exposes no API to amend a written entry, so this cannot be faithfully

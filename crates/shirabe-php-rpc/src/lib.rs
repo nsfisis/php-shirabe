@@ -330,7 +330,7 @@ impl Worker {
     }
 }
 
-// TODO(phase-d): every failure here panics rather than propagating a `Result`; this is an interim
+// TODO(phase-c): every failure here panics rather than propagating a `Result`; this is an interim
 // step until PHP RPC gets proper error handling (see docs/dev/php-rpc.md).
 static WORKER: LazyLock<Mutex<Worker>> = LazyLock::new(|| {
     Mutex::new(

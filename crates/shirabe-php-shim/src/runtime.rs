@@ -44,7 +44,7 @@ pub const PHP_OS: &str = match std::env::consts::OS.as_bytes() {
 };
 
 pub fn constant(_name: &str) -> PhpMixed {
-    // TODO(phase-d): resolving a constant by name needs a runtime constant registry, which the shim
+    // TODO(php-runtime): resolving a constant by name needs a runtime constant registry, which the shim
     // does not provide (constants are ported as Rust `const`s, not looked up by string).
     todo!()
 }
@@ -186,7 +186,7 @@ pub fn ini_get(option: &str) -> Option<String> {
 
 pub fn get_loaded_extensions() -> Vec<String> {
     // Mirrors the set recognized by extension_loaded().
-    // TODO(phase-d): this models only the Composer-relevant subset, not PHP's full extension list
+    // TODO(php-runtime): this models only the Composer-relevant subset, not PHP's full extension list
     // (Core, standard, date, pcre, ...).
     [
         "Phar", "curl", "filter", "hash", "iconv", "intl", "mbstring", "openssl", "zip", "zlib",
@@ -200,7 +200,7 @@ pub fn phpversion(_extension: &str) -> Option<String> {
     if _extension.is_empty() {
         Some(PHP_VERSION.to_string())
     } else {
-        // TODO(phase-d): per-extension version strings are not modeled; PHP returns the extension's
+        // TODO(php-runtime): per-extension version strings are not modeled; PHP returns the extension's
         // own version, or false when the extension is not loaded.
         todo!()
     }
@@ -210,7 +210,7 @@ pub fn phpversion(_extension: &str) -> Option<String> {
 pub fn set_error_handler(_callback: fn(i64, &str, &str, i64) -> bool) {}
 
 pub fn debug_backtrace() -> Vec<IndexMap<String, PhpMixed>> {
-    // TODO(phase-d): capturing a PHP-style call stack requires runtime introspection of the
+    // TODO(php-runtime): capturing a PHP-style call stack requires runtime introspection of the
     // interpreter frames, which has no equivalent in the compiled shim.
     todo!()
 }
@@ -218,7 +218,7 @@ pub fn debug_backtrace() -> Vec<IndexMap<String, PhpMixed>> {
 /// Equivalent to PHP `include $file;`
 pub fn include_file(file: &str) -> PhpMixed {
     let _ = file;
-    // TODO(phase-d): `include` evaluates a PHP source file at runtime; there is no PHP interpreter.
+    // TODO(php-runtime): `include` evaluates a PHP source file at runtime; there is no PHP interpreter.
     todo!()
 }
 
@@ -228,7 +228,7 @@ pub fn spl_autoload_register(
     prepend: bool,
 ) -> bool {
     let _ = (callback, throw, prepend);
-    // TODO(phase-d): class autoloading has no analogue in compiled Rust (classes are not loaded by
+    // TODO(php-runtime): class autoloading has no analogue in compiled Rust (classes are not loaded by
     // name at runtime), so the callback is dropped. Returns success so callers that register an
     // autoloader during startup can proceed; this is not a faithful implementation.
     true
@@ -236,7 +236,7 @@ pub fn spl_autoload_register(
 
 pub fn spl_autoload_unregister(callback: Box<dyn Fn(&str) -> PhpMixed + Send + Sync>) -> bool {
     let _ = callback;
-    // TODO(phase-d): see spl_autoload_register; nothing is registered, so this is a no-op stub.
+    // TODO(php-runtime): see spl_autoload_register; nothing is registered, so this is a no-op stub.
     true
 }
 
@@ -268,7 +268,7 @@ pub fn version_compare(_v1: &str, _v2: &str, _op: &str) -> bool {
         ">=" | "ge" => c >= 0,
         "==" | "=" | "eq" => c == 0,
         "!=" | "<>" | "ne" => c != 0,
-        // TODO(phase-d): PHP returns null for an unknown operator; this bool signature reports false.
+        // TODO(phase-c): PHP returns null for an unknown operator; this bool signature reports false.
         _ => false,
     }
 }
@@ -284,7 +284,7 @@ pub fn restore_error_handler() {}
 pub fn spl_object_hash<T: ?Sized>(_object: &T) -> String {
     // PHP returns a unique 32-char hex id per object instance; the object's address serves as the
     // identity here.
-    // TODO(phase-d): as in PHP, an address can be reused after an object is freed, so uniqueness is
+    // TODO(phase-c): as in PHP, an address can be reused after an object is freed, so uniqueness is
     // not guaranteed across an object's whole lifetime without an object store.
     format!("{:032x}", _object as *const T as *const u8 as usize)
 }
@@ -320,13 +320,13 @@ pub fn php_uname(mode: &str) -> String {
 }
 
 pub fn trigger_error(_message: &str, _error_level: i64) {
-    // TODO(phase-d): emitting a PHP error obeys error_reporting and the installed error handler
+    // TODO(php-runtime): emitting a PHP error obeys error_reporting and the installed error handler
     // (both runtime state not modeled here); writing unconditionally to stderr would diverge.
     todo!()
 }
 
 pub fn trigger_deprecation(_package: &str, _version: &str, _message: &str, _arg: &str) {
-    // TODO(phase-d): symfony/deprecation-contracts triggers an E_USER_DEPRECATED via the error
+    // TODO(php-runtime): symfony/deprecation-contracts triggers an E_USER_DEPRECATED via the error
     // subsystem, which is not modeled (see trigger_error).
     todo!()
 }
@@ -337,34 +337,34 @@ pub fn usleep(_microseconds: u64) {
 
 /// Equivalent to PHP's __DIR__ magic constant
 pub fn php_dir() -> String {
-    // TODO(phase-d): __DIR__ is the directory of the source file at compile time; it must be supplied
+    // TODO(php-runtime): __DIR__ is the directory of the source file at compile time; it must be supplied
     // per call site (e.g. via a macro), not from a runtime shim function.
     todo!()
 }
 
 pub fn dir() -> String {
-    // TODO(phase-d): see php_dir; __DIR__ is a per-source-file compile-time value.
+    // TODO(php-runtime): see php_dir; __DIR__ is a per-source-file compile-time value.
     todo!()
 }
 
 /// Equivalent to PHP's `require <file>` returning the file's return value
 pub fn require_php_file(_filename: &str) -> PhpMixed {
-    // TODO(phase-d): `require` evaluates a PHP source file at runtime; there is no PHP interpreter.
+    // TODO(php-runtime): `require` evaluates a PHP source file at runtime; there is no PHP interpreter.
     todo!()
 }
 
 pub fn php_require(_file: &str) -> PhpMixed {
-    // TODO(phase-d): see require_php_file.
+    // TODO(php-runtime): see require_php_file.
     todo!()
 }
 
 pub fn memory_get_usage() -> i64 {
-    // TODO(phase-d): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
+    // TODO(phase-c): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
     0
 }
 
 pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
-    // TODO(phase-d): return PHP's actual emalloc-tracked peak memory usage instead of a stub 0.
+    // TODO(phase-c): return PHP's actual emalloc-tracked peak memory usage instead of a stub 0.
     0
 }
 
@@ -372,18 +372,18 @@ pub fn call_user_func<T>(_callback: &str, _args: &[PhpMixed]) -> T
 where
     T: From<PhpMixed>,
 {
-    // TODO(phase-d): invoking a function by name needs a runtime function registry; the shim has no
+    // TODO(php-runtime): invoking a function by name needs a runtime function registry; the shim has no
     // way to resolve a callable from a string.
     todo!()
 }
 
 pub fn call_user_func_array(_callback: &str, _args: &PhpMixed) -> PhpMixed {
-    // TODO(phase-d): see call_user_func.
+    // TODO(php-runtime): see call_user_func.
     todo!()
 }
 
 pub fn call_php_callable(_callback: &PhpMixed, _args: &[PhpMixed]) -> PhpMixed {
-    // TODO(phase-d): PhpMixed carries no callable variant; a runtime callable cannot be invoked.
+    // TODO(php-runtime): PhpMixed carries no callable variant; a runtime callable cannot be invoked.
     todo!()
 }
 
@@ -393,12 +393,12 @@ pub fn error_get_last() -> Option<IndexMap<String, PhpMixed>> {
 }
 
 pub fn globals_get(_name: &str) -> PhpMixed {
-    // TODO(phase-d): the PHP $GLOBALS superglobal is not modeled in the shim.
+    // TODO(php-runtime): the PHP $GLOBALS superglobal is not modeled in the shim.
     todo!()
 }
 
 pub fn globals_set(_name: &str, _value: PhpMixed) {
-    // TODO(phase-d): the PHP $GLOBALS superglobal is not modeled in the shim.
+    // TODO(php-runtime): the PHP $GLOBALS superglobal is not modeled in the shim.
     todo!()
 }
 
@@ -408,13 +408,13 @@ pub fn clone<T: Clone>(_value: T) -> T {
 }
 
 pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
-    // TODO(phase-d): ini_set must return the previous value and have its override observed by a
+    // TODO(php-runtime): ini_set must return the previous value and have its override observed by a
     // subsequent ini_get; ini_get is currently a static lookup, so overrides cannot be wired up yet.
     todo!()
 }
 
 pub fn composer_dev_warning_time() -> i64 {
-    // TODO(phase-d): COMPOSER_DEV_WARNING_TIME is a build-time constant baked into Composer's release
+    // TODO(phase-c): COMPOSER_DEV_WARNING_TIME is a build-time constant baked into Composer's release
     // artifact; it has no fixed value in source and must be provided by the build process.
     todo!()
 }
@@ -433,45 +433,45 @@ pub fn gc_enable() {
 }
 
 pub fn react_promise_resolve(_value: PhpMixed) -> PhpMixed {
-    // TODO(phase-d): depends on the react/promise port (shirabe_external_packages), which is not yet
+    // TODO(phase-c): depends on the react/promise port (shirabe_external_packages), which is not yet
     // available.
     todo!()
 }
 
 pub fn ioncube_loader_iversion() -> i64 {
-    // TODO(phase-d): the ionCube loader is not present (extension_loaded reports it absent), so this
+    // TODO(phase-c): the ionCube loader is not present (extension_loaded reports it absent), so this
     // function is never defined at runtime; left unimplemented.
     todo!()
 }
 
 pub fn ioncube_loader_version() -> String {
-    // TODO(phase-d): see ioncube_loader_iversion.
+    // TODO(phase-c): see ioncube_loader_iversion.
     todo!()
 }
 
 pub fn phpinfo(_what: i64) {
-    // TODO(phase-d): phpinfo() dumps the full PHP runtime configuration, which the shim does not
+    // TODO(php-runtime): phpinfo() dumps the full PHP runtime configuration, which the shim does not
     // model.
     todo!()
 }
 
 pub fn sapi_windows_vt100_support(_resource: &crate::PhpResource) -> bool {
-    // TODO(phase-d): Windows-only SAPI function; not defined on the non-Windows target this build
+    // TODO(phase-c): Windows-only SAPI function; not defined on the non-Windows target this build
     // models (function_exists reports it absent).
     todo!()
 }
 
 pub fn sapi_windows_cp_get(_kind: Option<&str>) -> i64 {
-    // TODO(phase-d): Windows-only SAPI function; see sapi_windows_vt100_support.
+    // TODO(phase-c): Windows-only SAPI function; see sapi_windows_vt100_support.
     todo!()
 }
 
 pub fn sapi_windows_cp_set(_codepage: i64) -> bool {
-    // TODO(phase-d): Windows-only SAPI function; see sapi_windows_vt100_support.
+    // TODO(phase-c): Windows-only SAPI function; see sapi_windows_vt100_support.
     todo!()
 }
 
 pub fn sapi_windows_cp_conv(_in_codepage: i64, _out_codepage: i64, _subject: &str) -> String {
-    // TODO(phase-d): Windows-only SAPI function; see sapi_windows_vt100_support.
+    // TODO(phase-c): Windows-only SAPI function; see sapi_windows_vt100_support.
     todo!()
 }

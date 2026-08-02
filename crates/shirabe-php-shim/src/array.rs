@@ -686,7 +686,7 @@ pub fn sort<T: Ord>(_array: &mut Vec<T>) {
 
 pub fn sort_with_flags<T: Ord>(array: &mut [T], flags: i64) {
     if flags != SORT_REGULAR {
-        // TODO(phase-d): flag-specific comparison (SORT_NUMERIC/SORT_STRING/
+        // TODO(phase-c): flag-specific comparison (SORT_NUMERIC/SORT_STRING/
         // SORT_NATURAL/SORT_FLAG_CASE) cannot be expressed for a generic
         // `T: Ord` element. No caller passes a non-regular flag yet.
         todo!("sort() with flags other than SORT_REGULAR");
@@ -714,7 +714,7 @@ pub fn ksort<V>(array: &mut IndexMap<String, V>) {
 
 // PHP's default SORT_REGULAR comparison for array keys: two integer-like keys
 // compare numerically, otherwise byte-wise as strings.
-// TODO(phase-d): full SORT_REGULAR semantics for mixed integer/non-numeric-string
+// TODO(phase-c): full SORT_REGULAR semantics for mixed integer/non-numeric-string
 // keys are not reproduced; every current caller uses homogeneous string keys.
 fn php_sort_regular_key(a: &str, b: &str) -> std::cmp::Ordering {
     if let (Ok(na), Ok(nb)) = (a.parse::<i64>(), b.parse::<i64>())

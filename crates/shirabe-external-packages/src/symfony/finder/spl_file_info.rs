@@ -78,7 +78,7 @@ impl SplFileInfo {
 
     pub fn get_size(&self) -> i64 {
         // \SplFileInfo::getSize() returns the file size in bytes (throws on failure).
-        // TODO(phase-d): PHP throws a \RuntimeException on stat failure; this returns 0 instead.
+        // TODO(phase-c): PHP throws a \RuntimeException on stat failure; this returns 0 instead.
         shirabe_php_shim::filesize(&self.pathname).unwrap_or(0)
     }
 }

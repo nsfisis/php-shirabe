@@ -34,7 +34,7 @@ impl UnicodeString {
         width
     }
 
-    // TODO(phase-d): the faithful `length()` uses `grapheme_strlen` (extended grapheme clusters),
+    // TODO(phase-c): the faithful `length()` uses `grapheme_strlen` (extended grapheme clusters),
     // which needs Unicode segmentation tables with no Rust std equivalent and no permitted crate.
     // Approximated with the code-point count, exact only when no combining/multi-code-point
     // clusters are present (e.g. ASCII).
@@ -42,7 +42,7 @@ impl UnicodeString {
         shirabe_php_shim::mb_strlen(&self.string, "UTF-8")
     }
 
-    // TODO(phase-d): the faithful `slice()` uses `grapheme_substr` (grapheme-cluster offsets), which
+    // TODO(phase-c): the faithful `slice()` uses `grapheme_substr` (grapheme-cluster offsets), which
     // needs Unicode segmentation tables with no std equivalent and no permitted crate. Approximated
     // with code-point offsets via `mb_substr`, exact only without combining/multi-code-point clusters.
     pub fn slice(&self, start: i64, length: Option<i64>) -> Self {

@@ -465,7 +465,7 @@ impl Table {
         }
 
         if self.rendered {
-            // TODO(phase-b): downcast output to ConsoleSectionOutput to call clear().
+            // TODO(phase-c): downcast output to ConsoleSectionOutput to call clear().
             let _ = ConsoleSectionOutput::clear;
             let row_count = self.calculate_row_count();
             let _ = row_count;
@@ -482,7 +482,7 @@ impl Table {
         // PHP indexes $this->rows by arbitrary key; sparse assignment over a positional Vec is not
         // modeled and has no callers.
         let _ = (column, row);
-        // TODO(phase-d): sparse `$this->rows[$column] = $row` over a positional row vector.
+        // TODO(phase-c): sparse `$this->rows[$column] = $row` over a positional row vector.
         todo!()
     }
 

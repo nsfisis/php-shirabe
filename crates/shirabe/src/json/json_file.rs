@@ -534,7 +534,7 @@ impl JsonFile {
     /// @throws ParsingException
     /// @return bool                      true on success
     pub(crate) fn validate_syntax(json: &str, file: Option<&str>) -> anyhow::Result<bool> {
-        // TODO(phase-d): make json_decode() returns an error object with details.
+        // TODO(phase-c): make json_decode() returns an error object with details.
         let error = match serde_json::from_str::<serde_json::Value>(json) {
             Ok(_) => {
                 // TODO(phase-c): Rust's &str is guaranteed as UTF-8, but PHP string is not. Change `json`

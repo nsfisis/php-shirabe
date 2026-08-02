@@ -76,9 +76,9 @@ impl CurlDownloader {
         //   - cookie_store(true)        ~ CURL_LOCK_DATA_COOKIE
         //   - redirect(none)            ~ CURLOPT_FOLLOWLOCATION = false (we follow manually)
         // The libcurl version-specific multiplexing / accept-encoding workarounds are not needed.
-        // TODO: a brand-new reqwest client is created per CurlDownloader; that is acceptable here
+        // TODO(phase-e): a brand-new reqwest client is created per CurlDownloader; that is acceptable here
         // (one HttpDownloader owns one CurlDownloader) but not pooled across them.
-        // TODO: cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
+        // TODO(phase-c): cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
         // (.cookie_store(true)); omitted as it is not required for package downloads.
         let client = reqwest::Client::builder()
             .pool_max_idle_per_host(8)
@@ -507,10 +507,10 @@ impl CurlDownloader {
             .and_then(|v| v.as_int())
             .map(|n| n as u64);
 
-        // TODO: per-request ssl (cafile/verify_peer/local_cert) and proxy settings are reqwest
+        // TODO(phase-c): per-request ssl (cafile/verify_peer/local_cert) and proxy settings are reqwest
         // Client-level, not request-level. They are not applied here yet; a ConnectionOptions-keyed
         // Client cache (as in the design sketch) is required to honor them.
-        // TODO: CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
+        // TODO(phase-c): CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
         let _ = attributes;
 
         let reqwest_method =

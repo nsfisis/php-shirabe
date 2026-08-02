@@ -255,7 +255,7 @@ impl OutputFormatterInterface for OutputFormatter {
 
         // PHP returns the shared style instance; ownership cannot be expressed without Clone on
         // the trait object.
-        // TODO(human-review): returning a shared style here needs an Rc/Clone strategy in Phase C.
+        // TODO(phase-c): returning a shared style here needs an Rc/Clone strategy in Phase C.
         let _ = &self.styles[&shirabe_php_shim::strtolower(name)];
         todo!()
     }

@@ -496,7 +496,6 @@ impl AuthHelper {
                     username,
                 )));
             } else if password == "custom-headers" {
-                // TODO:
                 // Handle custom HTTP headers from auth.json
                 #[allow(unused_assignments)]
                 let mut custom_headers: PhpMixed = PhpMixed::Null;

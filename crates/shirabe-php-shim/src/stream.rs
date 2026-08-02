@@ -14,7 +14,7 @@ pub fn stream_get_contents(stream: &PhpResource) -> Option<String> {
 }
 
 pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
-    // TODO(phase-d): resolution searches the `include_path` ini setting, which the shim does not
+    // TODO(phase-c): resolution searches the `include_path` ini setting, which the shim does not
     // model; checking only the current directory would silently miss configured include paths.
     let _ = filename;
     todo!()
