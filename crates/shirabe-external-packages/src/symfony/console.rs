@@ -15,6 +15,7 @@ pub mod question;
 pub mod signal_registry;
 pub mod style;
 pub mod terminal;
+pub mod tester;
 
 pub use application::*;
 pub use attribute::*;
