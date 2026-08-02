@@ -15,8 +15,8 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, php_regex,
-    strtolower,
+    InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, impl_php_class, parse_url,
+    php_regex, strtolower,
 };
 
 #[derive(Debug)]
@@ -27,6 +27,8 @@ pub struct RepositoryCommand {
     config_file: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
     config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 }
+
+impl_php_class!(RepositoryCommand, r"Composer\Command\RepositoryCommand");
 
 impl Default for RepositoryCommand {
     fn default() -> Self {
@@ -588,10 +590,7 @@ impl Command for RepositoryCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\RepositoryCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RepositoryCommand {

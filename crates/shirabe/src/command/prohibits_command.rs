@@ -17,6 +17,8 @@ pub struct ProhibitsCommand {
     colors: std::cell::RefCell<Vec<String>>,
 }
 
+shirabe_php_shim::impl_php_class!(ProhibitsCommand, r"Composer\Command\ProhibitsCommand");
+
 impl Default for ProhibitsCommand {
     fn default() -> Self {
         Self::new()
@@ -129,10 +131,7 @@ impl Command for ProhibitsCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\ProhibitsCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ProhibitsCommand {

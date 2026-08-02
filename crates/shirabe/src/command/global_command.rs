@@ -19,13 +19,15 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{LogicException, RuntimeException, chdir, php_regex};
+use shirabe_php_shim::{LogicException, RuntimeException, chdir, impl_php_class, php_regex};
 use std::path::Path;
 
 #[derive(Debug)]
 pub struct GlobalCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(GlobalCommand, r"Composer\Command\GlobalCommand");
 
 impl Default for GlobalCommand {
     fn default() -> Self {
@@ -268,10 +270,7 @@ impl Command for GlobalCommand {
         base_command_initialize(self, input, output)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\GlobalCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for GlobalCommand {

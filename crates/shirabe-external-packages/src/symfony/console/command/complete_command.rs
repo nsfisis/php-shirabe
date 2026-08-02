@@ -11,7 +11,7 @@ use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 use std::ops::{Deref, DerefMut};
 
 /// Responsible for providing the values to the shell completion.
@@ -21,6 +21,11 @@ pub struct CompleteCommand {
     completion_outputs: IndexMap<String, PhpMixed>,
     is_debug: std::cell::Cell<bool>,
 }
+
+impl_php_class!(
+    CompleteCommand,
+    r"Symfony\Component\Console\Command\CompleteCommand"
+);
 
 impl Deref for CompleteCommand {
     type Target = CommandData;
@@ -145,7 +150,7 @@ impl CompleteCommand {
 
 fn get_class_of_command(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
     // LazyCommand is intentionally not ported.
-    command.borrow().get_class()
+    command.borrow().php_class_name().to_string()
 }
 
 fn get_definition_options(
@@ -414,8 +419,5 @@ impl Command for CompleteCommand {
         }
     }
 
-    crate::delegate_command_trait_impls_to_inner!(
-        inner,
-        "Symfony\\Component\\Console\\Command\\CompleteCommand"
-    );
+    crate::delegate_command_trait_impls_to_inner!(inner);
 }

@@ -11,12 +11,14 @@ use crate::io::IOInterfaceImmutable;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::realpath;
+use shirabe_php_shim::{impl_php_class, realpath};
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(ClearCacheCommand, r"Composer\Command\ClearCacheCommand");
 
 impl Default for ClearCacheCommand {
     fn default() -> Self {
@@ -192,10 +194,7 @@ impl Command for ClearCacheCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\ClearCacheCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ClearCacheCommand {

@@ -27,8 +27,8 @@ use shirabe_external_packages::symfony::console::helper::TableSeparator;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
-    count, explode, in_array, is_string,
+    InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
+    UnexpectedValueException, count, explode, in_array, is_string,
 };
 
 pub const SUCCESS: i64 = 0;
@@ -280,11 +280,13 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
 
 impl Command for BaseCommandData {
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(inner);
+}
 
-    fn get_class(&self) -> String {
-        // Forwards to the base state's panicking get_class; concrete commands supply their
-        // FQCN through delegate_command_trait_impls_to_inner!'s two-argument variant.
-        self.inner.get_class()
+impl PhpClass for BaseCommandData {
+    fn php_class_name(&self) -> &'static str {
+        // Forwards to the base state's panicking implementation; concrete commands supply
+        // their own class name through `impl_php_class!`.
+        self.inner.php_class_name()
     }
 }
 

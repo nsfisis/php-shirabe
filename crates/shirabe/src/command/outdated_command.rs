@@ -12,12 +12,14 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 
 #[derive(Debug)]
 pub struct OutdatedCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(OutdatedCommand, r"Composer\Command\OutdatedCommand");
 
 impl Default for OutdatedCommand {
     fn default() -> Self {
@@ -239,10 +241,7 @@ impl Command for OutdatedCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\OutdatedCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for OutdatedCommand {

@@ -44,8 +44,8 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, date, date_format_to_strftime, extension_loaded, in_array, php_regex, realpath,
-    strtolower, version_compare,
+    array_search, date, date_format_to_strftime, extension_loaded, impl_php_class, in_array,
+    php_regex, realpath, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -59,6 +59,8 @@ pub struct ShowCommand {
     pub(crate) colors: std::cell::RefCell<Vec<String>>,
     repository_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
+
+impl_php_class!(ShowCommand, r"Composer\Command\ShowCommand");
 
 impl Default for ShowCommand {
     fn default() -> Self {
@@ -1451,10 +1453,7 @@ impl Command for ShowCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\ShowCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ShowCommand {

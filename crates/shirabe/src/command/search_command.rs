@@ -18,12 +18,16 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote, substr};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array, preg_quote, substr,
+};
 
 #[derive(Debug)]
 pub struct SearchCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(SearchCommand, r"Composer\Command\SearchCommand");
 
 impl Default for SearchCommand {
     fn default() -> Self {
@@ -311,10 +315,7 @@ impl Command for SearchCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\SearchCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for SearchCommand {

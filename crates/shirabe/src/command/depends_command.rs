@@ -18,6 +18,8 @@ pub struct DependsCommand {
     colors: std::cell::RefCell<Vec<String>>,
 }
 
+shirabe_php_shim::impl_php_class!(DependsCommand, r"Composer\Command\DependsCommand");
+
 impl Default for DependsCommand {
     fn default() -> Self {
         Self::new()
@@ -122,10 +124,7 @@ impl Command for DependsCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\DependsCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for DependsCommand {

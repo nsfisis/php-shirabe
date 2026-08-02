@@ -39,7 +39,7 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
     array_merge, array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
-    implode, is_writable, strtolower, unlink,
+    impl_php_class, implode, is_writable, strtolower, unlink,
 };
 
 #[derive(Debug)]
@@ -60,6 +60,8 @@ pub struct RequireCommand {
     repository_sets:
         std::cell::RefCell<IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
+
+impl_php_class!(RequireCommand, r"Composer\Command\RequireCommand");
 
 impl Default for RequireCommand {
     fn default() -> Self {
@@ -659,10 +661,7 @@ impl Command for RequireCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\RequireCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RequireCommand {

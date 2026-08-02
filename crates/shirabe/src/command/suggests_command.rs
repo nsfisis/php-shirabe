@@ -15,12 +15,14 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, empty, in_array};
+use shirabe_php_shim::{PhpMixed, empty, impl_php_class, in_array};
 
 #[derive(Debug)]
 pub struct SuggestsCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(SuggestsCommand, r"Composer\Command\SuggestsCommand");
 
 impl Default for SuggestsCommand {
     fn default() -> Self {
@@ -228,10 +230,7 @@ impl Command for SuggestsCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\SuggestsCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for SuggestsCommand {

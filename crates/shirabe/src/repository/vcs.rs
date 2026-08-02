@@ -26,7 +26,7 @@ use crate::config::Config;
 use crate::io::IOInterface;
 use crate::util::{HttpDownloader, ProcessExecutor};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpClass, PhpMixed};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VcsDriverKind {
@@ -136,19 +136,21 @@ impl VcsDriverKind {
             VcsDriverKind::Svn => SvnDriver::supports(io, config, url, deep),
         }
     }
+}
 
-    /// PHP fully-qualified `class-string`, used as the fallback driver name in `getRepoName()`.
-    pub fn php_class_name(self) -> &'static str {
+impl PhpClass for VcsDriverKind {
+    /// Used as the fallback driver name in `getRepoName()`.
+    fn php_class_name(&self) -> &'static str {
         match self {
-            VcsDriverKind::GitHub => "Composer\\Repository\\Vcs\\GitHubDriver",
-            VcsDriverKind::GitLab => "Composer\\Repository\\Vcs\\GitLabDriver",
-            VcsDriverKind::GitBitbucket => "Composer\\Repository\\Vcs\\GitBitbucketDriver",
-            VcsDriverKind::Forgejo => "Composer\\Repository\\Vcs\\ForgejoDriver",
-            VcsDriverKind::Git => "Composer\\Repository\\Vcs\\GitDriver",
-            VcsDriverKind::Hg => "Composer\\Repository\\Vcs\\HgDriver",
-            VcsDriverKind::Perforce => "Composer\\Repository\\Vcs\\PerforceDriver",
-            VcsDriverKind::Fossil => "Composer\\Repository\\Vcs\\FossilDriver",
-            VcsDriverKind::Svn => "Composer\\Repository\\Vcs\\SvnDriver",
+            VcsDriverKind::GitHub => r"Composer\Repository\Vcs\GitHubDriver",
+            VcsDriverKind::GitLab => r"Composer\Repository\Vcs\GitLabDriver",
+            VcsDriverKind::GitBitbucket => r"Composer\Repository\Vcs\GitBitbucketDriver",
+            VcsDriverKind::Forgejo => r"Composer\Repository\Vcs\ForgejoDriver",
+            VcsDriverKind::Git => r"Composer\Repository\Vcs\GitDriver",
+            VcsDriverKind::Hg => r"Composer\Repository\Vcs\HgDriver",
+            VcsDriverKind::Perforce => r"Composer\Repository\Vcs\PerforceDriver",
+            VcsDriverKind::Fossil => r"Composer\Repository\Vcs\FossilDriver",
+            VcsDriverKind::Svn => r"Composer\Repository\Vcs\SvnDriver",
         }
     }
 }

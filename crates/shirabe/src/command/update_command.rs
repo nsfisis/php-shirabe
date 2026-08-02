@@ -34,7 +34,8 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, in_array, php_regex, strtolower,
+    array_keys, array_merge_map, array_search_in_vec, impl_php_class, in_array, php_regex,
+    strtolower,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
@@ -43,6 +44,8 @@ use shirabe_semver::constraint::MultiConstraint;
 pub struct UpdateCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(UpdateCommand, r"Composer\Command\UpdateCommand");
 
 impl Default for UpdateCommand {
     fn default() -> Self {
@@ -587,10 +590,7 @@ impl Command for UpdateCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\UpdateCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for UpdateCommand {

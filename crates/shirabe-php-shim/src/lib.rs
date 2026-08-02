@@ -284,6 +284,33 @@ impl<T: std::any::Any> AsAny for T {
     }
 }
 
+/// A ported type that reports the name of the PHP class it was ported from.
+///
+/// Rust has no runtime class name, so the PHP class name is stated once at the type's
+/// definition through [`impl_php_class!`]. Implement this wherever the port needs what PHP's
+/// `\get_class()` would report.
+pub trait PhpClass {
+    /// The fully-qualified class name, e.g. `Composer\Command\InstallCommand`.
+    fn php_class_name(&self) -> &'static str;
+}
+
+/// Implements [`PhpClass`] for a ported type, given the fully-qualified name of the PHP
+/// class it was ported from.
+///
+/// ```ignore
+/// impl_php_class!(InstallCommand, r"Composer\Command\InstallCommand");
+/// ```
+#[macro_export]
+macro_rules! impl_php_class {
+    ($ty:ty, $class_name:literal) => {
+        impl $crate::PhpClass for $ty {
+            fn php_class_name(&self) -> &'static str {
+                $class_name
+            }
+        }
+    };
+}
+
 impl From<i64> for PhpMixed {
     fn from(value: i64) -> Self {
         PhpMixed::Int(value)

@@ -13,7 +13,7 @@ use crate::symfony::console::input::input_definition::DefinitionItem;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 use std::ops::{Deref, DerefMut};
 
 /// HelpCommand displays the help for a given command.
@@ -22,6 +22,11 @@ pub struct HelpCommand {
     inner: CommandData,
     command: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 }
+
+impl_php_class!(
+    HelpCommand,
+    r"Symfony\Component\Console\Command\HelpCommand"
+);
 
 impl Deref for HelpCommand {
     type Target = CommandData;
@@ -164,8 +169,5 @@ impl Command for HelpCommand {
         Ok(())
     }
 
-    crate::delegate_command_trait_impls_to_inner!(
-        inner,
-        "Symfony\\Component\\Console\\Command\\HelpCommand"
-    );
+    crate::delegate_command_trait_impls_to_inner!(inner);
 }

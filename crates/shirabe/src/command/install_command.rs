@@ -16,12 +16,14 @@ use crate::util::HttpDownloader;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 
 #[derive(Debug)]
 pub struct InstallCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(InstallCommand, r"Composer\Command\InstallCommand");
 
 impl Default for InstallCommand {
     fn default() -> Self {
@@ -278,10 +280,7 @@ impl Command for InstallCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\InstallCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for InstallCommand {

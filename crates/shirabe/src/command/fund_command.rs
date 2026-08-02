@@ -15,7 +15,7 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 
@@ -23,6 +23,8 @@ use shirabe_semver::constraint::MatchAllConstraint;
 pub struct FundCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(FundCommand, r"Composer\Command\FundCommand");
 
 impl Default for FundCommand {
     fn default() -> Self {
@@ -233,10 +235,7 @@ impl Command for FundCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\FundCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for FundCommand {

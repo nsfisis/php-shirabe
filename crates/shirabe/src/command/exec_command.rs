@@ -10,12 +10,14 @@ use crate::io::IOInterfaceImmutable;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob};
+use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class};
 
 #[derive(Debug)]
 pub struct ExecCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(ExecCommand, r"Composer\Command\ExecCommand");
 
 impl Default for ExecCommand {
     fn default() -> Self {
@@ -261,10 +263,7 @@ impl Command for ExecCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\ExecCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ExecCommand {

@@ -325,13 +325,6 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn ignore_validation_errors(&self));
         $crate::delegate_to_inner!($field, fn get_ignore_validation_errors(&self) -> bool);
     };
-    // Variant taking the command's PHP fully-qualified class name (see `Command::get_class`).
-    ($field:ident, $fqcn:literal) => {
-        $crate::delegate_command_trait_impls_to_inner!($field);
-        fn get_class(&self) -> String {
-            $fqcn.to_string()
-        }
-    };
 }
 
 /// Polymorphic interface for all commands (PHP's `Command` base class as seen by
@@ -341,7 +334,7 @@ macro_rules! delegate_command_trait_impls_to_inner {
 /// the state methods there and override the behavior hooks (`configure`/`execute`/...).
 /// Object-safe so `dyn Command` works. All methods take `&self`; the command's mutable
 /// state is interior-mutable (see [`CommandData`]).
-pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
+pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim::PhpClass {
     /// Configures the current command.
     fn configure(&self) -> anyhow::Result<()> {
         Ok(())
@@ -375,12 +368,6 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     ) -> anyhow::Result<()> {
         Ok(())
     }
-
-    /// The PHP fully-qualified class name of the concrete command. Port hook for PHP's
-    /// `\get_class($command)` (used by `CompleteCommand`'s debug log), which Rust cannot
-    /// reflect from a trait object; every concrete command supplies its FQCN, usually via
-    /// `delegate_command_trait_impls_to_inner!($field, "Fqcn")`.
-    fn get_class(&self) -> String;
 
     /// Adds suggestions to `suggestions` for the current completion input.
     ///
@@ -571,13 +558,17 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
     fn get_ignore_validation_errors(&self) -> bool;
 }
 
+impl shirabe_php_shim::PhpClass for CommandData {
+    fn php_class_name(&self) -> &'static str {
+        panic!(
+            "php_class_name called on the base command state; concrete commands supply their class name"
+        );
+    }
+}
+
 impl Command for CommandData {
     fn is_enabled(&self) -> bool {
         true
-    }
-
-    fn get_class(&self) -> String {
-        panic!("get_class called on the base command state; concrete commands supply their FQCN");
     }
 
     fn set_application(

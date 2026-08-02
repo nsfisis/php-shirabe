@@ -30,7 +30,7 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{LogicException, get_debug_type, php_regex};
+use shirabe_php_shim::{LogicException, get_debug_type, impl_php_class, php_regex};
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
@@ -38,6 +38,8 @@ pub struct ArchiveCommand {
     /// For testing only: partial-mock seam mirroring PHPUnit `onlyMethods(['initialize', 'archive'])`.
     test_hooks: std::cell::RefCell<ArchiveCommandTestHooks>,
 }
+
+impl_php_class!(ArchiveCommand, r"Composer\Command\ArchiveCommand");
 
 /// For testing only: records and stubs for the `ArchiveCommand` partial-mock seam.
 #[derive(Debug, Default)]
@@ -223,10 +225,7 @@ impl Command for ArchiveCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\ArchiveCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl ArchiveCommand {

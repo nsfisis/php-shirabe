@@ -28,8 +28,9 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
-    file_exists, file_get_contents, file_put_contents, get_current_user, implode, is_dir,
-    is_string, php_regex, preg_quote, realpath, str_replace, strpos, strtolower, trim, ucwords,
+    file_exists, file_get_contents, file_put_contents, get_current_user, impl_php_class, implode,
+    is_dir, is_string, php_regex, preg_quote, realpath, str_replace, strpos, strtolower, trim,
+    ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 
@@ -44,6 +45,8 @@ pub struct InitCommand {
         IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
     >,
 }
+
+impl_php_class!(InitCommand, r"Composer\Command\InitCommand");
 
 impl PackageDiscoveryTrait for InitCommand {
     fn get_repos_mut(
@@ -908,10 +911,7 @@ impl Command for InitCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\InitCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for InitCommand {

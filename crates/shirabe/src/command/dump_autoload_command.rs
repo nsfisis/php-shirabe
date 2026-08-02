@@ -10,12 +10,14 @@ use crate::plugin::PluginEvents;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists, impl_php_class};
 
 #[derive(Debug)]
 pub struct DumpAutoloadCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(DumpAutoloadCommand, r"Composer\Command\DumpAutoloadCommand");
 
 impl Default for DumpAutoloadCommand {
     fn default() -> Self {
@@ -325,10 +327,7 @@ impl Command for DumpAutoloadCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\DumpAutoloadCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for DumpAutoloadCommand {

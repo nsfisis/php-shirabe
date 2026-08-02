@@ -13,7 +13,7 @@ use crate::symfony::console::input::input_definition::DefinitionItem;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 use std::ops::{Deref, DerefMut};
 
 /// ListCommand displays the list of all available commands for the application.
@@ -21,6 +21,11 @@ use std::ops::{Deref, DerefMut};
 pub struct ListCommand {
     inner: CommandData,
 }
+
+impl_php_class!(
+    ListCommand,
+    r"Symfony\Component\Console\Command\ListCommand"
+);
 
 impl Deref for ListCommand {
     type Target = CommandData;
@@ -165,8 +170,5 @@ impl Command for ListCommand {
         Ok(())
     }
 
-    crate::delegate_command_trait_impls_to_inner!(
-        inner,
-        "Symfony\\Component\\Console\\Command\\ListCommand"
-    );
+    crate::delegate_command_trait_impls_to_inner!(inner);
 }

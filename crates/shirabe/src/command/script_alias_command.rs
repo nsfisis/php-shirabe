@@ -10,7 +10,9 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string, php_regex};
+use shirabe_php_shim::{
+    InvalidArgumentException, LogicException, PhpMixed, impl_php_class, is_string, php_regex,
+};
 
 #[derive(Debug)]
 pub struct ScriptAliasCommand {
@@ -20,6 +22,8 @@ pub struct ScriptAliasCommand {
     description: String,
     aliases: Vec<String>,
 }
+
+impl_php_class!(ScriptAliasCommand, r"Composer\Command\ScriptAliasCommand");
 
 impl ScriptAliasCommand {
     pub fn new(
@@ -176,10 +180,7 @@ impl Command for ScriptAliasCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\ScriptAliasCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ScriptAliasCommand {

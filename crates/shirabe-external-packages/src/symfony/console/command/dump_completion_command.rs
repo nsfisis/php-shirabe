@@ -10,7 +10,7 @@ use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
 use crate::symfony::process::process::Process;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 use std::ops::{Deref, DerefMut};
 
 /// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
@@ -22,6 +22,11 @@ const COMPLETION_BASH: &str = include_str!("../Resources/completion.bash");
 pub struct DumpCompletionCommand {
     inner: CommandData,
 }
+
+impl_php_class!(
+    DumpCompletionCommand,
+    r"Symfony\Component\Console\Command\DumpCompletionCommand"
+);
 
 impl Deref for DumpCompletionCommand {
     type Target = CommandData;
@@ -288,8 +293,5 @@ impl Command for DumpCompletionCommand {
         self.complete_impl(input, suggestions)
     }
 
-    crate::delegate_command_trait_impls_to_inner!(
-        inner,
-        "Symfony\\Component\\Console\\Command\\DumpCompletionCommand"
-    );
+    crate::delegate_command_trait_impls_to_inner!(inner);
 }

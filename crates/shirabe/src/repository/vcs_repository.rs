@@ -29,7 +29,7 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, in_array, php_regex, str_replace, strpos,
+    InvalidArgumentException, PhpClass, PhpMixed, in_array, php_regex, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 

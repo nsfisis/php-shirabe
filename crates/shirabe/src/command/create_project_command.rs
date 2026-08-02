@@ -44,8 +44,8 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, RuntimeException,
-    UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd, implode,
-    is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
+    UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd,
+    impl_php_class, implode, is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
 };
 use std::path::PathBuf;
 
@@ -58,6 +58,11 @@ pub struct CreateProjectCommand {
     pub(crate) suggested_packages_reporter:
         std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>>>,
 }
+
+impl_php_class!(
+    CreateProjectCommand,
+    r"Composer\Command\CreateProjectCommand"
+);
 
 impl Default for CreateProjectCommand {
     fn default() -> Self {
@@ -271,10 +276,7 @@ impl Command for CreateProjectCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\CreateProjectCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for CreateProjectCommand {

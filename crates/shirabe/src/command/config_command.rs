@@ -24,9 +24,9 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
-    escapeshellcmd, exec, explode, file_exists, implode, in_array, is_array, is_bool, is_dir,
-    is_numeric, is_object, is_string, json_encode, php_regex, str_replace, strpos, strtolower,
-    system, touch, var_export,
+    escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array, is_array,
+    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, php_regex, str_replace, strpos,
+    strtolower, system, touch, var_export,
 };
 use shirabe_semver::VersionParser;
 
@@ -42,6 +42,8 @@ pub struct ConfigCommand {
         std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
     pub(crate) auth_config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 }
+
+impl_php_class!(ConfigCommand, r"Composer\Command\ConfigCommand");
 
 impl ConfigCommand {
     /// List of additional configurable package-properties
@@ -1281,10 +1283,7 @@ impl Command for ConfigCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\ConfigCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ConfigCommand {

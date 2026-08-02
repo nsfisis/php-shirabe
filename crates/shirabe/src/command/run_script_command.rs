@@ -16,8 +16,8 @@ use shirabe_external_packages::symfony::console::exception::CommandNotFoundExcep
 use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{InvalidArgumentException, RuntimeException};
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 
 #[derive(Debug)]
 pub struct RunScriptCommand {
@@ -25,6 +25,8 @@ pub struct RunScriptCommand {
 
     script_events: Vec<&'static str>,
 }
+
+impl_php_class!(RunScriptCommand, r"Composer\Command\RunScriptCommand");
 
 impl Default for RunScriptCommand {
     fn default() -> Self {
@@ -353,10 +355,7 @@ impl Command for RunScriptCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\RunScriptCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RunScriptCommand {

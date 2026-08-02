@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, array_merge_map, strip_tags};
+use shirabe_php_shim::{PhpMixed, array_merge_map, impl_php_class, strip_tags};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -31,6 +31,11 @@ struct CheckResult {
 pub struct CheckPlatformReqsCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(
+    CheckPlatformReqsCommand,
+    r"Composer\Command\CheckPlatformReqsCommand"
+);
 
 impl Default for CheckPlatformReqsCommand {
     fn default() -> Self {
@@ -412,10 +417,7 @@ impl Command for CheckPlatformReqsCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\CheckPlatformReqsCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for CheckPlatformReqsCommand {

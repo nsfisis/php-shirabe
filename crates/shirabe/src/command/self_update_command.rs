@@ -10,12 +10,14 @@ use crate::io::io_interface;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 
 #[derive(Debug)]
 pub struct SelfUpdateCommand {
     base_command_data: BaseCommandData,
 }
+
+impl_php_class!(SelfUpdateCommand, r"Composer\Command\SelfUpdateCommand");
 
 impl Default for SelfUpdateCommand {
     fn default() -> Self {
@@ -99,10 +101,7 @@ impl Command for SelfUpdateCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\SelfUpdateCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for SelfUpdateCommand {

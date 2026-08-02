@@ -40,8 +40,9 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, disk_free_space, file_exists, filter_var_boolean,
-    get_class_err, hash, implode, is_array, is_string, php_regex, rtrim, str_contains, str_replace,
-    str_starts_with, strpos, strstr, strstr3, strtolower, trim, version_compare,
+    get_class_err, hash, impl_php_class, implode, is_array, is_string, php_regex, rtrim,
+    str_contains, str_replace, str_starts_with, strpos, strstr, strstr3, strtolower, trim,
+    version_compare,
 };
 
 #[derive(Debug)]
@@ -54,6 +55,8 @@ pub struct DiagnoseCommand {
         std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>>,
     pub(crate) exit_code: std::cell::Cell<i64>,
 }
+
+impl_php_class!(DiagnoseCommand, r"Composer\Command\DiagnoseCommand");
 
 impl Default for DiagnoseCommand {
     fn default() -> Self {
@@ -452,10 +455,7 @@ impl Command for DiagnoseCommand {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
-        base_command_data,
-        "Composer\\Command\\DiagnoseCommand"
-    );
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for DiagnoseCommand {
