@@ -171,8 +171,61 @@ pub fn proc_open(
 
     // Remember which fds requested a pipe so their ends can be taken after spawn.
     let mut pipe_modes: Vec<(i64, String)> = Vec::new();
+    // Descriptors beyond stderr, as (target fd, child-side end). `Command` cannot express them, so
+    // the child installs them with dup2(2) between fork and exec.
+    let mut extra_fds: Vec<(std::os::fd::RawFd, std::os::fd::OwnedFd)> = Vec::new();
     for (index, descriptor) in descriptorspec.iter().enumerate() {
         let fd = index as i64;
+        if fd >= 3 {
+            match descriptor {
+                Descriptor::Pipe(mode) => {
+                    // O_CLOEXEC keeps the parent end out of the child; dup2 clears it on the
+                    // child end, which is what makes that one survive the exec.
+                    let (read_end, write_end) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC)
+                        .map_err(std::io::Error::from)?;
+                    // The mode is the child's point of view, so "r" means the child reads and the
+                    // parent writes.
+                    let child_reads = mode.starts_with('r');
+                    let (child_end, parent_end) = if child_reads {
+                        (read_end, write_end)
+                    } else {
+                        (write_end, read_end)
+                    };
+                    extra_fds.push((fd as std::os::fd::RawFd, child_end));
+                    pipes.insert(
+                        fd,
+                        PhpResource::Stream(std::rc::Rc::new(std::cell::RefCell::new(
+                            StreamState::new(
+                                StreamBacking::Pipe(ChildPipe::Extra(std::fs::File::from(
+                                    parent_end,
+                                ))),
+                                !child_reads,
+                                child_reads,
+                                mode.clone(),
+                                format!("pipe:fd{}", fd),
+                            ),
+                        ))),
+                    );
+                }
+                Descriptor::File(path, mode) => {
+                    extra_fds.push((
+                        fd as std::os::fd::RawFd,
+                        std::os::fd::OwnedFd::from(resource_to_file(&crate::fs::fopen(
+                            path, mode,
+                        )?)?),
+                    ));
+                }
+                Descriptor::Resource(resource) => {
+                    extra_fds.push((
+                        fd as std::os::fd::RawFd,
+                        std::os::fd::OwnedFd::from(resource_to_file(resource)?),
+                    ));
+                }
+                // A gap in a sparse descriptorspec: the child keeps whatever the parent has there.
+                Descriptor::Inherit => {}
+            }
+            continue;
+        }
         let stdio = match descriptor {
             Descriptor::Pipe(mode) => {
                 pipe_modes.push((fd, mode.clone()));
@@ -190,15 +243,43 @@ pub fn proc_open(
             0 => cmd.stdin(stdio),
             1 => cmd.stdout(stdio),
             2 => cmd.stderr(stdio),
-            _ => {
-                // TODO(phase-d): inheriting fds >= 3 (e.g. the --enable-sigchild pipe 3) requires
-                // dup2/pre_exec; a syscall crate is intentionally not introduced here.
-                todo!("proc_open: descriptors with fd >= 3 require fd inheritance (syscall)")
-            }
+            _ => unreachable!(),
         };
     }
 
+    if !extra_fds.is_empty() {
+        use std::os::fd::{AsRawFd as _, FromRawFd as _, IntoRawFd as _};
+        use std::os::unix::process::CommandExt as _;
+        let install_extra_fds = move || {
+            for (target, child_end) in &extra_fds {
+                if child_end.as_raw_fd() == *target {
+                    // dup2(fd, fd) is a no-op that leaves FD_CLOEXEC set, which would close the
+                    // descriptor on exec; clear the flag by hand instead.
+                    nix::fcntl::fcntl(
+                        child_end,
+                        nix::fcntl::FcntlArg::F_SETFD(nix::fcntl::FdFlag::empty()),
+                    )?;
+                    continue;
+                }
+                // SAFETY: dup2_raw closes `target` if it is open and makes it the duplicate of
+                // the child end; releasing the returned owner keeps it open across the exec.
+                let installed = unsafe {
+                    nix::unistd::dup2_raw(child_end, std::os::fd::OwnedFd::from_raw_fd(*target))?
+                };
+                let _ = installed.into_raw_fd();
+            }
+            Ok(())
+        };
+        // SAFETY: the closure only calls async-signal-safe syscalls, as required between fork and
+        // exec. It owns the child-side fds, so they stay alive until the exec happens.
+        unsafe {
+            cmd.pre_exec(install_extra_fds);
+        }
+    }
+
     let mut child = cmd.spawn()?;
+    // Closing the parent's copies of the child-side ends is what lets the child see EOF.
+    drop(cmd);
 
     for (fd, mode) in pipe_modes {
         // fd 0 is the child's stdin: the parent-side handle is writable. fds 1/2 are stdout/stderr:
@@ -289,13 +370,31 @@ pub fn proc_get_status(process: &PhpResource) -> IndexMap<String, PhpMixed> {
     status
 }
 
+/// PHP `proc_terminate`. Sends `signal` to the process behind the resource; returns PHP's `false`
+/// when the handle is already closed or the signal cannot be delivered.
 pub fn proc_terminate(process: &PhpResource, signal: i64) -> bool {
-    let _ = (process, signal);
-    // TODO(phase-d): sending an arbitrary signal requires kill(2); std's Child::kill only sends
-    // SIGKILL and a syscall crate is intentionally not introduced here.
-    todo!(
-        "proc_terminate: arbitrary signal delivery requires kill(2) (syscall crate not available)"
-    )
+    let PhpResource::Process(state) = process else {
+        return false;
+    };
+    let state = state.borrow();
+    let Some(child) = state.child.as_ref() else {
+        return false;
+    };
+    send_signal(child.id() as i32, signal)
+}
+
+/// Shared body of `proc_terminate` and `posix_kill`. Signal 0 is PHP's existence probe and is
+/// forwarded to `kill(2)` as such.
+fn send_signal(pid: i32, signal: i64) -> bool {
+    let signal = if signal == 0 {
+        None
+    } else {
+        match nix::sys::signal::Signal::try_from(signal as i32) {
+            Ok(signal) => Some(signal),
+            Err(_) => return false,
+        }
+    };
+    nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), signal).is_ok()
 }
 
 pub fn getmypid() -> i64 {
@@ -303,13 +402,14 @@ pub fn getmypid() -> i64 {
 }
 
 pub fn cli_set_process_title(_title: &str) -> bool {
-    // TODO(phase-d): changing the process title visible to ps(1) requires platform-specific calls
-    // (prctl/setproctitle) not available without a libc/syscall crate.
+    // TODO(phase-c): PHP rewrites the argv area so the new title shows up in ps(1)'s full command
+    // line. Rust hands out argv as owned copies, so the original block is not reachable; prctl's
+    // PR_SET_NAME only replaces the 16-byte comm field and would report a different title.
     todo!()
 }
 
 pub fn setproctitle(_title: &str) {
-    // TODO(phase-d): see cli_set_process_title; requires platform-specific process-title support.
+    // TODO(phase-c): see cli_set_process_title; requires access to the process's own argv block.
     todo!()
 }
 
@@ -318,68 +418,52 @@ pub fn setproctitle(_title: &str) {
 pub fn pcntl_async_signals(_enable: bool) {}
 
 pub fn pcntl_signal(_signal: i64, _handler: PhpMixed) -> bool {
-    // TODO(phase-d): registering a signal handler requires the signal-handling subsystem to be wired
-    // up (cf. SignalRegistry / the TODO(plugin) notes), plus a syscall crate for sigaction.
+    // TODO(phase-c): registering a signal handler requires the signal-handling subsystem to be
+    // wired up (cf. SignalRegistry / the TODO(plugin) notes). sigaction(2) itself is reachable, but
+    // the handler is a PHP callable whose dispatch depends on the runtime callable mechanism.
     todo!()
 }
 
 pub fn pcntl_signal_get_handler(_signal: i64) -> PhpMixed {
-    // TODO(phase-d): see pcntl_signal; needs the signal-handling subsystem.
+    // TODO(phase-c): see pcntl_signal; needs the signal-handling subsystem.
     todo!()
 }
 
-#[repr(C)]
-struct Passwd {
-    pw_name: *const std::os::raw::c_char,
-    pw_passwd: *const std::os::raw::c_char,
-    pw_uid: u32,
-    pw_gid: u32,
-    pw_gecos: *const std::os::raw::c_char,
-    pw_dir: *const std::os::raw::c_char,
-    pw_shell: *const std::os::raw::c_char,
-}
-
-unsafe extern "C" {
-    fn getuid() -> u32;
-    fn geteuid() -> u32;
-    fn getpwuid(uid: u32) -> *const Passwd;
-}
-
 pub fn posix_getuid() -> i64 {
-    // getuid(2) cannot fail; libc is already linked into every binary, so no extra crate is needed.
-    (unsafe { getuid() }) as i64
+    nix::unistd::getuid().as_raw() as i64
 }
 
 pub fn posix_geteuid() -> i64 {
-    // geteuid(2) cannot fail; libc is already linked into every binary, so no extra crate is needed.
-    (unsafe { geteuid() }) as i64
+    nix::unistd::geteuid().as_raw() as i64
 }
 
+/// Looks up the passwd entry for `uid` and returns it in the shape of PHP's `posix_getpwuid`
+/// associative array, or `false` when no entry matches.
 pub fn posix_getpwuid(uid: i64) -> PhpMixed {
-    // getpwuid(3) via libc (already linked); mirrors PHP posix_getpwuid returning an associative
-    // array of the passwd entry, or false when no entry matches the uid.
-    let pw = unsafe { getpwuid(uid as u32) };
-    if pw.is_null() {
-        return PhpMixed::Bool(false);
-    }
-    let cstr = |p: *const std::os::raw::c_char| -> String {
-        if p.is_null() {
-            String::new()
-        } else {
-            unsafe { std::ffi::CStr::from_ptr(p) }
-                .to_string_lossy()
-                .into_owned()
-        }
+    let user = match nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(uid as u32)) {
+        Ok(Some(user)) => user,
+        _ => return PhpMixed::Bool(false),
     };
-    let pw = unsafe { &*pw };
     let mut entry = indexmap::IndexMap::new();
-    entry.insert("name".to_string(), PhpMixed::String(cstr(pw.pw_name)));
-    entry.insert("passwd".to_string(), PhpMixed::String(cstr(pw.pw_passwd)));
-    entry.insert("uid".to_string(), PhpMixed::Int(pw.pw_uid as i64));
-    entry.insert("gid".to_string(), PhpMixed::Int(pw.pw_gid as i64));
-    entry.insert("gecos".to_string(), PhpMixed::String(cstr(pw.pw_gecos)));
-    entry.insert("dir".to_string(), PhpMixed::String(cstr(pw.pw_dir)));
-    entry.insert("shell".to_string(), PhpMixed::String(cstr(pw.pw_shell)));
+    entry.insert("name".to_string(), PhpMixed::String(user.name));
+    entry.insert(
+        "passwd".to_string(),
+        PhpMixed::String(user.passwd.to_string_lossy().into_owned()),
+    );
+    entry.insert("uid".to_string(), PhpMixed::Int(user.uid.as_raw() as i64));
+    entry.insert("gid".to_string(), PhpMixed::Int(user.gid.as_raw() as i64));
+    entry.insert(
+        "gecos".to_string(),
+        PhpMixed::String(user.gecos.to_string_lossy().into_owned()),
+    );
+    entry.insert(
+        "dir".to_string(),
+        PhpMixed::String(user.dir.to_string_lossy().into_owned()),
+    );
+    entry.insert(
+        "shell".to_string(),
+        PhpMixed::String(user.shell.to_string_lossy().into_owned()),
+    );
     PhpMixed::Array(entry)
 }
 
@@ -394,15 +478,24 @@ pub fn posix_isatty(stream: PhpResource) -> bool {
     }
 }
 
-pub fn posix_kill(_pid: i64, _signal: i64) -> bool {
-    // TODO(phase-d): kill(2) is not reachable without a libc/syscall crate.
-    todo!()
+pub fn posix_kill(pid: i64, signal: i64) -> bool {
+    send_signal(pid as i32, signal)
 }
 
+/// PHP `get_current_user()`: the name of the owner of the running script file. The Shirabe
+/// executable takes the place of the script; PHP returns an empty string when the lookup fails.
 pub fn get_current_user() -> String {
-    // TODO(phase-d): PHP returns the owner name of the running script file, which needs stat(2) plus
-    // getpwuid(3); neither is reachable without a libc/syscall crate.
-    todo!()
+    use std::os::unix::fs::MetadataExt as _;
+    let Ok(executable) = std::env::current_exe() else {
+        return String::new();
+    };
+    let Ok(metadata) = std::fs::metadata(&executable) else {
+        return String::new();
+    };
+    match nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(metadata.uid())) {
+        Ok(Some(user)) => user.name,
+        _ => String::new(),
+    }
 }
 
 #[cfg(test)]
@@ -478,6 +571,86 @@ mod tests {
         );
 
         assert_eq!(proc_close(&process), 0);
+    }
+
+    #[test]
+    fn proc_open_wires_a_pipe_the_child_writes_to_beyond_stderr() {
+        let mut pipes = IndexMap::new();
+        let process = proc_open(
+            "echo beyond >&3",
+            &[
+                Descriptor::Inherit,
+                Descriptor::Inherit,
+                Descriptor::Inherit,
+                Descriptor::Pipe("w".to_string()),
+            ],
+            &mut pipes,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            stream_get_contents(pipes.get(&3).unwrap()).unwrap(),
+            "beyond\n"
+        );
+        assert_eq!(proc_close(&process), 0);
+    }
+
+    #[test]
+    fn proc_open_wires_a_pipe_the_child_reads_from_beyond_stderr() {
+        let mut pipes = IndexMap::new();
+        let process = proc_open(
+            "cat <&4",
+            &[
+                Descriptor::Inherit,
+                Descriptor::Pipe("w".to_string()),
+                Descriptor::Inherit,
+                Descriptor::Inherit,
+                Descriptor::Pipe("r".to_string()),
+            ],
+            &mut pipes,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        fwrite(pipes.get(&4).unwrap(), "fed\n", None);
+        fclose(pipes.get(&4).unwrap());
+        // Dropping the last handle closes the fd so `cat` sees end-of-input.
+        pipes.shift_remove(&4);
+
+        assert_eq!(
+            stream_get_contents(pipes.get(&1).unwrap()).unwrap(),
+            "fed\n"
+        );
+        assert_eq!(proc_close(&process), 0);
+    }
+
+    #[test]
+    fn proc_terminate_signals_the_child() {
+        let mut pipes = IndexMap::new();
+        let process = proc_open(
+            "sleep 30",
+            &[
+                Descriptor::Inherit,
+                Descriptor::Inherit,
+                Descriptor::Inherit,
+            ],
+            &mut pipes,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(proc_terminate(&process, SIGTERM));
+        // A child killed by a signal has no exit code, which proc_close reports as -1.
+        assert_eq!(proc_close(&process), -1);
+        let status = proc_get_status(&process);
+        assert_eq!(status.get("pid").unwrap().as_int(), Some(-1));
     }
 
     #[test]

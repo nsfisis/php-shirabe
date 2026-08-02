@@ -423,6 +423,10 @@ pub enum ChildPipe {
     In(std::process::ChildStdin),
     Out(std::process::ChildStdout),
     Err(std::process::ChildStderr),
+    /// The parent end of a pipe wired to a child descriptor beyond stderr. `std::process::Child`
+    /// exposes no typed handle for those, so the raw end is kept as a file. Its direction is
+    /// carried by the owning `StreamState`'s `readable`/`writable` flags.
+    Extra(std::fs::File),
 }
 
 impl std::io::Read for ChildPipe {
@@ -430,6 +434,7 @@ impl std::io::Read for ChildPipe {
         match self {
             ChildPipe::Out(o) => o.read(buf),
             ChildPipe::Err(e) => e.read(buf),
+            ChildPipe::Extra(f) => f.read(buf),
             ChildPipe::In(_) => Err(std::io::Error::from(std::io::ErrorKind::Unsupported)),
         }
     }
@@ -439,6 +444,7 @@ impl std::io::Write for ChildPipe {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self {
             ChildPipe::In(i) => i.write(buf),
+            ChildPipe::Extra(f) => f.write(buf),
             ChildPipe::Out(_) | ChildPipe::Err(_) => {
                 Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
             }
@@ -448,6 +454,7 @@ impl std::io::Write for ChildPipe {
     fn flush(&mut self) -> std::io::Result<()> {
         match self {
             ChildPipe::In(i) => i.flush(),
+            ChildPipe::Extra(f) => f.flush(),
             ChildPipe::Out(_) | ChildPipe::Err(_) => Ok(()),
         }
     }
@@ -465,6 +472,7 @@ impl std::os::unix::io::AsRawFd for ChildPipe {
             ChildPipe::In(i) => i.as_raw_fd(),
             ChildPipe::Out(o) => o.as_raw_fd(),
             ChildPipe::Err(e) => e.as_raw_fd(),
+            ChildPipe::Extra(f) => f.as_raw_fd(),
         }
     }
 }

@@ -293,31 +293,29 @@ pub fn spl_object_hash_process<T>(_object: &T) -> String {
     format!("{:032x}", _object as *const T as usize)
 }
 
+// TODO(phase-c): the Windows branch of php_uname is missing. There PHP reports "Windows NT" as the
+// sysname and derives release/version from the OS version APIs rather than uname(2).
 pub fn php_uname(mode: &str) -> String {
+    let Ok(utsname) = nix::sys::utsname::uname() else {
+        return String::new();
+    };
+    let field = |value: &std::ffi::OsStr| value.to_string_lossy().into_owned();
     match mode {
-        // sysname, as reported by uname(2). On Windows PHP returns "Windows NT",
-        // which differs from PHP_OS.
-        "s" => match std::env::consts::OS {
-            "linux" => "Linux",
-            "macos" => "Darwin",
-            "windows" => "Windows NT",
-            "freebsd" => "FreeBSD",
-            "netbsd" => "NetBSD",
-            "openbsd" => "OpenBSD",
-            "dragonfly" => "DragonFly",
-            "solaris" => "SunOS",
-            other => other,
-        }
-        .to_string(),
-        // TODO(phase-c): use libc?
-        // release, as reported by uname(2). On Linux this matches the contents
-        // of /proc/sys/kernel/osrelease.
-        "r" => std::fs::read_to_string("/proc/sys/kernel/osrelease")
-            .map(|s| s.trim_end().to_string())
-            .unwrap_or_default(),
-        // TODO(phase-d): the remaining php_uname() modes ("n", "v", "m", "a") need uname(2) fields
-        // (nodename/version/machine) that are not reachable without a libc/syscall crate.
-        _ => todo!(),
+        "s" => field(utsname.sysname()),
+        "n" => field(utsname.nodename()),
+        "r" => field(utsname.release()),
+        "v" => field(utsname.version()),
+        "m" => field(utsname.machine()),
+        // "a" is the default and any other mode falls back to it: every field in the order
+        // sysname, nodename, release, version, machine.
+        _ => format!(
+            "{} {} {} {} {}",
+            field(utsname.sysname()),
+            field(utsname.nodename()),
+            field(utsname.release()),
+            field(utsname.version()),
+            field(utsname.machine()),
+        ),
     }
 }
 

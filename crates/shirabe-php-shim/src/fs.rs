@@ -563,13 +563,13 @@ pub fn rewind(stream: &PhpResource) -> bool {
 
 /// PHP `fstat()`: the stat array of an open stream, or `None` for `false`-on-failure.
 pub fn fstat(stream: &PhpResource) -> Option<IndexMap<String, PhpMixed>> {
+    use std::os::fd::AsFd as _;
     match stream {
-        // TODO(phase-d): the stdio streams expose no fd to stat without a syscall crate; report
-        // failure rather than fabricate fields.
-        PhpResource::Stdin
-        | PhpResource::Stdout
-        | PhpResource::Stderr
-        | PhpResource::Process(_) => None,
+        PhpResource::Stdin => fstat_fd(std::io::stdin().as_fd()),
+        PhpResource::Stdout => fstat_fd(std::io::stdout().as_fd()),
+        PhpResource::Stderr => fstat_fd(std::io::stderr().as_fd()),
+        // A process handle is not a stream and has no descriptor of its own.
+        PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
             let mut state = state.borrow_mut();
             if state.closed {
@@ -581,11 +581,36 @@ pub fn fstat(stream: &PhpResource) -> Option<IndexMap<String, PhpMixed>> {
                     (m.len(), Some(m))
                 }
                 StreamBacking::Memory(c) => (c.get_ref().len() as u64, None),
-                StreamBacking::Pipe(_) => return None,
+                StreamBacking::Pipe(p) => {
+                    use std::os::fd::{AsRawFd as _, BorrowedFd};
+                    // SAFETY: the pipe end is owned by the stream state, which is borrowed here.
+                    return fstat_fd(unsafe { BorrowedFd::borrow_raw(p.as_raw_fd()) });
+                }
             };
             Some(build_stat_map(size, file_meta.as_ref()))
         }
     }
+}
+
+/// Stats an open descriptor with `fstat(2)`, used for the stdio streams and for pipes, neither of
+/// which is backed by a `std::fs::File`.
+fn fstat_fd(fd: std::os::fd::BorrowedFd<'_>) -> Option<IndexMap<String, PhpMixed>> {
+    let st = nix::sys::stat::fstat(fd).ok()?;
+    Some(stat_fields_map([
+        ("dev", st.st_dev as i64),
+        ("ino", st.st_ino as i64),
+        ("mode", st.st_mode as i64),
+        ("nlink", st.st_nlink as i64),
+        ("uid", st.st_uid as i64),
+        ("gid", st.st_gid as i64),
+        ("rdev", st.st_rdev as i64),
+        ("size", st.st_size as i64),
+        ("atime", st.st_atime as i64),
+        ("mtime", st.st_mtime as i64),
+        ("ctime", st.st_ctime as i64),
+        ("blksize", st.st_blksize as i64),
+        ("blocks", st.st_blocks as i64),
+    ]))
 }
 
 // Builds the 13-field PHP stat array (indexed 0..12 and by name). For in-memory streams only
@@ -624,6 +649,11 @@ fn build_stat_map(size: u64, file_meta: Option<&std::fs::Metadata>) -> IndexMap<
             ("blocks", 0),
         ],
     };
+    stat_fields_map(fields)
+}
+
+// PHP stat/fstat/lstat return the 13 fields both by numeric index (0..12) and by name.
+fn stat_fields_map(fields: [(&str, i64); 13]) -> IndexMap<String, PhpMixed> {
     let mut map = IndexMap::new();
     for (i, (_, v)) in fields.iter().enumerate() {
         map.insert(i.to_string(), PhpMixed::Int(*v));
@@ -654,8 +684,7 @@ pub fn fflush(stream: &PhpResource) -> bool {
 pub fn lstat(_filename: &str) -> Option<IndexMap<String, PhpMixed>> {
     use std::os::unix::fs::MetadataExt;
     let m = std::fs::symlink_metadata(_filename).ok()?;
-    // PHP stat/lstat return the 13 fields both by numeric index (0..12) and by name.
-    let fields: [(&str, i64); 13] = [
+    Some(stat_fields_map([
         ("dev", m.dev() as i64),
         ("ino", m.ino() as i64),
         ("mode", m.mode() as i64),
@@ -669,26 +698,20 @@ pub fn lstat(_filename: &str) -> Option<IndexMap<String, PhpMixed>> {
         ("ctime", m.ctime()),
         ("blksize", m.blksize() as i64),
         ("blocks", m.blocks() as i64),
-    ];
-    let mut map = IndexMap::new();
-    for (i, (_, v)) in fields.iter().enumerate() {
-        map.insert(i.to_string(), PhpMixed::Int(*v));
-    }
-    for (name, v) in &fields {
-        map.insert(name.to_string(), PhpMixed::Int(*v));
-    }
-    Some(map)
+    ]))
 }
 
-pub fn touch(_path: &str) -> bool {
-    // TODO(phase-d): for an existing file PHP also bumps its mtime/atime to now; std exposes no
-    // portable utime, so only the create-if-absent case is handled here.
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(_path)
-        .is_ok()
+/// PHP `touch($path)`: creates the file when it is missing and stamps mtime/atime with the current
+/// time. Returns `false` (PHP failure) on error.
+pub fn touch(path: &str) -> bool {
+    if !touch_create(path) {
+        return false;
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let now = nix::sys::time::TimeVal::new(now.as_secs() as i64, now.subsec_micros() as i64);
+    nix::sys::stat::utimes(path, &now, &now).is_ok()
 }
 
 pub fn fflush_resource(resource: &PhpResource) {
@@ -699,32 +722,28 @@ pub fn fwrite_resource(resource: &PhpResource, data: &str) {
     fwrite(resource, data, None);
 }
 
-// libc is already linked into every binary, so `utime` can be declared directly without an extra
-// crate (mirrors the `fcntl`/`statvfs` declarations elsewhere). PHP's `touch($path, $mtime, $atime)`
-// passes whole seconds, which matches `struct utimbuf`'s `time_t` fields.
-#[repr(C)]
-struct Utimbuf {
-    actime: std::os::raw::c_long,
-    modtime: std::os::raw::c_long,
+/// PHP's `touch` creates the file first if it does not exist. An existing path is never opened, so
+/// directories — which `utimes` stamps just as well — go through untouched.
+fn touch_create(path: &str) -> bool {
+    if std::path::Path::new(path).exists() {
+        return true;
+    }
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+        .is_ok()
 }
 
-unsafe extern "C" {
-    fn utime(path: *const std::os::raw::c_char, times: *const Utimbuf) -> std::os::raw::c_int;
-}
-
+// PHP's `touch($path, $mtime, $atime)` passes whole seconds.
 fn touch_impl(path: &str, mtime: i64, atime: i64) -> bool {
-    let Ok(c_path) = std::ffi::CString::new(path) else {
-        return false;
-    };
-    // PHP's `touch` creates the file first if it does not exist.
-    if !std::path::Path::new(path).exists() && !touch(path) {
+    if !touch_create(path) {
         return false;
     }
-    let times = Utimbuf {
-        actime: atime as std::os::raw::c_long,
-        modtime: mtime as std::os::raw::c_long,
-    };
-    unsafe { utime(c_path.as_ptr(), &times) == 0 }
+    let atime = nix::sys::time::TimeVal::new(atime, 0);
+    let mtime = nix::sys::time::TimeVal::new(mtime, 0);
+    nix::sys::stat::utimes(path, &atime, &mtime).is_ok()
 }
 
 /// PHP `touch($path, $mtime)`: sets the modification time (and access time, per PHP, to the same
@@ -760,14 +779,8 @@ pub fn file_exists(path: impl AsRef<std::path::Path>) -> bool {
     path.as_ref().exists()
 }
 
-// TODO(phase-c): PHP's is_writable() resolves to access(2) with W_OK, honoring the effective
-// user/group and ACLs. This std-only approximation only inspects the permission bits, so it can
-// diverge for files the current user does not own. Refine with a syscall (libc/rustix) crate later.
 pub fn is_writable(_path: &str) -> bool {
-    match std::fs::metadata(_path) {
-        Ok(meta) => !meta.permissions().readonly(),
-        Err(_) => false,
-    }
+    nix::unistd::access(_path, nix::unistd::AccessFlags::W_OK).is_ok()
 }
 
 pub fn is_readable(_path: &str) -> bool {
@@ -785,13 +798,7 @@ pub fn is_readable(_path: &str) -> bool {
 }
 
 pub fn is_executable(_path: &str) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    // TODO(phase-d): like is_writable, this only inspects the permission bits and ignores the
-    // effective user/group, so it can diverge from PHP's access(2, X_OK) check.
-    match std::fs::metadata(_path) {
-        Ok(m) => (m.permissions().mode() & 0o111) != 0,
-        Err(_) => false,
-    }
+    nix::unistd::access(_path, nix::unistd::AccessFlags::X_OK).is_ok()
 }
 
 pub fn is_file(path: impl AsRef<std::path::Path>) -> bool {
@@ -940,18 +947,23 @@ pub fn file(_filename: &str, _flags: i64) -> Option<Vec<String>> {
 }
 
 pub fn umask() -> u32 {
-    // Linux exposes the current umask via /proc/self/status.
-    // TODO(phase-d): other platforms have no /proc; reading the umask there needs the
-    // read-modify-write umask(2), which std does not expose (no libc/syscall crate available).
-    std::fs::read_to_string("/proc/self/status")
+    // Linux exposes the current umask via /proc/self/status, which reads it without disturbing it.
+    let from_proc = std::fs::read_to_string("/proc/self/status")
         .ok()
         .and_then(|status| {
             status.lines().find_map(|line| {
                 line.strip_prefix("Umask:")
                     .and_then(|v| u32::from_str_radix(v.trim(), 8).ok())
             })
-        })
-        .unwrap_or(0o022)
+        });
+    if let Some(mask) = from_proc {
+        return mask;
+    }
+    // Elsewhere umask(2) is the only way to read it, and it is read-modify-write: set a value to
+    // learn the previous one, then put that one back.
+    let previous = nix::sys::stat::umask(nix::sys::stat::Mode::from_bits_truncate(0o022));
+    nix::sys::stat::umask(previous);
+    previous.bits() as u32
 }
 
 pub fn mkdir(_pathname: &str, _mode: u32, _recursive: bool) -> bool {
@@ -1133,48 +1145,11 @@ pub fn clearstatcache2(_clear_realpath_cache: bool, _filename: &str) {
     // cache to invalidate.
 }
 
-// libc is already linked into every binary, so `statvfs` can be declared directly without an extra
-// crate (mirrors the `fcntl`/`select` declarations in stream.rs). The layout below matches Linux's
-// `struct statvfs`.
-#[cfg(target_os = "linux")]
-#[repr(C)]
-struct Statvfs {
-    f_bsize: std::os::raw::c_ulong,
-    f_frsize: std::os::raw::c_ulong,
-    f_blocks: u64,
-    f_bfree: u64,
-    f_bavail: u64,
-    f_files: u64,
-    f_ffree: u64,
-    f_favail: u64,
-    f_fsid: std::os::raw::c_ulong,
-    f_flag: std::os::raw::c_ulong,
-    f_namemax: std::os::raw::c_ulong,
-    f_spare: [std::os::raw::c_int; 6],
-}
-
-#[cfg(target_os = "linux")]
-unsafe extern "C" {
-    fn statvfs(path: *const std::os::raw::c_char, buf: *mut Statvfs) -> std::os::raw::c_int;
-}
-
 /// PHP `disk_free_space()`: the number of available bytes on the filesystem containing `directory`,
 /// computed via `statvfs(3)` (`f_bavail * f_frsize`). Returns `None` (PHP `false`) on failure.
-#[cfg(target_os = "linux")]
 pub fn disk_free_space(directory: &str) -> Option<f64> {
-    let c_path = std::ffi::CString::new(directory).ok()?;
-    let mut buf = std::mem::MaybeUninit::<Statvfs>::uninit();
-    let rc = unsafe { statvfs(c_path.as_ptr(), buf.as_mut_ptr()) };
-    if rc != 0 {
-        return None;
-    }
-    let buf = unsafe { buf.assume_init() };
-    Some(buf.f_bavail as f64 * buf.f_frsize as f64)
-}
-
-#[cfg(not(target_os = "linux"))]
-pub fn disk_free_space(_directory: &str) -> Option<f64> {
-    None
+    let stat = nix::sys::statvfs::statvfs(directory).ok()?;
+    Some(stat.blocks_available() as f64 * stat.fragment_size() as f64)
 }
 
 pub const GLOB_MARK: i64 = 8;

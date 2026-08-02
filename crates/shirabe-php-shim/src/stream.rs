@@ -258,52 +258,13 @@ fn build_meta_data(
     map
 }
 
-// libc is already linked into every binary, so these can be declared directly without an extra
-// crate (mirrors the `getuid`/`geteuid` declarations in process.rs).
-const F_GETFL: i32 = 3;
-const F_SETFL: i32 = 4;
-const O_NONBLOCK: i32 = 0o4000;
-const FD_SETSIZE: usize = 1024;
-
-unsafe extern "C" {
-    fn fcntl(fd: i32, cmd: i32, ...) -> i32;
-    fn select(
-        nfds: i32,
-        readfds: *mut FdSet,
-        writefds: *mut FdSet,
-        exceptfds: *mut FdSet,
-        timeout: *mut TimeVal,
-    ) -> i32;
-}
-
-#[repr(C)]
-struct TimeVal {
-    tv_sec: i64,
-    tv_usec: i64,
-}
-
-// `fd_set` is a bitmap of `FD_SETSIZE` bits laid out as an array of `long` words.
-#[repr(C)]
-struct FdSet {
-    fds_bits: [i64; FD_SETSIZE / (8 * std::mem::size_of::<i64>())],
-}
-
-impl FdSet {
-    fn zero() -> Self {
-        FdSet {
-            fds_bits: [0; FD_SETSIZE / (8 * std::mem::size_of::<i64>())],
-        }
-    }
-
-    fn set(&mut self, fd: i32) {
-        let bits = 8 * std::mem::size_of::<i64>();
-        self.fds_bits[fd as usize / bits] |= 1i64 << (fd as usize % bits);
-    }
-
-    fn is_set(&self, fd: i32) -> bool {
-        let bits = 8 * std::mem::size_of::<i64>();
-        (self.fds_bits[fd as usize / bits] & (1i64 << (fd as usize % bits))) != 0
-    }
+/// Wraps a live descriptor obtained from `PhpResource::raw_fd` for the duration of one syscall.
+///
+/// # Safety
+///
+/// The caller must keep the owning resource alive and unclosed for the lifetime of the result.
+unsafe fn borrow_fd<'a>(fd: std::os::fd::RawFd) -> std::os::fd::BorrowedFd<'a> {
+    unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) }
 }
 
 /// PHP `stream_set_blocking()`: toggle `O_NONBLOCK` on the resource's underlying fd via `fcntl(2)`.
@@ -312,17 +273,19 @@ pub fn stream_set_blocking(resource: &PhpResource, enable: bool) -> bool {
     let Some(fd) = resource.raw_fd() else {
         return false;
     };
-    let flags = unsafe { fcntl(fd, F_GETFL) };
-    if flags < 0 {
+    // SAFETY: `resource` owns the descriptor and outlives both calls below.
+    let fd = unsafe { borrow_fd(fd) };
+    let Ok(flags) = nix::fcntl::fcntl(fd, nix::fcntl::FcntlArg::F_GETFL) else {
         return false;
-    }
+    };
+    let flags = nix::fcntl::OFlag::from_bits_truncate(flags);
     // `enable` means blocking, i.e. clear O_NONBLOCK.
     let new_flags = if enable {
-        flags & !O_NONBLOCK
+        flags & !nix::fcntl::OFlag::O_NONBLOCK
     } else {
-        flags | O_NONBLOCK
+        flags | nix::fcntl::OFlag::O_NONBLOCK
     };
-    unsafe { fcntl(fd, F_SETFL, new_flags) >= 0 }
+    nix::fcntl::fcntl(fd, nix::fcntl::FcntlArg::F_SETFL(new_flags)).is_ok()
 }
 
 /// PHP `stream_select`. Returns the number of changed streams, or `None` for the PHP `false`
@@ -336,22 +299,17 @@ pub fn stream_select(
     seconds: i64,
     microseconds: Option<i64>,
 ) -> Option<i64> {
-    let mut readfds = FdSet::zero();
-    let mut writefds = FdSet::zero();
-    let mut exceptfds = FdSet::zero();
-    let mut nfds = 0i32;
+    let mut readfds = nix::sys::select::FdSet::new();
+    let mut writefds = nix::sys::select::FdSet::new();
+    let mut exceptfds = nix::sys::select::FdSet::new();
 
     // Resources without an fd (in-memory streams, process handles) cannot be waited on; PHP would
     // emit a warning for them. We skip them here, leaving them out of the ready set.
-    let mut prepare = |set: &mut FdSet, resources: &[PhpResource]| {
+    let prepare = |set: &mut nix::sys::select::FdSet<'static>, resources: &[PhpResource]| {
         for resource in resources {
-            if let Some(fd) = resource.raw_fd()
-                && (fd as usize) < FD_SETSIZE
-            {
-                set.set(fd);
-                if fd + 1 > nfds {
-                    nfds = fd + 1;
-                }
+            if let Some(fd) = resource.raw_fd() {
+                // SAFETY: the resources stay alive and unclosed for the whole select(2) call.
+                set.insert(unsafe { borrow_fd(fd) });
             }
         }
     };
@@ -359,31 +317,27 @@ pub fn stream_select(
     prepare(&mut writefds, write);
     prepare(&mut exceptfds, except);
 
-    let mut timeout = TimeVal {
-        tv_sec: seconds,
-        tv_usec: microseconds.unwrap_or(0),
-    };
+    let mut timeout = nix::sys::time::TimeVal::new(seconds, microseconds.unwrap_or(0));
 
-    let ret = unsafe {
-        select(
-            nfds,
-            &mut readfds,
-            &mut writefds,
-            &mut exceptfds,
-            &mut timeout,
-        )
-    };
-
-    if ret < 0 {
+    let ret = nix::sys::select::select(
+        None,
+        &mut readfds,
+        &mut writefds,
+        &mut exceptfds,
+        &mut timeout,
+    );
+    let ret = match ret {
+        Ok(ret) => ret,
         // select(2) failed (e.g. EINTR). PHP returns false.
-        return None;
-    }
+        Err(_) => return None,
+    };
 
     // Narrow each array in place to the resources whose fd is still set in the result bitmap.
-    let narrow = |set: &FdSet, resources: &mut Vec<PhpResource>| {
+    let narrow = |set: &nix::sys::select::FdSet<'static>, resources: &mut Vec<PhpResource>| {
         resources.retain(|resource| match resource.raw_fd() {
-            Some(fd) if (fd as usize) < FD_SETSIZE => set.is_set(fd),
-            _ => false,
+            // SAFETY: as above, the resource still owns the descriptor.
+            Some(fd) => set.contains(unsafe { borrow_fd(fd) }),
+            None => false,
         });
     };
     narrow(&readfds, read);
