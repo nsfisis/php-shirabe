@@ -85,7 +85,7 @@ impl JsonManipulator {
 
         let m = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(r#type).as_bytes(),
+            JsonFile::encode(r#type)?.as_bytes(),
             ValueKind::Json,
         ) {
             Some(m) => m,
@@ -107,7 +107,7 @@ impl JsonManipulator {
             links = format!(
                 "{}{}{}\"{}\"{}",
                 &links[..key_start],
-                JsonFile::encode(&str_replace("\\/", "/", &existing_package)),
+                JsonFile::encode(&str_replace("\\/", "/", &existing_package))?,
                 separator,
                 constraint,
                 &links[value_end..]
@@ -133,8 +133,8 @@ impl JsonManipulator {
                             self.newline,
                             self.indent,
                             self.indent,
-                            JsonFile::encode(package),
-                            JsonFile::encode(constraint),
+                            JsonFile::encode(package)?,
+                            JsonFile::encode(constraint)?,
                             groups_1
                         ),
                         "\\$",
@@ -148,8 +148,8 @@ impl JsonManipulator {
                     self.newline,
                     self.indent,
                     self.indent,
-                    JsonFile::encode(package),
-                    JsonFile::encode(constraint),
+                    JsonFile::encode(package)?,
+                    JsonFile::encode(constraint)?,
                     self.newline,
                     self.indent
                 );
@@ -375,22 +375,28 @@ impl JsonManipulator {
                 Some((i, e))
             })
         } else {
-            json_grammar::find_top_level_key(
-                self.contents.as_bytes(),
-                b"\"repositories\"",
-                ValueKind::Object,
-            )
-            .and_then(|reps| {
-                let obj = self.contents[reps.value_pos..reps.value_end].to_string();
-                let key = JsonFile::encode(&repository_index);
-                json_grammar::find_top_level_key(obj.as_bytes(), key.as_bytes(), ValueKind::Object)
+            {
+                let key = JsonFile::encode(&repository_index)?;
+                json_grammar::find_top_level_key(
+                    self.contents.as_bytes(),
+                    b"\"repositories\"",
+                    ValueKind::Object,
+                )
+                .and_then(|reps| {
+                    let obj = self.contents[reps.value_pos..reps.value_end].to_string();
+                    json_grammar::find_top_level_key(
+                        obj.as_bytes(),
+                        key.as_bytes(),
+                        ValueKind::Object,
+                    )
                     .map(|inner| {
                         (
                             reps.value_pos + inner.value_pos,
                             reps.value_pos + inner.value_end,
                         )
                     })
-            })
+                })
+            }
         };
 
         let (repo_pos, repo_end) = match repo_span {
@@ -416,7 +422,7 @@ impl JsonManipulator {
             Some(u) => format!(
                 "{}{}{}",
                 &raw_repo[..u.value_pos],
-                JsonFile::encode(url),
+                JsonFile::encode(url)?,
                 &raw_repo[u.value_end..]
             ),
             None => raw_repo,
@@ -692,7 +698,7 @@ impl JsonManipulator {
         // main node content not match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node).as_bytes(),
+            JsonFile::encode(main_node)?.as_bytes(),
             ValueKind::Object,
         ) {
             Some(node) => node,
@@ -771,7 +777,7 @@ impl JsonManipulator {
                                     self.newline,
                                     self.indent,
                                     self.indent,
-                                    JsonFile::encode(&name_owned),
+                                    JsonFile::encode(&name_owned)?,
                                     self.format(&value_local, 1, false)?,
                                     whitespace
                                 ),
@@ -787,7 +793,7 @@ impl JsonManipulator {
                                 &format!(
                                     "{{{}{}: {},{}{}{}",
                                     whitespace,
-                                    JsonFile::encode(&name_owned),
+                                    JsonFile::encode(&name_owned)?,
                                     self.format(&value_local, 1, false)?,
                                     self.newline,
                                     self.indent,
@@ -812,7 +818,7 @@ impl JsonManipulator {
                         self.newline,
                         self.indent,
                         self.indent,
-                        JsonFile::encode(&name_owned),
+                        JsonFile::encode(&name_owned)?,
                         self.format(&value_local, 1, false)?,
                         whitespace
                     );
@@ -843,7 +849,7 @@ impl JsonManipulator {
         // no node content match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node).as_bytes(),
+            JsonFile::encode(main_node)?.as_bytes(),
             ValueKind::Object,
         ) {
             Some(node) => node,
@@ -1025,7 +1031,7 @@ impl JsonManipulator {
         // main node content not match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node).as_bytes(),
+            JsonFile::encode(main_node)?.as_bytes(),
             ValueKind::Array,
         ) {
             Some(node) => node,
@@ -1161,7 +1167,7 @@ impl JsonManipulator {
         // main node content not match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node).as_bytes(),
+            JsonFile::encode(main_node)?.as_bytes(),
             ValueKind::Array,
         ) {
             Some(node) => node,
@@ -1225,7 +1231,7 @@ impl JsonManipulator {
         // no node content match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node).as_bytes(),
+            JsonFile::encode(main_node)?.as_bytes(),
             ValueKind::Array,
         ) {
             Some(node) => node,
@@ -1304,7 +1310,7 @@ impl JsonManipulator {
         let content = self.format(&content, 0, false)?;
 
         // key exists already
-        let encoded_key = JsonFile::encode(key);
+        let encoded_key = JsonFile::encode(key)?;
         let key_match = if decoded.as_array().and_then(|a| a.get(key)).is_some() {
             json_grammar::find_top_level_key(
                 self.contents.as_bytes(),
@@ -1350,7 +1356,7 @@ impl JsonManipulator {
                         ",{}{}{}: {}{}}}",
                         self.newline,
                         self.indent,
-                        JsonFile::encode(key),
+                        JsonFile::encode(key)?,
                         content,
                         self.newline
                     ),
@@ -1369,7 +1375,7 @@ impl JsonManipulator {
                 &format!(
                     "{}{}: {}{}}}",
                     self.indent,
-                    JsonFile::encode(key),
+                    JsonFile::encode(key)?,
                     content,
                     self.newline
                 ),
@@ -1390,7 +1396,7 @@ impl JsonManipulator {
         }
 
         // key exists already
-        let encoded_key = JsonFile::encode(key);
+        let encoded_key = JsonFile::encode(key)?;
         let key_match = json_grammar::find_top_level_key(
             self.contents.as_bytes(),
             encoded_key.as_bytes(),
@@ -1443,7 +1449,7 @@ impl JsonManipulator {
         }
 
         // Match the key only when its value is an empty object `{ <space> }`.
-        let encoded_key = JsonFile::encode(key);
+        let encoded_key = JsonFile::encode(key)?;
         let cb = self.contents.as_bytes();
         let key_match =
             json_grammar::find_top_level_key(cb, encoded_key.as_bytes(), ValueKind::Object)
@@ -1531,7 +1537,7 @@ impl JsonManipulator {
                     elems.push(format!(
                         "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
-                        JsonFile::encode(key),
+                        JsonFile::encode(key)?,
                         self.format(val, depth + 1, false)?
                     ));
                 }
@@ -1546,7 +1552,7 @@ impl JsonManipulator {
             ));
         }
 
-        Ok(JsonFile::encode(&data))
+        JsonFile::encode(&data)
     }
 
     pub(crate) fn detect_indenting(&mut self) {
@@ -1707,7 +1713,7 @@ impl ManipulatorFormatter {
                     elems.push(format!(
                         "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
-                        JsonFile::encode(key),
+                        JsonFile::encode(key)?,
                         self.format(val, depth + 1, false)?
                     ));
                 }
@@ -1722,6 +1728,6 @@ impl ManipulatorFormatter {
             ));
         }
 
-        Ok(JsonFile::encode(&data))
+        JsonFile::encode(&data)
     }
 }

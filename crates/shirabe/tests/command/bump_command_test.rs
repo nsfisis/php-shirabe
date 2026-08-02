@@ -43,7 +43,8 @@ fn run_bump_case(
 
     let mut json = JsonFile::new("./composer.json".to_string(), None, None).unwrap();
     let read = json.read().unwrap();
-    let actual: serde_json::Value = serde_json::from_str(&JsonFile::encode(&read)).unwrap();
+    let actual: serde_json::Value =
+        serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap();
     assert_eq!(expected, actual);
 
     drop(tear_down);

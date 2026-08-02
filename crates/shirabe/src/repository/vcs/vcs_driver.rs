@@ -171,7 +171,7 @@ impl VcsDriverBase {
                     pretty_print: false,
                     ..Default::default()
                 },
-            );
+            )?;
             self.cache.as_mut().map(|c| c.write(identifier, &encoded));
         }
         self.info_cache.insert(identifier.to_string(), composer);
@@ -237,7 +237,7 @@ pub trait VcsDriver: VcsDriverInterface {
                         pretty_print: false,
                         ..Default::default()
                     },
-                );
+                )?;
                 self.cache_mut().map(|c| c.write(identifier, &encoded));
             }
 

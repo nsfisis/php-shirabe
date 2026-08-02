@@ -189,7 +189,7 @@ impl Auditor {
                 abandoned,
             };
 
-            io.write(&JsonFile::encode(&report));
+            io.write(&JsonFile::encode(&report)?);
 
             return Ok(audit_bitmask);
         }

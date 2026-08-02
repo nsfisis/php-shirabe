@@ -59,7 +59,7 @@ impl CheckPlatformReqsCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         results: &[CheckResult],
         format: &str,
-    ) {
+    ) -> anyhow::Result<()> {
         let io = self.get_io();
 
         if format == "json" {
@@ -117,7 +117,7 @@ impl CheckPlatformReqsCommand {
                 })
                 .collect();
 
-            io.write(&JsonFile::encode(&PhpMixed::List(rows)));
+            io.write(&JsonFile::encode(&PhpMixed::List(rows))?);
         } else {
             let rows: Vec<PhpMixed> = results
                 .iter()
@@ -151,6 +151,8 @@ impl CheckPlatformReqsCommand {
 
             self.render_table(rows, output);
         }
+
+        Ok(())
     }
 }
 
@@ -396,7 +398,7 @@ impl Command for CheckPlatformReqsCommand {
             .as_string()
             .unwrap_or("text")
             .to_string();
-        self.print_table(_output, &results, &format);
+        self.print_table(_output, &results, &format)?;
 
         Ok(exit_code)
     }

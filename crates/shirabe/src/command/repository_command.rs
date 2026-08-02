@@ -50,7 +50,7 @@ impl RepositoryCommand {
         command
     }
 
-    fn list_repositories(&self, mut repos: IndexMap<String, PhpMixed>) {
+    fn list_repositories(&self, mut repos: IndexMap<String, PhpMixed>) -> anyhow::Result<()> {
         let io = self.get_io();
 
         let mut packagist_present = false;
@@ -84,7 +84,7 @@ impl RepositoryCommand {
 
         if repos.is_empty() {
             io.write("No repositories configured");
-            return;
+            return Ok(());
         }
 
         for (key, repo) in &repos {
@@ -111,14 +111,19 @@ impl RepositoryCommand {
                     .get("type")
                     .and_then(|v| v.as_string())
                     .unwrap_or("unknown");
-                let url = repo_map
+                let url = match repo_map
                     .get("url")
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| JsonFile::encode(repo));
+                {
+                    Some(url) => url,
+                    None => JsonFile::encode(repo)?,
+                };
                 io.write(&format!("[{}] <info>{}</info> {}", name, r#type, url));
             }
         }
+
+        Ok(())
     }
 
     /// PHP: private function suggestTypeForAdd(): \Closure (a static closure — `this` unused)
@@ -352,7 +357,7 @@ impl Command for RepositoryCommand {
 
         match action.as_str() {
             "list" | "ls" | "show" => {
-                self.list_repositories(repos);
+                self.list_repositories(repos)?;
                 Ok(0)
             }
             "add" => {

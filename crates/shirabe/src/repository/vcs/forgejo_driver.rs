@@ -364,7 +364,7 @@ impl ForgejoDriver {
                                 pretty_print: false,
                                 ..Default::default()
                             },
-                        );
+                        )?;
                         self.inner
                             .cache
                             .as_mut()

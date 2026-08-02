@@ -28,7 +28,7 @@ fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
 fn read_json_file(path: &str) -> serde_json::Value {
     let mut json = JsonFile::new(path.to_string(), None, None).unwrap();
     let read = json.read().unwrap();
-    serde_json::from_str(&JsonFile::encode(&read)).unwrap()
+    serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap()
 }
 
 /// Mirrors PHPUnit's assertEmpty for a decoded JSON document (empty object/array/null).

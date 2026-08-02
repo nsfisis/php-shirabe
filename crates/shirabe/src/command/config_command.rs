@@ -497,7 +497,7 @@ impl Command for ConfigCommand {
                         pretty_print: false,
                         ..Default::default()
                     },
-                )
+                )?
             } else {
                 value.as_string().unwrap_or("").to_string()
             };

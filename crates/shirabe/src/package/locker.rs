@@ -132,7 +132,7 @@ impl Locker {
             &JsonFile::encode_with_options(
                 &PhpMixed::Array(relevant_content.into_iter().collect()),
                 JsonEncodeOptions::none(),
-            ),
+            )?,
         ))
     }
 
@@ -620,7 +620,7 @@ impl Locker {
                 let parsed = JsonFile::parse_json(
                     Some(&JsonFile::encode(&PhpMixed::Array(
                         lock.into_iter().collect(),
-                    ))),
+                    ))?),
                     None,
                 )?;
                 let parsed_map: IndexMap<String, PhpMixed> = match parsed {

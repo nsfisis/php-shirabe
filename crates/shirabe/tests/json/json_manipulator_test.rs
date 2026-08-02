@@ -4128,7 +4128,7 @@ fn test_remove_main_key_removes_key_where_value_is_null() {
 
     manipulator.remove_main_key("bar").unwrap();
 
-    let expected = JsonFile::encode(&arr(&[("foo", PhpMixed::Int(9000))]));
+    let expected = JsonFile::encode(&arr(&[("foo", PhpMixed::Int(9000))])).unwrap();
 
     assert_eq!(
         JsonFile::parse_json(Some(&expected), None).unwrap(),

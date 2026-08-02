@@ -17,7 +17,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
-/// ref: LockerTest::getJsonContent — `JsonFile::encode(ksort([minimum-stability, name]), 0)`.
+/// ref: LockerTest::getJsonContent — `JsonFile::encode(ksort([minimum-stability, name]), 0).unwrap()`.
 fn get_json_content(custom_data: &[(&str, &str)]) -> String {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert(
@@ -30,7 +30,7 @@ fn get_json_content(custom_data: &[(&str, &str)]) -> String {
     }
     data.sort_keys();
 
-    JsonFile::encode_with_options(&PhpMixed::Array(data), JsonEncodeOptions::none())
+    JsonFile::encode_with_options(&PhpMixed::Array(data), JsonEncodeOptions::none()).unwrap()
 }
 
 /// Builds a `Locker` backed by a real `composer.lock` `JsonFile` inside a fresh temp dir,
@@ -246,7 +246,8 @@ fn test_is_fresh_false() {
             m
         }),
         JsonEncodeOptions::none(),
-    );
+    )
+    .unwrap();
     let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
 
     assert!(!locker.is_fresh().unwrap());

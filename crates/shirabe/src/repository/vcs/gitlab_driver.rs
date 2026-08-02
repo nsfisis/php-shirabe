@@ -298,7 +298,7 @@ impl GitLabDriver {
                                     pretty_print: false,
                                     ..Default::default()
                                 },
-                            ),
+                            )?,
                         )
                     });
                 }

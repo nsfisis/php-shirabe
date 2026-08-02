@@ -293,7 +293,7 @@ impl Command for SearchCommand {
                     PhpMixed::Array(entry)
                 })
                 .collect();
-            io.write(&JsonFile::encode(&PhpMixed::List(rows)));
+            io.write(&JsonFile::encode(&PhpMixed::List(rows))?);
         }
 
         Ok(0)

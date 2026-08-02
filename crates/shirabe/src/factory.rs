@@ -790,7 +790,7 @@ impl Factory {
                                     .iter()
                                     .map(|(k, v)| (k.clone(), v.clone()))
                                     .collect(),
-                            ));
+                            ))?;
                             let locker = Locker::new(
                                 io.clone(),
                                 JsonFile::new(Platform::get_dev_null(), None, Some(io.clone()))?,

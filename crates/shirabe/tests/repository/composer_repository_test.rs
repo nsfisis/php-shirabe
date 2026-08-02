@@ -62,7 +62,7 @@ fn repo_config(url: &str) -> IndexMap<String, PhpMixed> {
 }
 
 fn json_encode(value: &PhpMixed) -> String {
-    shirabe::json::json_file::JsonFile::encode(value)
+    shirabe::json::json_file::JsonFile::encode(value).unwrap()
 }
 
 fn str_kv(pairs: &[(&str, PhpMixed)]) -> PhpMixed {

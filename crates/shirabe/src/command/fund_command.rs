@@ -211,7 +211,7 @@ impl Command for FundCommand {
             io.write("Thank you!");
         } else if format == "json" {
             let fundings_mixed: PhpMixed = fundings.clone().into();
-            io.write(&JsonFile::encode(&fundings_mixed));
+            io.write(&JsonFile::encode(&fundings_mixed)?);
         } else {
             io.write("No funding links were found in your package dependencies. This doesn't mean they don't need your support!");
         }

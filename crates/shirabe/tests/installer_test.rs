@@ -707,7 +707,8 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
                 let encoded = JsonFile::encode_with_options(
                     &composer,
                     shirabe::json::JsonEncodeOptions::none(),
-                );
+                )
+                .unwrap();
                 let hash = format!("{:x}", md5::compute(encoded.as_bytes()));
                 lock["hash"] = serde_json::Value::String(hash);
             }
@@ -926,7 +927,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     // escaped), or the freshness check spuriously fails on any composer.json containing "/"
     // (e.g. any vendor/package name).
     let contents =
-        JsonFile::encode_with_options(&case.composer, shirabe::json::JsonEncodeOptions::none());
+        JsonFile::encode_with_options(&case.composer, shirabe::json::JsonEncodeOptions::none())
+            .unwrap();
     let locker = Locker::new(io.clone(), lock_json, locker_im, &contents, process);
     composer
         .borrow_mut()

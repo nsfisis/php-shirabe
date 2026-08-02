@@ -698,7 +698,7 @@ impl Command for ShowCommand {
                     );
                     self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
                         wrapper.into_iter().collect(),
-                    )));
+                    ))?);
                 } else {
                     self.display_package_tree(vec![array_tree]);
                 }
@@ -829,7 +829,7 @@ impl Command for ShowCommand {
                 );
                 self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
                     wrapper.into_iter().collect(),
-                )));
+                ))?);
             } else {
                 self.display_package_tree(array_tree);
             }
@@ -1289,7 +1289,7 @@ impl Command for ShowCommand {
             let io = self.get_io();
             io.write(&JsonFile::encode(&PhpMixed::Array(
                 json_map.into_iter().collect(),
-            )));
+            ))?);
         } else {
             if input.borrow().get_option("latest")?.as_bool() == Some(true)
                 && view_data.values().any(|v| !v.is_empty())
@@ -2222,7 +2222,7 @@ impl ShowCommand {
 
         self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
             json.into_iter().collect(),
-        )));
+        ))?);
         Ok(())
     }
 

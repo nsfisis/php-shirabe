@@ -227,7 +227,7 @@ impl SvnDriver {
                         pretty_print: false,
                         ..Default::default()
                     },
-                );
+                )?;
                 self.inner
                     .cache
                     .as_mut()

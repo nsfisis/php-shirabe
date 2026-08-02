@@ -273,7 +273,7 @@ impl Command for LicensesCommand {
                 output_map.insert("dependencies".to_string(), PhpMixed::Array(dependencies));
                 io.write(&JsonFile::encode(&PhpMixed::Array(
                     output_map.into_iter().collect(),
-                )));
+                ))?);
             }
             "summary" => {
                 let mut used_licenses: IndexMap<String, i64> = IndexMap::new();

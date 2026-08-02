@@ -16,8 +16,8 @@ fn expect_parse_exception(text: &str, json: &str) {
 fn assert_json_format(json: &str, data: &PhpMixed, options: Option<JsonEncodeOptions>) {
     let json = json.replace('\r', "");
     match options {
-        None => assert_eq!(json, JsonFile::encode(data)),
-        Some(options) => assert_eq!(json, JsonFile::encode_with_options(data, options)),
+        None => assert_eq!(json, JsonFile::encode(data).unwrap()),
+        Some(options) => assert_eq!(json, JsonFile::encode_with_options(data, options).unwrap()),
     }
 }
 
@@ -191,11 +191,11 @@ fn test_double_escaped_unicode() {
         PhpMixed::String("Zdjęcia".to_string()),
         PhpMixed::String("hjkjhl\\u0119kkjk".to_string()),
     ]);
-    let encoded_data = JsonFile::encode(&data);
+    let encoded_data = JsonFile::encode(&data).unwrap();
 
     let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
     wrapper.insert("t".to_string(), PhpMixed::String(encoded_data));
-    let double_encoded_data = JsonFile::encode(&PhpMixed::Array(wrapper));
+    let double_encoded_data = JsonFile::encode(&PhpMixed::Array(wrapper)).unwrap();
 
     let decoded_data = shirabe_php_shim::json_decode(&double_encoded_data, true).unwrap();
     let t = decoded_data.as_array().unwrap().get("t").unwrap();

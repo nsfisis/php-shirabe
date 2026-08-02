@@ -220,7 +220,7 @@ impl JsonFile {
         if self.path == "php://memory" {
             file_put_contents(
                 &self.path,
-                Self::encode_with_options(&hash, options).as_bytes(),
+                Self::encode_with_options(&hash, options)?.as_bytes(),
             );
 
             return Ok(());
@@ -256,7 +256,7 @@ impl JsonFile {
                     &self.path,
                     &format!(
                         "{}{}",
-                        Self::encode_with_options(&hash, options.clone()),
+                        Self::encode_with_options(&hash, options.clone())?,
                         if options.pretty_print { "\n" } else { "" },
                     ),
                 )?;
@@ -443,25 +443,23 @@ impl JsonFile {
         Ok(true)
     }
 
-    pub fn encode<T: serde::Serialize + ?Sized>(data: &T) -> String {
+    pub fn encode<T: serde::Serialize + ?Sized>(data: &T) -> anyhow::Result<String> {
         Self::encode_with_options(data, JsonEncodeOptions::default())
     }
 
     pub fn encode_with_options<T: serde::Serialize + ?Sized>(
         data: &T,
         options: JsonEncodeOptions,
-    ) -> String {
-        let json = json_encode_ex(data, options.to_flags())
-            .map_err(|err| RuntimeException {
-                message: format!("JSON encoding failed: {}", err),
-                code: 0,
-            })
-            .unwrap(); // TODO(phase-c): propagating an Err.
+    ) -> anyhow::Result<String> {
+        let json = json_encode_ex(data, options.to_flags()).map_err(|err| RuntimeException {
+            message: format!("JSON encoding failed: {}", err),
+            code: 0,
+        })?;
 
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
             let indent_owned = options.indent;
-            return Preg::replace_callback(
+            return Ok(Preg::replace_callback(
                 php_regex!(r"#^ {4,}#m"),
                 move |m: &indexmap::IndexMap<
                     shirabe_external_packages::composer::pcre::CaptureKey,
@@ -475,10 +473,10 @@ impl JsonFile {
                     str_repeat(&indent_owned, (strlen(whole) / 4) as usize)
                 },
                 &json,
-            );
+            ));
         }
 
-        json
+        Ok(json)
     }
 
     /// Parses json string and returns hash.

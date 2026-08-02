@@ -303,7 +303,7 @@ impl GitHubDriver {
                                     pretty_print: false,
                                     ..Default::default()
                                 },
-                            ),
+                            )?,
                         )
                     });
                 }

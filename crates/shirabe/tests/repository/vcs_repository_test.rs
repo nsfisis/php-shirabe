@@ -60,7 +60,7 @@ fn set_up() -> Option<SetUp> {
     // add composed tag & master branch
     write_file(
         "composer.json",
-        &shirabe::json::JsonFile::encode(&composer(None)),
+        &shirabe::json::JsonFile::encode(&composer(None)).unwrap(),
     );
     exec(&["add", "composer.json"]);
     exec(&["commit", "-m", "addcomposer"]);
@@ -79,7 +79,7 @@ fn set_up() -> Option<SetUp> {
     exec(&["checkout", "master"]);
     write_file(
         "composer.json",
-        &shirabe::json::JsonFile::encode(&composer(Some("1.0.0"))),
+        &shirabe::json::JsonFile::encode(&composer(Some("1.0.0"))).unwrap(),
     );
     exec(&["add", "composer.json"]);
     exec(&["commit", "-m", "addversion"]);
@@ -105,7 +105,7 @@ fn set_up() -> Option<SetUp> {
     // update master to 2.0
     write_file(
         "composer.json",
-        &shirabe::json::JsonFile::encode(&composer(Some("2.0.0"))),
+        &shirabe::json::JsonFile::encode(&composer(Some("2.0.0"))).unwrap(),
     );
     exec(&["add", "composer.json"]);
     exec(&["commit", "-m", "bump-version"]);

@@ -2874,7 +2874,7 @@ impl ComposerRepository {
                                 .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect(),
                         );
-                        json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none());
+                        json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?;
                     }
                     self.cache.borrow_mut().write(ck, &json);
                 }
@@ -3054,7 +3054,7 @@ impl ComposerRepository {
                 data.insert("last-modified".to_string(), PhpMixed::String(lmd.clone()));
                 let as_mixed =
                     PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none());
+                json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?;
             }
             if !self.cache.borrow().is_read_only() {
                 self.cache.borrow_mut().write(cache_key, &json);
@@ -3229,7 +3229,7 @@ impl ComposerRepository {
                     pretty_print: false,
                     ..Default::default()
                 },
-            );
+            )?;
         }
         if !self.cache.borrow().is_read_only() {
             self.cache.borrow_mut().write(cache_key, &json);

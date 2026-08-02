@@ -281,7 +281,7 @@ impl GitBitbucketDriver {
                                 pretty_print: false,
                                 ..Default::default()
                             },
-                        ),
+                        )?,
                     )?;
                 }
             }

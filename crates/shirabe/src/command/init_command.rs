@@ -290,7 +290,7 @@ impl Command for InitCommand {
 
         let file_obj = JsonFile::new(Factory::get_composer_file()?, None, None)?;
         let options_for_encode: IndexMap<String, PhpMixed> = options.clone().into_iter().collect();
-        let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()));
+        let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()))?;
 
         if input.borrow().is_interactive() {
             io.write_error3(&format!("\n{}\n", json), true, io_interface::NORMAL);

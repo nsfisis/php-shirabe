@@ -123,6 +123,7 @@ fn repo_body() -> String {
         );
         m
     }))
+    .unwrap()
 }
 
 #[test]
@@ -175,7 +176,8 @@ fn test_get_branches() {
         entry.insert("name".to_string(), PhpMixed::String("main".to_string()));
         entry.insert("commit".to_string(), PhpMixed::Array(commit));
         entry
-    })]));
+    })]))
+    .unwrap();
 
     let (http_downloader, _http_guard) = http_mock(vec![
         expect_full(
@@ -217,7 +219,8 @@ fn test_get_tags() {
         entry.insert("name".to_string(), PhpMixed::String("1.0".to_string()));
         entry.insert("commit".to_string(), PhpMixed::Array(commit));
         entry
-    })]));
+    })]))
+    .unwrap();
 
     let (http_downloader, _http_guard) = http_mock(vec![
         expect_full(

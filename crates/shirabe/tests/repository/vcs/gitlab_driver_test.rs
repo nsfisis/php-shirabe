@@ -513,7 +513,7 @@ fn test_get_paginated_refs() {
             "2013-03-09T16:35:23.000+01:00",
         ));
     }
-    let branch_data = shirabe::json::JsonFile::encode(&PhpMixed::List(branch_data));
+    let branch_data = shirabe::json::JsonFile::encode(&PhpMixed::List(branch_data)).unwrap();
 
     let (http_downloader, _guard) = get_http_downloader_mock(
         vec![
