@@ -3,20 +3,30 @@
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
+use shirabe::autoload::{AutoloadGeneratorInterface, ClassLoader};
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::dependency_resolver::Transaction;
+use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::event_dispatcher::{Callable, EventDispatcher, EventInterface};
-use shirabe::installer::InstallerEvents;
+use shirabe::filter::PlatformRequirementFilterInterface;
+use shirabe::installer::{InstallationManagerInterface, InstallerEvents, InstallerInterface};
 use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
-use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};
+use shirabe::package::{
+    LockerInterface, PackageInterfaceHandle, RootPackageHandle, RootPackageInterfaceHandle,
+};
+use shirabe::repository::{
+    InstalledArrayRepository, InstalledRepositoryInterface, RepositoryInterfaceHandle,
+    RepositoryManagerInterface,
+};
 use shirabe::script::Event as ScriptEvent;
 use shirabe::script::ScriptEvents;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
+use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_external_packages::symfony::console::output::output_interface;
-use shirabe_php_shim::PHP_EOL;
+use shirabe_php_shim::{PHP_EOL, PhpMixed};
 
 fn tear_down() {
     Platform::clear_env("COMPOSER_SKIP_SCRIPTS");
@@ -322,32 +332,206 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
     let _ = &mut event;
 }
 
-// The remaining ignored tests drive listeners that invoke PHP scripts (`Class::method`), require
-// the autoloader rebuild of `make_autoloader` (an intentional no-op in the port), or rely on
-// object-identity callables. None of those seams exist in the Rust port (the PHP-script
-// invocation path is an unimplemented plugin-runtime `todo!`), so they remain ignored.
+// The remaining ignored tests use, as their listeners, static methods of the PHPUnit test class
+// `Composer\Test\EventDispatcher\EventDispatcherTest` itself (or object-identity array
+// callables). The PHP-script invocation path is implemented (execute_event_php_script sends a
+// CallStaticMethod over the RPC channel), but the worker child process cannot load that test
+// class: it extends PHPUnit\Framework\TestCase and phpunit is not part of composer/vendor.
+// Making these pass needs a decision on how to provide the listener methods to the child (e.g. a
+// stand-in fixture class with the same FQCN and method bodies), which is not a call to make
+// unilaterally under the no-test-alteration rule.
 
 #[test]
-#[ignore = "listener `EventDispatcherTest::call` is a PHP-script callable; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
+#[ignore = "listener `EventDispatcherTest::call` is a static method of the PHPUnit test class itself; the PHP worker cannot load it (extends PHPUnit\\Framework\\TestCase, phpunit absent from composer/vendor) — see the note above the ignored block"]
 fn test_listener_exceptions_are_caught() {
     let _tear_down = TearDown;
-    // TODO(phase-d): listener `EventDispatcherTest::call` is a PHP-script callable; dynamic
-    // static-method invocation requires the plugin runtime (execute_event_php_script is todo!())
+    // TODO(phase-d): the listener is a static method of the PHPUnit test class itself, which
+    // the PHP worker cannot load (phpunit is absent from composer/vendor); pending a decision on
+    // providing the listener methods to the child process.
     todo!()
 }
 
+// PHP mocks `Composer\Autoload\AutoloadGenerator` with onlyMethods(['buildPackageMap',
+// 'parseAutoloads', 'createLoader', 'setDevMode']).
+mockall::mock! {
+    #[derive(Debug)]
+    pub AutoloadGenerator {}
+    impl AutoloadGeneratorInterface for AutoloadGenerator {
+        fn set_dev_mode(&mut self, dev_mode: bool);
+        fn set_class_map_authoritative(&mut self, class_map_authoritative: bool);
+        fn set_apcu(&mut self, apcu: bool, apcu_prefix: Option<String>);
+        fn set_run_scripts(&mut self, run_scripts: bool);
+        fn set_dry_run(&mut self, dry_run: bool);
+        fn set_platform_requirement_filter(
+            &mut self,
+            platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
+        );
+        fn dump<'a>(
+            &mut self,
+            config: &Config,
+            local_repo: &mut dyn InstalledRepositoryInterface,
+            root_package: RootPackageInterfaceHandle,
+            installation_manager: &mut dyn InstallationManagerInterface,
+            target_dir: &str,
+            scan_psr_packages: bool,
+            suffix: Option<String>,
+            locker: Option<&'a mut dyn LockerInterface>,
+            strict_ambiguous: bool,
+        ) -> anyhow::Result<ClassMap>;
+        fn build_package_map(
+            &self,
+            installation_manager: &mut dyn InstallationManagerInterface,
+            root_package: RootPackageInterfaceHandle,
+            packages: Vec<PackageInterfaceHandle>,
+        ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>>;
+        fn parse_autoloads(
+            &self,
+            package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+            root_package: RootPackageInterfaceHandle,
+            filtered_dev_packages: PhpMixed,
+        ) -> IndexMap<String, PhpMixed>;
+        fn create_loader<'a>(
+            &self,
+            autoloads: &IndexMap<String, PhpMixed>,
+            vendor_dir: Option<String>,
+        ) -> ClassLoader;
+    }
+}
+
+// PHP mocks `Composer\Repository\RepositoryManager` with onlyMethods(['getLocalRepository']).
+mockall::mock! {
+    #[derive(Debug)]
+    pub RepositoryManager {}
+    impl RepositoryManagerInterface for RepositoryManager {
+        fn get_local_repository(&self) -> RepositoryInterfaceHandle;
+        fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+        fn create_repository<'a>(
+            &self,
+            r#type: &str,
+            config: IndexMap<String, PhpMixed>,
+            name: Option<&'a str>,
+        ) -> anyhow::Result<RepositoryInterfaceHandle>;
+        fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
+        fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+    }
+}
+
+// PHP mocks `Composer\Installer\InstallationManager` with disableOriginalConstructor().
+mockall::mock! {
+    #[derive(Debug)]
+    pub InstallationManager {}
+    impl InstallationManagerInterface for InstallationManager {
+        fn add_installer(&mut self, installer: Box<dyn InstallerInterface>);
+        fn remove_installer(&mut self, installer: &dyn InstallerInterface);
+        fn disable_plugins(&mut self);
+        fn is_package_installed(
+            &mut self,
+            repo: &mut dyn InstalledRepositoryInterface,
+            package: PackageInterfaceHandle,
+        ) -> anyhow::Result<bool>;
+        fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
+        fn execute(
+            &mut self,
+            repo: &mut dyn InstalledRepositoryInterface,
+            operations: Vec<AnyOperation>,
+            dev_mode: bool,
+            run_scripts: bool,
+            download_only: bool,
+        ) -> anyhow::Result<()>;
+        fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
+        fn set_output_progress(&mut self, output_progress: bool);
+        fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+    }
+}
+
+/// ref: EventDispatcherTest::testDispatcherPassDevModeToAutoloadGeneratorForScriptEvents
 #[test]
-#[ignore = "EventDispatcher::make_autoloader (PHP makeAutoloader, called from doDispatch's script branches) is an intentional no-op in the port, so AutoloadGeneratorInterface::set_dev_mode is never invoked and a set_dev_mode spy would observe nothing"]
+#[serial]
 fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
     let _tear_down = TearDown;
-    // TODO(phase-d): the PHP test spies on AutoloadGenerator::setDevMode, which PHP calls from
-    // makeAutoloader (invoked from doDispatch's script branches; it rebuilds and registers the
-    // project autoloader — loader->unregister, setDevMode(event->isDevMode()), buildPackageMap,
-    // parseAutoloads, createLoader->register — so that PHP-script listeners can be invoked). The
-    // Rust EventDispatcher::make_autoloader is an intentional no-op (see its TODO(plugin)
-    // marker), so set_dev_mode is never reached. A spy could be written against
-    // `dyn AutoloadGeneratorInterface` once make_autoloader does the real work.
-    todo!()
+    if !ensure_php_binary() {
+        // The php-script listener path queries class_exists through the PHP worker.
+        return;
+    }
+
+    // dataProvider provideDevModes
+    for dev_mode in [true, false] {
+        let composer = create_composer_instance();
+
+        let mut generator = MockAutoloadGenerator::new();
+        generator
+            .expect_set_dev_mode()
+            .with(mockall::predicate::eq(dev_mode))
+            .times(1..)
+            .return_const(());
+        generator
+            .expect_build_package_map()
+            .returning(|_, _, _| Ok(Vec::new()));
+        generator.expect_parse_autoloads().returning(|_, _, _| {
+            [
+                ("psr-0".to_string(), PhpMixed::List(vec![])),
+                ("psr-4".to_string(), PhpMixed::List(vec![])),
+                ("classmap".to_string(), PhpMixed::List(vec![])),
+                ("files".to_string(), PhpMixed::List(vec![])),
+                ("exclude-from-classmap".to_string(), PhpMixed::List(vec![])),
+            ]
+            .into_iter()
+            .collect()
+        });
+        generator
+            .expect_create_loader()
+            .returning(|_, _| ClassLoader::new(None));
+        composer
+            .borrow_mut()
+            .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
+
+        let package: RootPackageInterfaceHandle = RootPackageHandle::new(
+            "foo".to_string(),
+            "1.0.0.0".to_string(),
+            "1.0.0".to_string(),
+        )
+        .into();
+        let mut scripts: IndexMap<String, Vec<String>> = IndexMap::new();
+        scripts.insert(
+            "scriptName".to_string(),
+            vec!["ClassName::testMethod".to_string()],
+        );
+        package.set_scripts(scripts);
+        composer.borrow_mut().set_package(package);
+
+        let mut repository_manager = MockRepositoryManager::new();
+        repository_manager
+            .expect_get_local_repository()
+            .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
+        composer
+            .borrow_mut()
+            .set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
+                repository_manager,
+            )));
+        composer
+            .borrow_mut()
+            .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
+                MockInstallationManager::new(),
+            )));
+
+        let (process, _process_guard) =
+            get_process_executor_mock(vec![], false, MockHandler::default());
+        let mut dispatcher =
+            EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
+
+        let mut event = ScriptEvent::new(
+            "scriptName".to_string(),
+            composer.downgrade(),
+            null_io(),
+            dev_mode,
+            Vec::new(),
+            IndexMap::new(),
+        );
+
+        dispatcher
+            .dispatch(Some("scriptName"), Some(&mut event))
+            .unwrap();
+    }
 }
 
 #[test]
@@ -361,32 +545,32 @@ fn test_dispatcher_remove_listener() {
 }
 
 #[test]
-#[ignore = "mixes a PHP-script listener (EventDispatcherTest::someMethod) into the stack; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
+#[ignore = "listener `EventDispatcherTest::someMethod` is a static method of the PHPUnit test class itself; the PHP worker cannot load it — see the note above the ignored block"]
 fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let _tear_down = TearDown;
-    // TODO(phase-d): mixes a PHP-script listener (EventDispatcherTest::someMethod) into the
-    // stack; dynamic static-method invocation requires the plugin runtime
-    // (execute_event_php_script is todo!())
+    // TODO(phase-d): the PHP-script listener is a static method of the PHPUnit test class
+    // itself, which the PHP worker cannot load; pending a decision on providing the listener
+    // methods to the child process.
     todo!()
 }
 
 #[test]
-#[ignore = "second listener EventDispatcherTest::getTestEnv is a PHP-script callable; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
+#[ignore = "listener `EventDispatcherTest::getTestEnv` is a static method of the PHPUnit test class itself; the PHP worker cannot load it — see the note above the ignored block"]
 fn test_dispatcher_can_put_env() {
     let _tear_down = TearDown;
-    // TODO(phase-d): second listener EventDispatcherTest::getTestEnv is a PHP-script callable;
-    // dynamic static-method invocation requires the plugin runtime (execute_event_php_script is
-    // todo!())
+    // TODO(phase-d): the second listener is a static method of the PHPUnit test class itself,
+    // which the PHP worker cannot load; pending a decision on providing the listener methods to
+    // the child process.
     todo!()
 }
 
 #[test]
-#[ignore = "listeners are PHP-script callables (createsVendorBinFolderChecksEnv*) asserting on PATH; dynamic static-method invocation requires the plugin runtime (execute_event_php_script is todo!())"]
+#[ignore = "listeners (createsVendorBinFolderChecksEnv*) are static methods of the PHPUnit test class itself; the PHP worker cannot load them — see the note above the ignored block"]
 fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let _tear_down = TearDown;
-    // TODO(phase-d): listeners are PHP-script callables (createsVendorBinFolderChecksEnv*)
-    // asserting on PATH; dynamic static-method invocation requires the plugin runtime
-    // (execute_event_php_script is todo!())
+    // TODO(phase-d): the listeners are static methods of the PHPUnit test class itself, which
+    // the PHP worker cannot load; pending a decision on providing the listener methods to the
+    // child process.
     todo!()
 }
 

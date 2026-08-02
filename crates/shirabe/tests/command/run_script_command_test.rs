@@ -10,33 +10,25 @@ use shirabe_php_shim::PhpMixed;
 /// `ScriptEvent` passed to `hasEventListeners` matches the script name AND its `isDevMode()` equals
 /// the computed dev mode (`dev || !noDev`) -- the latter being the whole point of the test.
 #[test]
-#[ignore = "PHP asserts (a) via mocked hasEventListeners that the ScriptEvent has isDevMode() == \
-            (dev || !no_dev) and (b) via mocked dispatchScript that it is called once with \
-            ($script, $expectedDevMode, []). Neither expectation is expressible: (a) the \
-            __set_get_listeners_override callback only sees &dyn EventInterface \
-            (src/event_dispatcher/event.rs:49), which has no as_any/downcast seam to reach the \
-            concrete ScriptEvent::is_dev_mode (src/script/event.rs:51) -- adding one is a \
-            cross-cutting trait change over every event type, not a small test seam; (b) \
-            dispatch_script is a concrete method with no call-recording seam, and letting the \
-            real one run would execute listeners for real. The faithful body is therefore \
-            inexpressible and is left as todo!()."]
+#[ignore = "PHP mocks RunScriptCommand itself (onlyMethods incl. requireComposer -> a composer \
+            whose EventDispatcher is a hasEventListeners/dispatchScript recording mock) and \
+            drives run() with mocked Input/Output. The Rust RunScriptCommand has no \
+            requireComposer override seam and Input/Output are concrete types, so the mocked \
+            harness is inexpressible; the event-side isDevMode downcast now exists \
+            (EventInterface::as_any), but that alone does not unblock the test."]
 fn test_detect_and_pass_dev_mode_to_event_and_to_dispatching() {
-    // TODO(phase-d): PHP asserts (a) via mocked hasEventListeners that the ScriptEvent has
-    // isDevMode() == (dev || !no_dev) and (b) via mocked dispatchScript that it is called once
-    // with ($script, $expectedDevMode, []). Neither expectation is expressible: (a) the
-    // __set_get_listeners_override callback only sees &dyn EventInterface
-    // (src/event_dispatcher/event.rs:49), which has no as_any/downcast seam to reach the concrete
-    // ScriptEvent::is_dev_mode (src/script/event.rs:51) -- adding one is a cross-cutting trait
-    // change over every event type, not a small test seam; (b) dispatch_script is a concrete
-    // method with no call-recording seam, and letting the real one run would execute listeners
-    // for real. The faithful body is therefore inexpressible and is left as todo!().
+    // TODO(phase-d): PHP mocks RunScriptCommand itself (onlyMethods incl. requireComposer -> a
+    // composer whose EventDispatcher is a hasEventListeners/dispatchScript recording mock) and
+    // drives run() with mocked Input/Output. The Rust RunScriptCommand has no requireComposer
+    // override seam and Input/Output are concrete types, so the mocked harness is
+    // inexpressible; the event-side isDevMode downcast now exists (EventInterface::as_any), but
+    // that alone does not unblock the test.
     todo!()
 }
 
 /// ref: RunScriptCommandTest::testCanListScripts
 #[test]
 #[serial]
-#[ignore = "Application::do_run registers composer.json scripts as commands; that path calls loader.register (class_loader.rs:288 -> spl_autoload_register at runtime.rs:231) which is a todo!() stub. With a 'scripts' key present, app_tester.run() panics there before the command executes"]
 fn test_can_list_scripts() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -82,7 +74,6 @@ fn test_can_list_scripts() {
 /// ref: RunScriptCommandTest::testCanDefineAliases
 #[test]
 #[serial]
-#[ignore = "Application::do_run registers composer.json scripts as commands; that path calls loader.register (class_loader.rs:288 -> spl_autoload_register at runtime.rs:231) which is a todo!() stub. With a 'scripts' key present, app_tester.run() panics there before the command executes"]
 fn test_can_define_aliases() {
     let expected_aliases = vec!["one", "two", "three"];
 
@@ -131,19 +122,19 @@ fn test_can_define_aliases() {
 }
 
 #[test]
-#[ignore = "requires writing and executing a PHP-generated Symfony Command class (file_put_contents MyCommand.php) loaded via composer autoload; fundamentally unportable, no PHP runtime command loading in shirabe"]
+#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommand.php) as a live application command (todo!() in application.rs; PHP-side Application milestone). The EventDispatcher-side Command-class path alone cannot satisfy the direct invocation and its argument definitions"]
 fn test_execution_of_simple_symfony_command() {
-    // TODO(phase-d): requires writing and executing a PHP-generated Symfony Command class
-    // (file_put_contents MyCommand.php) loaded via composer autoload; fundamentally unportable, no
-    // PHP runtime command loading in shirabe.
+    // TODO(phase-d): the test invokes the script name as a top-level composer command, which
+    // requires Application::do_run to import the user's PHP Command class (MyCommand.php) as a
+    // live application command (todo!() in application.rs; PHP-side Application milestone).
     todo!()
 }
 
 #[test]
-#[ignore = "requires writing and executing a PHP-generated Symfony Command class (file_put_contents MyCommandWithDefinitions.php) loaded via composer autoload; fundamentally unportable, no PHP runtime command loading in shirabe"]
+#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommandWithDefinitions.php) as a live application command (todo!() in application.rs; PHP-side Application milestone). The EventDispatcher-side Command-class path alone cannot satisfy the direct invocation and its argument definitions"]
 fn test_execution_of_symfony_command_with_configuration() {
-    // TODO(phase-d): requires writing and executing a PHP-generated Symfony Command class
-    // (file_put_contents MyCommandWithDefinitions.php) loaded via composer autoload; fundamentally
-    // unportable, no PHP runtime command loading in shirabe.
+    // TODO(phase-d): the test invokes the script name as a top-level composer command, which
+    // requires Application::do_run to import the user's PHP Command class (MyCommandWithDefinitions.php)
+    // as a live application command (todo!() in application.rs; PHP-side Application milestone).
     todo!()
 }

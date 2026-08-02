@@ -60,6 +60,10 @@ impl PostFileDownloadEvent {
 }
 
 impl EventInterface for PostFileDownloadEvent {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         self.inner.get_name()
     }

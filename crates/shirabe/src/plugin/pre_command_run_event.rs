@@ -42,6 +42,10 @@ impl PreCommandRunEvent {
 }
 
 impl EventInterface for PreCommandRunEvent {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         self.inner.get_name()
     }

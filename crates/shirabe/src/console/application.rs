@@ -2372,63 +2372,51 @@ impl ApplicationHandle {
 
                                 // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly
                                 let dummy_str = dummy.as_string().unwrap_or("").to_string();
-                                let cmd: PhpMixed = if is_string(dummy)
-                                    && shirabe_php_shim::class_exists(&dummy_str)
-                                    && is_subclass_of(
-                                        &PhpMixed::String(dummy_str.clone()),
-                                        "Symfony\\Component\\Console\\Command\\Command",
-                                        true,
-                                    ) {
-                                    if is_subclass_of(
-                                        &PhpMixed::String(dummy_str.clone()),
-                                        "Symfony\\Component\\Console\\SingleCommandApplication",
-                                        true,
-                                    ) {
-                                        io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
-                                    }
-                                    let mut cmd = shirabe_php_shim::instantiate_class(
-                                        &dummy_str,
-                                        vec![PhpMixed::String(script.clone())],
-                                    );
-                                    // TODO(phase-c): the script's command class is built by
-                                    // reflection (instantiate_class) and stays PhpMixed; the
-                                    // SingleCommandApplication / SymfonyCommand typed registry it
-                                    // belongs to is an external-package todo!() stub.
-                                    // let _ = SingleCommandApplication::new;
-
-                                    // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
-                                    // TODO(phase-c): cmd is the PhpMixed result of reflection
-                                    // instantiation; reading/overriding its
-                                    // name/description requires the typed SymfonyCommand model that
-                                    // the Symfony stub does not yet provide.
-                                    let _ = description;
-                                    let _ = &mut cmd;
-                                    cmd
-                                } else {
-                                    // fallback to usual aliasing behavior
-                                    // TODO(phase-c): ScriptAliasCommand is a typed BaseCommand
-                                    // but this code path stores commands as PhpMixed; it can
-                                    // only be carried as a typed trait object once the Symfony
-                                    // command registry is modelled.
-                                    let _ = ScriptAliasCommand::new(
-                                        script.clone(),
-                                        Some(description),
-                                        aliases,
-                                    );
-                                    PhpMixed::Null
-                                };
+                                let cmd: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> =
+                                    if is_string(dummy)
+                                        && shirabe_php_shim::class_exists(&dummy_str)
+                                        && is_subclass_of(
+                                            &PhpMixed::String(dummy_str.clone()),
+                                            "Symfony\\Component\\Console\\Command\\Command",
+                                            true,
+                                        )
+                                    {
+                                        if is_subclass_of(
+                                            &PhpMixed::String(dummy_str.clone()),
+                                            "Symfony\\Component\\Console\\SingleCommandApplication",
+                                            true,
+                                        ) {
+                                            io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
+                                        }
+                                        // TODO(plugin): `new $dummy($script)` instantiates the
+                                        // user's PHP command class in-process and registers the
+                                        // live object on this Application; hosting a PHP-owned
+                                        // command here needs the PHP-side Application / command
+                                        // proxying of the plugin milestones. The shim
+                                        // class_exists above never recognizes user classes, so
+                                        // this arm is currently unreachable.
+                                        let _ = shirabe_php_shim::instantiate_class(
+                                            &dummy_str,
+                                            vec![PhpMixed::String(script.clone())],
+                                        );
+                                        todo!(
+                                            "plugin: import a user Command class as a live application command"
+                                        );
+                                    } else {
+                                        // fallback to usual aliasing behavior
+                                        std::rc::Rc::new(std::cell::RefCell::new(
+                                            ScriptAliasCommand::new(
+                                                script.clone(),
+                                                Some(description),
+                                                aliases,
+                                            )?,
+                                        ))
+                                    };
 
                                 // Compatibility layer for symfony/console <7.4
-                                // TODO(phase-c): Application::add() takes Rc<RefCell<dyn
-                                // SymfonyCommand>>
-                                // but `cmd` here is the PhpMixed result of reflection-based
-                                // plugin command instantiation; registering it as a typed
-                                // command instance is blocked on the Symfony command-registry
-                                // model (external-package todo!() stub).
-                                let _ = &cmd;
-                                todo!(
-                                    "plugin: register reflection-instantiated command on Application::add"
-                                );
+                                // (addCommand does not exist in the ported Application; add()
+                                // is the only registration entry point.)
+                                self.add(cmd)?;
                             }
                         }
                     }

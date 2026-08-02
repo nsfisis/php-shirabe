@@ -20,15 +20,20 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
+use shirabe_php_rpc::{
+    PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
+    call_function_with_dispatcher, call_static_method,
+};
 use shirabe_php_shim::{
     InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
-    array_search_in_vec, array_splice, class_exists, defined, file_exists, get_class, implode,
-    ini_get, is_a, is_array, is_callable, is_object, is_string, krsort, php_regex, preg_quote,
-    realpath, spl_autoload_functions, spl_autoload_register, spl_autoload_unregister,
-    spl_object_hash, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos,
-    strtoupper, substr, trim,
+    array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
+    is_callable, is_object, is_string, krsort, php_regex, preg_quote, realpath,
+    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
+    str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper, substr,
+    trim,
 };
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
@@ -345,7 +350,7 @@ impl EventDispatcher {
             );
             let is_string_callable = matches!(callable, Callable::String(_));
             if let Callable::Closure(ref closure) = callable {
-                let _ = self.make_autoloader(event, &callable);
+                self.make_autoloader(event, &callable)?;
                 // Closures are always callable in PHP (is_callable() returns true for any \Closure),
                 // so the is_callable()/RuntimeException branch below never applies here.
                 r#return = if matches!(closure(event), PhpMixed::Bool(false)) {
@@ -356,7 +361,7 @@ impl EventDispatcher {
             } else if !is_string_callable {
                 // TODO(plugin): non-string callable handling — verify is_callable, invoke,
                 // and replicate the get_class / write_error / is_callable error path from PHP.
-                let _ = self.make_autoloader(event, &callable);
+                self.make_autoloader(event, &callable)?;
                 if !is_callable(&PhpMixed::Null) {
                     let (class_name, method) = match &callable {
                         Callable::ArrayCallable(first, m) => {
@@ -536,9 +541,11 @@ impl EventDispatcher {
                         let class_name = substr(callable_str, 0, Some(pos));
                         let method_name = substr(callable_str, pos + 2, None);
 
-                        let _ =
-                            self.make_autoloader(event, &Callable::String(callable_str.clone()));
-                        if !class_exists(&class_name) {
+                        self.make_autoloader(event, &Callable::String(callable_str.clone()))?;
+                        if !self.php_runtime_bool(
+                            "class_exists",
+                            vec![PluginValue::string(class_name.clone())],
+                        )? {
                             self.io.write_error3(&format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
@@ -546,7 +553,10 @@ impl EventDispatcher {
                             ), true, crate::io::QUIET);
                             continue;
                         }
-                        if !is_callable(&PhpMixed::String(callable_str.clone())) {
+                        if !self.php_runtime_bool(
+                            "is_callable",
+                            vec![PluginValue::string(callable_str.clone())],
+                        )? {
                             self.io.write_error3(&format!(
                                 "<warning>Method {} is not callable, can not call {} script</warning>",
                                 callable_str,
@@ -576,14 +586,21 @@ impl EventDispatcher {
                     Callable::String(ref callable_str) if self.is_command_class(callable_str) => {
                         let class_name = callable_str.clone();
 
-                        let _ = self.make_autoloader(
+                        self.make_autoloader(
                             event,
                             &Callable::ArrayCallable(
                                 Box::new(PhpMixed::String(callable_str.clone())),
                                 "run".to_string(),
                             ),
-                        );
-                        if !class_exists(&class_name) {
+                        )?;
+                        // The user's command class extends Symfony's Command, so the child
+                        // process needs the real symfony/console classes before it can even
+                        // autoload the user class.
+                        self.ensure_composer_php_runtime()?;
+                        if !self.php_runtime_bool(
+                            "class_exists",
+                            vec![PluginValue::string(class_name.clone())],
+                        )? {
                             self.io.write_error3(&format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
@@ -591,11 +608,16 @@ impl EventDispatcher {
                             ), true, crate::io::QUIET);
                             continue;
                         }
-                        if !is_a(
-                            &PhpMixed::String(class_name.clone()),
-                            "Symfony\\Component\\Console\\Command\\Command",
-                            true,
-                        ) {
+                        if !self.php_runtime_bool(
+                            "is_a",
+                            vec![
+                                PluginValue::string(class_name.clone()),
+                                PluginValue::string(
+                                    "Symfony\\Component\\Console\\Command\\Command",
+                                ),
+                                PluginValue::Bool(true),
+                            ],
+                        )? {
                             self.io.write_error3(&format!(
                                 "<warning>Class {} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>",
                                 class_name,
@@ -603,10 +625,13 @@ impl EventDispatcher {
                             ), true, crate::io::QUIET);
                             continue;
                         }
-                        if defined(&format!(
-                            "Composer\\Script\\ScriptEvents::{}",
-                            str_replace("-", "_", &strtoupper(event.get_name()))
-                        )) {
+                        if self.php_runtime_bool(
+                            "defined",
+                            vec![PluginValue::string(format!(
+                                "Composer\\Script\\ScriptEvents::{}",
+                                str_replace("-", "_", &strtoupper(event.get_name()))
+                            ))],
+                        )? {
                             self.io.write_error3(&format!(
                                 "<warning>You cannot bind {} to a Command class, use a non-reserved name</warning>",
                                 event.get_name()
@@ -615,27 +640,132 @@ impl EventDispatcher {
                         }
 
                         // PHP hosts the user's Command class in a throwaway, bare
-                        // `Symfony\Component\Console\Application` (NOT Composer's Application):
-                        //   $app = new Application();
-                        //   $app->setCatchExceptions(false);
-                        //   $app->setAutoExit(false);
-                        //   $cmd = new $className($event->getName());
-                        //   $app->add($cmd);
-                        //   $app->setDefaultCommand((string) $cmd->getName(), true);
-                        //   $return = $app->run(new StringInput(...), $output);
-                        //
-                        // TODO(plugin): a `scripts` entry naming a Symfony Command subclass is run by
-                        // hosting it in a bare Symfony console Application. This requires the PHP
-                        // runtime — both the dynamic `new $className(...)` instantiation and the real
-                        // Symfony Application. It will be implemented by generating a PHP bootstrap
-                        // (the boilerplate above) parameterized by the class name, event name and
-                        // args, then executing it via the PHP runtime with the child process
-                        // inheriting STDOUT/STDERR in place of reusing the in-memory output. No
-                        // Rust-side Symfony Application is involved, so none is constructed here.
-                        let _ = &additional_args;
-                        todo!(
-                            "plugin: run a `scripts` Command class via the PHP runtime (bare Symfony Application host)"
+                        // `Symfony\Component\Console\Application` (NOT Composer's Application),
+                        // built by a generated snippet running inside the worker. The command's
+                        // output is captured in a BufferedOutput and written back through the
+                        // dispatcher's IO; upstream hands the live output object of `$this->io`
+                        // to `$app->run()` instead, so only the interleaving with concurrent
+                        // writes differs.
+                        let args = additional_args
+                            .iter()
+                            .map(|arg| ProcessExecutor::escape(arg))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let string_input = event
+                            .get_flags()
+                            .get("script-alias-input")
+                            .and_then(|v| v.as_string().map(|s| s.to_string()))
+                            .unwrap_or(args);
+                        let verbosity = if self.io.is_debug() {
+                            output_interface::VERBOSITY_DEBUG
+                        } else if self.io.is_very_verbose() {
+                            output_interface::VERBOSITY_VERY_VERBOSE
+                        } else if self.io.is_verbose() {
+                            output_interface::VERBOSITY_VERBOSE
+                        } else {
+                            output_interface::VERBOSITY_NORMAL
+                        };
+                        let snippet = format!(
+                            r#"
+$className = {class_name_lit};
+$app = new \Symfony\Component\Console\Application();
+$app->setCatchExceptions(false);
+if (method_exists($app, 'setCatchErrors')) {{
+    $app->setCatchErrors(false);
+}}
+$app->setAutoExit(false);
+$cmd = new $className({event_name_lit});
+if (method_exists($app, 'addCommand')) {{
+    $app->addCommand($cmd);
+}} else {{
+    $app->add($cmd);
+}}
+$app->setDefaultCommand((string) $cmd->getName(), true);
+$output = new \Symfony\Component\Console\Output\BufferedOutput({verbosity}, {decorated});
+try {{
+    $status = $app->run(new \Symfony\Component\Console\Input\StringInput({input_lit}), $output);
+    return ['status' => $status, 'output' => $output->fetch()];
+}} catch (\Throwable $e) {{
+    return ['throw' => [get_class($e), $e->getMessage(), (int) $e->getCode()], 'output' => $output->fetch()];
+}}
+"#,
+                            class_name_lit = php_single_quote(&class_name),
+                            event_name_lit = php_single_quote(event.get_name()),
+                            input_lit = php_single_quote(&string_input),
+                            verbosity = verbosity,
+                            decorated = if self.io.is_decorated() {
+                                "true"
+                            } else {
+                                "false"
+                            },
                         );
+                        self.ensure_script_autoloader()?;
+                        let mut dispatcher = ScriptRpcDispatcher {
+                            loader: self.loader.clone(),
+                            event: None,
+                        };
+                        let outcome = call_function_with_dispatcher(
+                            "__shirabe_eval",
+                            vec![PluginValue::string(snippet)],
+                            Some(&mut dispatcher),
+                        )?;
+                        let result = match outcome {
+                            Ok(value) => value.to_php_mixed()?,
+                            Err(throw) => {
+                                self.io.write_error3(
+                                    &format!(
+                                        "<error>Script {} handling the {} event terminated with an exception</error>",
+                                        callable_str.clone(),
+                                        event.get_name(),
+                                    ),
+                                    true,
+                                    crate::io::QUIET,
+                                );
+                                return Err(anyhow::anyhow!(RuntimeException {
+                                    message: throw.message,
+                                    code: throw.code,
+                                }));
+                            }
+                        };
+                        let command_output = result
+                            .as_array()
+                            .and_then(|map| map.get("output"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default()
+                            .to_string();
+                        if !command_output.is_empty() {
+                            self.io.write3(&command_output, false, crate::io::NORMAL);
+                        }
+                        if let Some(throw) = result.as_array().and_then(|map| map.get("throw")) {
+                            let fields = throw
+                                .as_list()
+                                .expect("the eval snippet reports exceptions as a list");
+                            let message = fields
+                                .get(1)
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default()
+                                .to_string();
+                            let code = match fields.get(2) {
+                                Some(PhpMixed::Int(code)) => *code,
+                                _ => 0,
+                            };
+                            self.io.write_error3(
+                                &format!(
+                                    "<error>Script {} handling the {} event terminated with an exception</error>",
+                                    callable_str.clone(),
+                                    event.get_name(),
+                                ),
+                                true,
+                                crate::io::QUIET,
+                            );
+                            return Err(anyhow::anyhow!(RuntimeException { message, code }));
+                        }
+                        r#return = match result.as_array().and_then(|map| map.get("status")) {
+                            Some(PhpMixed::Int(status)) => *status,
+                            other => panic!(
+                                "the eval snippet always returns an int status, got {other:?}"
+                            ),
+                        };
                     }
                     Callable::String(callable_str) => {
                         let args = additional_args
@@ -904,8 +1034,52 @@ impl EventDispatcher {
             );
         }
 
-        // TODO(plugin): invoke `$className::$methodName($event)` dynamically
-        todo!("dynamic static method invocation requires plugin runtime")
+        // The event crosses the boundary as a proxy stub: the child sees an instance of the
+        // stub class (same FQCN as the real event class) whose methods call back here.
+        let stub_class = if event.as_any().downcast_ref::<ScriptEvent>().is_some() {
+            "Composer\\Script\\Event"
+        } else if event.as_any().downcast_ref::<Event>().is_some() {
+            "Composer\\EventDispatcher\\Event"
+        } else {
+            // TODO(plugin): only the base Event and Script\Event proxy stubs exist so far;
+            // installer/package/plugin events need their own stubs.
+            return Err(anyhow::anyhow!(RuntimeException {
+                message: format!(
+                    "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
+                    event.get_name(),
+                    class_name,
+                    method_name,
+                ),
+                code: 0,
+            }));
+        };
+
+        self.ensure_script_autoloader()?;
+        let rhandle = shirabe_php_rpc::alloc_rhandle();
+        let mut dispatcher = ScriptRpcDispatcher {
+            loader: self.loader.clone(),
+            event: Some((rhandle, event)),
+        };
+        let outcome = call_static_method(
+            class_name,
+            method_name,
+            vec![PluginValue::RustHandle(RustObjHandle {
+                rhandle,
+                class: stub_class.to_string(),
+                epoch: 0,
+                snapshot: None,
+            })],
+            Some(&mut dispatcher),
+        )?;
+        match outcome {
+            Ok(value) => Ok(value.to_php_mixed()?),
+            // TODO(plugin): the original exception class is collapsed to RuntimeException on
+            // this side of the boundary.
+            Err(throw) => Err(anyhow::anyhow!(RuntimeException {
+                message: throw.message,
+                code: throw.code,
+            })),
+        }
     }
 
     fn event_needs_to_output(&self, event: &dyn EventInterface) -> bool {
@@ -1173,18 +1347,159 @@ impl EventDispatcher {
         event: &dyn EventInterface,
         callable: &Callable,
     ) -> anyhow::Result<()> {
-        // TODO(plugin): full autoloader rebuild on plugin-supplied/script-listener callables —
-        // a genuine no-op here, not merely a stub. All 3 call sites already discard the return
-        // value, and rebuilding+registering a ClassLoader has no observable effect in this port:
-        // there is no embedded PHP interpreter to register it into, and `class_exists` for
-        // user-defined classes is a hardcoded-false shim, so the caller's very next check always
-        // treats the class as unavailable regardless of what this function does. Also, every
-        // caller reaches this from inside AutoloadGenerator::dump(), which is invoked while a
-        // caller higher up the stack still holds the local-repository/installation-manager
-        // RefCells borrowed for the duration of its own statement — doing the real work here
-        // (which needs those same RefCells) would panic with "already borrowed".
-        let _ = (event, callable);
+        let composer = self.composer();
+        let Some(composer) = composer.as_full() else {
+            return Ok(());
+        };
+
+        let callable_key = match callable {
+            Callable::String(callable_str) => callable_str.clone(),
+            Callable::ArrayCallable(first, method) => match first.as_ref() {
+                PhpMixed::String(class) => format!("{}::{}", class, method),
+                other => format!("{}::{}", get_class(other), method),
+            },
+            Callable::Closure(_) => "closure".to_string(),
+        };
+        if self.previous_listeners.contains_key(&callable_key) {
+            return Ok(());
+        }
+        self.previous_listeners.insert(callable_key, true);
+
+        let package = composer.borrow().get_package().clone();
+        let repository_manager = composer.borrow().get_repository_manager();
+        let local_repository = repository_manager.borrow().get_local_repository();
+        let packages = local_repository.get_canonical_packages()?;
+        let generator = composer.borrow().get_autoload_generator();
+        let mut hash_input = packages
+            .iter()
+            .map(|p| format!("{}/{}", p.get_name(), p.get_version()))
+            .collect::<Vec<_>>()
+            .join(",");
+        let dev_mode = event
+            .as_any()
+            .downcast_ref::<ScriptEvent>()
+            .map(|e| e.is_dev_mode())
+            .or_else(|| {
+                event
+                    .as_any()
+                    .downcast_ref::<PackageEvent>()
+                    .map(|e| e.is_dev_mode())
+            })
+            .or_else(|| {
+                event
+                    .as_any()
+                    .downcast_ref::<InstallerEvent>()
+                    .map(|e| e.is_dev_mode())
+            });
+        if let Some(dev_mode) = dev_mode {
+            generator.borrow_mut().set_dev_mode(dev_mode);
+            if dev_mode {
+                hash_input.push_str("/dev");
+            }
+        }
+        let hash = hash("sha256", &hash_input);
+
+        if self.previous_hash.as_deref() == Some(hash.as_str()) {
+            return Ok(());
+        }
+
+        self.previous_hash = Some(hash);
+
+        let installation_manager = composer.borrow().get_installation_manager();
+        let package_map = generator.borrow().build_package_map(
+            &mut *installation_manager.borrow_mut(),
+            package.clone(),
+            packages,
+        )?;
+        let map = generator
+            .borrow()
+            .parse_autoloads(package_map, package, PhpMixed::Bool(false));
+
+        if let Some(loader) = &self.loader {
+            loader.unregister();
+        }
+
+        let vendor_dir = composer
+            .borrow()
+            .get_config()
+            .borrow()
+            .get("vendor-dir")
+            .as_string()
+            .map(|s| s.to_string());
+        let loader = generator.borrow().create_loader(&map, vendor_dir);
+        loader.register(false);
+        self.loader = Some(loader);
         Ok(())
+    }
+
+    /// Makes the worker's script-class autoloader active, so class queries and script execution
+    /// in the child can resolve classes through the Rust-side [`ClassLoader`] built by
+    /// [`Self::make_autoloader`].
+    fn ensure_script_autoloader(&self) -> anyhow::Result<()> {
+        unwrap_php_result(call_function(
+            "__shirabe_enable_script_autoloader",
+            Vec::new(),
+        ))?;
+        Ok(())
+    }
+
+    /// Loads the Composer PHP runtime (symfony/console and friends) into the worker, needed
+    /// before a `scripts` Command class can be autoloaded and hosted.
+    fn ensure_composer_php_runtime(&self) -> anyhow::Result<()> {
+        // TODO(plugin): the real PHP classes are taken from a Composer checkout for now; how
+        // they ship with a released Shirabe binary is part of the plugin distribution work.
+        let autoload = Self::composer_php_runtime_autoload().ok_or_else(|| {
+            anyhow::anyhow!(RuntimeException {
+                message: "unable to locate the Composer PHP runtime; set SHIRABE_COMPOSER_PHP_DIR \
+                          to a Composer checkout with its vendor directory installed"
+                    .to_string(),
+                code: 0,
+            })
+        })?;
+        unwrap_php_result(call_function(
+            "__shirabe_require",
+            vec![PluginValue::string(autoload)],
+        ))?;
+        Ok(())
+    }
+
+    fn composer_php_runtime_autoload() -> Option<String> {
+        if let Some(dir) = Platform::get_env("SHIRABE_COMPOSER_PHP_DIR") {
+            let path = std::path::Path::new(&dir)
+                .join("vendor")
+                .join("autoload.php");
+            if path.is_file() {
+                return path.to_str().map(|s| s.to_string());
+            }
+        }
+        // Development fallback: the Composer checkout sitting next to this workspace.
+        let dev = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../composer/vendor/autoload.php");
+        if dev.is_file() {
+            return dev.canonicalize().ok()?.to_str().map(|s| s.to_string());
+        }
+        None
+    }
+
+    /// Runs a boolean runtime query (`class_exists`, `is_a`, ...) inside the PHP worker, with
+    /// the script autoloader active so the query can trigger class loading.
+    fn php_runtime_bool(&self, function: &str, args: Vec<PluginValue>) -> anyhow::Result<bool> {
+        self.ensure_script_autoloader()?;
+        let mut dispatcher = ScriptRpcDispatcher {
+            loader: self.loader.clone(),
+            event: None,
+        };
+        let value = unwrap_php_result(call_function_with_dispatcher(
+            function,
+            args,
+            Some(&mut dispatcher),
+        ))?;
+        match value {
+            PluginValue::Bool(value) => Ok(value),
+            other => Err(anyhow::anyhow!(
+                "PHP runtime query `{function}` did not return a bool: {other:?}"
+            )),
+        }
     }
 
     fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -1209,6 +1524,113 @@ impl EventDispatcher {
             _ => false,
         }
     }
+}
+
+/// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
+/// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
+/// Rust-side [`ClassLoader`]), and at most one live event handle is exposed per dispatched
+/// call.
+///
+/// TODO(plugin): this per-call scope stands in for the persistent R table of the plugin
+/// activation milestone; a stub retained by the script beyond the call observes an unknown
+/// handle error instead of the live object.
+struct ScriptRpcDispatcher<'a> {
+    loader: Option<ClassLoader>,
+    event: Option<(u64, &'a dyn EventInterface)>,
+}
+
+impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
+    fn dispatch(
+        &mut self,
+        rhandle: u64,
+        method_name: &str,
+        args: Vec<PluginValue>,
+        _out_param_positions: &[u32],
+    ) -> Result<PluginValue, PhpThrow> {
+        if rhandle == 0 {
+            if method_name == "__shirabe_find_file" {
+                let class = match args.first() {
+                    Some(PluginValue::String(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
+                    other => {
+                        return Err(runtime_throw(format!(
+                            "__shirabe_find_file expects a class name argument, got {other:?}"
+                        )));
+                    }
+                };
+                return Ok(
+                    match self
+                        .loader
+                        .as_mut()
+                        .and_then(|loader| loader.find_file(&class))
+                    {
+                        Some(file) => PluginValue::string(file),
+                        None => PluginValue::Null,
+                    },
+                );
+            }
+            return Err(runtime_throw(format!(
+                "unknown runtime service method `{method_name}`"
+            )));
+        }
+        match self.event {
+            Some((event_rhandle, event)) if event_rhandle == rhandle => match method_name {
+                "getName" => Ok(PluginValue::string(event.get_name())),
+                "getArguments" => Ok(PluginValue::List(
+                    event
+                        .get_arguments()
+                        .iter()
+                        .map(|arg| PluginValue::string(arg.clone()))
+                        .collect(),
+                )),
+                "getFlags" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+                    event.get_flags().clone(),
+                ))),
+                "isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
+                "isDevMode" => match event.as_any().downcast_ref::<ScriptEvent>() {
+                    Some(script_event) => Ok(PluginValue::Bool(script_event.is_dev_mode())),
+                    None => Err(runtime_throw(
+                        "isDevMode is only available on script events".to_string(),
+                    )),
+                },
+                // TODO(plugin): getComposer/getIO/stopPropagation and the rest need the full
+                // object-graph proxying of the plugin activation milestone.
+                other => Err(runtime_throw(format!(
+                    "the Event method `{other}` is not available over RPC yet"
+                ))),
+            },
+            _ => Err(runtime_throw(format!(
+                "unknown Rust handle {rhandle} (script-event handles are scoped to a single \
+                 dispatched call)"
+            ))),
+        }
+    }
+}
+
+fn runtime_throw(message: String) -> PhpThrow {
+    PhpThrow {
+        exception_class: "RuntimeException".to_string(),
+        message,
+        code: 0,
+    }
+}
+
+/// Collapses the two failure lanes of an RPC call into `anyhow`: the callers here treat a PHP
+/// exception raised during a runtime query as fatal for the current dispatch.
+fn unwrap_php_result(
+    outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
+) -> anyhow::Result<PluginValue> {
+    match outcome? {
+        Ok(value) => Ok(value),
+        Err(throw) => Err(anyhow::anyhow!(RuntimeException {
+            message: throw.message,
+            code: throw.code,
+        })),
+    }
+}
+
+/// Quotes a string as a PHP single-quoted literal for a generated snippet.
+fn php_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
 // Composer's PartialComposer::setEventDispatcher() accepts any EventDispatcher subclass, so plugins

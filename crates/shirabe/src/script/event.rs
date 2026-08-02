@@ -75,6 +75,10 @@ impl Event {
 }
 
 impl EventInterface for Event {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         self.inner.get_name()
     }
@@ -97,6 +101,10 @@ impl EventInterface for Event {
 }
 
 impl EventInterface for OriginatingEvent {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         match self {
             OriginatingEvent::Base(e) => e.get_name(),

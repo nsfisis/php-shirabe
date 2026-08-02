@@ -78,6 +78,10 @@ impl PreFileDownloadEvent {
 }
 
 impl EventInterface for PreFileDownloadEvent {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         self.inner.get_name()
     }
