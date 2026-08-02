@@ -424,43 +424,6 @@ impl Phar {
     ) -> anyhow::Result<()> {
         extract_entries(&self.path, &self.entries, directory, overwrite)
     }
-
-    pub fn running(_return_full: bool) -> String {
-        // TODO(phase-c): reports the phar the current script runs from; Shirabe is a native
-        // binary and nothing in the ported code calls this yet.
-        todo!()
-    }
-}
-
-impl Phar {
-    pub const SHA512: i64 = 16;
-
-    // TODO(phase-c): the native .phar writing API below has no call sites in the ported code
-    // (Composer's Compiler is not ported); it is deliberately deferred.
-
-    pub fn new_phar(_filename: String, _flags: i64, _alias: &str) -> Self {
-        todo!()
-    }
-
-    pub fn set_signature_algorithm(&mut self, _algo: i64) {
-        todo!()
-    }
-
-    pub fn start_buffering(&mut self) {
-        todo!()
-    }
-
-    pub fn stop_buffering(&mut self) {
-        todo!()
-    }
-
-    pub fn add_from_string(&mut self, _path: &str, _content: &str) {
-        todo!()
-    }
-
-    pub fn set_stub(&mut self, _stub: &str) {
-        todo!()
-    }
 }
 
 #[derive(Debug)]
