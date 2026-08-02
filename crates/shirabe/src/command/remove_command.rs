@@ -8,6 +8,7 @@ use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::console::input::SuggestedValues;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
@@ -87,11 +88,12 @@ impl Command for RemoveCommand {
         Some(InputOption::VALUE_NONE),
         "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).",
         None).unwrap().into(),
-        InputOption::new("audit-format",
+        InputOption::new6("audit-format",
         None,
         Some(InputOption::VALUE_REQUIRED),
         "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-        Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string()))).unwrap().into(),
+        Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())),
+        SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
         InputOption::new("no-security-blocking",
         None,
         Some(InputOption::VALUE_NONE),

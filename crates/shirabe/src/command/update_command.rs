@@ -8,6 +8,7 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::console::input::SuggestedValues;
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
 use crate::io::IOInterface;
@@ -67,7 +68,7 @@ impl Command for UpdateCommand {
         self.set_aliases(vec!["u".to_string(), "upgrade".to_string()])?;
         self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file");
         self.set_definition(&[
-            InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None, self.suggest_installed_package(false, true)).unwrap().into(),
+            InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None, self.suggest_installed_package(false, false)).unwrap().into(),
             InputOption::new("with", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Temporary version constraint to add, e.g. foo/bar:1.0.0 or foo/bar=1.0.0", None).unwrap().into(),
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
@@ -78,7 +79,7 @@ impl Command for UpdateCommand {
             InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Overwrites the lock file hash to suppress warning about the lock file being out of date without updating package versions. Package metadata like mirrors and URLs are updated if they changed.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string()))).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),

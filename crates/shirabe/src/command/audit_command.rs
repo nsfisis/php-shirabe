@@ -57,12 +57,13 @@ impl Command for AuditCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new(
+            InputOption::new6(
                 "format",
                 Some(PhpMixed::String("f".to_string())),
                 Some(InputOption::VALUE_REQUIRED),
                 "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
                 Some(PhpMixed::String(Auditor::FORMAT_TABLE.to_string())),
+                SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect()),
             )
             .unwrap()
             .into(),
@@ -75,12 +76,13 @@ impl Command for AuditCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new(
+            InputOption::new6(
                 "abandoned",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
                 "Behavior on abandoned packages. Must be \"ignore\", \"report\", or \"fail\".",
                 None,
+                SuggestedValues::List(Auditor::ABANDONEDS.iter().map(|s| s.to_string()).collect()),
             )
             .unwrap()
             .into(),
