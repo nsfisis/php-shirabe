@@ -10,6 +10,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::input::ArgvInput;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -54,6 +55,8 @@ impl GlobalCommand {
             Ok(array_input.to_string())
         } else if let Some(string_input) = input_any.downcast_ref::<StringInput>() {
             Ok(string_input.to_string())
+        } else if let Some(completion_input) = input_any.downcast_ref::<CompletionInput>() {
+            Ok(completion_input.to_string())
         } else {
             Err(LogicException {
                 message: "Expected an Input instance that is stringable".to_string(),

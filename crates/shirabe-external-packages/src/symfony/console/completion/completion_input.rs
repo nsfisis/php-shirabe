@@ -9,7 +9,7 @@ use shirabe_php_shim::{PhpMixed, php_regex};
 ///
 /// This input allows unfinished option names or values and exposes what kind of
 /// completion is expected.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompletionInput {
     inner: ArgvInput,
     tokens: Vec<String>,
@@ -275,6 +275,134 @@ impl CompletionInput {
         }
 
         self.current_index >= nr_of_tokens
+    }
+}
+
+/// PHP: `CompletionInput extends ArgvInput` — the inherited `InputInterface` surface,
+/// forwarded to the embedded `ArgvInput`. `bind` dispatches to the specialized
+/// `CompletionInput::bind` above, matching PHP's virtual dispatch.
+impl crate::symfony::console::input::input_interface::InputInterface for CompletionInput {
+    fn dup(
+        &self,
+    ) -> std::rc::Rc<
+        std::cell::RefCell<dyn crate::symfony::console::input::input_interface::InputInterface>,
+    > {
+        std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
+    }
+
+    fn get_first_argument(&self) -> Option<String> {
+        self.inner.get_first_argument()
+    }
+
+    fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
+        crate::symfony::console::input::input_interface::InputInterface::has_parameter_option(
+            &self.inner,
+            values,
+            only_params,
+        )
+    }
+
+    fn get_parameter_option(
+        &self,
+        values: PhpMixed,
+        default: PhpMixed,
+        only_params: bool,
+    ) -> PhpMixed {
+        crate::symfony::console::input::input_interface::InputInterface::get_parameter_option(
+            &self.inner,
+            values,
+            default,
+            only_params,
+        )
+    }
+
+    fn bind(&mut self, definition: &InputDefinition) -> anyhow::Result<()> {
+        CompletionInput::bind(self, definition)
+    }
+
+    fn validate(&mut self) -> anyhow::Result<()> {
+        crate::symfony::console::input::input_interface::InputInterface::validate(&mut self.inner)
+    }
+
+    fn get_arguments(&self) -> indexmap::IndexMap<String, PhpMixed> {
+        crate::symfony::console::input::input_interface::InputInterface::get_arguments(&self.inner)
+    }
+
+    fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed> {
+        crate::symfony::console::input::input_interface::InputInterface::get_argument(
+            &self.inner,
+            name,
+        )
+    }
+
+    fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+        crate::symfony::console::input::input_interface::InputInterface::set_argument(
+            &mut self.inner,
+            name,
+            value,
+        )
+    }
+
+    fn has_argument(&self, name: &str) -> bool {
+        crate::symfony::console::input::input_interface::InputInterface::has_argument(
+            &self.inner,
+            name,
+        )
+    }
+
+    fn get_options(&self) -> indexmap::IndexMap<String, PhpMixed> {
+        crate::symfony::console::input::input_interface::InputInterface::get_options(&self.inner)
+    }
+
+    fn get_option(&self, name: &str) -> anyhow::Result<PhpMixed> {
+        crate::symfony::console::input::input_interface::InputInterface::get_option(
+            &self.inner,
+            name,
+        )
+    }
+
+    fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+        crate::symfony::console::input::input_interface::InputInterface::set_option(
+            &mut self.inner,
+            name,
+            value,
+        )
+    }
+
+    fn has_option(&self, name: &str) -> bool {
+        crate::symfony::console::input::input_interface::InputInterface::has_option(
+            &self.inner,
+            name,
+        )
+    }
+
+    fn is_interactive(&self) -> bool {
+        crate::symfony::console::input::input_interface::InputInterface::is_interactive(&self.inner)
+    }
+
+    fn set_interactive(&mut self, interactive: bool) {
+        crate::symfony::console::input::input_interface::InputInterface::set_interactive(
+            &mut self.inner,
+            interactive,
+        )
+    }
+
+    fn as_streamable(
+        &self,
+    ) -> Option<
+        &dyn crate::symfony::console::input::streamable_input_interface::StreamableInputInterface,
+    > {
+        crate::symfony::console::input::input_interface::InputInterface::as_streamable(&self.inner)
+    }
+
+    fn as_streamable_mut(
+        &mut self,
+    ) -> Option<
+        &mut dyn crate::symfony::console::input::streamable_input_interface::StreamableInputInterface,
+    >{
+        crate::symfony::console::input::input_interface::InputInterface::as_streamable_mut(
+            &mut self.inner,
+        )
     }
 }
 
