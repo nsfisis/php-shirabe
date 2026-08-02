@@ -359,6 +359,13 @@ it as a stateless utility — survives only for plugin-`new`ed instances.
 This is exactly the dual-instantiation situation the
 `plugin-constructible` attribute exists to surface.
 
+Proxy-side access to the graph-owned instances (the `getLoop()` route) is
+left unimplemented — a `todo!()`-style explicit error, not a silent stub —
+until a real plugin demonstrates the need. Note that `executeAsync()`
+throws a `LogicException` without the `@internal` `enableAsync()` (called
+only by `Loop::__construct`), so plugin-`new`ed instances never reach the
+async path anyway.
+
 ### Dual instantiation
 
 `Locker::getJsonFile(): JsonFile` makes `JsonFile` reachable, so it is
@@ -383,7 +390,8 @@ boundary despite being a wholesale-`php-native` vendor class. A `Process`
 can't be reconstructed PHP-side from Rust-generated data because its state
 is stored in a `resource` created by `proc_open()`.
 
-Resolution: split `ProcessExecutor`'s Rust implementation by caller.
+Proposed resolution (not adopted): split `ProcessExecutor`'s Rust
+implementation by caller.
 Rust-ported Composer code (`VersionGuesser`, `Git`, …) calls `execute_async()`
 directly and spawns in Rust. A plugin holding a `ProcessExecutor` handle
 (`Loop::getProcessExecutor()`) instead hits the `rust-proxy` stub's RPC entry,
@@ -392,13 +400,17 @@ there. The plugin gets the genuine object, never a fake one.
 
 ### Package and CompletePackage
 
-They classify as `rust-proxy` mechanically: they carry setters
-(`setRepository`, `setInstallationSource`, …), so the strict immutability
-test rightly rejects them. The plugin architecture plans a
-snapshot-with-writeback treatment for packages ("essentially immutable" as
-a pragmatic call); enacting it is an `overrides.list` entry awaiting
-explicit confirmation, including for the `RootPackage`/`AliasPackage`
-variants.
+They classify as `rust-proxy` mechanically, and the mechanical result
+stands: the whole package family, including the `RootPackage`/
+`AliasPackage` variants, is pure `rust-proxy` with no `overrides.list`
+entry. The family is genuinely mutable — it carries 60+ setters, and
+Composer itself mutates packages in flight (`DownloadManager::download`,
+`GitDownloader::doUpdate`, `PoolBuilder`, `LockTransaction`) — so a
+snapshot treatment would need write-back plus invalidation on top of the
+copy. Snapshotting, like getter prefetching, is a performance optimization
+to be weighed only against measured RPC overhead; the category is
+invisible to plugins (the child sees the same FQCN either way), so
+switching later is free.
 
 ### Bootstrap classes cannot be stub-shadowed
 
@@ -409,7 +421,11 @@ same-FQCN stub cannot coexist; both are overridden to `php-native`.
 `InstalledVersions::$installed` is nonetheless genuinely shared state —
 Rust rewrites `installed.php` on every dump — so the Rust side must push a
 reload (`InstalledVersions::reload()`) after installs, or post-install
-event handlers read stale data.
+event handlers read stale data. Whether and when that reload push happens,
+and how plugin-class autoloading is split between the two worlds, is not
+yet decided; until it is, the `InstalledVersions` state a plugin observes
+after a Rust-side dump is undefined. The Rust-side reload site carries a
+`TODO(plugin)` marker.
 
 ### ConsoleIO leaks world-2 objects
 
@@ -417,8 +433,8 @@ event handlers read stale data.
 seam: `getTable(): Table` / `getProgressBar(): ProgressBar`, and its
 constructor takes `InputInterface`/`OutputInterface`/`HelperSet` — none of
 which can cross the wire as values. The stub needs a bespoke story (e.g. a
-local Table bound to a proxying `OutputInterface`), or these members become
-explicit errors. Undecided.
+local Table bound to a proxying `OutputInterface`); until one is designed,
+both members raise explicit errors.
 
 ### Proxy clone semantics
 
