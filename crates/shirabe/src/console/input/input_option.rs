@@ -1,11 +1,15 @@
 //! ref: composer/src/Composer/Console/Input/InputOption.php
 
+use crate::console::input::SuggestedValues;
+use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
+use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::console::input::InputOption as BaseInputOption;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct InputOption {
     inner: BaseInputOption,
+    suggested_values: SuggestedValues,
 }
 
 impl InputOption {
@@ -21,13 +25,57 @@ impl InputOption {
         mode: Option<i64>,
         description: &str,
         default: Option<PhpMixed>,
-        // TODO(cli-completion): suggested_values closure / list dropped along with completion support
+    ) -> anyhow::Result<Self> {
+        Self::new6(
+            name,
+            shortcut,
+            mode,
+            description,
+            default,
+            SuggestedValues::List(Vec::new()),
+        )
+    }
+
+    /// PHP's constructor with the sixth parameter, `$suggestedValues`.
+    pub fn new6(
+        name: &str,
+        shortcut: Option<PhpMixed>,
+        mode: Option<i64>,
+        description: &str,
+        default: Option<PhpMixed>,
+        suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
         let shortcut = shortcut.unwrap_or(PhpMixed::Null);
         let default_mixed = default.unwrap_or(PhpMixed::Null);
         let inner =
             BaseInputOption::new(name, shortcut, mode, description.to_string(), default_mixed)?;
-        Ok(Self { inner })
+        // PHP throws LogicException here; suggested values on a valueless option cannot happen
+        // at runtime unless a configure() is wrong, so this is a programming error.
+        assert!(
+            suggested_values.is_empty() || inner.accept_value(),
+            "Cannot set suggested values if the option does not accept a value."
+        );
+        Ok(Self {
+            inner,
+            suggested_values,
+        })
+    }
+
+    /// Adds suggestions to `suggestions` for the current completion input.
+    ///
+    /// PHP closures are bound to the command; `this` is the command dispatching the
+    /// completion (see [`SuggestedValues`]).
+    pub fn complete(
+        &self,
+        this: &dyn crate::command::BaseCommand,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        self.suggested_values.complete(this, input, suggestions)
+    }
+
+    pub(crate) fn get_name(&self) -> String {
+        self.inner.get_name().to_string()
     }
 
     /// Unwraps to the underlying Symfony `InputOption` (used when forwarding a Composer-typed

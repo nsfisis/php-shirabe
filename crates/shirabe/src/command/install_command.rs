@@ -276,10 +276,8 @@ impl Command for InstallCommand {
 }
 
 impl BaseCommand for InstallCommand {
-    fn command_data(
-        &self,
-    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data()
+    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+        &self.base_command_data
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);

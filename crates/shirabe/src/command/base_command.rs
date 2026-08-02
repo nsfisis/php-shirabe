@@ -42,6 +42,15 @@ pub struct BaseCommandData {
     inner: CommandData,
     pub(crate) composer: std::cell::RefCell<Option<PartialComposerHandle>>,
     pub(crate) io: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>>,
+    /// The definition entries that were registered through the Composer-typed
+    /// InputArgument/InputOption (which carry the suggested-values backport). PHP checks
+    /// `$definition->getArgument($name) instanceof Composer\Console\Input\InputArgument`; in
+    /// this port `set_definition` converts the entries to the Symfony types for storage, so
+    /// the Composer-typedness is tracked by name in these side maps instead.
+    pub(crate) composer_arguments:
+        std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputArgument>>>,
+    pub(crate) composer_options:
+        std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputOption>>>,
 }
 
 impl BaseCommandData {
@@ -50,6 +59,8 @@ impl BaseCommandData {
             inner: CommandData::new(name),
             composer: std::cell::RefCell::new(None),
             io: std::cell::RefCell::new(None),
+            composer_arguments: std::cell::RefCell::new(IndexMap::new()),
+            composer_options: std::cell::RefCell::new(IndexMap::new()),
         }
     }
 
@@ -65,17 +76,40 @@ impl BaseCommandData {
 /// `Command` trait. The Symfony state methods are inherited from the [`Command`] supertrait;
 /// only the Composer-specific behavior and the Composer-typed definition builders live here.
 pub trait BaseCommand: Command {
-    /// Access to the embedded Symfony command state. Each command returns
-    /// `self.base_command_data.command_data()`; this lets the Composer-typed definition
-    /// builders below forward to `CommandData`'s Symfony-typed entry points. `CommandData` is
-    /// interior-mutable, so a shared reference is enough.
-    fn command_data(&self) -> &CommandData;
+    /// Access to the embedded base-command state. Each command returns
+    /// `&self.base_command_data`; the definition builders and the completion dispatch below
+    /// go through it. The state is interior-mutable, so a shared reference is enough.
+    fn base_command_data(&self) -> &BaseCommandData;
+
+    /// Access to the embedded Symfony command state, forwarding to `CommandData`'s
+    /// Symfony-typed entry points.
+    fn command_data(&self) -> &CommandData {
+        self.base_command_data().command_data()
+    }
 
     /// Sets the definition from Composer-typed argument/option instances.
     fn set_definition(&self, definition: &[InputDefinitionItem]) -> &Self
     where
         Self: Sized,
     {
+        let data = self.base_command_data();
+        // PHP replaces the whole definition, so the Composer-typed side maps follow suit.
+        data.composer_arguments.borrow_mut().clear();
+        data.composer_options.borrow_mut().clear();
+        for item in definition {
+            match item {
+                InputDefinitionItem::Argument(argument) => {
+                    data.composer_arguments
+                        .borrow_mut()
+                        .insert(argument.get_name(), argument.clone());
+                }
+                InputDefinitionItem::Option(option) => {
+                    data.composer_options
+                        .borrow_mut()
+                        .insert(option.get_name(), option.clone());
+                }
+            }
+        }
         let items = definition
             .iter()
             .map(|item| item.to_definition_item())
@@ -255,8 +289,8 @@ impl Command for BaseCommandData {
 }
 
 impl BaseCommand for BaseCommandData {
-    fn command_data(&self) -> &CommandData {
-        &self.inner
+    fn base_command_data(&self) -> &BaseCommandData {
+        self
     }
 
     fn require_composer(
@@ -734,6 +768,53 @@ fn apply_application_defaults(
         disable_scripts = disable_scripts || app.get_disable_scripts_by_default();
     }
     (disable_plugins, disable_scripts)
+}
+
+/// \Composer\Command\BaseCommand::complete — the suggested-values backport dispatch
+/// (BaseCommand.php:198-215). Shared via a free function because Rust has no inheritance;
+/// each command's `Command::complete` forwards here.
+pub fn base_command_complete(
+    cmd: &dyn BaseCommand,
+    input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+    suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+) -> anyhow::Result<()> {
+    use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
+
+    // PHP: (string) $input->getCompletionName()
+    let name = input.get_completion_name().unwrap_or_default();
+    // The definition Ref and the side-map Refs must be dropped before the suggestion closure
+    // runs: the closure may re-enter the command (require_composer etc.).
+    if CompletionInput::TYPE_OPTION_VALUE == input.get_completion_type()
+        && cmd.get_definition().has_option(&name)
+    {
+        // PHP: ($option = $definition->getOption($name)) instanceof InputOption — the
+        // Composer-typedness is tracked in the side map (see BaseCommandData).
+        let option = cmd
+            .base_command_data()
+            .composer_options
+            .borrow()
+            .get(&name)
+            .cloned();
+        if let Some(option) = option {
+            return option.complete(cmd, input, suggestions);
+        }
+    } else if CompletionInput::TYPE_ARGUMENT_VALUE == input.get_completion_type()
+        && cmd
+            .get_definition()
+            .has_argument(&PhpMixed::String(name.clone()))
+    {
+        let argument = cmd
+            .base_command_data()
+            .composer_arguments
+            .borrow()
+            .get(&name)
+            .cloned();
+        if let Some(argument) = argument {
+            return argument.complete(cmd, input, suggestions);
+        }
+    }
+    // PHP: parent::complete($input, $suggestions) — Symfony 5.4's Command::complete is a no-op.
+    Ok(())
 }
 
 /// \Composer\Command\BaseCommand::initialize — runs for every Composer command after the

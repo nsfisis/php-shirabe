@@ -237,10 +237,8 @@ impl Command for OutdatedCommand {
 }
 
 impl BaseCommand for OutdatedCommand {
-    fn command_data(
-        &self,
-    ) -> &shirabe_external_packages::symfony::console::command::command::CommandData {
-        self.base_command_data.command_data()
+    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+        &self.base_command_data
     }
 
     fn is_proxy_command(&self) -> bool {

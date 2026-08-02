@@ -1,11 +1,15 @@
 //! ref: composer/src/Composer/Console/Input/InputArgument.php
 
+use crate::console::input::SuggestedValues;
+use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
+use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::console::input::InputArgument as BaseInputArgument;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct InputArgument {
     inner: BaseInputArgument,
+    suggested_values: SuggestedValues,
 }
 
 impl InputArgument {
@@ -18,7 +22,23 @@ impl InputArgument {
         mode: Option<i64>,
         description: &str,
         default: Option<PhpMixed>,
-        // TODO(cli-completion): suggested_values closure / list dropped along with completion support
+    ) -> anyhow::Result<Self> {
+        Self::new5(
+            name,
+            mode,
+            description,
+            default,
+            SuggestedValues::List(Vec::new()),
+        )
+    }
+
+    /// PHP's constructor with the fifth parameter, `$suggestedValues`.
+    pub fn new5(
+        name: &str,
+        mode: Option<i64>,
+        description: &str,
+        default: Option<PhpMixed>,
+        suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
         let inner = BaseInputArgument::new(
             name.to_string(),
@@ -26,7 +46,27 @@ impl InputArgument {
             description.to_string(),
             default.unwrap_or(PhpMixed::Null),
         )?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            suggested_values,
+        })
+    }
+
+    /// Adds suggestions to `suggestions` for the current completion input.
+    ///
+    /// PHP closures are bound to the command; `this` is the command dispatching the
+    /// completion (see [`SuggestedValues`]).
+    pub fn complete(
+        &self,
+        this: &dyn crate::command::BaseCommand,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        self.suggested_values.complete(this, input, suggestions)
+    }
+
+    pub(crate) fn get_name(&self) -> String {
+        self.inner.get_name().to_string()
     }
 
     /// Unwraps to the underlying Symfony `InputArgument` (used when forwarding a Composer-typed
