@@ -2148,6 +2148,7 @@ dependencies = [
  "indexmap",
  "shirabe-external-packages",
  "shirabe-php-shim",
+ "shirabe-php-src",
  "tempfile",
 ]
 

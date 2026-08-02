@@ -1,5 +1,6 @@
 //! Rust port from the original C implementation in php-src.
 //! See `LICENSE.md` at the repository root.
+#![allow(special_module_name)]
 //!
 //! Rules for this crate:
 //!
@@ -16,4 +17,9 @@
 //!   /// php-src: ext/standard/strnatcmp.c `strnatcmp_ex` (PHP 8.5.2)
 //!   ```
 
+// The module mirrors php-src's `main/` directory; it is not a binary entry point (autobins is
+// disabled in Cargo.toml). `special_module_name` is allowed crate-wide because the item-level
+// attribute does not reach this early-pass lint.
+pub mod main;
 pub mod standard;
+pub mod zend;

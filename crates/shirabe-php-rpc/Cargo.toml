@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 shirabe-external-packages.workspace = true
 shirabe-php-shim.workspace = true
+shirabe-php-src.workspace = true
 anyhow.workspace = true
 indexmap.workspace = true
 tempfile.workspace = true

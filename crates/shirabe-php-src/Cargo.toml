@@ -3,6 +3,9 @@ name = "shirabe-php-src"
 version.workspace = true
 edition.workspace = true
 license = "BSD-3-Clause AND Zlib"
+# The module tree mirrors php-src's own tree, so `src/main.rs` is the `main/` directory of
+# php-src, not a binary entry point.
+autobins = false
 
 [lints]
 workspace = true
