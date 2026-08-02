@@ -13,7 +13,12 @@ use shirabe_php_shim::php_regex;
 #[derive(Debug)]
 pub struct OutputFormatter {
     decorated: bool,
-    styles: indexmap::IndexMap<String, Box<dyn OutputFormatterStyleInterface>>,
+    // PHP objects have reference semantics: get_style must hand out the shared
+    // style instance, so each style is held behind an Rc<RefCell<...>> handle.
+    styles: indexmap::IndexMap<
+        String,
+        std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>,
+    >,
     style_stack: OutputFormatterStyleStack,
 }
 
@@ -99,7 +104,7 @@ impl OutputFormatter {
         string: &str,
     ) -> anyhow::Result<Option<Box<dyn OutputFormatterStyleInterface>>> {
         if let Some(style) = self.styles.get(string) {
-            return Ok(Some(style.clone_box()));
+            return Ok(Some(style.borrow().clone_box()));
         }
 
         let mut matches: Vec<Vec<String>> = vec![];
@@ -231,8 +236,10 @@ impl OutputFormatterInterface for OutputFormatter {
     }
 
     fn set_style(&mut self, name: &str, style: Box<dyn OutputFormatterStyleInterface>) {
-        self.styles
-            .insert(shirabe_php_shim::strtolower(name), style);
+        self.styles.insert(
+            shirabe_php_shim::strtolower(name),
+            std::rc::Rc::new(std::cell::RefCell::new(style)),
+        );
     }
 
     fn has_style(&self, name: &str) -> bool {
@@ -240,7 +247,11 @@ impl OutputFormatterInterface for OutputFormatter {
             .contains_key(&shirabe_php_shim::strtolower(name))
     }
 
-    fn get_style(&self, name: &str) -> anyhow::Result<Box<dyn OutputFormatterStyleInterface>> {
+    fn get_style(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>>
+    {
         if !self.has_style(name) {
             return Err(anyhow::anyhow!(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
@@ -253,11 +264,9 @@ impl OutputFormatterInterface for OutputFormatter {
             )));
         }
 
-        // PHP returns the shared style instance; ownership cannot be expressed without Clone on
-        // the trait object.
-        // TODO(phase-c): returning a shared style here needs an Rc/Clone strategy in Phase C.
-        let _ = &self.styles[&shirabe_php_shim::strtolower(name)];
-        todo!()
+        Ok(std::rc::Rc::clone(
+            &self.styles[&shirabe_php_shim::strtolower(name)],
+        ))
     }
 
     fn format(&mut self, message: Option<&str>) -> anyhow::Result<Option<String>> {

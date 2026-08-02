@@ -19,7 +19,10 @@ pub trait OutputFormatterInterface: shirabe_php_shim::AsAny {
     /// Gets style options from style with specified name.
     ///
     /// Throws InvalidArgumentException when style isn't defined.
-    fn get_style(&self, name: &str) -> anyhow::Result<Box<dyn OutputFormatterStyleInterface>>;
+    fn get_style(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>>;
 
     /// Formats a message according to the given styles.
     fn format(&mut self, message: Option<&str>) -> anyhow::Result<Option<String>>;
