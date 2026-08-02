@@ -246,6 +246,12 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
 
 impl Command for BaseCommandData {
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(inner);
+
+    fn get_class(&self) -> String {
+        // Forwards to the base state's panicking get_class; concrete commands supply their
+        // FQCN through delegate_command_trait_impls_to_inner!'s two-argument variant.
+        self.inner.get_class()
+    }
 }
 
 impl BaseCommand for BaseCommandData {

@@ -53,4 +53,14 @@ pub trait OutputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     /// Returns current output formatter instance.
     fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>;
+
+    /// Downcast hook standing in for PHP's `$output instanceof ConsoleOutputInterface`
+    /// (cf. `InputInterface::as_streamable`). Only `ConsoleOutput` returns `Some`.
+    fn as_console_output(
+        &self,
+    ) -> Option<
+        &dyn crate::symfony::console::output::console_output_interface::ConsoleOutputInterface,
+    > {
+        None
+    }
 }

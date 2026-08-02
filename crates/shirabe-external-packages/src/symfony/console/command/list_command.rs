@@ -156,9 +156,17 @@ impl Command for ListCommand {
         Ok(0)
     }
 
-    fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
+    fn complete(
+        &self,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
         self.complete_impl(input, suggestions);
+        Ok(())
     }
 
-    crate::delegate_command_trait_impls_to_inner!(inner);
+    crate::delegate_command_trait_impls_to_inner!(
+        inner,
+        "Symfony\\Component\\Console\\Command\\ListCommand"
+    );
 }

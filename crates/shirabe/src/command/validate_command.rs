@@ -307,7 +307,10 @@ impl Command for ValidateCommand {
         base_command_initialize(self, input, output)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
+        base_command_data,
+        "Composer\\Command\\ValidateCommand"
+    );
 }
 
 impl BaseCommand for ValidateCommand {

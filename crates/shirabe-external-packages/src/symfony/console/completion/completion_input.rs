@@ -124,6 +124,9 @@ impl CompletionInput {
             .cloned()
             .collect();
         for current_argument_name in argument_names {
+            // PHP's foreach assigns the key variable before the body runs, so on break
+            // $argumentName still names the first argument that has no bound value.
+            argument_name = Some(current_argument_name.clone());
             if !self
                 .inner
                 .inner
@@ -132,7 +135,6 @@ impl CompletionInput {
             {
                 break;
             }
-            argument_name = Some(current_argument_name.clone());
 
             let argument_value = self.inner.inner.arguments[&current_argument_name].clone();
             self.completion_name = Some(current_argument_name.clone());

@@ -204,4 +204,7 @@ impl OutputInterface for ConsoleOutput {
     fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>> {
         self.inner.get_formatter()
     }
+    fn as_console_output(&self) -> Option<&dyn ConsoleOutputInterface> {
+        Some(self)
+    }
 }

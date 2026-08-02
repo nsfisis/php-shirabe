@@ -9,8 +9,13 @@ use crate::symfony::console::input::input_argument::InputArgument;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
+use crate::symfony::process::process::Process;
 use shirabe_php_shim::PhpMixed;
 use std::ops::{Deref, DerefMut};
+
+/// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
+/// single binary and does not install the Resources directory alongside it).
+const COMPLETION_BASH: &str = include_str!("../Resources/completion.bash");
 
 /// Dumps the completion script for the current shell.
 #[derive(Debug)]
@@ -59,15 +64,20 @@ impl DumpCompletionCommand {
         command
     }
 
-    pub fn complete_impl(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
+    pub fn complete_impl(
+        &self,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
         if input.must_suggest_argument_values_for("shell") {
-            // TODO(phase-d): PHP's complete() lets a DirectoryIterator failure propagate, but the
-            // Command::complete trait is infallible; on error the suggestions are skipped instead.
-            if let Ok(shells) = self.get_supported_shells() {
-                suggestions
-                    .suggest_values(shells.into_iter().map(StringOrSuggestion::String).collect());
-            }
+            suggestions.suggest_values(
+                self.get_supported_shells()?
+                    .into_iter()
+                    .map(StringOrSuggestion::String)
+                    .collect(),
+            );
         }
+        Ok(())
     }
 
     fn guess_shell() -> String {
@@ -81,7 +91,13 @@ impl DumpCompletionCommand {
         )
     }
 
-    fn tail_debug_log(&self, command_name: &str, _output: &dyn OutputInterface) {
+    /// The PHP closure captures `$output` by reference; `Process::run` needs a `'static`
+    /// callback, so the shared handle is moved into it instead.
+    fn tail_debug_log(
+        &self,
+        command_name: &str,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
         let debug_file = format!(
             "{}/sf_{}.log",
             shirabe_php_shim::sys_get_temp_dir(),
@@ -90,28 +106,34 @@ impl DumpCompletionCommand {
         if !shirabe_php_shim::file_exists(&debug_file) {
             shirabe_php_shim::touch(&debug_file);
         }
-        // TODO: Process::run() expects a `'static` callback, but the PHP closure captures
-        // `$output` by reference and writes each line to it. Bridging the borrowed `output`
-        // into a `'static` callback requires shared ownership of the output (Phase C).
-        todo!()
+        // new Process(['tail', '-f', $debugFile], null, null, null, 0) — timeout 0 disables it;
+        // like PHP, this tails forever until the user interrupts.
+        let mut process = Process::new(
+            vec!["tail".to_string(), "-f".to_string(), debug_file],
+            None,
+            None,
+            PhpMixed::Null,
+            Some(0.0),
+        )?;
+        process.run(
+            Some(Box::new(move |_type: &str, line: &str| {
+                output.borrow_mut().write(
+                    &[line.to_string()],
+                    false,
+                    output_interface::OUTPUT_NORMAL,
+                );
+                false
+            })),
+            indexmap::IndexMap::new(),
+        )?;
+        Ok(())
     }
 
     fn get_supported_shells(&self) -> anyhow::Result<Vec<String>> {
-        let mut shells = vec![];
-
-        // foreach (new \DirectoryIterator(__DIR__.'/../Resources/') as $file)
-        for file in shirabe_php_shim::directory_iterator(&format!(
-            "{}/../Resources/",
-            shirabe_php_shim::dir()
-        ))? {
-            if shirabe_php_shim::str_starts_with(&file.get_basename(), "completion.")
-                && file.is_file()
-            {
-                shells.push(file.get_extension());
-            }
-        }
-
-        Ok(shells)
+        // Deviation from PHP: the PHP implementation scans __DIR__.'/../Resources/' with a
+        // DirectoryIterator at runtime; the resources are embedded at compile time in this
+        // port, so the supported shells are a static list.
+        Ok(vec!["bash".to_string()])
     }
 }
 
@@ -192,7 +214,7 @@ impl Command for DumpCompletionCommand {
         );
 
         if input.borrow().get_option("debug")?.to_bool() {
-            self.tail_debug_log(&command_name, &*output.borrow());
+            self.tail_debug_log(&command_name, output.clone())?;
 
             return Ok(0);
         }
@@ -201,17 +223,23 @@ impl Command for DumpCompletionCommand {
             Some(s) => s.to_string(),
             None => Self::guess_shell(),
         };
-        let completion_file = format!(
-            "{}/../Resources/completion.{}",
-            shirabe_php_shim::dir(),
-            shell
-        );
-        if !shirabe_php_shim::file_exists(&completion_file) {
+        // __DIR__.'/../Resources/completion.'.$shell — resolved against the embedded
+        // resources; a shell without an embedded script is PHP's !file_exists() branch.
+        let completion_file = match shell.as_str() {
+            "bash" => Some(COMPLETION_BASH),
+            _ => None,
+        };
+        let Some(completion_file) = completion_file else {
             let supported_shells = self.get_supported_shells()?;
 
-            // TODO: PHP does `$output instanceof ConsoleOutputInterface ? $output->getErrorOutput()
-            // : $output`. There is no way to test trait membership through `&dyn OutputInterface`
-            // here; OutputInterface would need a downcast hook (Phase C). Writing to `output`.
+            // if ($output instanceof ConsoleOutputInterface) { $output = $output->getErrorOutput(); }
+            let output = {
+                let error_output = output
+                    .borrow()
+                    .as_console_output()
+                    .map(|console_output| console_output.get_error_output());
+                error_output.unwrap_or_else(|| output.clone())
+            };
             if !shell.is_empty() {
                 output.borrow_mut().writeln(
                     &[format!(
@@ -232,7 +260,7 @@ impl Command for DumpCompletionCommand {
             }
 
             return Ok(2);
-        }
+        };
 
         let application = self.get_application().unwrap();
         let version = application.borrow().get_version();
@@ -243,7 +271,7 @@ impl Command for DumpCompletionCommand {
                     "{{ VERSION }}".to_string(),
                 ],
                 &[command_name, version],
-                &shirabe_php_shim::file_get_contents(&completion_file).unwrap_or_default(),
+                completion_file,
             )],
             false,
             output_interface::OUTPUT_NORMAL,
@@ -252,9 +280,16 @@ impl Command for DumpCompletionCommand {
         Ok(0)
     }
 
-    fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
-        self.complete_impl(input, suggestions);
+    fn complete(
+        &self,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        self.complete_impl(input, suggestions)
     }
 
-    crate::delegate_command_trait_impls_to_inner!(inner);
+    crate::delegate_command_trait_impls_to_inner!(
+        inner,
+        "Symfony\\Component\\Console\\Command\\DumpCompletionCommand"
+    );
 }

@@ -325,6 +325,13 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn ignore_validation_errors(&self));
         $crate::delegate_to_inner!($field, fn get_ignore_validation_errors(&self) -> bool);
     };
+    // Variant taking the command's PHP fully-qualified class name (see `Command::get_class`).
+    ($field:ident, $fqcn:literal) => {
+        $crate::delegate_command_trait_impls_to_inner!($field);
+        fn get_class(&self) -> String {
+            $fqcn.to_string()
+        }
+    };
 }
 
 /// Polymorphic interface for all commands (PHP's `Command` base class as seen by
@@ -369,8 +376,24 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
         Ok(())
     }
 
+    /// The PHP fully-qualified class name of the concrete command. Port hook for PHP's
+    /// `\get_class($command)` (used by `CompleteCommand`'s debug log), which Rust cannot
+    /// reflect from a trait object; every concrete command supplies its FQCN, usually via
+    /// `delegate_command_trait_impls_to_inner!($field, "Fqcn")`.
+    fn get_class(&self) -> String;
+
     /// Adds suggestions to `suggestions` for the current completion input.
-    fn complete(&self, _input: &CompletionInput, _suggestions: &mut CompletionSuggestions) {}
+    ///
+    /// PHP's `complete` is `void` but can throw; errors are surfaced through `anyhow::Result`
+    /// so they propagate to `CompleteCommand::execute`'s catch-all (which turns them into
+    /// exit code 2), matching the PHP exception flow.
+    fn complete(
+        &self,
+        _input: &CompletionInput,
+        _suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
 
     /// Whether this command proxies to another application/command (Composer's
     /// `BaseCommand::isProxyCommand`). Exposed here so the `dyn Command` registry can detect proxy
@@ -551,6 +574,10 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
 impl Command for CommandData {
     fn is_enabled(&self) -> bool {
         true
+    }
+
+    fn get_class(&self) -> String {
+        panic!("get_class called on the base command state; concrete commands supply their FQCN");
     }
 
     fn set_application(

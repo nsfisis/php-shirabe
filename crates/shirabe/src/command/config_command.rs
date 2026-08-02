@@ -1273,7 +1273,10 @@ impl Command for ConfigCommand {
         .into())
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(
+        base_command_data,
+        "Composer\\Command\\ConfigCommand"
+    );
 }
 
 impl BaseCommand for ConfigCommand {

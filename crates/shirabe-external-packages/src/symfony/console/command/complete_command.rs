@@ -5,6 +5,7 @@ use crate::symfony::console::completion::completion_input::CompletionInput;
 use crate::symfony::console::completion::completion_suggestions::{
     CompletionSuggestions, StringOrSuggestion,
 };
+use crate::symfony::console::completion::output::bash_completion_output::BashCompletionOutput;
 use crate::symfony::console::completion::output::completion_output_interface::CompletionOutputInterface;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
@@ -144,9 +145,7 @@ impl CompleteCommand {
 
 fn get_class_of_command(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
     // LazyCommand is intentionally not ported.
-    // TODO: get_class() takes a PhpMixed but the command is a `dyn Command`; reflecting the
-    // concrete class name of a trait object requires a class-name hook on Command (Phase C).
-    todo!()
+    command.borrow().get_class()
 }
 
 fn get_definition_options(
@@ -162,8 +161,15 @@ fn get_definition_options(
 }
 
 /// new $completionOutput();
-fn instantiate_completion_output(_class: &PhpMixed) -> Box<dyn CompletionOutputInterface> {
-    todo!()
+fn instantiate_completion_output(class: &PhpMixed) -> Box<dyn CompletionOutputInterface> {
+    match class.to_string().as_str() {
+        "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput" => {
+            Box::new(BashCompletionOutput)
+        }
+        // completion_outputs only ever registers the bash output (Composer registers no extra
+        // ones), so any other FQCN is a programming error.
+        other => panic!("unknown completion output class: {}", other),
+    }
 }
 
 impl Command for CompleteCommand {
@@ -355,7 +361,7 @@ impl Command for CompleteCommand {
 
                         command
                             .borrow()
-                            .complete(&completion_input, &mut suggestions);
+                            .complete(&completion_input, &mut suggestions)?;
                     }
                 }
             }
@@ -407,5 +413,8 @@ impl Command for CompleteCommand {
         }
     }
 
-    crate::delegate_command_trait_impls_to_inner!(inner);
+    crate::delegate_command_trait_impls_to_inner!(
+        inner,
+        "Symfony\\Component\\Console\\Command\\CompleteCommand"
+    );
 }
