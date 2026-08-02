@@ -203,7 +203,10 @@ fn test_double_escaped_unicode() {
     assert_eq!(data, double_data);
 }
 
+// Shares the tabs2.json scratch file with test_overwrites_indentation_by_default; PHPUnit runs
+// tests serially, so the two never collide upstream.
 #[test]
+#[serial_test::serial(tabs2_fixture)]
 fn test_preserve_indentation_after_read() {
     let src = fixture_path("tabs.json");
     let dst = fixture_path("tabs2.json");
@@ -223,7 +226,9 @@ fn test_preserve_indentation_after_read() {
     std::fs::remove_file(&dst).unwrap();
 }
 
+// See test_preserve_indentation_after_read.
 #[test]
+#[serial_test::serial(tabs2_fixture)]
 fn test_overwrites_indentation_by_default() {
     let src = fixture_path("tabs.json");
     let dst = fixture_path("tabs2.json");
