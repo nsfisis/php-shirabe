@@ -4,3 +4,4 @@ mod async_runtime;
 mod config_stub;
 
 mod plugin_installer_test;
+mod subscriber_test;

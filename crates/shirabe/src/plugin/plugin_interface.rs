@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PluginInterface.php
 
 use crate::composer::ComposerHandle;
+use crate::event_dispatcher::EventSubscriberInterface;
 use crate::io::IOInterface;
 use crate::plugin::Capable;
 
@@ -31,11 +32,10 @@ pub trait PluginInterface: std::fmt::Debug {
     /// the name PHP would report.
     fn get_class_name(&self) -> String;
 
-    // TODO(plugin): PHP-side `instanceof` checks for EventSubscriberInterface / Capable.
-    // EventSubscriberInterface is not dyn-compatible (its only method is associated, not
-    // a `&self` method), so we expose a boolean predicate instead.
-    fn is_event_subscriber_interface(&self) -> bool {
-        false
+    // PHP-side `instanceof EventSubscriberInterface` / `instanceof Capable` checks map to
+    // these downcast accessors.
+    fn as_event_subscriber(&self) -> Option<&dyn EventSubscriberInterface> {
+        None
     }
 
     fn as_capable(&self) -> Option<&dyn Capable> {

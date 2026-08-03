@@ -348,6 +348,20 @@ static NEXT_CORR_ID: AtomicU64 = AtomicU64::new(1);
 /// (e.g. `__shirabe_find_file` autoload queries), so ids start at 1.
 static NEXT_RHANDLE: AtomicU64 = AtomicU64::new(1);
 
+thread_local! {
+    /// Listener for ReleaseRustHandle notifications, thread-local like the R table it prunes.
+    static RELEASE_RUST_HANDLE_HOOK: std::cell::RefCell<Option<Box<dyn Fn(u64)>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Registers the listener invoked with the released handle whenever a ReleaseRustHandle
+/// notification arrives on this thread. Replaces any previously registered listener.
+pub fn set_release_rust_handle_hook(hook: impl Fn(u64) + 'static) {
+    RELEASE_RUST_HANDLE_HOOK.with(|slot| {
+        *slot.borrow_mut() = Some(Box::new(hook));
+    });
+}
+
 pub fn alloc_rhandle() -> u64 {
     NEXT_RHANDLE.fetch_add(1, Ordering::Relaxed)
 }
@@ -507,10 +521,15 @@ fn rpc_call(
                 };
                 send_frame(&reply)?;
             }
-            Frame::ReleaseRustHandle { .. } => {
-                // TODO(plugin): R-table garbage collection is deferred — the shirabe crate
-                // keeps its entries alive for the worker's lifetime, and per-call script-event
-                // handles carry no state either, so the notification is dropped here.
+            Frame::ReleaseRustHandle { rhandle } => {
+                // A one-way notification sent by a child-side stub's __destruct; the shirabe
+                // crate registers a hook that drops the matching R-table entry. Per-call
+                // script-event handles carry no table state, so an unhooked release is a no-op.
+                RELEASE_RUST_HANDLE_HOOK.with(|hook| {
+                    if let Some(hook) = hook.borrow().as_ref() {
+                        hook(rhandle);
+                    }
+                });
                 continue;
             }
             Frame::EpochBump { .. } => {

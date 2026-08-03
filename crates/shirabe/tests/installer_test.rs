@@ -188,6 +188,12 @@ impl EventDispatcherInterface for StubEventDispatcher {
         Ok(0)
     }
     fn add_listener(&mut self, _event_name: &str, _listener: Callable, _priority: i64) {}
+    fn add_subscriber(
+        &mut self,
+        _subscriber: &dyn shirabe::event_dispatcher::EventSubscriberInterface,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
     fn has_event_listeners(&mut self, _event: &dyn EventInterface) -> bool {
         false
     }

@@ -85,6 +85,10 @@ mockall::mock! {
             transaction: Transaction,
         ) -> anyhow::Result<i64>;
         fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
+        fn add_subscriber<'a>(
+            &mut self,
+            subscriber: &'a dyn shirabe::event_dispatcher::EventSubscriberInterface,
+        ) -> anyhow::Result<()>;
         fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
     }
 }

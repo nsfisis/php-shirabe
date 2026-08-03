@@ -35,7 +35,7 @@ use tempfile::TempDir;
 /// The register/activate flow runs the plugin in the real PHP worker; without a PHP binary the
 /// worker cannot start. Tests exercising it return early, following the convention of the
 /// non-mock tests in `shirabe-php-rpc`.
-fn php_runtime_available() -> bool {
+pub(crate) fn php_runtime_available() -> bool {
     PhpExecutableFinder::new().find(false).is_some()
 }
 
@@ -45,7 +45,7 @@ fn php_runtime_available() -> bool {
 /// race the other's `class_exists` checks, so the worker-touching tests run serialized.
 static PHP_WORKER_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
+pub(crate) fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
     PHP_WORKER_TESTS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -57,6 +57,16 @@ fn fixtures_dir() -> String {
         .join("../../composer/tests/Composer/Test/Plugin/Fixtures");
     dir.canonicalize()
         .expect("the Composer checkout must provide the plugin fixtures")
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
+/// Shirabe-owned fixtures with no upstream counterpart (see `subscriber_test.rs`).
+pub(crate) fn shirabe_fixtures_dir() -> String {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures");
+    dir.canonicalize()
+        .expect("the Shirabe plugin fixtures directory must exist")
         .to_str()
         .unwrap()
         .to_string()
@@ -184,7 +194,16 @@ impl InstallationManagerInterface for MockInstallationManager {
     }
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
-        Some(format!("{}/{}", fixtures_dir(), package.get_pretty_name()))
+        let upstream = format!("{}/{}", fixtures_dir(), package.get_pretty_name());
+        if std::path::Path::new(&upstream).exists() {
+            return Some(upstream);
+        }
+        // Shirabe-specific fixtures (subscriber_test) live next to this test binary.
+        Some(format!(
+            "{}/{}",
+            shirabe_fixtures_dir(),
+            package.get_pretty_name()
+        ))
     }
 
     fn set_output_progress(&mut self, _output_progress: bool) {}
@@ -214,20 +233,20 @@ fn locker_installation_manager(
 }
 
 #[derive(Debug)]
-struct SetUp {
-    io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
-    io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pm: std::rc::Rc<std::cell::RefCell<PluginManager>>,
+pub(crate) struct SetUp {
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
+    pub(crate) io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    pub(crate) pm: std::rc::Rc<std::cell::RefCell<PluginManager>>,
     autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     packages: Vec<PackageInterfaceHandle>,
-    repository: InstalledRepositoryInterfaceHandle,
+    pub(crate) repository: InstalledRepositoryInterfaceHandle,
     // Keeps the Composer alive; PluginManager only holds a weak back-reference to it.
-    composer: ComposerHandle,
+    pub(crate) composer: ComposerHandle,
     // PHP's tearDown() removes this directory; TempDir does the same on drop.
     _directory: TempDir,
 }
 
-fn set_up() -> SetUp {
+pub(crate) fn set_up() -> SetUp {
     let loader = JsonLoader::new(Box::new(ArrayLoader::new(None, false)));
     let mut packages = vec![];
     let directory = TempDir::new().unwrap();
@@ -380,7 +399,7 @@ fn plugin_property(
     }
 }
 
-fn new_installer(set_up: &SetUp) -> PluginInstaller {
+pub(crate) fn new_installer(set_up: &SetUp) -> PluginInstaller {
     PluginInstaller::new(
         set_up.io_dyn.clone(),
         set_up.composer.upcast().downgrade(),
@@ -740,9 +759,9 @@ impl PluginInterface for CapablePlugin {
 }
 
 impl Capable for CapablePlugin {
-    fn get_capabilities(&self) -> IndexMap<String, String> {
+    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, String>> {
         *self.get_capabilities_calls.borrow_mut() += 1;
-        IndexMap::new()
+        Ok(IndexMap::new())
     }
 }
 

@@ -485,9 +485,12 @@ impl PluginManager {
                     .into());
                 }
                 let handle = self.php_runtime_new_object(&class)?;
-                let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> = std::rc::Rc::new(
-                    std::cell::RefCell::new(PhpPluginProxy::new(handle.phandle, handle.class)),
-                );
+                let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> =
+                    std::rc::Rc::new(std::cell::RefCell::new(PhpPluginProxy::new(
+                        handle.phandle,
+                        handle.class,
+                        handle.implements,
+                    )));
                 self.add_plugin(plugin.clone(), is_global_plugin, Some(package.clone()))?;
                 self.registered_plugins
                     .entry(package.get_name().to_string())
@@ -513,7 +516,7 @@ impl PluginManager {
         let value = unwrap_php_result(call_function_with_dispatcher(
             function,
             args,
-            Some(&mut PluginRpcDispatcher),
+            Some(&mut PluginRpcDispatcher::default()),
         ))?;
         match value {
             PluginValue::Bool(value) => Ok(value),
@@ -545,7 +548,7 @@ impl PluginManager {
         unwrap_php_result(call_function_with_dispatcher(
             "__shirabe_eval",
             vec![PluginValue::string(code)],
-            Some(&mut PluginRpcDispatcher),
+            Some(&mut PluginRpcDispatcher::default()),
         ))?;
         Ok(())
     }
@@ -561,7 +564,7 @@ impl PluginManager {
                 PluginValue::string(file_identifier),
                 PluginValue::string(file),
             ],
-            Some(&mut PluginRpcDispatcher),
+            Some(&mut PluginRpcDispatcher::default()),
         ))?;
         Ok(())
     }
@@ -571,7 +574,7 @@ impl PluginManager {
         let value = unwrap_php_result(shirabe_php_rpc::new_object(
             class,
             vec![],
-            Some(&mut PluginRpcDispatcher),
+            Some(&mut PluginRpcDispatcher::default()),
         ))?;
         match value {
             PluginValue::PhpHandle(handle) => Ok(handle),
@@ -735,12 +738,12 @@ impl PluginManager {
             .borrow_mut()
             .activate(self.composer_full(), self.io.clone())?;
 
-        // TODO(plugin): if plugin is EventSubscriberInterface, hook into the event dispatcher
-        // The PHP code calls $this->composer->getEventDispatcher()->addSubscriber($plugin);
-        // — add_subscriber here is generic over `S: EventSubscriberInterface` and cannot
-        // accept a `&dyn EventSubscriberInterface`. Skipped until subscriber dispatch is
-        // implemented dynamically.
-        let _ = plugin.borrow().is_event_subscriber_interface();
+        let plugin_ref = plugin.borrow();
+        if let Some(subscriber) = plugin_ref.as_event_subscriber() {
+            let event_dispatcher = self.composer_full().borrow().get_event_dispatcher();
+            let result = event_dispatcher.borrow_mut().add_subscriber(subscriber);
+            result?;
+        }
         Ok(())
     }
 
@@ -949,13 +952,12 @@ impl PluginManager {
         plugin: &dyn PluginInterface,
         capability: &str,
     ) -> anyhow::Result<Option<String>> {
-        // TODO(plugin): capability lookup
         let capable = match plugin.as_capable() {
             Some(c) => c,
             None => return Ok(None),
         };
 
-        let capabilities = capable.get_capabilities();
+        let capabilities = capable.get_capabilities()?;
 
         // PHP: !empty($capabilities[$capability]) && is_string($capabilities[$capability]) && trim($capabilities[$capability])
         if let Some(s) = capabilities.get(capability) {

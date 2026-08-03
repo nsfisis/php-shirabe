@@ -2,7 +2,8 @@
 
 use indexmap::IndexMap;
 
-// TODO(plugin): Plugin API - interface for plugins that expose capability implementations
+// The sole implementor is the PHP plugin proxy (Composer itself never implements Capable), so
+// the trait is fallible: the answer crosses the RPC boundary.
 pub trait Capable {
-    fn get_capabilities(&self) -> IndexMap<String, String>;
+    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, String>>;
 }

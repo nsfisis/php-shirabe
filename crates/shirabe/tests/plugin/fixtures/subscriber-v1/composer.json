@@ -1,0 +1,12 @@
+{
+    "name": "subscriber-v1",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "autoload": { "psr-0": { "Subscriber": "" } },
+    "extra": {
+        "class": "Subscriber\\Plugin"
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    }
+}

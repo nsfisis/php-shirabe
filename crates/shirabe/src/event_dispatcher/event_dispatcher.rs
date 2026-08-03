@@ -9,11 +9,13 @@ use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::event_dispatcher::EventSubscriberInterface;
 use crate::event_dispatcher::ScriptExecutionException;
+use crate::event_dispatcher::SubscribedEventEntry;
 use crate::installer::BinaryInstaller;
 use crate::installer::InstallerEvent;
 use crate::installer::PackageEvent;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::repository::RepositoryInterface;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
@@ -25,7 +27,7 @@ use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
-    call_function_with_dispatcher, call_static_method,
+    call_function_with_dispatcher, call_php_method, call_static_method,
 };
 use shirabe_php_shim::{
     InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
@@ -38,14 +40,14 @@ use shirabe_php_shim::{
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
 /// "Class::method"), a `[object|string, method]` pair, or a `\Closure`.
-///
-/// TODO(plugin): Subscriber-based (`ArrayCallable`) listeners come from plugins and are not
-/// implemented yet — only the string forms used by composer.json `scripts` work here.
 #[derive(Clone)]
 pub enum Callable {
     String(String),
     /// `[$className_or_object, $methodName]` array callable. The first element is represented
     /// here as `PhpMixed` to keep parity with PHP's loose typing.
+    ///
+    /// TODO(plugin): only listeners whose object half lives in the PHP child (`PhpMethod`) are
+    /// invocable; an `ArrayCallable` carrying a `PhpMixed` object still has no invocation path.
     ArrayCallable(Box<PhpMixed>, String),
     /// PHP `\Closure`, invoked with the event exactly like `$callable($event)` in
     /// `EventDispatcher::doDispatch`. Today this is only produced by Composer's own commands
@@ -53,6 +55,9 @@ pub enum Callable {
     /// `dependencyResolutionCompleted` tracker) — Plugin-supplied closures remain out of scope
     /// pending Plugin API.
     Closure(std::rc::Rc<dyn Fn(&dyn EventInterface) -> PhpMixed>),
+    /// `[$subscriber, $methodName]` array callable whose object half is a plugin entity in the
+    /// PHP child process, registered through `addSubscriber`. Invoked over RPC.
+    PhpMethod(shirabe_php_rpc::PhpObjHandle, String),
 }
 
 impl std::fmt::Debug for Callable {
@@ -65,6 +70,11 @@ impl std::fmt::Debug for Callable {
                 .field(method)
                 .finish(),
             Callable::Closure(_) => f.write_str("Closure(..)"),
+            Callable::PhpMethod(handle, method) => f
+                .debug_tuple("PhpMethod")
+                .field(handle)
+                .field(method)
+                .finish(),
         }
     }
 }
@@ -358,9 +368,87 @@ impl EventDispatcher {
                 } else {
                     0
                 };
+            } else if let Callable::PhpMethod(ref handle, ref method_name) = callable {
+                self.make_autoloader(event, &callable)?;
+                Self::ensure_script_autoloader()?;
+                let is_callable_value = unwrap_php_result(call_function_with_dispatcher(
+                    "is_callable",
+                    vec![PluginValue::List(vec![
+                        PluginValue::PhpHandle(handle.clone()),
+                        PluginValue::string(method_name.clone()),
+                    ])],
+                    Some(&mut PluginRpcDispatcher::default()),
+                ))?;
+                if !matches!(is_callable_value, PluginValue::Bool(true)) {
+                    return Err(anyhow::anyhow!(RuntimeException {
+                        message: format!(
+                            "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
+                            handle.class,
+                            method_name,
+                            event.get_name()
+                        ),
+                        code: 0,
+                    }));
+                }
+                self.io.write_error3(
+                    &format!(
+                        "> {}: {}->{}",
+                        formatted_event_name_with_args.clone(),
+                        handle.class,
+                        method_name,
+                    ),
+                    true,
+                    crate::io::VERBOSE,
+                );
+                let stub_class = Self::event_stub_class(event).ok_or_else(|| {
+                    // TODO(plugin): only the base Event and Script\Event proxy stubs exist so
+                    // far; installer/package/plugin events need their own stubs.
+                    anyhow::anyhow!(RuntimeException {
+                        message: format!(
+                            "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
+                            event.get_name(),
+                            handle.class,
+                            method_name,
+                        ),
+                        code: 0,
+                    })
+                })?;
+                let event_rhandle = shirabe_php_rpc::alloc_rhandle();
+                let mut dispatcher = PluginRpcDispatcher {
+                    event: Some((event_rhandle, event)),
+                };
+                let outcome = call_php_method(
+                    handle.phandle,
+                    method_name,
+                    vec![PluginValue::RustHandle(RustObjHandle {
+                        rhandle: event_rhandle,
+                        class: stub_class.to_string(),
+                        epoch: 0,
+                        snapshot: None,
+                    })],
+                    Some(&mut dispatcher),
+                )?;
+                r#return = match outcome {
+                    Ok(value) => {
+                        if matches!(value, PluginValue::Bool(false)) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    // TODO(plugin): the original exception class is collapsed to
+                    // RuntimeException on this side of the boundary.
+                    Err(throw) => {
+                        return Err(anyhow::anyhow!(RuntimeException {
+                            message: throw.message,
+                            code: throw.code,
+                        }));
+                    }
+                };
             } else if !is_string_callable {
-                // TODO(plugin): non-string callable handling — verify is_callable, invoke,
-                // and replicate the get_class / write_error / is_callable error path from PHP.
+                // TODO(plugin): an ArrayCallable whose object half is a PhpMixed has no
+                // invocation path; only the is_callable error lane and the verbose echo of the
+                // PHP branch are replicated here.
                 self.make_autoloader(event, &callable)?;
                 if !is_callable(&PhpMixed::Null) {
                     let (class_name, method) = match &callable {
@@ -1034,16 +1122,10 @@ try {{
             );
         }
 
-        // The event crosses the boundary as a proxy stub: the child sees an instance of the
-        // stub class (same FQCN as the real event class) whose methods call back here.
-        let stub_class = if event.as_any().downcast_ref::<ScriptEvent>().is_some() {
-            "Composer\\Script\\Event"
-        } else if event.as_any().downcast_ref::<Event>().is_some() {
-            "Composer\\EventDispatcher\\Event"
-        } else {
+        let stub_class = Self::event_stub_class(event).ok_or_else(|| {
             // TODO(plugin): only the base Event and Script\Event proxy stubs exist so far;
             // installer/package/plugin events need their own stubs.
-            return Err(anyhow::anyhow!(RuntimeException {
+            anyhow::anyhow!(RuntimeException {
                 message: format!(
                     "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
                     event.get_name(),
@@ -1051,8 +1133,8 @@ try {{
                     method_name,
                 ),
                 code: 0,
-            }));
-        };
+            })
+        })?;
 
         Self::ensure_script_autoloader()?;
         let rhandle = shirabe_php_rpc::alloc_rhandle();
@@ -1079,6 +1161,18 @@ try {{
                 message: throw.message,
                 code: throw.code,
             })),
+        }
+    }
+
+    /// The proxy stub class (same FQCN as the real event class) an event crosses the RPC
+    /// boundary as, or `None` when no stub exists for it yet.
+    fn event_stub_class(event: &dyn EventInterface) -> Option<&'static str> {
+        if event.as_any().downcast_ref::<ScriptEvent>().is_some() {
+            Some("Composer\\Script\\Event")
+        } else if event.as_any().downcast_ref::<Event>().is_some() {
+            Some("Composer\\EventDispatcher\\Event")
+        } else {
+            None
         }
     }
 
@@ -1135,12 +1229,38 @@ try {{
     }
 
     /// Adds object methods as listeners for the events in getSubscribedEvents
-    pub fn add_subscriber<S: EventSubscriberInterface>(&mut self, _subscriber: &S) {
-        // TODO(plugin): port full subscriber registration — depends on dynamic dispatch
-        // for `[$subscriber, $methodName]` style callables.
-        for (event_name, _params) in S::get_subscribed_events() {
-            let _ = event_name;
+    pub fn add_subscriber(
+        &mut self,
+        subscriber: &dyn EventSubscriberInterface,
+    ) -> anyhow::Result<()> {
+        for (event_name, params) in subscriber.get_subscribed_events()? {
+            match params {
+                SubscribedEventEntry::Method(method) => {
+                    self.add_listener(
+                        &event_name,
+                        Callable::PhpMethod(subscriber.subscriber_handle(), method),
+                        0,
+                    );
+                }
+                SubscribedEventEntry::MethodWithPriority(method, priority) => {
+                    self.add_listener(
+                        &event_name,
+                        Callable::PhpMethod(subscriber.subscriber_handle(), method),
+                        priority.unwrap_or(0),
+                    );
+                }
+                SubscribedEventEntry::Methods(listeners) => {
+                    for (method, priority) in listeners {
+                        self.add_listener(
+                            &event_name,
+                            Callable::PhpMethod(subscriber.subscriber_handle(), method),
+                            priority.unwrap_or(0),
+                        );
+                    }
+                }
+            }
         }
+        Ok(())
     }
 
     /// Retrieves all listeners for a given event
@@ -1358,6 +1478,8 @@ try {{
                 PhpMixed::String(class) => format!("{}::{}", class, method),
                 other => format!("{}::{}", get_class(other), method),
             },
+            // PHP: get_class($callable[0]).'::'.$callable[1] — the object half's runtime class.
+            Callable::PhpMethod(handle, method) => format!("{}::{}", handle.class, method),
             Callable::Closure(_) => "closure".to_string(),
         };
         if self.previous_listeners.contains_key(&callable_key) {
@@ -1573,36 +1695,47 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             )));
         }
         match self.event {
-            Some((event_rhandle, event)) if event_rhandle == rhandle => match method_name {
-                "getName" => Ok(PluginValue::string(event.get_name())),
-                "getArguments" => Ok(PluginValue::List(
-                    event
-                        .get_arguments()
-                        .iter()
-                        .map(|arg| PluginValue::string(arg.clone()))
-                        .collect(),
-                )),
-                "getFlags" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-                    event.get_flags().clone(),
-                ))),
-                "isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
-                "isDevMode" => match event.as_any().downcast_ref::<ScriptEvent>() {
-                    Some(script_event) => Ok(PluginValue::Bool(script_event.is_dev_mode())),
-                    None => Err(runtime_throw(
-                        "isDevMode is only available on script events".to_string(),
-                    )),
-                },
-                // TODO(plugin): getComposer/getIO/stopPropagation and the rest need the full
-                // object-graph proxying of the plugin activation milestone.
-                other => Err(runtime_throw(format!(
-                    "the Event method `{other}` is not available over RPC yet"
-                ))),
-            },
+            Some((event_rhandle, event)) if event_rhandle == rhandle => {
+                dispatch_event_method(event, method_name)
+            }
             _ => Err(runtime_throw(format!(
                 "unknown Rust handle {rhandle} (script-event handles are scoped to a single \
                  dispatched call)"
             ))),
         }
+    }
+}
+
+/// Serves an event proxy stub's method call, shared by the script dispatcher and the plugin
+/// dispatcher (both expose one live event handle per dispatched call).
+pub(crate) fn dispatch_event_method(
+    event: &dyn EventInterface,
+    method_name: &str,
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getName" => Ok(PluginValue::string(event.get_name())),
+        "getArguments" => Ok(PluginValue::List(
+            event
+                .get_arguments()
+                .iter()
+                .map(|arg| PluginValue::string(arg.clone()))
+                .collect(),
+        )),
+        "getFlags" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+            event.get_flags().clone(),
+        ))),
+        "isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
+        "isDevMode" => match event.as_any().downcast_ref::<ScriptEvent>() {
+            Some(script_event) => Ok(PluginValue::Bool(script_event.is_dev_mode())),
+            None => Err(runtime_throw(
+                "isDevMode is only available on script events".to_string(),
+            )),
+        },
+        // TODO(plugin): getComposer/getIO/stopPropagation and the rest need full proxying
+        // of the object graph an event exposes, which does not exist yet.
+        other => Err(runtime_throw(format!(
+            "the Event method `{other}` is not available over RPC yet"
+        ))),
     }
 }
 
@@ -1657,6 +1790,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
         transaction: Transaction,
     ) -> anyhow::Result<i64>;
     fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
+    fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()>;
     fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
 }
 
@@ -1691,6 +1825,10 @@ impl EventDispatcherInterface for EventDispatcher {
 
     fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64) {
         self.add_listener(event_name, listener, priority);
+    }
+
+    fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()> {
+        self.add_subscriber(subscriber)
     }
 
     fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool {
