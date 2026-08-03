@@ -1,6 +1,7 @@
 pub mod capability;
 pub mod capable;
 pub mod command_event;
+pub mod php_plugin_proxy;
 pub mod plugin_blocked_exception;
 pub mod plugin_events;
 pub mod plugin_interface;
@@ -13,6 +14,7 @@ pub mod pre_pool_create_event;
 pub use capability::*;
 pub use capable::*;
 pub use command_event::*;
+pub use php_plugin_proxy::*;
 pub use plugin_blocked_exception::*;
 pub use plugin_events::*;
 pub use plugin_interface::*;

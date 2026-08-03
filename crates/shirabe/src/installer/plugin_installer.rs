@@ -8,7 +8,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
-use crate::repository::InstalledRepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
@@ -46,7 +46,7 @@ impl PluginInstaller {
     async fn rollback_install(
         &self,
         e: anyhow::Error,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         self.inner.io.write_error(&format!(
@@ -79,7 +79,7 @@ impl InstallerInterface for PluginInstaller {
 
     fn is_installed(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         self.inner.is_installed(repo, package)
@@ -135,43 +135,56 @@ impl InstallerInterface for PluginInstaller {
 
     async fn install(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.inner.install(repo, package).await?;
+        self.inner.install(repo, package.clone()).await?;
 
-        // TODO(plugin): register package in plugin manager after install, rollback on failure
         Platform::workaround_filesystem_issues();
-        // self.get_plugin_manager().register_package(package, true)?;
-        // On error: self.rollback_install(e, repo, package)?;
+        let result =
+            self.get_plugin_manager()
+                .borrow_mut()
+                .register_package(package.clone(), true, false);
+        if let Err(e) = result {
+            self.rollback_install(e, repo, package).await?;
+        }
         Ok(None)
     }
 
     async fn update(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.inner.update(repo, initial, target).await?;
+        self.inner
+            .update(repo, initial.clone(), target.clone())
+            .await?;
 
-        // TODO(plugin): deactivate initial and register target in plugin manager after update, rollback on failure
         Platform::workaround_filesystem_issues();
-        // self.get_plugin_manager().deactivate_package(initial);
-        // self.get_plugin_manager().register_package(target, true)?;
-        // On error: self.rollback_install(e, repo, target)?;
+        let result = (|| -> anyhow::Result<()> {
+            self.get_plugin_manager()
+                .borrow_mut()
+                .deactivate_package(initial)?;
+            self.get_plugin_manager()
+                .borrow_mut()
+                .register_package(target.clone(), true, false)?;
+            Ok(())
+        })();
+        if let Err(e) = result {
+            self.rollback_install(e, repo, target).await?;
+        }
         Ok(None)
     }
 
     async fn uninstall(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        // TODO(plugin): uninstall package from plugin manager
         self.get_plugin_manager()
             .borrow_mut()
-            .uninstall_package(package.clone());
+            .uninstall_package(package.clone())?;
 
         self.inner.uninstall(repo, package).await
     }

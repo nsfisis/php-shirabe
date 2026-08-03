@@ -8,7 +8,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
-use crate::repository::InstalledRepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug)]
@@ -30,10 +30,10 @@ impl InstallerInterface for MetapackageInstaller {
 
     fn is_installed(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
-        repo.has_package(package)
+        repo.borrow_mut().has_package(package)
     }
 
     async fn download(
@@ -64,7 +64,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn install(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error3(
@@ -81,7 +81,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn update(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -111,7 +111,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn uninstall(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {

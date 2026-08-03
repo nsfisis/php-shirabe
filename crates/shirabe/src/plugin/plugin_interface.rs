@@ -7,23 +7,29 @@ use crate::plugin::Capable;
 pub const PLUGIN_API_VERSION: &str = "2.9.0";
 
 pub trait PluginInterface: std::fmt::Debug {
+    // The PHP methods return void but may throw; the owned `ComposerHandle` follows the shared
+    // handle policy — plugins typically store `$composer` beyond the call.
     fn activate(
         &mut self,
-        composer: &ComposerHandle,
+        composer: ComposerHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    );
+    ) -> anyhow::Result<()>;
 
     fn deactivate(
         &mut self,
-        composer: &ComposerHandle,
+        composer: ComposerHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    );
+    ) -> anyhow::Result<()>;
 
     fn uninstall(
         &mut self,
-        composer: &ComposerHandle,
+        composer: ComposerHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    );
+    ) -> anyhow::Result<()>;
+
+    /// PHP: `get_class($plugin)`. Rust has no runtime class name, so each implementor carries
+    /// the name PHP would report.
+    fn get_class_name(&self) -> String;
 
     // TODO(plugin): PHP-side `instanceof` checks for EventSubscriberInterface / Capable.
     // EventSubscriberInterface is not dyn-compatible (its only method is associated, not
@@ -33,6 +39,12 @@ pub trait PluginInterface: std::fmt::Debug {
     }
 
     fn as_capable(&self) -> Option<&dyn Capable> {
+        None
+    }
+
+    /// For testing only: recovers the PHP-backed proxy so tests can read plugin properties the
+    /// way PHPUnit asserts `$plugins[0]->version`.
+    fn as_php_plugin_proxy(&self) -> Option<&crate::plugin::PhpPluginProxy> {
         None
     }
 }

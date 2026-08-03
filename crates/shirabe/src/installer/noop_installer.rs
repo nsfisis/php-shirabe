@@ -2,7 +2,7 @@
 
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::repository::InstalledRepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug)]
@@ -16,10 +16,10 @@ impl InstallerInterface for NoopInstaller {
 
     fn is_installed(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
-        repo.has_package(package)
+        repo.borrow_mut().has_package(package)
     }
 
     async fn download(
@@ -50,7 +50,7 @@ impl InstallerInterface for NoopInstaller {
 
     async fn install(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
@@ -63,7 +63,7 @@ impl InstallerInterface for NoopInstaller {
 
     async fn update(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -86,7 +86,7 @@ impl InstallerInterface for NoopInstaller {
 
     async fn uninstall(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();

@@ -137,12 +137,14 @@ impl RepositoryInterface for InstalledArrayRepository {
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         None
     }
-    fn as_installed_repository_interface(&self) -> Option<&dyn InstalledRepositoryInterface> {
+    fn as_installed_repository_interface(
+        &self,
+    ) -> Option<&(dyn InstalledRepositoryInterface + 'static)> {
         Some(self)
     }
     fn as_installed_repository_interface_mut(
         &mut self,
-    ) -> Option<&mut dyn InstalledRepositoryInterface> {
+    ) -> Option<&mut (dyn InstalledRepositoryInterface + 'static)> {
         Some(self)
     }
     fn as_writable_repository_interface_mut(

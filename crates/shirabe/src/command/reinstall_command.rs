@@ -244,32 +244,23 @@ impl Command for ReinstallCommand {
 
         let uninstall_operations: Vec<AnyOperation> =
             uninstall_operations.into_iter().map(Into::into).collect();
-        {
-            let mut local_repo_ref = local_repo.borrow_mut();
-            let repo = local_repo_ref
-                .as_installed_repository_interface_mut()
-                .expect("local repository must be an InstalledRepositoryInterface");
-            installation_manager.borrow_mut().execute(
-                repo,
-                uninstall_operations,
-                dev_mode,
-                true,
-                false,
-            )?;
-        }
-        {
-            let mut local_repo_ref = local_repo.borrow_mut();
-            let repo = local_repo_ref
-                .as_installed_repository_interface_mut()
-                .expect("local repository must be an InstalledRepositoryInterface");
-            installation_manager.borrow_mut().execute(
-                repo,
-                install_operations.clone(),
-                dev_mode,
-                true,
-                false,
-            )?;
-        }
+        let repo = crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
+            &local_repo,
+        );
+        installation_manager.borrow_mut().execute(
+            &repo,
+            uninstall_operations,
+            dev_mode,
+            true,
+            false,
+        )?;
+        installation_manager.borrow_mut().execute(
+            &repo,
+            install_operations.clone(),
+            dev_mode,
+            true,
+            false,
+        )?;
 
         if !input
             .borrow()

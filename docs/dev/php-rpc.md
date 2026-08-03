@@ -50,9 +50,9 @@ frame is a fatal channel error, not an allocation attempt.
 | `0x08` | `ReleasePhpHandle` | Rust→PHP | `phandle` |
 | `0x09` | `EpochBump` | Rust→PHP | `rhandle`, `epoch` |
 
-The Rust side allocates odd correlation ids, the PHP side even ones. `NewObject` and
-`CallPhpMethod` are protocol receptacles: the worker currently answers them with an explicit
-`Throw` (the P table is not implemented yet).
+The Rust side allocates odd correlation ids, the PHP side even ones. `NewObject` instantiates
+a class in the worker and returns a `__phandle` descriptor for the new P-table entity;
+`CallPhpMethod` invokes a method on such an entity; `ReleasePhpHandle` drops it.
 
 ### Values: `PluginValue` and the codec
 
@@ -111,22 +111,45 @@ Shirabe-internal helpers prefixed `__shirabe_`), then falls back to calling the 
 function; an unknown name is an explicit error. Notable internal helpers:
 
 - `__shirabe_eval` — runs a Rust-generated PHP snippet and returns its `return` value (used by
-  the `scripts` Command-class execution path).
-- `__shirabe_require` — `require_once` a file (e.g. an autoloader) into the worker.
+  the `scripts` Command-class execution path and the `_composer_tmp` class-rename path of
+  `PluginManager::registerPackage`).
+- `__shirabe_require` — `require_once` a file (e.g. an autoloader) into the worker, then
+  re-prepends the stub autoloader so proxied FQCNs keep resolving to stubs even when the
+  required file registered its own prepending autoloader (a Composer `vendor/autoload.php`
+  does).
 - `__shirabe_enable_script_autoloader` — registers the autoloader that resolves classes through
   the Rust-side `ClassLoader` via handle 0.
+- `__shirabe_composer_require` — the body of `\Composer\Autoload\composerRequire`, sharing
+  its `$GLOBALS['__composer_autoload_files']` guard (files-autoload entries of plugin
+  packages).
+- `__shirabe_installed_versions_reload` — mirrors `FilesystemRepository::write`'s in-process
+  `InstalledVersions::reload($versions)` into the worker; guarded by
+  `class_exists(..., false)` so an unloaded class keeps its upstream lazy-load behavior.
+- `__shirabe_get_property` — for testing only: reads a public property of a P-table entity.
 - `__shirabe_oracle_roundtrip` — codec oracle support for tests.
 
 ## Proxy stubs
 
-`php/stubs/` holds hand-written proxy stub classes (currently `Composer\EventDispatcher\Event`
-and `Composer\Script\Event`), written in the shape the future stub generator will output. They
-are autoloaded with highest priority so a proxied FQCN can never be shadowed by the real
-implementation. Stubs are interned per rhandle (`WeakReference`-based registry) so identity
-(`===`) holds, and their destructors send `ReleaseRustHandle`.
+`php/stubs/` holds hand-written proxy stub classes (`Composer\EventDispatcher\Event`,
+`Composer\Script\Event`, `Composer\PartialComposer`, `Composer\Composer`, and the
+`Composer\IO\{BaseIO,ConsoleIO,BufferIO,NullIO}` hierarchy), written in the shape the future
+stub generator will output. They are autoloaded with highest priority so a proxied FQCN can
+never be shadowed by the real implementation; `__shirabe_require` restores that priority after
+loading code that prepends its own autoloader. Stubs are interned per rhandle
+(`WeakReference`-based registry) so identity (`===`) holds, and their destructors send
+`ReleaseRustHandle`.
+
+## The P table
+
+`ShirabePhpObjectRegistry` holds PHP-owned entities (e.g. plugin instances) keyed by phandle,
+strongly referenced until the Rust side sends `ReleasePhpHandle`. `toWire` turns any non-stub
+object into a `__phandle` descriptor (interned by `spl_object_id`, so one entity keeps one
+handle); `fromWire` resolves descriptors back to the live entity. The Rust-side counterpart —
+the R table holding `$composer`/`$io` entities reachable from plugin callbacks — lives in
+`crates/shirabe/src/plugin/php_plugin_proxy.rs`.
 
 ## Out of scope (deferred)
 
-The P table (PHP-owned objects crossing to Rust), `NewObject`/`CallPhpMethod` execution,
-out-parameter write-back at the call sites, epoch-based cache invalidation on the PHP side,
-error-class reconstruction across the boundary, and Windows support.
+Out-parameter write-back at the call sites, epoch-based cache invalidation on the PHP side,
+R-table garbage collection on `ReleaseRustHandle`, error-class reconstruction across the
+boundary, and Windows support.

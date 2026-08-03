@@ -3,7 +3,7 @@
 use crate::downloader::DownloadManagerInterface;
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::repository::InstalledRepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
@@ -37,7 +37,7 @@ impl InstallerInterface for ProjectInstaller {
 
     fn is_installed(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         Ok(false)
@@ -94,7 +94,7 @@ impl InstallerInterface for ProjectInstaller {
 
     async fn install(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
@@ -105,7 +105,7 @@ impl InstallerInterface for ProjectInstaller {
 
     async fn update(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -118,7 +118,7 @@ impl InstallerInterface for ProjectInstaller {
 
     async fn uninstall(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Err(InvalidArgumentException {

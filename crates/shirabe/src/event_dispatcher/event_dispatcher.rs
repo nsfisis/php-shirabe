@@ -596,7 +596,7 @@ impl EventDispatcher {
                         // The user's command class extends Symfony's Command, so the child
                         // process needs the real symfony/console classes before it can even
                         // autoload the user class.
-                        self.ensure_composer_php_runtime()?;
+                        Self::ensure_composer_php_runtime()?;
                         if !self.php_runtime_bool(
                             "class_exists",
                             vec![PluginValue::string(class_name.clone())],
@@ -699,7 +699,7 @@ try {{
                                 "false"
                             },
                         );
-                        self.ensure_script_autoloader()?;
+                        Self::ensure_script_autoloader()?;
                         let mut dispatcher = ScriptRpcDispatcher {
                             loader: self.loader.clone(),
                             event: None,
@@ -1054,7 +1054,7 @@ try {{
             }));
         };
 
-        self.ensure_script_autoloader()?;
+        Self::ensure_script_autoloader()?;
         let rhandle = shirabe_php_rpc::alloc_rhandle();
         let mut dispatcher = ScriptRpcDispatcher {
             loader: self.loader.clone(),
@@ -1435,7 +1435,7 @@ try {{
     /// Makes the worker's script-class autoloader active, so class queries and script execution
     /// in the child can resolve classes through the Rust-side [`ClassLoader`] built by
     /// [`Self::make_autoloader`].
-    fn ensure_script_autoloader(&self) -> anyhow::Result<()> {
+    pub(crate) fn ensure_script_autoloader() -> anyhow::Result<()> {
         unwrap_php_result(call_function(
             "__shirabe_enable_script_autoloader",
             Vec::new(),
@@ -1445,7 +1445,7 @@ try {{
 
     /// Loads the Composer PHP runtime (symfony/console and friends) into the worker, needed
     /// before a `scripts` Command class can be autoloaded and hosted.
-    fn ensure_composer_php_runtime(&self) -> anyhow::Result<()> {
+    pub(crate) fn ensure_composer_php_runtime() -> anyhow::Result<()> {
         // TODO(plugin): the real PHP classes are taken from a Composer checkout for now; how
         // they ship with a released Shirabe binary is part of the plugin distribution work.
         let autoload = Self::composer_php_runtime_autoload().ok_or_else(|| {
@@ -1484,7 +1484,7 @@ try {{
     /// Runs a boolean runtime query (`class_exists`, `is_a`, ...) inside the PHP worker, with
     /// the script autoloader active so the query can trigger class loading.
     fn php_runtime_bool(&self, function: &str, args: Vec<PluginValue>) -> anyhow::Result<bool> {
-        self.ensure_script_autoloader()?;
+        Self::ensure_script_autoloader()?;
         let mut dispatcher = ScriptRpcDispatcher {
             loader: self.loader.clone(),
             event: None,
@@ -1616,7 +1616,7 @@ fn runtime_throw(message: String) -> PhpThrow {
 
 /// Collapses the two failure lanes of an RPC call into `anyhow`: the callers here treat a PHP
 /// exception raised during a runtime query as fatal for the current dispatch.
-fn unwrap_php_result(
+pub(crate) fn unwrap_php_result(
     outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
 ) -> anyhow::Result<PluginValue> {
     match outcome? {

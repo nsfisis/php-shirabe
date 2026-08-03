@@ -13,7 +13,7 @@ use shirabe::io::{BufferIO, IOInterface};
 use shirabe::package::handle::{AliasPackageHandle, PackageHandle, RootPackageHandle};
 use shirabe::package::{Link, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use shirabe::repository::{
-    InstalledArrayRepository, InstalledRepositoryInterface, WritableRepositoryInterface,
+    InstalledArrayRepository, InstalledRepositoryInterfaceHandle, WritableRepositoryInterface,
 };
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
@@ -39,7 +39,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     fn is_installed(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         Ok(true)
@@ -64,7 +64,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     async fn install(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -72,7 +72,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     async fn update(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -81,7 +81,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 
     async fn uninstall(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)

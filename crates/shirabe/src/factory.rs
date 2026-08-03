@@ -42,7 +42,6 @@ use crate::plugin::PluginEvents;
 use crate::plugin::PluginManager;
 use crate::repository::FilesystemRepository;
 use crate::repository::InstalledFilesystemRepository;
-use crate::repository::InstalledRepositoryInterface;
 use crate::repository::RepositoryFactory;
 use crate::repository::RepositoryManager;
 use crate::util::Filesystem;
@@ -892,13 +891,9 @@ impl Factory {
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
             // PHP: $this->purgePackages($rm->getLocalRepository(), $im);
-            // TODO(phase-c): the rm/im locals are still in scope (Rc-shared with composer), but
-            // purge_packages wants `&mut dyn InstalledRepositoryInterface` and
-            // RepositoryManager::get_local_repository yields a RepositoryInterfaceHandle that
-            // exposes no raw &mut InstalledRepositoryInterface view (only per-method helpers that
-            // borrow internally). Wiring this needs such an accessor plus completing
-            // purge_packages' removal body (repo.removePackage), which is itself still a stub.
-            // self.purge_packages(rm.get_local_repository(), &mut im)?;
+            // TODO(phase-c): purge_packages' removal body (repo.removePackage for packages
+            // deleted on the filesystem) is still a stub; wire this call once implemented.
+            // self.purge_packages(&InstalledRepositoryInterfaceHandle::from_repository_handle(&rm.get_local_repository()), &mut im)?;
         }
 
         Ok(PartialComposerHandle::from_rc(composer))
@@ -1316,10 +1311,11 @@ impl Factory {
 
     fn purge_packages(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &crate::repository::InstalledRepositoryInterfaceHandle,
         im: &mut InstallationManager,
     ) -> anyhow::Result<()> {
-        for package in repo.get_packages()? {
+        let packages = repo.borrow_mut().get_packages()?;
+        for package in packages {
             if !im.is_package_installed(repo, package.clone())? {
                 let _ = package;
             }

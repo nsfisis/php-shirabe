@@ -8,7 +8,7 @@ use crate::test_case::get_package;
 use shirabe::installer::{InstallerInterface, MetapackageInstaller};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
-use shirabe::repository::{InstalledArrayRepository, RepositoryInterface};
+use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 
 fn installer() -> MetapackageInstaller {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -20,17 +20,13 @@ fn installer() -> MetapackageInstaller {
 fn test_install() {
     let package = get_package("test/pkg", "1.0.0");
     let installer = installer();
-    let mut repository = InstalledArrayRepository::new_with_packages(vec![]).unwrap();
+    let repository = InstalledRepositoryInterfaceHandle::new(
+        InstalledArrayRepository::new_with_packages(vec![]).unwrap(),
+    );
 
-    run(installer.install(
-        &std::cell::RefCell::new(
-            &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface,
-        ),
-        package.clone(),
-    ))
-    .unwrap();
+    run(installer.install(&repository, package.clone())).unwrap();
 
-    assert!(repository.has_package(package).unwrap());
+    assert!(repository.borrow_mut().has_package(package).unwrap());
 }
 
 #[test]
@@ -38,59 +34,41 @@ fn test_update() {
     let initial = get_package("test/initial", "1.0.0");
     let target = get_package("test/target", "1.0.1");
     let installer = installer();
-    let mut repository =
-        InstalledArrayRepository::new_with_packages(vec![initial.clone()]).unwrap();
+    let repository = InstalledRepositoryInterfaceHandle::new(
+        InstalledArrayRepository::new_with_packages(vec![initial.clone()]).unwrap(),
+    );
 
-    run(installer.update(
-        &std::cell::RefCell::new(
-            &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface,
-        ),
-        initial.clone(),
-        target.clone(),
-    ))
-    .unwrap();
+    run(installer.update(&repository, initial.clone(), target.clone())).unwrap();
 
-    assert!(!repository.has_package(initial.clone()).unwrap());
-    assert!(repository.has_package(target.clone()).unwrap());
+    assert!(
+        !repository
+            .borrow_mut()
+            .has_package(initial.clone())
+            .unwrap()
+    );
+    assert!(repository.borrow_mut().has_package(target.clone()).unwrap());
 
     // Updating again, with the initial package no longer installed, fails.
-    assert!(
-        run(installer.update(
-            &std::cell::RefCell::new(
-                &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface
-            ),
-            initial,
-            target
-        ))
-        .is_err()
-    );
+    assert!(run(installer.update(&repository, initial, target)).is_err());
 }
 
 #[test]
 fn test_uninstall() {
     let package = get_package("test/pkg", "1.0.0");
     let installer = installer();
-    let mut repository =
-        InstalledArrayRepository::new_with_packages(vec![package.clone()]).unwrap();
+    let repository = InstalledRepositoryInterfaceHandle::new(
+        InstalledArrayRepository::new_with_packages(vec![package.clone()]).unwrap(),
+    );
 
-    run(installer.uninstall(
-        &std::cell::RefCell::new(
-            &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface,
-        ),
-        package.clone(),
-    ))
-    .unwrap();
+    run(installer.uninstall(&repository, package.clone())).unwrap();
 
-    assert!(!repository.has_package(package.clone()).unwrap());
+    assert!(
+        !repository
+            .borrow_mut()
+            .has_package(package.clone())
+            .unwrap()
+    );
 
     // Uninstalling again, with the package no longer installed, fails.
-    assert!(
-        run(installer.uninstall(
-            &std::cell::RefCell::new(
-                &mut repository as &mut dyn shirabe::repository::InstalledRepositoryInterface
-            ),
-            package
-        ))
-        .is_err()
-    );
+    assert!(run(installer.uninstall(&repository, package)).is_err());
 }

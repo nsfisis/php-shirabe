@@ -1257,17 +1257,15 @@ impl Installer {
 
         if self.execute_operations {
             local_repo.set_dev_package_names(self.locker.borrow_mut().get_dev_package_names()?);
-            let mut local_repo_ref = local_repo.borrow_mut();
             self.installation_manager.borrow_mut().execute(
-                local_repo_ref
-                    .as_installed_repository_interface_mut()
-                    .unwrap(),
+                &crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
+                    &local_repo,
+                ),
                 local_repo_transaction.get_operations().clone(),
                 self.dev_mode,
                 self.run_scripts,
                 self.download_only,
             )?;
-            drop(local_repo_ref);
 
             // see https://github.com/composer/composer/issues/2764
             if !local_repo_transaction.get_operations().is_empty() {

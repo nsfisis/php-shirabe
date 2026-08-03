@@ -10,7 +10,7 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::handle::CompletePackageHandle;
-use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterface};
+use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;
@@ -39,11 +39,9 @@ fn set_up() -> SetUp {
     SetUp { loop_, io }
 }
 
-// Equivalent to `getMockBuilder(InstallerInterface::class)->getMock()`. mockall cannot generate an
-// `#[async_trait]` impl for the async methods that take `&mut dyn InstalledRepositoryInterface`
-// (the object lifetime async_trait inserts clashes with mockall's generated lifetimes), so the
-// expectations live on inherent methods and a thin hand-written InstallerInterface impl forwards to
-// them, dropping the unused `repo` argument exactly as the PHPUnit mock ignores it. The methods not
+// Equivalent to `getMockBuilder(InstallerInterface::class)->getMock()`. The expectations live on
+// inherent methods and a thin hand-written InstallerInterface impl forwards to them, dropping the
+// unused `repo` argument exactly as the PHPUnit mock ignores it. The methods not
 // configured by any test (is_installed/download/prepare/cleanup/get_install_path, and the defaulted
 // as_binary_presence_interface/as_plugin_installer_mut) return the same defaults as an unconfigured
 // PHPUnit mock.
@@ -75,7 +73,7 @@ impl InstallerInterface for MockInstaller {
 
     fn is_installed(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         Ok(false)
@@ -100,7 +98,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn install(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         MockInstaller::install(self, package)
@@ -108,7 +106,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn update(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -117,7 +115,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn uninstall(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         MockInstaller::uninstall(self, package)
@@ -175,7 +173,7 @@ impl InstallerInterface for BinaryInstaller {
 
     fn is_installed(
         &self,
-        _repo: &mut dyn InstalledRepositoryInterface,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         Ok(false)
@@ -200,7 +198,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn install(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -208,7 +206,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn update(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -217,7 +215,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn uninstall(
         &self,
-        _repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -360,11 +358,9 @@ fn test_install() {
 
     let operation = InstallOperation::new(package);
 
-    let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.install(
-        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
-        &operation,
-    ));
+    let repository =
+        InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
+    run(manager.install(&repository, &operation));
 }
 
 #[test]
@@ -395,11 +391,9 @@ fn test_update_with_equal_types() {
 
     let operation = UpdateOperation::new(initial, target);
 
-    let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.update(
-        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
-        &operation,
-    ));
+    let repository =
+        InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
+    run(manager.update(&repository, &operation));
 }
 
 #[test]
@@ -440,11 +434,9 @@ fn test_update_with_not_equal_types() {
 
     let operation = UpdateOperation::new(initial, target);
 
-    let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.update(
-        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
-        &operation,
-    ));
+    let repository =
+        InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
+    run(manager.update(&repository, &operation));
 }
 
 #[test]
@@ -471,11 +463,9 @@ fn test_uninstall() {
 
     let operation = UninstallOperation::new(package);
 
-    let mut repository = InstalledArrayRepository::new().unwrap();
-    run(manager.uninstall(
-        &std::cell::RefCell::new(&mut repository as &mut dyn InstalledRepositoryInterface),
-        &operation,
-    ));
+    let repository =
+        InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
+    run(manager.uninstall(&repository, &operation));
 }
 
 #[test]

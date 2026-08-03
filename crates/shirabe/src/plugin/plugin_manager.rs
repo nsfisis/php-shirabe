@@ -6,6 +6,7 @@
 
 use crate::composer::PartialComposerHandle;
 use crate::composer::{ComposerHandle, ComposerWeakHandle};
+use crate::event_dispatcher::{EventDispatcher, unwrap_php_result};
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
@@ -17,16 +18,20 @@ use crate::package::base_package::{self};
 use crate::package::version::VersionParser;
 use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
+use crate::plugin::php_plugin_proxy::{PhpPluginProxy, PluginRpcDispatcher};
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::InstalledRepository;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositoryUtils;
+use crate::repository::RootPackageRepository;
 use crate::util::PackageSorter;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, array_key_exists,
-    get_class_obj, implode, ksort, php_regex, trigger_error, trim, var_export_str, version_compare,
+    dirname, file_get_contents, implode, ksort, php_regex, preg_quote, strrpos, strtr_array,
+    substr, trigger_error, trim, var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -37,7 +42,9 @@ pub struct PluginManager {
     pub(crate) global_composer: Option<PartialComposerHandle>,
     pub(crate) version_parser: VersionParser,
     pub(crate) disable_plugins: DisablePlugins,
-    pub(crate) plugins: Vec<Box<dyn PluginInterface>>,
+    // PHP stores the same plugin instance in both $plugins and $registeredPlugins (reference
+    // semantics); shared handles preserve the identity comparisons that relies on.
+    pub(crate) plugins: Vec<std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>>,
     pub(crate) registered_plugins: IndexMap<String, Vec<PluginOrInstaller>>,
     allow_plugin_rules: Option<IndexMap<String, bool>>,
     allow_global_plugin_rules: Option<IndexMap<String, bool>>,
@@ -46,11 +53,12 @@ pub struct PluginManager {
 
 #[derive(Debug)]
 pub enum PluginOrInstaller {
-    Plugin(Box<dyn PluginInterface>),
+    Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
     Installer(Box<dyn InstallerInterface>),
 }
 
-static mut CLASS_COUNTER: i64 = 0;
+/// PHP `private static $classCounter = 0;`.
+static CLASS_COUNTER: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
 impl PluginManager {
     pub fn new(
@@ -121,7 +129,7 @@ impl PluginManager {
                 .borrow()
                 .get_local_repository();
             self.load_repository(
-                &mut *repo.borrow_mut(),
+                &repo,
                 false,
                 Some(self.composer_full().borrow().get_package().clone()),
             )?;
@@ -136,7 +144,7 @@ impl PluginManager {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            self.load_repository(&mut *repo.borrow_mut(), true, None)?;
+            self.load_repository(&repo, true, None)?;
         }
         Ok(())
     }
@@ -151,7 +159,7 @@ impl PluginManager {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            self.deactivate_repository(&mut *repo.borrow_mut(), false)?;
+            self.deactivate_repository(&repo, false)?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
@@ -163,7 +171,7 @@ impl PluginManager {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            self.deactivate_repository(&mut *repo.borrow_mut(), true)?;
+            self.deactivate_repository(&repo, true)?;
         }
 
         Ok(())
@@ -173,7 +181,7 @@ impl PluginManager {
     ///
     /// PHP returns `$this->plugins` directly; the plugin objects are shared by reference, so this
     /// borrows the stored instances rather than cloning them.
-    pub fn get_plugins(&self) -> &[Box<dyn PluginInterface>] {
+    pub fn get_plugins(&self) -> &[std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>] {
         &self.plugins
     }
 
@@ -276,10 +284,7 @@ impl PluginManager {
             return Ok(());
         }
 
-        // TODO(plugin): the rest of registerPackage performs class-level eval() to load the plugin source.
-        // This is a runtime concern that requires PHP semantics; not portable to Rust without a PHP interpreter.
-        // The remainder of the function is mirrored as references but performs no actual loading.
-        let _old_installer_plugin = package.get_type() == "composer-installer";
+        let old_installer_plugin = package.get_type() == "composer-installer";
 
         if self.registered_plugins.contains_key(&package.get_name()) {
             return Ok(());
@@ -304,7 +309,7 @@ impl PluginManager {
                 code: 0,
             }.into());
         }
-        let _classes: Vec<String> = if let Some(arr) = class_value.and_then(|v| v.as_list()) {
+        let classes: Vec<String> = if let Some(arr) = class_value.and_then(|v| v.as_list()) {
             arr.iter()
                 .filter_map(|v| v.as_string().map(|s| s.to_string()))
                 .collect()
@@ -317,22 +322,260 @@ impl PluginManager {
             ]
         };
 
-        // TODO(plugin): everything below this point in the original PHP would create runtime instances:
-        //   - clone root package and clear `files` autoloads
-        //   - build a synthetic InstalledRepository for plugin dependencies
-        //   - parseAutoloads / createLoader on the autoload generator
-        //   - eval the plugin class source under a temporary class name
-        //   - call activate(...) and register subscribers
-        // None of that is implementable without a PHP runtime, and so the body is intentionally left as a no-op stub.
-        let _ = fail_on_missing_classes;
+        let composer = self.composer_full();
+        let local_repo = composer
+            .borrow()
+            .get_repository_manager()
+            .borrow()
+            .get_local_repository();
+        let global_repo = self.global_composer.as_ref().map(|gc| {
+            gc.borrow_partial()
+                .get_repository_manager()
+                .borrow()
+                .get_local_repository()
+        });
+
+        let root_package = RootPackageInterfaceHandle::dup(composer.borrow().get_package());
+
+        // clear files autoload rules from the root package as the root dependencies are not
+        // necessarily all present yet when booting this runtime autoloader
+        let mut root_package_autoloads = root_package.get_autoload();
+        root_package_autoloads.insert("files".to_string(), PhpMixed::List(vec![]));
+        root_package.set_autoload(root_package_autoloads);
+        let mut root_package_autoloads = root_package.get_dev_autoload();
+        root_package_autoloads.insert("files".to_string(), PhpMixed::List(vec![]));
+        root_package.set_dev_autoload(root_package_autoloads);
+
+        let root_package_repo =
+            RepositoryInterfaceHandle::new(RootPackageRepository::new(root_package.clone()));
+        let mut installed_repo =
+            InstalledRepository::new(vec![local_repo.clone(), root_package_repo]);
+        if let Some(global_repo) = &global_repo {
+            installed_repo.add_repository(global_repo.clone());
+        }
+
+        let mut autoload_packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        autoload_packages.insert(package.get_name().to_string(), package.clone());
+        let autoload_packages =
+            self.collect_dependencies(&installed_repo, autoload_packages, package.clone())?;
+
+        let generator = composer.borrow().get_autoload_generator();
+        let root_package_as_package: PackageInterfaceHandle = root_package.clone().into();
+        let mut autoloads: Vec<(PackageInterfaceHandle, Option<String>)> =
+            vec![(root_package_as_package.clone(), Some(String::new()))];
+        for (_name, autoload_package) in &autoload_packages {
+            if autoload_package.ptr_eq(&root_package_as_package) {
+                continue;
+            }
+
+            let is_global_package = match &global_repo {
+                Some(gr) => gr.borrow_mut().has_package(autoload_package.clone())?,
+                None => false,
+            };
+            let install_path = self.get_install_path(autoload_package.clone(), is_global_package);
+            let install_path = match install_path {
+                Some(p) => p,
+                None => continue,
+            };
+            autoloads.push((autoload_package.clone(), Some(install_path)));
+        }
+
+        let map =
+            generator
+                .borrow()
+                .parse_autoloads(autoloads, root_package, PhpMixed::Bool(false));
+        let vendor_dir = composer
+            .borrow()
+            .get_config()
+            .borrow()
+            .get("vendor-dir")
+            .as_string()
+            .map(|s| s.to_string());
+        let mut class_loader = generator.borrow().create_loader(&map, vendor_dir);
+        class_loader.register(false);
+
+        // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like
+        // PluginInterface) and the reverse-RPC autoloader before touching plugin classes there.
+        EventDispatcher::ensure_composer_php_runtime()?;
+        EventDispatcher::ensure_script_autoloader()?;
+
+        if let Some(files) = map.get("files").and_then(|v| v.as_array()) {
+            for (file_identifier, file) in files {
+                // exclude laminas/laminas-zendframework-bridge:src/autoload.php as it breaks Composer in some conditions
+                // see https://github.com/composer/composer/issues/10349 and https://github.com/composer/composer/issues/10401
+                // this hack can be removed once this deprecated package stop being installed
+                if file_identifier == "7e9bd612cc444b3eed788ebbe46263a0" {
+                    continue;
+                }
+                let file = file.as_string().unwrap_or_else(|| {
+                    panic!("autoload files entry `{file_identifier}` is not a string path")
+                });
+                self.php_runtime_composer_require(file_identifier, file)?;
+            }
+        }
+
+        for class in classes {
+            let mut class = class;
+            if self.php_runtime_class_exists(&class, false)? {
+                class = trim(&class, Some("\\")).to_string();
+                let path = class_loader.find_file(&class).unwrap_or_else(|| {
+                    panic!("plugin class `{class}` is already defined but has no autoloadable file")
+                });
+                let code = file_get_contents(&path)
+                    .unwrap_or_else(|| panic!("unable to read the plugin class file `{path}`"));
+                let class_counter = CLASS_COUNTER.load(std::sync::atomic::Ordering::Relaxed);
+                let separator_pos = strrpos(&class, "\\");
+                let mut class_name = class.clone();
+                // PHP: `if ($separatorPos)` — position 0 is falsy and keeps the full name.
+                if let Some(separator_pos) = separator_pos
+                    && separator_pos != 0
+                {
+                    class_name = substr(&class, (separator_pos + 1) as i64, None);
+                }
+                let code = Preg::replace4(
+                    format!(
+                        "{{^((?:(?:final|readonly)\\s+)*(?:\\s*))class\\s+({})}}mi",
+                        preg_quote(&class_name, None)
+                    ),
+                    &format!("$1class $2_composer_tmp{}", class_counter),
+                    &code,
+                    1,
+                );
+                let mut replacements: IndexMap<String, String> = IndexMap::new();
+                replacements.insert("__FILE__".to_string(), var_export_str(&path, true));
+                replacements.insert("__DIR__".to_string(), var_export_str(&dirname(&path), true));
+                replacements.insert("__CLASS__".to_string(), var_export_str(&class, true));
+                let code = strtr_array(&code, &replacements);
+                let code = Preg::replace4(r"/^\s*<\?(php)?/i", "", &code, 1);
+                self.php_runtime_eval(&code)?;
+                class = format!("{}_composer_tmp{}", class, class_counter);
+                CLASS_COUNTER.store(class_counter + 1, std::sync::atomic::Ordering::Relaxed);
+            }
+
+            if old_installer_plugin {
+                // TODO(plugin): legacy composer-installer plugins need the InstallerInterface
+                // reverse adapter, which does not exist yet; explicit error until then.
+                return Err(RuntimeException {
+                    message: format!(
+                        "Shirabe cannot load \"{}\": legacy composer-installer plugins are not supported yet",
+                        package.get_name()
+                    ),
+                    code: 0,
+                }
+                .into());
+            } else if self.php_runtime_class_exists(&class, true)? {
+                if !self.php_runtime_is_a(&class, "Composer\\Plugin\\PluginInterface")? {
+                    return Err(RuntimeException {
+                        message: format!(
+                            "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Plugin\\PluginInterface",
+                            package.get_name(),
+                            class
+                        ),
+                        code: 0,
+                    }
+                    .into());
+                }
+                let handle = self.php_runtime_new_object(&class)?;
+                let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> = std::rc::Rc::new(
+                    std::cell::RefCell::new(PhpPluginProxy::new(handle.phandle, handle.class)),
+                );
+                self.add_plugin(plugin.clone(), is_global_plugin, Some(package.clone()))?;
+                self.registered_plugins
+                    .entry(package.get_name().to_string())
+                    .or_default()
+                    .push(PluginOrInstaller::Plugin(plugin));
+            } else if fail_on_missing_classes {
+                return Err(UnexpectedValueException {
+                    message: format!(
+                        "Plugin {} could not be initialized, class not found: {}",
+                        package.get_name(),
+                        class
+                    ),
+                    code: 0,
+                }
+                .into());
+            }
+        }
         Ok(())
     }
 
+    /// Runs a boolean runtime query in the PHP worker with the plugin dispatcher active.
+    fn php_runtime_bool(&self, function: &str, args: Vec<PluginValue>) -> anyhow::Result<bool> {
+        let value = unwrap_php_result(call_function_with_dispatcher(
+            function,
+            args,
+            Some(&mut PluginRpcDispatcher),
+        ))?;
+        match value {
+            PluginValue::Bool(value) => Ok(value),
+            other => Err(anyhow::anyhow!(
+                "PHP runtime query `{function}` did not return a bool: {other:?}"
+            )),
+        }
+    }
+
+    fn php_runtime_class_exists(&self, class: &str, autoload: bool) -> anyhow::Result<bool> {
+        self.php_runtime_bool(
+            "class_exists",
+            vec![PluginValue::string(class), PluginValue::Bool(autoload)],
+        )
+    }
+
+    fn php_runtime_is_a(&self, class: &str, interface: &str) -> anyhow::Result<bool> {
+        self.php_runtime_bool(
+            "is_a",
+            vec![
+                PluginValue::string(class),
+                PluginValue::string(interface),
+                PluginValue::Bool(true),
+            ],
+        )
+    }
+
+    fn php_runtime_eval(&self, code: &str) -> anyhow::Result<()> {
+        unwrap_php_result(call_function_with_dispatcher(
+            "__shirabe_eval",
+            vec![PluginValue::string(code)],
+            Some(&mut PluginRpcDispatcher),
+        ))?;
+        Ok(())
+    }
+
+    fn php_runtime_composer_require(
+        &self,
+        file_identifier: &str,
+        file: &str,
+    ) -> anyhow::Result<()> {
+        unwrap_php_result(call_function_with_dispatcher(
+            "__shirabe_composer_require",
+            vec![
+                PluginValue::string(file_identifier),
+                PluginValue::string(file),
+            ],
+            Some(&mut PluginRpcDispatcher),
+        ))?;
+        Ok(())
+    }
+
+    /// PHP `new $class()` in the worker, returning the P-table handle of the new entity.
+    fn php_runtime_new_object(&self, class: &str) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
+        let value = unwrap_php_result(shirabe_php_rpc::new_object(
+            class,
+            vec![],
+            Some(&mut PluginRpcDispatcher),
+        ))?;
+        match value {
+            PluginValue::PhpHandle(handle) => Ok(handle),
+            other => Err(anyhow::anyhow!(
+                "instantiating `{class}` did not return a PHP handle: {other:?}"
+            )),
+        }
+    }
+
     /// Deactivates a plugin package
-    pub fn deactivate_package(&mut self, package: PackageInterfaceHandle) {
-        // TODO(plugin): deactivation flow
+    pub fn deactivate_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         if !self.registered_plugins.contains_key(&package.get_name()) {
-            return;
+            return Ok(());
         }
 
         let plugins = self
@@ -349,17 +592,17 @@ impl PluginManager {
                         .remove_installer(&*inst);
                 }
                 PluginOrInstaller::Plugin(p) => {
-                    self.remove_plugin(&*p);
+                    self.remove_plugin(&p)?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Uninstall a plugin package
-    pub fn uninstall_package(&mut self, package: PackageInterfaceHandle) {
-        // TODO(plugin): uninstall flow
+    pub fn uninstall_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         if !self.registered_plugins.contains_key(&package.get_name()) {
-            return;
+            return Ok(());
         }
 
         let plugins = self
@@ -375,12 +618,13 @@ impl PluginManager {
                         .borrow_mut()
                         .remove_installer(&*inst);
                 }
-                PluginOrInstaller::Plugin(mut p) => {
-                    self.remove_plugin(&*p);
-                    self.uninstall_plugin(&mut *p);
+                PluginOrInstaller::Plugin(p) => {
+                    self.remove_plugin(&p)?;
+                    self.uninstall_plugin(&p)?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Returns the version of the internal composer-plugin-api package.
@@ -391,11 +635,10 @@ impl PluginManager {
     /// Adds a plugin, activates it and registers it with the event dispatcher
     pub fn add_plugin(
         &mut self,
-        mut plugin: Box<dyn PluginInterface>,
+        plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
         is_global_plugin: bool,
         source_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
-        // TODO(plugin): plugin activation
         if self.are_plugins_disabled(if is_global_plugin { "global" } else { "local" }) {
             return Ok(());
         }
@@ -419,16 +662,20 @@ impl PluginManager {
                     plugin_optional,
                     true,
                 )? {
-                    self.io.write_error(&format!(
-                        "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
-                        get_class_obj(&*plugin),
-                        sp.get_name(),
-                        if is_global_plugin || self.running_in_global_dir {
-                            "(installed globally) "
-                        } else {
-                            ""
-                        }
-                    ));
+                    self.io.write_error3(
+                        &format!(
+                            "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
+                            plugin.borrow().get_class_name(),
+                            sp.get_name(),
+                            if is_global_plugin || self.running_in_global_dir {
+                                "(installed globally) "
+                            } else {
+                                ""
+                            }
+                        ),
+                        true,
+                        crate::io::DEBUG,
+                    );
                     return Ok(());
                 }
             }
@@ -441,65 +688,88 @@ impl PluginManager {
         if is_global_plugin || self.running_in_global_dir {
             details.push("installed globally".to_string());
         }
-        self.io.write_error(&format!(
-            "Loading plugin {}{}",
-            get_class_obj(&*plugin),
-            if !details.is_empty() {
-                format!(" ({})", implode(", ", &details))
-            } else {
-                String::new()
-            }
-        ));
-        plugin.activate(&self.composer_full(), self.io.clone());
+        self.io.write_error3(
+            &format!(
+                "Loading plugin {}{}",
+                plugin.borrow().get_class_name(),
+                if !details.is_empty() {
+                    format!(" ({})", implode(", ", &details))
+                } else {
+                    String::new()
+                }
+            ),
+            true,
+            crate::io::DEBUG,
+        );
+        self.plugins.push(plugin.clone());
+        plugin
+            .borrow_mut()
+            .activate(self.composer_full(), self.io.clone())?;
 
         // TODO(plugin): if plugin is EventSubscriberInterface, hook into the event dispatcher
         // The PHP code calls $this->composer->getEventDispatcher()->addSubscriber($plugin);
         // — add_subscriber here is generic over `S: EventSubscriberInterface` and cannot
         // accept a `&dyn EventSubscriberInterface`. Skipped until subscriber dispatch is
         // implemented dynamically.
-        let _ = (*plugin).is_event_subscriber_interface();
-        self.plugins.push(plugin);
+        let _ = plugin.borrow().is_event_subscriber_interface();
         Ok(())
     }
 
     /// Removes a plugin, deactivates it and removes any listener the plugin has set on the plugin instance
-    pub fn remove_plugin(&mut self, plugin: &dyn PluginInterface) {
-        // TODO(plugin): plugin removal — PHP uses identity (`===`) comparison via array_search($plugin, $this->plugins, true).
-        let plugin_addr = plugin as *const dyn PluginInterface as *const () as usize;
-        let index = self.plugins.iter().position(|p| {
-            (p.as_ref() as *const dyn PluginInterface as *const () as usize) == plugin_addr
-        });
+    pub fn remove_plugin(
+        &mut self,
+        plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+    ) -> anyhow::Result<()> {
+        // PHP uses identity (`===`) comparison via array_search($plugin, $this->plugins, true).
+        let index = self
+            .plugins
+            .iter()
+            .position(|p| std::rc::Rc::ptr_eq(p, plugin));
         let index = match index {
             Some(i) => i,
-            None => return,
+            None => return Ok(()),
         };
 
-        self.io
-            .write_error(&format!("Unloading plugin {}", get_class_obj(plugin)));
-        let mut removed = self.plugins.remove(index);
-        removed.deactivate(&self.composer_full(), self.io.clone());
+        self.io.write_error3(
+            &format!("Unloading plugin {}", plugin.borrow().get_class_name()),
+            true,
+            crate::io::DEBUG,
+        );
+        let removed = self.plugins.remove(index);
+        removed
+            .borrow_mut()
+            .deactivate(self.composer_full(), self.io.clone())?;
 
         // TODO(plugin): remove_listener accepts any callable/object in PHP; here we have
         // a plugin instance and need to translate to a Callable, which is not portable
         // without runtime reflection.
-        let _ = plugin;
+        Ok(())
     }
 
     /// Notifies a plugin it is being uninstalled and should clean up
-    pub fn uninstall_plugin(&self, plugin: &mut dyn PluginInterface) {
-        // TODO(plugin): plugin uninstall hook
-        self.io
-            .write_error(&format!("Uninstalling plugin {}", get_class_obj(plugin)));
-        plugin.uninstall(&self.composer_full(), self.io.clone());
+    pub fn uninstall_plugin(
+        &self,
+        plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+    ) -> anyhow::Result<()> {
+        self.io.write_error3(
+            &format!("Uninstalling plugin {}", plugin.borrow().get_class_name()),
+            true,
+            crate::io::DEBUG,
+        );
+        plugin
+            .borrow_mut()
+            .uninstall(self.composer_full(), self.io.clone())?;
+        Ok(())
     }
 
+    // The repository stays behind its shared handle (borrowed only transiently) because
+    // register_package re-enters the same local repository through the RepositoryManager.
     fn load_repository(
         &mut self,
-        repo: &mut dyn RepositoryInterface,
+        repo: &RepositoryInterfaceHandle,
         is_global_repo: bool,
         root_package: Option<RootPackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
-        // TODO(plugin): repository scan for plugin packages
         let packages = repo.get_packages()?;
 
         let mut weights: IndexMap<String, i64> = IndexMap::new();
@@ -570,10 +840,9 @@ impl PluginManager {
 
     fn deactivate_repository(
         &mut self,
-        repo: &mut dyn RepositoryInterface,
+        repo: &RepositoryInterfaceHandle,
         _is_global_repo: bool,
     ) -> anyhow::Result<()> {
-        // TODO(plugin): deactivate plugins from a repository
         let packages = repo.get_packages()?;
         // PHP: $sortedPackages = array_reverse(PackageSorter::sortPackages($packages));
         let mut sorted_packages = PackageSorter::sort_packages(packages.to_vec(), IndexMap::new());
@@ -584,10 +853,10 @@ impl PluginManager {
                 continue;
             }
             if "composer-plugin" == package.get_type() {
-                self.deactivate_package(package.clone());
+                self.deactivate_package(package.clone())?;
             // Backward compatibility
             } else if "composer-installer" == package.get_type() {
-                self.deactivate_package(package.clone());
+                self.deactivate_package(package.clone())?;
             }
         }
 
@@ -686,7 +955,7 @@ impl PluginManager {
             return Err(UnexpectedValueException {
                 message: format!(
                     "Plugin {} provided invalid capability class name(s), got {}",
-                    get_class_obj(plugin),
+                    plugin.get_class_name(),
                     var_export_str(capabilities.get(capability).unwrap(), true)
                 ),
                 code: 0,
@@ -721,9 +990,11 @@ impl PluginManager {
         // TODO(plugin): aggregate capabilities across all loaded plugins
         let mut capabilities: Vec<Box<dyn Capability>> = vec![];
         for plugin in self.get_plugins() {
-            if let Ok(Some(capability)) =
-                self.get_plugin_capability(&**plugin, capability_class_name, ctor_args.clone())
-            {
+            if let Ok(Some(capability)) = self.get_plugin_capability(
+                &*plugin.borrow(),
+                capability_class_name,
+                ctor_args.clone(),
+            ) {
                 capabilities.push(capability);
             }
         }

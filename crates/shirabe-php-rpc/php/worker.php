@@ -64,11 +64,66 @@ final class ShirabeRustObjectRegistry
     }
 }
 
+/**
+ * The P table: PHP-owned entities exposed to Rust, keyed by phandle. Entries are strong
+ * references — an entity stays alive until the Rust side sends ReleasePhpHandle.
+ */
+final class ShirabePhpObjectRegistry
+{
+    /** @var array<int, object> */
+    private static array $objects = [];
+    /** @var array<int, int> spl_object_id => phandle, so one entity keeps one handle */
+    private static array $handlesByObjectId = [];
+    private static int $nextPhandle = 1;
+
+    public static function register(object $obj): int
+    {
+        $objectId = spl_object_id($obj);
+        $existing = self::$handlesByObjectId[$objectId] ?? null;
+        if ($existing !== null && isset(self::$objects[$existing])) {
+            return $existing;
+        }
+        $phandle = self::$nextPhandle++;
+        self::$objects[$phandle] = $obj;
+        self::$handlesByObjectId[$objectId] = $phandle;
+        return $phandle;
+    }
+
+    public static function get(int $phandle): object
+    {
+        if (!isset(self::$objects[$phandle])) {
+            throw new RuntimeException("unknown PHP handle {$phandle}");
+        }
+        return self::$objects[$phandle];
+    }
+
+    public static function release(int $phandle): void
+    {
+        $obj = self::$objects[$phandle] ?? null;
+        unset(self::$objects[$phandle]);
+        if ($obj !== null) {
+            unset(self::$handlesByObjectId[spl_object_id($obj)]);
+        }
+    }
+
+    /** @return array{__phandle: int, __class: string, __implements: list<string>} */
+    public static function descriptor(object $obj): array
+    {
+        return [
+            '__phandle' => self::register($obj),
+            '__class' => get_class($obj),
+            '__implements' => array_values(class_implements($obj)),
+        ];
+    }
+}
+
 final class ShirabeRpcRuntime
 {
     /** @var resource */
     public static $socket;
     public static ?string $stubsDir = null;
+    /** @var ?callable(string): void */
+    public static $stubAutoloader = null;
     /** @var array<string, callable(array): mixed> */
     public static array $dispatch = [];
     /** Even correlation ids; the Rust side allocates odd ones. */
@@ -147,11 +202,7 @@ final class ShirabeRpcRuntime
             return $value->__shirabeRustHandleDescriptor();
         }
         if (is_object($value)) {
-            // TODO(plugin): PHP-owned objects (the P table) are not implemented yet; only Rust
-            // proxy stubs can cross the boundary until the plugin activation milestone.
-            throw new RuntimeException(
-                'returning a PHP object over RPC is not supported yet: ' . get_class($value)
-            );
+            return ShirabePhpObjectRegistry::descriptor($value);
         }
         if (is_resource($value)) {
             throw new RuntimeException('a PHP resource cannot cross the RPC boundary');
@@ -176,8 +227,7 @@ final class ShirabeRpcRuntime
             );
         }
         if (isset($value['__phandle'])) {
-            // TODO(plugin): the P table is not implemented yet.
-            throw new RuntimeException('__phandle descriptors are not supported yet');
+            return ShirabePhpObjectRegistry::get((int) $value['__phandle']);
         }
         if (isset($value['__pclass']) && count($value) === 1) {
             return $value['__pclass'];
@@ -261,19 +311,31 @@ final class ShirabeRpcRuntime
                 });
                 break;
             case SHIRABE_TAG_NEW_OBJECT:
-                self::replyWith($corrId, static function () {
-                    // TODO(plugin): requires the P table (plugin activation milestone M2).
-                    throw new RuntimeException('NewObject is not supported yet');
+                [$class, $ctorArgs] = $fields;
+                self::replyWith($corrId, static function () use ($class, $ctorArgs) {
+                    $ctorArgs = ShirabeRpcRuntime::fromWire($ctorArgs);
+                    if (!class_exists($class)) {
+                        throw new RuntimeException("PHP class `{$class}` does not exist");
+                    }
+                    return new $class(...$ctorArgs);
                 });
                 break;
             case SHIRABE_TAG_CALL_PHP_METHOD:
-                self::replyWith($corrId, static function () {
-                    // TODO(plugin): requires the P table (plugin activation milestone M2).
-                    throw new RuntimeException('CallPhpMethod is not supported yet');
+                [$phandle, $method, $args] = $fields;
+                self::replyWith($corrId, static function () use ($phandle, $method, $args) {
+                    $obj = ShirabePhpObjectRegistry::get((int) $phandle);
+                    $args = ShirabeRpcRuntime::fromWire($args);
+                    if (!is_callable([$obj, $method])) {
+                        throw new RuntimeException(
+                            get_class($obj) . "::{$method} is not callable"
+                        );
+                    }
+                    return $obj->$method(...$args);
                 });
                 break;
             case SHIRABE_TAG_RELEASE_PHP_HANDLE:
-                // TODO(plugin): the P table is not implemented yet; nothing to release.
+                [$phandle] = $fields;
+                ShirabePhpObjectRegistry::release((int) $phandle);
                 break;
             case SHIRABE_TAG_EPOCH_BUMP:
                 [$rhandle, $epoch] = $fields;
@@ -308,6 +370,16 @@ final class ShirabeRpcRuntime
      * resolved by asking the Rust-side ClassLoader (built by EventDispatcher::makeAutoloader)
      * where the class file lives. Handle 0 is the runtime service endpoint on the Rust side.
      */
+    /** Re-prepends the stub autoloader so it precedes any autoloader registered since. */
+    public static function ensureStubAutoloaderPriority(): void
+    {
+        if (self::$stubAutoloader === null) {
+            return;
+        }
+        spl_autoload_unregister(self::$stubAutoloader);
+        spl_autoload_register(self::$stubAutoloader, true, true);
+    }
+
     public static function enableScriptAutoloader(): void
     {
         if (self::$scriptAutoloaderRegistered) {
@@ -332,8 +404,9 @@ ShirabeRpcRuntime::$stubsDir = $argv[2] ?? null;
 
 // Proxy stub classes take priority over any other autoloader (including autoloaders that a
 // script or the composer runtime registers later), so a proxied FQCN can never be shadowed by
-// the real implementation.
-spl_autoload_register(static function (string $class): void {
+// the real implementation. `__shirabe_require` re-prepends this closure after loading code
+// that registers its own prepending autoloader.
+ShirabeRpcRuntime::$stubAutoloader = static function (string $class): void {
     if (ShirabeRpcRuntime::$stubsDir === null) {
         return;
     }
@@ -341,7 +414,8 @@ spl_autoload_register(static function (string $class): void {
     if (is_file($file)) {
         require $file;
     }
-}, true, true);
+};
+spl_autoload_register(ShirabeRpcRuntime::$stubAutoloader, true, true);
 
 // Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the diagnose payload
 // reports as `xdebug_active`.
@@ -481,11 +555,46 @@ ShirabeRpcRuntime::$dispatch = [
     '__shirabe_oracle_roundtrip' => static fn($args) => serialize(unserialize($args[0], ['allowed_classes' => false])),
     '__shirabe_require' => static function ($args) {
         require_once $args[0];
+        // The required file may have registered further prepending autoloaders (a Composer
+        // vendor/autoload.php prepends its ClassLoader); proxied FQCNs must stay resolvable to
+        // the stub classes, so the stub autoloader is moved back to the front of the stack.
+        ShirabeRpcRuntime::ensureStubAutoloaderPriority();
         return true;
     },
     '__shirabe_enable_script_autoloader' => static function ($args) {
         ShirabeRpcRuntime::enableScriptAutoloader();
         return true;
+    },
+    // The body of \Composer\Autoload\composerRequire (AutoloadGenerator.php), sharing its
+    // $GLOBALS guard so files already required by a real Composer autoloader in this process
+    // are not required twice.
+    '__shirabe_composer_require' => static function ($args) {
+        [$fileIdentifier, $file] = $args;
+        if (empty($GLOBALS['__composer_autoload_files'][$fileIdentifier])) {
+            $GLOBALS['__composer_autoload_files'][$fileIdentifier] = true;
+
+            require $file;
+        }
+        return true;
+    },
+    // Mirrors FilesystemRepository::write's in-process `InstalledVersions::reload($versions)`
+    // into this child. The class_exists guard (no autoload) matches the upstream observable
+    // behavior: when the class was never loaded here, a later lazy load reads the
+    // freshly-written installed.php anyway.
+    '__shirabe_installed_versions_reload' => static function ($args) {
+        if (class_exists('Composer\\InstalledVersions', false)) {
+            \Composer\InstalledVersions::reload($args[0]);
+        }
+        return true;
+    },
+    // For testing only: reads a public property of a P-table entity (PHPUnit asserts like
+    // `$plugins[0]->version` have no method to call).
+    '__shirabe_get_property' => static function ($args) {
+        $obj = ShirabeRpcRuntime::fromWire($args[0]);
+        if (!is_object($obj)) {
+            throw new RuntimeException('__shirabe_get_property expects a handle argument');
+        }
+        return $obj->{$args[1]};
     },
 ];
 

@@ -10,7 +10,6 @@ use shirabe::io::IOInterface;
 use shirabe::json::json_file::JsonFile;
 use shirabe::package::loader::ArrayLoader;
 use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, RootPackageHandle};
-use shirabe::repository::InstalledRepositoryInterface;
 use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
@@ -99,13 +98,13 @@ mockall::mock! {
         fn disable_plugins(&mut self);
         fn is_package_installed(
             &mut self,
-            repo: &mut dyn InstalledRepositoryInterface,
+            repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
             package: PackageInterfaceHandle,
         ) -> anyhow::Result<bool>;
         fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
         fn execute(
             &mut self,
-            repo: &mut dyn InstalledRepositoryInterface,
+            repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
             operations: Vec<AnyOperation>,
             dev_mode: bool,
             run_scripts: bool,

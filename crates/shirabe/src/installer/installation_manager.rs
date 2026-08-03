@@ -16,6 +16,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
 use crate::util::sync_executor;
@@ -198,17 +199,18 @@ impl InstallationManager {
     /// Checks whether provided package is installed in one of the registered installers.
     pub fn is_package_installed(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         // For testing only (ref InstallationManagerMock::isPackageInstalled).
         if self.mock.is_some() {
-            return repo.has_package(package);
+            return repo.borrow_mut().has_package(package);
         }
 
         if let Some(alias) = package.as_alias() {
             let alias_of: PackageInterfaceHandle = alias.get_alias_of().into();
-            return Ok(repo.has_package(package)? && self.is_package_installed(repo, alias_of)?);
+            return Ok(repo.borrow_mut().has_package(package)?
+                && self.is_package_installed(repo, alias_of)?);
         }
 
         self.get_installer(&package.get_type())?
@@ -236,7 +238,7 @@ impl InstallationManager {
     /// Executes solver operation.
     pub fn execute(
         &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
         dev_mode: bool,
         run_scripts: bool,
@@ -248,6 +250,7 @@ impl InstallationManager {
         // borrowed across the loop without also borrowing `&self`.
         if let Some(mock) = self.mock.as_mut() {
             let _ = (dev_mode, run_scripts, download_only);
+            let mut repo = repo.borrow_mut();
             for operation in operations {
                 let trace = shirabe_php_shim::strip_tags(&operation.to_string());
                 match operation {
@@ -318,11 +321,6 @@ impl InstallationManager {
 
         let all_operations: Vec<AnyOperation> = operations.clone();
 
-        // The concurrent operation chains share the repository; each chain borrows it only in
-        // synchronous sections, never across an await.
-        let repo_cell: std::cell::RefCell<&mut dyn InstalledRepositoryInterface> =
-            std::cell::RefCell::new(repo);
-
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
@@ -363,7 +361,7 @@ impl InstallationManager {
 
             for batch_to_execute in batches {
                 sync_executor::block_on(self.download_and_execute_batch(
-                    &repo_cell,
+                    repo,
                     batch_to_execute,
                     &mut cleanup_promises,
                     dev_mode,
@@ -394,7 +392,7 @@ impl InstallationManager {
         // do a last write so that we write the repository even if nothing changed
         // as that can trigger an update of some files like InstalledVersions.php if
         // running a new composer version
-        repo_cell.into_inner().write(dev_mode, self);
+        repo.borrow_mut().write(dev_mode, self);
 
         Ok(())
     }
@@ -402,7 +400,7 @@ impl InstallationManager {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     async fn download_and_execute_batch(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         operations: IndexMap<i64, AnyOperation>,
         cleanup_promises: &mut IndexMap<
             i64,
@@ -544,7 +542,7 @@ impl InstallationManager {
 
     async fn execute_batch(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         operations: IndexMap<i64, AnyOperation>,
         cleanup_promises: &IndexMap<
             i64,
@@ -577,10 +575,10 @@ impl InstallationManager {
                 }
                 match &operation {
                     AnyOperation::MarkAliasInstalled(op) => {
-                        self.mark_alias_installed(&mut **repo.borrow_mut(), op)?;
+                        self.mark_alias_installed(&mut *repo.borrow_mut(), op)?;
                     }
                     AnyOperation::MarkAliasUninstalled(op) => {
-                        self.mark_alias_uninstalled(&mut **repo.borrow_mut(), op);
+                        self.mark_alias_uninstalled(&mut *repo.borrow_mut(), op);
                     }
                     _ => {}
                 }
@@ -701,7 +699,7 @@ impl InstallationManager {
     /// Executes install operation.
     pub async fn install(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         operation: &InstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
@@ -716,7 +714,7 @@ impl InstallationManager {
     /// Executes update operation.
     pub async fn update(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         operation: &UpdateOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let initial = operation.get_initial_package().clone();
@@ -744,7 +742,7 @@ impl InstallationManager {
     /// Uninstalls package.
     pub async fn uninstall(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         operation: &UninstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
@@ -1017,13 +1015,13 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     fn disable_plugins(&mut self);
     fn is_package_installed(
         &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool>;
     fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
     fn execute(
         &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
         dev_mode: bool,
         run_scripts: bool,
@@ -1053,7 +1051,7 @@ impl InstallationManagerInterface for InstallationManager {
 
     fn is_package_installed(
         &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         InstallationManager::is_package_installed(self, repo, package)
@@ -1065,7 +1063,7 @@ impl InstallationManagerInterface for InstallationManager {
 
     fn execute(
         &mut self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
         dev_mode: bool,
         run_scripts: bool,

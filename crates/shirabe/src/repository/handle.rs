@@ -3,8 +3,8 @@
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, LockArrayRepository, PlatformRepository,
-    ProviderInfo, RepositoryInterface, SearchResult,
+    FindPackageConstraint, InstalledRepositoryInterface, LoadPackagesResult, LockArrayRepository,
+    PlatformRepository, ProviderInfo, RepositoryInterface, SearchResult,
 };
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
@@ -189,6 +189,62 @@ impl RepositoryInterfaceHandle {
         if let Some(r) = self.0.borrow_mut().as_installed_repository_interface_mut() {
             r.set_dev_package_names(dev_package_names);
         }
+    }
+}
+
+/// Shared handle over a repository known to implement `InstalledRepositoryInterface`.
+///
+/// The installer pipeline passes this instead of a long-lived `&mut dyn
+/// InstalledRepositoryInterface` so that re-entrant access to the same repository through
+/// `RepositoryManager::get_local_repository()` — e.g. `PluginManager::register_package` running
+/// inside `InstallationManager::execute` — borrows the shared `RefCell` only transiently.
+#[derive(Debug, Clone)]
+pub struct InstalledRepositoryInterfaceHandle(
+    std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>>,
+);
+
+impl InstalledRepositoryInterfaceHandle {
+    pub fn new<T: RepositoryInterface + 'static>(repository: T) -> Self {
+        Self::from_repository_handle(&RepositoryInterfaceHandle::new(repository))
+    }
+
+    /// PHP has no counterpart for this narrowing: parameters typed
+    /// `InstalledRepositoryInterface` simply receive such an instance. Handing over a
+    /// repository that is not one is a programming error.
+    pub fn from_repository_handle(handle: &RepositoryInterfaceHandle) -> Self {
+        assert!(
+            handle.is_installed_repository_interface(),
+            "repository does not implement InstalledRepositoryInterface"
+        );
+        Self(handle.as_rc().clone())
+    }
+
+    pub fn as_repository_handle(&self) -> RepositoryInterfaceHandle {
+        RepositoryInterfaceHandle::from_rc(self.0.clone())
+    }
+
+    pub fn borrow(&self) -> Ref<'_, dyn InstalledRepositoryInterface> {
+        Ref::map(self.0.borrow(), |r| {
+            r.as_installed_repository_interface()
+                .expect("checked at handle construction")
+        })
+    }
+
+    pub fn borrow_mut(&self) -> RefMut<'_, dyn InstalledRepositoryInterface> {
+        RefMut::map(self.0.borrow_mut(), |r| {
+            r.as_installed_repository_interface_mut()
+                .expect("checked at handle construction")
+        })
+    }
+
+    /// PHP `===` (reference identity).
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Stable identity usable as a map key (PHP `spl_object_hash`).
+    pub fn ptr_id(&self) -> usize {
+        std::rc::Rc::as_ptr(&self.0) as *const () as usize
     }
 }
 

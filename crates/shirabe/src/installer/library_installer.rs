@@ -8,7 +8,7 @@ use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::repository::InstalledRepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
@@ -241,10 +241,10 @@ impl InstallerInterface for LibraryInstaller {
 
     fn is_installed(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
-        if !repo.has_package(package.clone())? {
+        if !repo.borrow_mut().has_package(package.clone())? {
             return Ok(false);
         }
 
@@ -315,7 +315,7 @@ impl InstallerInterface for LibraryInstaller {
 
     async fn install(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
@@ -346,7 +346,7 @@ impl InstallerInterface for LibraryInstaller {
 
     async fn update(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -380,7 +380,7 @@ impl InstallerInterface for LibraryInstaller {
 
     async fn uninstall(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {

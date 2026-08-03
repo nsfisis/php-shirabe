@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::PhpMixed;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -396,6 +396,57 @@ pub fn call_static_method(
     )
 }
 
+/// Instantiates `new $class(...$ctor_args)` in the worker (autoloading the class if needed).
+/// On success the returned value is a `PluginValue::PhpHandle` registered in the worker's P
+/// table; the entity stays alive there until `release_php_handle`.
+pub fn new_object(
+    class: &str,
+    ctor_args: Vec<PluginValue>,
+    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+    rpc_call(
+        |corr_id| Frame::NewObject {
+            corr_id,
+            pclass: class.to_string(),
+            ctor_args,
+        },
+        dispatcher,
+    )
+}
+
+/// Calls `$obj->$method(...$args)` on a P-table entity in the worker.
+pub fn call_php_method(
+    phandle: u64,
+    method: &str,
+    args: Vec<PluginValue>,
+    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+    rpc_call(
+        |corr_id| Frame::CallPhpMethod {
+            corr_id,
+            phandle,
+            method_name: method.to_string(),
+            args,
+            out_param_positions: Vec::new(),
+        },
+        dispatcher,
+    )
+}
+
+/// One-way notification dropping a P-table entity in the worker. Callers releasing from a
+/// destructor should ignore the error: a dead worker has nothing left to release.
+pub fn release_php_handle(phandle: u64) -> anyhow::Result<()> {
+    let _session = session::SessionGuard::enter();
+    send_frame(&Frame::ReleasePhpHandle { phandle })
+}
+
+/// Whether the PHP worker process has been spawned by this process. Callers that only need to
+/// mirror state into an already-running worker (e.g. `InstalledVersions::reload` pushes) use
+/// this to avoid spawning a worker that would have nothing to observe.
+pub fn worker_is_running() -> bool {
+    WORKER_SPAWNED.load(Ordering::SeqCst)
+}
+
 fn rpc_call(
     request: impl FnOnce(u64) -> Frame,
     mut dispatcher: Option<&mut dyn RustMethodDispatcher>,
@@ -499,6 +550,30 @@ const STUB_FILES: &[(&str, &str)] = &[
         "Composer/Script/Event.php",
         include_str!("../php/stubs/Composer/Script/Event.php"),
     ),
+    (
+        "Composer/PartialComposer.php",
+        include_str!("../php/stubs/Composer/PartialComposer.php"),
+    ),
+    (
+        "Composer/Composer.php",
+        include_str!("../php/stubs/Composer/Composer.php"),
+    ),
+    (
+        "Composer/IO/BaseIO.php",
+        include_str!("../php/stubs/Composer/IO/BaseIO.php"),
+    ),
+    (
+        "Composer/IO/ConsoleIO.php",
+        include_str!("../php/stubs/Composer/IO/ConsoleIO.php"),
+    ),
+    (
+        "Composer/IO/BufferIO.php",
+        include_str!("../php/stubs/Composer/IO/BufferIO.php"),
+    ),
+    (
+        "Composer/IO/NullIO.php",
+        include_str!("../php/stubs/Composer/IO/NullIO.php"),
+    ),
 ];
 
 struct Worker {
@@ -530,10 +605,13 @@ impl Worker {
 // TODO(phase-c): a failed spawn panics rather than propagating a `Result`; this is an interim
 // step until PHP RPC gets proper error handling (see docs/dev/php-rpc.md).
 static WORKER: LazyLock<Mutex<Worker>> = LazyLock::new(|| {
-    Mutex::new(
-        spawn_worker().unwrap_or_else(|e| panic!("PHP RPC: failed to spawn PHP worker: {e:#}")),
-    )
+    let worker =
+        spawn_worker().unwrap_or_else(|e| panic!("PHP RPC: failed to spawn PHP worker: {e:#}"));
+    WORKER_SPAWNED.store(true, Ordering::SeqCst);
+    Mutex::new(worker)
 });
+
+static WORKER_SPAWNED: AtomicBool = AtomicBool::new(false);
 
 /// Writes one frame while holding the worker mutex only for the duration of the write, so the
 /// session owner (see `session`) can interleave sends and blocking reads without keeping the

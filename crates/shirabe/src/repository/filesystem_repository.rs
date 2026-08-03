@@ -343,10 +343,20 @@ impl FilesystemRepository {
             );
 
             // make sure the in memory state is up to date with on disk
-            // TODO(plugin): whether this reload must also be pushed to the plugin PHP child
-            // process is undecided; the InstalledVersions state a plugin observes after this
-            // dump is undefined (docs/dev/plugin-class-classification.md, "Bootstrap classes
-            // cannot be stub-shadowed").
+            // The upstream in-process reload is split in two here: the Rust-side mirror below,
+            // and a push into the PHP worker where the real observers (plugins) live. The push
+            // is skipped when no worker is running — with no child there is nothing that could
+            // observe the stale state, and the worker glue additionally ignores it while the
+            // class is not loaded there (a later lazy load reads the freshly written
+            // installed.php, matching upstream observations in every case).
+            if shirabe_php_rpc::worker_is_running() {
+                crate::event_dispatcher::unwrap_php_result(shirabe_php_rpc::call_function(
+                    "__shirabe_installed_versions_reload",
+                    vec![shirabe_php_rpc::PluginValue::from_php_mixed(
+                        &PhpMixed::Array(versions.clone()),
+                    )],
+                ))?;
+            }
             InstalledVersions::reload(versions);
 
             // make sure the selfDir matches the expected data at runtime if the class was loaded from the vendor dir, as it may have been

@@ -3,7 +3,7 @@
 use crate::installer::BinaryPresenceInterface;
 use crate::installer::PluginInstaller;
 use crate::package::PackageInterfaceHandle;
-use crate::repository::InstalledRepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use shirabe_php_shim::PhpMixed;
 
 #[async_trait::async_trait(?Send)]
@@ -12,7 +12,7 @@ pub trait InstallerInterface: std::fmt::Debug {
 
     fn is_installed(
         &self,
-        repo: &mut dyn InstalledRepositoryInterface,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool>;
 
@@ -29,25 +29,26 @@ pub trait InstallerInterface: std::fmt::Debug {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    // install/update/uninstall take the repository behind a RefCell: the concurrent operation
-    // chains share it, and implementations must borrow it only in synchronous sections (never
-    // across an await).
+    // install/update/uninstall take the repository as a shared handle: the concurrent operation
+    // chains share it (and re-entrant flows like plugin registration reach the same repository
+    // through RepositoryManager), so implementations must borrow it only in synchronous
+    // sections (never across an await).
     async fn install(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn update(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn uninstall(
         &self,
-        repo: &std::cell::RefCell<&mut dyn InstalledRepositoryInterface>,
+        repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 

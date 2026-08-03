@@ -1011,9 +1011,11 @@ impl CreateProjectCommand {
         let mut im = installation_manager.borrow_mut();
         im.set_output_progress(!no_progress);
         im.add_installer(Box::new(project_installer));
-        let mut installed_repo = InstalledArrayRepository::new()?;
+        let installed_repo = crate::repository::InstalledRepositoryInterfaceHandle::new(
+            InstalledArrayRepository::new()?,
+        );
         im.execute(
-            &mut installed_repo,
+            &installed_repo,
             vec![InstallOperation::new(package.clone()).into()],
             true,
             true,
