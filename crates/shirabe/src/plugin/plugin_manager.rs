@@ -272,15 +272,19 @@ impl PluginManager {
             .map(|v| v.as_bool() == Some(true))
             .unwrap_or(false);
         if !self.is_plugin_allowed(&package.get_name(), is_global_plugin, plugin_optional, true)? {
-            self.io.write_error(&format!(
-                "Skipped loading \"{}\" {}as it is not in config.allow-plugins",
-                package.get_name(),
-                if is_global_plugin || self.running_in_global_dir {
-                    "(installed globally) "
-                } else {
-                    ""
-                }
-            ));
+            self.io.write_error3(
+                &format!(
+                    "Skipped loading \"{}\" {}as it is not in config.allow-plugins",
+                    package.get_name(),
+                    if is_global_plugin || self.running_in_global_dir {
+                        "(installed globally) "
+                    } else {
+                        ""
+                    }
+                ),
+                true,
+                crate::io::DEBUG,
+            );
             return Ok(());
         }
 
@@ -298,6 +302,7 @@ impl PluginManager {
             Some(PhpMixed::Null) => true,
             Some(PhpMixed::Bool(false)) => true,
             Some(PhpMixed::Int(0)) => true,
+            Some(PhpMixed::Float(f)) if *f == 0.0 => true,
             Some(PhpMixed::String(s)) if s.is_empty() || s == "0" => true,
             Some(PhpMixed::Array(a)) => a.is_empty(),
             Some(PhpMixed::List(l)) => l.is_empty(),
@@ -309,17 +314,19 @@ impl PluginManager {
                 code: 0,
             }.into());
         }
-        let classes: Vec<String> = if let Some(arr) = class_value.and_then(|v| v.as_list()) {
-            arr.iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                .collect()
-        } else {
-            vec![
-                class_value
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("")
-                    .to_string(),
-            ]
+        // PHP: is_array($extra['class']) ? $extra['class'] : [$extra['class']] — an associative
+        // array iterates its values too, and a non-string entry reaches class_exists() where it
+        // raises a TypeError (an Error, not caught by the plugin installer's rollback).
+        let expect_class_name = |value: &PhpMixed| -> String {
+            value.as_string().map(|s| s.to_string()).unwrap_or_else(|| {
+                panic!("extra.class entries must be strings (PHP raises a TypeError): {value:?}")
+            })
+        };
+        let classes: Vec<String> = match class_value {
+            Some(PhpMixed::List(items)) => items.iter().map(expect_class_name).collect(),
+            Some(PhpMixed::Array(map)) => map.values().map(expect_class_name).collect(),
+            Some(other) => vec![expect_class_name(other)],
+            None => unreachable!("empty() above rejected a missing extra.class"),
         };
 
         let composer = self.composer_full();
@@ -421,6 +428,8 @@ impl PluginManager {
                 let path = class_loader.find_file(&class).unwrap_or_else(|| {
                     panic!("plugin class `{class}` is already defined but has no autoloadable file")
                 });
+                // TODO(phase-e): file_get_contents is lossy UTF-8; the eval'd plugin source
+                // should be carried as bytes.
                 let code = file_get_contents(&path)
                     .unwrap_or_else(|| panic!("unable to read the plugin class file `{path}`"));
                 let class_counter = CLASS_COUNTER.load(std::sync::atomic::Ordering::Relaxed);
@@ -578,24 +587,34 @@ impl PluginManager {
             return Ok(());
         }
 
-        let plugins = self
+        // PHP unsets registeredPlugins only after the loop; a deactivate() throw must leave the
+        // entry observable, so removal happens last here too. Plugins are cloned out per index
+        // (shared handles); installer entries are only referenced while calling removeInstaller.
+        let name = package.get_name();
+        let count = self
             .registered_plugins
-            .shift_remove(&package.get_name())
-            .unwrap_or_default();
-        for plugin in plugins {
+            .get(&name)
+            .map(|entries| entries.len())
+            .unwrap_or(0);
+        for index in 0..count {
+            let plugin = match &self.registered_plugins.get(&name).unwrap()[index] {
+                PluginOrInstaller::Plugin(p) => Some(p.clone()),
+                PluginOrInstaller::Installer(_) => None,
+            };
             match plugin {
-                PluginOrInstaller::Installer(inst) => {
-                    self.composer_full()
-                        .borrow()
-                        .get_installation_manager()
-                        .borrow_mut()
-                        .remove_installer(&*inst);
-                }
-                PluginOrInstaller::Plugin(p) => {
-                    self.remove_plugin(&p)?;
+                Some(p) => self.remove_plugin(&p)?,
+                None => {
+                    let composer = self.composer_full();
+                    let installation_manager = composer.borrow().get_installation_manager();
+                    if let PluginOrInstaller::Installer(inst) =
+                        &self.registered_plugins.get(&name).unwrap()[index]
+                    {
+                        installation_manager.borrow_mut().remove_installer(&**inst);
+                    }
                 }
             }
         }
+        self.registered_plugins.shift_remove(&name);
         Ok(())
     }
 
@@ -605,25 +624,35 @@ impl PluginManager {
             return Ok(());
         }
 
-        let plugins = self
+        // PHP unsets registeredPlugins only after the loop, as in deactivate_package.
+        let name = package.get_name();
+        let count = self
             .registered_plugins
-            .shift_remove(&package.get_name())
-            .unwrap_or_default();
-        for plugin in plugins {
+            .get(&name)
+            .map(|entries| entries.len())
+            .unwrap_or(0);
+        for index in 0..count {
+            let plugin = match &self.registered_plugins.get(&name).unwrap()[index] {
+                PluginOrInstaller::Plugin(p) => Some(p.clone()),
+                PluginOrInstaller::Installer(_) => None,
+            };
             match plugin {
-                PluginOrInstaller::Installer(inst) => {
-                    self.composer_full()
-                        .borrow()
-                        .get_installation_manager()
-                        .borrow_mut()
-                        .remove_installer(&*inst);
-                }
-                PluginOrInstaller::Plugin(p) => {
+                Some(p) => {
                     self.remove_plugin(&p)?;
                     self.uninstall_plugin(&p)?;
                 }
+                None => {
+                    let composer = self.composer_full();
+                    let installation_manager = composer.borrow().get_installation_manager();
+                    if let PluginOrInstaller::Installer(inst) =
+                        &self.registered_plugins.get(&name).unwrap()[index]
+                    {
+                        installation_manager.borrow_mut().remove_installer(&**inst);
+                    }
+                }
             }
         }
+        self.registered_plugins.shift_remove(&name);
         Ok(())
     }
 
@@ -895,11 +924,13 @@ impl PluginManager {
         global: bool,
     ) -> Option<String> {
         if !global {
+            // Shared borrow: this runs re-entrantly while InstallationManager::execute holds a
+            // shared borrow of the same manager handle.
             return self
                 .composer_full()
                 .borrow()
                 .get_installation_manager()
-                .borrow_mut()
+                .borrow()
                 .get_install_path(package);
         }
 
@@ -909,7 +940,7 @@ impl PluginManager {
             .unwrap()
             .borrow_partial()
             .get_installation_manager()
-            .borrow_mut()
+            .borrow()
             .get_install_path(package)
     }
 

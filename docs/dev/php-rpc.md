@@ -122,9 +122,10 @@ function; an unknown name is an explicit error. Notable internal helpers:
 - `__shirabe_composer_require` — the body of `\Composer\Autoload\composerRequire`, sharing
   its `$GLOBALS['__composer_autoload_files']` guard (files-autoload entries of plugin
   packages).
-- `__shirabe_installed_versions_reload` — mirrors `FilesystemRepository::write`'s in-process
-  `InstalledVersions::reload($versions)` into the worker; guarded by
-  `class_exists(..., false)` so an unloaded class keeps its upstream lazy-load behavior.
+- `__shirabe_installed_versions_reload` — mirrors the tail of `FilesystemRepository::write`
+  (the unconditional `InstalledVersions::reload($versions)` plus the reflection-based
+  `selfDir`/`installedIsLocalDir` restore) into the worker; skipped only when the class is not
+  even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
 - `__shirabe_get_property` — for testing only: reads a public property of a P-table entity.
 - `__shirabe_oracle_roundtrip` — codec oracle support for tests.
 

@@ -431,7 +431,7 @@ mockall::mock! {
         ) -> anyhow::Result<bool>;
         fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
         fn execute(
-            &mut self,
+            &self,
             repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
             operations: Vec<AnyOperation>,
             dev_mode: bool,

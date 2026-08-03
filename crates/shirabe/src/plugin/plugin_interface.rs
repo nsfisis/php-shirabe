@@ -44,7 +44,7 @@ pub trait PluginInterface: std::fmt::Debug {
 
     /// For testing only: recovers the PHP-backed proxy so tests can read plugin properties the
     /// way PHPUnit asserts `$plugins[0]->version`.
-    fn as_php_plugin_proxy(&self) -> Option<&crate::plugin::PhpPluginProxy> {
+    fn __as_php_plugin_proxy(&self) -> Option<&crate::plugin::PhpPluginProxy> {
         None
     }
 }

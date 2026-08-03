@@ -1008,20 +1008,26 @@ impl CreateProjectCommand {
 
         let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs);
         let installation_manager = composer.get_installation_manager().clone();
-        let mut im = installation_manager.borrow_mut();
-        im.set_output_progress(!no_progress);
-        im.add_installer(Box::new(project_installer));
+        {
+            let mut im = installation_manager.borrow_mut();
+            im.set_output_progress(!no_progress);
+            im.add_installer(Box::new(project_installer));
+        }
         let installed_repo = crate::repository::InstalledRepositoryInterfaceHandle::new(
             InstalledArrayRepository::new()?,
         );
-        im.execute(
+        // A shared borrow: plugin registration inside execute re-enters this manager handle
+        // through the Composer graph.
+        installation_manager.borrow().execute(
             &installed_repo,
             vec![InstallOperation::new(package.clone()).into()],
             true,
             true,
             false,
         )?;
-        im.notify_installs(io.clone());
+        installation_manager
+            .borrow_mut()
+            .notify_installs(io.clone());
 
         // collect suggestions
         self.suggested_packages_reporter

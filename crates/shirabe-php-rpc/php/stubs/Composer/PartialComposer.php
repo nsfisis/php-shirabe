@@ -21,8 +21,16 @@ class PartialComposer implements \ShirabeRustStub
     /** @var int */
     protected $__epoch;
 
-    public function __construct(int $rhandle, int $epoch)
+    public function __construct(int $rhandle = 0, int $epoch = 0)
     {
+        if (func_num_args() < 2) {
+            // Constructing the class from plugin code (a common idiom for e.g. `new BufferIO()`)
+            // is an open question of the plugin design; only proxy instantiation passes a
+            // Rust handle. Fail with a diagnosable message instead of an ArgumentCountError.
+            throw new \RuntimeException(
+                'Shirabe does not support constructing ' . static::class . ' inside the plugin process yet'
+            );
+        }
         $this->__rhandle = $rhandle;
         $this->__epoch = $epoch;
     }

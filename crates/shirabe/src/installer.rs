@@ -1257,7 +1257,9 @@ impl Installer {
 
         if self.execute_operations {
             local_repo.set_dev_package_names(self.locker.borrow_mut().get_dev_package_names()?);
-            self.installation_manager.borrow_mut().execute(
+            // A shared borrow: plugin registration inside execute re-enters this manager
+            // handle through the Composer graph.
+            self.installation_manager.borrow().execute(
                 &crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
                     &local_repo,
                 ),

@@ -15,7 +15,7 @@ use shirabe_php_rpc::{
 };
 
 /// A Rust-side entity a PHP proxy stub points back to.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum RustEntity {
     Composer(ComposerHandle),
     Io(std::rc::Rc<std::cell::RefCell<dyn IOInterface>>),
@@ -25,6 +25,10 @@ thread_local! {
     /// The R table. Entries are strong references kept for the worker's lifetime.
     /// TODO(plugin): GC (dropping entries on ReleaseRustHandle) is not implemented yet;
     /// until then entities registered here are intentionally never released.
+    /// TODO(plugin): thread-local while the worker and its stub intern table are
+    /// process-global; the session lock serializes calls, and every dispatch currently runs on
+    /// the thread that registered the handle, but a handle minted on one thread is invisible
+    /// to another.
     static R_TABLE: std::cell::RefCell<IndexMap<u64, RustEntity>> =
         std::cell::RefCell::new(IndexMap::new());
 }
@@ -96,6 +100,12 @@ pub(crate) fn io_stub_class(
 
 /// Looks a class up in every registered Rust-side `ClassLoader`, in registration order — the
 /// Rust mirror of what the PHP `spl_autoload_register` stack would do in-process.
+///
+/// TODO(plugin): `ClassLoader::register` keeps one loader per vendor-dir (matching upstream's
+/// `$registeredLoaders`), but the real spl stack keeps every registered loader; because the
+/// `spl_autoload_register` shim is a no-op, registering a second plugin loader under the same
+/// vendor-dir evicts the first one here, and a class of the earlier plugin that was never
+/// loaded can become unresolvable (PHP would still find it).
 pub(crate) fn find_file_in_registered_loaders(class: &str) -> Option<String> {
     for (_vendor_dir, mut loader) in ClassLoader::get_registered_loaders() {
         if let Some(file) = loader.find_file(class) {
@@ -122,6 +132,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
                 let class = match args.first() {
+                    // TODO(phase-e): lossy UTF-8; class names are bytes in PHP.
                     Some(PluginValue::String(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
                     other => {
                         return Err(runtime_throw(format!(
@@ -139,20 +150,20 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
             )));
         }
 
-        R_TABLE.with(|table| {
-            let table = table.borrow();
-            match table.get(&rhandle) {
-                Some(RustEntity::Io(io)) => dispatch_io_method(io, method_name, &args),
-                Some(RustEntity::Composer(_)) => {
-                    // TODO(plugin): the Composer object graph (getConfig, getRepositoryManager,
-                    // ...) becomes reachable over RPC later.
-                    Err(runtime_throw(format!(
-                        "the Composer method `{method_name}` is not available over RPC yet"
-                    )))
-                }
-                None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+        // The entity is cloned out so no table borrow is held while the handler runs (a
+        // handler that re-enters register_*_entity would otherwise panic on the RefCell).
+        let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
+        match entity {
+            Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, &args),
+            Some(RustEntity::Composer(_)) => {
+                // TODO(plugin): the Composer object graph (getConfig, getRepositoryManager,
+                // ...) becomes reachable over RPC later.
+                Err(runtime_throw(format!(
+                    "the Composer method `{method_name}` is not available over RPC yet"
+                )))
             }
-        })
+            None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+        }
     }
 }
 
@@ -193,6 +204,7 @@ fn decode_write_args(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<(Vec<String>, bool, i64), PhpThrow> {
+    // TODO(phase-e): lossy UTF-8; IO messages are bytes in PHP.
     let messages = match args.first() {
         Some(PluginValue::String(bytes)) => vec![String::from_utf8_lossy(bytes).into_owned()],
         Some(PluginValue::List(items)) => {
@@ -347,7 +359,7 @@ impl PluginInterface for PhpPluginProxy {
         self.class.clone()
     }
 
-    fn as_php_plugin_proxy(&self) -> Option<&PhpPluginProxy> {
+    fn __as_php_plugin_proxy(&self) -> Option<&PhpPluginProxy> {
         Some(self)
     }
 }

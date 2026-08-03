@@ -508,9 +508,9 @@ fn rpc_call(
                 send_frame(&reply)?;
             }
             Frame::ReleaseRustHandle { .. } => {
-                // TODO(plugin): there is no persistent R table yet (script-event handles are
-                // scoped to a single dispatched call), so stub destructor notifications carry no
-                // state to clean up.
+                // TODO(plugin): R-table garbage collection is deferred — the shirabe crate
+                // keeps its entries alive for the worker's lifetime, and per-call script-event
+                // handles carry no state either, so the notification is dropped here.
                 continue;
             }
             Frame::EpochBump { .. } => {

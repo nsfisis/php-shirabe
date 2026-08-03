@@ -173,7 +173,7 @@ impl InstallationManagerInterface for MockInstallationManager {
     fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) {}
 
     fn execute(
-        &mut self,
+        &self,
         _repo: &InstalledRepositoryInterfaceHandle,
         _operations: Vec<AnyOperation>,
         _dev_mode: bool,
@@ -372,7 +372,7 @@ fn plugin_property(
 ) -> String {
     let plugin = plugin.borrow();
     let proxy = plugin
-        .as_php_plugin_proxy()
+        .__as_php_plugin_proxy()
         .expect("registered plugins are PHP-backed proxies");
     match proxy.__get_property(name).unwrap() {
         PhpMixed::String(s) => s,

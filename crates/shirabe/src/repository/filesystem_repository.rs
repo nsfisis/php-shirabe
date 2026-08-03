@@ -343,18 +343,21 @@ impl FilesystemRepository {
             );
 
             // make sure the in memory state is up to date with on disk
-            // The upstream in-process reload is split in two here: the Rust-side mirror below,
-            // and a push into the PHP worker where the real observers (plugins) live. The push
-            // is skipped when no worker is running — with no child there is nothing that could
-            // observe the stale state, and the worker glue additionally ignores it while the
-            // class is not loaded there (a later lazy load reads the freshly written
-            // installed.php, matching upstream observations in every case).
+            // The upstream in-process reload/selfDir/installedIsLocalDir tail is mirrored
+            // twice: into the Rust-side statics below, and into the PHP worker where the real
+            // observers (plugins) live. The push is skipped when no worker is running — with no
+            // child there is nothing that could observe the state; the glue skips it only when
+            // the class is not even autoloadable there (no Composer PHP runtime = no observer
+            // code either).
             if shirabe_php_rpc::worker_is_running() {
                 crate::event_dispatcher::unwrap_php_result(shirabe_php_rpc::call_function(
                     "__shirabe_installed_versions_reload",
-                    vec![shirabe_php_rpc::PluginValue::from_php_mixed(
-                        &PhpMixed::Array(versions.clone()),
-                    )],
+                    vec![
+                        shirabe_php_rpc::PluginValue::from_php_mixed(&PhpMixed::Array(
+                            versions.clone(),
+                        )),
+                        shirabe_php_rpc::PluginValue::string(repo_dir.clone()),
+                    ],
                 ))?;
             }
             InstalledVersions::reload(versions);

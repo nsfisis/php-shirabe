@@ -365,11 +365,6 @@ final class ShirabeRpcRuntime
         }
     }
 
-    /**
-     * Registers the script-class autoloader: classes referenced by composer.json scripts are
-     * resolved by asking the Rust-side ClassLoader (built by EventDispatcher::makeAutoloader)
-     * where the class file lives. Handle 0 is the runtime service endpoint on the Rust side.
-     */
     /** Re-prepends the stub autoloader so it precedes any autoloader registered since. */
     public static function ensureStubAutoloaderPriority(): void
     {
@@ -380,6 +375,11 @@ final class ShirabeRpcRuntime
         spl_autoload_register(self::$stubAutoloader, true, true);
     }
 
+    /**
+     * Registers the script-class autoloader: classes referenced by composer.json scripts are
+     * resolved by asking the Rust-side ClassLoader (built by EventDispatcher::makeAutoloader)
+     * where the class file lives. Handle 0 is the runtime service endpoint on the Rust side.
+     */
     public static function enableScriptAutoloader(): void
     {
         if (self::$scriptAutoloaderRegistered) {
@@ -577,13 +577,33 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return true;
     },
-    // Mirrors FilesystemRepository::write's in-process `InstalledVersions::reload($versions)`
-    // into this child. The class_exists guard (no autoload) matches the upstream observable
-    // behavior: when the class was never loaded here, a later lazy load reads the
-    // freshly-written installed.php anyway.
+    // Mirrors the tail of FilesystemRepository::write into this child: the unconditional
+    // `InstalledVersions::reload($versions)` plus the reflection-based selfDir /
+    // installedIsLocalDir restore. Skipped only when the class is not even autoloadable here
+    // (the Composer PHP runtime was never loaded): without it no code in this process can
+    // observe InstalledVersions at all.
+    // TODO(plugin): seeding the initial state when the plugin runtime boots (the Factory-time
+    // safelyLoadInstalledVersions of the project's installed.php) is not wired yet; until the
+    // first write of a run, a plugin observes an unseeded InstalledVersions.
     '__shirabe_installed_versions_reload' => static function ($args) {
-        if (class_exists('Composer\\InstalledVersions', false)) {
-            \Composer\InstalledVersions::reload($args[0]);
+        [$versions, $repoDir] = $args;
+        if (!class_exists('Composer\\InstalledVersions')) {
+            return true;
+        }
+        \Composer\InstalledVersions::reload($versions);
+        try {
+            $reflProp = new ReflectionProperty(\Composer\InstalledVersions::class, 'selfDir');
+            (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+            $reflProp->setValue(null, strtr($repoDir, '\\', '/'));
+
+            $reflProp = new ReflectionProperty(\Composer\InstalledVersions::class, 'installedIsLocalDir');
+            (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+            $reflProp->setValue(null, true);
+        } catch (ReflectionException $e) {
+            if (preg_match('{Property .*? does not exist}i', $e->getMessage()) !== 1) {
+                throw $e;
+            }
+            // noop, an outdated InstalledVersions class simply lacks the properties
         }
         return true;
     },

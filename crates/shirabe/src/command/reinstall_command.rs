@@ -247,14 +247,14 @@ impl Command for ReinstallCommand {
         let repo = crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
             &local_repo,
         );
-        installation_manager.borrow_mut().execute(
+        installation_manager.borrow().execute(
             &repo,
             uninstall_operations,
             dev_mode,
             true,
             false,
         )?;
-        installation_manager.borrow_mut().execute(
+        installation_manager.borrow().execute(
             &repo,
             install_operations.clone(),
             dev_mode,

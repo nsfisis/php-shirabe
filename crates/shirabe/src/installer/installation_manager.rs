@@ -48,7 +48,9 @@ pub struct InstallationManager {
     /// For testing only: present iff this manager behaves like
     /// `Composer\Test\Mock\InstallationManagerMock`, recording operations instead of executing
     /// them. `None` in production.
-    mock: Option<InstallationManagerMockState>,
+    // RefCell so the recording survives `execute(&self)` (shared borrows of the manager
+    // handle must coexist with re-entrant plugin registration; see `execute`).
+    mock: Option<std::cell::RefCell<InstallationManagerMockState>>,
 }
 
 /// For testing only: recorded operations for the `InstallationManagerMock` behavior.
@@ -86,7 +88,9 @@ impl InstallationManager {
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> Self {
         Self {
-            mock: Some(InstallationManagerMockState::default()),
+            mock: Some(std::cell::RefCell::new(
+                InstallationManagerMockState::default(),
+            )),
             ..Self::new(loop_, io, event_dispatcher)
         }
     }
@@ -95,7 +99,7 @@ impl InstallationManager {
     pub fn __get_trace(&self) -> Vec<String> {
         self.mock
             .as_ref()
-            .map(|m| m.trace.clone())
+            .map(|m| m.borrow().trace.clone())
             .unwrap_or_default()
     }
 
@@ -103,7 +107,7 @@ impl InstallationManager {
     pub fn __get_installed_packages(&self) -> Vec<PackageInterfaceHandle> {
         self.mock
             .as_ref()
-            .map(|m| m.installed.clone())
+            .map(|m| m.borrow().installed.clone())
             .unwrap_or_default()
     }
 
@@ -111,7 +115,7 @@ impl InstallationManager {
     pub fn __get_updated_packages(&self) -> Vec<(PackageInterfaceHandle, PackageInterfaceHandle)> {
         self.mock
             .as_ref()
-            .map(|m| m.updated.clone())
+            .map(|m| m.borrow().updated.clone())
             .unwrap_or_default()
     }
 
@@ -119,7 +123,7 @@ impl InstallationManager {
     pub fn __get_uninstalled_packages(&self) -> Vec<PackageInterfaceHandle> {
         self.mock
             .as_ref()
-            .map(|m| m.uninstalled.clone())
+            .map(|m| m.borrow().uninstalled.clone())
             .unwrap_or_default()
     }
 
@@ -236,8 +240,13 @@ impl InstallationManager {
     }
 
     /// Executes solver operation.
+    ///
+    /// `&self` (not `&mut self`, unlike the porting default): callers invoke this through the
+    /// shared manager handle, and plugin registration inside the batch re-enters the same
+    /// handle (`PluginManager::get_install_path`), so only shared borrows may be outstanding
+    /// for the whole call.
     pub fn execute(
-        &mut self,
+        &self,
         repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
         dev_mode: bool,
@@ -248,7 +257,8 @@ impl InstallationManager {
         // skipping the download step (ref InstallationManagerMock::execute). The alias operations'
         // repo mutation is inlined (rather than calling mark_alias_*) so `self.mock` can stay
         // borrowed across the loop without also borrowing `&self`.
-        if let Some(mock) = self.mock.as_mut() {
+        if let Some(mock) = self.mock.as_ref() {
+            let mut mock = mock.borrow_mut();
             let _ = (dev_mode, run_scripts, download_only);
             let mut repo = repo.borrow_mut();
             for operation in operations {
@@ -392,7 +402,7 @@ impl InstallationManager {
         // do a last write so that we write the repository even if nothing changed
         // as that can trigger an update of some files like InstalledVersions.php if
         // running a new composer version
-        repo.borrow_mut().write(dev_mode, self);
+        repo.borrow_mut().write(dev_mode, self)?;
 
         Ok(())
     }
@@ -658,7 +668,7 @@ impl InstallationManager {
                 }
 
                 // PHP: ->then(fn() => $repo->write($devMode, $this)) persists the repository after each op.
-                repo.borrow_mut().write(dev_mode, self);
+                repo.borrow_mut().write(dev_mode, self)?;
 
                 let event_name_post = match op_type {
                     "install" => PackageEvents::POST_PACKAGE_INSTALL,
@@ -1020,7 +1030,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     ) -> anyhow::Result<bool>;
     fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
     fn execute(
-        &mut self,
+        &self,
         repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
         dev_mode: bool,
@@ -1062,7 +1072,7 @@ impl InstallationManagerInterface for InstallationManager {
     }
 
     fn execute(
-        &mut self,
+        &self,
         repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
         dev_mode: bool,
