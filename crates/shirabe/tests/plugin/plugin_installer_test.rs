@@ -18,7 +18,7 @@ use shirabe::json::JsonFile;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Locker, LockerInterface, PackageInterfaceHandle, RootPackageHandle};
 use shirabe::plugin::plugin_interface::PluginInterface;
-use shirabe::plugin::{Capable, PluginManager};
+use shirabe::plugin::{Capable, PluginManager, composer_handle_value, io_handle_value};
 use shirabe::repository::{
     InstalledArrayRepository, InstalledRepositoryInterfaceHandle, RepositoryInterfaceHandle,
     RepositoryManagerInterface,
@@ -633,13 +633,44 @@ fn test_plugin_range_constraints_work_only_with_certain_api_version() {
     todo!()
 }
 
-#[ignore = "get_plugin_capability never instantiates a capability class (TODO(plugin) in plugin/plugin_manager.rs); Capability::CommandProvider/BaseCommand runtime instantiation is unported"]
 #[test]
 fn test_command_provider_capability() {
-    // TODO(phase-d): get_plugin_capability never instantiates a capability class (TODO(plugin)
-    // in plugin/plugin_manager.rs); Capability::CommandProvider/BaseCommand runtime
-    // instantiation is also unported.
-    todo!()
+    if !php_runtime_available() {
+        return;
+    }
+    let _worker = lock_php_worker();
+    let set_up = set_up();
+    // PHP mocks the repository so getPackages() returns [$this->packages[7]] (plugin-v8);
+    // the real InstalledArrayRepository reaches the same state by adding the package.
+    set_up
+        .repository
+        .borrow_mut()
+        .add_package(set_up.packages[7].clone())
+        .unwrap();
+    let _installer = new_installer(&set_up);
+    set_up.pm.borrow_mut().load_installed_plugins().unwrap();
+
+    let mut ctor_args = IndexMap::new();
+    ctor_args.insert(
+        "composer".to_string(),
+        composer_handle_value(&set_up.composer),
+    );
+    ctor_args.insert("io".to_string(), io_handle_value(&set_up.io_dyn).unwrap());
+    let caps = set_up
+        .pm
+        .borrow()
+        .get_plugin_capabilities("Composer\\Plugin\\Capability\\CommandProvider", ctor_args)
+        .unwrap();
+    assert_eq!(1, caps.len());
+    // PHP: assertInstanceOf('Composer\Plugin\Capability\CommandProvider', $caps[0]).
+    let provider = caps[0]
+        .as_command_provider()
+        .expect("the capability implements CommandProvider");
+
+    let commands = provider.get_commands().unwrap();
+    assert_eq!(1, commands.len());
+    // PHP: assertInstanceOf('Composer\Command\BaseCommand', $commands[0]) is witnessed by the
+    // element type of Vec<Box<dyn BaseCommand>>.
 }
 
 // A hand-written stub is used in place of PHPUnit's
@@ -692,27 +723,63 @@ fn test_incapable_plugin_is_correctly_detected() {
     assert!(result.is_none());
 }
 
-#[ignore = "Requires runtime instantiation of Mock\\Capability via get_plugin_capability; not implemented (TODO(plugin))"]
+#[ignore = "the mocked Capable plugin is Rust-native and cannot cross the RPC boundary: getPluginCapability passes the plugin itself as $ctorArgs['plugin'] to Mock\\Capability, and the test reads $capability->args back; PluginInterface has no rust-proxy stub (TODO(plugin))"]
 #[test]
 fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_args() {
-    // TODO(phase-d): requires runtime instantiation of Mock\Capability via
-    // get_plugin_capability; not implemented (TODO(plugin)).
+    // TODO(phase-d): the mocked Capable plugin is Rust-native and cannot cross the RPC
+    // boundary — getPluginCapability must pass the plugin itself as $ctorArgs['plugin'] to
+    // Mock\Capability's constructor, and the test reads $capability->args back over RPC;
+    // PluginInterface has no rust-proxy stub (TODO(plugin)).
     todo!()
 }
 
-// PluginManager::get_capability_implementation_class_name (via Capable::get_capabilities)
-// resolves capability class names through an IndexMap<String, String>, so most of PHP's
-// invalidImplementationClassNames data provider (null, 0, 1000, [1], [], stdClass) cannot be
-// represented at all in the ported type — only the string entries ("", "   ") could be
-// constructed. Per the phase-d rule against porting a subset of a data provider, this whole
-// test must stay unported rather than dropping the non-string cases.
-#[ignore = "Capable::get_capabilities is typed IndexMap<String, String>; most of the invalidImplementationClassNames data provider (null, 0, 1000, [1], [], stdClass) is not representable, and porting only the string cases would drop data-provider entries (TODO(phase-d))"]
+/// PHP data provider `invalidImplementationClassNames`, one PhpMixed per entry.
+fn invalid_implementation_class_names() -> Vec<PhpMixed> {
+    vec![
+        PhpMixed::Null,
+        PhpMixed::String(String::new()),
+        PhpMixed::Int(0),
+        PhpMixed::Int(1000),
+        PhpMixed::String("   ".to_string()),
+        PhpMixed::List(vec![PhpMixed::Int(1)]),
+        PhpMixed::List(vec![]),
+        // PHP: new \stdClass()
+        PhpMixed::Object(IndexMap::new()),
+    ]
+}
+
 #[test]
 fn test_querying_with_invalid_capability_class_name_throws() {
-    // TODO(phase-d): Capable::get_capabilities is typed IndexMap<String, String>; most of the
-    // invalidImplementationClassNames data provider (null, 0, 1000, [1], [], stdClass) is not
-    // representable, and porting only the string cases would drop data-provider entries.
-    todo!()
+    let capability_api = "Composer\\Plugin\\Capability\\Capability";
+    for invalid_implementation_class_name in invalid_implementation_class_names() {
+        let set_up = set_up();
+        let plugin = CapablePlugin {
+            capabilities: IndexMap::from([(
+                capability_api.to_string(),
+                invalid_implementation_class_name.clone(),
+            )]),
+            get_capabilities_calls: std::cell::RefCell::new(0),
+        };
+
+        let err =
+            match set_up
+                .pm
+                .borrow()
+                .get_plugin_capability(&plugin, capability_api, IndexMap::new())
+            {
+                Err(err) => err,
+                Ok(_) => panic!(
+                    "expected UnexpectedValueException for {invalid_implementation_class_name:?}"
+                ),
+            };
+        assert!(
+            err.downcast_ref::<shirabe_php_shim::UnexpectedValueException>()
+                .is_some(),
+            "expected UnexpectedValueException for {invalid_implementation_class_name:?}, got: {err}"
+        );
+        // PHP: ->expects($this->once())->method('getCapabilities').
+        assert_eq!(1, *plugin.get_capabilities_calls.borrow());
+    }
 }
 
 // A hand-written stub plays the role of PHPUnit's
@@ -721,6 +788,7 @@ fn test_querying_with_invalid_capability_class_name_throws() {
 // is reproduced with a call counter asserted after the call.
 #[derive(Debug)]
 struct CapablePlugin {
+    capabilities: IndexMap<String, PhpMixed>,
     get_capabilities_calls: std::cell::RefCell<i64>,
 }
 
@@ -759,9 +827,9 @@ impl PluginInterface for CapablePlugin {
 }
 
 impl Capable for CapablePlugin {
-    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         *self.get_capabilities_calls.borrow_mut() += 1;
-        Ok(IndexMap::new())
+        Ok(self.capabilities.clone())
     }
 }
 
@@ -770,6 +838,7 @@ fn test_querying_non_provided_capability_returns_null_safely() {
     let set_up = set_up();
 
     let plugin = CapablePlugin {
+        capabilities: IndexMap::new(),
         get_capabilities_calls: std::cell::RefCell::new(0),
     };
 
@@ -786,10 +855,13 @@ fn test_querying_non_provided_capability_returns_null_safely() {
     assert_eq!(1, *plugin.get_capabilities_calls.borrow());
 }
 
-#[ignore = "Requires runtime get_plugin_capability with PHP-class-name capability lookup (class_exists/instanceof checks are unported TODO(plugin)); not implemented"]
+#[ignore = "the '\\stdClass' data-provider case reaches new \\stdClass($ctorArgs), which needs the Rust-native mocked plugin passed as $ctorArgs['plugin'] over RPC (no PluginInterface rust-proxy stub exists, TODO(plugin)); porting only the NonExistentClassLikeMiddleClass case would drop a data-provider entry (TODO(phase-d))"]
 #[test]
 fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
-    // TODO(phase-d): requires runtime get_plugin_capability with PHP-class-name capability lookup
-    // (class_exists/instanceof checks are unported TODO(plugin)); not implemented.
+    // TODO(phase-d): the '\stdClass' data-provider case reaches new \stdClass($ctorArgs),
+    // which needs the Rust-native mocked plugin passed as $ctorArgs['plugin'] over RPC — no
+    // PluginInterface rust-proxy stub exists (TODO(plugin)). Porting only the
+    // NonExistentClassLikeMiddleClass case (which fails at class_exists, before the plugin is
+    // passed) would drop a data-provider entry.
     todo!()
 }

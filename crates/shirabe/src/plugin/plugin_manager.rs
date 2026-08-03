@@ -14,7 +14,9 @@ use crate::package::base_package::{self};
 use crate::package::version::VersionParser;
 use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
-use crate::plugin::php_plugin_proxy::{PhpPluginProxy, PluginRpcDispatcher};
+use crate::plugin::php_plugin_proxy::{
+    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, PluginRpcDispatcher, php_is_a,
+};
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterfaceHandle;
@@ -25,9 +27,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, array_key_exists,
-    dirname, file_get_contents, implode, ksort, php_regex, preg_quote, strrpos, strtr_array,
-    substr, trigger_error, trim, var_export_str, version_compare,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
+    file_get_contents, implode, ksort, php_regex, preg_quote, strrpos, strtr_array, substr,
+    trigger_error, trim, var_export, var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -966,36 +968,26 @@ impl PluginManager {
         let capabilities = capable.get_capabilities()?;
 
         // PHP: !empty($capabilities[$capability]) && is_string($capabilities[$capability]) && trim($capabilities[$capability])
-        if let Some(s) = capabilities.get(capability) {
+        if let Some(value) = capabilities.get(capability)
+            && !empty(value)
+            && let PhpMixed::String(s) = value
+        {
             let trimmed = trim(s, Some(" \t\n\r\0\u{0B}"));
-            if !s.is_empty() && s != "0" && !trimmed.is_empty() {
+            // PHP evaluates trim(...) in boolean context: "" and "0" are falsy.
+            if !trimmed.is_empty() && trimmed != "0" {
                 return Ok(Some(trimmed));
             }
         }
 
-        // PHP: empty($capabilities[$capability]) — true for null, false, 0, "", "0", [], or missing key.
-        // In Rust the values are typed as String, so we only need to consider "", "0".
-        let cap_is_empty = match capabilities.get(capability) {
-            None => true,
-            Some(s) if s.is_empty() || s == "0" => true,
-            _ => false,
-        };
-        if array_key_exists(capability, &capabilities)
-            && (cap_is_empty
-                || trim(
-                    capabilities
-                        .get(capability)
-                        .map(|s| s.as_str())
-                        .unwrap_or(""),
-                    Some(" \t\n\r\0\u{0B}"),
-                )
-                .is_empty())
-        {
+        // PHP: array_key_exists($capability, $capabilities) && (empty(...) || !is_string(...)
+        // || !trim(...)). Once the first branch has declined, a present key always fails one
+        // of the three disjuncts, so a present key unconditionally throws here.
+        if let Some(value) = capabilities.get(capability) {
             return Err(UnexpectedValueException {
                 message: format!(
                     "Plugin {} provided invalid capability class name(s), got {}",
                     plugin.get_class_name(),
-                    var_export_str(capabilities.get(capability).unwrap(), true)
+                    var_export(value, true)
                 ),
                 code: 0,
             }
@@ -1009,36 +1001,110 @@ impl PluginManager {
         &self,
         plugin: &dyn PluginInterface,
         capability_class_name: &str,
-        _ctor_args: IndexMap<String, PhpMixed>,
+        ctor_args: IndexMap<String, PluginValue>,
     ) -> anyhow::Result<Option<Box<dyn Capability>>> {
-        // TODO(plugin): instantiate plugin capability via runtime class lookup
-        let _capability_class =
+        let capability_class =
             match self.get_capability_implementation_class_name(plugin, capability_class_name)? {
                 Some(c) => c,
                 None => return Ok(None),
             };
-        // PHP: requires class_exists / new $capabilityClass($ctorArgs); cannot be performed in Rust without a runtime registry.
-        Ok(None)
+
+        // PHP: if (!class_exists($capabilityClass))
+        let exists = unwrap_php_result(call_function_with_dispatcher(
+            "class_exists",
+            vec![PluginValue::string(capability_class.clone())],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        if !matches!(exists, PluginValue::Bool(true)) {
+            return Err(RuntimeException {
+                message: format!(
+                    "Cannot instantiate Capability, as class {} from plugin {} does not exist.",
+                    capability_class,
+                    plugin.get_class_name()
+                ),
+                code: 0,
+            }
+            .into());
+        }
+
+        // PHP: $ctorArgs['plugin'] = $plugin; the capability constructor receives the plugin
+        // instance itself, so a plugin with no PHP-side entity cannot be represented.
+        let plugin_value = match plugin.__as_php_plugin_proxy() {
+            Some(proxy) => PluginValue::PhpHandle(shirabe_php_rpc::PhpObjHandle {
+                phandle: proxy.phandle,
+                class: proxy.class.clone(),
+                implements: proxy.implements.clone(),
+            }),
+            None => anyhow::bail!(
+                "cannot instantiate capability {capability_class}: plugin {} has no PHP-side entity to pass as $ctorArgs['plugin']",
+                plugin.get_class_name()
+            ),
+        };
+        let mut ctor_args = ctor_args;
+        ctor_args.insert("plugin".to_string(), plugin_value);
+        let args_value = PluginValue::Array(
+            ctor_args
+                .into_iter()
+                .map(|(k, v)| (k.into_bytes(), v))
+                .collect(),
+        );
+
+        // PHP: $capabilityObj = new $capabilityClass($ctorArgs);
+        let capability_obj = unwrap_php_result(shirabe_php_rpc::new_object(
+            &capability_class,
+            vec![args_value],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        let handle = match capability_obj {
+            PluginValue::PhpHandle(handle) => handle,
+            other => anyhow::bail!(
+                "worker returned a non-object for new {capability_class}(...): {other:?}"
+            ),
+        };
+
+        // PHP: if (!$capabilityObj instanceof Capability || !$capabilityObj instanceof $capabilityClassName)
+        if !php_is_a(&handle, "Composer\\Plugin\\Capability\\Capability")?
+            || !php_is_a(&handle, capability_class_name)?
+        {
+            return Err(RuntimeException {
+                message: format!(
+                    "Class {capability_class} must implement both Composer\\Plugin\\Capability\\Capability and {capability_class_name}."
+                ),
+                code: 0,
+            }
+            .into());
+        }
+
+        match capability_class_name {
+            "Composer\\Plugin\\Capability\\CommandProvider" => {
+                Ok(Some(Box::new(PhpCommandProviderProxy::new(handle))))
+            }
+            "Composer\\Plugin\\Capability\\Capability" => {
+                Ok(Some(Box::new(PhpCapabilityProxy::new(handle))))
+            }
+            // A capability interface outside composer-plugin-api that the instanceof checks
+            // accepted (the plugin ships its own): no Rust adapter exists for its methods.
+            other => anyhow::bail!("capability {other} is recognized but not yet adapted"),
+        }
     }
 
     pub fn get_plugin_capabilities(
         &self,
         capability_class_name: &str,
-        ctor_args: IndexMap<String, PhpMixed>,
-    ) -> Vec<Box<dyn Capability>> {
-        // TODO(plugin): aggregate capabilities across all loaded plugins
+        ctor_args: IndexMap<String, PluginValue>,
+    ) -> anyhow::Result<Vec<Box<dyn Capability>>> {
         let mut capabilities: Vec<Box<dyn Capability>> = vec![];
         for plugin in self.get_plugins() {
-            if let Ok(Some(capability)) = self.get_plugin_capability(
+            if let Some(capability) = self.get_plugin_capability(
                 &*plugin.borrow(),
                 capability_class_name,
                 ctor_args.clone(),
-            ) {
+            )? {
                 capabilities.push(capability);
             }
         }
 
-        capabilities
+        Ok(capabilities)
     }
 
     fn parse_allowed_plugins(

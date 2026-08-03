@@ -6,22 +6,30 @@
 //! (`$composer`, `$io`) live in the R table here.
 
 use crate::autoload::ClassLoader;
+use crate::command::BaseCommand;
 use crate::composer::ComposerHandle;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
-use crate::event_dispatcher::{EventInterface, EventSubscriberInterface, SubscribedEventEntry};
+use crate::event_dispatcher::{
+    EventInterface, EventSubscriberInterface, SubscribedEventEntry, unwrap_php_result,
+};
 use crate::installer::InstallationManagerInterface;
 use crate::io::IOInterface;
 use crate::package::handle::AnyPackage;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
+use crate::plugin::capability::{Capability, CommandProvider};
+use crate::plugin::capable::Capable;
 use crate::plugin::plugin_interface::PluginInterface;
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, RepositoryInterfaceHandle,
     RepositoryManagerInterface,
 };
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_rpc::{
-    PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_php_method,
-    release_php_handle,
+    PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
+    call_function_with_dispatcher, call_php_method, release_php_handle,
 };
 use shirabe_php_shim::PhpMixed;
 
@@ -576,23 +584,7 @@ impl PhpPluginProxy {
         composer: &ComposerHandle,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
-        let composer_rhandle = register_composer_entity(composer);
-        let io_rhandle = register_io_entity(io);
-        let io_class = io_stub_class(io)?;
-        let args = vec![
-            PluginValue::RustHandle(RustObjHandle {
-                rhandle: composer_rhandle,
-                class: "Composer\\Composer".to_string(),
-                epoch: 0,
-                snapshot: None,
-            }),
-            PluginValue::RustHandle(RustObjHandle {
-                rhandle: io_rhandle,
-                class: io_class.to_string(),
-                epoch: 0,
-                snapshot: None,
-            }),
-        ];
+        let args = vec![composer_handle_value(composer), io_handle_value(io)?];
         let outcome = call_php_method(
             self.phandle,
             method,
@@ -675,6 +667,18 @@ impl PluginInterface for PhpPluginProxy {
         }
     }
 
+    fn as_capable(&self) -> Option<&dyn Capable> {
+        if self
+            .implements
+            .iter()
+            .any(|interface| interface == "Composer\\Plugin\\Capable")
+        {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
     fn __as_php_plugin_proxy(&self) -> Option<&PhpPluginProxy> {
         Some(self)
     }
@@ -709,6 +713,45 @@ impl EventSubscriberInterface for PhpPluginProxy {
             class: self.class.clone(),
             implements: self.implements.clone(),
         }
+    }
+}
+
+impl Capable for PhpPluginProxy {
+    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+        let outcome = call_php_method(
+            self.phandle,
+            "getCapabilities",
+            Vec::new(),
+            Some(&mut PluginRpcDispatcher::default()),
+        )?;
+        let value = match outcome {
+            Ok(value) => value,
+            // TODO(plugin): the original exception class is collapsed to RuntimeException on
+            // this side of the boundary.
+            Err(throw) => {
+                return Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+                    message: throw.message,
+                    code: throw.code,
+                }));
+            }
+        };
+        // PHP: `(array) $plugin->getCapabilities()` — the interface declares no return type,
+        // so a non-array return is cast. A handle in the map (a plugin putting an object among
+        // its capability values) has no PhpMixed image and fails the conversion explicitly.
+        let entries = match value {
+            PluginValue::Null => IndexMap::new(),
+            PluginValue::Array(map) | PluginValue::Object(map) => map
+                .into_iter()
+                .map(|(k, v)| Ok((String::from_utf8_lossy(&k).into_owned(), v.to_php_mixed()?)))
+                .collect::<anyhow::Result<_>>()?,
+            PluginValue::List(items) => items
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| Ok((i.to_string(), v.to_php_mixed()?)))
+                .collect::<anyhow::Result<_>>()?,
+            scalar => IndexMap::from([("0".to_string(), scalar.to_php_mixed()?)]),
+        };
+        Ok(entries)
     }
 }
 
@@ -796,5 +839,214 @@ impl Drop for PhpPluginProxy {
     fn drop(&mut self) {
         // A dead worker has nothing left to release.
         let _ = release_php_handle(self.phandle);
+    }
+}
+
+/// Wire value handing the shared Rust-side `$composer` to the child, interned in the R table.
+pub fn composer_handle_value(composer: &ComposerHandle) -> PluginValue {
+    rust_handle_value(register_composer_entity(composer), "Composer\\Composer")
+}
+
+/// Wire value handing the shared Rust-side `$io` to the child, interned in the R table.
+pub fn io_handle_value(
+    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+) -> anyhow::Result<PluginValue> {
+    let class = io_stub_class(io)?;
+    Ok(rust_handle_value(register_io_entity(io), class))
+}
+
+/// `is_a($obj, $class)` evaluated in the worker: the child's own class table answers, so
+/// parent classes are covered (a `PhpObjHandle`'s `implements` lists interfaces only).
+pub(crate) fn php_is_a(handle: &PhpObjHandle, class: &str) -> anyhow::Result<bool> {
+    let value = unwrap_php_result(call_function_with_dispatcher(
+        "is_a",
+        vec![
+            PluginValue::PhpHandle(handle.clone()),
+            PluginValue::string(class),
+        ],
+        Some(&mut PluginRpcDispatcher::default()),
+    ))?;
+    Ok(matches!(value, PluginValue::Bool(true)))
+}
+
+/// `Capability` adapter for a capability entity living in the PHP child process, for
+/// capability interfaces that add no methods of their own (the plain
+/// `Composer\Plugin\Capability\Capability` marker).
+#[derive(Debug)]
+pub struct PhpCapabilityProxy {
+    pub(crate) handle: PhpObjHandle,
+}
+
+impl PhpCapabilityProxy {
+    pub(crate) fn new(handle: PhpObjHandle) -> Self {
+        Self { handle }
+    }
+}
+
+impl Capability for PhpCapabilityProxy {}
+
+impl Drop for PhpCapabilityProxy {
+    fn drop(&mut self) {
+        let _ = release_php_handle(self.handle.phandle);
+    }
+}
+
+/// `CommandProvider` adapter for a capability entity living in the PHP child process.
+#[derive(Debug)]
+pub struct PhpCommandProviderProxy {
+    handle: PhpObjHandle,
+}
+
+impl PhpCommandProviderProxy {
+    pub(crate) fn new(handle: PhpObjHandle) -> Self {
+        Self { handle }
+    }
+}
+
+impl Capability for PhpCommandProviderProxy {
+    fn as_command_provider(&self) -> Option<&dyn CommandProvider> {
+        Some(self)
+    }
+}
+
+impl CommandProvider for PhpCommandProviderProxy {
+    fn get_commands(&self) -> anyhow::Result<Vec<Box<dyn BaseCommand>>> {
+        let value = unwrap_php_result(call_php_method(
+            self.handle.phandle,
+            "getCommands",
+            Vec::new(),
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        // PHP's getCommands(): array is unenforceable on the wire, and a
+        // `Vec<Box<dyn BaseCommand>>` asserts every element up front, so the two checks
+        // Application::getPluginCommands performs on the raw value live here, with its
+        // messages.
+        let items = match value {
+            PluginValue::List(items) => items,
+            PluginValue::Array(map) => map.into_values().collect(),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    shirabe_php_shim::UnexpectedValueException {
+                        message: format!(
+                            "Plugin capability {} failed to return an array from getCommands",
+                            self.handle.class
+                        ),
+                        code: 0,
+                    }
+                ));
+            }
+        };
+        let mut commands: Vec<Box<dyn BaseCommand>> = Vec::new();
+        for item in items {
+            let command_handle = match item {
+                PluginValue::PhpHandle(handle) => handle,
+                _ => return Err(invalid_command_error(&self.handle)),
+            };
+            if !php_is_a(&command_handle, "Composer\\Command\\BaseCommand")? {
+                return Err(invalid_command_error(&self.handle));
+            }
+            commands.push(Box::new(PhpCommandProxy::new(command_handle)?));
+        }
+        Ok(commands)
+    }
+}
+
+fn invalid_command_error(capability: &PhpObjHandle) -> anyhow::Error {
+    anyhow::anyhow!(shirabe_php_shim::UnexpectedValueException {
+        message: format!(
+            "Plugin capability {} returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects",
+            capability.class
+        ),
+        code: 0,
+    })
+}
+
+impl Drop for PhpCommandProviderProxy {
+    fn drop(&mut self) {
+        let _ = release_php_handle(self.handle.phandle);
+    }
+}
+
+/// `BaseCommand` adapter for a command entity living in the PHP child process. The Rust-side
+/// command state mirrors the child's (the name is read back over RPC at construction, after
+/// the PHP constructor ran `configure()`); running the command needs the PHP-side Symfony
+/// Application and is an explicit error until that exists.
+#[derive(Debug)]
+pub struct PhpCommandProxy {
+    base_command_data: crate::command::BaseCommandData,
+    handle: PhpObjHandle,
+}
+
+impl PhpCommandProxy {
+    pub(crate) fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
+        let data = crate::command::BaseCommandData::new(None);
+        let name = unwrap_php_result(call_php_method(
+            handle.phandle,
+            "getName",
+            Vec::new(),
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        match name {
+            PluginValue::Null => {}
+            PluginValue::String(bytes) => {
+                Command::set_name(&data, &String::from_utf8_lossy(&bytes))?;
+            }
+            other => {
+                return Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+                    message: format!(
+                        "{}::getName() returned an unsupported shape over RPC: {other:?}",
+                        handle.class
+                    ),
+                    code: 0,
+                }));
+            }
+        }
+        Ok(Self {
+            base_command_data: data,
+            handle,
+        })
+    }
+}
+
+impl Command for PhpCommandProxy {
+    fn execute(
+        &self,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        // TODO(plugin): executing a plugin-provided command requires the PHP-side Symfony
+        // Application; until then this is an explicit error, never a silent no-op.
+        Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+            message: format!(
+                "cannot execute plugin-provided command {} yet: running PHP commands is not supported",
+                self.handle.class
+            ),
+            code: 0,
+        }))
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for PhpCommandProxy {
+    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+        &self.base_command_data
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl shirabe_php_shim::PhpClass for PhpCommandProxy {
+    fn php_class_name(&self) -> &'static str {
+        // TODO(plugin): PhpClass reports only &'static str, but this command's PHP class name
+        // is runtime data (`self.handle.class`); callers needing get_class() must read the
+        // handle instead.
+        panic!("PhpCommandProxy has no static PHP class name; read the handle's class instead")
+    }
+}
+
+impl Drop for PhpCommandProxy {
+    fn drop(&mut self) {
+        let _ = release_php_handle(self.handle.phandle);
     }
 }
