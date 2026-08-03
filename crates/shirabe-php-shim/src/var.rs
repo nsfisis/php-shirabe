@@ -418,7 +418,10 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
             for (i, item) in items.iter().enumerate() {
                 var_export_indent(out, level + 1);
                 out.push_str(&format!("{} => ", i));
-                if matches!(item, PhpMixed::List(_) | PhpMixed::Array(_)) {
+                if matches!(
+                    item,
+                    PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
+                ) {
                     out.push('\n');
                     var_export_indent(out, level + 1);
                 }
@@ -437,7 +440,10 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
                     None => out.push_str(&var_export_string(k)),
                 }
                 out.push_str(" => ");
-                if matches!(v, PhpMixed::List(_) | PhpMixed::Array(_)) {
+                if matches!(
+                    v,
+                    PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
+                ) {
                     out.push('\n');
                     var_export_indent(out, level + 1);
                 }
@@ -447,9 +453,30 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
             var_export_indent(out, level);
             out.push(')');
         }
-        // TODO(php-runtime): PHP renders objects as "\Class::__set_state(array(...))"; PhpMixed::Object
-        // carries no class name.
-        PhpMixed::Object(_) => todo!(),
+        // TODO(php-runtime): PhpMixed::Object carries no class name, so this renders the
+        // stdClass shape "(object) array(...)" (PHP 8.5 oracle); any other class would render
+        // as "\Class::__set_state(array(...))" and cannot be distinguished here.
+        PhpMixed::Object(entries) => {
+            out.push_str("(object) array(\n");
+            for (k, v) in entries {
+                var_export_indent(out, level + 1);
+                // Object property keys are always exported as quoted strings, never as ints.
+                out.push(' ');
+                out.push_str(&var_export_string(k));
+                out.push_str(" => ");
+                if matches!(
+                    v,
+                    PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
+                ) {
+                    out.push('\n');
+                    var_export_indent(out, level + 1);
+                }
+                var_export_into(out, v, level + 1);
+                out.push_str(",\n");
+            }
+            var_export_indent(out, level);
+            out.push(')');
+        }
     }
 }
 
@@ -496,5 +523,46 @@ fn var_export_float(f: f64) -> String {
         s
     } else {
         format!("{}.0", s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// PHP 8.5.8 oracle: `var_export($v, true)` over stdClass-shaped objects, standalone and
+    /// nested in arrays (object properties indent one space deeper than array elements, and
+    /// keys stay quoted strings).
+    #[test]
+    fn test_var_export_object() {
+        assert_eq!(
+            "(object) array(\n)",
+            var_export(&PhpMixed::Object(IndexMap::new()), true)
+        );
+        let obj = PhpMixed::Object(IndexMap::from([
+            ("a".to_string(), PhpMixed::Int(1)),
+            (
+                "b".to_string(),
+                PhpMixed::List(vec![PhpMixed::Int(1), PhpMixed::Int(2)]),
+            ),
+        ]));
+        assert_eq!(
+            "(object) array(\n   'a' => 1,\n   'b' => \n  array (\n    0 => 1,\n    1 => 2,\n  ),\n)",
+            var_export(&obj, true)
+        );
+        let arr = PhpMixed::Array(IndexMap::from([(
+            "x".to_string(),
+            PhpMixed::Object(IndexMap::from([
+                ("a".to_string(), PhpMixed::Int(1)),
+                (
+                    "o".to_string(),
+                    PhpMixed::Object(IndexMap::from([("b".to_string(), PhpMixed::Int(2))])),
+                ),
+            ])),
+        )]));
+        assert_eq!(
+            "array (\n  'x' => \n  (object) array(\n     'a' => 1,\n     'o' => \n    (object) array(\n       'b' => 2,\n    ),\n  ),\n)",
+            var_export(&arr, true)
+        );
     }
 }
