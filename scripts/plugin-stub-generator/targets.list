@@ -10,3 +10,14 @@ Composer\IO\BaseIO
 Composer\IO\ConsoleIO
 Composer\IO\BufferIO
 Composer\IO\NullIO
+Composer\Package\BasePackage
+Composer\Package\Package
+Composer\Package\CompletePackage
+Composer\Package\RootPackage
+Composer\Repository\ArrayRepository
+Composer\Repository\WritableArrayRepository
+Composer\Repository\InstalledArrayRepository
+Composer\Repository\FilesystemRepository
+Composer\Repository\InstalledFilesystemRepository
+Composer\Repository\RepositoryManager
+Composer\Installer\InstallationManager

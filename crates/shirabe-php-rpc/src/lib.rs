@@ -594,6 +594,50 @@ const STUB_FILES: &[(&str, &str)] = &[
         "Composer/IO/NullIO.php",
         include_str!("../php/stubs/Composer/IO/NullIO.php"),
     ),
+    (
+        "Composer/Package/BasePackage.php",
+        include_str!("../php/stubs/Composer/Package/BasePackage.php"),
+    ),
+    (
+        "Composer/Package/Package.php",
+        include_str!("../php/stubs/Composer/Package/Package.php"),
+    ),
+    (
+        "Composer/Package/CompletePackage.php",
+        include_str!("../php/stubs/Composer/Package/CompletePackage.php"),
+    ),
+    (
+        "Composer/Package/RootPackage.php",
+        include_str!("../php/stubs/Composer/Package/RootPackage.php"),
+    ),
+    (
+        "Composer/Repository/ArrayRepository.php",
+        include_str!("../php/stubs/Composer/Repository/ArrayRepository.php"),
+    ),
+    (
+        "Composer/Repository/WritableArrayRepository.php",
+        include_str!("../php/stubs/Composer/Repository/WritableArrayRepository.php"),
+    ),
+    (
+        "Composer/Repository/InstalledArrayRepository.php",
+        include_str!("../php/stubs/Composer/Repository/InstalledArrayRepository.php"),
+    ),
+    (
+        "Composer/Repository/FilesystemRepository.php",
+        include_str!("../php/stubs/Composer/Repository/FilesystemRepository.php"),
+    ),
+    (
+        "Composer/Repository/InstalledFilesystemRepository.php",
+        include_str!("../php/stubs/Composer/Repository/InstalledFilesystemRepository.php"),
+    ),
+    (
+        "Composer/Repository/RepositoryManager.php",
+        include_str!("../php/stubs/Composer/Repository/RepositoryManager.php"),
+    ),
+    (
+        "Composer/Installer/InstallationManager.php",
+        include_str!("../php/stubs/Composer/Installer/InstallationManager.php"),
+    ),
 ];
 
 struct Worker {

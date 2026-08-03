@@ -51,14 +51,24 @@ the generator's vendor directory or the classifier report is unavailable.
   ones it extends, methods in declaration order; a concrete redeclaration in
   the class wins over the interface signature) followed by the class's own
   remaining public methods. A subclass stub declares only the methods whose
-  *name* is new relative to the inherited stub surface; an omitted override
-  must match the inherited parameter list (names, arity, defaults, passing
-  modes — type declarations may differ), otherwise generation fails.
+  *name* is new relative to the inherited stub surface — including methods of
+  interfaces the subclass adds; an omitted override must match the inherited
+  parameter list (names, arity, defaults, passing modes — type declarations
+  may differ), otherwise generation fails. PHP builtin interfaces
+  (`Countable`, `Stringable`, ...) contribute no closure entries of their own;
+  the class's own public methods already cover their surface.
 * Methods returning `self`/`static` perform the RPC and then `return $this;`
   to preserve identity instead of round-tripping the handle.
-* **Class constants and static methods** are materialized verbatim from the
-  real source (they read no instance state and run locally in the worker),
-  together with any non-public static helpers they call.
+* **Class constants, static methods and public static properties** are
+  materialized verbatim from the real source (they read no instance state and
+  run locally in the worker), together with any non-public static helpers the
+  methods call.
+* **Public instance properties** are not declared on the stub; `__get`/`__set`
+  forwarders carry every access (including dynamic-property writes) to the
+  Rust side, where an unsupported name is an explicit error.
+* **`__toString`** is forwarded like any other method. **`__clone`** emits a
+  throwing body: proxy clone semantics are an open design question, and
+  cloning must not silently share the Rust handle between two stubs.
 * **Imports**: the original file's `use` statements are kept in their original
   order, restricted to names the emitted stub references; signatures declared
   elsewhere (interface files) are re-spelled through that import table.
@@ -69,8 +79,8 @@ Generation fails — instead of emitting something quietly wrong — on:
 
 * a target missing from the classifier report, classified other than
   `rust-proxy`/`contract`, or a report carrying violations,
-* public properties (a stub cannot forward property access),
-* by-ref or variadic parameters, magic methods, static interface methods,
+* by-ref or variadic parameters, static interface methods, magic methods
+  other than `__toString`/`__clone`,
 * an omitted override diverging from the inherited stub signature,
 * a subclass target listed before its base class, or extending a class that is
   not a target,

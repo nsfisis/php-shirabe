@@ -52,6 +52,28 @@ final class Generator
         }
     PHP;
 
+    private const PROPERTY_FORWARDERS = <<<'PHP'
+        /** The real class declares public properties; every access forwards to the entity. */
+        public function __get($name)
+        {
+            return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        }
+
+        public function __set($name, $value): void
+        {
+            \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        }
+    PHP;
+
+    private const CLONE_THROW = <<<'PHP'
+        public function __clone()
+        {
+            // Cloning a proxy is an open design question; fail instead of silently sharing
+            // the Rust-side entity between two stub instances.
+            throw new \RuntimeException('Shirabe does not support cloning ' . static::class . ' inside the plugin process yet');
+        }
+    PHP;
+
     private Project $project;
 
     private NamePrinter $printer;
@@ -122,9 +144,20 @@ final class Generator
             $isRoot = true;
         }
 
+        $hasPublicInstanceProperties = false;
+        $staticProperties = [];
         foreach ($class->getProperties() as $property) {
-            if ($property->isPublic()) {
-                $this->errors[] = "$fqcn declares a public property; a proxy stub cannot forward property access";
+            if (!$property->isPublic()) {
+                continue;
+            }
+            if ($property->isStatic()) {
+                // A public static property reads no instance state; its real declaration is
+                // materialized so it lives locally in the worker, like static methods.
+                $staticProperties[] = $file->verbatim($property->getStartLine(), $property->getEndLine());
+            } else {
+                // Instance properties are entity state: the stub declares none and lets the
+                // __get/__set forwarders below carry every access to the Rust side.
+                $hasPublicInstanceProperties = true;
             }
         }
 
@@ -140,14 +173,24 @@ final class Generator
         $publicStatics = [];
         $nonPublicStatics = [];
         $ownInstanceMethods = [];
+        $cloneThrows = false;
         foreach ($class->getMethods() as $method) {
             $name = $method->name->toString();
             if ($name === '__construct') {
                 continue;
             }
             if (str_starts_with($name, '__')) {
-                if ($method->isPublic()) {
+                if ($method->isPublic() && !in_array($name, ['__toString', '__clone'], true)) {
                     $this->errors[] = "$fqcn::$name: magic methods cannot be proxied";
+                }
+                // __toString is an ordinary zero-argument call under a magic name and is
+                // forwarded below; __clone semantics are an open design question and the
+                // emitted body throws instead of silently sharing the Rust handle.
+                if ($method->isPublic() && $name === '__toString') {
+                    $ownInstanceMethods[$name] = $method;
+                }
+                if ($method->isPublic() && $name === '__clone') {
+                    $cloneThrows = true;
                 }
                 continue;
             }
@@ -183,12 +226,24 @@ final class Generator
             }
         } else {
             $surface = $this->surfaces[$parentFqcn];
-            if ($class->implements !== []) {
-                $this->errors[] = "$fqcn adds interfaces to a stub base class; this is not supported yet";
+            // Interfaces the subclass adds contribute the methods whose names are new
+            // relative to the inherited stub surface.
+            foreach ($this->interfaceClosure($class) as $interface) {
+                foreach ($interface->classLike->getMethods() as $method) {
+                    $name = $method->name->toString();
+                    if ($method->isStatic()) {
+                        $this->errors[] = "$fqcn: static interface method $name is not supported";
+                        continue;
+                    }
+                    if (!isset($surface[$name])) {
+                        $emitted[$name] ??= $method;
+                    }
+                }
             }
             foreach ($ownInstanceMethods as $name => $method) {
                 if (isset($surface[$name])) {
                     $this->checkOmittedOverride($fqcn, $name, $method, $file, $surface[$name]);
+                    unset($emitted[$name]);
                 } else {
                     $emitted[$name] = $method;
                 }
@@ -206,9 +261,11 @@ final class Generator
         if ($class->extends !== null) {
             $decl .= ' extends ' . $this->printer->renderName($class->extends, $file);
         }
+        $interfaces = array_map(fn (Name $n): string => $this->printer->renderName($n, $file), $class->implements);
         if ($isRoot) {
-            $interfaces = array_map(fn (Name $n): string => $this->printer->renderName($n, $file), $class->implements);
             $interfaces[] = '\ShirabeRustStub';
+        }
+        if ($interfaces !== []) {
             $decl .= ' implements ' . implode(', ', $interfaces);
         }
 
@@ -218,6 +275,15 @@ final class Generator
         }
         if ($constants !== []) {
             $members[] = implode("\n", $constants);
+        }
+        if ($staticProperties !== []) {
+            $members[] = implode("\n", $staticProperties);
+        }
+        if ($hasPublicInstanceProperties) {
+            $members[] = self::PROPERTY_FORWARDERS;
+        }
+        if ($cloneThrows) {
+            $members[] = self::CLONE_THROW;
         }
         $members = array_merge($members, $staticMethods, $methodTexts);
         $body = implode("\n\n", $members);
@@ -273,6 +339,11 @@ final class Generator
                 return;
             }
             $seen[$fqcn] = true;
+            if (interface_exists($fqcn, false) && (new \ReflectionClass($fqcn))->isInternal()) {
+                // A PHP builtin interface (Countable, Stringable, ...) has no source file to
+                // read; the class's own public methods already cover its surface.
+                return;
+            }
             $file = $this->project->sourceFor($fqcn);
             if (!$file->classLike instanceof Interface_) {
                 $this->errors[] = "$fqcn is implemented as an interface but is not one";
