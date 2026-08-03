@@ -195,8 +195,15 @@ impl LoaderInterface for ValidatingArrayLoader {
             let license_val = self.config.borrow()["license"].clone();
             // validate main data types
             if is_array(&license_val) || is_string(&license_val) {
+                // PHP: `(array) $this->config['license']` — an array (list-shaped included)
+                // stays as-is; only a scalar is wrapped.
                 let mut licenses: IndexMap<String, PhpMixed> = match &license_val {
                     PhpMixed::Array(m) => m.clone(),
+                    PhpMixed::List(items) => items
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| (i.to_string(), v.clone()))
+                        .collect(),
                     other => {
                         let mut m = IndexMap::new();
                         m.insert("0".to_string(), other.clone());
