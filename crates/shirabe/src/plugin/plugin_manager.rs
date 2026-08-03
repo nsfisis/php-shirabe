@@ -1,8 +1,4 @@
 //! ref: composer/src/Composer/Plugin/PluginManager.php
-//!
-//! TODO(plugin): the entire plugin manager subsystem is part of the Plugin API
-//! and is not implemented in Phase A. The structure is mirrored verbatim so
-//! future plugin support can fill in the runtime hooks.
 
 use crate::composer::PartialComposerHandle;
 use crate::composer::{ComposerHandle, ComposerWeakHandle};

@@ -1005,7 +1005,7 @@ impl ProcessExecutor {
     }
 }
 
-/// Phase B helper trait: convert various command argument forms into `PhpMixed`.
+/// Helper trait: convert various command argument forms into `PhpMixed`.
 pub trait IntoExecCommand {
     fn into_exec_command(self) -> PhpMixed;
 }
@@ -1187,7 +1187,7 @@ impl<'a> IntoExecOutput<'a> for Box<dyn FnMut(&str, &str) -> bool> {
     fn write_back(&mut self, _value: String) {}
 }
 
-/// Phase B helper: accept either `i64` or `PhpMixed` for `set_timeout`.
+/// Helper: accept either `i64` or `PhpMixed` for `set_timeout`.
 pub trait ToTimeoutSeconds {
     fn to_timeout_seconds(self) -> i64;
 }

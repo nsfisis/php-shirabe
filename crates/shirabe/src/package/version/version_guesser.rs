@@ -20,8 +20,8 @@ use shirabe_php_shim::{
 };
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
-/// with a test double. PHP has no such interface; this exists only to allow mocking the concrete
-/// `VersionGuesser` (a Phase C seam).
+/// with a test double. PHP has no such interface; this exists only to allow mocking the
+/// concrete `VersionGuesser`.
 pub trait VersionGuesserInterface: std::fmt::Debug {
     fn guess_version(
         &mut self,

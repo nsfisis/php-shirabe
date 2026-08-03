@@ -235,8 +235,8 @@ impl SymfonyStyle {
                 .unwrap()
                 .ask(&mut *input, self.output.clone(), question)
         };
-        // PHP `askQuestion` returns the answer directly; exceptions propagate. Phase B
-        // collapses the double `Result` by panicking on either error.
+        // PHP `askQuestion` returns the answer directly; exceptions propagate. The double
+        // `Result` is collapsed here by panicking on either error.
         let answer = answer
             .expect("question helper error")
             .expect("missing input");

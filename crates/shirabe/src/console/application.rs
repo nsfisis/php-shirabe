@@ -2391,10 +2391,10 @@ impl ApplicationHandle {
                                         // TODO(plugin): `new $dummy($script)` instantiates the
                                         // user's PHP command class in-process and registers the
                                         // live object on this Application; hosting a PHP-owned
-                                        // command here needs the PHP-side Application / command
-                                        // proxying of the plugin milestones. The shim
-                                        // class_exists above never recognizes user classes, so
-                                        // this arm is currently unreachable.
+                                        // command here needs a PHP-side Symfony Application and
+                                        // command proxying, neither of which exists yet. The
+                                        // shim class_exists above never recognizes user
+                                        // classes, so this arm is currently unreachable.
                                         let _ = shirabe_php_shim::instantiate_class(
                                             &dummy_str,
                                             vec![PhpMixed::String(script.clone())],
@@ -2850,7 +2850,7 @@ impl ApplicationHandle {
                 if Terminal::has_stty_available() {
                     // TODO(phase-c): registers SIGINT/SIGTERM handlers that restore the stty mode via
                     // shell_exec('stty ...'). pcntl signal handlers have no faithful Rust
-                    // equivalent in Phase A.
+                    // equivalent yet.
                     let _stty_mode = shirabe_php_shim::shell_exec("stty -g");
                     for _signal in [shirabe_php_shim::SIGINT, shirabe_php_shim::SIGTERM] {
                         todo!("register signal handler to restore stty mode");

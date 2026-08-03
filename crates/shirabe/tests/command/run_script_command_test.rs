@@ -122,19 +122,19 @@ fn test_can_define_aliases() {
 }
 
 #[test]
-#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommand.php) as a live application command (todo!() in application.rs; PHP-side Application milestone). The EventDispatcher-side Command-class path alone cannot satisfy the direct invocation and its argument definitions"]
+#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommand.php) as a live application command (todo!() in application.rs; needs a PHP-side Symfony Application, which does not exist yet). The EventDispatcher-side Command-class path alone cannot satisfy the direct invocation and its argument definitions"]
 fn test_execution_of_simple_symfony_command() {
     // TODO(phase-d): the test invokes the script name as a top-level composer command, which
     // requires Application::do_run to import the user's PHP Command class (MyCommand.php) as a
-    // live application command (todo!() in application.rs; PHP-side Application milestone).
+    // live application command (todo!() in application.rs; needs a PHP-side Symfony Application, which does not exist yet).
     todo!()
 }
 
 #[test]
-#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommandWithDefinitions.php) as a live application command (todo!() in application.rs; PHP-side Application milestone). The EventDispatcher-side Command-class path alone cannot satisfy the direct invocation and its argument definitions"]
+#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommandWithDefinitions.php) as a live application command (todo!() in application.rs; needs a PHP-side Symfony Application, which does not exist yet). The EventDispatcher-side Command-class path alone cannot satisfy the direct invocation and its argument definitions"]
 fn test_execution_of_symfony_command_with_configuration() {
     // TODO(phase-d): the test invokes the script name as a top-level composer command, which
     // requires Application::do_run to import the user's PHP Command class (MyCommandWithDefinitions.php)
-    // as a live application command (todo!() in application.rs; PHP-side Application milestone).
+    // as a live application command (todo!() in application.rs; needs a PHP-side Symfony Application, which does not exist yet).
     todo!()
 }

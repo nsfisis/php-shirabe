@@ -999,8 +999,8 @@ impl Table {
         }
 
         // PHP returns a TableRows wrapping a generator that lazily yields row groups.
-        // The generator borrows $this to call fillCells(). In Phase A we precompute the
-        // row groups eagerly to preserve behavior, then hand them to TableRows.
+        // The generator borrows $this to call fillCells(). Here the row groups are
+        // precomputed eagerly to preserve behavior, then handed to TableRows.
         let mut row_groups: Vec<Vec<Row>> = Vec::new();
         for (row_key, row) in rows.into_iter().enumerate() {
             let row_key = row_key as i64;

@@ -576,7 +576,7 @@ impl Factory {
 
         // initialize composer
         //
-        // Phase C: build the whole Composer graph at once with Rc::new_cyclic so that
+        // The whole Composer graph is built at once with Rc::new_cyclic so that
         // back-references (the EventDispatcher's composer, etc.) can hold a
         // PartialComposerWeak (Weak<RefCell<InnerComposer>>). The closure cannot return a
         // Result, so construction errors are surfaced through `build_error`.
@@ -1444,7 +1444,7 @@ impl Factory {
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<HttpDownloader> {
-        // TODO(plugin): static `$warned` flag — port as a OnceCell or atomic in Phase B.
+        // TODO(plugin): static `$warned` flag — port as a OnceCell or atomic.
         static mut WARNED: bool = false;
         let mut disable_tls = false;
         // allow running the config command if disable-tls is in the arg list, even if openssl is missing, to allow disabling it via the config command

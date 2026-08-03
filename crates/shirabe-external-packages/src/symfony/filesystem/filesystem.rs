@@ -298,8 +298,8 @@ impl Filesystem {
 
     // TODO(phase-c): this only ports Symfony's readlink($path, $canonicalize = false) overload;
     // the $canonicalize = true branch (realpath()-based resolution, returning null if the path
-    // does not exist at all) is entirely unported. Per the phase B default-argument convention
-    // this should become a `read_link2` overload if that branch is ever needed.
+    // does not exist at all) is entirely unported. Following the numbered-suffix convention
+    // for PHP default arguments, it should become a `read_link2` overload if ever needed.
     fn read_link(&self, path: &str) -> String {
         // Symfony's readlink() with $canonicalize = false: returns null if the path is not a link.
         // TODO(phase-c): the Rust signature is non-Option, so the non-link case yields the path's

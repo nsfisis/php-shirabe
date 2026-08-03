@@ -63,8 +63,8 @@ impl CommandData {
     pub fn get_default_name() -> Option<String> {
         // TODO(phase-c): PHP uses ReflectionClass to read the #[AsCommand] attribute
         // and ReflectionProperty to check that `$defaultName` is declared on the late-static
-        // class itself (not inherited). Reflection-based late static binding cannot be
-        // reproduced in Phase A; human review needed for the porting strategy.
+        // class itself (not inherited). Reflection-based late static binding has no direct
+        // Rust equivalent; human review needed for the porting strategy.
         todo!()
     }
 

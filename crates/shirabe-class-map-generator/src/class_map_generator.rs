@@ -144,9 +144,7 @@ impl ClassMapGenerator {
             }
         } else {
             // $path is already an array or Traversable of SplFileInfo
-            todo!(
-                "non-string path (Traversable/array of SplFileInfo) is not yet handled in Phase A"
-            )
+            todo!("non-string path (Traversable/array of SplFileInfo) is not handled yet")
         };
 
         let cwd = realpath(&getcwd().unwrap_or_default()).unwrap_or_default();

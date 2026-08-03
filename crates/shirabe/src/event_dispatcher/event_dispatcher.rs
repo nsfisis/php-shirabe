@@ -1649,9 +1649,9 @@ try {{
 /// Rust-side [`ClassLoader`]), and at most one live event handle is exposed per dispatched
 /// call.
 ///
-/// TODO(plugin): this per-call scope stands in for the persistent R table of the plugin
-/// activation milestone; a stub retained by the script beyond the call observes an unknown
-/// handle error instead of the live object.
+/// TODO(plugin): this per-call scope stands in for persistent R-table registration; a stub
+/// retained by the script beyond the call observes an unknown handle error instead of the
+/// live object.
 struct ScriptRpcDispatcher<'a> {
     loader: Option<ClassLoader>,
     event: Option<(u64, &'a dyn EventInterface)>,

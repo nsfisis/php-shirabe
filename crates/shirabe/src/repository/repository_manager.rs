@@ -131,7 +131,8 @@ impl RepositoryManager {
         cleaned_config.shift_remove("exclude");
         cleaned_config.shift_remove("canonical");
 
-        // Phase B: implement dynamic class instantiation by class name
+        // PHP instantiates `new $class(...)` dynamically; the port matches on the known
+        // repository class names instead.
         let repository = self.create_repository_by_class(&class, cleaned_config)?;
 
         if let Some(filter_config) = filter_config {
@@ -191,7 +192,7 @@ impl RepositoryManager {
                 )?,
             )),
             other => todo!(
-                "Phase B: dynamic class instantiation by class name: {}",
+                "dynamic class instantiation is not implemented for repository class {}",
                 other
             ),
         }
