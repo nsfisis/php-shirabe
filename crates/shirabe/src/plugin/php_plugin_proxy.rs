@@ -90,8 +90,8 @@ pub(crate) fn io_stub_class(
     } else if any.downcast_ref::<crate::io::null_io::NullIO>().is_some() {
         Ok("Composer\\IO\\NullIO")
     } else {
-        // TODO(plugin): only the IO classes with hand-written proxy stubs can cross the
-        // boundary until a stub generator exists.
+        // TODO(plugin): only IO implementations with a generated proxy stub can cross the
+        // boundary; the rest are an explicit error until stubs of their own are generated.
         Err(anyhow::anyhow!(
             "no proxy stub class is available for this IO implementation"
         ))

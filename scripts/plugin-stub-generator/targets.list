@@ -1,0 +1,12 @@
+# Classes emitted as proxy stubs into crates/shirabe-php-rpc/php/stubs/. One FQCN per
+# line; the output path is derived from the FQCN. Every entry must be classified as
+# rust-proxy or contract in the classifier report, and stub base classes must precede
+# their subclasses.
+Composer\EventDispatcher\Event
+Composer\Script\Event
+Composer\PartialComposer
+Composer\Composer
+Composer\IO\BaseIO
+Composer\IO\ConsoleIO
+Composer\IO\BufferIO
+Composer\IO\NullIO
