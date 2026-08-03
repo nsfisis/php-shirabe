@@ -94,6 +94,38 @@ fn test_subscriber_listener_returning_false_sets_return_code() {
 }
 
 #[test]
+fn test_remove_plugin_removes_its_subscribed_listeners() {
+    if !php_runtime_available() {
+        return;
+    }
+    let _worker = lock_php_worker();
+    let set_up = set_up();
+    install_subscriber_plugin(&set_up);
+
+    assert_eq!(0, dispatch(&set_up, "post-install-cmd"));
+
+    let plugin = set_up
+        .pm
+        .borrow()
+        .get_plugins()
+        .iter()
+        .find(|p| p.borrow().get_class_name() == "Subscriber\\Plugin")
+        .expect("the subscriber plugin is registered")
+        .clone();
+    set_up.pm.borrow_mut().remove_plugin(&plugin).unwrap();
+
+    // removePlugin removed the plugin's `[$subscriber, 'onPostInstall']` listener, so the
+    // second dispatch produces no further output.
+    let return_code = dispatch(&set_up, "post-install-cmd");
+
+    assert_eq!(0, return_code);
+    assert_eq!(
+        "activate subscriber-v1\nsubscriber saw post-install-cmd\n",
+        set_up.io.borrow().get_output()
+    );
+}
+
+#[test]
 fn test_unrelated_event_does_not_reach_the_subscriber() {
     if !php_runtime_available() {
         return;

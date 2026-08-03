@@ -772,9 +772,19 @@ impl PluginManager {
             .borrow_mut()
             .deactivate(self.composer_full(), self.io.clone())?;
 
-        // TODO(plugin): remove_listener accepts any callable/object in PHP; here we have
-        // a plugin instance and need to translate to a Callable, which is not portable
-        // without runtime reflection.
+        // PHP passes the plugin object itself; its cross-RPC identity (the P-table handle) is
+        // carried by the subscriber accessor, and `addSubscriber` is the only source of
+        // listeners capturing a plugin object today.
+        // TODO(plugin): a plugin registering `[$this, 'method']` listeners directly through an
+        // EventDispatcher proxy would have no removal path here; no such RPC surface exists yet.
+        let subscriber_handle = removed
+            .borrow()
+            .as_event_subscriber()
+            .map(|s| s.subscriber_handle());
+        if let Some(handle) = subscriber_handle {
+            let event_dispatcher = self.composer_full().borrow().get_event_dispatcher();
+            event_dispatcher.borrow_mut().remove_listener(&handle);
+        }
         Ok(())
     }
 

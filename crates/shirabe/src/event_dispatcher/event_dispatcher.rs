@@ -1205,25 +1205,21 @@ try {{
             .push(listener);
     }
 
-    pub fn remove_listener(&mut self, listener: &Callable) {
-        for (_event_name, priorities) in self.listeners.iter_mut() {
-            for (_priority, listeners) in priorities.iter_mut() {
-                let mut to_remove: Vec<usize> = Vec::new();
-                for (index, candidate) in listeners.iter().enumerate() {
-                    let same = match (listener, candidate) {
-                        (Callable::String(a), Callable::String(b)) => a == b,
-                        // TODO(plugin): array callable identity (compare object refs)
-                        _ => false,
-                    };
-                    let array_obj_match = matches!(candidate, Callable::ArrayCallable(_, _))
-                        && matches!(listener, Callable::ArrayCallable(_, _));
-                    if same || array_obj_match {
-                        to_remove.push(index);
-                    }
-                }
-                for idx in to_remove.into_iter().rev() {
-                    listeners.remove(idx);
-                }
+    /// PHP's parameter is `callable|object`; every caller in Composer and its test suite
+    /// passes an object, and no `Callable` shape holds a bare object, so the parameter is
+    /// narrowed to the object's cross-RPC identity (its P-table handle). Of PHP's two match
+    /// conditions only `$candidate[0] === $listener` can fire for an object listener; it maps
+    /// to phandle equality on `Callable::PhpMethod`.
+    pub fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle) {
+        for priorities in self.listeners.values_mut() {
+            for listeners in priorities.values_mut() {
+                // TODO(plugin): an `ArrayCallable`'s object half is a `PhpMixed` without
+                // cross-RPC identity, so `$candidate[0] === $listener` is undecidable for it;
+                // only `PhpMethod` candidates are compared.
+                listeners.retain(|candidate| match candidate {
+                    Callable::PhpMethod(handle, _) => handle.phandle != listener.phandle,
+                    _ => true,
+                });
             }
         }
     }
@@ -1791,6 +1787,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
     ) -> anyhow::Result<i64>;
     fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
     fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()>;
+    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle);
     fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
 }
 
@@ -1829,6 +1826,10 @@ impl EventDispatcherInterface for EventDispatcher {
 
     fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()> {
         self.add_subscriber(subscriber)
+    }
+
+    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle) {
+        self.remove_listener(listener);
     }
 
     fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool {

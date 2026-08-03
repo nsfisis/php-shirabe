@@ -194,6 +194,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
     ) -> anyhow::Result<()> {
         Ok(())
     }
+    fn remove_listener(&mut self, _listener: &shirabe_php_rpc::PhpObjHandle) {}
     fn has_event_listeners(&mut self, _event: &dyn EventInterface) -> bool {
         false
     }
