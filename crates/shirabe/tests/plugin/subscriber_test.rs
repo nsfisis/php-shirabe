@@ -104,12 +104,18 @@ fn test_remove_plugin_removes_its_subscribed_listeners() {
 
     assert_eq!(0, dispatch(&set_up, "post-install-cmd"));
 
+    // The worker is shared across tests: when another test already defined the plugin class,
+    // this install registered it under a `_composer_tmpN` rename (as upstream does).
     let plugin = set_up
         .pm
         .borrow()
         .get_plugins()
         .iter()
-        .find(|p| p.borrow().get_class_name() == "Subscriber\\Plugin")
+        .find(|p| {
+            p.borrow()
+                .get_class_name()
+                .starts_with("Subscriber\\Plugin")
+        })
         .expect("the subscriber plugin is registered")
         .clone();
     set_up.pm.borrow_mut().remove_plugin(&plugin).unwrap();
