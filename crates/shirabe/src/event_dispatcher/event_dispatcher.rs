@@ -1727,8 +1727,37 @@ pub(crate) fn dispatch_event_method(
                 "isDevMode is only available on script events".to_string(),
             )),
         },
-        // TODO(plugin): getComposer/getIO/stopPropagation and the rest need full proxying
-        // of the object graph an event exposes, which does not exist yet.
+        "getComposer" => match event.as_any().downcast_ref::<ScriptEvent>() {
+            Some(script_event) => {
+                let composer = script_event.get_composer().upgrade().ok_or_else(|| {
+                    runtime_throw("the Composer instance of this event is gone".to_string())
+                })?;
+                let rhandle = crate::plugin::php_plugin_proxy::register_composer_entity(&composer);
+                Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
+                    rhandle,
+                    "Composer\\Composer",
+                ))
+            }
+            None => Err(runtime_throw(
+                "getComposer is only available on script events".to_string(),
+            )),
+        },
+        "getIO" => match event.as_any().downcast_ref::<ScriptEvent>() {
+            Some(script_event) => {
+                let io = script_event.get_io();
+                let class = crate::plugin::php_plugin_proxy::io_stub_class(&io)
+                    .map_err(|error| runtime_throw(error.to_string()))?;
+                let rhandle = crate::plugin::php_plugin_proxy::register_io_entity(&io);
+                Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
+                    rhandle, class,
+                ))
+            }
+            None => Err(runtime_throw(
+                "getIO is only available on script events".to_string(),
+            )),
+        },
+        // TODO(plugin): stopPropagation and the rest need full proxying of the object graph
+        // an event exposes, which does not exist yet.
         other => Err(runtime_throw(format!(
             "the Event method `{other}` is not available over RPC yet"
         ))),

@@ -9,19 +9,46 @@ use crate::autoload::ClassLoader;
 use crate::composer::ComposerHandle;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
 use crate::event_dispatcher::{EventInterface, EventSubscriberInterface, SubscribedEventEntry};
+use crate::installer::InstallationManagerInterface;
 use crate::io::IOInterface;
+use crate::package::handle::AnyPackage;
+use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::plugin_interface::PluginInterface;
+use crate::repository::{
+    InstalledArrayRepository, InstalledFilesystemRepository, RepositoryInterfaceHandle,
+    RepositoryManagerInterface,
+};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_php_method,
     release_php_handle,
 };
+use shirabe_php_shim::PhpMixed;
 
 /// A Rust-side entity a PHP proxy stub points back to.
 #[derive(Debug, Clone)]
 enum RustEntity {
     Composer(ComposerHandle),
     Io(std::rc::Rc<std::cell::RefCell<dyn IOInterface>>),
+    InstallationManager(std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>),
+    RepositoryManager(std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>),
+    Repository(RepositoryInterfaceHandle),
+    Package(std::rc::Rc<std::cell::RefCell<AnyPackage>>),
+}
+
+/// The pointer identity backing R-table interning: the same shared instance must always cross
+/// the boundary as the same handle (`===` in the child).
+fn entity_ptr_id(entity: &RustEntity) -> usize {
+    match entity {
+        RustEntity::Composer(composer) => {
+            std::rc::Rc::as_ptr(composer.as_rc()) as *const () as usize
+        }
+        RustEntity::Io(io) => std::rc::Rc::as_ptr(io) as *const () as usize,
+        RustEntity::InstallationManager(im) => std::rc::Rc::as_ptr(im) as *const () as usize,
+        RustEntity::RepositoryManager(rm) => std::rc::Rc::as_ptr(rm) as *const () as usize,
+        RustEntity::Repository(repository) => repository.ptr_id(),
+        RustEntity::Package(package) => std::rc::Rc::as_ptr(package) as *const () as usize,
+    }
 }
 
 thread_local! {
@@ -54,43 +81,83 @@ fn ensure_release_hook_installed() {
     });
 }
 
-/// Registers the Composer instance in the R table, interned by shared-pointer identity so the
-/// same instance always crosses the boundary as the same handle (`===` in the child).
-pub(crate) fn register_composer_entity(composer: &ComposerHandle) -> u64 {
+/// Registers an entity in the R table, interned by shared-pointer identity within its variant.
+fn register_entity(entity: RustEntity) -> u64 {
     ensure_release_hook_installed();
     R_TABLE.with(|table| {
         let mut table = table.borrow_mut();
-        let ptr = std::rc::Rc::as_ptr(composer.as_rc()) as *const () as usize;
-        for (rhandle, entity) in table.iter() {
-            if let RustEntity::Composer(existing) = entity
-                && std::rc::Rc::as_ptr(existing.as_rc()) as *const () as usize == ptr
-            {
+        let ptr = entity_ptr_id(&entity);
+        let discriminant = std::mem::discriminant(&entity);
+        for (rhandle, existing) in table.iter() {
+            if std::mem::discriminant(existing) == discriminant && entity_ptr_id(existing) == ptr {
                 return *rhandle;
             }
         }
         let rhandle = shirabe_php_rpc::alloc_rhandle();
-        table.insert(rhandle, RustEntity::Composer(composer.clone()));
+        table.insert(rhandle, entity);
         rhandle
     })
 }
 
-/// Registers an IO instance in the R table, interned like [`register_composer_entity`].
+/// Registers the Composer instance in the R table.
+pub(crate) fn register_composer_entity(composer: &ComposerHandle) -> u64 {
+    register_entity(RustEntity::Composer(composer.clone()))
+}
+
+/// Registers an IO instance in the R table.
 pub(crate) fn register_io_entity(io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> u64 {
-    ensure_release_hook_installed();
-    R_TABLE.with(|table| {
-        let mut table = table.borrow_mut();
-        let ptr = std::rc::Rc::as_ptr(io) as *const () as usize;
-        for (rhandle, entity) in table.iter() {
-            if let RustEntity::Io(existing) = entity
-                && std::rc::Rc::as_ptr(existing) as *const () as usize == ptr
-            {
-                return *rhandle;
-            }
-        }
-        let rhandle = shirabe_php_rpc::alloc_rhandle();
-        table.insert(rhandle, RustEntity::Io(io.clone()));
-        rhandle
+    register_entity(RustEntity::Io(io.clone()))
+}
+
+/// A `RustHandle` wire descriptor for a freshly registered (or re-interned) entity.
+pub(crate) fn rust_handle_value(rhandle: u64, class: &str) -> PluginValue {
+    PluginValue::RustHandle(RustObjHandle {
+        rhandle,
+        class: class.to_string(),
+        epoch: 0,
+        snapshot: None,
     })
+}
+
+/// The proxy stub class matching a package's concrete variant.
+fn package_stub_class(
+    package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
+) -> Result<&'static str, PhpThrow> {
+    match &*package.borrow() {
+        AnyPackage::Package(_) => Ok("Composer\\Package\\Package"),
+        AnyPackage::CompletePackage(_) => Ok("Composer\\Package\\CompletePackage"),
+        AnyPackage::RootPackage(_) => Ok("Composer\\Package\\RootPackage"),
+        // TODO(plugin): alias packages need proxy stubs of their own before they can cross.
+        AnyPackage::AliasPackage(_)
+        | AnyPackage::CompleteAliasPackage(_)
+        | AnyPackage::RootAliasPackage(_) => Err(runtime_throw(
+            "alias packages are not available over RPC yet".to_string(),
+        )),
+    }
+}
+
+/// The proxy stub class matching a repository's concrete type.
+fn repository_stub_class(repository: &RepositoryInterfaceHandle) -> Result<&'static str, PhpThrow> {
+    if repository.is::<InstalledFilesystemRepository>() {
+        Ok("Composer\\Repository\\InstalledFilesystemRepository")
+    } else if repository.is::<InstalledArrayRepository>() {
+        Ok("Composer\\Repository\\InstalledArrayRepository")
+    } else {
+        // TODO(plugin): the remaining repository classes get stubs on demand, driven by
+        // explicit errors from real plugins.
+        Err(runtime_throw(
+            "no proxy stub class is available for this repository over RPC yet".to_string(),
+        ))
+    }
+}
+
+/// Registers a package and returns its wire descriptor.
+pub(crate) fn package_handle_value(
+    package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
+) -> Result<PluginValue, PhpThrow> {
+    let class = package_stub_class(package)?;
+    let rhandle = register_entity(RustEntity::Package(package.clone()));
+    Ok(rust_handle_value(rhandle, class))
 }
 
 /// The PHP class name (= proxy stub class) of a Rust IO instance, for the `__class` field of
@@ -192,15 +259,203 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
         match entity {
             Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, &args),
-            Some(RustEntity::Composer(_)) => {
-                // TODO(plugin): the Composer object graph (getConfig, getRepositoryManager,
-                // ...) becomes reachable over RPC later.
-                Err(runtime_throw(format!(
-                    "the Composer method `{method_name}` is not available over RPC yet"
-                )))
+            Some(RustEntity::Composer(composer)) => {
+                dispatch_composer_method(&composer, method_name)
+            }
+            Some(RustEntity::InstallationManager(im)) => {
+                dispatch_installation_manager_method(&im, method_name, &args)
+            }
+            Some(RustEntity::RepositoryManager(rm)) => {
+                dispatch_repository_manager_method(&rm, method_name)
+            }
+            Some(RustEntity::Repository(repository)) => {
+                dispatch_repository_method(&repository, method_name)
+            }
+            Some(RustEntity::Package(package)) => {
+                dispatch_package_method(&package, method_name, &args)
             }
             None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
         }
+    }
+}
+
+fn dispatch_composer_method(
+    composer: &ComposerHandle,
+    method_name: &str,
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getRepositoryManager" => {
+            let rm = composer.borrow().get_repository_manager();
+            let rhandle = register_entity(RustEntity::RepositoryManager(rm));
+            Ok(rust_handle_value(
+                rhandle,
+                "Composer\\Repository\\RepositoryManager",
+            ))
+        }
+        "getInstallationManager" => {
+            let im = composer.borrow().get_installation_manager();
+            let rhandle = register_entity(RustEntity::InstallationManager(im));
+            Ok(rust_handle_value(
+                rhandle,
+                "Composer\\Installer\\InstallationManager",
+            ))
+        }
+        "getPackage" => {
+            let package = composer.borrow().get_package().as_rc().clone();
+            package_handle_value(&package)
+        }
+        // TODO(plugin): the remaining Composer object graph (getConfig, getLocker, ...)
+        // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
+        other => Err(runtime_throw(format!(
+            "the Composer method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+fn dispatch_repository_manager_method(
+    rm: &std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
+    method_name: &str,
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getLocalRepository" => {
+            let local = rm.borrow().get_local_repository();
+            let class = repository_stub_class(&local)?;
+            let rhandle = register_entity(RustEntity::Repository(local));
+            Ok(rust_handle_value(rhandle, class))
+        }
+        // TODO(plugin): the remaining RepositoryManager surface is widened on demand, driven
+        // by explicit errors from real plugins.
+        other => Err(runtime_throw(format!(
+            "the RepositoryManager method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+fn dispatch_repository_method(
+    repository: &RepositoryInterfaceHandle,
+    method_name: &str,
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getPackages" => {
+            let packages = repository.borrow_mut().get_packages().map_err(|error| {
+                // TODO(plugin): the original exception class is collapsed to RuntimeException
+                // on this side of the boundary.
+                runtime_throw(format!("getPackages failed over RPC: {error}"))
+            })?;
+            let mut items = Vec::with_capacity(packages.len());
+            for package in packages {
+                items.push(package_handle_value(package.as_rc())?);
+            }
+            Ok(PluginValue::List(items))
+        }
+        // TODO(plugin): the remaining RepositoryInterface surface is widened on demand,
+        // driven by explicit errors from real plugins.
+        other => Err(runtime_throw(format!(
+            "the repository method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+fn dispatch_package_method(
+    package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    let package = package.borrow();
+    let package = package.as_package_interface();
+    match method_name {
+        "getName" => Ok(PluginValue::string(package.get_name().to_string())),
+        "getType" => Ok(PluginValue::string(package.get_type())),
+        "getPrettyVersion" => Ok(PluginValue::string(
+            package.get_pretty_version().to_string(),
+        )),
+        "getExtra" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+            package.get_extra(),
+        ))),
+        "getFullPrettyVersion" => {
+            let truncate = match args.first() {
+                None => true,
+                Some(PluginValue::Bool(truncate)) => *truncate,
+                other => {
+                    return Err(runtime_throw(format!(
+                        "getFullPrettyVersion expects a bool truncate flag, got {other:?}"
+                    )));
+                }
+            };
+            let display_mode = match args.get(1) {
+                None | Some(PluginValue::Int(0)) => DisplayMode::SourceRefIfDev,
+                Some(PluginValue::Int(1)) => DisplayMode::SourceRef,
+                Some(PluginValue::Int(2)) => DisplayMode::DistRef,
+                other => {
+                    return Err(runtime_throw(format!(
+                        "getFullPrettyVersion expects a display mode of 0..=2, got {other:?}"
+                    )));
+                }
+            };
+            Ok(PluginValue::string(
+                package.get_full_pretty_version(truncate, display_mode),
+            ))
+        }
+        "getRequires" => {
+            let requires = package.get_requires();
+            if requires.is_empty() {
+                // An empty PHP array crosses the wire as a list.
+                Ok(PluginValue::List(Vec::new()))
+            } else {
+                // TODO(plugin): Link is a rust-snapshot value whose constraint field must
+                // materialize as a real composer/semver object in the child; the snapshot
+                // encoding does not exist yet.
+                Err(runtime_throw(
+                    "encoding Link values over RPC is not implemented yet".to_string(),
+                ))
+            }
+        }
+        // TODO(plugin): the remaining PackageInterface surface (setters included) is widened
+        // on demand, driven by explicit errors from real plugins.
+        other => Err(runtime_throw(format!(
+            "the package method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+fn dispatch_installation_manager_method(
+    im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getInstallPath" => {
+            let package = match args.first() {
+                Some(PluginValue::RustHandle(handle)) => {
+                    let entity = R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned());
+                    match entity {
+                        Some(RustEntity::Package(package)) => {
+                            PackageInterfaceHandle::from_rc_unchecked(package)
+                        }
+                        _ => {
+                            return Err(runtime_throw(format!(
+                                "getInstallPath expects a package handle, got Rust handle {}",
+                                handle.rhandle
+                            )));
+                        }
+                    }
+                }
+                other => {
+                    return Err(runtime_throw(format!(
+                        "getInstallPath expects a package argument, got {other:?}"
+                    )));
+                }
+            };
+            Ok(match im.borrow().get_install_path(package) {
+                Some(path) => PluginValue::string(path),
+                None => PluginValue::Null,
+            })
+        }
+        // TODO(plugin): the remaining InstallationManager surface is widened on demand,
+        // driven by explicit errors from real plugins.
+        other => Err(runtime_throw(format!(
+            "the InstallationManager method `{other}` is not available over RPC yet"
+        ))),
     }
 }
 
