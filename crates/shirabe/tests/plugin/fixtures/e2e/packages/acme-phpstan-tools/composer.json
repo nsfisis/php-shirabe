@@ -1,0 +1,5 @@
+{
+    "name": "acme/phpstan-tools",
+    "version": "1.0.0",
+    "description": "Package whose name mentions phpstan without being an extension; exercises the NOT_INSTALLED path."
+}

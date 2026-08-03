@@ -1,0 +1,11 @@
+{
+    "name": "acme/extension",
+    "version": "1.0.0",
+    "type": "phpstan-extension",
+    "description": "PHPStan extension fixture handled by phpstan/extension-installer.",
+    "extra": {
+        "phpstan": {
+            "includes": ["extension.neon"]
+        }
+    }
+}

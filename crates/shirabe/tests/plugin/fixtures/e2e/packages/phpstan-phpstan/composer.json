@@ -1,0 +1,5 @@
+{
+    "name": "phpstan/phpstan",
+    "version": "2.1.0",
+    "description": "Minimal stand-in for phpstan/phpstan used by the extension-installer E2E fixture."
+}

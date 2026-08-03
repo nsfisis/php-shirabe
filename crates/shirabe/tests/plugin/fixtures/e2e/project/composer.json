@@ -1,0 +1,71 @@
+{
+    "name": "shirabe/e2e-extension-installer",
+    "description": "E2E fixture project: install phpstan/extension-installer and let it generate its config.",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "phpstan/extension-installer",
+                "version": "1.4.3",
+                "type": "composer-plugin",
+                "license": [
+                    "MIT"
+                ],
+                "autoload": {
+                    "psr-4": {
+                        "PHPStan\\ExtensionInstaller\\": "src/"
+                    }
+                },
+                "require": {
+                    "php": "^7.2 || ^8.0",
+                    "composer-plugin-api": "^2.0",
+                    "phpstan/phpstan": "^1.9.0 || ^2.0"
+                },
+                "extra": {
+                    "class": "PHPStan\\ExtensionInstaller\\Plugin"
+                },
+                "dist": {
+                    "type": "path",
+                    "url": "../ext/phpstan-extension-installer-1.4.3"
+                },
+                "transport-options": {
+                    "symlink": false
+                }
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/phpstan-phpstan",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/acme-extension",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/acme-phpstan-tools",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "phpstan/extension-installer": "1.4.3",
+        "acme/extension": "1.0.0",
+        "acme/phpstan-tools": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        }
+    }
+}

@@ -1,0 +1,33 @@
+#!/bin/sh
+# Fetches the external plugin the E2E test runs against, into the git-ignored ext/
+# directory. The plugin is pinned to an immutable upstream commit and the extracted
+# files are verified by hash, so the test stays deterministic without the third-party
+# source ever entering this repository. Requires network once; the E2E test skips
+# itself while ext/ is absent.
+set -eu
+
+# phpstan/extension-installer 1.4.3
+commit=85e90b3942d06b2326fba0403ec24fe912372936
+dir="$(dirname "$0")/ext/phpstan-extension-installer-1.4.3"
+
+if [ -f "$dir/src/Plugin.php" ]; then
+    echo "already fetched: $dir"
+    exit 0
+fi
+
+mkdir -p "$dir"
+curl -fsSL "https://codeload.github.com/phpstan/extension-installer/tar.gz/$commit" \
+    | tar -xz -C "$dir" --strip-components=1
+
+# GitHub archives are content-addressed by the commit, but the archive encoding is not
+# guaranteed stable; the extracted files are what the test consumes, so they are what
+# gets pinned.
+(cd "$dir" && sha256sum -c --quiet) <<'EOF' || { rm -rf "$dir"; echo "hash mismatch; discarded the fetched tree" >&2; exit 1; }
+92d8a5f0f9da0ebe198fe466bc4efc1793d90d8da93efd912fdc9dc414a56885  LICENSE
+76197285d0c2a8dec7cff9f8562638bda879367829fd982281cba53068c7f153  README.md
+71f6125d095522d8b24925d9144d361b2419f41be6174607b026473ae65c2604  composer.json
+fc46b5548e9656fab230ed4b97fdf13b54712743d04498374d40ebae2610bac1  src/GeneratedConfig.php
+5803a3fb8c272d52848e4aa240707370e301fa081fc632b487fafacfe4985af7  src/Plugin.php
+EOF
+
+echo "fetched: $dir"
