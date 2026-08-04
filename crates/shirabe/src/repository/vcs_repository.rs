@@ -178,7 +178,7 @@ impl VcsRepository {
                 .iter()
                 .find(|(_, v)| **v == kind)
                 .map(|(name, _)| name.clone())
-                .unwrap_or_else(|| kind.php_class_name().to_string()),
+                .unwrap_or_else(|| kind.php_class_name()),
             None => String::new(),
         };
 

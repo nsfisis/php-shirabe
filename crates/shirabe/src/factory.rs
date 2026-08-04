@@ -903,11 +903,11 @@ impl Factory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
-    ) -> Option<PartialComposerHandle> {
+    ) -> anyhow::Result<Option<PartialComposerHandle>> {
         let factory = Self::default();
 
-        let config = Self::create_config(Some(io.clone()), None).ok()?;
-        factory.create_global_composer(io, &config, disable_plugins, disable_scripts, true)
+        let config = Self::create_config(Some(io.clone()), None)?;
+        Ok(factory.create_global_composer(io, &config, disable_plugins, disable_scripts, true))
     }
 
     fn add_local_repository(

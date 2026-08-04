@@ -559,7 +559,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
 }
 
 impl shirabe_php_shim::PhpClass for CommandData {
-    fn php_class_name(&self) -> &'static str {
+    fn php_class_name(&self) -> String {
         panic!(
             "php_class_name called on the base command state; concrete commands supply their class name"
         );

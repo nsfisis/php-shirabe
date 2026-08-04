@@ -910,7 +910,9 @@ impl Capability for PhpCommandProviderProxy {
 }
 
 impl CommandProvider for PhpCommandProviderProxy {
-    fn get_commands(&self) -> anyhow::Result<Vec<Box<dyn BaseCommand>>> {
+    fn get_commands(
+        &self,
+    ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>>> {
         let value = unwrap_php_result(call_php_method(
             self.handle.phandle,
             "getCommands",
@@ -936,7 +938,7 @@ impl CommandProvider for PhpCommandProviderProxy {
                 ));
             }
         };
-        let mut commands: Vec<Box<dyn BaseCommand>> = Vec::new();
+        let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>> = Vec::new();
         for item in items {
             let command_handle = match item {
                 PluginValue::PhpHandle(handle) => handle,
@@ -945,7 +947,9 @@ impl CommandProvider for PhpCommandProviderProxy {
             if !php_is_a(&command_handle, "Composer\\Command\\BaseCommand")? {
                 return Err(invalid_command_error(&self.handle));
             }
-            commands.push(Box::new(PhpCommandProxy::new(command_handle)?));
+            commands.push(std::rc::Rc::new(std::cell::RefCell::new(
+                PhpCommandProxy::new(command_handle)?,
+            )));
         }
         Ok(commands)
     }
@@ -968,9 +972,10 @@ impl Drop for PhpCommandProviderProxy {
 }
 
 /// `BaseCommand` adapter for a command entity living in the PHP child process. The Rust-side
-/// command state mirrors the child's (the name is read back over RPC at construction, after
-/// the PHP constructor ran `configure()`); running the command needs the PHP-side Symfony
-/// Application and is an explicit error until that exists.
+/// command state mirrors the child's list metadata (name, description, aliases, hidden flag —
+/// read back over RPC at construction, after the PHP constructor ran `configure()`); running
+/// the command needs the PHP-side Symfony Application and is an explicit error until that
+/// exists.
 #[derive(Debug)]
 pub struct PhpCommandProxy {
     base_command_data: crate::command::BaseCommandData,
@@ -980,30 +985,72 @@ pub struct PhpCommandProxy {
 impl PhpCommandProxy {
     pub(crate) fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
         let data = crate::command::BaseCommandData::new(None);
-        let name = unwrap_php_result(call_php_method(
-            handle.phandle,
-            "getName",
-            Vec::new(),
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
+        // TODO(plugin): the input definition (arguments/options) is not read back yet;
+        // `help` rendering and input parsing for this command need it.
+        let name = Self::call_metadata_getter(&handle, "getName")?;
         match name {
             PluginValue::Null => {}
             PluginValue::String(bytes) => {
                 Command::set_name(&data, &String::from_utf8_lossy(&bytes))?;
             }
-            other => {
-                return Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                    message: format!(
-                        "{}::getName() returned an unsupported shape over RPC: {other:?}",
-                        handle.class
-                    ),
-                    code: 0,
-                }));
+            other => return Err(Self::unsupported_shape(&handle, "getName", &other)),
+        }
+        let description = Self::call_metadata_getter(&handle, "getDescription")?;
+        match description {
+            PluginValue::String(bytes) => {
+                Command::set_description(&data, &String::from_utf8_lossy(&bytes));
             }
+            other => return Err(Self::unsupported_shape(&handle, "getDescription", &other)),
+        }
+        let aliases = Self::call_metadata_getter(&handle, "getAliases")?;
+        let alias_items = match aliases {
+            PluginValue::List(items) => items,
+            PluginValue::Array(map) => map.into_values().collect(),
+            other => return Err(Self::unsupported_shape(&handle, "getAliases", &other)),
+        };
+        let mut alias_names = Vec::new();
+        for alias in alias_items {
+            match alias {
+                PluginValue::String(bytes) => {
+                    alias_names.push(String::from_utf8_lossy(&bytes).into_owned());
+                }
+                other => return Err(Self::unsupported_shape(&handle, "getAliases", &other)),
+            }
+        }
+        Command::set_aliases(&data, alias_names)?;
+        let hidden = Self::call_metadata_getter(&handle, "isHidden")?;
+        match hidden {
+            PluginValue::Bool(hidden) => {
+                Command::set_hidden(&data, hidden);
+            }
+            other => return Err(Self::unsupported_shape(&handle, "isHidden", &other)),
         }
         Ok(Self {
             base_command_data: data,
             handle,
+        })
+    }
+
+    fn call_metadata_getter(handle: &PhpObjHandle, method: &str) -> anyhow::Result<PluginValue> {
+        unwrap_php_result(call_php_method(
+            handle.phandle,
+            method,
+            Vec::new(),
+            Some(&mut PluginRpcDispatcher::default()),
+        ))
+    }
+
+    fn unsupported_shape(
+        handle: &PhpObjHandle,
+        method: &str,
+        value: &PluginValue,
+    ) -> anyhow::Error {
+        anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+            message: format!(
+                "{}::{method}() returned an unsupported shape over RPC: {value:?}",
+                handle.class
+            ),
+            code: 0,
         })
     }
 }
@@ -1037,11 +1084,8 @@ impl BaseCommand for PhpCommandProxy {
 }
 
 impl shirabe_php_shim::PhpClass for PhpCommandProxy {
-    fn php_class_name(&self) -> &'static str {
-        // TODO(plugin): PhpClass reports only &'static str, but this command's PHP class name
-        // is runtime data (`self.handle.class`); callers needing get_class() must read the
-        // handle instead.
-        panic!("PhpCommandProxy has no static PHP class name; read the handle's class instead")
+    fn php_class_name(&self) -> String {
+        self.handle.class.clone()
     }
 }
 

@@ -150,7 +150,7 @@ impl CompleteCommand {
 
 fn get_class_of_command(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
     // LazyCommand is intentionally not ported.
-    command.borrow().php_class_name().to_string()
+    command.borrow().php_class_name()
 }
 
 fn get_definition_options(

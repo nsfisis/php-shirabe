@@ -9,5 +9,6 @@ use crate::plugin::capability::Capability;
 /// The sole implementor is the PHP capability proxy (Composer itself never implements a
 /// capability), so the method is fallible: the answer crosses the RPC boundary.
 pub trait CommandProvider: Capability {
-    fn get_commands(&self) -> anyhow::Result<Vec<Box<dyn BaseCommand>>>;
+    fn get_commands(&self)
+    -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>>>;
 }

@@ -283,7 +283,7 @@ impl Command for BaseCommandData {
 }
 
 impl PhpClass for BaseCommandData {
-    fn php_class_name(&self) -> &'static str {
+    fn php_class_name(&self) -> String {
         // Forwards to the base state's panicking implementation; concrete commands supply
         // their own class name through `impl_php_class!`.
         self.inner.php_class_name()
@@ -852,7 +852,7 @@ pub fn base_command_initialize(
         crate::factory::DisablePlugins::None
     };
     let composer = if composer.is_none() {
-        Factory::create_global(io.clone(), disable_plugins_kind, disable_scripts)
+        Factory::create_global(io.clone(), disable_plugins_kind, disable_scripts)?
     } else {
         composer
     };

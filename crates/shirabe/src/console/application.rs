@@ -416,13 +416,9 @@ impl Application {
             match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
                 Ok(c) => self.composer = Some(c.upcast()),
                 Err(e) => {
-                    if e.downcast_ref::<JsonValidationException>().is_some()
-                        || e.downcast_ref::<RuntimeException>().is_some()
+                    if e.downcast_ref::<shirabe_php_shim::InvalidArgumentException>()
+                        .is_some()
                     {
-                        if required {
-                            return Err(e);
-                        }
-                    } else {
                         if required {
                             self.io.write_error(&e.to_string());
                             if self.are_exceptions_caught() {
@@ -433,6 +429,19 @@ impl Application {
                             }
                             return Err(e);
                         }
+                    } else if e.downcast_ref::<JsonValidationException>().is_some()
+                        || e.downcast_ref::<RuntimeException>().is_some()
+                        // PHP's `catch (RuntimeException)` also catches subclasses;
+                        // NoSslException is the one Factory::create raises.
+                        || e.downcast_ref::<NoSslException>().is_some()
+                    {
+                        if required {
+                            return Err(e);
+                        }
+                    } else {
+                        // Anything else (e.g. seld/jsonlint's ParsingException) propagates
+                        // regardless of $required, feeding doRun's GithubActionError path.
+                        return Err(e);
                     }
                 }
             }
@@ -584,8 +593,53 @@ impl Application {
     fn get_plugin_commands(
         &mut self,
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
-        // TODO(plugin): plugin command discovery is part of the plugin API
-        Ok(vec![])
+        let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![];
+
+        let mut composer = self.get_composer(false, Some(false), None)?;
+        if composer.is_none() {
+            let disable_plugins = if self.disable_plugins_by_default {
+                crate::factory::DisablePlugins::All
+            } else {
+                crate::factory::DisablePlugins::None
+            };
+            composer = Factory::create_global(
+                self.io.clone(),
+                disable_plugins,
+                self.disable_scripts_by_default,
+            )?;
+        }
+
+        if let Some(composer) = composer {
+            let composer = composer
+                .as_full()
+                .expect("Factory::create and Factory::create_global build a full Composer");
+            let pm = composer.borrow().get_plugin_manager();
+            let mut ctor_args: IndexMap<String, shirabe_php_rpc::PluginValue> = IndexMap::new();
+            ctor_args.insert(
+                "composer".to_string(),
+                crate::plugin::composer_handle_value(&composer),
+            );
+            ctor_args.insert("io".to_string(), crate::plugin::io_handle_value(&self.io)?);
+            let capabilities = pm.borrow().get_plugin_capabilities(
+                "Composer\\Plugin\\Capability\\CommandProvider",
+                ctor_args,
+            )?;
+            for capability in capabilities {
+                let provider = capability.as_command_provider().expect(
+                    "get_plugin_capability builds a CommandProvider adapter for this capability class",
+                );
+                // The is_array / instanceof BaseCommand checks PHP performs on the raw
+                // getCommands value live in the adapter.
+                let new_commands = provider.get_commands()?;
+                commands.extend(
+                    new_commands.into_iter().map(|command| {
+                        command as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>
+                    }),
+                );
+            }
+        }
+
+        Ok(commands)
     }
 
     /// Get the working directory at startup time
@@ -2141,10 +2195,7 @@ impl ApplicationHandle {
                 for command in plugin_commands {
                     let cmd_name = command.borrow().get_name().unwrap_or_default();
                     if application.borrow_mut().has(&cmd_name) {
-                        // TODO(plugin): PHP uses get_class($command) for the skipped-command class
-                        // name. Plugin command discovery (get_plugin_commands) is unimplemented, so
-                        // this loop never runs; wire the concrete class name with the plugin API.
-                        let cls = String::new();
+                        let cls = command.borrow().php_class_name();
                         io.write_error(&format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
                     } else {
                         self.add(command)?;

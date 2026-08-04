@@ -670,7 +670,7 @@ fn test_command_provider_capability() {
     let commands = provider.get_commands().unwrap();
     assert_eq!(1, commands.len());
     // PHP: assertInstanceOf('Composer\Command\BaseCommand', $commands[0]) is witnessed by the
-    // element type of Vec<Box<dyn BaseCommand>>.
+    // element type of Vec<Rc<RefCell<dyn BaseCommand>>>.
 }
 
 // A hand-written stub is used in place of PHPUnit's
