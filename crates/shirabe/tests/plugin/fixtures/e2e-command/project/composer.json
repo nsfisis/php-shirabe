@@ -1,0 +1,24 @@
+{
+    "name": "shirabe/e2e-command-provider",
+    "description": "E2E fixture project: run a plugin-provided command against upstream Composer and Shirabe.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/command-provider": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/command-provider": true
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/command-provider",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin providing a command through the CommandProvider capability.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\CommandProvider\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\CommandProvider\\Plugin"
+    }
+}

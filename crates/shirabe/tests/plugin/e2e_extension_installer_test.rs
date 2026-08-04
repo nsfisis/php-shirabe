@@ -20,7 +20,7 @@ fn fixture_dir() -> PathBuf {
 /// The upstream Composer checkout used as the comparison oracle (and as the PHP runtime of
 /// the worker). Absent checkout means the oracle cannot run; the test returns early,
 /// following the convention of the non-mock tests in `shirabe-php-rpc`.
-fn upstream_composer_bin() -> Option<PathBuf> {
+pub(crate) fn upstream_composer_bin() -> Option<PathBuf> {
     let root = match std::env::var("SHIRABE_COMPOSER_PHP_DIR") {
         Ok(dir) => PathBuf::from(dir),
         Err(_) => Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer"),
@@ -33,7 +33,7 @@ fn upstream_composer_bin() -> Option<PathBuf> {
     }
 }
 
-fn copy_dir(from: &Path, to: &Path) {
+pub(crate) fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
     for entry in std::fs::read_dir(from).unwrap() {
         let entry = entry.unwrap();
