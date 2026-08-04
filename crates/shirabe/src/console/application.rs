@@ -2479,11 +2479,13 @@ impl ApplicationHandle {
                                         }
                                         // TODO(plugin): `new $dummy($script)` instantiates the
                                         // user's PHP command class in-process and registers the
-                                        // live object on this Application; hosting a PHP-owned
-                                        // command here needs a PHP-side Symfony Application and
-                                        // command proxying, neither of which exists yet. The
-                                        // shim class_exists above never recognizes user
-                                        // classes, so this arm is currently unreachable.
+                                        // live object on this Application. The worker-side
+                                        // console application and PhpCommandProxy exist now,
+                                        // but this arm is not wired to them: the class checks
+                                        // above use the shim class_exists, which never
+                                        // recognizes user classes, so the arm stays
+                                        // unreachable until the checks and the instantiation
+                                        // go through the worker.
                                         let _ = shirabe_php_shim::instantiate_class(
                                             &dummy_str,
                                             vec![PhpMixed::String(script.clone())],

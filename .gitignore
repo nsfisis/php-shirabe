@@ -1,2 +1,3 @@
 /target
 /crates/shirabe/tests/plugin/fixtures/e2e/ext/
+/crates/shirabe/tests/plugin/fixtures/e2e-normalize/ext/

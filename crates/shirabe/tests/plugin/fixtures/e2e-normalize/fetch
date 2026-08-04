@@ -1,0 +1,42 @@
+#!/bin/sh
+# Fetches the external packages the composer-normalize E2E test runs against, into the
+# git-ignored ext/ directory. Every package is pinned to an immutable upstream commit and the
+# extracted tree is verified by a content hash over all files, so the test stays deterministic
+# without any third-party source entering this repository. Requires network once; the E2E test
+# skips itself while ext/ is absent.
+set -eu
+
+base="$(dirname "$0")/ext"
+
+tree_hash() {
+    (cd "$1" && find . -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+}
+
+# <dir> <github repo> <commit> <tree hash>
+while read -r dir repo commit hash; do
+    target="$base/$dir"
+    if [ -d "$target" ]; then
+        echo "already fetched: $target"
+        continue
+    fi
+    mkdir -p "$target"
+    curl -fsSL "https://codeload.github.com/$repo/tar.gz/$commit" \
+        | tar -xz -C "$target" --strip-components=1
+    actual="$(tree_hash "$target")"
+    if [ "$actual" != "$hash" ]; then
+        rm -rf "$target"
+        echo "tree hash mismatch for $repo@$commit: got $actual; discarded the fetched tree" >&2
+        exit 1
+    fi
+    echo "fetched: $target"
+done <<'EOF'
+composer-normalize-2.52.0 ergebnis/composer-normalize 988f83f5e51a42cdd2337e5fcd935432f8dfa33c 5259a0371a2b571fab3018c8a6a5929883a669f516e1e8a3fb1cfb37e0803e2c
+json-1.6.0 ergebnis/json 7b56d2b5d9e897e75b43e2e753075a0904c921b1 faa07a09e62d6a47582f011744fae2d0f220ccdda157465d31b11b3c095c3605
+json-normalizer-4.10.1 ergebnis/json-normalizer 77961faf2c651c3f05977b53c6c68e8434febf62 edea5b84656b1ae172ca4e92ebe481ff3c22828d3637b36c76e65223c38e9dce
+json-pointer-3.8.0 ergebnis/json-pointer b58c3c468a7ff109fdf9a255f17de29ecbe5276c 5395f59f684babf62a33d721ef8ab49eaba3d1280786081b45c49c29fdea1562
+json-printer-3.8.1 ergebnis/json-printer 211d73fc7ec6daf98568ee6ed6e6d133dee8503e 72d8e6ca1a168229bb2a50524a00d0c0a3c69be5e65731d177b6b563503e6b9a
+json-schema-validator-4.5.1 ergebnis/json-schema-validator b739527a480a9e3651360ad351ea77e7e9019df2 a176d190b6517b0380edfe13e526289864849c8b1788dee19123560658fc0be4
+json-schema-6.10.0 jsonrainbow/json-schema 8b1308a9d7bdbdb20ce87ef920f82b4564bb2d33 8b6b7931f9072aabf599927cf92ecc171f37e6516c4075172b60a45baa276380
+php-enum-4.7.2 marc-mabe/php-enum bb426fcdd65c60fb3638ef741e8782508fda7eef 7bb6a4923625cd6353b95534b322f951acf0aef055054cffd99e97dcbf1778b5
+diff-1.3.0 localheinz/diff 33bd840935970cda6691c23fc7d94ae764c0734c 283c8104b38fc8428e0819d30ab5e94f4e8284293d79b994bba4fbf0e05ca86f
+EOF
