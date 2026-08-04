@@ -595,6 +595,8 @@ impl Application {
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
         let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![];
 
+        crate::plugin::reset_pending_plugin_command_handles();
+
         let mut composer = self.get_composer(false, Some(false), None)?;
         if composer.is_none() {
             let disable_plugins = if self.disable_plugins_by_default {
@@ -636,6 +638,42 @@ impl Application {
                         command as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>
                     }),
                 );
+            }
+
+            if !commands.is_empty() {
+                // Publish the handoff the worker-side console application boots from when one
+                // of these commands actually runs: the shared object graph, plus metadata
+                // mirrors of the built-in commands (plugin commands are not registered yet, so
+                // this snapshot is exactly the Rust-implemented set).
+                let mut seen: Vec<*const ()> = Vec::new();
+                let mut rust_commands: Vec<crate::plugin::RustCommandMetadata> = Vec::new();
+                for command in self.commands.values() {
+                    let ptr = std::rc::Rc::as_ptr(command) as *const ();
+                    if seen.contains(&ptr) {
+                        continue;
+                    }
+                    seen.push(ptr);
+                    let command = command.borrow();
+                    let Some(name) = command.get_name() else {
+                        continue;
+                    };
+                    rust_commands.push(crate::plugin::RustCommandMetadata {
+                        name,
+                        description: command.get_description(),
+                        aliases: command.get_aliases(),
+                        hidden: command.is_hidden(),
+                    });
+                }
+                crate::plugin::publish_console_application_context(
+                    &composer,
+                    &self.io,
+                    self.get_initial_working_directory(),
+                    self.disable_plugins_by_default,
+                    self.disable_scripts_by_default,
+                    rust_commands,
+                    crate::plugin::take_pending_plugin_command_handles(),
+                );
+                register_worker_reverse_application(self.me.clone());
             }
         }
 
@@ -3121,4 +3159,68 @@ fn borrow_output_mut(
     output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
 ) -> std::cell::RefMut<'_, dyn OutputInterface> {
     output.borrow_mut()
+}
+
+thread_local! {
+    /// The application answering `__shirabe_run_rust_command` callbacks from the plugin
+    /// worker's reverse command stubs; registered when plugin commands are collected.
+    static WORKER_REVERSE_APPLICATION: std::cell::RefCell<
+        Option<std::rc::Weak<std::cell::RefCell<Application>>>,
+    > = const { std::cell::RefCell::new(None) };
+}
+
+/// Registers the application the worker's reverse command stubs call back into.
+pub(crate) fn register_worker_reverse_application(
+    application: std::rc::Weak<std::cell::RefCell<Application>>,
+) {
+    WORKER_REVERSE_APPLICATION.with(|slot| *slot.borrow_mut() = Some(application));
+}
+
+/// Runs a built-in command on behalf of a plugin-provided command executing in the worker
+/// (the reverse half of the two-world command split): the stringified input the plugin passed
+/// is re-parsed here and the command runs against this side's application state — helper set
+/// included — writing to the same stdio the worker inherited.
+pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow::Result<i64> {
+    let application = WORKER_REVERSE_APPLICATION
+        .with(|slot| slot.borrow().as_ref().and_then(std::rc::Weak::upgrade))
+        .ok_or_else(|| {
+            anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+                message: format!(
+                    "cannot run command {name}: no application is registered for worker callbacks"
+                ),
+                code: 0,
+            })
+        })?;
+    let command = application.borrow_mut().find(name)?;
+    // PHP's `(string) $input` omits the command name when the input was built without an
+    // explicit `command` entry, but the merged definition binds the first positional token to
+    // the `command` argument, so the name is prepended when the first token is not this
+    // command.
+    let trimmed = input_line.trim();
+    let first_token = trimmed.split_whitespace().next().unwrap_or("");
+    let is_named = {
+        let command = command.borrow();
+        command.get_name().as_deref() == Some(first_token)
+            || command
+                .get_aliases()
+                .iter()
+                .any(|alias| alias == first_token)
+    };
+    let line = if is_named {
+        trimmed.to_string()
+    } else if trimmed.is_empty() {
+        name.to_string()
+    } else {
+        format!("{name} {trimmed}")
+    };
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            shirabe_external_packages::symfony::console::input::string_input::StringInput::new(
+                &line,
+            )?,
+        ));
+    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(ConsoleOutput::new(None, None, None)?),
+    );
+    command.borrow().run(input, output)
 }

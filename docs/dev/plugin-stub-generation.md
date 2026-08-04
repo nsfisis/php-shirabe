@@ -25,6 +25,12 @@ Inputs:
 
 * `targets.list` — the FQCNs to emit, stub base classes before their subclasses.
   Growing the stub set means adding a line here and regenerating.
+* the hand-written classes under `crates/shirabe-php-rpc/php/runtime/` (their
+  FQCNs derive from the file paths). These are two-world implementations with
+  behavior of their own — not mechanical proxies — so the generator never emits
+  them, but it accepts them as base classes of generated stubs (computing the
+  inherited surface from the real Composer class the runtime file mirrors) and
+  fails if a `targets.list` entry would shadow one.
 * the Composer checkout (`composer/`, override with `--composer-root=`); the
   generator locates sources through the checkout's own PSR-4 autoload map, so
   interfaces from vendor packages (e.g. `Psr\Log\LoggerInterface`) resolve too.
@@ -83,12 +89,19 @@ Generation fails — instead of emitting something quietly wrong — on:
   other than `__toString`/`__clone`,
 * an omitted override diverging from the inherited stub signature,
 * a subclass target listed before its base class, or extending a class that is
-  not a target,
+  neither a target nor provided by `php/runtime/`,
+* a target whose FQCN is also provided by `php/runtime/`,
 * non-public class constants (materializing them is unsupported so far).
 
 `generate-stubs` (in both modes) additionally fails when a `.php` file exists
-under the stubs directory that no target produces, or when `STUB_FILES` in
-`crates/shirabe-php-rpc/src/lib.rs` does not embed every generated file.
+under the stubs directory that no target produces, or when `STUB_FILES` /
+`RUNTIME_FILES` in `crates/shirabe-php-rpc/src/lib.rs` does not embed every
+generated stub / runtime file. It also cross-checks the handoff property table
+for `Composer\Console\Application` (declared in `generate-stubs` itself) against
+the real class: a property upstream adds without a handoff classification — or a
+table row the class no longer declares — fails generation, so the worker-side
+runtime application can never silently drop plugin-visible state after a
+Composer version bump.
 
 When a future Composer release adds a public member the emitter cannot handle,
 these assertions surface it at generation time; extending the emitter (or

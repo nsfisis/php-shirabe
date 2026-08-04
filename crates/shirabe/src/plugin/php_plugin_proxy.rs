@@ -42,6 +42,9 @@ enum RustEntity {
     RepositoryManager(std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>),
     Repository(RepositoryInterfaceHandle),
     Package(std::rc::Rc<std::cell::RefCell<AnyPackage>>),
+    EventDispatcher(
+        std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>,
+    ),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -56,6 +59,9 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::RepositoryManager(rm) => std::rc::Rc::as_ptr(rm) as *const () as usize,
         RustEntity::Repository(repository) => repository.ptr_id(),
         RustEntity::Package(package) => std::rc::Rc::as_ptr(package) as *const () as usize,
+        RustEntity::EventDispatcher(dispatcher) => {
+            std::rc::Rc::as_ptr(dispatcher) as *const () as usize
+        }
     }
 }
 
@@ -251,6 +257,27 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
                     None => PluginValue::Null,
                 });
             }
+            if method_name == "__shirabe_run_rust_command" {
+                let (name, input_line) = match (args.first(), args.get(1)) {
+                    (Some(PluginValue::String(name)), Some(PluginValue::String(line))) => (
+                        // TODO(phase-e): lossy UTF-8; command lines are bytes in PHP.
+                        String::from_utf8_lossy(name).into_owned(),
+                        String::from_utf8_lossy(line).into_owned(),
+                    ),
+                    _ => {
+                        return Err(runtime_throw(format!(
+                            "__shirabe_run_rust_command expects a command name and an input line, got {args:?}"
+                        )));
+                    }
+                };
+                return match crate::console::application::run_worker_reverse_command(
+                    &name,
+                    &input_line,
+                ) {
+                    Ok(code) => Ok(PluginValue::Int(code)),
+                    Err(e) => Err(runtime_throw(format!("{e:#}"))),
+                };
+            }
             return Err(runtime_throw(format!(
                 "unknown runtime service method `{method_name}`"
             )));
@@ -282,6 +309,9 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             Some(RustEntity::Package(package)) => {
                 dispatch_package_method(&package, method_name, &args)
             }
+            Some(RustEntity::EventDispatcher(dispatcher)) => {
+                dispatch_event_dispatcher_method(&dispatcher, method_name, &args)
+            }
             None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
         }
     }
@@ -312,10 +342,53 @@ fn dispatch_composer_method(
             let package = composer.borrow().get_package().as_rc().clone();
             package_handle_value(&package)
         }
+        "getEventDispatcher" => {
+            let dispatcher = composer.borrow().get_event_dispatcher();
+            let rhandle = register_entity(RustEntity::EventDispatcher(dispatcher));
+            Ok(rust_handle_value(
+                rhandle,
+                "Composer\\EventDispatcher\\EventDispatcher",
+            ))
+        }
         // TODO(plugin): the remaining Composer object graph (getConfig, getLocker, ...)
         // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
         other => Err(runtime_throw(format!(
             "the Composer method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+fn dispatch_event_dispatcher_method(
+    dispatcher: &std::rc::Rc<
+        std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
+    >,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "dispatch" => {
+            let name = match args.first() {
+                Some(PluginValue::String(name)) => String::from_utf8_lossy(name).into_owned(),
+                other => {
+                    return Err(runtime_throw(format!(
+                        "dispatch expects an event name, got {other:?}"
+                    )));
+                }
+            };
+            let probe = crate::event_dispatcher::Event::from_name(name.clone());
+            if dispatcher.borrow_mut().has_event_listeners(&probe) {
+                // TODO(plugin): dispatching a worker-constructed event through the Rust-side
+                // dispatcher needs the event object (and the console input it carries) proxied
+                // back into this process; until then only the no-listener case — where
+                // upstream's dispatch is observably a no-op returning 0 — is supported.
+                return Err(runtime_throw(format!(
+                    "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
+                )));
+            }
+            Ok(PluginValue::Int(0))
+        }
+        other => Err(runtime_throw(format!(
+            "the EventDispatcher method `{other}` is not available over RPC yet"
         ))),
     }
 }
@@ -971,22 +1044,186 @@ impl Drop for PhpCommandProviderProxy {
     }
 }
 
+/// Metadata row for one Rust-implemented command, mirrored into the worker as a
+/// `\Shirabe\RustCommandStub` so a plugin-provided command can `find()` and invoke built-in
+/// commands (their execution crosses back into this process).
+#[derive(Debug)]
+pub(crate) struct RustCommandMetadata {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) aliases: Vec<String>,
+    pub(crate) hidden: bool,
+}
+
+impl RustCommandMetadata {
+    fn wire_value(&self) -> PluginValue {
+        let mut row: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
+        row.insert(b"name".to_vec(), PluginValue::string(self.name.clone()));
+        row.insert(
+            b"description".to_vec(),
+            PluginValue::string(self.description.clone()),
+        );
+        row.insert(
+            b"aliases".to_vec(),
+            PluginValue::List(
+                self.aliases
+                    .iter()
+                    .map(|alias| PluginValue::string(alias.clone()))
+                    .collect(),
+            ),
+        );
+        row.insert(b"hidden".to_vec(), PluginValue::Bool(self.hidden));
+        PluginValue::Array(row)
+    }
+}
+
+/// Handoff state for the worker-side console application (the `Composer\Console\Application`
+/// defined under the RPC crate's `php/runtime/`): assembled by
+/// `Application::get_plugin_commands` once the full command set is known, booted in the worker
+/// the first time a plugin-provided command actually runs.
+#[derive(Debug)]
+pub(crate) struct PhpConsoleApplicationContext {
+    composer: ComposerHandle,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    initial_working_directory: Option<String>,
+    disable_plugins_by_default: bool,
+    disable_scripts_by_default: bool,
+    rust_commands: Vec<RustCommandMetadata>,
+    /// Clones of the plugin command handles; ownership (and release) stays with the
+    /// `PhpCommandProxy` instances holding the originals.
+    plugin_commands: Vec<PhpObjHandle>,
+    app: std::cell::RefCell<Option<PhpObjHandle>>,
+}
+
+thread_local! {
+    /// Handles of the `PhpCommandProxy` instances built while `Application::get_plugin_commands`
+    /// collects providers; drained into the context it publishes.
+    static PENDING_COMMAND_HANDLES: std::cell::RefCell<Vec<PhpObjHandle>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+
+    /// The published context, read by `PhpCommandProxy::run` at execution time.
+    static CONSOLE_APP_CONTEXT: std::cell::RefCell<Option<std::rc::Rc<PhpConsoleApplicationContext>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Clears handles a failed earlier collection may have left behind.
+pub(crate) fn reset_pending_plugin_command_handles() {
+    PENDING_COMMAND_HANDLES.with(|handles| handles.borrow_mut().clear());
+}
+
+pub(crate) fn take_pending_plugin_command_handles() -> Vec<PhpObjHandle> {
+    PENDING_COMMAND_HANDLES.with(|handles| std::mem::take(&mut *handles.borrow_mut()))
+}
+
+pub(crate) fn publish_console_application_context(
+    composer: &ComposerHandle,
+    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    initial_working_directory: Option<String>,
+    disable_plugins_by_default: bool,
+    disable_scripts_by_default: bool,
+    rust_commands: Vec<RustCommandMetadata>,
+    plugin_commands: Vec<PhpObjHandle>,
+) {
+    let context = std::rc::Rc::new(PhpConsoleApplicationContext {
+        composer: composer.clone(),
+        io: io.clone(),
+        initial_working_directory,
+        disable_plugins_by_default,
+        disable_scripts_by_default,
+        rust_commands,
+        plugin_commands,
+        app: std::cell::RefCell::new(None),
+    });
+    CONSOLE_APP_CONTEXT.with(|slot| *slot.borrow_mut() = Some(context));
+}
+
+impl PhpConsoleApplicationContext {
+    /// Boots the worker-side application on first use and returns its handle.
+    fn booted_app(&self) -> anyhow::Result<PhpObjHandle> {
+        if let Some(app) = self.app.borrow().as_ref() {
+            return Ok(app.clone());
+        }
+        let mut config: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
+        config.insert(b"composer".to_vec(), composer_handle_value(&self.composer));
+        config.insert(b"io".to_vec(), io_handle_value(&self.io)?);
+        config.insert(
+            b"initialWorkingDirectory".to_vec(),
+            match &self.initial_working_directory {
+                Some(dir) => PluginValue::string(dir.clone()),
+                None => PluginValue::Null,
+            },
+        );
+        config.insert(
+            b"disablePluginsByDefault".to_vec(),
+            PluginValue::Bool(self.disable_plugins_by_default),
+        );
+        config.insert(
+            b"disableScriptsByDefault".to_vec(),
+            PluginValue::Bool(self.disable_scripts_by_default),
+        );
+        config.insert(
+            b"rustCommands".to_vec(),
+            PluginValue::List(
+                self.rust_commands
+                    .iter()
+                    .map(RustCommandMetadata::wire_value)
+                    .collect(),
+            ),
+        );
+        config.insert(
+            b"pluginCommands".to_vec(),
+            PluginValue::List(
+                self.plugin_commands
+                    .iter()
+                    .cloned()
+                    .map(PluginValue::PhpHandle)
+                    .collect(),
+            ),
+        );
+        let value = unwrap_php_result(call_function_with_dispatcher(
+            "__shirabe_console_application_boot",
+            vec![PluginValue::Array(config)],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        let app = match value {
+            PluginValue::PhpHandle(app) => app,
+            other => {
+                return Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+                    message: format!(
+                        "__shirabe_console_application_boot returned an unsupported shape over RPC: {other:?}"
+                    ),
+                    code: 0,
+                }));
+            }
+        };
+        *self.app.borrow_mut() = Some(app.clone());
+        Ok(app)
+    }
+}
+
+impl Drop for PhpConsoleApplicationContext {
+    fn drop(&mut self) {
+        if let Some(app) = self.app.borrow_mut().take() {
+            let _ = release_php_handle(app.phandle);
+        }
+    }
+}
+
 /// `BaseCommand` adapter for a command entity living in the PHP child process. The Rust-side
-/// command state mirrors the child's list metadata (name, description, aliases, hidden flag —
-/// read back over RPC at construction, after the PHP constructor ran `configure()`); running
-/// the command needs the PHP-side Symfony Application and is an explicit error until that
-/// exists.
+/// command state mirrors the child's metadata (name, description, aliases, hidden/proxy flags,
+/// help, usages and the input definition — read back over RPC at construction, after the PHP
+/// constructor ran `configure()`), so `list` and `help` render from local state; running the
+/// command forwards the whole input line to the worker-side console application.
 #[derive(Debug)]
 pub struct PhpCommandProxy {
     base_command_data: crate::command::BaseCommandData,
     handle: PhpObjHandle,
+    proxy_command: bool,
 }
 
 impl PhpCommandProxy {
     pub(crate) fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
         let data = crate::command::BaseCommandData::new(None);
-        // TODO(plugin): the input definition (arguments/options) is not read back yet;
-        // `help` rendering and input parsing for this command need it.
         let name = Self::call_metadata_getter(&handle, "getName")?;
         match name {
             PluginValue::Null => {}
@@ -1025,10 +1262,154 @@ impl PhpCommandProxy {
             }
             other => return Err(Self::unsupported_shape(&handle, "isHidden", &other)),
         }
+        let proxy_command = match Self::call_metadata_getter(&handle, "isProxyCommand")? {
+            PluginValue::Bool(proxy_command) => proxy_command,
+            other => return Err(Self::unsupported_shape(&handle, "isProxyCommand", &other)),
+        };
+        Self::read_back_definition(&handle, &data)?;
+        PENDING_COMMAND_HANDLES.with(|handles| handles.borrow_mut().push(handle.clone()));
         Ok(Self {
             base_command_data: data,
             handle,
+            proxy_command,
         })
+    }
+
+    /// Mirrors the command's input definition (plus help text and extra usages) into the
+    /// Rust-side command state, so `help`/`list` render it without touching the worker.
+    fn read_back_definition(
+        handle: &PhpObjHandle,
+        data: &crate::command::BaseCommandData,
+    ) -> anyhow::Result<()> {
+        use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
+        use shirabe_external_packages::symfony::console::input::input_definition::{
+            DefinitionItem, InputDefinition,
+        };
+        use shirabe_external_packages::symfony::console::input::input_option::InputOption;
+
+        let value = unwrap_php_result(call_function_with_dispatcher(
+            "__shirabe_read_command_definition",
+            vec![PluginValue::PhpHandle(handle.clone())],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        let mut map = match value {
+            PluginValue::Array(map) => map,
+            other => return Err(Self::unsupported_shape(handle, "getDefinition", &other)),
+        };
+        let field = |row: &mut IndexMap<Vec<u8>, PluginValue>, key: &str| -> PluginValue {
+            row.shift_remove(key.as_bytes())
+                .unwrap_or(PluginValue::Null)
+        };
+        let as_rows = |value: PluginValue| -> Vec<PluginValue> {
+            match value {
+                PluginValue::List(rows) => rows,
+                PluginValue::Array(map) => map.into_values().collect(),
+                _ => Vec::new(),
+            }
+        };
+
+        let mut items: Vec<DefinitionItem> = Vec::new();
+        for row in as_rows(field(&mut map, "arguments")) {
+            let mut row = match row {
+                PluginValue::Array(row) => row,
+                other => return Err(Self::unsupported_shape(handle, "getDefinition", &other)),
+            };
+            let (name, description) =
+                match (field(&mut row, "name"), field(&mut row, "description")) {
+                    (PluginValue::String(name), PluginValue::String(description)) => (
+                        String::from_utf8_lossy(&name).into_owned(),
+                        String::from_utf8_lossy(&description).into_owned(),
+                    ),
+                    (other, _) => {
+                        return Err(Self::unsupported_shape(handle, "getDefinition", &other));
+                    }
+                };
+            let required = matches!(field(&mut row, "required"), PluginValue::Bool(true));
+            let is_array = matches!(field(&mut row, "isArray"), PluginValue::Bool(true));
+            let mut mode = if required {
+                InputArgument::REQUIRED
+            } else {
+                InputArgument::OPTIONAL
+            };
+            if is_array {
+                mode |= InputArgument::IS_ARRAY;
+            }
+            let default = field(&mut row, "default").to_php_mixed()?;
+            items.push(DefinitionItem::InputArgument(InputArgument::new(
+                name,
+                Some(mode),
+                description,
+                default,
+            )?));
+        }
+        for row in as_rows(field(&mut map, "options")) {
+            let mut row = match row {
+                PluginValue::Array(row) => row,
+                other => return Err(Self::unsupported_shape(handle, "getDefinition", &other)),
+            };
+            let (name, description) =
+                match (field(&mut row, "name"), field(&mut row, "description")) {
+                    (PluginValue::String(name), PluginValue::String(description)) => (
+                        String::from_utf8_lossy(&name).into_owned(),
+                        String::from_utf8_lossy(&description).into_owned(),
+                    ),
+                    (other, _) => {
+                        return Err(Self::unsupported_shape(handle, "getDefinition", &other));
+                    }
+                };
+            let accept_value = matches!(field(&mut row, "acceptValue"), PluginValue::Bool(true));
+            let mut mode = if accept_value {
+                if matches!(field(&mut row, "isValueRequired"), PluginValue::Bool(true)) {
+                    InputOption::VALUE_REQUIRED
+                } else {
+                    InputOption::VALUE_OPTIONAL
+                }
+            } else {
+                InputOption::VALUE_NONE
+            };
+            if matches!(field(&mut row, "isArray"), PluginValue::Bool(true)) {
+                mode |= InputOption::VALUE_IS_ARRAY;
+            }
+            if matches!(field(&mut row, "isNegatable"), PluginValue::Bool(true)) {
+                mode |= InputOption::VALUE_NEGATABLE;
+            }
+            let shortcut = field(&mut row, "shortcut").to_php_mixed()?;
+            // `getDefault()` exposes the stored representation (`false` for VALUE_NONE), while
+            // the constructor only accepts null there; mirror the constructor's normalization.
+            let default = if accept_value {
+                field(&mut row, "default").to_php_mixed()?
+            } else {
+                PhpMixed::Null
+            };
+            items.push(DefinitionItem::InputOption(InputOption::new(
+                &name,
+                shortcut,
+                Some(mode),
+                description,
+                default,
+            )?));
+        }
+        data.command_data().set_definition(
+            shirabe_external_packages::symfony::console::command::command::SetDefinitionArg::Definition(
+                InputDefinition::new(items)?,
+            ),
+        );
+
+        match field(&mut map, "help") {
+            PluginValue::String(help) => {
+                Command::set_help(data, &String::from_utf8_lossy(&help));
+            }
+            other => return Err(Self::unsupported_shape(handle, "getHelp", &other)),
+        }
+        for usage in as_rows(field(&mut map, "usages")) {
+            match usage {
+                PluginValue::String(usage) => {
+                    Command::add_usage(data, &String::from_utf8_lossy(&usage));
+                }
+                other => return Err(Self::unsupported_shape(handle, "getUsages", &other)),
+            }
+        }
+        Ok(())
     }
 
     fn call_metadata_getter(handle: &PhpObjHandle, method: &str) -> anyhow::Result<PluginValue> {
@@ -1056,20 +1437,58 @@ impl PhpCommandProxy {
 }
 
 impl Command for PhpCommandProxy {
+    /// Forwards the whole run to the worker-side console application (the proxy-command idiom
+    /// the trait allows): the real Symfony machinery there performs input binding, validation,
+    /// interaction and execution against the live PHP command object, writing to the stdio the
+    /// worker inherited. The Rust-side `base_run` half must not run against the mirrored
+    /// definition, or binding and interaction would happen twice.
+    fn run(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let context = CONSOLE_APP_CONTEXT
+            .with(|slot| slot.borrow().clone())
+            .ok_or_else(|| {
+                anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+                    message: format!(
+                        "cannot run plugin-provided command {}: no worker-side console application context was published",
+                        self.handle.class
+                    ),
+                    code: 0,
+                })
+            })?;
+        let app = context.booted_app()?;
+        let input_line = input.borrow().__to_string();
+        let value = unwrap_php_result(call_function_with_dispatcher(
+            "__shirabe_run_console_application",
+            vec![PluginValue::PhpHandle(app), PluginValue::string(input_line)],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        match value {
+            PluginValue::Int(code) => Ok(code),
+            other => Err(Self::unsupported_shape(&self.handle, "run", &other)),
+        }
+    }
+
     fn execute(
         &self,
         _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        // TODO(plugin): executing a plugin-provided command requires the PHP-side Symfony
-        // Application; until then this is an explicit error, never a silent no-op.
+        // `run` above never reaches this template hook; a direct call would bypass the
+        // worker-side binding, so it stays an explicit error.
         Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
             message: format!(
-                "cannot execute plugin-provided command {} yet: running PHP commands is not supported",
+                "plugin-provided command {} executes in the PHP worker through run(); execute() must not be called directly",
                 self.handle.class
             ),
             code: 0,
         }))
+    }
+
+    fn is_proxy_command(&self) -> bool {
+        self.proxy_command
     }
 
     shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);

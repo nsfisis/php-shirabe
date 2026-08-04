@@ -93,22 +93,40 @@ final class Generator
      */
     private array $surfaces = [];
 
-    /** @param list<string> $targets */
+    /** @var array<string, true> */
+    private array $runtimeSet = [];
+
+    /**
+     * @param list<string> $targets
+     * @param list<string> $runtimeProvided FQCNs of the hand-written dual-mode classes under
+     *                                      php/runtime/; they may serve as stub base classes
+     *                                      but must never be generation targets themselves
+     */
     public function __construct(
         string $composerRoot,
         private readonly Report $report,
         private readonly array $targets,
+        private readonly array $runtimeProvided = [],
     ) {
         $this->project = new Project($composerRoot);
         $this->printer = new NamePrinter();
         foreach ($targets as $fqcn) {
             $this->targetSet[$fqcn] = true;
         }
+        foreach ($runtimeProvided as $fqcn) {
+            $this->runtimeSet[$fqcn] = true;
+        }
     }
 
     /** @return array<string, string> relative stub path => file content */
     public function generate(): array
     {
+        foreach ($this->runtimeProvided as $fqcn) {
+            if (isset($this->targetSet[$fqcn])) {
+                $this->errors[] = "$fqcn is both a stub target and provided by php/runtime/;"
+                    . ' the runtime definition would be shadowed by the generated stub';
+            }
+        }
         $files = [];
         foreach ($this->targets as $fqcn) {
             $files[str_replace('\\', '/', $fqcn) . '.php'] = $this->emitClass($fqcn);
@@ -117,6 +135,45 @@ final class Generator
             throw new GenerationError($this->errors);
         }
         return $files;
+    }
+
+    /**
+     * The stub surface a runtime-provided (hand-written, dual-mode) base class exposes,
+     * computed from the real Composer class the runtime file mirrors, so a generated subclass
+     * stub can omit the methods it inherits — the same records emitClass builds for generated
+     * parents.
+     *
+     * @return array<string, list<array{string, bool, string, bool, bool}>>
+     */
+    private function surfaceFromRealClass(string $fqcn): array
+    {
+        $file = $this->project->sourceFor($fqcn);
+        $class = $file->classLike;
+        if (!$class instanceof Class_) {
+            $this->errors[] = "$fqcn is not a class";
+            return [];
+        }
+        $surface = [];
+        $parentFqcn = $class->extends === null ? null : $this->resolvedName($class->extends);
+        if ($parentFqcn !== null) {
+            $surface = $this->surfaces[$parentFqcn] ?? $this->surfaceFromRealClass($parentFqcn);
+        }
+        foreach ($this->interfaceClosure($class) as $interface) {
+            foreach ($interface->classLike->getMethods() as $method) {
+                if ($method->isStatic()) {
+                    continue;
+                }
+                $surface[$method->name->toString()] ??= $this->fingerprint($method, $file);
+            }
+        }
+        foreach ($class->getMethods() as $method) {
+            $name = $method->name->toString();
+            if ($method->isStatic() || !$method->isPublic() || str_starts_with($name, '__')) {
+                continue;
+            }
+            $surface[$name] = $this->fingerprint($method, $file);
+        }
+        return $surface;
     }
 
     private function emitClass(string $fqcn): string
@@ -136,8 +193,12 @@ final class Generator
         $parentFqcn = $class->extends === null ? null : $this->resolvedName($class->extends);
         $isRoot = $parentFqcn === null;
         if ($parentFqcn !== null && !isset($this->targetSet[$parentFqcn])) {
-            $this->errors[] = "$fqcn extends $parentFqcn, which is not a stub target";
-            $isRoot = true;
+            if (isset($this->runtimeSet[$parentFqcn])) {
+                $this->surfaces[$parentFqcn] ??= $this->surfaceFromRealClass($parentFqcn);
+            } else {
+                $this->errors[] = "$fqcn extends $parentFqcn, which is not a stub target";
+                $isRoot = true;
+            }
         }
         if (!$isRoot && !isset($this->surfaces[$parentFqcn])) {
             $this->errors[] = "$fqcn must come after its base class $parentFqcn in targets.list";

@@ -2,7 +2,7 @@
 # line; the output path is derived from the FQCN. Every entry must be classified as
 # rust-proxy or contract in the classifier report, and stub base classes must precede
 # their subclasses.
-Composer\EventDispatcher\Event
+Composer\EventDispatcher\EventDispatcher
 Composer\Script\Event
 Composer\PartialComposer
 Composer\Composer

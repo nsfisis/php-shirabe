@@ -18,8 +18,13 @@ const SHIRABE_MAX_FRAME_LEN = 268435456; // 256 MiB, mirrored on the Rust side.
 /** Marker interface every Rust-proxy stub class implements. */
 interface ShirabeRustStub
 {
-    /** @return array{__rhandle: int, __class: string, __epoch: int} */
-    public function __shirabeRustHandleDescriptor(): array;
+    /**
+     * Null when this instance holds no Rust handle: a dual-mode class (see php/runtime/) that
+     * was constructed natively in this process crosses the wire as a P-table entity instead.
+     *
+     * @return ?array{__rhandle: int, __class: string, __epoch: int}
+     */
+    public function __shirabeRustHandleDescriptor(): ?array;
 }
 
 /** Interns proxy stubs so the same Rust handle always yields the same stub instance. */
@@ -199,7 +204,11 @@ final class ShirabeRpcRuntime
     public static function toWire($value)
     {
         if ($value instanceof ShirabeRustStub) {
-            return $value->__shirabeRustHandleDescriptor();
+            $descriptor = $value->__shirabeRustHandleDescriptor();
+            if ($descriptor !== null) {
+                return $descriptor;
+            }
+            // A natively-constructed dual-mode instance falls through to the P table below.
         }
         if (is_object($value)) {
             return ShirabePhpObjectRegistry::descriptor($value);
@@ -615,6 +624,61 @@ ShirabeRpcRuntime::$dispatch = [
             throw new RuntimeException('__shirabe_get_property expects a handle argument');
         }
         return $obj->{$args[1]};
+    },
+    // Builds the worker-side Composer\Console\Application (the runtime/ definition, not the
+    // real class) from the Rust handoff; the caller keeps the returned handle and runs
+    // plugin-provided commands through __shirabe_run_console_application.
+    '__shirabe_console_application_boot' => static function ($args) {
+        return \Composer\Console\Application::__shirabeBoot($args[0]);
+    },
+    // Runs one command line (the stringified input of the Rust-side run) through a booted
+    // worker-side application; output goes to the inherited stdio, the exit code returns
+    // over the wire, and a command failure propagates as an RPC throw (catchExceptions is
+    // off on the booted application).
+    '__shirabe_run_console_application' => static function ($args) {
+        [$app, $inputString] = $args;
+        if (!$app instanceof \Composer\Console\Application) {
+            throw new RuntimeException('__shirabe_run_console_application expects an application handle');
+        }
+        return $app->run(new \Symfony\Component\Console\Input\StringInput($inputString));
+    },
+    // Reads a command's input definition (plus help text and extra usages) as plain data, so
+    // the Rust side can mirror it for `help`/`list` rendering without executing anything.
+    '__shirabe_read_command_definition' => static function ($args) {
+        $command = $args[0];
+        if (!$command instanceof \Symfony\Component\Console\Command\Command) {
+            throw new RuntimeException('__shirabe_read_command_definition expects a command handle');
+        }
+        $definition = $command->getDefinition();
+        $arguments = [];
+        foreach ($definition->getArguments() as $argument) {
+            $arguments[] = [
+                'name' => $argument->getName(),
+                'required' => $argument->isRequired(),
+                'isArray' => $argument->isArray(),
+                'description' => $argument->getDescription(),
+                'default' => $argument->getDefault(),
+            ];
+        }
+        $options = [];
+        foreach ($definition->getOptions() as $option) {
+            $options[] = [
+                'name' => $option->getName(),
+                'shortcut' => $option->getShortcut(),
+                'acceptValue' => $option->acceptValue(),
+                'isValueRequired' => $option->isValueRequired(),
+                'isArray' => $option->isArray(),
+                'isNegatable' => $option->isNegatable(),
+                'description' => $option->getDescription(),
+                'default' => $option->getDefault(),
+            ];
+        }
+        return [
+            'arguments' => $arguments,
+            'options' => $options,
+            'help' => $command->getHelp(),
+            'usages' => $command->getUsages(),
+        ];
     },
 ];
 

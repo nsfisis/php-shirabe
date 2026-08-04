@@ -563,8 +563,8 @@ const GLUE_SCRIPT: &str = include_str!("../php/worker.php");
 /// generator's `--check` mode verifies both the file contents and this list).
 const STUB_FILES: &[(&str, &str)] = &[
     (
-        "Composer/EventDispatcher/Event.php",
-        include_str!("../php/stubs/Composer/EventDispatcher/Event.php"),
+        "Composer/EventDispatcher/EventDispatcher.php",
+        include_str!("../php/stubs/Composer/EventDispatcher/EventDispatcher.php"),
     ),
     (
         "Composer/Script/Event.php",
@@ -640,6 +640,24 @@ const STUB_FILES: &[(&str, &str)] = &[
     ),
 ];
 
+/// Hand-written worker-side classes (two-world implementations with behavior of their own, not
+/// mechanical proxies), written into the same autoload directory as the generated stubs so the
+/// prepended stub autoloader resolves their FQCNs ahead of any real class file.
+const RUNTIME_FILES: &[(&str, &str)] = &[
+    (
+        "Composer/Console/Application.php",
+        include_str!("../php/runtime/Composer/Console/Application.php"),
+    ),
+    (
+        "Composer/EventDispatcher/Event.php",
+        include_str!("../php/runtime/Composer/EventDispatcher/Event.php"),
+    ),
+    (
+        "Shirabe/RustCommandStub.php",
+        include_str!("../php/runtime/Shirabe/RustCommandStub.php"),
+    ),
+];
+
 struct Worker {
     stream: UnixStream,
     // Also queried for its exit status when a socket read/write fails, to tell a dead worker
@@ -707,7 +725,7 @@ fn spawn_worker() -> anyhow::Result<Worker> {
     std::fs::write(&script_path, GLUE_SCRIPT)?;
 
     let stubs_dir = tempdir.path().join("stubs");
-    for (relative_path, contents) in STUB_FILES {
+    for (relative_path, contents) in STUB_FILES.iter().chain(RUNTIME_FILES) {
         let path = stubs_dir.join(relative_path);
         std::fs::create_dir_all(path.parent().expect("stub paths have a parent"))?;
         std::fs::write(&path, contents)?;
