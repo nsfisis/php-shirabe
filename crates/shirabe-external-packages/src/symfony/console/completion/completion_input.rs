@@ -294,6 +294,10 @@ impl crate::symfony::console::input::input_interface::InputInterface for Complet
         self.inner.get_first_argument()
     }
 
+    fn __to_string(&self) -> String {
+        self.to_string()
+    }
+
     fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
         crate::symfony::console::input::input_interface::InputInterface::has_parameter_option(
             &self.inner,

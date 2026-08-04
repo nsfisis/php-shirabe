@@ -43,6 +43,10 @@ pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     fn set_interactive(&mut self, interactive: bool);
 
+    /// PHP's `(string) $input` (the `__toString` magic method every Symfony input implements);
+    /// implementors forward to their `Display` impl.
+    fn __to_string(&self) -> String;
+
     /// Models PHP's `$input instanceof StreamableInputInterface` check. Streamable inputs override
     /// this to return `Some(self)`; everything else falls back to `None`.
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {

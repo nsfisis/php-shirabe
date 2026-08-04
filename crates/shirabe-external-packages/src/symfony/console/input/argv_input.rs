@@ -619,6 +619,10 @@ impl InputInterface for ArgvInput {
         self.inner.set_interactive(interactive)
     }
 
+    fn __to_string(&self) -> String {
+        self.to_string()
+    }
+
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
         Some(self)
     }
