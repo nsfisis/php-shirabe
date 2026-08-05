@@ -2020,24 +2020,13 @@ impl ShowCommand {
             let out = match license {
                 None => license_id.clone(),
                 Some(license) => {
-                    // SpdxLicenses::getLicenseByIdentifier returns [0 => fullname, 1 => osiApproved, 2 => url].
-                    let list = license.as_list();
-                    let fullname = list
-                        .and_then(|l| l.first())
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                        .to_string();
-                    let is_osi =
-                        list.and_then(|l| l.get(1)).and_then(|v| v.as_bool()) == Some(true);
-                    let url = list
-                        .and_then(|l| l.get(2))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                        .to_string();
-                    if is_osi {
-                        format!("{} ({}) (OSI approved) {}", fullname, license_id, url)
+                    if license.is_osi_approved {
+                        format!(
+                            "{} ({}) (OSI approved) {}",
+                            license.name, license_id, license.url
+                        )
                     } else {
-                        format!("{} ({}) {}", fullname, license_id, url)
+                        format!("{} ({}) {}", license.name, license_id, license.url)
                     }
                 }
             };
@@ -2268,23 +2257,11 @@ impl ShowCommand {
                     match license {
                         None => PhpMixed::String(license_id),
                         Some(l) => {
-                            // PHP shape: ['name' => $license[0], 'osi' => $licenseId, 'url' => $license[2]].
-                            // Note 'osi' is the license id string, not the OSI-approved flag.
-                            let list = l.as_list();
-                            let name = list
-                                .and_then(|x| x.first())
-                                .and_then(|v| v.as_string())
-                                .unwrap_or("")
-                                .to_string();
-                            let url = list
-                                .and_then(|x| x.get(2))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or("")
-                                .to_string();
+                            // The 'osi' key holds the license id string, not the OSI-approved flag.
                             let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            m.insert("name".to_string(), PhpMixed::String(name));
+                            m.insert("name".to_string(), PhpMixed::String(l.name));
                             m.insert("osi".to_string(), PhpMixed::String(license_id));
-                            m.insert("url".to_string(), PhpMixed::String(url));
+                            m.insert("url".to_string(), PhpMixed::String(l.url));
                             PhpMixed::Array(m.into_iter().collect())
                         }
                     }

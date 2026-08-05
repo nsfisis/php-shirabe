@@ -1,7 +1,6 @@
 //! ref: composer/vendor/composer/spdx-licenses/src/SpdxLicenses.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 // PHP reads the resource files from `dirname(__DIR__) . '/res'` at runtime via
 // file_get_contents. Composer's res directory ships with the vendored package; embed it at compile
@@ -31,6 +30,14 @@ pub struct SpdxLicenses {
     exceptions_by_length_desc: Vec<String>,
 }
 
+#[derive(Debug)]
+pub struct LicenseMetadata {
+    pub name: String,
+    pub is_osi_approved: bool,
+    pub url: String,
+    pub is_deprecated_license_id: bool,
+}
+
 impl Default for SpdxLicenses {
     fn default() -> Self {
         Self::new()
@@ -53,24 +60,18 @@ impl SpdxLicenses {
     }
 
     /// Returns license metadata by license identifier.
-    ///
-    /// The returned list is in the form of:
-    ///   [ 0 => full name, 1 => osi certified, 2 => link to license text, 3 => deprecation status ]
-    pub fn get_license_by_identifier(&self, identifier: &str) -> Option<PhpMixed> {
+    pub fn get_license_by_identifier(&self, identifier: &str) -> Option<LicenseMetadata> {
         let key = identifier.to_lowercase();
 
         let (identifier, name, is_osi_approved, is_deprecated_license_id) =
             self.licenses.get(&key)?;
 
-        Some(PhpMixed::List(vec![
-            PhpMixed::String(name.clone()),
-            PhpMixed::Bool(*is_osi_approved),
-            PhpMixed::String(format!(
-                "https://spdx.org/licenses/{}.html#licenseText",
-                identifier
-            )),
-            PhpMixed::Bool(*is_deprecated_license_id),
-        ]))
+        Some(LicenseMetadata {
+            name: name.clone(),
+            is_osi_approved: *is_osi_approved,
+            url: format!("https://spdx.org/licenses/{}.html#licenseText", identifier),
+            is_deprecated_license_id: *is_deprecated_license_id,
+        })
     }
 
     pub fn validate(&self, license: &str) -> bool {

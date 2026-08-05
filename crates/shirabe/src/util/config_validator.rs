@@ -116,33 +116,23 @@ impl ConfigValidator {
             let license_validator = SpdxLicenses::new();
             for license in &licenses {
                 let spdx_license = license_validator.get_license_by_identifier(license);
-                if let Some(spdx_license) = spdx_license {
-                    // PHP: $spdxLicense[3] — fourth element is the deprecated flag.
-                    let is_deprecated = match &spdx_license {
-                        PhpMixed::List(l) => l.get(3).and_then(|v| v.as_bool()).unwrap_or(false),
-                        _ => false,
-                    };
-                    if is_deprecated {
-                        if Preg::is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license) {
-                            warnings.push(format!(
-                                "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
-                                license,
-                                license.replace('+', "")
-                            ));
-                        } else if Preg::is_match(
-                            php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"),
+                if spdx_license.is_some_and(|l| l.is_deprecated_license_id) {
+                    if Preg::is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license) {
+                        warnings.push(format!(
+                            "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
                             license,
-                        ) {
-                            warnings.push(format!(
-                                "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
-                                license, license, license
-                            ));
-                        } else {
-                            warnings.push(format!(
-                                "License \"{}\" is a deprecated SPDX license identifier, see https://spdx.org/licenses/",
-                                license
-                            ));
-                        }
+                            license.replace('+', "")
+                        ));
+                    } else if Preg::is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license) {
+                        warnings.push(format!(
+                            "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
+                            license, license, license
+                        ));
+                    } else {
+                        warnings.push(format!(
+                            "License \"{}\" is a deprecated SPDX license identifier, see https://spdx.org/licenses/",
+                            license
+                        ));
                     }
                 }
             }
