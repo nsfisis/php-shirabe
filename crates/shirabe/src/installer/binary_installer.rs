@@ -383,64 +383,170 @@ impl BinaryInstaller {
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
                         .to_string();
                 stream_proxy_code = format!(
-                    "if (PHP_VERSION_ID < 80000) {{\n    if (!class_exists('Composer\\BinProxyWrapper')) {{\n        /**\n         * @internal\n         */\n        final class BinProxyWrapper\n        {{\n            private $handle;\n            private $position;\n            private $realpath;\n\n            public function stream_open($path, $mode, $options, &$opened_path)\n            {{\n                // get rid of phpvfscomposer:// prefix for __FILE__ & __DIR__ resolution\n                $opened_path = substr($path, 17);\n                $this->realpath = realpath($opened_path) ?: $opened_path;\n                $opened_path = {phpunit_hack1}$this->realpath;\n                $this->handle = fopen($this->realpath, $mode);\n                $this->position = 0;\n\n                return (bool) $this->handle;\n            }}\n\n            public function stream_read($count)\n            {{\n                $data = fread($this->handle, $count);\n\n                if ($this->position === 0) {{\n                    $data = preg_replace('{{^#!.*\\r?\\n}}', '', $data);\n                }}{phpunit_hack2}\n\n                $this->position += strlen($data);\n\n                return $data;\n            }}\n\n            public function stream_cast($castAs)\n            {{\n                return $this->handle;\n            }}\n\n            public function stream_close()\n            {{\n                fclose($this->handle);\n            }}\n\n            public function stream_lock($operation)\n            {{\n                return $operation ? flock($this->handle, $operation) : true;\n            }}\n\n            public function stream_seek($offset, $whence)\n            {{\n                if (0 === fseek($this->handle, $offset, $whence)) {{\n                    $this->position = ftell($this->handle);\n                    return true;\n                }}\n\n                return false;\n            }}\n\n            public function stream_tell()\n            {{\n                return $this->position;\n            }}\n\n            public function stream_eof()\n            {{\n                return feof($this->handle);\n            }}\n\n            public function stream_stat()\n            {{\n                return array();\n            }}\n\n            public function stream_set_option($option, $arg1, $arg2)\n            {{\n                return true;\n            }}\n\n            public function url_stat($path, $flags)\n            {{\n                $path = substr($path, 17);\n                if (file_exists($path)) {{\n                    return stat($path);\n                }}\n\n                return false;\n            }}\n        }}\n    }}\n\n    if (\n        (function_exists('stream_get_wrappers') && in_array('phpvfscomposer', stream_get_wrappers(), true))\n        || (function_exists('stream_wrapper_register') && stream_wrapper_register('phpvfscomposer', 'Composer\\BinProxyWrapper'))\n    ) {{\n        return include(\"phpvfscomposer://\" . {bin_path_exported});\n    }}\n}}\n",
-                    phpunit_hack1 = phpunit_hack1,
-                    phpunit_hack2 = phpunit_hack2,
-                    bin_path_exported = bin_path_exported,
+                    r#"if (PHP_VERSION_ID < 80000) {{
+    if (!class_exists('Composer\BinProxyWrapper')) {{
+        /**
+         * @internal
+         */
+        final class BinProxyWrapper
+        {{
+            private $handle;
+            private $position;
+            private $realpath;
+
+            public function stream_open($path, $mode, $options, &$opened_path)
+            {{
+                // get rid of phpvfscomposer:// prefix for __FILE__ & __DIR__ resolution
+                $opened_path = substr($path, 17);
+                $this->realpath = realpath($opened_path) ?: $opened_path;
+                $opened_path = {phpunit_hack1}$this->realpath;
+                $this->handle = fopen($this->realpath, $mode);
+                $this->position = 0;
+
+                return (bool) $this->handle;
+            }}
+
+            public function stream_read($count)
+            {{
+                $data = fread($this->handle, $count);
+
+                if ($this->position === 0) {{
+                    $data = preg_replace('{{^#!.*\r?\n}}', '', $data);
+                }}{phpunit_hack2}
+
+                $this->position += strlen($data);
+
+                return $data;
+            }}
+
+            public function stream_cast($castAs)
+            {{
+                return $this->handle;
+            }}
+
+            public function stream_close()
+            {{
+                fclose($this->handle);
+            }}
+
+            public function stream_lock($operation)
+            {{
+                return $operation ? flock($this->handle, $operation) : true;
+            }}
+
+            public function stream_seek($offset, $whence)
+            {{
+                if (0 === fseek($this->handle, $offset, $whence)) {{
+                    $this->position = ftell($this->handle);
+                    return true;
+                }}
+
+                return false;
+            }}
+
+            public function stream_tell()
+            {{
+                return $this->position;
+            }}
+
+            public function stream_eof()
+            {{
+                return feof($this->handle);
+            }}
+
+            public function stream_stat()
+            {{
+                return array();
+            }}
+
+            public function stream_set_option($option, $arg1, $arg2)
+            {{
+                return true;
+            }}
+
+            public function url_stat($path, $flags)
+            {{
+                $path = substr($path, 17);
+                if (file_exists($path)) {{
+                    return stat($path);
+                }}
+
+                return false;
+            }}
+        }}
+    }}
+
+    if (
+        (function_exists('stream_get_wrappers') && in_array('phpvfscomposer', stream_get_wrappers(), true))
+        || (function_exists('stream_wrapper_register') && stream_wrapper_register('phpvfscomposer', 'Composer\BinProxyWrapper'))
+    ) {{
+        return include("phpvfscomposer://" . {bin_path_exported});
+    }}
+}}
+"#
                 );
             }
 
             return format!(
-                "{}\n<?php\n\n/**\n * Proxy PHP file generated by Composer\n *\n * This file includes the referenced bin path ({})\n *{}\n * @generated\n */\n\nnamespace Composer;\n\n{}\n{}\nreturn include {};\n",
-                proxy_code,
-                bin_path,
-                stream_hint,
-                globals_code,
-                stream_proxy_code,
-                bin_path_exported,
+                r#"{proxy_code}
+<?php
+
+/**
+ * Proxy PHP file generated by Composer
+ *
+ * This file includes the referenced bin path ({bin_path})
+ *{stream_hint}
+ * @generated
+ */
+
+namespace Composer;
+
+{globals_code}
+{stream_proxy_code}
+return include {bin_path_exported};
+"#
             );
         }
 
         format!(
-            "#!/usr/bin/env sh\n\
-             \n\
-             # Support bash to support `source` with fallback on $0 if this does not run with bash\n\
-             # https://stackoverflow.com/a/35006505/6512\n\
-             selfArg=\"$BASH_SOURCE\"\n\
-             if [ -z \"$selfArg\" ]; then\n\
-             \x20\x20\x20\x20selfArg=\"$0\"\n\
-             fi\n\
-             \n\
-             self=$(realpath \"$selfArg\" 2> /dev/null)\n\
-             if [ -z \"$self\" ]; then\n\
-             \x20\x20\x20\x20self=\"$selfArg\"\n\
-             fi\n\
-             \n\
-             dir=$(cd \"${{self%[/\\\\]*}}\" > /dev/null; cd {bin_dir} && pwd)\n\
-             \n\
-             if [ -d /proc/cygdrive ]; then\n\
-             \x20\x20\x20\x20case $(which php) in\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20$(readlink -n /proc/cygdrive)/*)\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20# We are in Cygwin using Windows php, so the path must be translated\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20dir=$(cygpath -m \"$dir\");\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20;;\n\
-             \x20\x20\x20\x20esac\n\
-             fi\n\
-             \n\
-             export COMPOSER_RUNTIME_BIN_DIR=\"$(cd \"${{self%[/\\\\]*}}\" > /dev/null; pwd)\"\n\
-             \n\
-             # If bash is sourcing this file, we have to source the target as well\n\
-             bashSource=\"$BASH_SOURCE\"\n\
-             if [ -n \"$bashSource\" ]; then\n\
-             \x20\x20\x20\x20if [ \"$bashSource\" != \"$0\" ]; then\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20source \"${{dir}}/{bin_file}\" \"$@\"\n\
-             \x20\x20\x20\x20\x20\x20\x20\x20return\n\
-             \x20\x20\x20\x20fi\n\
-             fi\n\
-             \n\
-             exec \"${{dir}}/{bin_file}\" \"$@\"\n",
-            bin_dir = bin_dir,
-            bin_file = bin_file,
+            r#"#!/usr/bin/env sh
+
+# Support bash to support `source` with fallback on $0 if this does not run with bash
+# https://stackoverflow.com/a/35006505/6512
+selfArg="$BASH_SOURCE"
+if [ -z "$selfArg" ]; then
+    selfArg="$0"
+fi
+
+self=$(realpath "$selfArg" 2> /dev/null)
+if [ -z "$self" ]; then
+    self="$selfArg"
+fi
+
+dir=$(cd "${{self%[/\\]*}}" > /dev/null; cd {bin_dir} && pwd)
+
+if [ -d /proc/cygdrive ]; then
+    case $(which php) in
+        $(readlink -n /proc/cygdrive)/*)
+            # We are in Cygwin using Windows php, so the path must be translated
+            dir=$(cygpath -m "$dir");
+            ;;
+    esac
+fi
+
+export COMPOSER_RUNTIME_BIN_DIR="$(cd "${{self%[/\\]*}}" > /dev/null; pwd)"
+
+# If bash is sourcing this file, we have to source the target as well
+bashSource="$BASH_SOURCE"
+if [ -n "$bashSource" ]; then
+    if [ "$bashSource" != "$0" ]; then
+        source "${{dir}}/{bin_file}" "$@"
+        return
+    fi
+fi
+
+exec "${{dir}}/{bin_file}" "$@"
+"#
         )
     }
 }
