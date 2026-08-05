@@ -358,7 +358,7 @@ impl AutoloadGenerator {
         for dir in &classmap_list {
             let dir_str = dir.as_string().unwrap_or("");
             class_map_generator.scan_paths(
-                PhpMixed::String(dir_str.to_string()),
+                dir_str,
                 self.build_exclusion_regex(dir_str, excluded.clone()),
                 "classmap",
                 None,
@@ -426,7 +426,7 @@ impl AutoloadGenerator {
                             };
 
                         class_map_generator.scan_paths(
-                            PhpMixed::String(dir_str.clone()),
+                            &dir_str,
                             exclusion_regex,
                             &group_type,
                             Some(namespace.clone()),
@@ -908,7 +908,7 @@ impl AutoloadGenerator {
                 let dir_str = dir.as_string().unwrap_or("");
                 let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     class_map_generator.scan_paths(
-                        PhpMixed::String(dir_str.to_string()),
+                        dir_str,
                         self.build_exclusion_regex(dir_str, excluded.clone()),
                         "classmap",
                         None,

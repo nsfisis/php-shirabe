@@ -8,9 +8,9 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
-    PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, is_string,
-    pathinfo, php_regex, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers,
-    strlen, strpos, strrpos, strtr, substr,
+    PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, pathinfo,
+    php_regex, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers, strlen,
+    strpos, strrpos, strtr, substr,
 };
 use std::path::PathBuf;
 
@@ -49,7 +49,7 @@ impl ClassMapGenerator {
     }
 
     /// Iterate over all files in the given directory searching for classes
-    pub fn create_map(path: PhpMixed) -> anyhow::Result<indexmap::IndexMap<String, String>> {
+    pub fn create_map(path: &str) -> anyhow::Result<indexmap::IndexMap<String, String>> {
         let mut generator = Self::new_default();
         generator.scan_paths(path, None, "classmap", None, vec![])?;
         Ok(generator.get_class_map().get_map().clone())
@@ -67,7 +67,7 @@ impl ClassMapGenerator {
     /// Iterate over all files in the given directory searching for classes
     pub fn scan_paths(
         &mut self,
-        path: PhpMixed,
+        path: &str,
         excluded: Option<String>,
         autoload_type: &str,
         namespace: Option<String>,
@@ -90,61 +90,47 @@ impl ClassMapGenerator {
         }
 
         let base_path: Option<String> = if autoload_type != "classmap" {
-            if !is_string(&path) {
-                return Err(anyhow::anyhow!(InvalidArgumentException {
-                    message:
-                        "$path must be a string when specifying a psr-0 or psr-4 autoload type"
-                            .to_string(),
-                    code: 0,
-                }));
-            }
             if namespace.is_none() {
                 return Err(anyhow::anyhow!(InvalidArgumentException {
                     message: "$namespace must be given (even if it is an empty string if you do not want to filter) when specifying a psr-0 or psr-4 autoload type".to_string(),
                     code: 0,
                 }));
             }
-            path.as_string().map(|s| s.to_string())
+            Some(path.to_owned())
         } else {
             None
         };
 
-        let files: Vec<PathBuf> = if is_string(&path) {
-            let path_str = path.as_string().unwrap_or("");
-            if is_file(path_str) {
-                vec![PathBuf::from(path_str)]
-            } else if is_dir(path_str) || strpos(path_str, "*").is_some() {
-                let ext_pattern = format!(
-                    "/\\.(?:{})$/",
-                    implode(
-                        "|",
-                        &self
-                            .extensions
-                            .iter()
-                            .map(|e| preg_quote(e, None))
-                            .collect::<Vec<_>>(),
-                    )
-                );
-                Finder::create()
-                    .files()
-                    .follow_links()
-                    .name(&ext_pattern)
-                    .r#in(path_str)
-                    .exclude(&excluded_dirs)
-                    .iter()
-                    .collect()
-            } else {
-                return Err(anyhow::anyhow!(RuntimeException {
-                    message: format!(
-                        "Could not scan for classes inside \"{}\" which does not appear to be a file nor a folder",
-                        path_str
-                    ),
-                    code: 0,
-                }));
-            }
+        let files: Vec<PathBuf> = if is_file(path) {
+            vec![PathBuf::from(path)]
+        } else if is_dir(path) || strpos(path, "*").is_some() {
+            let ext_pattern = format!(
+                "/\\.(?:{})$/",
+                implode(
+                    "|",
+                    &self
+                        .extensions
+                        .iter()
+                        .map(|e| preg_quote(e, None))
+                        .collect::<Vec<_>>(),
+                )
+            );
+            Finder::create()
+                .files()
+                .follow_links()
+                .name(&ext_pattern)
+                .r#in(path)
+                .exclude(&excluded_dirs)
+                .iter()
+                .collect()
         } else {
-            // $path is already an array or Traversable of SplFileInfo
-            todo!("non-string path (Traversable/array of SplFileInfo) is not handled yet")
+            return Err(anyhow::anyhow!(RuntimeException {
+                message: format!(
+                    "Could not scan for classes inside \"{}\" which does not appear to be a file nor a folder",
+                    path
+                ),
+                code: 0,
+            }));
         };
 
         let cwd = realpath(getcwd().unwrap_or_default()).unwrap_or_default();
