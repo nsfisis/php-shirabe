@@ -525,15 +525,7 @@ impl Command for ConfigCommand {
         let values: Vec<String> = setting_values; // what the user is trying to add/change
 
         let boolean_validator = |val: &PhpMixed| -> bool {
-            in_array_strict(
-                val.as_string().unwrap_or(""),
-                &[
-                    PhpMixed::String("true".to_string()),
-                    PhpMixed::String("false".to_string()),
-                    PhpMixed::String("1".to_string()),
-                    PhpMixed::String("0".to_string()),
-                ],
-            )
+            matches!(val.as_string().unwrap_or(""), "true" | "false" | "1" | "0")
         };
         let boolean_normalizer = |val: &PhpMixed| -> PhpMixed {
             let s = val.as_string().unwrap_or("");
@@ -883,13 +875,8 @@ impl Command for ConfigCommand {
         }
 
         // handle unsetting extra/suggest
-        if in_array_strict(
-            setting_key.as_str(),
-            &[
-                PhpMixed::String("suggest".to_string()),
-                PhpMixed::String("extra".to_string()),
-            ],
-        ) && input.borrow().get_option("unset")?.as_bool() == Some(true)
+        if matches!(setting_key.as_str(), "suggest" | "extra")
+            && input.borrow().get_option("unset")?.as_bool() == Some(true)
         {
             self.config_source
                 .borrow_mut()
@@ -944,12 +931,9 @@ impl Command for ConfigCommand {
         }
 
         // handle audit.ignore and audit.ignore-abandoned with --merge support
-        if in_array_strict(
+        if matches!(
             setting_key.as_str(),
-            &[
-                PhpMixed::String("audit.ignore".to_string()),
-                PhpMixed::String("audit.ignore-abandoned".to_string()),
-            ],
+            "audit.ignore" | "audit.ignore-abandoned"
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
@@ -1094,14 +1078,9 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
-            } else if in_array_strict(
+            } else if matches!(
                 matches[1].as_str(),
-                &[
-                    PhpMixed::String("github-oauth".to_string()),
-                    PhpMixed::String("gitlab-oauth".to_string()),
-                    PhpMixed::String("gitlab-token".to_string()),
-                    PhpMixed::String("bearer".to_string()),
-                ],
+                "github-oauth" | "gitlab-oauth" | "gitlab-token" | "bearer"
             ) {
                 if 1 != values.len() {
                     return Err(RuntimeException {
@@ -1417,15 +1396,7 @@ impl ConfigCommand {
         let raw_contents_arr = raw_contents.as_array().cloned().unwrap_or_default();
         let mut k = k;
         for (key, value) in &contents_arr {
-            if k.is_none()
-                && !in_array_strict(
-                    key.as_str(),
-                    &[
-                        PhpMixed::String("config".to_string()),
-                        PhpMixed::String("repositories".to_string()),
-                    ],
-                )
-            {
+            if k.is_none() && !matches!(key.as_str(), "config" | "repositories") {
                 continue;
             }
 
@@ -1671,14 +1642,9 @@ pub type ValidatorFn = Box<dyn Fn(&PhpMixed) -> PhpMixed>;
 pub type NormalizerFn = Box<dyn Fn(&PhpMixed) -> PhpMixed>;
 
 fn boolean_validator(val: &PhpMixed) -> PhpMixed {
-    PhpMixed::Bool(in_array_strict(
+    PhpMixed::Bool(matches!(
         val.as_string().unwrap_or(""),
-        &[
-            PhpMixed::String("true".to_string()),
-            PhpMixed::String("false".to_string()),
-            PhpMixed::String("1".to_string()),
-            PhpMixed::String("0".to_string()),
-        ],
+        "true" | "false" | "1" | "0"
     ))
 }
 
@@ -1715,13 +1681,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "preferred-install".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String("auto".to_string()),
-                        PhpMixed::String("source".to_string()),
-                        PhpMixed::String("dist".to_string()),
-                    ],
+                    "auto" | "source" | "dist"
                 ))
             }),
             Box::new(|val| val.clone()),
@@ -1731,13 +1693,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "gitlab-protocol".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String("git".to_string()),
-                        PhpMixed::String("http".to_string()),
-                        PhpMixed::String("https".to_string()),
-                    ],
+                    "git" | "http" | "https"
                 ))
             }),
             Box::new(|val| val.clone()),
@@ -1747,13 +1705,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "store-auths".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String("true".to_string()),
-                        PhpMixed::String("false".to_string()),
-                        PhpMixed::String("prompt".to_string()),
-                    ],
+                    "true" | "false" | "prompt"
                 ))
             }),
             Box::new(|val| {
@@ -1889,15 +1843,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "discard-changes".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String("stash".to_string()),
-                        PhpMixed::String("true".to_string()),
-                        PhpMixed::String("false".to_string()),
-                        PhpMixed::String("1".to_string()),
-                        PhpMixed::String("0".to_string()),
-                    ],
+                    "stash" | "true" | "false" | "1" | "0"
                 ))
             }),
             Box::new(|val| {
@@ -1959,16 +1907,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "bump-after-update".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String("dev".to_string()),
-                        PhpMixed::String("no-dev".to_string()),
-                        PhpMixed::String("true".to_string()),
-                        PhpMixed::String("false".to_string()),
-                        PhpMixed::String("1".to_string()),
-                        PhpMixed::String("0".to_string()),
-                    ],
+                    "dev" | "no-dev" | "true" | "false" | "1" | "0"
                 ))
             }),
             Box::new(|val| {
@@ -2037,15 +1978,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "platform-check".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String("php-only".to_string()),
-                        PhpMixed::String("true".to_string()),
-                        PhpMixed::String("false".to_string()),
-                        PhpMixed::String("1".to_string()),
-                        PhpMixed::String("0".to_string()),
-                    ],
+                    "php-only" | "true" | "false" | "1" | "0"
                 ))
             }),
             Box::new(|val| {
@@ -2062,13 +1997,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "use-parent-dir".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String("true".to_string()),
-                        PhpMixed::String("false".to_string()),
-                        PhpMixed::String("prompt".to_string()),
-                    ],
+                    "true" | "false" | "prompt"
                 ))
             }),
             Box::new(|val| {
@@ -2085,13 +2016,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "audit.abandoned".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array_strict(
+                PhpMixed::Bool(matches!(
                     val.as_string().unwrap_or(""),
-                    &[
-                        PhpMixed::String(Auditor::ABANDONED_IGNORE.to_string()),
-                        PhpMixed::String(Auditor::ABANDONED_REPORT.to_string()),
-                        PhpMixed::String(Auditor::ABANDONED_FAIL.to_string()),
-                    ],
+                    Auditor::ABANDONED_IGNORE | Auditor::ABANDONED_REPORT | Auditor::ABANDONED_FAIL
                 ))
             }),
             Box::new(|val| val.clone()),
@@ -2177,14 +2104,9 @@ fn build_multi_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)> 
                 }
                 if let Some(list) = vals.as_list() {
                     for val in list {
-                        if !in_array_strict(
+                        if !matches!(
                             val.as_string().unwrap_or(""),
-                            &[
-                                PhpMixed::String("low".to_string()),
-                                PhpMixed::String("medium".to_string()),
-                                PhpMixed::String("high".to_string()),
-                                PhpMixed::String("critical".to_string()),
-                            ],
+                            "low" | "medium" | "high" | "critical"
                         ) {
                             return PhpMixed::String(
                                 "valid severities include: low, medium, high, critical".to_string(),

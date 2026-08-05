@@ -97,10 +97,10 @@ use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
     bin2hex, chdir, date_default_timezone_get, date_default_timezone_set, defined, dirname,
     disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    function_exists, getcwd, getmypid, glob, in_array_strict, ini_set, is_array, is_dir, is_file,
-    is_string, is_subclass_of, json_decode, memory_get_peak_usage, memory_get_usage, microtime,
-    php_regex, php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round,
-    str_contains, str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
+    function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
+    is_subclass_of, json_decode, memory_get_peak_usage, memory_get_usage, microtime, php_regex,
+    php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains,
+    str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
@@ -2067,28 +2067,20 @@ impl ApplicationHandle {
         }
 
         // prompt user for dir change if no composer.json is present in current dir
-        let no_composer_json_commands = vec![
-            "".to_string(),
-            "list".to_string(),
-            "init".to_string(),
-            "about".to_string(),
-            "help".to_string(),
-            "diagnose".to_string(),
-            "self-update".to_string(),
-            "global".to_string(),
-            "create-project".to_string(),
-            "outdated".to_string(),
-        ];
         let use_parent_dir_if_no_json_available =
             application.borrow().get_use_parent_dir_config_value();
-        let no_composer_json_commands_pm: Vec<PhpMixed> = no_composer_json_commands
-            .iter()
-            .map(|s| PhpMixed::String(s.clone()))
-            .collect();
         if new_work_dir.is_none()
-            && !in_array_strict(
+            && !matches!(
                 command_name.as_deref().unwrap_or(""),
-                &no_composer_json_commands_pm,
+                "" | "list"
+                    | "init"
+                    | "about"
+                    | "help"
+                    | "diagnose"
+                    | "self-update"
+                    | "global"
+                    | "create-project"
+                    | "outdated"
             )
             && !file_exists(Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
@@ -2180,16 +2172,11 @@ impl ApplicationHandle {
 
         // avoid loading plugins/initializing the Composer instance earlier than necessary if no plugin command is needed
         // if showing the version, we never need plugin commands
-        let mnp_list = vec![
-            PhpMixed::String("".to_string()),
-            PhpMixed::String("list".to_string()),
-            PhpMixed::String("help".to_string()),
-        ];
         let may_need_plugin_command = !input
             .borrow()
             .has_parameter_option(PhpMixed::from(vec!["--version", "-V"]), false)
             && (command_name.is_none()
-                || in_array_strict(command_name.as_deref().unwrap_or(""), &mnp_list)
+                || matches!(command_name.as_deref().unwrap_or(""), "" | "list" | "help")
                 || (command_name.as_deref() == Some("_complete") && !is_non_allowed_root));
 
         let may_need_script_command = may_need_plugin_command

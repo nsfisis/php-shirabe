@@ -18,8 +18,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
-    array_search_mixed, extension_loaded, http_build_query_mixed, implode, in_array_strict,
-    is_array, php_regex, strpos,
+    array_search_mixed, extension_loaded, http_build_query_mixed, implode, is_array, php_regex,
+    strpos,
 };
 
 #[derive(Debug)]
@@ -697,7 +697,7 @@ impl GitBitbucketDriver {
                 {
                     let te = &e;
                     let code = te.get_code();
-                    let in_set = in_array_strict(code, &[PhpMixed::Int(403), PhpMixed::Int(404)]);
+                    let in_set = matches!(code, 403 | 404);
                     if in_set
                         || (401 == code
                             && strpos(te.get_message(), "Could not authenticate against")

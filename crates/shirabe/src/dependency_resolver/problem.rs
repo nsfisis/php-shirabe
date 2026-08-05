@@ -13,8 +13,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, defined, extension_loaded, implode, in_array_strict, loosely_compare,
-    php_regex, phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
+    LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare, php_regex,
+    phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
     strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
@@ -211,7 +211,6 @@ impl Problem {
         let mut templates: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
             IndexMap::new();
         let parser = VersionParser::new();
-        let deduplicatable_rule_types = [rule::RULE_PACKAGE_REQUIRES, rule::RULE_PACKAGE_CONFLICT];
         for rule in rules {
             let rule_ref = rule.borrow();
             let mut message = rule_ref.get_pretty_string(
@@ -223,12 +222,9 @@ impl Problem {
                 learned_pool,
             )?;
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            let matched = if in_array_strict(
+            let matched = if matches!(
                 rule_ref.get_reason(),
-                &deduplicatable_rule_types
-                    .iter()
-                    .map(|t| PhpMixed::Int(*t))
-                    .collect::<Vec<_>>(),
+                rule::RULE_PACKAGE_REQUIRES | rule::RULE_PACKAGE_CONFLICT
             ) {
                 Preg::is_match3(
                     php_regex!(
@@ -964,13 +960,7 @@ impl Problem {
                 && c.get_version() == "dev-master"
             {
                 for candidate in &packages {
-                    if in_array_strict(
-                        candidate.get_version().to_string(),
-                        &[
-                            PhpMixed::String("dev-default".to_string()),
-                            PhpMixed::String("dev-main".to_string()),
-                        ],
-                    ) {
+                    if matches!(candidate.get_version().as_str(), "dev-default" | "dev-main") {
                         suffix = format!(
                             " Perhaps dev-master was renamed to {}?",
                             candidate.get_pretty_version()

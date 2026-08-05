@@ -40,8 +40,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
-    UnexpectedValueException, extension_loaded, hash, http_build_query, in_array_strict,
-    json_decode, parse_url_all, php_regex, realpath, strtolower, strtr, urlencode, var_export,
+    UnexpectedValueException, extension_loaded, hash, http_build_query, json_decode, parse_url_all,
+    php_regex, realpath, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
@@ -1441,13 +1441,7 @@ impl ComposerRepository {
                         if let Some(te) = e.downcast_ref::<TransportException>() {
                             let status_code = te.get_status_code();
                             if self.lazy_providers_url.is_some()
-                                && in_array_strict(
-                                    match status_code {
-                                        Some(c) => PhpMixed::Int(c),
-                                        None => PhpMixed::Null,
-                                    },
-                                    &[PhpMixed::Int(404), PhpMixed::Int(499)],
-                                )
+                                && matches!(status_code, Some(404 | 499))
                             {
                                 let mut p: IndexMap<String, PhpMixed> = IndexMap::new();
                                 p.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));

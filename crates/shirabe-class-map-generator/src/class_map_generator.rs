@@ -73,14 +73,7 @@ impl ClassMapGenerator {
         namespace: Option<String>,
         excluded_dirs: Vec<String>,
     ) -> anyhow::Result<()> {
-        if !in_array_strict(
-            autoload_type.to_string(),
-            &[
-                PhpMixed::String("psr-0".to_string()),
-                PhpMixed::String("psr-4".to_string()),
-                PhpMixed::String("classmap".to_string()),
-            ],
-        ) {
+        if !matches!(autoload_type, "psr-0" | "psr-4" | "classmap") {
             return Err(anyhow::anyhow!(InvalidArgumentException {
                 message: "$autoloadType must be one of: \"psr-0\", \"psr-4\" or \"classmap\""
                     .to_string(),

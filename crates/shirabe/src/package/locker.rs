@@ -29,7 +29,7 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array_loose,
-    in_array_strict, is_int, ksort, php_regex, realpath, strcmp, strtolower, touch2, trim, usort,
+    is_int, ksort, php_regex, realpath, strcmp, strtolower, touch2, trim, usort,
 };
 
 /// Reads/writes project lockfile (composer.lock).
@@ -476,18 +476,12 @@ impl Locker {
         let aliases: Vec<IndexMap<String, PhpMixed>> = array_map(
             |alias: &IndexMap<String, PhpMixed>| {
                 let mut alias = alias.clone();
-                let version = alias
-                    .get("version")
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("")
-                    .to_string();
-                if in_array_strict(
-                    version,
-                    &[
-                        PhpMixed::String("dev-master".to_string()),
-                        PhpMixed::String("dev-trunk".to_string()),
-                        PhpMixed::String("dev-default".to_string()),
-                    ],
+                if matches!(
+                    alias
+                        .get("version")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or(""),
+                    "dev-master" | "dev-trunk" | "dev-default"
                 ) {
                     alias.insert(
                         "version".to_string(),

@@ -306,28 +306,24 @@ impl Config {
             };
             for (key, val_box) in &config_section_map {
                 let val = val_box.clone();
-                if in_array_strict(
-                    key.clone(),
-                    &[
-                        PhpMixed::String("bitbucket-oauth".to_string()),
-                        PhpMixed::String("github-oauth".to_string()),
-                        PhpMixed::String("gitlab-oauth".to_string()),
-                        PhpMixed::String("gitlab-token".to_string()),
-                        PhpMixed::String("http-basic".to_string()),
-                        PhpMixed::String("bearer".to_string()),
-                        PhpMixed::String("client-certificate".to_string()),
-                        PhpMixed::String("forgejo-token".to_string()),
-                    ],
+                if matches!(
+                    key.as_str(),
+                    "bitbucket-oauth"
+                        | "github-oauth"
+                        | "gitlab-oauth"
+                        | "gitlab-token"
+                        | "http-basic"
+                        | "bearer"
+                        | "client-certificate"
+                        | "forgejo-token"
                 ) && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                     self.config
                         .insert(key.clone(), array_merge(existing, val.clone()));
                     self.set_source_of_config_value(&val, key, source);
-                } else if in_array_strict(
-                    key.clone(),
-                    &[PhpMixed::String("allow-plugins".to_string())],
-                ) && self.config.contains_key(key)
+                } else if key == "allow-plugins"
+                    && self.config.contains_key(key)
                     && is_array(self.config.get(key).unwrap_or(&PhpMixed::Null))
                     && is_array(&val)
                 {
@@ -339,13 +335,8 @@ impl Config {
                         array_merge(array_merge(val.clone(), existing), val.clone()),
                     );
                     self.set_source_of_config_value(&val, key, source);
-                } else if in_array_strict(
-                    key.clone(),
-                    &[
-                        PhpMixed::String("gitlab-domains".to_string()),
-                        PhpMixed::String("github-domains".to_string()),
-                    ],
-                ) && self.config.contains_key(key)
+                } else if matches!(key.as_str(), "gitlab-domains" | "github-domains")
+                    && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                     let merged = array_merge(existing, val.clone());
@@ -768,16 +759,7 @@ impl Config {
                 let env = self.get_composer_env("COMPOSER_DISCARD_CHANGES");
                 if !matches!(env, PhpMixed::Bool(false)) {
                     let env_str = env.as_string().unwrap_or("").to_string();
-                    if !in_array_strict(
-                        env_str.clone(),
-                        &[
-                            PhpMixed::String("stash".to_string()),
-                            PhpMixed::String("true".to_string()),
-                            PhpMixed::String("false".to_string()),
-                            PhpMixed::String("1".to_string()),
-                            PhpMixed::String("0".to_string()),
-                        ],
-                    ) {
+                    if !matches!(env_str.as_str(), "stash" | "true" | "false" | "1" | "0") {
                         return Err(RuntimeException {
                             message: format!(
                                 "Invalid value for COMPOSER_DISCARD_CHANGES: {}. Expected 1, 0, true, false or stash",
@@ -897,13 +879,7 @@ impl Config {
                     self.get_composer_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
                 if !matches!(block_abandoned_env, PhpMixed::Bool(false)) {
                     let env_str = block_abandoned_env.as_string().unwrap_or("").to_string();
-                    if !in_array_strict(
-                        env_str.clone(),
-                        &[
-                            PhpMixed::String("0".to_string()),
-                            PhpMixed::String("1".to_string()),
-                        ],
-                    ) {
+                    if !matches!(env_str.as_str(), "0" | "1") {
                         return Err(RuntimeException {
                             message: format!(
                                 "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: {}. Expected 0 or 1.",
@@ -1083,18 +1059,7 @@ impl Config {
         let hostname = parse_url(url, PHP_URL_HOST)
             .as_string()
             .map(|s| s.to_string());
-        if in_array_strict(
-            scheme
-                .clone()
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-            &[
-                PhpMixed::String("http".to_string()),
-                PhpMixed::String("git".to_string()),
-                PhpMixed::String("ftp".to_string()),
-                PhpMixed::String("svn".to_string()),
-            ],
-        ) {
+        if matches!(scheme.as_deref(), Some("http" | "git" | "ftp" | "svn")) {
             if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
                 if scheme.as_deref() == Some("svn") {
                     if in_array_strict(

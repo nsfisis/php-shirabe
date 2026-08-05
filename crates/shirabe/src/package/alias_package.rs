@@ -11,7 +11,7 @@ use crate::repository::RepositoryInterfaceWeakHandle;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use indexmap::IndexSet;
-use shirabe_php_shim::{LogicException, PhpMixed, in_array_strict};
+use shirabe_php_shim::{LogicException, PhpMixed};
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
@@ -131,13 +131,9 @@ impl AliasPackage {
             pretty_version = self.alias_of.get_pretty_version();
         }
 
-        if in_array_strict(
-            link_type.to_string(),
-            &[
-                PhpMixed::String(Link::TYPE_CONFLICT.to_string()),
-                PhpMixed::String(Link::TYPE_PROVIDE.to_string()),
-                PhpMixed::String(Link::TYPE_REPLACE.to_string()),
-            ],
+        if matches!(
+            link_type,
+            Link::TYPE_CONFLICT | Link::TYPE_PROVIDE | Link::TYPE_REPLACE
         ) {
             let mut new_links: Vec<Link> = vec![];
             for link in links.values() {

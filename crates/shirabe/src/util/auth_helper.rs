@@ -249,13 +249,9 @@ impl AuthHelper {
                     .and_then(|a| a.get("password"))
                     .and_then(|v| v.clone())
                     .unwrap_or_default();
-                if in_array_strict(
-                    password,
-                    &[
-                        PhpMixed::String("gitlab-ci-token".to_string()),
-                        PhpMixed::String("private-token".to_string()),
-                        PhpMixed::String("oauth2".to_string()),
-                    ],
+                if matches!(
+                    password.as_str(),
+                    "gitlab-ci-token" | "private-token" | "oauth2"
                 ) {
                     return Err(TransportException::new(
                         format!("Invalid credentials for '{}', aborting.", url),
@@ -520,13 +516,9 @@ impl AuthHelper {
                     authentication_display_message =
                         Some("Using GitHub token authentication".to_string());
                 }
-            } else if in_array_strict(
-                password.clone(),
-                &[
-                    PhpMixed::String("oauth2".to_string()),
-                    PhpMixed::String("private-token".to_string()),
-                    PhpMixed::String("gitlab-ci-token".to_string()),
-                ],
+            } else if matches!(
+                password.as_str(),
+                "oauth2" | "private-token" | "gitlab-ci-token"
             ) && in_array_strict(origin.to_string(), &{
                 let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
                 match &gitlab_domains {
@@ -593,13 +585,7 @@ impl AuthHelper {
                         .insert(origin.to_string(), display_message.clone());
                 }
             }
-        } else if in_array_strict(
-            origin.to_string(),
-            &[
-                PhpMixed::String("api.bitbucket.org".to_string()),
-                PhpMixed::String("api.github.com".to_string()),
-            ],
-        ) {
+        } else if matches!(origin, "api.bitbucket.org" | "api.github.com") {
             return self.add_authentication_options(options, &str_replace("api.", "", origin), url);
         }
 

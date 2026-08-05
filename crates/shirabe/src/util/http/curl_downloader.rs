@@ -413,13 +413,7 @@ impl CurlDownloader {
                 .and_then(|v| v.as_int())
                 .unwrap_or(0);
             if Self::method_is_get(options)
-                && in_array_strict(
-                    status_code,
-                    &[423, 425, 500, 502, 503, 504, 507, 510]
-                        .iter()
-                        .map(|c| PhpMixed::Int(*c))
-                        .collect::<Vec<_>>(),
-                )
+                && matches!(status_code, 423 | 425 | 500 | 502 | 503 | 504 | 507 | 510)
                 && retries < self.max_retries
             {
                 self.io.write_error3(
@@ -820,16 +814,14 @@ impl CurlDownloader {
         }
 
         let mut details = String::new();
-        if in_array_strict(
+        if matches!(
             response
                 .inner
                 .get_header("content-type")
                 .unwrap_or_default()
-                .to_lowercase(),
-            &[
-                PhpMixed::String("application/json".to_string()),
-                PhpMixed::String("application/json; charset=utf-8".to_string()),
-            ],
+                .to_lowercase()
+                .as_str(),
+            "application/json" | "application/json; charset=utf-8"
         ) {
             let body = response.inner.get_body().unwrap_or("");
             details = format!(
