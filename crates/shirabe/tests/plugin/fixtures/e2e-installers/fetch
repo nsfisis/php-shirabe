@@ -1,0 +1,42 @@
+#!/bin/sh
+# Fetches the external plugin the E2E test runs against, into the git-ignored ext/
+# directory. The plugin is pinned to an immutable upstream commit and the extracted
+# files are verified by hash, so the test stays deterministic without the third-party
+# source ever entering this repository. Requires network once; the E2E test skips
+# itself while ext/ is absent.
+set -eu
+
+# composer/installers v2.3.0
+commit=12fb2dfe5e16183de69e784a7b84046c43d97e8e
+# GitHub archives are content-addressed by the commit, but the archive encoding is not
+# guaranteed stable; the extracted files are what the test consumes, so they are what
+# gets pinned. This tree holds a hundred installer classes, so the pin is one digest over
+# the sorted per-file digests rather than a line per file.
+expected=2f9bb837ed1374985909cf33eb1e6e33d0dc3bf1eb0c55599c7326a886bf4f50
+
+ext="$(dirname "$0")/ext"
+dir="$ext/composer-installers-2.3.0"
+
+if [ -f "$dir/src/Composer/Installers/Installer.php" ]; then
+    echo "already fetched: $dir"
+    exit 0
+fi
+
+# Staged next to the destination and only moved into place once verified, so a mismatched
+# tree is never observable under the name the test looks for.
+staging="$ext/.staging-$commit"
+mkdir -p "$staging"
+# The CI workflows are not part of the installed package and would only add noise to the
+# digest.
+curl -fsSL "https://codeload.github.com/composer/installers/tar.gz/$commit" \
+    | tar -xz -C "$staging" --strip-components=1 --exclude='.github'
+
+actual=$(cd "$staging" && find . -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+if [ "$actual" != "$expected" ]; then
+    echo "hash mismatch: expected $expected, got $actual" >&2
+    echo "the fetched tree was left in $staging for inspection; delete it before retrying" >&2
+    exit 1
+fi
+
+mv "$staging" "$dir"
+echo "fetched: $dir"

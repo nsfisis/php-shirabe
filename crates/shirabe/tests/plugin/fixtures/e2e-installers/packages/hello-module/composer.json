@@ -1,0 +1,6 @@
+{
+    "name": "acme/hello-module",
+    "version": "1.0.0",
+    "type": "drupal-module",
+    "description": "Fixture package placed by composer/installers under modules/."
+}

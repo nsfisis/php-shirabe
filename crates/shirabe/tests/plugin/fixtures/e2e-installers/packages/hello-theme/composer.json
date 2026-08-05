@@ -1,0 +1,6 @@
+{
+    "name": "acme/hello-theme",
+    "version": "1.0.0",
+    "type": "drupal-theme",
+    "description": "Fixture package placed by composer/installers under themes/."
+}

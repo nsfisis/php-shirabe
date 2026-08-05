@@ -1,0 +1,57 @@
+{
+    "name": "shirabe/e2e-installers",
+    "description": "E2E fixture project: let composer/installers place packages of a framework-specific type.",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "composer/installers",
+                "version": "2.3.0",
+                "type": "composer-plugin",
+                "license": [
+                    "MIT"
+                ],
+                "autoload": {
+                    "psr-4": {
+                        "Composer\\Installers\\": "src/Composer/Installers"
+                    }
+                },
+                "require": {
+                    "php": "^7.2 || ^8.0",
+                    "composer-plugin-api": "^1.0 || ^2.0"
+                },
+                "extra": {
+                    "class": "Composer\\Installers\\Plugin",
+                    "plugin-modifies-install-path": true
+                },
+                "dist": {
+                    "type": "path",
+                    "url": "../ext/composer-installers-2.3.0"
+                },
+                "transport-options": {
+                    "symlink": false
+                }
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "composer/installers": "2.3.0",
+        "acme/hello-module": "1.0.0",
+        "acme/hello-theme": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "composer/installers": true
+        }
+    }
+}
