@@ -2596,13 +2596,15 @@ impl ApplicationHandle {
 
                     // override TransportException's code for the purpose of parent::run() using it as process exit code
                     // as http error codes are all beyond the 255 range of permitted exit codes
-                    if e.downcast_ref::<TransportException>().is_some() {
-                        // PHP: ReflectionProperty $reflProp = new \ReflectionProperty($e, 'code');
-                        //      $reflProp->setValue($e, Installer::ERROR_TRANSPORT_EXCEPTION);
-                        // TODO(phase-c): reflection-based mutation of the existing exception is not portable;
-                        // we surface the rewritten code via a fresh TransportException at the call site.
-                        let _ = Installer::ERROR_TRANSPORT_EXCEPTION;
-                    }
+                    // TODO(phase-c): PHP's `instanceof TransportException` also matches the subclass
+                    // MaxFileSizeExceededException, which is a newtype here and is not matched by this downcast.
+                    let e = match e.downcast::<TransportException>() {
+                        Ok(mut e) => {
+                            e.code = Installer::ERROR_TRANSPORT_EXCEPTION;
+                            anyhow::Error::new(e)
+                        }
+                        Err(e) => e,
+                    };
 
                     Err(e)
                 }
