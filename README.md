@@ -13,6 +13,7 @@ It aims at 100% compatibility with Composer, including the plugin API.
 
 Shirabe runs Composer plugins using the system-provided real PHP. The plugin API is partially implemented. The following plugins are verified to work:
 
+* [composer/installers](https://github.com/composer/installers)
 * [phpstan/extension-installer](https://github.com/phpstan/extension-installer)
 
 
