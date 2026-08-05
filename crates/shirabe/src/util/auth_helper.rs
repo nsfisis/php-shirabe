@@ -12,8 +12,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, base64_encode, explode,
-    in_array, is_array, is_string, json_decode, parse_url, php_regex, str_replace, strpos,
-    strtolower, substr, trim,
+    in_array_loose, in_array_strict, is_array, is_string, json_decode, parse_url, php_regex,
+    str_replace, strpos, strtolower, substr, trim,
 };
 
 #[derive(Debug)]
@@ -71,13 +71,12 @@ impl AuthHelper {
                         0,
                         Some(1),
                     ));
-                    if in_array(
-                        PhpMixed::String(input.clone()),
-                        &PhpMixed::List(vec![
+                    if in_array_loose(
+                        input.clone(),
+                        &[
                             PhpMixed::String("y".to_string()),
                             PhpMixed::String("n".to_string()),
-                        ]),
-                        false,
+                        ],
                     ) {
                         return Ok(PhpMixed::String(input));
                     }
@@ -250,14 +249,13 @@ impl AuthHelper {
                     .and_then(|a| a.get("password"))
                     .and_then(|v| v.clone())
                     .unwrap_or_default();
-                if in_array(
-                    PhpMixed::String(password),
-                    &PhpMixed::List(vec![
+                if in_array_strict(
+                    password,
+                    &[
                         PhpMixed::String("gitlab-ci-token".to_string()),
                         PhpMixed::String("private-token".to_string()),
                         PhpMixed::String("oauth2".to_string()),
-                    ]),
-                    true,
+                    ],
                 ) {
                     return Err(TransportException::new(
                         format!("Invalid credentials for '{}', aborting.", url),
@@ -522,26 +520,21 @@ impl AuthHelper {
                     authentication_display_message =
                         Some("Using GitHub token authentication".to_string());
                 }
-            } else if in_array(
-                PhpMixed::String(password.clone()),
-                &PhpMixed::List(vec![
+            } else if in_array_strict(
+                password.clone(),
+                &[
                     PhpMixed::String("oauth2".to_string()),
                     PhpMixed::String("private-token".to_string()),
                     PhpMixed::String("gitlab-ci-token".to_string()),
-                ]),
-                true,
-            ) && in_array(
-                PhpMixed::String(origin.to_string()),
-                &PhpMixed::List({
-                    let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-                    match &gitlab_domains {
-                        PhpMixed::List(l) => l.clone(),
-                        PhpMixed::Array(a) => a.values().cloned().collect(),
-                        _ => vec![],
-                    }
-                }),
-                true,
-            ) {
+                ],
+            ) && in_array_strict(origin.to_string(), &{
+                let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
+                match &gitlab_domains {
+                    PhpMixed::List(l) => l.clone(),
+                    PhpMixed::Array(a) => a.values().cloned().collect(),
+                    _ => vec![],
+                }
+            }) {
                 if password == "oauth2" {
                     headers.push(PhpMixed::String(format!(
                         "Authorization: Bearer {}",
@@ -600,13 +593,12 @@ impl AuthHelper {
                         .insert(origin.to_string(), display_message.clone());
                 }
             }
-        } else if in_array(
-            PhpMixed::String(origin.to_string()),
-            &PhpMixed::List(vec![
+        } else if in_array_strict(
+            origin.to_string(),
+            &[
                 PhpMixed::String("api.bitbucket.org".to_string()),
                 PhpMixed::String("api.github.com".to_string()),
-            ]),
-            true,
+            ],
         ) {
             return self.add_authentication_options(options, &str_replace("api.", "", origin), url);
         }

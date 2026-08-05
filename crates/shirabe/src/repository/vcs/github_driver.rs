@@ -17,7 +17,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_key_exists, array_map,
-    array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array,
+    array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array_loose,
     parse_url_all, php_regex, strpos, strtolower, substr, trim, urlencode,
 };
 
@@ -966,14 +966,9 @@ impl GitHubDriver {
                     .cloned()
                     .unwrap_or_default()
             });
-        if !in_array(
-            PhpMixed::String(strtolower(&Preg::replace(
-                php_regex!(r"{^www\.}i"),
-                "",
-                &origin_url,
-            ))),
-            &config.borrow().get("github-domains"),
-            false,
+        if !in_array_loose(
+            strtolower(&Preg::replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
+            config.borrow().get("github-domains").values(),
         ) {
             return Ok(false);
         }

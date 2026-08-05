@@ -44,8 +44,8 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, date, date_format_to_strftime, extension_loaded, impl_php_class, in_array,
-    php_regex, realpath, strtolower, version_compare,
+    array_search, date, date_format_to_strftime, extension_loaded, impl_php_class, in_array_loose,
+    in_array_strict, php_regex, realpath, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -303,13 +303,12 @@ impl Command for ShowCommand {
             .as_string()
             .unwrap_or("text")
             .to_string();
-        if !in_array(
-            PhpMixed::String(format.clone()),
-            &PhpMixed::List(vec![
+        if !in_array_loose(
+            format.clone(),
+            &[
                 PhpMixed::String("text".to_string()),
                 PhpMixed::String("json".to_string()),
-            ]),
-            false,
+            ],
         ) {
             self.get_io().write_error(&format!(
                 "Unsupported format \"{}\". See help for supported formats.",
@@ -628,15 +627,13 @@ impl Command for ShowCommand {
 
             if let Some(ref pkg) = matched_package
                 && input.borrow().get_option("direct")?.as_bool() == Some(true)
-                && !in_array(
-                    PhpMixed::String(pkg.get_name()),
-                    &PhpMixed::List(
-                        self.get_root_requires()
-                            .into_iter()
-                            .map(PhpMixed::String)
-                            .collect(),
-                    ),
-                    true,
+                && !in_array_strict(
+                    pkg.get_name(),
+                    &self
+                        .get_root_requires()
+                        .into_iter()
+                        .map(PhpMixed::String)
+                        .collect::<Vec<_>>(),
                 )
             {
                 return Err(InvalidArgumentException {
@@ -798,15 +795,12 @@ impl Command for ShowCommand {
             });
             let mut array_tree: Vec<IndexMap<String, PhpMixed>> = Vec::new();
             for package in packages.iter() {
-                if in_array(
-                    PhpMixed::String(package.get_name()),
-                    &PhpMixed::List(
-                        root_requires
-                            .iter()
-                            .map(|s| PhpMixed::String(s.clone()))
-                            .collect(),
-                    ),
-                    true,
+                if in_array_strict(
+                    package.get_name(),
+                    &root_requires
+                        .iter()
+                        .map(|s| PhpMixed::String(s.clone()))
+                        .collect::<Vec<_>>(),
                 ) {
                     array_tree.push(self.generate_package_tree(
                         package.clone(),
@@ -911,12 +905,12 @@ impl Command for ShowCommand {
                         if matches_filter {
                             let matches_list = match &package_list_filter {
                                 None => true,
-                                Some(list) => in_array(
-                                    PhpMixed::String(p.get_name()),
-                                    &PhpMixed::List(
-                                        list.iter().map(|s| PhpMixed::String(s.clone())).collect(),
-                                    ),
-                                    true,
+                                Some(list) => in_array_strict(
+                                    p.get_name(),
+                                    &list
+                                        .iter()
+                                        .map(|s| PhpMixed::String(s.clone()))
+                                        .collect::<Vec<_>>(),
                                 ),
                             };
                             if matches_list {
@@ -1075,15 +1069,13 @@ impl Command for ShowCommand {
                         );
                         package_view_data.insert(
                             "direct-dependency".to_string(),
-                            PhpMixed::Bool(in_array(
-                                PhpMixed::String(package.get_name()),
-                                &PhpMixed::List(
-                                    self.get_root_requires()
-                                        .into_iter()
-                                        .map(PhpMixed::String)
-                                        .collect(),
-                                ),
-                                true,
+                            PhpMixed::Bool(in_array_strict(
+                                package.get_name(),
+                                &self
+                                    .get_root_requires()
+                                    .into_iter()
+                                    .map(PhpMixed::String)
+                                    .collect::<Vec<_>>(),
                             )),
                         );
                         if format != "json"
@@ -2581,11 +2573,7 @@ impl ShowCommand {
                 .unwrap_or("")
                 .to_string();
 
-            let circular_warn = if in_array(
-                PhpMixed::String(require_name.clone()),
-                &PhpMixed::List(current_tree.to_vec()),
-                true,
-            ) {
+            let circular_warn = if in_array_strict(require_name.clone(), &current_tree) {
                 "(circular dependency aborted here)"
             } else {
                 ""
@@ -2635,11 +2623,7 @@ impl ShowCommand {
                     PhpMixed::String(require.get_pretty_constraint().to_string()),
                 );
 
-                if !in_array(
-                    PhpMixed::String(require_name.clone()),
-                    &PhpMixed::List(current_tree.to_vec()),
-                    true,
-                ) {
+                if !in_array_strict(require_name.clone(), &current_tree) {
                     current_tree.push(PhpMixed::String(require_name.clone()));
                     let deep_children = self.add_tree(
                         require_name,

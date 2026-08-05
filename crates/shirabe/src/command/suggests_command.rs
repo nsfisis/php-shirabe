@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, empty, impl_php_class, in_array};
+use shirabe_php_shim::{PhpMixed, empty, impl_php_class, in_array_loose};
 
 #[derive(Debug)]
 pub struct SuggestsCommand {
@@ -169,7 +169,7 @@ impl Command for SuggestsCommand {
             composer.get_package().clone().into();
         packages.push(root_pkg_as_base);
         for package in &packages {
-            if !empty(&filter) && !in_array(PhpMixed::String(package.get_name()), &filter, false) {
+            if !empty(&filter) && !in_array_loose(package.get_name(), filter.values()) {
                 continue;
             }
             reporter.add_suggestions_from_package(package.clone());

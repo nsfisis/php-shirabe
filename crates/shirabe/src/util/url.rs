@@ -4,7 +4,9 @@ use crate::config::Config;
 use crate::util::GitHub;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array, parse_url, php_regex};
+use shirabe_php_shim::{
+    PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array_strict, parse_url, php_regex,
+};
 
 pub struct Url;
 
@@ -93,17 +95,13 @@ impl Url {
                     r#ref
                 );
             }
-        } else if in_array(
-            PhpMixed::String(host.clone()),
-            &config.get("github-domains"),
-            true,
-        ) {
+        } else if in_array_strict(host.clone(), config.get("github-domains").values()) {
             url = Preg::replace(
                 php_regex!(r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i"),
                 &format!("$1/{}", r#ref),
                 &url,
             );
-        } else if in_array(PhpMixed::String(host), &config.get("gitlab-domains"), true) {
+        } else if in_array_strict(host, config.get("gitlab-domains").values()) {
             url = Preg::replace(
                 php_regex!(
                     r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i"
@@ -146,11 +144,7 @@ impl Url {
         // Gitlab can be installed in a non-root context (i.e. gitlab.com/foo). When downloading archives the originUrl
         // is the host without the path, so we look for the registered gitlab-domains matching the host here
         if !origin.contains('/')
-            && !in_array(
-                PhpMixed::String(origin.clone()),
-                &config.get("gitlab-domains"),
-                true,
-            )
+            && !in_array_strict(origin.clone(), config.get("gitlab-domains").values())
         {
             let gitlab_domains: Vec<String> = match config.get("gitlab-domains") {
                 PhpMixed::List(list) => list

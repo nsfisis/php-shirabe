@@ -8,9 +8,9 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
-    PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, pathinfo,
-    php_regex, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers, strlen,
-    strpos, strrpos, strtr, substr,
+    PhpMixed, RuntimeException, explode, getcwd, implode, in_array_strict, is_dir, is_file,
+    pathinfo, php_regex, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers,
+    strlen, strpos, strrpos, strtr, substr,
 };
 use std::path::PathBuf;
 
@@ -73,14 +73,13 @@ impl ClassMapGenerator {
         namespace: Option<String>,
         excluded_dirs: Vec<String>,
     ) -> anyhow::Result<()> {
-        if !in_array(
-            PhpMixed::String(autoload_type.to_string()),
-            &PhpMixed::List(vec![
+        if !in_array_strict(
+            autoload_type.to_string(),
+            &[
                 PhpMixed::String("psr-0".to_string()),
                 PhpMixed::String("psr-4".to_string()),
                 PhpMixed::String("classmap".to_string()),
-            ]),
-            true,
+            ],
         ) {
             return Err(anyhow::anyhow!(InvalidArgumentException {
                 message: "$autoloadType must be one of: \"psr-0\", \"psr-4\" or \"classmap\""
@@ -146,15 +145,13 @@ impl ClassMapGenerator {
                 }
             };
             let ext = pathinfo(PhpMixed::String(file_path.clone()), PATHINFO_EXTENSION);
-            if !in_array(
+            if !in_array_strict(
                 ext,
-                &PhpMixed::List(
-                    self.extensions
-                        .iter()
-                        .map(|e| PhpMixed::String(e.clone()))
-                        .collect(),
-                ),
-                true,
+                &self
+                    .extensions
+                    .iter()
+                    .map(|e| PhpMixed::String(e.clone()))
+                    .collect::<Vec<_>>(),
             ) {
                 continue;
             }

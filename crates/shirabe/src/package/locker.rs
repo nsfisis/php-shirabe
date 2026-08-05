@@ -28,8 +28,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
-    array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array, is_int,
-    ksort, php_regex, realpath, strcmp, strtolower, touch2, trim, usort,
+    array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array_loose,
+    in_array_strict, is_int, ksort, php_regex, realpath, strcmp, strtolower, touch2, trim, usort,
 };
 
 /// Reads/writes project lockfile (composer.lock).
@@ -481,14 +481,13 @@ impl Locker {
                     .and_then(|v| v.as_string())
                     .unwrap_or("")
                     .to_string();
-                if in_array(
-                    PhpMixed::String(version),
-                    &PhpMixed::List(vec![
+                if in_array_strict(
+                    version,
+                    &[
                         PhpMixed::String("dev-master".to_string()),
                         PhpMixed::String("dev-trunk".to_string()),
                         PhpMixed::String("dev-default".to_string()),
-                    ]),
-                    true,
+                    ],
                 ) {
                     alias.insert(
                         "version".to_string(),
@@ -807,13 +806,12 @@ impl Locker {
         let mut datetime: Option<chrono::DateTime<chrono::Utc>> = None;
 
         if path.is_some()
-            && in_array(
-                PhpMixed::String(source_type.clone().unwrap_or_default()),
-                &PhpMixed::List(vec![
+            && in_array_loose(
+                source_type.clone().unwrap_or_default(),
+                &[
                     PhpMixed::String("git".to_string()),
                     PhpMixed::String("hg".to_string()),
-                ]),
-                false,
+                ],
             )
         {
             let source_ref = package

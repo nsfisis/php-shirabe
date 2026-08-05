@@ -11,7 +11,7 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, http_build_query, in_array, json_decode, php_regex, time,
+    PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode, php_regex, time,
 };
 
 #[derive(Debug)]
@@ -55,15 +55,9 @@ impl GitLab {
         let bc_origin_url = Preg::replace(php_regex!("{:\\d+}"), "", origin_url);
 
         let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-        if !in_array(
-            PhpMixed::String(origin_url.to_string()),
-            &gitlab_domains,
-            true,
-        ) && !in_array(
-            PhpMixed::String(bc_origin_url.clone()),
-            &gitlab_domains,
-            true,
-        ) {
+        if !in_array_strict(origin_url.to_string(), gitlab_domains.values())
+            && !in_array_strict(bc_origin_url.clone(), gitlab_domains.values())
+        {
             return false;
         }
 

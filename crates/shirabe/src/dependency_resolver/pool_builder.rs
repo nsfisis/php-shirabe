@@ -21,8 +21,8 @@ use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, array_flip_strings, array_map, in_array, microtime, number_format,
-    round, strpos,
+    LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
+    number_format, round, strpos,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::Intervals;
@@ -540,25 +540,23 @@ impl PoolBuilder {
                         .insert(pkg_version.clone(), package.clone());
 
                     let pkg_type_mixed: PhpMixed = pkg_type.clone().into();
-                    let ignored_mixed: PhpMixed = self
+                    let ignored_mixed: Vec<PhpMixed> = self
                         .ignored_types
                         .iter()
                         .cloned()
                         .map(PhpMixed::from)
-                        .collect::<Vec<_>>()
-                        .into();
-                    if in_array(pkg_type_mixed.clone(), &ignored_mixed, true)
+                        .collect();
+                    if in_array_strict(pkg_type_mixed.clone(), &ignored_mixed)
                         || (self.allowed_types.is_some() && {
-                            let allowed_mixed: PhpMixed = self
+                            let allowed_mixed: Vec<PhpMixed> = self
                                 .allowed_types
                                 .as_ref()
                                 .unwrap()
                                 .iter()
                                 .cloned()
                                 .map(PhpMixed::from)
-                                .collect::<Vec<_>>()
-                                .into();
-                            !in_array(pkg_type_mixed.clone(), &allowed_mixed, true)
+                                .collect();
+                            !in_array_strict(pkg_type_mixed.clone(), &allowed_mixed)
                         })
                     {
                         continue;

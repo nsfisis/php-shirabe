@@ -33,7 +33,8 @@ use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, in_array, parse_url, php_regex, preg_quote, rename, strpos, substr, unlink_silent,
+    PhpMixed, in_array_loose, in_array_strict, parse_url, php_regex, preg_quote, rename, strpos,
+    substr, unlink_silent,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -412,15 +413,12 @@ impl CurlDownloader {
                 .and_then(|v| v.as_int())
                 .unwrap_or(0);
             if Self::method_is_get(options)
-                && in_array(
-                    PhpMixed::Int(status_code),
-                    &PhpMixed::List(
-                        [423, 425, 500, 502, 503, 504, 507, 510]
-                            .iter()
-                            .map(|c| PhpMixed::Int(*c))
-                            .collect(),
-                    ),
-                    true,
+                && in_array_strict(
+                    status_code,
+                    &[423, 425, 500, 502, 503, 504, 507, 510]
+                        .iter()
+                        .map(|c| PhpMixed::Int(*c))
+                        .collect::<Vec<_>>(),
                 )
                 && retries < self.max_retries
             {
@@ -717,10 +715,9 @@ impl CurlDownloader {
             .and_then(|b| b.as_int())
             .unwrap_or(0);
 
-        if in_array(
-            PhpMixed::Int(response.inner.get_status_code()),
-            &PhpMixed::List(vec![PhpMixed::Int(401), PhpMixed::Int(403)]),
-            false,
+        if in_array_loose(
+            response.inner.get_status_code(),
+            &[PhpMixed::Int(401), PhpMixed::Int(403)],
         ) && retry_auth_failure
         {
             let status_message = response.inner.get_status_message();
@@ -767,11 +764,7 @@ impl CurlDownloader {
             _ => Vec::new(),
         };
         if response.inner.get_status_code() == 404
-            && in_array(
-                PhpMixed::String(origin.to_string()),
-                &PhpMixed::List(gitlab_domains_list),
-                true,
-            )
+            && in_array_strict(origin.to_string(), &gitlab_domains_list)
             && strpos(url, "archive.zip").is_some()
         {
             needs_auth_retry = Some("GitLab requires authentication and it was not provided");
@@ -827,19 +820,16 @@ impl CurlDownloader {
         }
 
         let mut details = String::new();
-        if in_array(
-            PhpMixed::String(
-                response
-                    .inner
-                    .get_header("content-type")
-                    .unwrap_or_default()
-                    .to_lowercase(),
-            ),
-            &PhpMixed::List(vec![
+        if in_array_strict(
+            response
+                .inner
+                .get_header("content-type")
+                .unwrap_or_default()
+                .to_lowercase(),
+            &[
                 PhpMixed::String("application/json".to_string()),
                 PhpMixed::String("application/json; charset=utf-8".to_string()),
-            ]),
-            true,
+            ],
         ) {
             let body = response.inner.get_body().unwrap_or("");
             details = format!(

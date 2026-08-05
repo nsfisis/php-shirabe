@@ -19,7 +19,7 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array, preg_quote, substr,
+    InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array_loose, preg_quote, substr,
 };
 
 #[derive(Debug)]
@@ -120,13 +120,12 @@ impl Command for SearchCommand {
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| "text".to_string());
-        if !in_array(
-            PhpMixed::String(format.clone()),
-            &PhpMixed::List(vec![
+        if !in_array_loose(
+            format.clone(),
+            &[
                 PhpMixed::String("text".to_string()),
                 PhpMixed::String("json".to_string()),
-            ]),
-            false,
+            ],
         ) {
             io.write_error(&format!(
                 "Unsupported format \"{}\". See help for supported formats.",

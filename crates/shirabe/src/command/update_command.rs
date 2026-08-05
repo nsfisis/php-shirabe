@@ -34,7 +34,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, impl_php_class, in_array, php_regex,
+    array_keys, array_merge_map, array_search_in_vec, impl_php_class, in_array_strict, php_regex,
     strtolower,
 };
 use shirabe_semver::Intervals;
@@ -334,14 +334,13 @@ impl Command for UpdateCommand {
         // the arguments lock/nothing/mirrors are not package names but trigger a mirror update instead
         // they are further mutually exclusive with listing actual package names
         let filtered_packages: Vec<String> = array_filter(&packages, |package: &String| -> bool {
-            !in_array(
-                PhpMixed::String(package.clone()),
-                &PhpMixed::List(vec![
+            !in_array_strict(
+                package.clone(),
+                &[
                     PhpMixed::String("lock".to_string()),
                     PhpMixed::String("nothing".to_string()),
                     PhpMixed::String("mirrors".to_string()),
-                ]),
-                true,
+                ],
             )
         });
         let update_mirrors = input

@@ -28,8 +28,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
     PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, file_exists,
-    filesize, get_class, hash, hash_file, in_array, is_dir, is_executable, parse_url, pathinfo,
-    realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+    filesize, get_class, hash, hash_file, in_array_strict, is_dir, is_executable, parse_url,
+    pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -339,15 +339,14 @@ impl DownloaderInterface for FileDownloader {
                         if let Some(te) = e.downcast_ref::<TransportException>() {
                             // if we got an http response with a proper code, then requesting again will probably not help, abort
                             if 0 != te.get_code()
-                                && !in_array(
-                                    PhpMixed::Int(te.get_code()),
-                                    &PhpMixed::List(vec![
+                                && !in_array_strict(
+                                    te.get_code(),
+                                    &[
                                         PhpMixed::Int(500),
                                         PhpMixed::Int(502),
                                         PhpMixed::Int(503),
                                         PhpMixed::Int(504),
-                                    ]),
-                                    true,
+                                    ],
                                 )
                             {
                                 retries = 0;

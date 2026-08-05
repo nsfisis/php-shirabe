@@ -585,18 +585,20 @@ fn php_slice_bounds(len: i64, offset: i64, length: Option<i64>) -> (usize, usize
     (start as usize, end as usize)
 }
 
-pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
-    let values: Vec<&PhpMixed> = match haystack {
-        PhpMixed::List(items) => items.iter().collect(),
-        PhpMixed::Array(map) => map.values().collect(),
-        _ => return false,
-    };
+pub fn in_array_strict<'a>(
+    needle: impl Into<PhpMixed>,
+    haystack: impl IntoIterator<Item = &'a PhpMixed>,
+) -> bool {
+    let needle = needle.into();
+    haystack.into_iter().any(|value| *value == needle)
+}
 
-    if strict {
-        values.iter().any(|value| **value == needle)
-    } else {
-        values.iter().any(|value| loose_eq(value, &needle))
-    }
+pub fn in_array_loose<'a>(
+    needle: impl Into<PhpMixed>,
+    haystack: impl IntoIterator<Item = &'a PhpMixed>,
+) -> bool {
+    let needle = needle.into();
+    haystack.into_iter().any(|value| loose_eq(value, &needle))
 }
 
 /// PHP numeric-string-aware conversion to a number, used by loose comparison.

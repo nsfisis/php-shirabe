@@ -17,7 +17,8 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, impl_php_class, implode, in_array,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, impl_php_class, implode,
+    in_array_strict,
 };
 
 #[derive(Debug)]
@@ -165,10 +166,12 @@ impl Command for AuditCommand {
             .as_string()
             .map(|s| s.to_string());
         if abandoned.is_some()
-            && !in_array(
-                PhpMixed::String(abandoned.clone().unwrap()),
-                &PhpMixed::from(Auditor::ABANDONEDS.to_vec()),
-                true,
+            && !in_array_strict(
+                abandoned.clone().unwrap(),
+                &Auditor::ABANDONEDS
+                    .iter()
+                    .map(|s| PhpMixed::String(s.to_string()))
+                    .collect::<Vec<_>>(),
             )
         {
             return Err(InvalidArgumentException {

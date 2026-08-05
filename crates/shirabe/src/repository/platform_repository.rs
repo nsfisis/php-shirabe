@@ -23,8 +23,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
-    array_slice_strs, explode, get_class, implode, in_array, is_string, php_regex, str_replace,
-    str_starts_with, strpos, strtolower, var_export,
+    array_slice_strs, explode, get_class, implode, in_array_strict, is_string, php_regex,
+    str_replace, str_starts_with, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -322,16 +322,12 @@ impl PlatformRepository {
         }
 
         // Check for Xdebug in a restarted process
-        if !in_array(
-            PhpMixed::String("xdebug".to_string()),
-            &PhpMixed::Array(
-                loaded_extensions
-                    .iter()
-                    .enumerate()
-                    .map(|(i, s)| (i.to_string(), PhpMixed::String(s.clone())))
-                    .collect(),
-            ),
-            true,
+        if !in_array_strict(
+            "xdebug".to_string(),
+            &loaded_extensions
+                .iter()
+                .map(|s| PhpMixed::String(s.clone()))
+                .collect::<Vec<_>>(),
         ) && let Some(xdebug_pretty_version) = XdebugHandler::get_skipped_version()
             && !xdebug_pretty_version.is_empty()
         {

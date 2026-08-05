@@ -18,8 +18,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
-    array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array, is_array,
-    is_string, ord, php_regex, strpos, strtolower,
+    array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array_loose,
+    in_array_strict, is_array, is_string, ord, php_regex, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -115,13 +115,12 @@ impl GitLabDriver {
             .get(&CaptureKey::ByName("scheme".to_string()))
             .cloned()
             .unwrap_or_default();
-        self.scheme = if in_array(
-            PhpMixed::String(scheme_match.clone()),
-            &PhpMixed::List(vec![
+        self.scheme = if in_array_strict(
+            scheme_match.clone(),
+            &[
                 PhpMixed::String("https".to_string()),
                 PhpMixed::String("http".to_string()),
-            ]),
-            true,
+            ],
         ) {
             scheme_match
         } else if self
@@ -159,14 +158,13 @@ impl GitLabDriver {
             .filter(|_| is_string(&protocol_value))
         {
             // https treated as a synonym for http.
-            if !in_array(
-                PhpMixed::String(protocol.to_string()),
-                &PhpMixed::List(vec![
+            if !in_array_strict(
+                protocol.to_string(),
+                &[
                     PhpMixed::String("git".to_string()),
                     PhpMixed::String("http".to_string()),
                     PhpMixed::String("https".to_string()),
-                ]),
-                true,
+                ],
             ) {
                 return Err(RuntimeException {
                     message: "gitlab-protocol must be one of git, http.".to_string(),
@@ -604,13 +602,12 @@ impl GitLabDriver {
         for byte in &bytes {
             let character = byte.to_string();
             let final_character = if !ctype_alnum(&character)
-                && !in_array(
-                    PhpMixed::String(character.clone()),
-                    &PhpMixed::List(vec![
+                && !in_array_strict(
+                    character.clone(),
+                    &[
                         PhpMixed::String("-".to_string()),
                         PhpMixed::String("_".to_string()),
-                    ]),
-                    true,
+                    ],
                 ) {
                 format!("%{:02X}", ord(&character))
             } else {
@@ -1066,20 +1063,16 @@ impl GitLabDriver {
     ) -> Option<String> {
         let mut guessed_domain = strtolower(&guessed_domain);
 
-        if in_array(
-            PhpMixed::String(guessed_domain.clone()),
-            configured_domains,
-            false,
-        ) || (port_number.is_some()
-            && in_array(
-                PhpMixed::String(format!(
-                    "{}:{}",
-                    guessed_domain,
-                    port_number.as_deref().unwrap_or("")
-                )),
-                configured_domains,
-                false,
-            ))
+        if in_array_loose(guessed_domain.clone(), configured_domains.values())
+            || (port_number.is_some()
+                && in_array_loose(
+                    format!(
+                        "{}:{}",
+                        guessed_domain,
+                        port_number.as_deref().unwrap_or("")
+                    ),
+                    configured_domains.values(),
+                ))
         {
             if let Some(ref port) = port_number {
                 return Some(format!("{}:{}", guessed_domain, port));
@@ -1095,16 +1088,12 @@ impl GitLabDriver {
         while let Some(part) = array_shift(url_parts) {
             guessed_domain.push_str(&format!("/{}", part));
 
-            if in_array(
-                PhpMixed::String(guessed_domain.clone()),
-                configured_domains,
-                false,
-            ) || (port_number.is_some()
-                && in_array(
-                    PhpMixed::String(Preg::replace(php_regex!(r"{:\d+}"), "", &guessed_domain)),
-                    configured_domains,
-                    false,
-                ))
+            if in_array_loose(guessed_domain.clone(), configured_domains.values())
+                || (port_number.is_some()
+                    && in_array_loose(
+                        Preg::replace(php_regex!(r"{:\d+}"), "", &guessed_domain),
+                        configured_domains.values(),
+                    ))
             {
                 return Some(guessed_domain);
             }

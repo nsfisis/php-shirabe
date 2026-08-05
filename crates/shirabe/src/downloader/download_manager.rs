@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, dirname, implode, in_array, preg_quote, rtrim, str_replace,
+    array_reverse, array_shift, dirname, implode, in_array_strict, preg_quote, rtrim, str_replace,
     strtolower, usort,
 };
 
@@ -487,15 +487,12 @@ impl DownloadManager {
         if let Some(prev) = prev_package {
             // if we are updating, we want to keep the same source as the previously installed package (if available in the new one)
             let prev_source = prev.get_installation_source();
-            if in_array(
-                PhpMixed::String(prev_source.clone().unwrap_or_default()),
-                &PhpMixed::List(
-                    sources
-                        .iter()
-                        .map(|s| PhpMixed::String(s.clone()))
-                        .collect(),
-                ),
-                true,
+            if in_array_strict(
+                prev_source.clone().unwrap_or_default(),
+                &sources
+                    .iter()
+                    .map(|s| PhpMixed::String(s.clone()))
+                    .collect::<Vec<_>>(),
             )
                 // unless the previous package was stable dist (by default) and the new package is dev, then we allow the new default to take over
                 && !(!prev.is_dev()

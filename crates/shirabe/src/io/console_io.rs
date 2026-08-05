@@ -24,7 +24,7 @@ use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
 use shirabe_external_packages::symfony::console::question::Question;
 use shirabe_external_packages::symfony::console::question::QuestionInterface;
 use shirabe_php_shim::{
-    PhpMixed, array_search, implode, in_array, is_array, is_string, microtime, str_repeat,
+    PhpMixed, array_search, implode, in_array_strict, is_array, is_string, microtime, str_repeat,
     strip_tags, strlen,
 };
 
@@ -614,7 +614,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             _ => vec![],
         };
         for (index, choice) in &choice_list {
-            if in_array(choice.clone(), &PhpMixed::List(result_list.clone()), true) {
+            if in_array_strict(choice.clone(), &result_list) {
                 results.push(index.clone());
             }
         }

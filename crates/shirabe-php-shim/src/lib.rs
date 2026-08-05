@@ -209,6 +209,16 @@ impl PhpMixed {
         }
     }
 
+    /// Values of an array in insertion order. Panics on non-array values, mirroring the TypeError
+    /// PHP raises when an array is expected.
+    pub fn values(&self) -> Vec<&PhpMixed> {
+        match self {
+            PhpMixed::List(l) => l.iter().collect(),
+            PhpMixed::Array(a) | PhpMixed::Object(a) => a.values().collect(),
+            other => panic!("expected an array, got {:?}", other),
+        }
+    }
+
     pub fn is_null(&self) -> bool {
         matches!(self, PhpMixed::Null)
     }

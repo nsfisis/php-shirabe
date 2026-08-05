@@ -15,8 +15,9 @@ use shirabe_external_packages::symfony::process::exception::ProcessSignaledExcep
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
-    escapeshellarg, explode, implode, in_array, is_array, is_dir, is_numeric, is_string, php_regex,
-    rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
+    escapeshellarg, explode, implode, in_array_strict, is_array, is_dir, is_numeric, is_string,
+    php_regex, rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
+    substr_replace, trim,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -974,15 +975,12 @@ impl ProcessExecutor {
 
     /// Resolves executable paths on Windows
     fn get_executable(name: &str) -> String {
-        if in_array(
-            PhpMixed::String(strtolower(name)),
-            &PhpMixed::List(
-                Self::BUILTIN_CMD_COMMANDS
-                    .iter()
-                    .map(|s| PhpMixed::String(s.to_string()))
-                    .collect(),
-            ),
-            true,
+        if in_array_strict(
+            strtolower(name),
+            &Self::BUILTIN_CMD_COMMANDS
+                .iter()
+                .map(|s| PhpMixed::String(s.to_string()))
+                .collect::<Vec<_>>(),
         ) {
             return name.to_string();
         }

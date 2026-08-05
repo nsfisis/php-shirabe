@@ -19,8 +19,8 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir, php_regex,
-    preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
+    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array_strict, is_dir,
+    php_regex, preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -537,7 +537,7 @@ impl GitDownloader {
                 .cloned()
                 .unwrap_or_default();
             let mut push_url = format!("git@{}:{}/{}.git", m1, m2, m3);
-            if !in_array(PhpMixed::String("ssh".to_string()), &protocols, true) {
+            if !in_array_strict("ssh".to_string(), protocols.values()) {
                 push_url = format!("https://{}/{}/{}.git", m1, m2, m3);
             }
             let cmd = vec![

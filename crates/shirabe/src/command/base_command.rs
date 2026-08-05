@@ -28,7 +28,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array, is_string,
+    UnexpectedValueException, count, explode, in_array_strict, is_string,
 };
 
 pub const SUCCESS: i64 = 0;
@@ -663,7 +663,7 @@ impl BaseCommand for BaseCommandData {
             .iter()
             .map(|s| PhpMixed::String(s.to_string()))
             .collect();
-        if !in_array(val.clone(), &PhpMixed::List(formats), true) {
+        if !in_array_strict(val.clone(), &formats) {
             return Err(InvalidArgumentException {
                 message: format!(
                     "--{} must be one of {}.",

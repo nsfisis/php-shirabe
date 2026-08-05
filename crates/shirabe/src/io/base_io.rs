@@ -10,7 +10,8 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::psr::log::LogLevel;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, in_array, json_encode_ex, php_regex,
+    UnexpectedValueException, array_merge, in_array_loose, in_array_strict, json_encode_ex,
+    php_regex,
 };
 
 fn log_context(context: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
@@ -116,10 +117,12 @@ pub trait BaseIO: IOInterface {
                 let token_str = token.as_string().unwrap_or("").to_string();
                 let github_domains = config.get("github-domains");
                 if domain != "github.com"
-                    && !in_array(
-                        PhpMixed::String(domain.clone()),
-                        &github_domains.clone().unwrap_or(PhpMixed::List(vec![])),
-                        true,
+                    && !in_array_strict(
+                        domain.clone(),
+                        github_domains
+                            .clone()
+                            .unwrap_or(PhpMixed::List(vec![]))
+                            .values(),
                     )
                 {
                     <Self as BaseIO>::debug(
@@ -162,10 +165,12 @@ pub trait BaseIO: IOInterface {
             for (domain, token) in map.clone() {
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
-                    && !in_array(
-                        PhpMixed::String(domain.clone()),
-                        &gitlab_domains.clone().unwrap_or(PhpMixed::List(vec![])),
-                        true,
+                    && !in_array_strict(
+                        domain.clone(),
+                        gitlab_domains
+                            .clone()
+                            .unwrap_or(PhpMixed::List(vec![]))
+                            .values(),
                     )
                 {
                     <Self as BaseIO>::debug(
@@ -203,10 +208,12 @@ pub trait BaseIO: IOInterface {
             for (domain, token) in map.clone() {
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
-                    && !in_array(
-                        PhpMixed::String(domain.clone()),
-                        &gitlab_domains.clone().unwrap_or(PhpMixed::List(vec![])),
-                        true,
+                    && !in_array_strict(
+                        domain.clone(),
+                        gitlab_domains
+                            .clone()
+                            .unwrap_or(PhpMixed::List(vec![]))
+                            .values(),
                     )
                 {
                     <Self as BaseIO>::debug(
@@ -252,10 +259,12 @@ pub trait BaseIO: IOInterface {
         if let Some(map) = forgejo_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
                 let forgejo_domains = config.get("forgejo-domains");
-                if !in_array(
-                    PhpMixed::String(domain.clone()),
-                    &forgejo_domains.clone().unwrap_or(PhpMixed::List(vec![])),
-                    true,
+                if !in_array_strict(
+                    domain.clone(),
+                    forgejo_domains
+                        .clone()
+                        .unwrap_or(PhpMixed::List(vec![]))
+                        .values(),
                 ) {
                     <Self as BaseIO>::debug(
                         self,
@@ -461,15 +470,14 @@ pub trait BaseIO: IOInterface {
         }
 
         let level_str = level.as_string().unwrap_or("");
-        if in_array(
+        if in_array_loose(
             level.clone(),
-            &PhpMixed::List(vec![
+            &[
                 PhpMixed::String(LogLevel::EMERGENCY.to_string()),
                 PhpMixed::String(LogLevel::ALERT.to_string()),
                 PhpMixed::String(LogLevel::CRITICAL.to_string()),
                 PhpMixed::String(LogLevel::ERROR.to_string()),
-            ]),
-            false,
+            ],
         ) {
             self.write_error3(
                 &format!("<error>{}</error>", message_str),

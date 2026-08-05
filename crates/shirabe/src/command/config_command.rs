@@ -24,9 +24,9 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
-    escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array, is_array,
-    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, php_regex, str_replace, strpos,
-    strtolower, system, touch, var_export,
+    escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array_loose,
+    in_array_strict, is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode,
+    php_regex, str_replace, strpos, strtolower, system, touch, var_export,
 };
 use shirabe_semver::VersionParser;
 
@@ -470,7 +470,13 @@ impl Command for ConfigCommand {
                 .as_array()
                 .and_then(|a| a.get(&setting_key))
                 .is_some()
-                && in_array(setting_key.as_str().into(), &properties.into(), true)
+                && in_array_strict(
+                    setting_key.as_str(),
+                    &properties
+                        .iter()
+                        .map(|s| PhpMixed::String(s.to_string()))
+                        .collect::<Vec<_>>(),
+                )
             {
                 value = raw_data
                     .as_array()
@@ -519,16 +525,14 @@ impl Command for ConfigCommand {
         let values: Vec<String> = setting_values; // what the user is trying to add/change
 
         let boolean_validator = |val: &PhpMixed| -> bool {
-            in_array(
-                val.as_string().unwrap_or("").into(),
-                &vec![
-                    "true".to_string(),
-                    "false".to_string(),
-                    "1".to_string(),
-                    "0".to_string(),
-                ]
-                .into(),
-                true,
+            in_array_strict(
+                val.as_string().unwrap_or(""),
+                &[
+                    PhpMixed::String("true".to_string()),
+                    PhpMixed::String("false".to_string()),
+                    PhpMixed::String("1".to_string()),
+                    PhpMixed::String("0".to_string()),
+                ],
             )
         };
         let boolean_normalizer = |val: &PhpMixed| -> PhpMixed {
@@ -879,10 +883,12 @@ impl Command for ConfigCommand {
         }
 
         // handle unsetting extra/suggest
-        if in_array(
-            setting_key.as_str().into(),
-            &vec!["suggest".to_string(), "extra".to_string()].into(),
-            true,
+        if in_array_strict(
+            setting_key.as_str(),
+            &[
+                PhpMixed::String("suggest".to_string()),
+                PhpMixed::String("extra".to_string()),
+            ],
         ) && input.borrow().get_option("unset")?.as_bool() == Some(true)
         {
             self.config_source
@@ -938,14 +944,12 @@ impl Command for ConfigCommand {
         }
 
         // handle audit.ignore and audit.ignore-abandoned with --merge support
-        if in_array(
-            setting_key.as_str().into(),
-            &vec![
-                "audit.ignore".to_string(),
-                "audit.ignore-abandoned".to_string(),
-            ]
-            .into(),
-            true,
+        if in_array_strict(
+            setting_key.as_str(),
+            &[
+                PhpMixed::String("audit.ignore".to_string()),
+                PhpMixed::String("audit.ignore-abandoned".to_string()),
+            ],
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
@@ -1090,16 +1094,14 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
-            } else if in_array(
-                matches[1].as_str().into(),
-                &vec![
-                    "github-oauth".to_string(),
-                    "gitlab-oauth".to_string(),
-                    "gitlab-token".to_string(),
-                    "bearer".to_string(),
-                ]
-                .into(),
-                true,
+            } else if in_array_strict(
+                matches[1].as_str(),
+                &[
+                    PhpMixed::String("github-oauth".to_string()),
+                    PhpMixed::String("gitlab-oauth".to_string()),
+                    PhpMixed::String("gitlab-token".to_string()),
+                    PhpMixed::String("bearer".to_string()),
+                ],
             ) {
                 if 1 != values.len() {
                     return Err(RuntimeException {
@@ -1416,10 +1418,12 @@ impl ConfigCommand {
         let mut k = k;
         for (key, value) in &contents_arr {
             if k.is_none()
-                && !in_array(
-                    key.as_str().into(),
-                    &vec!["config".to_string(), "repositories".to_string()].into(),
-                    true,
+                && !in_array_strict(
+                    key.as_str(),
+                    &[
+                        PhpMixed::String("config".to_string()),
+                        PhpMixed::String("repositories".to_string()),
+                    ],
                 )
             {
                 continue;
@@ -1667,16 +1671,14 @@ pub type ValidatorFn = Box<dyn Fn(&PhpMixed) -> PhpMixed>;
 pub type NormalizerFn = Box<dyn Fn(&PhpMixed) -> PhpMixed>;
 
 fn boolean_validator(val: &PhpMixed) -> PhpMixed {
-    PhpMixed::Bool(in_array(
-        val.as_string().unwrap_or("").into(),
-        &vec![
-            "true".to_string(),
-            "false".to_string(),
-            "1".to_string(),
-            "0".to_string(),
-        ]
-        .into(),
-        true,
+    PhpMixed::Bool(in_array_strict(
+        val.as_string().unwrap_or(""),
+        &[
+            PhpMixed::String("true".to_string()),
+            PhpMixed::String("false".to_string()),
+            PhpMixed::String("1".to_string()),
+            PhpMixed::String("0".to_string()),
+        ],
     ))
 }
 
@@ -1713,10 +1715,13 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "preferred-install".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec!["auto".to_string(), "source".to_string(), "dist".to_string()].into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("auto".to_string()),
+                        PhpMixed::String("source".to_string()),
+                        PhpMixed::String("dist".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| val.clone()),
@@ -1726,10 +1731,13 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "gitlab-protocol".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec!["git".to_string(), "http".to_string(), "https".to_string()].into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("git".to_string()),
+                        PhpMixed::String("http".to_string()),
+                        PhpMixed::String("https".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| val.clone()),
@@ -1739,15 +1747,13 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "store-auths".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec![
-                        "true".to_string(),
-                        "false".to_string(),
-                        "prompt".to_string(),
-                    ]
-                    .into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("true".to_string()),
+                        PhpMixed::String("false".to_string()),
+                        PhpMixed::String("prompt".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| {
@@ -1866,16 +1872,14 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "bin-compat".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec![
-                        "auto".to_string(),
-                        "full".to_string(),
-                        "proxy".to_string(),
-                        "symlink".to_string(),
-                    ]
-                    .into(),
-                    false,
+                PhpMixed::Bool(in_array_loose(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("auto".to_string()),
+                        PhpMixed::String("full".to_string()),
+                        PhpMixed::String("proxy".to_string()),
+                        PhpMixed::String("symlink".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| val.clone()),
@@ -1885,17 +1889,15 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "discard-changes".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec![
-                        "stash".to_string(),
-                        "true".to_string(),
-                        "false".to_string(),
-                        "1".to_string(),
-                        "0".to_string(),
-                    ]
-                    .into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("stash".to_string()),
+                        PhpMixed::String("true".to_string()),
+                        PhpMixed::String("false".to_string()),
+                        PhpMixed::String("1".to_string()),
+                        PhpMixed::String("0".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| {
@@ -1957,18 +1959,16 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "bump-after-update".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec![
-                        "dev".to_string(),
-                        "no-dev".to_string(),
-                        "true".to_string(),
-                        "false".to_string(),
-                        "1".to_string(),
-                        "0".to_string(),
-                    ]
-                    .into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("dev".to_string()),
+                        PhpMixed::String("no-dev".to_string()),
+                        PhpMixed::String("true".to_string()),
+                        PhpMixed::String("false".to_string()),
+                        PhpMixed::String("1".to_string()),
+                        PhpMixed::String("0".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| {
@@ -2037,17 +2037,15 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "platform-check".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec![
-                        "php-only".to_string(),
-                        "true".to_string(),
-                        "false".to_string(),
-                        "1".to_string(),
-                        "0".to_string(),
-                    ]
-                    .into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("php-only".to_string()),
+                        PhpMixed::String("true".to_string()),
+                        PhpMixed::String("false".to_string()),
+                        PhpMixed::String("1".to_string()),
+                        PhpMixed::String("0".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| {
@@ -2064,15 +2062,13 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "use-parent-dir".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec![
-                        "true".to_string(),
-                        "false".to_string(),
-                        "prompt".to_string(),
-                    ]
-                    .into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String("true".to_string()),
+                        PhpMixed::String("false".to_string()),
+                        PhpMixed::String("prompt".to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| {
@@ -2089,15 +2085,13 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "audit.abandoned".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(in_array(
-                    val.as_string().unwrap_or("").into(),
-                    &vec![
-                        Auditor::ABANDONED_IGNORE.to_string(),
-                        Auditor::ABANDONED_REPORT.to_string(),
-                        Auditor::ABANDONED_FAIL.to_string(),
-                    ]
-                    .into(),
-                    true,
+                PhpMixed::Bool(in_array_strict(
+                    val.as_string().unwrap_or(""),
+                    &[
+                        PhpMixed::String(Auditor::ABANDONED_IGNORE.to_string()),
+                        PhpMixed::String(Auditor::ABANDONED_REPORT.to_string()),
+                        PhpMixed::String(Auditor::ABANDONED_FAIL.to_string()),
+                    ],
                 ))
             }),
             Box::new(|val| val.clone()),
@@ -2131,10 +2125,13 @@ fn build_multi_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)> 
                 }
                 if let Some(list) = vals.as_list() {
                     for val in list {
-                        if !in_array(
-                            val.as_string().unwrap_or("").into(),
-                            &vec!["git".to_string(), "https".to_string(), "ssh".to_string()].into(),
-                            false,
+                        if !in_array_loose(
+                            val.as_string().unwrap_or(""),
+                            &[
+                                PhpMixed::String("git".to_string()),
+                                PhpMixed::String("https".to_string()),
+                                PhpMixed::String("ssh".to_string()),
+                            ],
                         ) {
                             return PhpMixed::String(
                                 "valid protocols include: git, https, ssh".to_string(),
@@ -2180,16 +2177,14 @@ fn build_multi_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)> 
                 }
                 if let Some(list) = vals.as_list() {
                     for val in list {
-                        if !in_array(
-                            val.as_string().unwrap_or("").into(),
-                            &vec![
-                                "low".to_string(),
-                                "medium".to_string(),
-                                "high".to_string(),
-                                "critical".to_string(),
-                            ]
-                            .into(),
-                            true,
+                        if !in_array_strict(
+                            val.as_string().unwrap_or(""),
+                            &[
+                                PhpMixed::String("low".to_string()),
+                                PhpMixed::String("medium".to_string()),
+                                PhpMixed::String("high".to_string()),
+                                PhpMixed::String("critical".to_string()),
+                            ],
                         ) {
                             return PhpMixed::String(
                                 "valid severities include: low, medium, high, critical".to_string(),

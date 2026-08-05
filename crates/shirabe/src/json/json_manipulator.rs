@@ -7,9 +7,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
-    array_reverse, empty, explode, implode, in_array, is_array, is_int, is_numeric, json_decode,
-    php_regex, php_truthy, preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen,
-    strnatcmp, strpos, substr, trim, uksort,
+    array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
+    json_decode, php_regex, php_truthy, preg_quote, rtrim, str_contains, str_repeat, str_replace,
+    strlen, strnatcmp, strpos, substr, trim, uksort,
 };
 
 #[derive(Debug)]
@@ -660,14 +660,13 @@ impl JsonManipulator {
 
         let mut name_owned = name.to_string();
         let mut sub_name: Option<String> = None;
-        if in_array(
-            PhpMixed::String(main_node.to_string()),
-            &PhpMixed::List(vec![
+        if in_array_loose(
+            main_node.to_string(),
+            &[
                 PhpMixed::String("config".to_string()),
                 PhpMixed::String("extra".to_string()),
                 PhpMixed::String("scripts".to_string()),
-            ]),
-            false,
+            ],
         ) && strpos(name, ".").is_some()
         {
             let parts = explode(".", name);
@@ -866,14 +865,13 @@ impl JsonManipulator {
 
         let mut name_owned = name.to_string();
         let mut sub_name: Option<String> = None;
-        if in_array(
-            PhpMixed::String(main_node.to_string()),
-            &PhpMixed::List(vec![
+        if in_array_loose(
+            main_node.to_string(),
+            &[
                 PhpMixed::String("config".to_string()),
                 PhpMixed::String("extra".to_string()),
                 PhpMixed::String("scripts".to_string()),
-            ]),
-            false,
+            ],
         ) && strpos(name, ".").is_some()
         {
             let parts = explode(".", name);

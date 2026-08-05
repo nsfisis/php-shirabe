@@ -20,8 +20,8 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_flip, dirname, get_class_err, get_debug_type, in_array, is_array, is_null, is_string,
-    ksort, realpath, str_repeat, usort, var_export,
+    array_flip, dirname, get_class_err, get_debug_type, in_array_strict, is_array, is_null,
+    is_string, ksort, realpath, str_repeat, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -281,17 +281,15 @@ impl FilesystemRepository {
 
             // only write to the files the names which are really installed, as we receive the full list
             // of dev package names before they get installed during composer install
-            if in_array(
-                PhpMixed::String(package.get_name().to_string()),
-                &PhpMixed::List(
-                    self.inner
-                        .dev_package_names
-                        .borrow()
-                        .iter()
-                        .map(|s| PhpMixed::String(s.clone()))
-                        .collect(),
-                ),
-                true,
+            if in_array_strict(
+                package.get_name().to_string(),
+                &self
+                    .inner
+                    .dev_package_names
+                    .borrow()
+                    .iter()
+                    .map(|s| PhpMixed::String(s.clone()))
+                    .collect::<Vec<_>>(),
             ) && let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names")
             {
                 list.push(PhpMixed::String(package.get_name().to_string()));

@@ -11,9 +11,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
-    array_merge, array_search_mixed, array_unique, empty, filter_var_url, implode, in_array,
-    intval, is_array, is_string, parse_url, php_regex, php_to_string, rtrim, strtolower,
-    strtoupper, strtr, substr, trigger_error,
+    array_merge, array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,
+    in_array_strict, intval, is_array, is_string, parse_url, php_regex, php_to_string, rtrim,
+    strtolower, strtoupper, strtr, substr, trigger_error,
 };
 
 use crate::advisory::Auditor;
@@ -306,9 +306,9 @@ impl Config {
             };
             for (key, val_box) in &config_section_map {
                 let val = val_box.clone();
-                if in_array(
-                    PhpMixed::String(key.clone()),
-                    &PhpMixed::List(vec![
+                if in_array_strict(
+                    key.clone(),
+                    &[
                         PhpMixed::String("bitbucket-oauth".to_string()),
                         PhpMixed::String("github-oauth".to_string()),
                         PhpMixed::String("gitlab-oauth".to_string()),
@@ -317,18 +317,16 @@ impl Config {
                         PhpMixed::String("bearer".to_string()),
                         PhpMixed::String("client-certificate".to_string()),
                         PhpMixed::String("forgejo-token".to_string()),
-                    ]),
-                    true,
+                    ],
                 ) && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                     self.config
                         .insert(key.clone(), array_merge(existing, val.clone()));
                     self.set_source_of_config_value(&val, key, source);
-                } else if in_array(
-                    PhpMixed::String(key.clone()),
-                    &PhpMixed::List(vec![PhpMixed::String("allow-plugins".to_string())]),
-                    true,
+                } else if in_array_strict(
+                    key.clone(),
+                    &[PhpMixed::String("allow-plugins".to_string())],
                 ) && self.config.contains_key(key)
                     && is_array(self.config.get(key).unwrap_or(&PhpMixed::Null))
                     && is_array(&val)
@@ -341,13 +339,12 @@ impl Config {
                         array_merge(array_merge(val.clone(), existing), val.clone()),
                     );
                     self.set_source_of_config_value(&val, key, source);
-                } else if in_array(
-                    PhpMixed::String(key.clone()),
-                    &PhpMixed::List(vec![
+                } else if in_array_strict(
+                    key.clone(),
+                    &[
                         PhpMixed::String("gitlab-domains".to_string()),
                         PhpMixed::String("github-domains".to_string()),
-                    ]),
-                    true,
+                    ],
                 ) && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
@@ -738,15 +735,14 @@ impl Config {
                     other => other.as_string().unwrap_or("").to_string(),
                 };
 
-                if !in_array(
-                    PhpMixed::String(value.clone()),
-                    &PhpMixed::List(vec![
+                if !in_array_loose(
+                    value.clone(),
+                    &[
                         PhpMixed::String("auto".to_string()),
                         PhpMixed::String("full".to_string()),
                         PhpMixed::String("proxy".to_string()),
                         PhpMixed::String("symlink".to_string()),
-                    ]),
-                    false,
+                    ],
                 ) {
                     return Err(RuntimeException {
                         message: format!(
@@ -772,16 +768,15 @@ impl Config {
                 let env = self.get_composer_env("COMPOSER_DISCARD_CHANGES");
                 if !matches!(env, PhpMixed::Bool(false)) {
                     let env_str = env.as_string().unwrap_or("").to_string();
-                    if !in_array(
-                        PhpMixed::String(env_str.clone()),
-                        &PhpMixed::List(vec![
+                    if !in_array_strict(
+                        env_str.clone(),
+                        &[
                             PhpMixed::String("stash".to_string()),
                             PhpMixed::String("true".to_string()),
                             PhpMixed::String("false".to_string()),
                             PhpMixed::String("1".to_string()),
                             PhpMixed::String("0".to_string()),
-                        ]),
-                        true,
+                        ],
                     ) {
                         return Err(RuntimeException {
                             message: format!(
@@ -876,15 +871,12 @@ impl Config {
                     let abandoned_env_str = abandoned_env.as_string().unwrap_or("").to_string();
                     let valid_choices: Vec<String> =
                         Auditor::ABANDONEDS.iter().map(|s| s.to_string()).collect();
-                    if !in_array(
-                        PhpMixed::String(abandoned_env_str.clone()),
-                        &PhpMixed::List(
-                            valid_choices
-                                .iter()
-                                .map(|s| PhpMixed::String(s.clone()))
-                                .collect(),
-                        ),
-                        true,
+                    if !in_array_strict(
+                        abandoned_env_str.clone(),
+                        &valid_choices
+                            .iter()
+                            .map(|s| PhpMixed::String(s.clone()))
+                            .collect::<Vec<_>>(),
                     ) {
                         return Err(RuntimeException {
                             message: format!(
@@ -905,13 +897,12 @@ impl Config {
                     self.get_composer_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
                 if !matches!(block_abandoned_env, PhpMixed::Bool(false)) {
                     let env_str = block_abandoned_env.as_string().unwrap_or("").to_string();
-                    if !in_array(
-                        PhpMixed::String(env_str.clone()),
-                        &PhpMixed::List(vec![
+                    if !in_array_strict(
+                        env_str.clone(),
+                        &[
                             PhpMixed::String("0".to_string()),
                             PhpMixed::String("1".to_string()),
-                        ]),
-                        true,
+                        ],
                     ) {
                         return Err(RuntimeException {
                             message: format!(
@@ -1092,25 +1083,23 @@ impl Config {
         let hostname = parse_url(url, PHP_URL_HOST)
             .as_string()
             .map(|s| s.to_string());
-        if in_array(
+        if in_array_strict(
             scheme
                 .clone()
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
-            &PhpMixed::List(vec![
+            &[
                 PhpMixed::String("http".to_string()),
                 PhpMixed::String("git".to_string()),
                 PhpMixed::String("ftp".to_string()),
                 PhpMixed::String("svn".to_string()),
-            ]),
-            true,
+            ],
         ) {
             if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
                 if scheme.as_deref() == Some("svn") {
-                    if in_array(
+                    if in_array_strict(
                         hostname.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
-                        &self.get_with_flags("secure-svn-domains", 0)?,
-                        true,
+                        self.get_with_flags("secure-svn-domains", 0)?.values(),
                     ) {
                         return Ok(());
                     }

@@ -17,8 +17,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map, clearstatcache,
-    explode, implode, in_array, is_dir, php_regex, preg_quote, rawurldecode, rawurlencode,
-    str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim, version_compare,
+    explode, implode, in_array_loose, in_array_strict, is_dir, php_regex, preg_quote, rawurldecode,
+    rawurlencode, str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim,
+    version_compare,
 };
 use std::sync::Mutex;
 
@@ -329,15 +330,12 @@ impl Git {
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
-        ) && !in_array(
-            PhpMixed::String("ssh".to_string()),
-            &PhpMixed::List(
-                protocols_list
-                    .iter()
-                    .map(|s| PhpMixed::String(s.clone()))
-                    .collect(),
-            ),
-            true,
+        ) && !in_array_strict(
+            "ssh".to_string(),
+            &protocols_list
+                .iter()
+                .map(|s| PhpMixed::String(s.clone()))
+                .collect::<Vec<_>>(),
         );
 
         let mut auth: Option<IndexMap<String, Option<String>>> = None;
@@ -1346,16 +1344,15 @@ impl Git {
         let mut masked_credentials: Vec<String> = vec![];
 
         for credential in credentials {
-            if in_array(
-                PhpMixed::String(credential.clone()),
-                &PhpMixed::List(vec![
+            if in_array_loose(
+                credential.clone(),
+                &[
                     PhpMixed::String("private-token".to_string()),
                     PhpMixed::String("x-token-auth".to_string()),
                     PhpMixed::String("oauth2".to_string()),
                     PhpMixed::String("gitlab-ci-token".to_string()),
                     PhpMixed::String("x-oauth-basic".to_string()),
-                ]),
-                false,
+                ],
             ) {
                 masked_credentials.push(credential.clone());
             } else if strlen(credential) > 6 {

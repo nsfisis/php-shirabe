@@ -24,7 +24,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
-    array_slice, asort, explode, file_get_contents, implode, in_array, is_array, is_file,
+    array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
     is_numeric, json_decode, levenshtein, php_regex, strlen, strpos, trim,
 };
 
@@ -239,15 +239,12 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             if !matches.is_empty() {
                 // Remove existing packages from search results.
                 matches.retain(|found_package| {
-                    !in_array(
-                        PhpMixed::String(found_package.name.clone()),
-                        &PhpMixed::List(
-                            existing_packages
-                                .iter()
-                                .map(|s| PhpMixed::String(s.clone()))
-                                .collect(),
-                        ),
-                        true,
+                    !in_array_strict(
+                        found_package.name.clone(),
+                        &existing_packages
+                            .iter()
+                            .map(|s| PhpMixed::String(s.clone()))
+                            .collect::<Vec<_>>(),
                     )
                 });
                 // PHP: $matches = array_values($matches); — already a Vec in Rust
@@ -661,15 +658,12 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             // Check for similar names/typos
             let similar = self.find_similar(name)?;
             if !similar.is_empty() {
-                if in_array(
-                    PhpMixed::String(name.to_string()),
-                    &PhpMixed::List(
-                        similar
-                            .iter()
-                            .map(|s| PhpMixed::String(s.clone()))
-                            .collect(),
-                    ),
-                    true,
+                if in_array_strict(
+                    name.to_string(),
+                    &similar
+                        .iter()
+                        .map(|s| PhpMixed::String(s.clone()))
+                        .collect::<Vec<_>>(),
                 ) {
                     return Err(InvalidArgumentException {
                         message: format!(

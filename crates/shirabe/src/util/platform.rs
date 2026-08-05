@@ -5,7 +5,7 @@ use crate::util::Silencer;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
-    file_get_contents, fstat, function_exists, getcwd, getenv, in_array, ini_get, is_array,
+    file_get_contents, fstat, function_exists, getcwd, getenv, in_array_strict, ini_get, is_array,
     is_readable, mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid,
     posix_isatty, putenv, putenv_clear, realpath, stream_isatty, stripos, strlen, strtoupper,
     substr, usleep,
@@ -280,13 +280,12 @@ impl Platform {
 
         // detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690
-        if in_array(
-            PhpMixed::String(strtoupper(&Self::get_env("MSYSTEM").unwrap_or_default())),
-            &PhpMixed::List(vec![
+        if in_array_strict(
+            strtoupper(&Self::get_env("MSYSTEM").unwrap_or_default()),
+            &[
                 PhpMixed::String("MINGW32".to_string()),
                 PhpMixed::String("MINGW64".to_string()),
-            ]),
-            true,
+            ],
         ) {
             return true;
         }

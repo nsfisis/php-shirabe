@@ -29,7 +29,7 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpClass, PhpMixed, in_array, php_regex, str_replace, strpos,
+    InvalidArgumentException, PhpClass, PhpMixed, in_array_strict, php_regex, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -1030,14 +1030,9 @@ impl VcsRepository {
     }
 
     fn should_rethrow_transport_exception(&self, e: &TransportException) -> bool {
-        in_array(
-            PhpMixed::Int(e.get_code()),
-            &PhpMixed::List(vec![
-                PhpMixed::Int(401),
-                PhpMixed::Int(403),
-                PhpMixed::Int(429),
-            ]),
-            true,
+        in_array_strict(
+            e.get_code(),
+            &[PhpMixed::Int(401), PhpMixed::Int(403), PhpMixed::Int(429)],
         ) || e.get_code() >= 500
     }
 }

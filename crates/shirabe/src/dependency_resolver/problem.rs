@@ -13,7 +13,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, loosely_compare,
+    LogicException, PhpMixed, defined, extension_loaded, implode, in_array_strict, loosely_compare,
     php_regex, phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
     strtolower, substr, substr_count, version_compare,
 };
@@ -223,15 +223,12 @@ impl Problem {
                 learned_pool,
             )?;
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            let matched = if in_array(
-                PhpMixed::Int(rule_ref.get_reason()),
-                &PhpMixed::List(
-                    deduplicatable_rule_types
-                        .iter()
-                        .map(|t| PhpMixed::Int(*t))
-                        .collect(),
-                ),
-                true,
+            let matched = if in_array_strict(
+                rule_ref.get_reason(),
+                &deduplicatable_rule_types
+                    .iter()
+                    .map(|t| PhpMixed::Int(*t))
+                    .collect::<Vec<_>>(),
             ) {
                 Preg::is_match3(
                     php_regex!(
@@ -967,13 +964,12 @@ impl Problem {
                 && c.get_version() == "dev-master"
             {
                 for candidate in &packages {
-                    if in_array(
-                        PhpMixed::String(candidate.get_version().to_string()),
-                        &PhpMixed::List(vec![
+                    if in_array_strict(
+                        candidate.get_version().to_string(),
+                        &[
                             PhpMixed::String("dev-default".to_string()),
                             PhpMixed::String("dev-main".to_string()),
-                        ]),
-                        true,
+                        ],
                     ) {
                         suffix = format!(
                             " Perhaps dev-master was renamed to {}?",
