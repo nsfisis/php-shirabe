@@ -3,9 +3,6 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-pub const LICENSES_FILE: &str = "spdx-licenses.json";
-pub const EXCEPTIONS_FILE: &str = "spdx-exceptions.json";
-
 // PHP reads the resource files from `dirname(__DIR__) . '/res'` at runtime via
 // file_get_contents. Composer's res directory ships with the vendored package; embed it at compile
 // time so the data is available without filesystem access.
@@ -14,6 +11,14 @@ const LICENSES_JSON: &str =
 const EXCEPTIONS_JSON: &str =
     include_str!("../../../composer/vendor/composer/spdx-licenses/res/spdx-exceptions.json");
 
+// Only the members Composer itself calls are ported: SpdxLicenses::getLicenses(),
+// ::getExceptionByIdentifier(), ::getIdentifierByName(), ::isOsiApprovedByIdentifier(),
+// ::isDeprecatedByIdentifier(), ::getResourcesDir() and the LICENSES_FILE / EXCEPTIONS_FILE
+// constants are left out.
+//
+// Dropping unused members is only acceptable because of what this class is: pure logic over the
+// bundled SPDX data, holding no Composer state, and plugins reach the real PHP implementation
+// rather than this port.
 #[derive(Debug)]
 pub struct SpdxLicenses {
     // [ lowercased license identifier => (identifier, full name, osi certified, deprecated) ]
@@ -66,70 +71,6 @@ impl SpdxLicenses {
             )),
             PhpMixed::Bool(*is_deprecated_license_id),
         ]))
-    }
-
-    /// Returns all licenses information, keyed by the lowercased license identifier.
-    ///
-    /// Each item is [ 0 => identifier, 1 => full name, 2 => osi certified, 3 => deprecated ].
-    pub fn get_licenses(&self) -> PhpMixed {
-        let mut out: IndexMap<String, PhpMixed> = IndexMap::new();
-        for (key, (identifier, name, is_osi_approved, is_deprecated_license_id)) in &self.licenses {
-            out.insert(
-                key.clone(),
-                PhpMixed::List(vec![
-                    PhpMixed::String(identifier.clone()),
-                    PhpMixed::String(name.clone()),
-                    PhpMixed::Bool(*is_osi_approved),
-                    PhpMixed::Bool(*is_deprecated_license_id),
-                ]),
-            );
-        }
-        PhpMixed::Array(out)
-    }
-
-    /// Returns license exception metadata by license exception identifier.
-    ///
-    /// The returned list is in the form of:
-    ///   [ 0 => full name, 1 => link to license text ]
-    pub fn get_exception_by_identifier(&self, identifier: &str) -> Option<PhpMixed> {
-        let key = identifier.to_lowercase();
-
-        let (identifier, name) = self.exceptions.get(&key)?;
-
-        Some(PhpMixed::List(vec![
-            PhpMixed::String(name.clone()),
-            PhpMixed::String(format!(
-                "https://spdx.org/licenses/{}.html#licenseExceptionText",
-                identifier
-            )),
-        ]))
-    }
-
-    /// Returns the short identifier of a license (or license exception) by full name.
-    pub fn get_identifier_by_name(&self, name: &str) -> Option<String> {
-        for (identifier, full_name, _, _) in self.licenses.values() {
-            if full_name == name {
-                return Some(identifier.clone());
-            }
-        }
-
-        for (identifier, full_name) in self.exceptions.values() {
-            if full_name == name {
-                return Some(identifier.clone());
-            }
-        }
-
-        None
-    }
-
-    /// Returns the OSI Approved status for a license by identifier.
-    pub fn is_osi_approved_by_identifier(&self, identifier: &str) -> bool {
-        self.licenses[&identifier.to_lowercase()].2
-    }
-
-    /// Returns the deprecation status for a license by identifier.
-    pub fn is_deprecated_by_identifier(&self, identifier: &str) -> bool {
-        self.licenses[&identifier.to_lowercase()].3
     }
 
     pub fn validate(&self, license: &str) -> bool {
