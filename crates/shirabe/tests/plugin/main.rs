@@ -5,6 +5,7 @@ mod config_stub;
 
 mod e2e_command_provider_test;
 mod e2e_extension_installer_test;
+mod e2e_installer_test;
 mod e2e_normalize_test;
 mod plugin_installer_test;
 mod subscriber_test;

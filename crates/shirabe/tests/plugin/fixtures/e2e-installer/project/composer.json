@@ -1,0 +1,32 @@
+{
+    "name": "shirabe/e2e-installer",
+    "description": "E2E fixture project: install a custom package type through a plugin-provided installer.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/asset-installer": "1.0.0",
+        "shirabe-test/asset-a": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/asset-installer": true
+        }
+    }
+}

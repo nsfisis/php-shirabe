@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/asset-installer",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin registering a custom installer through InstallationManager::addInstaller.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\AssetInstaller\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\AssetInstaller\\Plugin"
+    }
+}

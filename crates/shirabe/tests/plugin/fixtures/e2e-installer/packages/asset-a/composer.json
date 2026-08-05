@@ -1,0 +1,6 @@
+{
+    "name": "shirabe-test/asset-a",
+    "version": "1.0.0",
+    "type": "shirabe-asset",
+    "description": "Fixture package installed by the plugin-provided installer."
+}
