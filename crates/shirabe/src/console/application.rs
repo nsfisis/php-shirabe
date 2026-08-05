@@ -2248,7 +2248,7 @@ impl ApplicationHandle {
                     } else if let Some(pe) = e.downcast_ref::<ParsingException>() {
                         let details = pe.get_details();
 
-                        let file = realpath(&Factory::get_composer_file().unwrap_or_default());
+                        let file = realpath(Factory::get_composer_file().unwrap_or_default());
 
                         let line = details.line;
 

@@ -893,14 +893,14 @@ pub fn ucfirst(s: &str) -> String {
     }
 }
 
-pub fn php_strip_whitespace(path: &str) -> String {
+pub fn php_strip_whitespace(path: impl AsRef<std::path::Path>) -> String {
     // PHP `php_strip_whitespace()` tokenizes the source and re-emits it with comments removed and
     // each run of whitespace collapsed to a single space. There is no PHP tokenizer in the shim, so
     // this is a hand-written lexer that reproduces the observable effect for the cases the class-map
     // generator depends on: it preserves single-quoted, double-quoted, backtick and heredoc/nowdoc
     // string contents verbatim while dropping `//`, `#` and `/* */` comments and squeezing
     // whitespace. On any read failure it returns an empty string, mirroring `@php_strip_whitespace`.
-    let contents = match std::fs::read(path) {
+    let contents = match std::fs::read(path.as_ref()) {
         Ok(bytes) => bytes,
         Err(_) => return String::new(),
     };

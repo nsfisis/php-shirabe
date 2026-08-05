@@ -198,7 +198,7 @@ impl Cache {
                         unlink(&temp_file_name);
 
                         let free_space = if function_exists("disk_free_space") {
-                            disk_free_space(&dirname(&temp_file_name))
+                            disk_free_space(dirname(&temp_file_name))
                                 .map(|space| space.to_string())
                                 .unwrap_or_default()
                         } else {

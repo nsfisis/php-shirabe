@@ -179,12 +179,12 @@ impl AutoloadGenerator {
         // Fixes failing Windows realpath() implementation.
         // See https://bugs.php.net/bug.php?id=72738
         let base_path = filesystem.normalize_path(
-            &realpath(&realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default())
+            &realpath(realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default())
                 .unwrap_or_default(),
         );
         let vendor_path = filesystem.normalize_path(
             &realpath(
-                &realpath(config.get("vendor-dir").as_string().unwrap_or("")).unwrap_or_default(),
+                realpath(config.get("vendor-dir").as_string().unwrap_or("")).unwrap_or_default(),
             )
             .unwrap_or_default(),
         );
@@ -692,7 +692,7 @@ impl AutoloadGenerator {
             } else {
                 format!(
                     "{}/{}",
-                    realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
+                    realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
                     dir
                 )
             };
@@ -1853,7 +1853,7 @@ class ComposerStaticInit{}
                             install_path.clone()
                         };
 
-                        let resolved_path = realpath(&format!(
+                        let resolved_path = realpath(format!(
                             "{}/{}",
                             install_path_for_resolve,
                             updir.clone().unwrap_or_default()

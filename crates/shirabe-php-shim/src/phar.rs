@@ -22,16 +22,20 @@ struct PharEntry {
     mtime: Option<u64>,
 }
 
-fn corruption_error(path: &str, detail: &str) -> anyhow::Error {
+fn corruption_error(path: &std::path::Path, detail: &str) -> anyhow::Error {
     anyhow::anyhow!(UnexpectedValueException {
-        message: format!("internal corruption of phar \"{}\" ({})", path, detail),
+        message: format!(
+            "internal corruption of phar \"{}\" ({})",
+            path.display(),
+            detail
+        ),
         code: 0,
     })
 }
 
 /// Reads a tar- or zip-based archive (optionally gzip/bzip2 compressed as a whole)
 /// into memory. Returns the entries and the detected `Phar::TAR`/`Phar::ZIP` format.
-fn read_archive_entries(path: &str) -> anyhow::Result<(Vec<PharEntry>, i64)> {
+fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry>, i64)> {
     let bytes = std::fs::read(path)
         .map_err(|e| corruption_error(path, &format!("unable to open archive: {}", e)))?;
     let bytes = if bytes.starts_with(&[0x1f, 0x8b]) {
@@ -127,6 +131,14 @@ fn read_archive_entries(path: &str) -> anyhow::Result<(Vec<PharEntry>, i64)> {
     Ok((entries, Phar::TAR))
 }
 
+/// Appends `suffix` to the file name, as phar does when it names the compressed archive
+/// (`out.tar` + `.gz` = `out.tar.gz`).
+fn sibling_with_suffix(path: &std::path::Path, suffix: &str) -> std::path::PathBuf {
+    let mut name = path.to_path_buf().into_os_string();
+    name.push(suffix);
+    std::path::PathBuf::from(name)
+}
+
 fn unix_mtime(time: std::time::SystemTime) -> u64 {
     time.duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -134,23 +146,23 @@ fn unix_mtime(time: std::time::SystemTime) -> u64 {
 }
 
 fn extract_entries(
-    archive_path: &str,
+    archive_path: &std::path::Path,
     entries: &[PharEntry],
-    directory: &str,
+    directory: &std::path::Path,
     overwrite: bool,
 ) -> anyhow::Result<()> {
     let extract_error = |detail: String| {
         anyhow::anyhow!(PharException {
             message: format!(
                 "Extracting from phar \"{}\" failed: {}",
-                archive_path, detail
+                archive_path.display(),
+                detail
             ),
             code: 0,
         })
     };
 
-    let base = std::path::Path::new(directory);
-    std::fs::create_dir_all(base).map_err(|e| extract_error(e.to_string()))?;
+    std::fs::create_dir_all(directory).map_err(|e| extract_error(e.to_string()))?;
     for entry in entries {
         let rel = std::path::Path::new(&entry.localname);
         if rel.is_absolute()
@@ -163,7 +175,7 @@ fn extract_entries(
                 entry.localname
             )));
         }
-        let dest = base.join(rel);
+        let dest = directory.join(rel);
         match &entry.data {
             PharEntryData::Dir => {
                 std::fs::create_dir_all(&dest).map_err(|e| extract_error(e.to_string()))?;
@@ -245,7 +257,7 @@ const PHAR_HAS_SIGNATURE: u32 = 0x0001_0000;
 const PHAR_FILE_COMPRESSED_GZ: u32 = 0x0000_1000;
 const PHAR_FILE_COMPRESSED_BZ2: u32 = 0x0000_2000;
 
-fn verify_phar_signature(path: &str, bytes: &[u8]) -> anyhow::Result<()> {
+fn verify_phar_signature(path: &std::path::Path, bytes: &[u8]) -> anyhow::Result<()> {
     let broken = || corruption_error(path, "phar has a broken or missing signature");
     let n = bytes.len();
     if n < 8 || &bytes[n - 4..] != b"GBMB" {
@@ -278,7 +290,7 @@ fn verify_phar_signature(path: &str, bytes: &[u8]) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn parse_native_phar(path: &str) -> anyhow::Result<Vec<PharEntry>> {
+fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     let bytes = std::fs::read(path)
         .map_err(|e| corruption_error(path, &format!("unable to open phar: {}", e)))?;
 
@@ -401,7 +413,7 @@ fn parse_native_phar(path: &str) -> anyhow::Result<Vec<PharEntry>> {
 
 #[derive(Debug)]
 pub struct Phar {
-    path: String,
+    path: std::path::PathBuf,
     entries: Vec<PharEntry>,
 }
 
@@ -411,18 +423,19 @@ impl Phar {
     pub const GZ: i64 = 4096;
     pub const BZ2: i64 = 8192;
 
-    pub fn new(path: String) -> anyhow::Result<Self> {
+    pub fn new(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
+        let path = path.as_ref().to_path_buf();
         let entries = parse_native_phar(&path)?;
         Ok(Self { path, entries })
     }
 
     pub fn extract_to(
         &self,
-        directory: &str,
+        directory: impl AsRef<std::path::Path>,
         _files: Option<()>,
         overwrite: bool,
     ) -> anyhow::Result<()> {
-        extract_entries(&self.path, &self.entries, directory, overwrite)
+        extract_entries(&self.path, &self.entries, directory.as_ref(), overwrite)
     }
 }
 
@@ -467,26 +480,26 @@ impl PharFileInfo {
 
 #[derive(Debug)]
 pub struct PharData {
-    path: String,
+    path: std::path::PathBuf,
     format: i64,
     entries: std::cell::RefCell<Vec<PharEntry>>,
 }
 
 impl PharData {
-    pub fn new(path: String) -> anyhow::Result<Self> {
-        Self::open(path, None)
+    pub fn new(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
+        Self::open(path.as_ref().to_path_buf(), None)
     }
 
     pub fn new_with_format(
-        path: String,
+        path: impl AsRef<std::path::Path>,
         _flags: i64,
         _alias: &str,
         format: i64,
     ) -> anyhow::Result<Self> {
-        Self::open(path, Some(format))
+        Self::open(path.as_ref().to_path_buf(), Some(format))
     }
 
-    fn open(path: String, format: Option<i64>) -> anyhow::Result<Self> {
+    fn open(path: std::path::PathBuf, format: Option<i64>) -> anyhow::Result<Self> {
         if crate::file_exists(&path) {
             let (entries, detected_format) = read_archive_entries(&path)?;
             return Ok(Self {
@@ -495,7 +508,7 @@ impl PharData {
                 entries: std::cell::RefCell::new(entries),
             });
         }
-        let parent_exists = match std::path::Path::new(&path).parent() {
+        let parent_exists = match path.parent() {
             Some(parent) if parent.as_os_str().is_empty() => true,
             Some(parent) => parent.is_dir(),
             None => false,
@@ -504,12 +517,12 @@ impl PharData {
             return Err(anyhow::anyhow!(UnexpectedValueException {
                 message: format!(
                     "Cannot create phar '{}', file extension (or combination) not recognised or the directory does not exist",
-                    path
+                    path.display()
                 ),
                 code: 0,
             }));
         }
-        let format = format.unwrap_or(if path.ends_with(".zip") {
+        let format = format.unwrap_or(if path.to_string_lossy().ends_with(".zip") {
             Phar::ZIP
         } else {
             Phar::TAR
@@ -595,11 +608,16 @@ impl PharData {
 
     pub fn extract_to(
         &self,
-        directory: &str,
+        directory: impl AsRef<std::path::Path>,
         _files: Option<()>,
         overwrite: bool,
     ) -> anyhow::Result<()> {
-        extract_entries(&self.path, &self.entries.borrow(), directory, overwrite)
+        extract_entries(
+            &self.path,
+            &self.entries.borrow(),
+            directory.as_ref(),
+            overwrite,
+        )
     }
 
     pub fn add_empty_dir(&self, dirname: &str) -> anyhow::Result<()> {
@@ -621,8 +639,9 @@ impl PharData {
     pub fn build_from_iterator(
         &self,
         iter: &mut dyn Iterator<Item = std::path::PathBuf>,
-        base_directory: &str,
+        base_directory: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<()> {
+        let base_directory = base_directory.as_ref();
         {
             let mut entries = self.entries.borrow_mut();
             for file in iter {
@@ -633,7 +652,7 @@ impl PharData {
                             message: format!(
                                 "Iterator returned a path \"{}\" that is not in the base directory \"{}\"",
                                 file.display(),
-                                base_directory
+                                base_directory.display()
                             ),
                             code: 0,
                         })
@@ -662,7 +681,11 @@ impl PharData {
         let tar_bytes = self.build_tar_bytes()?;
         let write_error = |e: std::io::Error| {
             anyhow::anyhow!(PharException {
-                message: format!("Unable to compress phar archive \"{}\": {}", self.path, e),
+                message: format!(
+                    "Unable to compress phar archive \"{}\": {}",
+                    self.path.display(),
+                    e
+                ),
                 code: 0,
             })
         };
@@ -672,7 +695,7 @@ impl PharData {
                     flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
                 encoder.write_all(&tar_bytes).map_err(write_error)?;
                 (
-                    format!("{}.gz", self.path),
+                    sibling_with_suffix(&self.path, ".gz"),
                     encoder.finish().map_err(write_error)?,
                 )
             }
@@ -681,7 +704,7 @@ impl PharData {
                     bzip2::write::BzEncoder::new(Vec::new(), bzip2::Compression::new(4));
                 encoder.write_all(&tar_bytes).map_err(write_error)?;
                 (
-                    format!("{}.bz2", self.path),
+                    sibling_with_suffix(&self.path, ".bz2"),
                     encoder.finish().map_err(write_error)?,
                 )
             }
@@ -703,7 +726,11 @@ impl PharData {
         let bytes = self.build_tar_bytes()?;
         std::fs::write(&self.path, bytes).map_err(|e| {
             anyhow::anyhow!(PharException {
-                message: format!("Unable to write phar archive \"{}\": {}", self.path, e),
+                message: format!(
+                    "Unable to write phar archive \"{}\": {}",
+                    self.path.display(),
+                    e
+                ),
                 code: 0,
             })
         })
@@ -712,7 +739,11 @@ impl PharData {
     fn build_tar_bytes(&self) -> anyhow::Result<Vec<u8>> {
         let write_error = |e: std::io::Error| {
             anyhow::anyhow!(PharException {
-                message: format!("Unable to write phar archive \"{}\": {}", self.path, e),
+                message: format!(
+                    "Unable to write phar archive \"{}\": {}",
+                    self.path.display(),
+                    e
+                ),
                 code: 0,
             })
         };
@@ -773,7 +804,11 @@ impl PharData {
     fn write_zip(&self) -> anyhow::Result<()> {
         let write_error = |e: String| {
             anyhow::anyhow!(PharException {
-                message: format!("Unable to write phar archive \"{}\": {}", self.path, e),
+                message: format!(
+                    "Unable to write phar archive \"{}\": {}",
+                    self.path.display(),
+                    e
+                ),
                 code: 0,
             })
         };
@@ -841,14 +876,14 @@ mod tests {
         let b = write_file(&src, "sub/b.txt", b"world");
         let tar_path = dir.path().join("out.tar");
 
-        let phar = PharData::new(tar_path.to_string_lossy().into_owned()).unwrap();
+        let phar = PharData::new(&tar_path).unwrap();
         assert!(!phar.valid());
-        phar.build_from_iterator(&mut vec![a, b].into_iter(), src.to_str().unwrap())
+        phar.build_from_iterator(&mut vec![a, b].into_iter(), &src)
             .unwrap();
         phar.add_empty_dir("emptydir").unwrap();
         assert!(tar_path.exists());
 
-        let read_back = PharData::new(tar_path.to_string_lossy().into_owned()).unwrap();
+        let read_back = PharData::new(&tar_path).unwrap();
         assert!(read_back.valid());
         assert_eq!(read_back.get("a.txt").unwrap().get_content(), b"hello");
         assert_eq!(read_back.get("sub/b.txt").unwrap().get_content(), b"world");
@@ -868,9 +903,7 @@ mod tests {
         );
 
         let out = dir.path().join("extracted");
-        read_back
-            .extract_to(out.to_str().unwrap(), None, true)
-            .unwrap();
+        read_back.extract_to(&out, None, true).unwrap();
         assert_eq!(std::fs::read(out.join("a.txt")).unwrap(), b"hello");
         assert_eq!(std::fs::read(out.join("sub/b.txt")).unwrap(), b"world");
         assert!(out.join("emptydir").is_dir());
@@ -883,23 +916,22 @@ mod tests {
         let a = write_file(&src, "a.txt", b"hello");
         let tar_path = dir.path().join("out.tar");
 
-        let phar = PharData::new(tar_path.to_string_lossy().into_owned()).unwrap();
-        phar.build_from_iterator(&mut vec![a].into_iter(), src.to_str().unwrap())
+        let phar = PharData::new(&tar_path).unwrap();
+        phar.build_from_iterator(&mut vec![a].into_iter(), &src)
             .unwrap();
         phar.compress(Phar::GZ).unwrap();
         phar.compress(Phar::BZ2).unwrap();
 
         assert!(tar_path.exists());
         for compressed in ["out.tar.gz", "out.tar.bz2"] {
-            let read_back =
-                PharData::new(dir.path().join(compressed).to_string_lossy().into_owned()).unwrap();
+            let read_back = PharData::new(dir.path().join(compressed)).unwrap();
             assert_eq!(read_back.get("a.txt").unwrap().get_content(), b"hello");
         }
     }
 
     #[test]
     fn phar_data_missing_file_in_missing_directory_is_rejected() {
-        let error = PharData::new("/nonexistent-dir/foo.tar".to_string()).unwrap_err();
+        let error = PharData::new("/nonexistent-dir/foo.tar").unwrap_err();
         assert!(
             error
                 .downcast_ref::<UnexpectedValueException>()
@@ -976,9 +1008,9 @@ mod tests {
         let phar_path = dir.path().join("test.phar");
         std::fs::write(&phar_path, build_native_phar(false)).unwrap();
 
-        let phar = Phar::new(phar_path.to_string_lossy().into_owned()).unwrap();
+        let phar = Phar::new(&phar_path).unwrap();
         let out = dir.path().join("extracted");
-        phar.extract_to(out.to_str().unwrap(), None, true).unwrap();
+        phar.extract_to(&out, None, true).unwrap();
         assert_eq!(
             std::fs::read(out.join("dir/hello.txt")).unwrap(),
             b"Hello World"
@@ -995,7 +1027,7 @@ mod tests {
         let phar_path = dir.path().join("tampered.phar");
         std::fs::write(&phar_path, build_native_phar(true)).unwrap();
 
-        let error = Phar::new(phar_path.to_string_lossy().into_owned()).unwrap_err();
+        let error = Phar::new(&phar_path).unwrap_err();
         assert!(
             error
                 .downcast_ref::<UnexpectedValueException>()

@@ -296,7 +296,7 @@ impl CurlDownloader {
                         crate::io::DEBUG,
                     );
                     if let Some(filename) = filename {
-                        unlink_silent(&format!("{}~", filename));
+                        unlink_silent(format!("{}~", filename));
                     }
                     return Ok(Decision::Retry {
                         url: url.to_string(),
@@ -305,7 +305,7 @@ impl CurlDownloader {
                 }
 
                 if let Some(filename) = filename {
-                    unlink_silent(&format!("{}~", filename));
+                    unlink_silent(format!("{}~", filename));
                 }
                 // PHP throws a MaxFileSizeExceededException (a TransportException subclass) with
                 // the raw "Maximum allowed download size reached..." message verbatim rather than
@@ -368,7 +368,7 @@ impl CurlDownloader {
                     .unwrap_or(0);
                 attributes.insert("retries".to_string(), PhpMixed::Int(retries + 1));
                 if let Some(filename) = filename {
-                    unlink_silent(&format!("{}~", filename));
+                    unlink_silent(format!("{}~", filename));
                 }
                 return Ok(Decision::Retry {
                     url: url.to_string(),
@@ -392,7 +392,7 @@ impl CurlDownloader {
                 Ok(location) if !location.is_empty() => {
                     attributes.insert("redirects".to_string(), PhpMixed::Int(redirects + 1));
                     if let Some(filename) = filename {
-                        unlink_silent(&format!("{}~", filename));
+                        unlink_silent(format!("{}~", filename));
                     }
                     return Ok(Decision::Retry {
                         url: location,
@@ -402,7 +402,7 @@ impl CurlDownloader {
                 Ok(_) => {}
                 Err(e) => {
                     if let Some(filename) = filename {
-                        unlink_silent(&format!("{}~", filename));
+                        unlink_silent(format!("{}~", filename));
                     }
                     return Ok(Decision::Failed(e));
                 }
@@ -440,7 +440,7 @@ impl CurlDownloader {
                 );
                 attributes.insert("retries".to_string(), PhpMixed::Int(retries + 1));
                 if let Some(filename) = filename {
-                    unlink_silent(&format!("{}~", filename));
+                    unlink_silent(format!("{}~", filename));
                 }
                 return Ok(Decision::Retry {
                     url: url.to_string(),
@@ -827,7 +827,7 @@ impl CurlDownloader {
         error_message: &str,
     ) -> TransportException {
         if let Some(filename) = filename {
-            unlink_silent(&format!("{}~", filename));
+            unlink_silent(format!("{}~", filename));
         }
 
         let mut details = String::new();

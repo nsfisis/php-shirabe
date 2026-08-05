@@ -499,7 +499,7 @@ impl Filesystem {
             if file.is_dir() {
                 self.ensure_directory_exists(&target_path)?;
             } else {
-                result = result && copy(&file.get_pathname(), &target_path);
+                result = result && copy(file.get_pathname(), &target_path);
             }
         }
 
@@ -944,7 +944,7 @@ impl Filesystem {
         let cwd = Platform::get_cwd(false).unwrap_or_default();
 
         let relative_path = self.find_shortest_path(link, target, false, false);
-        chdir(&dirname(link));
+        chdir(dirname(link));
         let result = symlink(&relative_path, link);
 
         chdir(&cwd);

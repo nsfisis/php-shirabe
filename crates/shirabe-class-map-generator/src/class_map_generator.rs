@@ -147,7 +147,7 @@ impl ClassMapGenerator {
             todo!("non-string path (Traversable/array of SplFileInfo) is not handled yet")
         };
 
-        let cwd = realpath(&getcwd().unwrap_or_default()).unwrap_or_default();
+        let cwd = realpath(getcwd().unwrap_or_default()).unwrap_or_default();
 
         for file in files {
             let mut file_path = match file.to_str() {

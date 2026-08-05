@@ -62,7 +62,7 @@ impl ArchiveDownloader for PharDownloader {
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // Can throw an UnexpectedValueException
-        let archive = Phar::new(file.to_string())?;
+        let archive = Phar::new(file)?;
         archive.extract_to(path, None, true)?;
         // TODO: handle openssl signed phars
         // https://github.com/composer/composer/pull/33#issuecomment-2250768

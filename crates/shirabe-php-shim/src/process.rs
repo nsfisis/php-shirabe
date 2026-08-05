@@ -144,7 +144,7 @@ pub fn proc_open(
     command: &str,
     descriptorspec: &[Descriptor],
     pipes: &mut IndexMap<i64, PhpResource>,
-    cwd: Option<&str>,
+    cwd: Option<&std::path::Path>,
     env: Option<&[String]>,
     options: Option<&IndexMap<String, PhpMixed>>,
 ) -> std::io::Result<PhpResource> {

@@ -807,7 +807,7 @@ impl Locker {
         if path.is_none() {
             return Ok(None);
         }
-        let path = realpath(&path.unwrap());
+        let path = realpath(path.unwrap());
         let source_type = package.get_source_type();
         let mut datetime: Option<chrono::DateTime<chrono::Utc>> = None;
 

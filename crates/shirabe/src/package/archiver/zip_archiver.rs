@@ -74,15 +74,12 @@ impl ArchiverInterface for ZipArchiver {
                 if filepath.is_dir() {
                     zip.add_empty_dir(&relative_path.to_string_lossy());
                 } else {
-                    zip.add_file(
-                        &filepath.to_string_lossy(),
-                        &relative_path.to_string_lossy(),
-                    );
+                    zip.add_file(&filepath, &relative_path.to_string_lossy());
                 }
 
                 // setExternalAttributesName() is only available with libzip 0.11.2 or above
                 if method_exists(&PhpMixed::Null, "setExternalAttributesName") {
-                    let perms = fileperms(&filepath.to_string_lossy());
+                    let perms = fileperms(&filepath);
                     zip.set_external_attributes_name(
                         &relative_path.to_string_lossy(),
                         ZipArchive::OPSYS_UNIX,

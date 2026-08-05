@@ -362,7 +362,7 @@ impl Process {
                 &commandline,
                 &descriptors,
                 pipes,
-                cwd.as_deref(),
+                cwd.as_deref().map(std::path::Path::new),
                 Some(&env_pairs),
                 Some(&options),
             )

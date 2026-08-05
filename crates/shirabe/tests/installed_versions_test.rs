@@ -402,7 +402,7 @@ fn test_get_install_path() {
     assert_eq!(
         realpath(&dir),
         realpath(
-            &InstalledVersions::get_install_path("__root__")
+            InstalledVersions::get_install_path("__root__")
                 .unwrap()
                 .unwrap()
         )

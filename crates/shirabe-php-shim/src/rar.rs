@@ -2,7 +2,7 @@
 pub struct RarEntry;
 
 impl RarEntry {
-    pub fn extract(&self, _path: &str) -> bool {
+    pub fn extract(&self, _path: impl AsRef<std::path::Path>) -> bool {
         todo!()
     }
 }
@@ -11,7 +11,7 @@ impl RarEntry {
 pub struct RarArchive;
 
 impl RarArchive {
-    pub fn open(_file: &str) -> Option<Self> {
+    pub fn open(_file: impl AsRef<std::path::Path>) -> Option<Self> {
         todo!()
     }
 

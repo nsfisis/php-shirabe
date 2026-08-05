@@ -512,7 +512,7 @@ impl Factory {
             Self::create_config(Some(io.clone()), Some(&cwd))?
         };
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
-            && realpath(&config.get_str("home")?) == realpath(&dirname(&local_config_source));
+            && realpath(&config.get_str("home")?) == realpath(dirname(&local_config_source));
         config.merge(&local_config_data, &local_config_source);
 
         if let Some(ref composer_file_path) = composer_file {

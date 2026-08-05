@@ -95,7 +95,7 @@ impl GitDriver {
             let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(&dirname(&self.repo_dir))?;
 
-            if !is_writable(&dirname(&self.repo_dir)) {
+            if !is_writable(dirname(&self.repo_dir)) {
                 return Err(RuntimeException {
                     message: format!(
                         "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",

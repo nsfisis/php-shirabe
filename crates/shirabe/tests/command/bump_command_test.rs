@@ -243,7 +243,7 @@ fn test_bump_fails_on_write_error_to_composer_file() {
 
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
     let composer_json_path = tear_down.working_dir().join("composer.json");
-    shirabe_php_shim::chmod(&composer_json_path.to_string_lossy(), 0o444);
+    shirabe_php_shim::chmod(&composer_json_path, 0o444);
 
     let mut app_tester = get_application_tester();
     let status_code = app_tester

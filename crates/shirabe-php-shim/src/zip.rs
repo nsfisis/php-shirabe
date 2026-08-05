@@ -27,7 +27,7 @@ enum ZipState {
     Writer {
         writer: zip::ZipWriter<std::fs::File>,
         /// The destination path, retained so `close` can confirm the file exists.
-        path: String,
+        path: std::path::PathBuf,
         status: String,
     },
 }
@@ -65,10 +65,11 @@ impl ZipArchive {
         }
     }
 
-    pub fn open(&mut self, filename: &str, flags: i64) -> Result<(), i64> {
+    pub fn open(&mut self, filename: impl AsRef<std::path::Path>, flags: i64) -> Result<(), i64> {
         if let Some(mock) = &self.mock {
             return mock.open;
         }
+        let filename = filename.as_ref();
         if flags & Self::CREATE != 0 {
             let file = match std::fs::File::create(filename) {
                 Ok(f) => f,
@@ -76,7 +77,7 @@ impl ZipArchive {
             };
             *self.state.borrow_mut() = ZipState::Writer {
                 writer: zip::ZipWriter::new(file),
-                path: filename.to_string(),
+                path: filename.to_path_buf(),
                 status: String::new(),
             };
             self.num_files = 0;
@@ -143,7 +144,7 @@ impl ZipArchive {
         Some(stat)
     }
 
-    pub fn extract_to(&self, path: &str) -> Result<bool, ErrorException> {
+    pub fn extract_to(&self, path: impl AsRef<std::path::Path>) -> Result<bool, ErrorException> {
         if let Some(mock) = &self.mock {
             return mock.extract_to.clone().map_err(|message| ErrorException {
                 message,
@@ -157,7 +158,7 @@ impl ZipArchive {
         let ZipState::Reader(archive) = &mut *state else {
             return Ok(false);
         };
-        Ok(archive.extract(path).is_ok())
+        Ok(archive.extract(path.as_ref()).is_ok())
     }
 
     pub fn locate_name(&self, name: &str) -> Option<i64> {
@@ -230,8 +231,8 @@ impl ZipArchive {
             .is_ok()
     }
 
-    pub fn add_file(&self, filepath: &str, local_name: &str) -> bool {
-        let contents = match std::fs::read(filepath) {
+    pub fn add_file(&self, filepath: impl AsRef<std::path::Path>, local_name: &str) -> bool {
+        let contents = match std::fs::read(filepath.as_ref()) {
             Ok(c) => c,
             Err(_) => return false,
         };

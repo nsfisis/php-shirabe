@@ -7,12 +7,12 @@ use std::io::Write as _;
 #[derive(Debug, Clone)]
 pub struct GzFile(std::rc::Rc<std::cell::RefCell<flate2::read::MultiGzDecoder<std::fs::File>>>);
 
-pub fn gzopen(file: &str, mode: &str) -> Result<GzFile, std::io::Error> {
+pub fn gzopen(file: impl AsRef<std::path::Path>, mode: &str) -> Result<GzFile, std::io::Error> {
     assert!(
         mode.starts_with('r'),
         "gzopen: only read modes are supported (got {mode:?})"
     );
-    let f = std::fs::File::open(file)?;
+    let f = std::fs::File::open(file.as_ref())?;
     Ok(GzFile(std::rc::Rc::new(std::cell::RefCell::new(
         flate2::read::MultiGzDecoder::new(f),
     ))))

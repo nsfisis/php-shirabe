@@ -205,7 +205,7 @@ impl LibraryInstaller {
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&self.vendor_dir.borrow());
-        let realpath = realpath(&self.vendor_dir.borrow()).unwrap_or_default();
+        let realpath = realpath(self.vendor_dir.borrow().as_str()).unwrap_or_default();
         *self.vendor_dir.borrow_mut() = realpath;
     }
 

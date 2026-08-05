@@ -201,7 +201,7 @@ fn test_url_remains_relative() {
     // realpath() does not fully expand the paths
     // PHP Bug https://bugs.php.net/bug.php?id=72642
     let repository_url = [
-        realpath(&realpath(&fixtures_dir().replace("/Fixtures", "")).unwrap_or_default())
+        realpath(realpath(fixtures_dir().replace("/Fixtures", "")).unwrap_or_default())
             .unwrap_or_default(),
         "Fixtures".to_string(),
         "path".to_string(),
@@ -210,7 +210,7 @@ fn test_url_remains_relative() {
     .join(DIRECTORY_SEPARATOR);
     // getcwd() not necessarily match __DIR__
     // PHP Bug https://bugs.php.net/bug.php?id=73797
-    let cwd = realpath(&realpath(&Platform::get_cwd(false).unwrap()).unwrap_or_default())
+    let cwd = realpath(realpath(Platform::get_cwd(false).unwrap()).unwrap_or_default())
         .unwrap_or_default();
     let relative_url = repository_url[cwd.len().min(repository_url.len())..]
         .trim_start_matches(DIRECTORY_SEPARATOR)

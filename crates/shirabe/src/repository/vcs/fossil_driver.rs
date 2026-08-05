@@ -123,7 +123,7 @@ impl FossilDriver {
         let mut fs = Filesystem::new(None);
         fs.ensure_directory_exists(&self.checkout_dir)?;
 
-        if !is_writable(&dirname(&self.checkout_dir)) {
+        if !is_writable(dirname(&self.checkout_dir)) {
             return Err(RuntimeException {
                 message: format!(
                     "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",

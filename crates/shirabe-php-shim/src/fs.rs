@@ -178,7 +178,7 @@ pub fn recursive_directory_iterator(
         return Err(UnexpectedValueException {
             message: format!(
                 "RecursiveDirectoryIterator::__construct({}): Failed to open directory",
-                root.to_string_lossy()
+                root.display()
             ),
             code: 0,
         });
@@ -243,13 +243,13 @@ fn rii_walk(
 }
 
 pub fn directory_iterator(
-    path: &str,
+    path: impl AsRef<std::path::Path>,
 ) -> Result<Vec<DirectoryIteratorEntry>, UnexpectedValueException> {
-    let base = std::path::Path::new(path);
+    let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| UnexpectedValueException {
         message: format!(
             "DirectoryIterator::__construct({}): Failed to open directory",
-            path
+            base.display()
         ),
         code: 0,
     })?;
@@ -681,7 +681,7 @@ pub fn fflush(stream: &PhpResource) -> bool {
     }
 }
 
-pub fn lstat(_filename: &str) -> Option<IndexMap<String, PhpMixed>> {
+pub fn lstat(_filename: impl AsRef<std::path::Path>) -> Option<IndexMap<String, PhpMixed>> {
     use std::os::unix::fs::MetadataExt;
     let m = std::fs::symlink_metadata(_filename).ok()?;
     Some(stat_fields_map([
@@ -703,7 +703,8 @@ pub fn lstat(_filename: &str) -> Option<IndexMap<String, PhpMixed>> {
 
 /// PHP `touch($path)`: creates the file when it is missing and stamps mtime/atime with the current
 /// time. Returns `false` (PHP failure) on error.
-pub fn touch(path: &str) -> bool {
+pub fn touch(path: impl AsRef<std::path::Path>) -> bool {
+    let path = path.as_ref();
     if !touch_create(path) {
         return false;
     }
@@ -724,8 +725,8 @@ pub fn fwrite_resource(resource: &PhpResource, data: &str) {
 
 /// PHP's `touch` creates the file first if it does not exist. An existing path is never opened, so
 /// directories — which `utimes` stamps just as well — go through untouched.
-fn touch_create(path: &str) -> bool {
-    if std::path::Path::new(path).exists() {
+fn touch_create(path: &std::path::Path) -> bool {
+    if path.exists() {
         return true;
     }
     std::fs::OpenOptions::new()
@@ -737,7 +738,7 @@ fn touch_create(path: &str) -> bool {
 }
 
 // PHP's `touch($path, $mtime, $atime)` passes whole seconds.
-fn touch_impl(path: &str, mtime: i64, atime: i64) -> bool {
+fn touch_impl(path: &std::path::Path, mtime: i64, atime: i64) -> bool {
     if !touch_create(path) {
         return false;
     }
@@ -748,25 +749,25 @@ fn touch_impl(path: &str, mtime: i64, atime: i64) -> bool {
 
 /// PHP `touch($path, $mtime)`: sets the modification time (and access time, per PHP, to the same
 /// value). Returns `false` (PHP failure) on error.
-pub fn touch2(path: &str, mtime: i64) -> bool {
-    touch_impl(path, mtime, mtime)
+pub fn touch2(path: impl AsRef<std::path::Path>, mtime: i64) -> bool {
+    touch_impl(path.as_ref(), mtime, mtime)
 }
 
 /// PHP `touch($path, $mtime, $atime)`.
-pub fn touch3(path: &str, mtime: i64, atime: i64) -> bool {
-    touch_impl(path, mtime, atime)
+pub fn touch3(path: impl AsRef<std::path::Path>, mtime: i64, atime: i64) -> bool {
+    touch_impl(path.as_ref(), mtime, atime)
 }
 
-pub fn chmod(_path: &str, _mode: u32) -> bool {
+pub fn chmod(_path: impl AsRef<std::path::Path>, _mode: u32) -> bool {
     use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(_path, std::fs::Permissions::from_mode(_mode)).is_ok()
+    std::fs::set_permissions(_path.as_ref(), std::fs::Permissions::from_mode(_mode)).is_ok()
 }
 
-pub fn fileperms(_path: &str) -> i64 {
+pub fn fileperms(_path: impl AsRef<std::path::Path>) -> i64 {
     use std::os::unix::fs::MetadataExt;
     // PHP returns the full st_mode (file type bits included).
     // TODO(phase-c): PHP returns false on error; this i64 signature reports 0 instead.
-    std::fs::metadata(_path)
+    std::fs::metadata(_path.as_ref())
         .map(|m| m.mode() as i64)
         .unwrap_or(0)
 }
@@ -779,12 +780,12 @@ pub fn file_exists(path: impl AsRef<std::path::Path>) -> bool {
     path.as_ref().exists()
 }
 
-pub fn is_writable(_path: &str) -> bool {
-    nix::unistd::access(_path, nix::unistd::AccessFlags::W_OK).is_ok()
+pub fn is_writable(_path: impl AsRef<std::path::Path>) -> bool {
+    nix::unistd::access(_path.as_ref(), nix::unistd::AccessFlags::W_OK).is_ok()
 }
 
-pub fn is_readable(_path: &str) -> bool {
-    let path = std::path::Path::new(_path);
+pub fn is_readable(_path: impl AsRef<std::path::Path>) -> bool {
+    let path = _path.as_ref();
     match std::fs::metadata(path) {
         Ok(meta) => {
             if meta.is_dir() {
@@ -797,8 +798,8 @@ pub fn is_readable(_path: &str) -> bool {
     }
 }
 
-pub fn is_executable(_path: &str) -> bool {
-    nix::unistd::access(_path, nix::unistd::AccessFlags::X_OK).is_ok()
+pub fn is_executable(_path: impl AsRef<std::path::Path>) -> bool {
+    nix::unistd::access(_path.as_ref(), nix::unistd::AccessFlags::X_OK).is_ok()
 }
 
 pub fn is_file(path: impl AsRef<std::path::Path>) -> bool {
@@ -815,34 +816,36 @@ pub fn is_dir(path: impl AsRef<std::path::Path>) -> bool {
     path.as_ref().is_dir()
 }
 
-pub fn fileatime(_filename: &str) -> Option<i64> {
-    std::fs::metadata(_filename)
+pub fn fileatime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
+    std::fs::metadata(_filename.as_ref())
         .ok()
         .and_then(|m| m.accessed().ok())
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
 }
 
-pub fn filemtime(_filename: &str) -> Option<i64> {
-    std::fs::metadata(_filename)
+pub fn filemtime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
+    std::fs::metadata(_filename.as_ref())
         .ok()
         .and_then(|m| m.modified().ok())
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
 }
 
-pub fn fileowner(_filename: &str) -> Option<i64> {
+pub fn fileowner(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
     use std::os::unix::fs::MetadataExt;
-    std::fs::metadata(_filename).ok().map(|m| m.uid() as i64)
+    std::fs::metadata(_filename.as_ref())
+        .ok()
+        .map(|m| m.uid() as i64)
 }
 
 pub fn unlink(path: impl AsRef<std::path::Path>) -> bool {
     std::fs::remove_file(path).is_ok()
 }
 
-pub fn unlink_silent(_path: &str) -> bool {
+pub fn unlink_silent(_path: impl AsRef<std::path::Path>) -> bool {
     // PHP's `@unlink`: delete the file, suppressing any warning.
-    std::fs::remove_file(_path).is_ok()
+    std::fs::remove_file(_path.as_ref()).is_ok()
 }
 
 pub fn file_put_contents(_path: &str, _data: &[u8]) -> Option<i64> {
@@ -911,8 +914,8 @@ pub fn getcwd() -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
-pub fn chdir(_path: &str) -> anyhow::Result<()> {
-    Ok(std::env::set_current_dir(_path)?)
+pub fn chdir(_path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
+    Ok(std::env::set_current_dir(_path.as_ref())?)
 }
 
 pub fn glob(_pattern: &str) -> Vec<String> {
@@ -966,12 +969,12 @@ pub fn umask() -> u32 {
     previous.bits() as u32
 }
 
-pub fn mkdir(_pathname: &str, _mode: u32, _recursive: bool) -> bool {
+pub fn mkdir(_pathname: impl AsRef<std::path::Path>, _mode: u32, _recursive: bool) -> bool {
     use std::os::unix::fs::DirBuilderExt;
     // DirBuilder::mode passes the mode to mkdir(2), which applies the process umask, matching PHP.
     let mut builder = std::fs::DirBuilder::new();
     builder.mode(_mode).recursive(_recursive);
-    builder.create(_pathname).is_ok()
+    builder.create(_pathname.as_ref()).is_ok()
 }
 
 pub fn rmdir(dir: impl AsRef<std::path::Path>) -> bool {
@@ -985,8 +988,8 @@ pub fn rename(
     std::fs::rename(old_name, new_name).is_ok()
 }
 
-pub fn copy(_source: &str, _dest: &str) -> bool {
-    std::fs::copy(_source, _dest).is_ok()
+pub fn copy(_source: impl AsRef<std::path::Path>, _dest: impl AsRef<std::path::Path>) -> bool {
+    std::fs::copy(_source.as_ref(), _dest.as_ref()).is_ok()
 }
 
 pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
@@ -1015,21 +1018,21 @@ pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
     }
 }
 
-pub fn symlink(_target: &str, _link: &str) -> bool {
-    std::os::unix::fs::symlink(_target, _link).is_ok()
+pub fn symlink(_target: impl AsRef<std::path::Path>, _link: impl AsRef<std::path::Path>) -> bool {
+    std::os::unix::fs::symlink(_target.as_ref(), _link.as_ref()).is_ok()
 }
 
 pub fn sys_get_temp_dir() -> String {
     std::env::temp_dir().to_string_lossy().into_owned()
 }
 
-pub fn tempnam(_dir: &str, _prefix: &str) -> Option<String> {
+pub fn tempnam(_dir: impl AsRef<std::path::Path>, _prefix: &str) -> Option<String> {
     use std::os::unix::fs::PermissionsExt;
     // TODO(phase-c): PHP falls back to the system temp dir when $dir is not writable; that fallback
     // is not implemented here.
     for _ in 0..1000 {
         let name = format!("{}{:08x}", _prefix, fastrand::u32(..));
-        let path = std::path::Path::new(_dir).join(name);
+        let path = _dir.as_ref().join(name);
         match std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -1054,11 +1057,12 @@ pub struct PhpDirHandle {
     pub path: std::path::PathBuf,
 }
 
-pub fn opendir(path: &str) -> Option<PhpDirHandle> {
+pub fn opendir(path: impl AsRef<std::path::Path>) -> Option<PhpDirHandle> {
+    let path = path.as_ref();
     // opendir succeeds iff the path is a readable directory.
     std::fs::read_dir(path).ok()?;
     Some(PhpDirHandle {
-        path: std::path::PathBuf::from(path),
+        path: path.to_path_buf(),
     })
 }
 
@@ -1086,9 +1090,9 @@ pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
     PhpMixed::String(component)
 }
 
-// TODO(phase-c): takes &Path and returns Option<PathBuf>
-pub fn realpath(path: &str) -> Option<String> {
-    std::path::Path::new(path)
+// TODO(phase-c): returns Option<PathBuf>
+pub fn realpath(path: impl AsRef<std::path::Path>) -> Option<String> {
+    path.as_ref()
         .canonicalize()
         .ok()
         .and_then(|p| p.to_str().map(ToOwned::to_owned))
@@ -1140,15 +1144,15 @@ pub fn clearstatcache() {
     // cache to invalidate.
 }
 
-pub fn clearstatcache2(_clear_realpath_cache: bool, _filename: &str) {
+pub fn clearstatcache2(_clear_realpath_cache: bool, _filename: impl AsRef<std::path::Path>) {
     // Rust performs a fresh syscall for every metadata query; there is no stat
     // cache to invalidate.
 }
 
 /// PHP `disk_free_space()`: the number of available bytes on the filesystem containing `directory`,
 /// computed via `statvfs(3)` (`f_bavail * f_frsize`). Returns `None` (PHP `false`) on failure.
-pub fn disk_free_space(directory: &str) -> Option<f64> {
-    let stat = nix::sys::statvfs::statvfs(directory).ok()?;
+pub fn disk_free_space(directory: impl AsRef<std::path::Path>) -> Option<f64> {
+    let stat = nix::sys::statvfs::statvfs(directory.as_ref()).ok()?;
     Some(stat.blocks_available() as f64 * stat.fragment_size() as f64)
 }
 

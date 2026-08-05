@@ -433,7 +433,7 @@ fn test_remove_directory_php() {
     let working_dir = tempfile::TempDir::new().unwrap();
     let working_dir = working_dir.path().to_str().unwrap().to_string();
 
-    mkdir(&format!("{working_dir}/level1/level2"), 0o777, true);
+    mkdir(format!("{working_dir}/level1/level2"), 0o777, true);
     file_put_contents(
         &format!("{working_dir}/level1/level2/hello.txt"),
         b"hello world",
@@ -509,10 +509,10 @@ fn test_unlink_symlinked_directory() {
     let working_dir = tempfile::TempDir::new().unwrap();
     let basepath = working_dir.path().to_str().unwrap().to_string();
     let symlinked = format!("{basepath}/linked");
-    mkdir(&format!("{basepath}/real"), 0o777, true);
-    touch(&format!("{basepath}/real/FILE"));
+    mkdir(format!("{basepath}/real"), 0o777, true);
+    touch(format!("{basepath}/real/FILE"));
 
-    let result = symlink(&format!("{basepath}/real"), &symlinked);
+    let result = symlink(format!("{basepath}/real"), &symlinked);
 
     if !result {
         // Symbolic links for directories not supported on this platform.
@@ -534,12 +534,12 @@ fn test_remove_symlinked_directory_with_trailing_slash() {
     let working_dir = tempfile::TempDir::new().unwrap();
     let working_dir = working_dir.path().to_str().unwrap().to_string();
 
-    mkdir(&format!("{working_dir}/real"), 0o777, true);
-    touch(&format!("{working_dir}/real/FILE"));
+    mkdir(format!("{working_dir}/real"), 0o777, true);
+    touch(format!("{working_dir}/real/FILE"));
     let symlinked = format!("{working_dir}/linked");
     let symlinked_trailing_slash = format!("{symlinked}/");
 
-    let result = symlink(&format!("{working_dir}/real"), &symlinked);
+    let result = symlink(format!("{working_dir}/real"), &symlinked);
 
     if !result {
         // Symbolic links for directories not supported on this platform.
@@ -567,7 +567,7 @@ fn test_junctions() {
     let working_dir = tempfile::TempDir::new().unwrap();
     let working_dir = working_dir.path().to_str().unwrap().to_string();
 
-    mkdir(&format!("{working_dir}/real/nesting/testing"), 0o777, true);
+    mkdir(format!("{working_dir}/real/nesting/testing"), 0o777, true);
     let mut fs = Filesystem::new(None);
 
     // Non-Windows systems do not support this and will return false on all tests, and an exception
@@ -625,7 +625,7 @@ fn test_override_junctions() {
     let working_dir = tempfile::TempDir::new().unwrap();
     let working_dir = working_dir.path().to_str().unwrap().to_string();
 
-    mkdir(&format!("{working_dir}/real/nesting/testing"), 0o777, true);
+    mkdir(format!("{working_dir}/real/nesting/testing"), 0o777, true);
     let mut fs = Filesystem::new(None);
 
     let old_target = format!("{working_dir}/real/nesting/testing");
@@ -667,8 +667,8 @@ fn test_copy() {
     let unique_tmp = tempfile::TempDir::new().unwrap();
     let test_file = format!("{}/composer_test_file", unique_tmp.path().to_str().unwrap());
 
-    mkdir(&format!("{working_dir}/foo/bar"), 0o777, true);
-    mkdir(&format!("{working_dir}/foo/baz"), 0o777, true);
+    mkdir(format!("{working_dir}/foo/bar"), 0o777, true);
+    mkdir(format!("{working_dir}/foo/baz"), 0o777, true);
     file_put_contents(&format!("{working_dir}/foo/foo.file"), b"foo");
     file_put_contents(&format!("{working_dir}/foo/bar/foobar.file"), b"foobar");
     file_put_contents(&format!("{working_dir}/foo/baz/foobaz.file"), b"foobaz");
@@ -722,8 +722,8 @@ fn test_copy_then_remove() {
     let unique_tmp = tempfile::TempDir::new().unwrap();
     let test_file = format!("{}/composer_test_file", unique_tmp.path().to_str().unwrap());
 
-    mkdir(&format!("{working_dir}/foo/bar"), 0o777, true);
-    mkdir(&format!("{working_dir}/foo/baz"), 0o777, true);
+    mkdir(format!("{working_dir}/foo/bar"), 0o777, true);
+    mkdir(format!("{working_dir}/foo/baz"), 0o777, true);
     file_put_contents(&format!("{working_dir}/foo/foo.file"), b"foo");
     file_put_contents(&format!("{working_dir}/foo/bar/foobar.file"), b"foobar");
     file_put_contents(&format!("{working_dir}/foo/baz/foobaz.file"), b"foobaz");

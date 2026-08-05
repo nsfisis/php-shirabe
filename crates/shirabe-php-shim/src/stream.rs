@@ -13,10 +13,10 @@ pub fn stream_get_contents(stream: &PhpResource) -> Option<String> {
     stream_read_remaining(stream, None)
 }
 
-pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
+pub fn stream_resolve_include_path(filename: impl AsRef<std::path::Path>) -> Option<String> {
     // TODO(phase-c): resolution searches the `include_path` ini setting, which the shim does not
     // model; checking only the current directory would silently miss configured include paths.
-    let _ = filename;
+    let _ = filename.as_ref();
     todo!()
 }
 

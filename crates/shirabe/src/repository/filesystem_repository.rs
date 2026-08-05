@@ -644,7 +644,7 @@ impl FilesystemRepository {
 
         let install_path = if package.as_root().is_some() {
             let to = self.filesystem.borrow_mut().normalize_path(
-                &realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
+                &realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
             );
             Some(
                 self.filesystem

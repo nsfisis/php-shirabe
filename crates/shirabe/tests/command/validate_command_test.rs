@@ -163,7 +163,7 @@ fn test_unaccessible_file() {
 
     let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
     let composer_json = tear_down.working_dir().join("composer.json");
-    shirabe_php_shim::chmod(&composer_json.to_string_lossy(), 0o200);
+    shirabe_php_shim::chmod(&composer_json, 0o200);
 
     let mut app_tester = get_application_tester();
     app_tester
@@ -176,6 +176,6 @@ fn test_unaccessible_file() {
     );
     assert_eq!(3, app_tester.get_status_code());
 
-    shirabe_php_shim::chmod(&composer_json.to_string_lossy(), 0o700);
+    shirabe_php_shim::chmod(&composer_json, 0o700);
     drop(tear_down);
 }

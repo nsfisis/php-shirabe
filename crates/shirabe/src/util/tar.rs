@@ -7,7 +7,7 @@ pub struct Tar;
 
 impl Tar {
     pub fn get_composer_json(path_to_archive: &str) -> anyhow::Result<Option<String>> {
-        let phar = PharData::new(path_to_archive.to_string())?;
+        let phar = PharData::new(path_to_archive)?;
 
         if !phar.valid() {
             return Ok(None);

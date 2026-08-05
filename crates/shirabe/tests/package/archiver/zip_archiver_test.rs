@@ -106,7 +106,7 @@ impl ArchiverTestCase {
 
     fn write_file(&self, path: &str, content: String, current_work_dir: &str) {
         if !file_exists(dirname(path)) {
-            mkdir(&dirname(path), 0o777, true);
+            mkdir(dirname(path), 0o777, true);
         }
 
         let result = file_put_contents(path, content.as_bytes());
