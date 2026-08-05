@@ -436,13 +436,6 @@ which can cross the wire as values. The stub needs a bespoke story (e.g. a
 local Table bound to a proxying `OutputInterface`); until one is designed,
 both members raise explicit errors.
 
-### Proxy clone semantics
-
-`clone $package` is a common plugin idiom (and `NoopInstaller::install`
-does `$repo->addPackage(clone $package)`), but PHP `clone` on a proxy stub
-copies the handle, not the Rust entity. The stub generator needs a
-`__clone` that RPCs a clone of the entity. Undecided.
-
 ## The classifier tool
 
 ### Dependencies and layout

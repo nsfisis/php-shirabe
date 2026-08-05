@@ -16,7 +16,9 @@ use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::json::JsonFile;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
-use shirabe::package::{Locker, LockerInterface, PackageInterfaceHandle, RootPackageHandle};
+use shirabe::package::{
+    CompletePackageHandle, Locker, LockerInterface, PackageInterfaceHandle, RootPackageHandle,
+};
 use shirabe::plugin::plugin_interface::PluginInterface;
 use shirabe::plugin::{Capable, PluginManager, composer_handle_value, io_handle_value};
 use shirabe::repository::{
@@ -30,6 +32,7 @@ use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::PhpMixed;
+use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 /// The register/activate flow runs the plugin in the real PHP worker; without a PHP binary the
@@ -166,9 +169,9 @@ impl RepositoryManagerInterface for MockRepositoryManager {
 struct MockInstallationManager;
 
 impl InstallationManagerInterface for MockInstallationManager {
-    fn add_installer(&mut self, _installer: Box<dyn InstallerInterface>) {}
+    fn add_installer(&self, _installer: std::rc::Rc<dyn InstallerInterface>) {}
 
-    fn remove_installer(&mut self, _installer: &dyn InstallerInterface) {}
+    fn remove_installer(&self, _installer: &dyn InstallerInterface) {}
 
     fn disable_plugins(&mut self) {}
 
@@ -606,31 +609,114 @@ fn test_register_plugin_only_one_time() {
     assert_eq!("activate v1\n", set_up.io.borrow().get_output());
 }
 
-// PluginManager::get_plugin_api_version returns a hardcoded constant
-// (plugin_interface::PLUGIN_API_VERSION) with no seam to override it per-test the way PHP's
-// `getMockBuilder(PluginManager::class)->onlyMethods(['getPluginApiVersion'])` does.
-#[ignore = "Requires mocking getPluginApiVersion; PluginManager has no such seam (TODO(plugin))"]
+/// PHP `setPluginApiVersionWithPlugins`: swaps in a plugin manager reporting
+/// `new_plugin_api_version` (PHP mocks `getPluginApiVersion`; the Rust seam is
+/// `__set_plugin_api_version`) and a local repository holding the internal composer-plugin-api
+/// package plus `plugins` (PHP mocks `getPackages`), then loads the installed plugins.
+fn set_plugin_api_version_with_plugins(
+    set_up: &SetUp,
+    new_plugin_api_version: &str,
+    plugins: Vec<PackageInterfaceHandle>,
+) -> std::rc::Rc<std::cell::RefCell<PluginManager>> {
+    let pm = std::rc::Rc::new(std::cell::RefCell::new(PluginManager::new(
+        set_up.io_dyn.clone(),
+        set_up.composer.downgrade(),
+        None,
+        DisablePlugins::None,
+    )));
+    pm.borrow_mut()
+        .__set_plugin_api_version(new_plugin_api_version);
+    set_up.composer.borrow_mut().set_plugin_manager(pm.clone());
+
+    let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
+        "composer-plugin-api".to_string(),
+        VersionParser
+            .normalize(new_plugin_api_version, None)
+            .unwrap(),
+        new_plugin_api_version.to_string(),
+    )
+    .into();
+    let repository =
+        InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
+    repository
+        .borrow_mut()
+        .add_package(plug_api_internal_package)
+        .unwrap();
+    for plugin in plugins {
+        repository.borrow_mut().add_package(plugin).unwrap();
+    }
+    set_up
+        .composer
+        .borrow()
+        .get_repository_manager()
+        .borrow_mut()
+        .set_local_repository(repository.as_repository_handle());
+
+    pm.borrow_mut().load_installed_plugins().unwrap();
+    pm
+}
+
 #[test]
 fn test_star_plugin_version_works_with_any_api_version() {
-    // TODO(phase-d): requires mocking getPluginApiVersion; PluginManager has no such seam
-    // (TODO(plugin)).
-    todo!()
+    if !php_runtime_available() {
+        return;
+    }
+    let _worker = lock_php_worker();
+    let set_up = set_up();
+    let star_version_plugin = || vec![PackageInterfaceHandle::dup(&set_up.packages[4])];
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "1.0.0", star_version_plugin());
+    assert_eq!(1, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "1.9.9", star_version_plugin());
+    assert_eq!(1, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "2.0.0-dev", star_version_plugin());
+    assert_eq!(1, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "100.0.0-stable", star_version_plugin());
+    assert_eq!(1, pm.borrow().get_plugins().len());
 }
 
-#[ignore = "Requires mocking getPluginApiVersion; PluginManager has no such seam (TODO(plugin))"]
 #[test]
 fn test_plugin_constraint_works_only_with_certain_api_version() {
-    // TODO(phase-d): requires mocking getPluginApiVersion; PluginManager has no such seam
-    // (TODO(plugin)).
-    todo!()
+    if !php_runtime_available() {
+        return;
+    }
+    let _worker = lock_php_worker();
+    let set_up = set_up();
+    let plugin_with_api_constraint = || vec![PackageInterfaceHandle::dup(&set_up.packages[5])];
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "1.0.0", plugin_with_api_constraint());
+    assert_eq!(0, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "1.1.9", plugin_with_api_constraint());
+    assert_eq!(0, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "1.2.0", plugin_with_api_constraint());
+    assert_eq!(1, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "1.9.9", plugin_with_api_constraint());
+    assert_eq!(1, pm.borrow().get_plugins().len());
 }
 
-#[ignore = "Requires mocking getPluginApiVersion; PluginManager has no such seam (TODO(plugin))"]
 #[test]
 fn test_plugin_range_constraints_work_only_with_certain_api_version() {
-    // TODO(phase-d): requires mocking getPluginApiVersion; PluginManager has no such seam
-    // (TODO(plugin)).
-    todo!()
+    if !php_runtime_available() {
+        return;
+    }
+    let _worker = lock_php_worker();
+    let set_up = set_up();
+    let plugin_with_api_constraint = || vec![PackageInterfaceHandle::dup(&set_up.packages[6])];
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "1.0.0", plugin_with_api_constraint());
+    assert_eq!(0, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "3.0.0", plugin_with_api_constraint());
+    assert_eq!(1, pm.borrow().get_plugins().len());
+
+    let pm = set_plugin_api_version_with_plugins(&set_up, "5.5.0", plugin_with_api_constraint());
+    assert_eq!(0, pm.borrow().get_plugins().len());
 }
 
 #[test]

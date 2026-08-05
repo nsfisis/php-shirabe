@@ -67,8 +67,8 @@ mockall::mock! {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for MockInstaller {
-    fn supports(&self, package_type: &str) -> bool {
-        MockInstaller::supports(self, package_type)
+    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+        Ok(MockInstaller::supports(self, package_type))
     }
 
     fn is_installed(
@@ -163,12 +163,12 @@ impl BinaryInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for BinaryInstaller {
-    fn supports(&self, package_type: &str) -> bool {
+    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
         self.calls
             .borrow_mut()
             .supports_args
             .push(package_type.to_string());
-        package_type == "library"
+        Ok(package_type == "library")
     }
 
     fn is_installed(
@@ -272,10 +272,10 @@ fn test_add_get_installer() {
         .times(2)
         .returning(|arg| arg == "vendor");
 
-    let mut manager =
+    let manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
 
-    manager.add_installer(Box::new(installer));
+    manager.add_installer(std::rc::Rc::new(installer));
     assert!(manager.get_installer("vendor").is_ok());
 
     assert!(manager.get_installer("unregistered").is_err());
@@ -290,7 +290,7 @@ fn test_add_remove_installer() {
         .times(2)
         .returning(|arg| arg == "vendor");
     // The manager stores installers as Rc, so the PHP object-identity semantics (assertSame,
-    // removeInstaller) map to Rc::ptr_eq on a handle registered via __add_installer.
+    // removeInstaller) map to Rc::ptr_eq on the handle the caller keeps.
     let installer: std::rc::Rc<dyn InstallerInterface> = std::rc::Rc::new(installer);
 
     let mut installer2 = MockInstaller::new();
@@ -300,15 +300,15 @@ fn test_add_remove_installer() {
         .returning(|arg| arg == "vendor");
     let installer2: std::rc::Rc<dyn InstallerInterface> = std::rc::Rc::new(installer2);
 
-    let mut manager =
+    let manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
 
-    manager.__add_installer(installer.clone());
+    manager.add_installer(installer.clone());
     assert!(std::rc::Rc::ptr_eq(
         &installer,
         &manager.get_installer("vendor").unwrap()
     ));
-    manager.__add_installer(installer2.clone());
+    manager.add_installer(installer2.clone());
     assert!(std::rc::Rc::ptr_eq(
         &installer2,
         &manager.get_installer("vendor").unwrap()
@@ -352,9 +352,9 @@ fn test_install() {
         .withf_st(move |package| same_handle(package, &expected))
         .returning(|_| Ok(None));
 
-    let mut manager =
+    let manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
-    manager.add_installer(Box::new(installer));
+    manager.add_installer(std::rc::Rc::new(installer));
 
     let operation = InstallOperation::new(package);
 
@@ -385,9 +385,9 @@ fn test_update_with_equal_types() {
         })
         .returning(|_, _| Ok(None));
 
-    let mut manager =
+    let manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
-    manager.add_installer(Box::new(installer));
+    manager.add_installer(std::rc::Rc::new(installer));
 
     let operation = UpdateOperation::new(initial, target);
 
@@ -427,10 +427,10 @@ fn test_update_with_not_equal_types() {
         .withf_st(move |package| same_handle(package, &expected_target))
         .returning(|_| Ok(None));
 
-    let mut manager =
+    let manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
-    manager.add_installer(Box::new(lib_installer));
-    manager.add_installer(Box::new(bundle_installer));
+    manager.add_installer(std::rc::Rc::new(lib_installer));
+    manager.add_installer(std::rc::Rc::new(bundle_installer));
 
     let operation = UpdateOperation::new(initial, target);
 
@@ -457,9 +457,9 @@ fn test_uninstall() {
         .withf_st(move |package| same_handle(package, &expected))
         .returning(|_| Ok(None));
 
-    let mut manager =
+    let manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
-    manager.add_installer(Box::new(installer));
+    manager.add_installer(std::rc::Rc::new(installer));
 
     let operation = UninstallOperation::new(package);
 
@@ -472,9 +472,9 @@ fn test_uninstall() {
 fn test_install_binary() {
     let set_up = set_up();
     let (installer, calls) = BinaryInstaller::new();
-    let mut manager =
+    let manager =
         shirabe::installer::InstallationManager::new(set_up.loop_.clone(), set_up.io.clone(), None);
-    manager.add_installer(Box::new(installer));
+    manager.add_installer(std::rc::Rc::new(installer));
 
     let package = get_package("test/pkg", "1.0.0");
     manager.ensure_binaries_presence(package.clone());

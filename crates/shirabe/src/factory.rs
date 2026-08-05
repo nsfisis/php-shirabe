@@ -1291,7 +1291,7 @@ impl Factory {
         )));
 
         im.borrow_mut()
-            .add_installer(Box::new(crate::installer::LibraryInstaller::new(
+            .add_installer(std::rc::Rc::new(crate::installer::LibraryInstaller::new(
                 io.clone(),
                 composer.clone(),
                 None,
@@ -1299,14 +1299,15 @@ impl Factory {
                 Some(binary_installer.clone()),
             )));
         im.borrow_mut()
-            .add_installer(Box::new(crate::installer::PluginInstaller::new(
+            .add_installer(std::rc::Rc::new(crate::installer::PluginInstaller::new(
                 io.clone(),
                 composer,
                 Some(fs),
                 Some(binary_installer),
             )));
-        im.borrow_mut()
-            .add_installer(Box::new(crate::installer::MetapackageInstaller::new(io)));
+        im.borrow_mut().add_installer(std::rc::Rc::new(
+            crate::installer::MetapackageInstaller::new(io),
+        ));
     }
 
     fn purge_packages(

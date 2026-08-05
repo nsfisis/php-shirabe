@@ -50,6 +50,16 @@ class InstallationManager implements \ShirabeRustStub
         ];
     }
 
+    public function __clone()
+    {
+        // PHP has already shallow-copied this stub, so both copies would point at one
+        // entity and release it twice. The Rust side clones the entity instead, applying
+        // whatever __clone semantics the real class defines, and this copy rebinds to the
+        // fresh handle. Entities without clone semantics answer with an explicit error.
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
     public function reset(): void
     {
         \ShirabeRpcRuntime::callRust($this->__rhandle, 'reset', []);

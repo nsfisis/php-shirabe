@@ -20,8 +20,8 @@ use crate::plugin::capability::{Capability, CommandProvider};
 use crate::plugin::capable::Capable;
 use crate::plugin::plugin_interface::PluginInterface;
 use crate::repository::{
-    InstalledArrayRepository, InstalledFilesystemRepository, RepositoryInterfaceHandle,
-    RepositoryManagerInterface,
+    InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
+    RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
@@ -292,6 +292,12 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         // The entity is cloned out so no table borrow is held while the handler runs (a
         // handler that re-enters register_*_entity would otherwise panic on the RefCell).
         let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
+        if method_name == "__shirabeClone" {
+            return match entity {
+                Some(entity) => clone_entity(&entity),
+                None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+            };
+        }
         match entity {
             Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, &args),
             Some(RustEntity::Composer(composer)) => {
@@ -315,6 +321,36 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
         }
     }
+}
+
+/// Serves the `__clone` forwarder every proxy stub carries. Only entities whose Rust type
+/// models the PHP clone answer; the rest are an explicit error, so a plugin cloning a live
+/// service never silently ends up with two stubs over one entity.
+fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
+    let rhandle = match entity {
+        // `AnyPackage::dup` carries `BasePackage::__clone` (repository reset, id = -1) and the
+        // `RootAliasPackage::__clone` override.
+        RustEntity::Package(package) => {
+            let cloned = package.borrow().dup();
+            register_entity(RustEntity::Package(std::rc::Rc::new(
+                std::cell::RefCell::new(cloned),
+            )))
+        }
+        RustEntity::Composer(_)
+        | RustEntity::Io(_)
+        | RustEntity::InstallationManager(_)
+        | RustEntity::RepositoryManager(_)
+        | RustEntity::Repository(_)
+        | RustEntity::EventDispatcher(_) => {
+            return Err(runtime_throw(
+                "cloning this Rust-side entity over RPC is not supported".to_string(),
+            ));
+        }
+    };
+    Ok(PluginValue::List(vec![
+        PluginValue::Int(rhandle as i64),
+        PluginValue::Int(0),
+    ]))
 }
 
 fn dispatch_composer_method(
@@ -437,22 +473,259 @@ fn dispatch_repository_method(
     }
 }
 
+/// A PHP string-or-null wire value.
+fn optional_string(value: Option<String>) -> PluginValue {
+    match value {
+        Some(value) => PluginValue::string(value),
+        None => PluginValue::Null,
+    }
+}
+
+fn string_list(values: Vec<String>) -> PluginValue {
+    PluginValue::List(values.into_iter().map(PluginValue::string).collect())
+}
+
+/// `?list<array{url: string, preferred: bool}>` as PHP shapes it.
+fn mirror_list(mirrors: Option<Vec<crate::package::Mirror>>) -> PluginValue {
+    match mirrors {
+        None => PluginValue::Null,
+        Some(mirrors) => PluginValue::List(
+            mirrors
+                .into_iter()
+                .map(|mirror| {
+                    PluginValue::Array(IndexMap::from([
+                        (b"url".to_vec(), PluginValue::string(mirror.url)),
+                        (b"preferred".to_vec(), PluginValue::Bool(mirror.preferred)),
+                    ]))
+                })
+                .collect(),
+        ),
+    }
+}
+
+/// An `array<string, mixed>` as PHP shapes it: empty maps cross as a list, since an empty PHP
+/// array is indistinguishable from an empty list on the wire.
+fn string_keyed_map(map: IndexMap<String, PhpMixed>) -> PluginValue {
+    if map.is_empty() {
+        PluginValue::List(Vec::new())
+    } else {
+        PluginValue::from_php_mixed(&PhpMixed::Array(map))
+    }
+}
+
+/// The inverse of `mirror_list`.
+fn decode_mirrors(
+    method: &str,
+    value: Option<&PluginValue>,
+) -> Result<Option<Vec<crate::package::Mirror>>, PhpThrow> {
+    let rows = match value {
+        None | Some(PluginValue::Null) => return Ok(None),
+        Some(PluginValue::List(rows)) => rows.clone(),
+        Some(PluginValue::Array(rows)) => rows.values().cloned().collect(),
+        other => {
+            return Err(runtime_throw(format!(
+                "{method} expects a list of mirrors or null, got {other:?}"
+            )));
+        }
+    };
+    let mut mirrors = Vec::with_capacity(rows.len());
+    for row in rows {
+        let row = match row {
+            PluginValue::Array(row) => row,
+            other => {
+                return Err(runtime_throw(format!(
+                    "{method} expects mirror maps, got {other:?}"
+                )));
+            }
+        };
+        let url = match row.get(b"url".as_slice()) {
+            Some(PluginValue::String(url)) => String::from_utf8_lossy(url).into_owned(),
+            other => {
+                return Err(runtime_throw(format!(
+                    "{method} expects a string `url` in every mirror, got {other:?}"
+                )));
+            }
+        };
+        let preferred = matches!(
+            row.get(b"preferred".as_slice()),
+            Some(PluginValue::Bool(true))
+        );
+        mirrors.push(crate::package::Mirror { url, preferred });
+    }
+    Ok(Some(mirrors))
+}
+
+fn decode_optional_string(
+    method: &str,
+    value: Option<&PluginValue>,
+) -> Result<Option<String>, PhpThrow> {
+    match value {
+        None | Some(PluginValue::Null) => Ok(None),
+        Some(PluginValue::String(bytes)) => Ok(Some(String::from_utf8_lossy(bytes).into_owned())),
+        other => Err(runtime_throw(format!(
+            "{method} expects a string or null, got {other:?}"
+        ))),
+    }
+}
+
 fn dispatch_package_method(
     package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let package = package.borrow();
-    let package = package.as_package_interface();
+    // The link getters return `array<string, Link>`; only the empty case has a wire image so
+    // far (an empty PHP array crosses as a list).
+    //
+    // TODO(plugin): Link is a rust-snapshot value whose constraint field must materialize as a
+    // real composer/semver object in the child; the snapshot encoding does not exist yet.
+    let links = |links: IndexMap<String, crate::package::Link>| -> Result<PluginValue, PhpThrow> {
+        if links.is_empty() {
+            Ok(PluginValue::List(Vec::new()))
+        } else {
+            Err(runtime_throw(format!(
+                "the package method `{method_name}` returns Link values, whose encoding over RPC is not implemented yet"
+            )))
+        }
+    };
+
+    // Mutators borrow mutably and must not hold the borrow across the shared-borrow arms.
+    match method_name {
+        "setId" => {
+            let id = match args.first() {
+                Some(PluginValue::Int(id)) => *id,
+                other => {
+                    return Err(runtime_throw(format!(
+                        "setId expects an int, got {other:?}"
+                    )));
+                }
+            };
+            package.borrow_mut().as_package_interface_mut().set_id(id);
+            return Ok(PluginValue::Null);
+        }
+        "setInstallationSource"
+        | "setSourceReference"
+        | "setSourceUrl"
+        | "setDistUrl"
+        | "setDistType"
+        | "setDistReference"
+        | "setSourceDistReferences" => {
+            let value = decode_optional_string(method_name, args.first())?;
+            let mut borrowed = package.borrow_mut();
+            let package = borrowed.as_package_interface_mut();
+            match method_name {
+                "setInstallationSource" => package.set_installation_source(value),
+                "setSourceReference" => package.set_source_reference(value),
+                "setSourceUrl" => package.set_source_url(value),
+                "setDistUrl" => package.set_dist_url(value),
+                "setDistType" => package.set_dist_type(value),
+                "setDistReference" => package.set_dist_reference(value),
+                _ => package.set_source_dist_references(value.ok_or_else(|| {
+                    runtime_throw("setSourceDistReferences expects a reference string".to_string())
+                })?),
+            }
+            return Ok(PluginValue::Null);
+        }
+        "setSourceMirrors" | "setDistMirrors" => {
+            let mirrors = decode_mirrors(method_name, args.first())?;
+            let mut borrowed = package.borrow_mut();
+            let package = borrowed.as_package_interface_mut();
+            if method_name == "setSourceMirrors" {
+                package.set_source_mirrors(mirrors);
+            } else {
+                package.set_dist_mirrors(mirrors);
+            }
+            return Ok(PluginValue::Null);
+        }
+        "setRepository" => {
+            let repository = match args.first() {
+                Some(PluginValue::RustHandle(handle)) => {
+                    match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                        Some(RustEntity::Repository(repository)) => repository,
+                        _ => {
+                            return Err(runtime_throw(format!(
+                                "setRepository expects a repository handle, got Rust handle {}",
+                                handle.rhandle
+                            )));
+                        }
+                    }
+                }
+                other => {
+                    return Err(runtime_throw(format!(
+                        "setRepository expects a repository argument, got {other:?}"
+                    )));
+                }
+            };
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_repository(repository)
+                .map_err(|error| runtime_throw(format!("setRepository failed: {error}")))?;
+            return Ok(PluginValue::Null);
+        }
+        "setTransportOptions" => {
+            let options = match args.first() {
+                Some(value) => match value.to_php_mixed().map_err(|error| {
+                    runtime_throw(format!(
+                        "setTransportOptions could not decode its argument: {error:#}"
+                    ))
+                })? {
+                    PhpMixed::Array(options) => options,
+                    PhpMixed::List(items) if items.is_empty() => IndexMap::new(),
+                    other => {
+                        return Err(runtime_throw(format!(
+                            "setTransportOptions expects an array, got {other:?}"
+                        )));
+                    }
+                },
+                None => IndexMap::new(),
+            };
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_transport_options(options);
+            return Ok(PluginValue::Null);
+        }
+        _ => {}
+    }
+
+    let borrowed = package.borrow();
+    let package = borrowed.as_package_interface();
     match method_name {
         "getName" => Ok(PluginValue::string(package.get_name().to_string())),
+        "getPrettyName" => Ok(PluginValue::string(package.get_pretty_name().to_string())),
+        "getNames" => {
+            let provides = match args.first() {
+                None => true,
+                Some(PluginValue::Bool(provides)) => *provides,
+                other => {
+                    return Err(runtime_throw(format!(
+                        "getNames expects a bool provides flag, got {other:?}"
+                    )));
+                }
+            };
+            Ok(string_list(package.get_names(provides)))
+        }
+        "getId" => Ok(PluginValue::Int(package.get_id())),
+        "isDev" => Ok(PluginValue::Bool(package.is_dev())),
         "getType" => Ok(PluginValue::string(package.get_type())),
+        "getTargetDir" => Ok(optional_string(package.get_target_dir())),
+        "getExtra" => Ok(string_keyed_map(package.get_extra())),
+        "getInstallationSource" => Ok(optional_string(package.get_installation_source())),
+        "getSourceType" => Ok(optional_string(package.get_source_type())),
+        "getSourceUrl" => Ok(optional_string(package.get_source_url())),
+        "getSourceUrls" => Ok(string_list(package.get_source_urls())),
+        "getSourceReference" => Ok(optional_string(package.get_source_reference())),
+        "getSourceMirrors" => Ok(mirror_list(package.get_source_mirrors())),
+        "getDistType" => Ok(optional_string(package.get_dist_type())),
+        "getDistUrl" => Ok(optional_string(package.get_dist_url())),
+        "getDistUrls" => Ok(string_list(package.get_dist_urls())),
+        "getDistReference" => Ok(optional_string(package.get_dist_reference())),
+        "getDistSha1Checksum" => Ok(optional_string(package.get_dist_sha1_checksum())),
+        "getDistMirrors" => Ok(mirror_list(package.get_dist_mirrors())),
+        "getVersion" => Ok(PluginValue::string(package.get_version().to_string())),
         "getPrettyVersion" => Ok(PluginValue::string(
             package.get_pretty_version().to_string(),
         )),
-        "getExtra" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            package.get_extra(),
-        ))),
         "getFullPrettyVersion" => {
             let truncate = match args.first() {
                 None => true,
@@ -477,22 +750,56 @@ fn dispatch_package_method(
                 package.get_full_pretty_version(truncate, display_mode),
             ))
         }
-        "getRequires" => {
-            let requires = package.get_requires();
-            if requires.is_empty() {
-                // An empty PHP array crosses the wire as a list.
+        "getStability" => Ok(PluginValue::string(package.get_stability().to_string())),
+        "getRequires" => links(package.get_requires()),
+        "getConflicts" => links(package.get_conflicts()),
+        "getProvides" => links(package.get_provides()),
+        "getReplaces" => links(package.get_replaces()),
+        "getDevRequires" => links(package.get_dev_requires()),
+        "getSuggests" => {
+            let suggests = package.get_suggests();
+            if suggests.is_empty() {
                 Ok(PluginValue::List(Vec::new()))
             } else {
-                // TODO(plugin): Link is a rust-snapshot value whose constraint field must
-                // materialize as a real composer/semver object in the child; the snapshot
-                // encoding does not exist yet.
-                Err(runtime_throw(
-                    "encoding Link values over RPC is not implemented yet".to_string(),
+                Ok(PluginValue::Array(
+                    suggests
+                        .into_iter()
+                        .map(|(name, description)| {
+                            (name.into_bytes(), PluginValue::string(description))
+                        })
+                        .collect(),
                 ))
             }
         }
-        // TODO(plugin): the remaining PackageInterface surface (setters included) is widened
-        // on demand, driven by explicit errors from real plugins.
+        "getAutoload" => Ok(string_keyed_map(package.get_autoload())),
+        "getDevAutoload" => Ok(string_keyed_map(package.get_dev_autoload())),
+        "getIncludePaths" => Ok(string_list(package.get_include_paths())),
+        "getPhpExt" => Ok(match package.get_php_ext() {
+            Some(config) => string_keyed_map(config),
+            None => PluginValue::Null,
+        }),
+        "getRepository" => match package.get_repository() {
+            Some(repository) => repository_handle_value(&repository),
+            None => Ok(PluginValue::Null),
+        },
+        "getBinaries" => Ok(string_list(package.get_binaries())),
+        "getUniqueName" => Ok(PluginValue::string(package.get_unique_name())),
+        "getNotificationUrl" => Ok(optional_string(package.get_notification_url())),
+        "__toString" => Ok(PluginValue::string(package.get_unique_name())),
+        "getPrettyString" => Ok(PluginValue::string(package.get_pretty_string())),
+        "isDefaultBranch" => Ok(PluginValue::Bool(package.is_default_branch())),
+        "getTransportOptions" => Ok(string_keyed_map(package.get_transport_options())),
+        "getReleaseDate" => match package.get_release_date() {
+            None => Ok(PluginValue::Null),
+            // TODO(plugin): a \DateTimeInterface has to materialize as a real PHP object in the
+            // child, which needs a snapshot encoding for value objects.
+            Some(_) => Err(runtime_throw(
+                "encoding the release date over RPC is not implemented yet".to_string(),
+            )),
+        },
+        // TODO(plugin): the concrete-class surface below PackageInterface (`Package`'s setters,
+        // `CompletePackage`'s metadata, `RootPackage`'s root-only state) is widened on demand,
+        // driven by explicit errors from real plugins.
         other => Err(runtime_throw(format!(
             "the package method `{other}` is not available over RPC yet"
         ))),
@@ -531,6 +838,35 @@ fn dispatch_installation_manager_method(
                 Some(path) => PluginValue::string(path),
                 None => PluginValue::Null,
             })
+        }
+        "addInstaller" | "removeInstaller" => {
+            let handle = match args.first() {
+                Some(PluginValue::PhpHandle(handle)) => handle.clone(),
+                other => {
+                    return Err(runtime_throw(format!(
+                        "{method_name} expects an installer object, got {other:?}"
+                    )));
+                }
+            };
+            if !php_is_a(&handle, "Composer\\Installer\\InstallerInterface").map_err(|error| {
+                runtime_throw(format!(
+                    "{method_name} could not type-check its argument: {error:#}"
+                ))
+            })? {
+                return Err(runtime_throw(format!(
+                    "{method_name} expects a Composer\\Installer\\InstallerInterface, got {}",
+                    handle.class
+                )));
+            }
+            let phandle = handle.phandle;
+            let installer = php_installer_proxy(handle);
+            if method_name == "addInstaller" {
+                im.borrow().add_installer(installer);
+            } else {
+                im.borrow().remove_installer(&*installer);
+                forget_php_installer_proxy(phandle);
+            }
+            Ok(PluginValue::Null)
         }
         // TODO(plugin): the remaining InstallationManager surface is widened on demand,
         // driven by explicit errors from real plugins.
@@ -940,6 +1276,243 @@ pub(crate) fn php_is_a(handle: &PhpObjHandle, class: &str) -> anyhow::Result<boo
         Some(&mut PluginRpcDispatcher::default()),
     ))?;
     Ok(matches!(value, PluginValue::Bool(true)))
+}
+
+/// Wire value handing a Rust-side repository to the child, interned in the R table.
+pub(crate) fn repository_handle_value(
+    repository: &RepositoryInterfaceHandle,
+) -> Result<PluginValue, PhpThrow> {
+    let class = repository_stub_class(repository)?;
+    let rhandle = register_entity(RustEntity::Repository(repository.clone()));
+    Ok(rust_handle_value(rhandle, class))
+}
+
+/// `InstallerInterface` adapter for an installer entity living in the PHP child process: the
+/// installer a plugin hands to `InstallationManager::addInstaller`, or the class a legacy
+/// `composer-installer` package names. Every call is forwarded as a `CallPhpMethod` RPC.
+#[derive(Debug)]
+pub struct PhpInstallerProxy {
+    pub(crate) handle: PhpObjHandle,
+}
+
+impl PhpInstallerProxy {
+    pub(crate) fn new(handle: PhpObjHandle) -> Self {
+        Self { handle }
+    }
+
+    fn call(&self, method: &str, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
+        unwrap_php_result(call_php_method(
+            self.handle.phandle,
+            method,
+            args,
+            Some(&mut PluginRpcDispatcher::default()),
+        ))
+    }
+
+    fn package_arg(package: &PackageInterfaceHandle) -> anyhow::Result<PluginValue> {
+        Ok(package_handle_value(package.as_rc())?)
+    }
+
+    fn optional_package_arg(
+        package: &Option<PackageInterfaceHandle>,
+    ) -> anyhow::Result<PluginValue> {
+        match package {
+            Some(package) => Self::package_arg(package),
+            None => Ok(PluginValue::Null),
+        }
+    }
+
+    fn repo_arg(repo: &InstalledRepositoryInterfaceHandle) -> anyhow::Result<PluginValue> {
+        Ok(repository_handle_value(&repo.as_repository_handle())?)
+    }
+
+    /// The `?PromiseInterface` half of the installer contract. A plugin installer that returns
+    /// a real promise needs the promise machinery the RPC boundary does not carry yet, so it is
+    /// an explicit error rather than a silently dropped continuation.
+    fn promise_result(&self, method: &str, value: PluginValue) -> anyhow::Result<Option<PhpMixed>> {
+        match value {
+            PluginValue::Null => Ok(None),
+            other => Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+                message: format!(
+                    "{}::{method}() returned a promise, which cannot cross the RPC boundary yet: {other:?}",
+                    self.handle.class
+                ),
+                code: 0,
+            })),
+        }
+    }
+
+    fn unsupported_shape(&self, method: &str, value: &PluginValue) -> anyhow::Error {
+        anyhow::anyhow!(shirabe_php_shim::RuntimeException {
+            message: format!(
+                "{}::{method}() returned an unsupported shape over RPC: {value:?}",
+                self.handle.class
+            ),
+            code: 0,
+        })
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl crate::installer::InstallerInterface for PhpInstallerProxy {
+    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+        match self.call("supports", vec![PluginValue::string(package_type)])? {
+            PluginValue::Bool(supports) => Ok(supports),
+            other => Err(self.unsupported_shape("supports", &other)),
+        }
+    }
+
+    fn is_installed(
+        &self,
+        repo: &InstalledRepositoryInterfaceHandle,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<bool> {
+        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)?];
+        match self.call("isInstalled", args)? {
+            PluginValue::Bool(installed) => Ok(installed),
+            other => Err(self.unsupported_shape("isInstalled", &other)),
+        }
+    }
+
+    async fn download(
+        &self,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        let args = vec![
+            Self::package_arg(&package)?,
+            Self::optional_package_arg(&prev_package)?,
+        ];
+        let value = self.call("download", args)?;
+        self.promise_result("download", value)
+    }
+
+    async fn prepare(
+        &self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        let args = vec![
+            PluginValue::string(r#type),
+            Self::package_arg(&package)?,
+            Self::optional_package_arg(&prev_package)?,
+        ];
+        let value = self.call("prepare", args)?;
+        self.promise_result("prepare", value)
+    }
+
+    async fn install(
+        &self,
+        repo: &InstalledRepositoryInterfaceHandle,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)?];
+        let value = self.call("install", args)?;
+        self.promise_result("install", value)
+    }
+
+    async fn update(
+        &self,
+        repo: &InstalledRepositoryInterfaceHandle,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        let args = vec![
+            Self::repo_arg(repo)?,
+            Self::package_arg(&initial)?,
+            Self::package_arg(&target)?,
+        ];
+        let value = self.call("update", args)?;
+        self.promise_result("update", value)
+    }
+
+    async fn uninstall(
+        &self,
+        repo: &InstalledRepositoryInterfaceHandle,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)?];
+        let value = self.call("uninstall", args)?;
+        self.promise_result("uninstall", value)
+    }
+
+    async fn cleanup(
+        &self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        let args = vec![
+            PluginValue::string(r#type),
+            Self::package_arg(&package)?,
+            Self::optional_package_arg(&prev_package)?,
+        ];
+        let value = self.call("cleanup", args)?;
+        self.promise_result("cleanup", value)
+    }
+
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+        // PHP declares `getInstallPath(): string`; a failure here is a plugin error the
+        // infallible signature cannot carry, so it aborts rather than answering a path that
+        // would silently install the package in the wrong place.
+        let args = vec![Self::package_arg(&package).unwrap_or_else(|error| {
+            panic!(
+                "{}::getInstallPath argument failed: {error:#}",
+                self.handle.class
+            )
+        })];
+        let value = self.call("getInstallPath", args).unwrap_or_else(|error| {
+            panic!(
+                "{}::getInstallPath failed over RPC: {error:#}",
+                self.handle.class
+            )
+        });
+        match value {
+            PluginValue::Null => None,
+            PluginValue::String(path) => Some(String::from_utf8_lossy(&path).into_owned()),
+            other => panic!("{}", self.unsupported_shape("getInstallPath", &other)),
+        }
+    }
+}
+
+impl Drop for PhpInstallerProxy {
+    fn drop(&mut self) {
+        let _ = release_php_handle(self.handle.phandle);
+    }
+}
+
+thread_local! {
+    /// The installer adapters handed to `InstallationManager::addInstaller` over RPC, keyed by
+    /// the entity's phandle. `removeInstaller` arrives carrying the same entity, and the
+    /// manager compares installers by identity, so the adapter it was given has to be found
+    /// again rather than rebuilt.
+    static PHP_INSTALLER_PROXIES: std::cell::RefCell<IndexMap<u64, std::rc::Rc<dyn crate::installer::InstallerInterface>>> =
+        std::cell::RefCell::new(IndexMap::new());
+}
+
+/// The adapter for an installer entity, building it on first sight.
+pub(crate) fn php_installer_proxy(
+    handle: PhpObjHandle,
+) -> std::rc::Rc<dyn crate::installer::InstallerInterface> {
+    PHP_INSTALLER_PROXIES.with(|proxies| {
+        let mut proxies = proxies.borrow_mut();
+        if let Some(existing) = proxies.get(&handle.phandle) {
+            return existing.clone();
+        }
+        let phandle = handle.phandle;
+        let proxy: std::rc::Rc<dyn crate::installer::InstallerInterface> =
+            std::rc::Rc::new(PhpInstallerProxy::new(handle));
+        proxies.insert(phandle, proxy.clone());
+        proxy
+    })
+}
+
+/// Drops the adapter bookkeeping for an installer entity that left the manager.
+fn forget_php_installer_proxy(phandle: u64) {
+    PHP_INSTALLER_PROXIES.with(|proxies| {
+        proxies.borrow_mut().shift_remove(&phandle);
+    });
 }
 
 /// `Capability` adapter for a capability entity living in the PHP child process, for

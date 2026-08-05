@@ -72,9 +72,13 @@ the generator's vendor directory or the classifier report is unavailable.
 * **Public instance properties** are not declared on the stub; `__get`/`__set`
   forwarders carry every access (including dynamic-property writes) to the
   Rust side, where an unsupported name is an explicit error.
-* **`__toString`** is forwarded like any other method. **`__clone`** emits a
-  throwing body: proxy clone semantics are an open design question, and
-  cloning must not silently share the Rust handle between two stubs.
+* **`__toString`** is forwarded like any other method. **`__clone`** is part of
+  the boilerplate on every stub, whether or not the real class declares one:
+  PHP has already copied the stub by the time it runs, so the copy asks the
+  Rust side for a clone of the entity and rebinds itself to the fresh handle
+  (`__shirabeClone`, answered with `[rhandle, epoch]`). The clone semantics of
+  the real class live on the Rust side with the entity; entities that model no
+  clone answer with an explicit error.
 * **Imports**: the original file's `use` statements are kept in their original
   order, restricted to names the emitted stub references; signatures declared
   elsewhere (interface files) are re-spelled through that import table.

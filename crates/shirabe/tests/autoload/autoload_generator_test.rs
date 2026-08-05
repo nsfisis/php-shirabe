@@ -33,8 +33,8 @@ struct InstallPathStubInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for InstallPathStubInstaller {
-    fn supports(&self, _package_type: &str) -> bool {
-        true
+    fn supports(&self, _package_type: &str) -> anyhow::Result<bool> {
+        Ok(true)
     }
 
     fn is_installed(
@@ -155,8 +155,8 @@ fn make_installation_manager(
     )));
     let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
 
-    let mut im = InstallationManager::new(loop_, io, None);
-    im.add_installer(Box::new(InstallPathStubInstaller {
+    let im = InstallationManager::new(loop_, io, None);
+    im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
         vendor_dir: vendor_dir.to_string(),
     }));
     im
@@ -491,7 +491,7 @@ fn test_vendor_dir_same_as_working_dir() {
     let mut s = set_up();
     s.vendor_dir = s.working_dir.clone();
     // Re-register the install-path stub so getInstallPath uses the new vendor dir.
-    s.im.add_installer(Box::new(InstallPathStubInstaller {
+    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
         vendor_dir: s.vendor_dir.clone(),
     }));
 
@@ -551,7 +551,7 @@ fn test_root_package_autoloading_alternative_vendor_dir() {
     ]));
 
     s.vendor_dir = format!("{}/subdir", s.vendor_dir);
-    s.im.add_installer(Box::new(InstallPathStubInstaller {
+    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
         vendor_dir: s.vendor_dir.clone(),
     }));
 

@@ -10,8 +10,8 @@ pub struct NoopInstaller;
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for NoopInstaller {
-    fn supports(&self, _package_type: &str) -> bool {
-        true
+    fn supports(&self, _package_type: &str) -> anyhow::Result<bool> {
+        Ok(true)
     }
 
     fn is_installed(

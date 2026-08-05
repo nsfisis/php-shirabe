@@ -168,7 +168,9 @@ Both sets are written into the same autoload directory at worker spawn and resol
 highest priority, so these FQCNs can never be shadowed by the real implementation;
 `__shirabe_require` restores that priority after loading code that prepends its own autoloader.
 Stubs are interned per rhandle (`WeakReference`-based registry) so identity (`===`) holds, and
-their destructors send `ReleaseRustHandle`.
+their destructors send `ReleaseRustHandle`. `clone` on a stub calls `__shirabeClone` on the
+entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
+double-release) one entity; entities with no clone semantics answer with an explicit error.
 
 ## The P table
 

@@ -73,8 +73,8 @@ impl PluginInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for PluginInstaller {
-    fn supports(&self, package_type: &str) -> bool {
-        package_type == "composer-plugin" || package_type == "composer-installer"
+    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+        Ok(package_type == "composer-plugin" || package_type == "composer-installer")
     }
 
     fn is_installed(

@@ -47,12 +47,13 @@ pub struct PluginManager {
     allow_plugin_rules: Option<IndexMap<String, bool>>,
     allow_global_plugin_rules: Option<IndexMap<String, bool>>,
     running_in_global_dir: bool,
+    plugin_api_version_override: Option<String>,
 }
 
 #[derive(Debug)]
 pub enum PluginOrInstaller {
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
-    Installer(Box<dyn InstallerInterface>),
+    Installer(std::rc::Rc<dyn InstallerInterface>),
 }
 
 /// PHP `private static $classCounter = 0;`.
@@ -101,7 +102,15 @@ impl PluginManager {
             allow_plugin_rules,
             allow_global_plugin_rules,
             running_in_global_dir: false,
+            plugin_api_version_override: None,
         }
+    }
+
+    /// For testing only: makes `get_plugin_api_version` report `version` instead of the
+    /// compiled-in constant, the seam PHPUnit obtains from
+    /// `getMockBuilder(PluginManager::class)->onlyMethods(['getPluginApiVersion'])`.
+    pub fn __set_plugin_api_version(&mut self, version: &str) {
+        self.plugin_api_version_override = Some(version.to_string());
     }
 
     pub fn set_running_in_global_dir(&mut self, running_in_global_dir: bool) {
@@ -460,16 +469,46 @@ impl PluginManager {
             }
 
             if old_installer_plugin {
-                // TODO(plugin): legacy composer-installer plugins need the InstallerInterface
-                // reverse adapter, which does not exist yet; explicit error until then.
-                return Err(RuntimeException {
-                    message: format!(
-                        "Shirabe cannot load \"{}\": legacy composer-installer plugins are not supported yet",
-                        package.get_name()
-                    ),
-                    code: 0,
+                if !self.php_runtime_is_a(&class, "Composer\\Installer\\InstallerInterface")? {
+                    return Err(RuntimeException {
+                        message: format!(
+                            "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Installer\\InstallerInterface",
+                            package.get_name(),
+                            class
+                        ),
+                        code: 0,
+                    }
+                    .into());
                 }
-                .into());
+                self.io.write_error(&format!(
+                    "<warning>Loading \"{}\" {}which is a legacy composer-installer built for Composer 1.x, it is likely to cause issues as you are running Composer 2.x.</warning>",
+                    package.get_name(),
+                    if is_global_plugin || self.running_in_global_dir {
+                        "(installed globally) "
+                    } else {
+                        ""
+                    }
+                ));
+                let composer = self.composer_full();
+                let handle = self.php_runtime_new_object_with_args(
+                    &class,
+                    vec![
+                        crate::plugin::io_handle_value(&self.io)?,
+                        crate::plugin::composer_handle_value(&composer),
+                    ],
+                )?;
+                let installer = crate::plugin::php_installer_proxy(handle);
+                // A shared borrow: this runs inside `InstallationManager::execute`, which holds
+                // one of its own for the whole run.
+                composer
+                    .borrow()
+                    .get_installation_manager()
+                    .borrow()
+                    .add_installer(installer.clone());
+                self.registered_plugins
+                    .entry(package.get_name().to_string())
+                    .or_default()
+                    .push(PluginOrInstaller::Installer(installer));
             } else if self.php_runtime_class_exists(&class, true)? {
                 if !self.php_runtime_is_a(&class, "Composer\\Plugin\\PluginInterface")? {
                     return Err(RuntimeException {
@@ -569,9 +608,17 @@ impl PluginManager {
 
     /// PHP `new $class()` in the worker, returning the P-table handle of the new entity.
     fn php_runtime_new_object(&self, class: &str) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
+        self.php_runtime_new_object_with_args(class, vec![])
+    }
+
+    fn php_runtime_new_object_with_args(
+        &self,
+        class: &str,
+        args: Vec<PluginValue>,
+    ) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
         let value = unwrap_php_result(shirabe_php_rpc::new_object(
             class,
-            vec![],
+            args,
             Some(&mut PluginRpcDispatcher::default()),
         ))?;
         match value {
@@ -610,7 +657,7 @@ impl PluginManager {
                     if let PluginOrInstaller::Installer(inst) =
                         &self.registered_plugins.get(&name).unwrap()[index]
                     {
-                        installation_manager.borrow_mut().remove_installer(&**inst);
+                        installation_manager.borrow().remove_installer(&**inst);
                     }
                 }
             }
@@ -648,7 +695,7 @@ impl PluginManager {
                     if let PluginOrInstaller::Installer(inst) =
                         &self.registered_plugins.get(&name).unwrap()[index]
                     {
-                        installation_manager.borrow_mut().remove_installer(&**inst);
+                        installation_manager.borrow().remove_installer(&**inst);
                     }
                 }
             }
@@ -659,7 +706,10 @@ impl PluginManager {
 
     /// Returns the version of the internal composer-plugin-api package.
     pub(crate) fn get_plugin_api_version(&self) -> String {
-        plugin_interface::PLUGIN_API_VERSION.to_string()
+        match &self.plugin_api_version_override {
+            Some(version) => version.clone(),
+            None => plugin_interface::PLUGIN_API_VERSION.to_string(),
+        }
     }
 
     /// Adds a plugin, activates it and registers it with the event dispatcher

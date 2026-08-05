@@ -51,6 +51,16 @@ final class ShirabeRustObjectRegistry
         return $stub;
     }
 
+    /**
+     * Interns a stub the registry did not build: a `__clone` forwarder rebinds the copy PHP
+     * made to a freshly cloned entity, and that pairing has to be visible to later crossings
+     * of the same handle.
+     */
+    public static function adopt(int $rhandle, object $stub): void
+    {
+        self::$internTable[$rhandle] = WeakReference::create($stub);
+    }
+
     /** Invoked when an EpochBump frame arrives. No-op if the stub already died. */
     public static function bumpEpoch(int $rhandle, int $epoch): void
     {

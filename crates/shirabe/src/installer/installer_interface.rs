@@ -8,7 +8,7 @@ use shirabe_php_shim::PhpMixed;
 
 #[async_trait::async_trait(?Send)]
 pub trait InstallerInterface: std::fmt::Debug {
-    fn supports(&self, package_type: &str) -> bool;
+    fn supports(&self, package_type: &str) -> anyhow::Result<bool>;
 
     fn is_installed(
         &self,

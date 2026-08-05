@@ -50,6 +50,16 @@ final class Generator
                 '__epoch' => $this->__epoch,
             ];
         }
+
+        public function __clone()
+        {
+            // PHP has already shallow-copied this stub, so both copies would point at one
+            // entity and release it twice. The Rust side clones the entity instead, applying
+            // whatever __clone semantics the real class defines, and this copy rebinds to the
+            // fresh handle. Entities without clone semantics answer with an explicit error.
+            [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+            \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        }
     PHP;
 
     private const PROPERTY_FORWARDERS = <<<'PHP'
@@ -62,15 +72,6 @@ final class Generator
         public function __set($name, $value): void
         {
             \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
-        }
-    PHP;
-
-    private const CLONE_THROW = <<<'PHP'
-        public function __clone()
-        {
-            // Cloning a proxy is an open design question; fail instead of silently sharing
-            // the Rust-side entity between two stub instances.
-            throw new \RuntimeException('Shirabe does not support cloning ' . static::class . ' inside the plugin process yet');
         }
     PHP;
 
@@ -234,7 +235,6 @@ final class Generator
         $publicStatics = [];
         $nonPublicStatics = [];
         $ownInstanceMethods = [];
-        $cloneThrows = false;
         foreach ($class->getMethods() as $method) {
             $name = $method->name->toString();
             if ($name === '__construct') {
@@ -245,13 +245,11 @@ final class Generator
                     $this->errors[] = "$fqcn::$name: magic methods cannot be proxied";
                 }
                 // __toString is an ordinary zero-argument call under a magic name and is
-                // forwarded below; __clone semantics are an open design question and the
-                // emitted body throws instead of silently sharing the Rust handle.
+                // forwarded below. A real __clone declaration needs no counterpart here: the
+                // boilerplate's forwarder delegates cloning to the entity, whose Rust-side
+                // clone carries the declared semantics.
                 if ($method->isPublic() && $name === '__toString') {
                     $ownInstanceMethods[$name] = $method;
-                }
-                if ($method->isPublic() && $name === '__clone') {
-                    $cloneThrows = true;
                 }
                 continue;
             }
@@ -342,9 +340,6 @@ final class Generator
         }
         if ($hasPublicInstanceProperties) {
             $members[] = self::PROPERTY_FORWARDERS;
-        }
-        if ($cloneThrows) {
-            $members[] = self::CLONE_THROW;
         }
         $members = array_merge($members, $staticMethods, $methodTexts);
         $body = implode("\n\n", $members);

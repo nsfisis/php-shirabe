@@ -232,11 +232,11 @@ impl LibraryInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for LibraryInstaller {
-    fn supports(&self, package_type: &str) -> bool {
-        match &self.r#type {
+    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+        Ok(match &self.r#type {
             Some(t) => package_type == t,
             None => true,
-        }
+        })
     }
 
     fn is_installed(

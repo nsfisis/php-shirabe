@@ -42,6 +42,16 @@ abstract class BasePackage implements PackageInterface, \ShirabeRustStub
         ];
     }
 
+    public function __clone()
+    {
+        // PHP has already shallow-copied this stub, so both copies would point at one
+        // entity and release it twice. The Rust side clones the entity instead, applying
+        // whatever __clone semantics the real class defines, and this copy rebinds to the
+        // fresh handle. Entities without clone semantics answer with an explicit error.
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
     public const STABILITY_STABLE = 0;
     public const STABILITY_RC = 5;
     public const STABILITY_BETA = 10;
@@ -73,13 +83,6 @@ abstract class BasePackage implements PackageInterface, \ShirabeRustStub
     public function __set($name, $value): void
     {
         \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
-    }
-
-    public function __clone()
-    {
-        // Cloning a proxy is an open design question; fail instead of silently sharing
-        // the Rust-side entity between two stub instances.
-        throw new \RuntimeException('Shirabe does not support cloning ' . static::class . ' inside the plugin process yet');
     }
 
     public static function packageNameToRegexp(string $allowPattern, string $wrap = '{^%s$}i'): string

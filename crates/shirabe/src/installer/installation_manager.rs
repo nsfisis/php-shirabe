@@ -33,12 +33,12 @@ pub struct InstallationManager {
     /// Rc rather than Box so `get_installer` can hand out shareable handles: the download/cleanup
     /// futures collected for Loop::wait must own their installer beyond the loop iteration that
     /// created them (PHP closures capture $installer the same way).
-    installers: Vec<std::rc::Rc<dyn InstallerInterface>>,
-    /// Maps a package type to the index of its installer in `installers`. PHP caches the installer
-    /// instance itself; here we store an index instead. The index never dangles because both
-    /// `add_installer` and `remove_installer` clear the cache whenever `installers` changes.
+    /// RefCell so a plugin activated from inside `execute` — which holds a shared borrow of this
+    /// manager for the whole run — can still register its own installer.
+    installers: std::cell::RefCell<Vec<std::rc::Rc<dyn InstallerInterface>>>,
+    /// Maps a package type to its installer.
     /// RefCell so lookups can populate the cache through `&self` from concurrent operation chains.
-    cache: std::cell::RefCell<IndexMap<String, usize>>,
+    cache: std::cell::RefCell<IndexMap<String, std::rc::Rc<dyn InstallerInterface>>>,
     /// RefCell so mark_for_notification works through `&self` from concurrent operation chains.
     notifiable_packages: std::cell::RefCell<IndexMap<String, Vec<PackageInterfaceHandle>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
@@ -69,7 +69,7 @@ impl InstallationManager {
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> Self {
         Self {
-            installers: vec![],
+            installers: std::cell::RefCell::new(vec![]),
             cache: std::cell::RefCell::new(IndexMap::new()),
             notifiable_packages: std::cell::RefCell::new(IndexMap::new()),
             loop_,
@@ -133,30 +133,25 @@ impl InstallationManager {
     }
 
     /// Adds installer
-    pub fn add_installer(&mut self, installer: Box<dyn InstallerInterface>) {
-        array_unshift(&mut self.installers, std::rc::Rc::from(installer));
-        self.cache = std::cell::RefCell::new(IndexMap::new());
-    }
-
-    /// For testing only: adds an installer as a pre-built shared handle, so the caller keeps an
-    /// identity handle usable for PHP `assertSame`-style comparisons (`Rc::ptr_eq`) and for
-    /// `remove_installer`. `add_installer` cannot serve because `Rc::from(Box)` reallocates,
-    /// losing the caller's pointer identity.
-    pub fn __add_installer(&mut self, installer: std::rc::Rc<dyn InstallerInterface>) {
-        array_unshift(&mut self.installers, installer);
-        self.cache = std::cell::RefCell::new(IndexMap::new());
+    ///
+    /// The installer is taken as a shared handle: PHP hands over an object reference and both
+    /// sides keep the same identity afterwards, which `removeInstaller` and the plugin
+    /// manager's `registeredPlugins` bookkeeping compare against.
+    pub fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>) {
+        array_unshift(&mut self.installers.borrow_mut(), installer);
+        self.cache.borrow_mut().clear();
     }
 
     /// Removes installer
-    pub fn remove_installer(&mut self, installer: &dyn InstallerInterface) {
+    pub fn remove_installer(&self, installer: &dyn InstallerInterface) {
         let target = installer as *const dyn InstallerInterface as *const ();
-        let key = self
-            .installers
+        let mut installers = self.installers.borrow_mut();
+        let key = installers
             .iter()
             .position(|inst| &**inst as *const dyn InstallerInterface as *const () == target);
         if let Some(k) = key {
-            array_splice(&mut self.installers, k as i64, Some(1), vec![]);
-            self.cache = std::cell::RefCell::new(IndexMap::new());
+            array_splice(&mut installers, k as i64, Some(1), vec![]);
+            self.cache.borrow_mut().clear();
         }
     }
 
@@ -166,7 +161,9 @@ impl InstallationManager {
     /// disabling the PluginManager. This ensures that no third-party
     /// code is ever executed.
     pub fn disable_plugins(&mut self) {
-        for installer in self.installers.iter() {
+        // Cloned out: `disablePlugins` reaches into the plugin manager, which may reach back.
+        let installers = self.installers.borrow().clone();
+        for installer in installers.iter() {
             if let Some(plugin_installer) = installer.as_plugin_installer() {
                 plugin_installer.disable_plugins();
             }
@@ -180,17 +177,18 @@ impl InstallationManager {
     ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
-        if let Some(&index) = self.cache.borrow().get(&r#type) {
-            return Ok(self.installers[index].clone());
+        if let Some(installer) = self.cache.borrow().get(&r#type) {
+            return Ok(installer.clone());
         }
 
-        let index = self
-            .installers
-            .iter()
-            .position(|installer| installer.supports(&r#type));
-        if let Some(index) = index {
-            self.cache.borrow_mut().insert(r#type, index);
-            return Ok(self.installers[index].clone());
+        // Cloned out: a PHP-backed installer answers `supports` over RPC, and the plugin behind
+        // it can register a further installer from that call.
+        let installers = self.installers.borrow().clone();
+        for installer in installers {
+            if installer.supports(&r#type)? {
+                self.cache.borrow_mut().insert(r#type, installer.clone());
+                return Ok(installer);
+            }
         }
 
         Err(InvalidArgumentException {
@@ -1020,8 +1018,8 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         unimplemented!("as_any is only implemented for the concrete InstallationManager")
     }
 
-    fn add_installer(&mut self, installer: Box<dyn InstallerInterface>);
-    fn remove_installer(&mut self, installer: &dyn InstallerInterface);
+    fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
+    fn remove_installer(&self, installer: &dyn InstallerInterface);
     fn disable_plugins(&mut self);
     fn is_package_installed(
         &mut self,
@@ -1047,12 +1045,12 @@ impl InstallationManagerInterface for InstallationManager {
         self
     }
 
-    fn add_installer(&mut self, installer: Box<dyn InstallerInterface>) {
-        self.add_installer(installer);
+    fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>) {
+        InstallationManager::add_installer(self, installer);
     }
 
-    fn remove_installer(&mut self, installer: &dyn InstallerInterface) {
-        self.remove_installer(installer);
+    fn remove_installer(&self, installer: &dyn InstallerInterface) {
+        InstallationManager::remove_installer(self, installer);
     }
 
     fn disable_plugins(&mut self) {

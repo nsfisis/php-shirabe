@@ -421,8 +421,8 @@ mockall::mock! {
     #[derive(Debug)]
     pub InstallationManager {}
     impl InstallationManagerInterface for InstallationManager {
-        fn add_installer(&mut self, installer: Box<dyn InstallerInterface>);
-        fn remove_installer(&mut self, installer: &dyn InstallerInterface);
+        fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
+        fn remove_installer(&self, installer: &dyn InstallerInterface);
         fn disable_plugins(&mut self);
         fn is_package_installed(
             &mut self,
