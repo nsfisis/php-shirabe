@@ -7,6 +7,12 @@ namespace Composer\Package;
 
 class Package extends BasePackage
 {
+    public function __construct(string $name, string $version, string $prettyVersion)
+    {
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$name, $version, $prettyVersion]]);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
     public function setType(string $type): void
     {
         \ShirabeRpcRuntime::callRust($this->__rhandle, 'setType', [$type]);

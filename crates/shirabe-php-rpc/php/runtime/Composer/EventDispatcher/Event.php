@@ -4,9 +4,10 @@
 // lives in both worlds at once: an instance revived from a Rust handle proxies every call over
 // RPC (like a generated stub), while an instance constructed natively — real Composer code in
 // this process does `new PreCommandRunEvent(...)`, whose parent constructor lands here — is a
-// faithful in-process port of the real base class. The two modes are told apart by the
-// constructor arguments; `__shirabeRustHandleDescriptor()` returns null in native mode so the
-// wire codec registers the object in the P table instead of treating it as a Rust handle.
+// faithful in-process port of the real base class. Proxy revival binds the handle without
+// running the constructor, so the constructor below is the native mode alone;
+// `__shirabeRustHandleDescriptor()` returns null there so the wire codec registers the object in
+// the P table instead of treating it as a Rust handle.
 
 namespace Composer\EventDispatcher;
 
@@ -29,27 +30,18 @@ class Event implements \ShirabeRustStub
     /** @var bool Whether the event should not be passed to more listeners (native mode) */
     private $propagationStopped = false;
 
-    /**
-     * Proxy revival passes (int $rhandle, int $epoch); the real class's constructor is
-     * (string $name, array $args = [], array $flags = []).
-     */
-    public function __construct($name = null, $args = [], $flags = [])
+    public function __construct(string $name, array $args = [], array $flags = [])
     {
-        if (is_int($name) && func_num_args() === 2 && is_int($args)) {
-            $this->__rhandle = $name;
-            $this->__epoch = $args;
-
-            return;
-        }
-        if (!is_string($name)) {
-            throw new \RuntimeException(
-                'Shirabe does not support constructing ' . static::class . ' inside the plugin process without an event name'
-            );
-        }
         $this->__rhandle = null;
         $this->name = $name;
         $this->args = $args;
         $this->flags = $flags;
+    }
+
+    public function __shirabeBind(int $rhandle, int $epoch): void
+    {
+        $this->__rhandle = $rhandle;
+        $this->__epoch = $epoch;
     }
 
     public function __destruct()

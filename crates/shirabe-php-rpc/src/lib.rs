@@ -579,6 +579,14 @@ const STUB_FILES: &[(&str, &str)] = &[
         include_str!("../php/stubs/Composer/Composer.php"),
     ),
     (
+        "Composer/Config.php",
+        include_str!("../php/stubs/Composer/Config.php"),
+    ),
+    (
+        "Composer/Downloader/DownloadManager.php",
+        include_str!("../php/stubs/Composer/Downloader/DownloadManager.php"),
+    ),
+    (
         "Composer/IO/BaseIO.php",
         include_str!("../php/stubs/Composer/IO/BaseIO.php"),
     ),

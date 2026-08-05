@@ -126,6 +126,13 @@ function; an unknown name is an explicit error. Notable internal helpers:
   (the unconditional `InstalledVersions::reload($versions)` plus the reflection-based
   `selfDir`/`installedIsLocalDir` restore) into the worker; skipped only when the class is not
   even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
+- `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, so a Rust method
+  whose PHP signature declares `PromiseInterface` (the `DownloadManager` surface) can answer
+  with the object type the caller expects. The Rust future has already run to completion by
+  then; deferred resolution across the boundary does not exist yet.
+- `__shirabe_settle_promise` — the inverse: drains a promise a plugin returned to Rust. React
+  settles synchronously, so an already-settled promise yields its value here (a rejection is
+  re-thrown as the Throw reply); one that is still pending is an explicit error.
 - `__shirabe_get_property` — for testing only: reads a public property of a P-table entity.
 - `__shirabe_oracle_roundtrip` — codec oracle support for tests.
 - `__shirabe_console_application_boot` — builds the worker-side `Composer\Console\Application`
@@ -138,10 +145,13 @@ function; an unknown name is an explicit error. Notable internal helpers:
 - `__shirabe_read_command_definition` — reads a command's input definition (plus help text and
   extra usages) as plain data, so the Rust side mirrors it for `help`/`list` rendering.
 
-The runtime service endpoint (handle 0) answers `__shirabe_find_file` (autoload lookups) and
+The runtime service endpoint (handle 0) answers `__shirabe_find_file` (autoload lookups),
 `__shirabe_run_rust_command` — the reverse half of the two-world command split: a
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
-the Rust process, against the Rust-side application state.
+the Rust process, against the Rust-side application state — and `__shirabeConstruct`, which
+allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
+answers with `[rhandle, epoch]`. Classes whose entity Rust cannot build are an explicit error
+naming the class.
 
 ## Proxy stubs and runtime classes
 
@@ -158,17 +168,19 @@ by `scripts/plugin-stub-generator/generate-stubs` and must not be edited by hand
   surface (`getIO()`/`getComposer()`/...) answers from the Rust handoff.
 - `Shirabe\RustCommandStub` — the reverse stub for built-in commands registered into that
   application.
-- `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle it proxies like a
-  generated stub, while a natively-constructed instance (real Composer code in the worker does
-  `new PreCommandRunEvent(...)`, whose parent constructor lands here) is a faithful in-process
-  port of the real base class and crosses the wire as a P-table entity
-  (`__shirabeRustHandleDescriptor()` returns null in native mode).
+- `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle (through
+  `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
+  Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands
+  here) is a faithful in-process port of the real base class and crosses the wire as a P-table
+  entity (`__shirabeRustHandleDescriptor()` returns null in native mode).
 
 Both sets are written into the same autoload directory at worker spawn and resolved with
 highest priority, so these FQCNs can never be shadowed by the real implementation;
 `__shirabe_require` restores that priority after loading code that prepends its own autoloader.
 Stubs are interned per rhandle (`WeakReference`-based registry) so identity (`===`) holds, and
-their destructors send `ReleaseRustHandle`. `clone` on a stub calls `__shirabeClone` on the
+their destructors send `ReleaseRustHandle`. Reviving a stub for an existing entity bypasses its
+constructor (`newInstanceWithoutConstructor` plus `__shirabeBind`), because the constructor
+carries the real class's own signature and belongs to plugin code building a *new* entity. `clone` on a stub calls `__shirabeClone` on the
 entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
 double-release) one entity; entities with no clone semantics answer with an explicit error.
 

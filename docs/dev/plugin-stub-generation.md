@@ -46,12 +46,18 @@ the generator's vendor directory or the classifier report is unavailable.
 ## What the generator emits
 
 * **Root stubs** (targets whose parent class is not itself a target) carry the
-  proxy boilerplate: `__rhandle`/`__epoch` properties, a constructor that
-  accepts `(rhandle, epoch)` from proxy instantiation and throws a diagnosable
-  `RuntimeException` when plugin code tries to `new` the class directly, a
+  proxy boilerplate: `__rhandle`/`__epoch` properties, the `__shirabeBind`
+  binder the registry calls when reviving a stub for an existing entity, a
   destructor releasing the Rust handle, and the wire descriptor helper. The
   real `extends`/`implements` hierarchy is preserved and `\ShirabeRustStub` is
   appended to the interface list.
+* **Constructors** reproduce the real class's parameter list and forward to the
+  Rust side (`__shirabeConstruct` on handle 0), which allocates the entity and
+  answers with its handle; a class Rust cannot build answers with an explicit
+  error naming it. One is emitted for every root stub and for every subclass
+  that declares a public constructor of its own, so `new SomeProxiedClass(...)`
+  in plugin code never yields an unbound stub. Proxy revival does not run them
+  (see `__shirabeBind` above).
 * **Instance methods** forward via `\ShirabeRpcRuntime::callRust`. For a root
   stub the emitted surface is the interface closure (each interface before the
   ones it extends, methods in declaration order; a concrete redeclaration in
@@ -89,8 +95,8 @@ Generation fails — instead of emitting something quietly wrong — on:
 
 * a target missing from the classifier report, classified other than
   `rust-proxy`/`contract`, or a report carrying violations,
-* by-ref or variadic parameters, static interface methods, magic methods
-  other than `__toString`/`__clone`,
+* by-ref or variadic parameters (in constructors too), static interface
+  methods, magic methods other than `__toString`/`__clone`,
 * an omitted override diverging from the inherited stub signature,
 * a subclass target listed before its base class, or extending a class that is
   neither a target nor provided by `php/runtime/`,

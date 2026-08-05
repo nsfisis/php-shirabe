@@ -5,7 +5,12 @@
 
 namespace Composer\Repository;
 
+use Composer\IO\IOInterface;
+use Composer\Config;
+use Composer\EventDispatcher\EventDispatcher;
 use Composer\Package\PackageInterface;
+use Composer\Util\HttpDownloader;
+use Composer\Util\ProcessExecutor;
 
 class RepositoryManager implements \ShirabeRustStub
 {
@@ -14,16 +19,12 @@ class RepositoryManager implements \ShirabeRustStub
     /** @var int */
     protected $__epoch;
 
-    public function __construct(int $rhandle = 0, int $epoch = 0)
+    /**
+     * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
+     * the constructor, which belongs to plugin code building a new entity instead.
+     */
+    public function __shirabeBind(int $rhandle, int $epoch): void
     {
-        if (func_num_args() < 2) {
-            // Constructing the class from plugin code (a common idiom for e.g. `new BufferIO()`)
-            // is an open question of the plugin design; only proxy instantiation passes a
-            // Rust handle. Fail with a diagnosable message instead of an ArgumentCountError.
-            throw new \RuntimeException(
-                'Shirabe does not support constructing ' . static::class . ' inside the plugin process yet'
-            );
-        }
         $this->__rhandle = $rhandle;
         $this->__epoch = $epoch;
     }
@@ -49,6 +50,12 @@ class RepositoryManager implements \ShirabeRustStub
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
         [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
+    public function __construct(IOInterface $io, Config $config, HttpDownloader $httpDownloader, ?EventDispatcher $eventDispatcher = null, ?ProcessExecutor $process = null)
+    {
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$io, $config, $httpDownloader, $eventDispatcher, $process]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

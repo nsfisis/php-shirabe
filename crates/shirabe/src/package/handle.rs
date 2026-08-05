@@ -64,8 +64,9 @@ impl AnyPackage {
         }
     }
 
-    /// For testing only: reach the base `Package` of a real package variant.
-    /// Crate-private; the public `__set_*` test hatches are built on top of it.
+    /// The base `Package` of a real package variant, for the members `PackageInterface` does not
+    /// carry (`Package`'s own setters, which the subclasses inherit). The public `__set_*` test
+    /// hatches are built on top of it too.
     pub(crate) fn as_package_mut(&mut self) -> Option<&mut Package> {
         match self {
             Self::Package(p) => Some(p),

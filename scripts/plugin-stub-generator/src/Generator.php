@@ -23,16 +23,12 @@ final class Generator
         /** @var int */
         protected $__epoch;
 
-        public function __construct(int $rhandle = 0, int $epoch = 0)
+        /**
+         * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
+         * the constructor, which belongs to plugin code building a new entity instead.
+         */
+        public function __shirabeBind(int $rhandle, int $epoch): void
         {
-            if (func_num_args() < 2) {
-                // Constructing the class from plugin code (a common idiom for e.g. `new BufferIO()`)
-                // is an open question of the plugin design; only proxy instantiation passes a
-                // Rust handle. Fail with a diagnosable message instead of an ArgumentCountError.
-                throw new \RuntimeException(
-                    'Shirabe does not support constructing ' . static::class . ' inside the plugin process yet'
-                );
-            }
             $this->__rhandle = $rhandle;
             $this->__epoch = $epoch;
         }
@@ -235,9 +231,13 @@ final class Generator
         $publicStatics = [];
         $nonPublicStatics = [];
         $ownInstanceMethods = [];
+        $constructor = null;
         foreach ($class->getMethods() as $method) {
             $name = $method->name->toString();
             if ($name === '__construct') {
+                if ($method->isPublic()) {
+                    $constructor = $method;
+                }
                 continue;
             }
             if (str_starts_with($name, '__')) {
@@ -332,6 +332,9 @@ final class Generator
         if ($isRoot) {
             $members[] = self::BOILERPLATE;
         }
+        if ($isRoot || $constructor !== null) {
+            $members[] = $this->renderConstructor($fqcn, $constructor, $file);
+        }
         if ($constants !== []) {
             $members[] = implode("\n", $constants);
         }
@@ -352,6 +355,44 @@ final class Generator
             $text .= $uses . "\n\n";
         }
         return $text . $decl . "\n{\n" . ($body === '' ? '' : $body . "\n") . "}\n";
+    }
+
+    /**
+     * The constructor plugin code reaches when it writes `new SomeProxiedClass(...)`. The real
+     * class's parameter list is reproduced and forwarded to the Rust side, which allocates the
+     * entity and answers with its handle; classes whose entity it cannot build answer with an
+     * explicit error naming the class.
+     */
+    private function renderConstructor(string $fqcn, ?ClassMethod $constructor, SourceFile $file): string
+    {
+        $params = [];
+        $args = [];
+        foreach ($constructor?->params ?? [] as $param) {
+            $paramName = $param->var->name;
+            if ($param->byRef) {
+                $this->errors[] = "$fqcn::__construct: by-ref parameter \$$paramName cannot be proxied yet";
+            }
+            if ($param->variadic) {
+                $this->errors[] = "$fqcn::__construct: variadic parameter \$$paramName cannot be proxied yet";
+            }
+            $rendered = '';
+            if ($param->type !== null) {
+                $rendered = $this->printer->renderType($param->type, $file) . ' ';
+            }
+            $rendered .= '$' . $paramName;
+            if ($param->default !== null) {
+                $rendered .= ' = ' . $this->printer->renderExpr($param->default, $file);
+            }
+            $params[] = $rendered;
+            $args[] = '$' . $paramName;
+        }
+        $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, ["
+            . implode(', ', $args) . ']])';
+        return "    public function __construct(" . implode(', ', $params) . ")\n"
+            . "    {\n"
+            . "        [\$this->__rhandle, \$this->__epoch] = $call;\n"
+            . "        \\ShirabeRustObjectRegistry::adopt(\$this->__rhandle, \$this);\n"
+            . "    }";
     }
 
     /**

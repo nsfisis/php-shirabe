@@ -5,10 +5,19 @@
 
 namespace Composer\Repository;
 
+use Composer\Json\JsonFile;
+use Composer\Package\RootPackageInterface;
 use Composer\Pcre\Preg;
+use Composer\Util\Filesystem;
 
 class FilesystemRepository extends WritableArrayRepository
 {
+    public function __construct(JsonFile $repositoryFile, bool $dumpVersions = false, ?RootPackageInterface $rootPackage = null, ?Filesystem $filesystem = null)
+    {
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$repositoryFile, $dumpVersions, $rootPackage, $filesystem]]);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
     public static function safelyLoadInstalledVersions(string $path): bool
     {
         $installedVersionsData = @file_get_contents($path);

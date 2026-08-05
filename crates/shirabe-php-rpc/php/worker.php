@@ -25,6 +25,9 @@ interface ShirabeRustStub
      * @return ?array{__rhandle: int, __class: string, __epoch: int}
      */
     public function __shirabeRustHandleDescriptor(): ?array;
+
+    /** Binds this stub to an existing Rust entity, in place of running its constructor. */
+    public function __shirabeBind(int $rhandle, int $epoch): void;
 }
 
 /** Interns proxy stubs so the same Rust handle always yields the same stub instance. */
@@ -46,7 +49,10 @@ final class ShirabeRustObjectRegistry
                 "no proxy stub class is available for {$class}"
             );
         }
-        $stub = new $class($rhandle, $epoch);
+        // The stub's constructor belongs to plugin code building a *new* entity; an entity that
+        // already exists is bound directly, so proxying never runs it.
+        $stub = (new ReflectionClass($class))->newInstanceWithoutConstructor();
+        $stub->__shirabeBind($rhandle, $epoch);
         self::$internTable[$rhandle] = WeakReference::create($stub);
         return $stub;
     }
@@ -625,6 +631,53 @@ ShirabeRpcRuntime::$dispatch = [
             // noop, an outdated InstalledVersions class simply lacks the properties
         }
         return true;
+    },
+    // An already-fulfilled promise for a Rust-side call whose PHP signature declares
+    // PromiseInterface. The Rust future ran to completion before this is called, so there is
+    // nothing left to defer; see .ken/plugin-arch/design.md §10.1.6.
+    '__shirabe_resolved_promise' => static function ($args) {
+        if (!function_exists('React\\Promise\\resolve')) {
+            throw new RuntimeException(
+                'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
+            );
+        }
+        return \React\Promise\resolve($args[0]);
+    },
+    // Drains a promise a plugin returned to the Rust side. React settles promises
+    // synchronously, so an already-settled one runs these handlers during then(); one that is
+    // still pending is an explicit error rather than a silently dropped continuation.
+    '__shirabe_settle_promise' => static function ($args) {
+        $promise = $args[0];
+        if (!$promise instanceof \React\Promise\PromiseInterface) {
+            throw new RuntimeException('__shirabe_settle_promise expects a promise handle');
+        }
+        $settled = false;
+        $value = null;
+        $rejected = false;
+        $reason = null;
+        $promise->then(
+            static function ($result) use (&$settled, &$value) {
+                $settled = true;
+                $value = $result;
+            },
+            static function ($error) use (&$settled, &$rejected, &$reason) {
+                $settled = true;
+                $rejected = true;
+                $reason = $error;
+            }
+        );
+        if (!$settled) {
+            throw new RuntimeException(
+                'the promise returned to Shirabe is still pending; deferred resolution across the'
+                . ' RPC boundary is not implemented yet'
+            );
+        }
+        if ($rejected) {
+            throw $reason instanceof Throwable
+                ? $reason
+                : new RuntimeException('the promise returned to Shirabe was rejected with ' . gettype($reason));
+        }
+        return $value;
     },
     // For testing only: reads a public property of a P-table entity (PHPUnit asserts like
     // `$plugins[0]->version` have no method to call).

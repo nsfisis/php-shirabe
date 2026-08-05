@@ -11,6 +11,12 @@ use Composer\EventDispatcher\Event as BaseEvent;
 
 class Event extends BaseEvent
 {
+    public function __construct(string $name, Composer $composer, IOInterface $io, bool $devMode = false, array $args = [], array $flags = [])
+    {
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$name, $composer, $io, $devMode, $args, $flags]]);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
     public function getComposer(): Composer
     {
         return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getComposer', []);

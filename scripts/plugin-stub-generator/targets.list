@@ -6,6 +6,8 @@ Composer\EventDispatcher\EventDispatcher
 Composer\Script\Event
 Composer\PartialComposer
 Composer\Composer
+Composer\Config
+Composer\Downloader\DownloadManager
 Composer\IO\BaseIO
 Composer\IO\ConsoleIO
 Composer\IO\BufferIO

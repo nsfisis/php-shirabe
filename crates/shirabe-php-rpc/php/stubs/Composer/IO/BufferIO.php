@@ -5,8 +5,17 @@
 
 namespace Composer\IO;
 
+use Symfony\Component\Console\Output\StreamOutput;
+use Symfony\Component\Console\Formatter\OutputFormatterInterface;
+
 class BufferIO extends ConsoleIO
 {
+    public function __construct(string $input = '', int $verbosity = StreamOutput::VERBOSITY_NORMAL, ?OutputFormatterInterface $formatter = null)
+    {
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$input, $verbosity, $formatter]]);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
     public function getOutput(): string
     {
         return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getOutput', []);

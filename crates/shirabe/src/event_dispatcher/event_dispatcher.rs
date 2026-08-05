@@ -1686,6 +1686,9 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                     },
                 );
             }
+            if method_name == "__shirabeConstruct" {
+                return crate::plugin::php_plugin_proxy::construct_entity(&args);
+            }
             return Err(runtime_throw(format!(
                 "unknown runtime service method `{method_name}`"
             )));

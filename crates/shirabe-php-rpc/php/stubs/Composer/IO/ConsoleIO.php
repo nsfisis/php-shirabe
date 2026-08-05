@@ -6,10 +6,19 @@
 namespace Composer\IO;
 
 use Composer\Pcre\Preg;
+use Symfony\Component\Console\Helper\HelperSet;
 use Symfony\Component\Console\Helper\Table;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class ConsoleIO extends BaseIO
 {
+    public function __construct(InputInterface $input, OutputInterface $output, HelperSet $helperSet)
+    {
+        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$input, $output, $helperSet]]);
+        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+    }
+
     public static function sanitize($messages, bool $allowNewlines = true)
     {
         // Match ANSI escape sequences:
