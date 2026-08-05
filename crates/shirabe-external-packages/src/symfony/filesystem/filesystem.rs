@@ -115,9 +115,11 @@ impl Filesystem {
                         as u32,
                 );
 
-                // TODO(phase-c): PHP preserves the origin file's mtime via
-                // touch($targetFile, filemtime($originFile)). shirabe_php_shim::touch2 now exists
-                // and could implement this, but it is not wired up here yet.
+                // Like `cp`, preserve the file modification time.
+                shirabe_php_shim::touch2(
+                    target_file,
+                    shirabe_php_shim::filemtime(origin_file).unwrap_or(0),
+                );
 
                 let bytes_origin = shirabe_php_shim::filesize(origin_file).unwrap_or(0);
                 if bytes_copied != bytes_origin {
@@ -157,16 +159,28 @@ impl Filesystem {
         Ok(())
     }
 
-    fn exists(&self, files: PhpMixed) -> bool {
-        // TODO(phase-c): PHP throws IOException when a path exceeds PHP_MAXPATHLEN - 2 characters;
-        // this port has no such guard, and the plain `bool` return type here cannot express that
-        // throw path without changing the signature.
+    fn exists(&self, files: PhpMixed) -> anyhow::Result<bool> {
+        let max_path_length = shirabe_php_shim::PHP_MAXPATHLEN - 2;
+
         for file in Self::to_iterable(&files) {
+            if file.len() as i64 > max_path_length {
+                return Err(IOException::new(
+                    format!(
+                        "Could not check if file exist because path length exceeds {} characters.",
+                        max_path_length
+                    ),
+                    0,
+                    None,
+                    Some(file),
+                )
+                .into());
+            }
+
             if !shirabe_php_shim::file_exists(&file) {
-                return false;
+                return Ok(false);
             }
         }
-        true
+        Ok(true)
     }
 
     fn remove(&self, files: PhpMixed) -> anyhow::Result<()> {
@@ -186,13 +200,11 @@ impl Filesystem {
         for file in files {
             if shirabe_php_shim::is_link(&file) {
                 // See https://bugs.php.net/52176
-                // TODO(phase-c): PHP's condition is
-                // `!(unlink() || '\\' !== DIRECTORY_SEPARATOR || rmdir()) && file_exists()`. On
-                // Unix, `'\\' !== DIRECTORY_SEPARATOR` is always true, so the `!(...)` is always
-                // false and this branch never throws there regardless of unlink's result (the
-                // rmdir fallback and this exception only matter on Windows). This port omits that
-                // always-true disjunct, so it CAN throw here on Unix where upstream never would.
-                if !shirabe_php_shim::unlink(&file) && shirabe_php_shim::file_exists(&file) {
+                if !(shirabe_php_shim::unlink(&file)
+                    || shirabe_php_shim::DIRECTORY_SEPARATOR != "\\"
+                    || shirabe_php_shim::rmdir(&file))
+                    && shirabe_php_shim::file_exists(&file)
+                {
                     return Err(IOException::new(
                         format!("Failed to remove symlink \"{}\": ", file),
                         0,
@@ -251,30 +263,38 @@ impl Filesystem {
         Ok(())
     }
 
-    // TODO(phase-c): PHP's symlink() has a `'\\' === DIRECTORY_SEPARATOR` branch that (a)
-    // normalizes '/' to '\\' in both paths, and (b) when $copyOnWindows is true, mirrors the
-    // directory instead of symlinking it and returns early. Neither is ported: `_copy_on_windows`
-    // is accepted but unused, so this always symlinks even where PHP would have copied.
     pub fn symlink(
         &self,
         origin_dir: &str,
         target_dir: &str,
-        _copy_on_windows: bool,
+        copy_on_windows: bool,
     ) -> anyhow::Result<()> {
+        let mut origin_dir = origin_dir.to_string();
+        let mut target_dir = target_dir.to_string();
+
+        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
+            origin_dir = shirabe_php_shim::strtr(&origin_dir, "/", "\\");
+            target_dir = shirabe_php_shim::strtr(&target_dir, "/", "\\");
+
+            if copy_on_windows {
+                return self.mirror(&origin_dir, &target_dir, None, &indexmap::IndexMap::new());
+            }
+        }
+
         self.mkdir(
-            PhpMixed::String(shirabe_php_shim::dirname(target_dir)),
+            PhpMixed::String(shirabe_php_shim::dirname(&target_dir)),
             0o777,
         )?;
 
-        if shirabe_php_shim::is_link(target_dir) {
-            if self.read_link(target_dir) == origin_dir {
+        if shirabe_php_shim::is_link(&target_dir) {
+            if self.read_link(&target_dir) == origin_dir {
                 return Ok(());
             }
-            self.remove(PhpMixed::String(target_dir.to_string()))?;
+            self.remove(PhpMixed::String(target_dir.clone()))?;
         }
 
-        if !shirabe_php_shim::symlink(origin_dir, target_dir) {
-            return Self::link_exception(origin_dir, target_dir, "symbolic");
+        if !shirabe_php_shim::symlink(&origin_dir, &target_dir) {
+            return Self::link_exception(&origin_dir, &target_dir, "symbolic");
         }
         Ok(())
     }
@@ -349,7 +369,7 @@ impl Filesystem {
         let origin_dir = shirabe_php_shim::rtrim(origin_dir, Some("/\\"));
         let origin_dir_len = origin_dir.len();
 
-        if !self.exists(PhpMixed::String(origin_dir.clone())) {
+        if !self.exists(PhpMixed::String(origin_dir.clone()))? {
             return Err(IOException::new(
                 format!(
                     "The origin directory specified \"{}\" was not found.",
@@ -368,7 +388,7 @@ impl Filesystem {
             .unwrap_or(false);
 
         // Iterate in destination folder to remove obsolete entries.
-        if self.exists(PhpMixed::String(target_dir.clone())) && delete {
+        if self.exists(PhpMixed::String(target_dir.clone()))? && delete {
             let target_dir_len = target_dir.len();
             if let Ok(dir) = shirabe_php_shim::recursive_directory_iterator(
                 &target_dir,
@@ -381,7 +401,7 @@ impl Filesystem {
                 for file in &delete_iterator {
                     let pathname = file.get_pathname();
                     let origin = format!("{}{}", origin_dir, &pathname[target_dir_len..]);
-                    if !self.exists(PhpMixed::String(origin)) {
+                    if !self.exists(PhpMixed::String(origin))? {
                         self.remove(PhpMixed::String(pathname))?;
                     }
                 }
@@ -413,20 +433,24 @@ impl Filesystem {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        // TODO(phase-c): PHP's skip condition is
-        // `$file->getPathname() === $targetDir || $file->getRealPath() === $targetDir ||
-        // isset($filesCreatedWhileMirroring[$file->getRealPath()])`, and it records every
-        // `$target` it creates into `$filesCreatedWhileMirroring` to avoid revisiting a path
-        // already produced earlier in this same mirror() call (e.g. via a symlink loop back into
-        // the tree). Only the plain pathname comparison is ported; the getRealPath() comparison
-        // and the created-files dedup set are both omitted.
+        let mut files_created_while_mirroring: indexmap::IndexMap<String, bool> =
+            indexmap::IndexMap::new();
+
         for file in &iterator {
             let pathname = file.get_pathname();
-            if pathname == target_dir {
+            // SplFileInfo::getRealPath(), which returns false for a path that cannot be resolved.
+            let real_path = shirabe_php_shim::realpath(&pathname);
+            if pathname == target_dir
+                || real_path.as_deref() == Some(target_dir.as_str())
+                || real_path
+                    .as_ref()
+                    .is_some_and(|p| files_created_while_mirroring.contains_key(p))
+            {
                 continue;
             }
 
             let target = format!("{}{}", target_dir, &pathname[origin_dir_len..]);
+            files_created_while_mirroring.insert(target.clone(), true);
 
             if !copy_on_windows && file.is_link() {
                 self.symlink(&self.read_link(&pathname), &target, false)?;

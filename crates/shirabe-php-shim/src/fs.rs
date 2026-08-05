@@ -22,6 +22,15 @@ pub const PATHINFO_BASENAME: i64 = 2;
 pub const PATH_SEPARATOR: &str = ":";
 pub const DIRECTORY_SEPARATOR: &str = "/";
 
+/// PHP `PHP_MAXPATHLEN`: the platform's `MAXPATHLEN` (`MAX_PATH` on Windows).
+pub const PHP_MAXPATHLEN: i64 = if cfg!(windows) {
+    260
+} else if cfg!(target_os = "linux") {
+    4096
+} else {
+    1024
+};
+
 pub const FILE_IGNORE_NEW_LINES: i64 = 2;
 
 pub const SEEK_SET: i64 = 0;
