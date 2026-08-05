@@ -47,8 +47,6 @@ impl Default for Transaction {
 }
 
 impl Transaction {
-    /// @param PackageInterface[] $presentPackages
-    /// @param PackageInterface[] $resultPackages
     pub fn new(
         present_packages: Vec<PackageInterfaceHandle>,
         result_packages: Vec<PackageInterfaceHandle>,
@@ -68,7 +66,6 @@ impl Transaction {
         &self.operations
     }
 
-    /// @param PackageInterface[] $resultPackages
     fn set_result_package_maps(&mut self, result_packages: Vec<PackageInterfaceHandle>) {
         let package_sort = |a: &PackageInterfaceHandle, b: &PackageInterfaceHandle| -> i64 {
             // sort alias packages by the same name behind their non alias version
@@ -107,7 +104,6 @@ impl Transaction {
         }
     }
 
-    /// @return OperationInterface[]
     pub(crate) fn calculate_operations(&mut self) -> Vec<AnyOperation> {
         let mut operations: Vec<AnyOperation> = vec![];
 
@@ -222,8 +218,6 @@ impl Transaction {
     ///
     /// These serve as a starting point to enumerate packages in a topological order despite potential cycles.
     /// If there are packages with a cycle on the top level the package with the lowest name gets picked
-    ///
-    /// @return array<string, PackageInterface>
     pub(crate) fn get_root_packages(&self) -> IndexMap<String, PackageInterfaceHandle> {
         let mut roots: IndexMap<String, PackageInterfaceHandle> = self
             .result_package_map
@@ -251,7 +245,6 @@ impl Transaction {
         roots
     }
 
-    /// @return PackageInterface[]
     pub(crate) fn get_providers_in_result(&self, link: &Link) -> Vec<PackageInterfaceHandle> {
         let Some(packages) = self.result_packages_by_name.get(link.get_target()) else {
             return vec![];
@@ -269,7 +262,6 @@ impl Transaction {
     /// it at least fixes the symptoms and makes usage of composer possible (again)
     /// in such scenarios.
     ///
-    /// @param  OperationInterface[] $operations
     /// @return OperationInterface[] reordered operation list
     fn move_plugins_to_front(&self, mut operations: Vec<AnyOperation>) -> Vec<AnyOperation> {
         let mut dl_modifying_plugins_no_deps: Vec<AnyOperation> = vec![];
@@ -370,7 +362,6 @@ impl Transaction {
     /// Removals of packages should be executed before installations in
     /// case two packages resolve to the same path (due to custom installers)
     ///
-    /// @param  OperationInterface[] $operations
     /// @return OperationInterface[] reordered operation list
     fn move_uninstalls_to_front(&self, mut operations: Vec<AnyOperation>) -> Vec<AnyOperation> {
         let mut uninst_ops: Vec<AnyOperation> = vec![];

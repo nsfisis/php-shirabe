@@ -790,7 +790,6 @@ impl ProcessExecutor {
         self.allow_async = true;
     }
 
-    /// @return string[]
     pub fn split_lines(&self, output: &str) -> Vec<String> {
         let output = trim(output, None);
 
@@ -821,7 +820,6 @@ impl ProcessExecutor {
         Self::escape_argument(argument)
     }
 
-    /// @param string|list<string> $command
     fn output_command_run(&self, command: &PhpMixed, cwd: Option<&str>, r#async: bool) {
         Self::output_command_run_with(&self.io, command, cwd, r#async);
     }
@@ -943,7 +941,6 @@ impl ProcessExecutor {
         argument
     }
 
-    /// @param string[]|string $command
     pub fn requires_git_dir_env(&self, command: &PhpMixed) -> bool {
         let cmd: Vec<String> = if !is_array(command) {
             explode(" ", command.as_string().unwrap_or(""))

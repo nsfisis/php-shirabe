@@ -35,12 +35,6 @@ pub struct Pool {
 }
 
 impl Pool {
-    /// @param BasePackage[] $packages
-    /// @param BasePackage[] $unacceptableFixedOrLockedPackages
-    /// @param array<string, array<string, string>> $removedVersions
-    /// @param array<string, array<string, string>> $removedVersionsByPackage
-    /// @param array<string, array<string, array<SecurityAdvisory|PartialSecurityAdvisory>>> $securityRemovedVersions
-    /// @param array<string, array<string, string>> $abandonedRemovedVersions
     pub fn new(
         packages: Vec<BasePackageHandle>,
         unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
@@ -67,7 +61,6 @@ impl Pool {
         this
     }
 
-    /// @return array<string, string>
     pub fn get_removed_versions(
         &self,
         name: &str,
@@ -89,12 +82,10 @@ impl Pool {
         result
     }
 
-    /// @return array<string, array<string, string>>
     pub fn get_all_removed_versions(&self) -> &IndexMap<String, IndexMap<String, String>> {
         &self.removed_versions
     }
 
-    /// @return array<string, string>
     pub fn get_removed_versions_by_package(&self, object_hash: &str) -> IndexMap<String, String> {
         let Some(versions) = self.removed_versions_by_package.get(object_hash) else {
             return IndexMap::new();
@@ -103,7 +94,6 @@ impl Pool {
         versions.clone()
     }
 
-    /// @return array<string, array<string, string>>
     pub fn get_all_removed_versions_by_package(
         &self,
     ) -> &IndexMap<String, IndexMap<String, String>> {
@@ -133,7 +123,6 @@ impl Pool {
         false
     }
 
-    /// @return string[]
     pub fn get_security_advisory_identifiers_for_package_version(
         &self,
         package_name: &str,
@@ -183,21 +172,18 @@ impl Pool {
         false
     }
 
-    /// @return array<string, array<string, array<SecurityAdvisory|PartialSecurityAdvisory>>>
     pub fn get_all_security_removed_package_versions(
         &self,
     ) -> &IndexMap<String, IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>> {
         &self.security_removed_versions
     }
 
-    /// @return array<string, array<string, string>>
     pub fn get_all_abandoned_removed_package_versions(
         &self,
     ) -> &IndexMap<String, IndexMap<String, String>> {
         &self.abandoned_removed_versions
     }
 
-    /// @param BasePackage[] $packages
     fn set_packages(&mut self, packages: Vec<BasePackageHandle>) {
         let mut id: i64 = 1;
 
@@ -216,7 +202,6 @@ impl Pool {
         }
     }
 
-    /// @return BasePackage[]
     pub fn get_packages(&self) -> &Vec<BasePackageHandle> {
         &self.packages
     }
@@ -259,7 +244,6 @@ impl Pool {
     /// @param  string               $name       The package name to be searched for
     /// @param  ?ConstraintInterface $constraint A constraint that all returned
     ///                                          packages must match or null to return all
-    /// @return BasePackage[]
     pub(crate) fn compute_what_provides(
         &self,
         name: &str,
@@ -286,7 +270,6 @@ impl Pool {
         self.package_by_id(package_id)
     }
 
-    /// @param array<int, BasePackage> $installedMap
     pub fn literal_to_pretty_string(
         &self,
         literal: i64,
@@ -376,7 +359,6 @@ impl Pool {
             .any(|p| p.ptr_eq(&package))
     }
 
-    /// @return BasePackage[]
     pub fn get_unacceptable_fixed_or_locked_packages(&self) -> &Vec<BasePackageHandle> {
         &self.unacceptable_fixed_or_locked_packages
     }

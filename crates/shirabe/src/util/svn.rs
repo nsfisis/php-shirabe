@@ -124,7 +124,6 @@ impl Svn {
             .map(|o| o.unwrap_or_default())
     }
 
-    /// @param non-empty-list<string> $svnCommand
     fn execute_with_auth_retry(
         &mut self,
         svn_command: Vec<String>,
@@ -257,8 +256,6 @@ impl Svn {
     /// @param non-empty-list<string> $cmd  Usually 'svn ls' or something like that.
     /// @param string $url  Repo URL.
     /// @param string $path Target for a checkout
-    ///
-    /// @return non-empty-list<string>
     pub(crate) fn get_command(
         &mut self,
         mut cmd: Vec<String>,
@@ -280,8 +277,6 @@ impl Svn {
     /// Return the credential string for the svn command.
     ///
     /// Adds --no-auth-cache when credentials are present.
-    ///
-    /// @return list<string>
     pub(crate) fn get_credential_args(&mut self) -> Vec<String> {
         if !self.has_auth() {
             return vec![];
@@ -354,8 +349,6 @@ impl Svn {
     }
 
     /// Return the no-auth-cache switch.
-    ///
-    /// @return list<string>
     pub(crate) fn get_auth_cache_args(&self) -> Vec<String> {
         if self.cache_credentials {
             vec![]

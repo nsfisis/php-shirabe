@@ -37,7 +37,6 @@ pub struct Perforce {
 }
 
 impl Perforce {
-    /// @phpstan-param RepoConfig $repoConfig
     pub fn new(
         repo_config: IndexMap<String, PhpMixed>,
         port: String,
@@ -69,7 +68,6 @@ impl Perforce {
         this
     }
 
-    /// @phpstan-param RepoConfig $repoConfig
     pub fn create(
         repo_config: IndexMap<String, PhpMixed>,
         port: String,
@@ -95,7 +93,6 @@ impl Perforce {
         ) == 0
     }
 
-    /// @phpstan-param RepoConfig $repoConfig
     pub fn initialize(&mut self, repo_config: &IndexMap<String, PhpMixed>) {
         self.unique_perforce_client_name = self.generate_unique_perforce_client_name();
         if repo_config.is_empty() {
@@ -133,7 +130,6 @@ impl Perforce {
         }
     }
 
-    /// @return non-empty-string
     pub fn generate_unique_perforce_client_name(&self) -> String {
         format!("{}_{}", gethostname(), time())
     }
@@ -151,7 +147,6 @@ impl Perforce {
         file_system.borrow_mut().remove(&client_spec);
     }
 
-    /// @param non-empty-string|non-empty-list<string> $command
     pub(crate) fn execute_command(&mut self, command: PhpMixed) -> i64 {
         self.command_result = String::new();
 
@@ -239,7 +234,6 @@ impl Perforce {
         }
     }
 
-    /// @return non-empty-string
     pub fn get_p4_client_spec(&mut self) -> String {
         let path = self.path.clone();
         format!("{}/{}.p4.spec", path, self.get_client())
@@ -333,7 +327,6 @@ impl Perforce {
 
     /// @internal
     /// @param non-empty-list<string> $arguments Additional arguments for git rev-list
-    /// @return non-empty-list<string>
     pub fn generate_p4_command(&mut self, arguments: Vec<String>, use_client: bool) -> Vec<String> {
         let mut p4_command: Vec<String> = vec![Self::get_p4_executable()];
         if self.get_user().is_some() {
@@ -415,7 +408,6 @@ impl Perforce {
         Ok(())
     }
 
-    /// @param resource|false $spec
     pub fn write_client_spec_to_file(&mut self, spec: &PhpResource) {
         fwrite(
             spec,
@@ -527,8 +519,6 @@ impl Perforce {
         Ok(())
     }
 
-    /// @param resource $pipe
-    /// @param mixed    $name
     pub(crate) fn read(&self, pipe: &PhpResource, _name: PhpMixed) {
         if feof(pipe) {
             return;
@@ -590,7 +580,6 @@ impl Perforce {
         Ok(())
     }
 
-    /// @return mixed[]|null
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
@@ -663,7 +652,6 @@ impl Perforce {
         None
     }
 
-    /// @return array{master: string}
     pub fn get_branches(&mut self) -> IndexMap<String, String> {
         let mut possible_branches: IndexMap<String, String> = IndexMap::new();
         if !self.is_stream() {
@@ -725,7 +713,6 @@ impl Perforce {
         result
     }
 
-    /// @return array<string, string>
     pub fn get_tags(&mut self) -> IndexMap<String, String> {
         let command = self.generate_p4_command(vec!["labels".to_string()], true);
         self.execute_command(PhpMixed::List(
@@ -771,7 +758,6 @@ impl Perforce {
         false
     }
 
-    /// @return mixed|null
     pub(crate) fn get_change_list(&mut self, reference: &str) -> Option<String> {
         let index = strpos(reference, "@")?;
         let label = substr(reference, index as i64, None);
@@ -789,7 +775,6 @@ impl Perforce {
         Some(fields.get(1).cloned().unwrap_or_default())
     }
 
-    /// @return mixed|null
     pub fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String> {
         let from_change_list = self.get_change_list(from_reference)?;
         let to_change_list = self.get_change_list(to_reference)?;

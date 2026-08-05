@@ -673,8 +673,6 @@ impl BaseCommand for RequireCommand {
 }
 
 impl RequireCommand {
-    /// @param array<string, string> $newRequirements
-    /// @return string[]
     fn get_inconsistent_require_keys(
         &self,
         new_requirements: &IndexMap<String, String>,
@@ -694,7 +692,6 @@ impl RequireCommand {
         inconsistent_requirements
     }
 
-    /// @return array<string, string>
     fn get_packages_by_require_key(&self) -> IndexMap<String, String> {
         let json = self.json.borrow().as_ref().unwrap().clone();
         let composer_definition = json.borrow_mut().read().unwrap_or_default();
@@ -748,9 +745,6 @@ impl RequireCommand {
         .unwrap_or_default()
     }
 
-    /// @param array<string, string> $requirements
-    /// @param 'require'|'require-dev' $requireKey
-    /// @param 'require'|'require-dev' $removeKey
     /// @throws \Exception
     fn do_update(
         &self,
@@ -1053,7 +1047,6 @@ impl RequireCommand {
         Ok(status)
     }
 
-    /// @param list<string> $requirementsToUpdate
     fn update_requirements_after_resolution(
         &self,
         requirements_to_update: &[String],
@@ -1192,7 +1185,6 @@ impl RequireCommand {
         Ok(0)
     }
 
-    /// @param array<string, string> $new
     fn update_file(
         &self,
         json: &std::rc::Rc<std::cell::RefCell<JsonFile>>,
@@ -1235,7 +1227,6 @@ impl RequireCommand {
         let _ = json.borrow().write(PhpMixed::Array(composer_definition));
     }
 
-    /// @param array<string, string> $new
     fn update_file_cleanly(
         &self,
         json: &std::rc::Rc<std::cell::RefCell<JsonFile>>,

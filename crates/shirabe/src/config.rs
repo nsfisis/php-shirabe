@@ -296,8 +296,6 @@ impl Config {
     }
 
     /// Merges new config values with the existing ones (overriding)
-    ///
-    /// @param array{config?: array<string, mixed>, repositories?: array<mixed>} $config
     pub fn merge(&mut self, config: &IndexMap<String, PhpMixed>, source: &str) {
         // override defaults with given config
         let config_section = config.get("config").cloned().unwrap_or(PhpMixed::Null);
@@ -555,7 +553,6 @@ impl Config {
         }
     }
 
-    /// @return array<int|string, mixed>
     pub fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
         self.repositories.clone()
     }
@@ -564,8 +561,6 @@ impl Config {
     ///
     /// @param  int               $flags Options (see class constants)
     /// @throws \RuntimeException
-    ///
-    /// @return mixed
     pub fn get(&self, key: &str) -> PhpMixed {
         self.get_with_flags(key, 0).unwrap_or(PhpMixed::Null)
     }
@@ -949,7 +944,6 @@ impl Config {
         }
     }
 
-    /// @return array<string, mixed[]>
     pub fn all(&mut self, flags: i64) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         let mut all: IndexMap<String, PhpMixed> = IndexMap::new();
         all.insert(
@@ -976,7 +970,6 @@ impl Config {
             .unwrap_or_else(|| Self::SOURCE_UNKNOWN.to_string())
     }
 
-    /// @param mixed  $configValue
     fn set_source_of_config_value(&self, config_value: &PhpMixed, path: &str, source: &str) {
         self.source_of_config_value
             .borrow_mut()
@@ -996,7 +989,6 @@ impl Config {
         }
     }
 
-    /// @return array<string, mixed[]>
     pub fn raw(&self) -> IndexMap<String, PhpMixed> {
         let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
         result.insert(
@@ -1016,8 +1008,6 @@ impl Config {
     ///
     /// @param  string|mixed $value a config string that can contain {$refs-to-other-config}
     /// @param  int          $flags Options (see class constants)
-    ///
-    /// @return string|mixed
     fn process(&self, value: PhpMixed, flags: i64) -> anyhow::Result<PhpMixed> {
         if !is_string(&value) {
             return Ok(value);
@@ -1063,10 +1053,6 @@ impl Config {
     ///
     /// This should be used to read COMPOSER_ environment variables
     /// that overload config values.
-    ///
-    /// @param non-empty-string $var
-    ///
-    /// @return string|false
     fn get_composer_env(&self, var: &str) -> PhpMixed {
         if self.use_environment {
             return match Platform::get_env(var) {

@@ -40,9 +40,6 @@ static INSTALLED_BY_VENDOR: std::sync::LazyLock<
 
 impl InstalledVersions {
     /// Returns a list of all package names which are present, either by being installed, replaced or provided
-    ///
-    /// @return string[]
-    /// @psalm-return list<string>
     pub fn get_installed_packages() -> Vec<String> {
         let mut packages: Vec<Vec<String>> = vec![];
         for installed in Self::get_installed() {
@@ -75,10 +72,6 @@ impl InstalledVersions {
     }
 
     /// Returns a list of all package names with a specific type e.g. 'library'
-    ///
-    /// @param  string   $type
-    /// @return string[]
-    /// @psalm-return list<string>
     pub fn get_installed_packages_by_type(r#type: &str) -> Vec<String> {
         let mut packages_by_type: Vec<String> = vec![];
 
@@ -104,10 +97,6 @@ impl InstalledVersions {
     /// Checks whether the given package is installed
     ///
     /// This also returns true if the package name is provided or replaced by another package
-    ///
-    /// @param  string $packageName
-    /// @param  bool   $includeDevRequirements
-    /// @return bool
     pub fn is_installed(package_name: &str, include_dev_requirements: bool) -> bool {
         for installed in Self::get_installed() {
             let Some(versions) = installed.get("versions").and_then(|v| v.as_array()) else {
@@ -135,9 +124,7 @@ impl InstalledVersions {
     ///   Composer\InstalledVersions::satisfies(new VersionParser, 'foo/bar', '^2.3')
     ///
     /// @param  VersionParser $parser      Install composer/semver to have access to this class and functionality
-    /// @param  string        $packageName
     /// @param  string|null   $constraint  A version constraint to check for, if you pass one you have to make sure composer/semver is required by your package
-    /// @return bool
     pub fn satisfies(
         parser: &VersionParser,
         package_name: &str,
@@ -154,7 +141,6 @@ impl InstalledVersions {
     /// It is easier to use this via isInstalled() with the $constraint argument if you need to check
     /// whether a given version of a package is installed, and not just whether it exists
     ///
-    /// @param  string $packageName
     /// @return string Version constraint usable with composer/semver
     pub fn get_version_ranges(package_name: &str) -> anyhow::Result<String> {
         for installed in Self::get_installed() {
@@ -223,7 +209,6 @@ impl InstalledVersions {
         .into())
     }
 
-    /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as version, use satisfies or getVersionRanges if you need to know if a given version is present
     pub fn get_version(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
@@ -251,7 +236,6 @@ impl InstalledVersions {
         .into())
     }
 
-    /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as version, use satisfies or getVersionRanges if you need to know if a given version is present
     pub fn get_pretty_version(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
@@ -279,7 +263,6 @@ impl InstalledVersions {
         .into())
     }
 
-    /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as reference
     pub fn get_reference(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
@@ -307,7 +290,6 @@ impl InstalledVersions {
         .into())
     }
 
-    /// @param  string      $packageName
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as install path. Packages of type metapackages also have a null install path.
     pub fn get_install_path(package_name: &str) -> anyhow::Result<Option<String>> {
         for installed in Self::get_installed() {
@@ -334,8 +316,6 @@ impl InstalledVersions {
         .into())
     }
 
-    /// @return array
-    /// @psalm-return array{name: string, pretty_version: string, version: string, reference: string|null, type: string, install_path: string, aliases: string[], dev: bool}
     pub fn get_root_package() -> IndexMap<String, PhpMixed> {
         let installed = Self::get_installed();
 
@@ -348,7 +328,6 @@ impl InstalledVersions {
 
     /// Returns the raw data of all installed.php which are currently loaded for custom implementations
     ///
-    /// @return array[]
     /// Returns the first dataset loaded, which may not be what you expect. Use get_all_raw_data
     /// instead, which returns all datasets for all autoloaders present in the process.
     pub fn get_raw_data() -> IndexMap<String, PhpMixed> {
@@ -380,7 +359,6 @@ impl InstalledVersions {
     /// interference between PHPUnit's dependencies and the project's dependencies.
     ///
     /// @param  array[] $data A vendor/composer/installed.php data set
-    /// @return void
     pub fn reload(data: IndexMap<String, PhpMixed>) {
         *INSTALLED.lock().unwrap() = Some(data);
         *INSTALLED_BY_VENDOR.lock().unwrap() = IndexMap::new();
@@ -402,7 +380,6 @@ impl InstalledVersions {
         *INSTALLED_IS_LOCAL_DIR.lock().unwrap() = value;
     }
 
-    /// @return string
     fn get_self_dir() -> String {
         let mut self_dir = SELF_DIR.lock().unwrap();
         if self_dir.is_none() {
@@ -416,8 +393,6 @@ impl InstalledVersions {
         self_dir.clone().unwrap()
     }
 
-    /// @return array[]
-    /// @psalm-return list<array{root: ..., versions: ...}>
     fn get_installed() -> Vec<IndexMap<String, PhpMixed>> {
         {
             let mut can_get_vendors = CAN_GET_VENDORS.lock().unwrap();

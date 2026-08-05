@@ -191,8 +191,6 @@ impl HttpDownloader {
         self.execute(url, options, Some(to), false).await
     }
 
-    /// @phpstan-param non-empty-string $url
-    ///
     /// Shared core of `get`/`add`/`copy`/`add_copy`: mock short-circuit, empty-URL guard, the
     /// sync/allow_async gate, and the concurrency-limiting semaphore permit. Mirrors PHP `addJob`
     /// up to (but not including) the resolver, which is `dispatch`.
@@ -366,8 +364,6 @@ impl HttpDownloader {
     }
 
     /// @internal
-    ///
-    /// @param  array{warning?: string, info?: string, warning-versions?: string, info-versions?: string, warnings?: array<array{versions: string, message: string}>, infos?: array<array{versions: string, message: string}>} $data
     pub fn output_warnings(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         url: &str,
@@ -466,8 +462,6 @@ impl HttpDownloader {
     }
 
     /// @internal
-    ///
-    /// @return ?string[]
     pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<String>> {
         let e_as_transport: Option<&TransportException> = e.downcast_ref::<TransportException>();
         e_as_transport?;

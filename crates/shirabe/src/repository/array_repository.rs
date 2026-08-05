@@ -116,7 +116,6 @@ impl ArrayRepository {
         Ok(packages)
     }
 
-    /// @param array<PackageInterface> $packages
     pub fn new(packages: Vec<PackageInterfaceHandle>) -> anyhow::Result<Self> {
         let this = Self {
             packages: std::cell::RefCell::new(None),
@@ -158,7 +157,6 @@ impl ArrayRepository {
         Ok(())
     }
 
-    /// @return AliasPackage|CompleteAliasPackage
     pub(crate) fn create_alias_package(
         &self,
         package: BasePackageHandle,

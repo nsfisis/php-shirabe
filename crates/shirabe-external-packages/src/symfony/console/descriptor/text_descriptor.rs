@@ -483,7 +483,6 @@ impl TextDescriptor {
         ))
     }
 
-    /// @param array<Command|string> $commands
     fn get_column_width(&self, commands: &[CommandOrString]) -> i64 {
         let mut widths: Vec<i64> = vec![];
 
@@ -510,7 +509,6 @@ impl TextDescriptor {
         }
     }
 
-    /// @param InputOption[] $options
     fn calculate_total_width_for_options(&self, options: &[&InputOption]) -> i64 {
         let mut total_width: i64 = 0;
         for option in options {

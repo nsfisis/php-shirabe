@@ -93,8 +93,6 @@ impl DescriptorHelper {
     }
 
     /// Registers a descriptor.
-    ///
-    /// @return $this
     pub fn register(
         &mut self,
         format: &str,

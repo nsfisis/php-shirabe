@@ -288,8 +288,6 @@ impl BaseCommand for CreateProjectCommand {
 }
 
 impl CreateProjectCommand {
-    /// @param string|array<string>|null $repositories
-    ///
     /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
     pub fn install_project(
@@ -632,8 +630,6 @@ impl CreateProjectCommand {
         Ok(0)
     }
 
-    /// @param array<string>|null $repositories
-    ///
     /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
     fn install_root_package(

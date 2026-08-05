@@ -416,7 +416,6 @@ impl GitHubDriver {
             .unwrap_or(None))
     }
 
-    /// @return array<int, array{type: string, url: string}>|false
     fn get_funding_info(&mut self) -> PhpMixed {
         if let Some(ref info) = self.funding_info {
             return info.clone();
@@ -996,8 +995,6 @@ impl GitHubDriver {
     }
 
     /// Gives back the loaded <github-api>/repos/<owner>/<repo> result
-    ///
-    /// @return mixed[]|null
     pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         self.fetch_root_identifier()?;
 
@@ -1234,7 +1231,6 @@ impl GitHubDriver {
 
     /// @phpstan-impure
     ///
-    /// @return true
     /// @throws \RuntimeException
     pub(crate) fn attempt_clone_fallback(
         &mut self,

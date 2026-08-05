@@ -89,15 +89,9 @@ impl RepositorySet {
     /// passing minimumStability is all you need to worry about. The rest is for advanced pool creation including
     /// aliases, pinned references and other special cases.
     ///
-    /// @param key-of<BasePackage::STABILITIES> $minimumStability
     /// @param int[]  $stabilityFlags   an array of package name => BasePackage::STABILITY_* value
-    /// @phpstan-param array<string, BasePackage::STABILITY_*> $stabilityFlags
-    /// @param array[] $rootAliases
-    /// @phpstan-param list<array{package: string, version: string, alias: string, alias_normalized: string}> $rootAliases
     /// @param string[] $rootReferences an array of package name => source reference
-    /// @phpstan-param array<string, string> $rootReferences
     /// @param ConstraintInterface[] $rootRequires an array of package name => constraint from the root package
-    /// @phpstan-param array<string, ConstraintInterface> $rootRequires
     /// @param array<string, ConstraintInterface> $temporaryConstraints Runtime temporary constraints that will be used to filter packages
     pub fn new(
         minimum_stability: &str,
@@ -144,7 +138,6 @@ impl RepositorySet {
     }
 
     /// @return ConstraintInterface[] an array of package name => constraint from the root package, platform requirements excluded
-    /// @phpstan-return array<string, ConstraintInterface>
     pub fn get_root_requires(&self) -> &IndexMap<String, AnyConstraint> {
         &self.root_requires
     }
@@ -191,7 +184,6 @@ impl RepositorySet {
     /// Returned in the order of repositories, matching priority
     ///
     /// @param  int                      $flags      any of the ALLOW_* constants from this class to tweak what is returned
-    /// @return BasePackage[]
     pub fn find_packages(
         &self,
         name: &str,
@@ -268,8 +260,6 @@ impl RepositorySet {
         Ok(result)
     }
 
-    /// @param string[] $packageNames
-    /// @return ($allowPartialAdvisories is true ? array{advisories: array<string, array<PartialSecurityAdvisory|SecurityAdvisory>>, unreachableRepos: array<string>} : array{advisories: array<string, array<SecurityAdvisory>>, unreachableRepos: array<string>})
     pub fn get_security_advisories(
         &self,
         package_names: Vec<String>,
@@ -295,8 +285,6 @@ impl RepositorySet {
         })
     }
 
-    /// @param PackageInterface[] $packages
-    /// @return ($allowPartialAdvisories is true ? array{advisories: array<string, array<PartialSecurityAdvisory|SecurityAdvisory>>, unreachableRepos: array<string>} : array{advisories: array<string, array<SecurityAdvisory>>, unreachableRepos: array<string>})
     #[tracing::instrument(skip_all)]
     pub fn get_matching_security_advisories(
         &self,
@@ -354,9 +342,7 @@ impl RepositorySet {
         })
     }
 
-    /// @param array<string, ConstraintInterface> $packageConstraintMap
     /// @param array<string> &$unreachableRepos Array to store messages about unreachable repositories
-    /// @return ($allowPartialAdvisories is true ? array<string, array<PartialSecurityAdvisory|SecurityAdvisory>> : array<string, array<SecurityAdvisory>>)
     fn get_security_advisories_for_constraints(
         &self,
         package_constraint_map: IndexMap<String, AnyConstraint>,
@@ -417,7 +403,6 @@ impl RepositorySet {
     }
 
     /// @return array[] an array with the provider name as key and value of array('name' => '...', 'description' => '...', 'type' => '...')
-    /// @phpstan-return array<string, array{name: string, description: string|null, type: string}>
     pub fn get_providers(
         &self,
         package_name: &str,
@@ -435,7 +420,6 @@ impl RepositorySet {
 
     /// Check for each given package name whether it would be accepted by this RepositorySet in the given $stability
     ///
-    /// @param string[] $names
     /// @param key-of<BasePackage::STABILITIES> $stability one of 'stable', 'RC', 'beta', 'alpha' or 'dev'
     pub fn is_package_acceptable(&self, names: &[String], stability: &str) -> bool {
         StabilityFilter::is_package_acceptable(
@@ -588,7 +572,6 @@ impl RepositorySet {
         self.create_pool_for_packages(vec![package_name.to_string()], locked_repo)
     }
 
-    /// @param string[] $packageNames
     pub fn create_pool_for_packages(
         &mut self,
         package_names: Vec<String>,
@@ -625,10 +608,6 @@ impl RepositorySet {
         )
     }
 
-    /// @param array[] $aliases
-    /// @phpstan-param list<array{package: string, version: string, alias: string, alias_normalized: string}> $aliases
-    ///
-    /// @return array<string, array<string, array{alias: string, alias_normalized: string}>>
     fn get_root_aliases_per_package(
         aliases: Vec<RootAliasInput>,
     ) -> IndexMap<String, IndexMap<String, RootAliasEntry>> {

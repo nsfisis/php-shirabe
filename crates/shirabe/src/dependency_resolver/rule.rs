@@ -129,12 +129,10 @@ impl Rule {
         }
     }
 
-    /// @return self::RULE_*
     pub fn get_reason(&self) -> i64 {
         (self.bitfield() & (255 << BITFIELD_REASON)) >> BITFIELD_REASON
     }
 
-    /// @phpstan-return ReasonData
     pub fn get_reason_data(&self) -> &ReasonData {
         self.reason_data()
     }
@@ -157,7 +155,6 @@ impl Rule {
         }
     }
 
-    /// @param RuleSet::TYPE_* $type
     pub fn set_type(&mut self, r#type: i64) {
         *self.bitfield_mut() =
             (self.bitfield() & !(255i64 << BITFIELD_TYPE)) | ((255 & r#type) << BITFIELD_TYPE);
@@ -302,8 +299,6 @@ impl Rule {
         }
     }
 
-    /// @param BasePackage[] $installedMap
-    /// @param array<Rule[]> $learnedPool
     pub fn get_pretty_string(
         &self,
         repository_set: &RepositorySet,

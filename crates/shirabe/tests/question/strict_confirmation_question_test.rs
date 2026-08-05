@@ -13,7 +13,6 @@ use shirabe_php_shim::PhpMixed;
 const TRUE_ANSWER_REGEX: &str = "/^y(?:es)?$/i";
 const FALSE_ANSWER_REGEX: &str = "/^no?$/i";
 
-/// @return string[][]
 fn get_ask_confirmation_bad_data() -> Vec<&'static str> {
     vec!["not correct", "no more", "yes please", "yellow"]
 }
@@ -61,7 +60,6 @@ fn test_ask_confirmation() {
     }
 }
 
-/// @return mixed[][]
 fn get_ask_confirmation_data() -> Vec<(&'static str, bool, bool)> {
     vec![
         ("", true, true),
@@ -101,7 +99,6 @@ fn test_ask_confirmation_with_custom_true_and_false_answer() {
     );
 }
 
-/// @return resource
 fn get_input_stream(input: &str) -> shirabe_php_shim::PhpResource {
     let stream = shirabe_php_shim::php_fopen_resource("php://memory", "r+");
 
@@ -119,7 +116,6 @@ fn create_output_interface() -> std::rc::Rc<std::cell::RefCell<dyn OutputInterfa
     std::rc::Rc::new(std::cell::RefCell::new(output))
 }
 
-/// @return array{ArrayInput, QuestionHelper}
 fn create_input(entry: &str) -> (ArrayInput, QuestionHelper) {
     let mut input = ArrayInput::new(
         vec![(

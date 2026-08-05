@@ -135,7 +135,6 @@ impl JsonFile {
     ///
     /// @throws ParsingException
     /// @throws \RuntimeException
-    /// @return mixed
     pub fn read(&self) -> anyhow::Result<PhpMixed> {
         let json: Option<String> = match (|| -> anyhow::Result<Option<String>> {
             if let Some(http_downloader) = &self.http_downloader {
@@ -281,8 +280,6 @@ impl JsonFile {
     }
 
     /// Modify file properties only if content modified
-    ///
-    /// @return int|false
     fn file_put_contents_if_modified(
         &self,
         path: &str,
@@ -306,8 +303,6 @@ impl JsonFile {
     /// @throws JsonValidationException
     /// @throws ParsingException
     /// @return true                    true on success
-    ///
-    /// @phpstan-param self::*_SCHEMA $schema
     pub fn validate_schema(&self, schema: i64, schema_file: Option<&str>) -> anyhow::Result<bool> {
         if !Filesystem::is_readable(&self.path) {
             return Err(RuntimeException {
@@ -333,8 +328,6 @@ impl JsonFile {
     /// @param  string|null             $schemaFile a path to the schema file
     /// @throws JsonValidationException
     /// @return true                    true on success
-    ///
-    /// @phpstan-param self::*_SCHEMA $schema
     pub fn validate_json_schema(
         source: &str,
         data: &PhpMixed,
@@ -487,7 +480,6 @@ impl JsonFile {
     /// @param string $file the json file
     ///
     /// @throws ParsingException
-    /// @return mixed
     pub fn parse_json(json: Option<&str>, file: Option<&str>) -> anyhow::Result<PhpMixed> {
         let json = match json {
             None => return Ok(PhpMixed::Null),

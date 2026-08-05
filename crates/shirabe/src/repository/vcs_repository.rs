@@ -265,12 +265,10 @@ impl VcsRepository {
         self.branch_error_occurred.get()
     }
 
-    /// @return list<string>
     pub fn get_empty_references(&self) -> Vec<String> {
         self.empty_references.borrow().clone()
     }
 
-    /// @return array<'tags'|'branches', array<string, TransportException>>
     pub fn get_version_transport_exceptions(
         &self,
     ) -> IndexMap<String, IndexMap<String, TransportException>> {
@@ -835,9 +833,6 @@ impl VcsRepository {
         Ok(())
     }
 
-    /// @param array{name?: string, dist?: array{type: string, url: string, reference: string, shasum: string}, source?: array{type: string, url: string, reference: string}} $data
-    ///
-    /// @return array{name: string|null, dist: array{type: string, url: string, reference: string, shasum: string}|null, source: array{type: string, url: string, reference: string}}
     fn pre_process(
         &self,
         driver: &dyn VcsDriverInterface,
@@ -916,7 +911,6 @@ impl VcsRepository {
         Ok(data)
     }
 
-    /// @return string|false
     fn validate_branch(&self, branch: &str) -> Option<String> {
         let result = self
             .version_parser
@@ -941,7 +935,6 @@ impl VcsRepository {
         None
     }
 
-    /// @return string|false
     fn validate_tag(&self, version: &str) -> Option<String> {
         self.version_parser
             .borrow()

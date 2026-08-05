@@ -120,10 +120,6 @@ impl AliasPackage {
         self.root_package_alias
     }
 
-    /// @param Link[]       $links
-    /// @param Link::TYPE_* $linkType
-    ///
-    /// @return Link[]
     pub(crate) fn replace_self_version_dependencies(
         &mut self,
         mut links: IndexMap<String, Link>,
@@ -266,19 +262,16 @@ impl PackageInterface for AliasPackage {
     }
 
     /// @inheritDoc
-    /// @return array<string, Link>
     fn get_conflicts(&self) -> IndexMap<String, Link> {
         self.conflicts.clone()
     }
 
     /// @inheritDoc
-    /// @return array<string, Link>
     fn get_provides(&self) -> IndexMap<String, Link> {
         self.provides.clone()
     }
 
     /// @inheritDoc
-    /// @return array<string, Link>
     fn get_replaces(&self) -> IndexMap<String, Link> {
         self.replaces.clone()
     }

@@ -242,9 +242,6 @@ impl Auditor {
         Ok(audit_bitmask)
     }
 
-    /// @param array<string, array<SecurityAdvisory|AnySecurityAdvisory>> $advisories
-    /// @param array<string, string|null> $ignoreList
-    /// @return bool
     pub fn needs_complete_advisory_load(
         &self,
         advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
@@ -272,9 +269,6 @@ impl Auditor {
         array_any(&ignored_ids, |id: &String| !str_starts_with(id, "PKSA-"))
     }
 
-    /// @param array<PackageInterface> $packages
-    /// @param array<string, string|null> $ignoreAbandoned
-    /// @return array<CompletePackageInterface>
     pub fn filter_abandoned_packages(
         &self,
         packages: &[PackageInterfaceHandle],
@@ -409,7 +403,6 @@ impl Auditor {
         (advisories.len() as i64, count)
     }
 
-    /// @param array<string, array<SecurityAdvisory>> $advisories
     /// @param self::FORMAT_* $format The format that will be used to output audit results.
     fn output_advisories(
         &self,
@@ -456,7 +449,6 @@ impl Auditor {
         }
     }
 
-    /// @param array<string, array<SecurityAdvisory>> $advisories
     fn output_advisories_table(
         &self,
         io: &ConsoleIO,
@@ -517,7 +509,6 @@ impl Auditor {
         Ok(())
     }
 
-    /// @param array<string, array<SecurityAdvisory>> $advisories
     fn output_advisories_plain(
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -563,8 +554,6 @@ impl Auditor {
         Ok(())
     }
 
-    /// @param array<CompletePackageInterface> $packages
-    /// @param self::FORMAT_PLAIN|self::FORMAT_TABLE $format
     fn output_abandoned_packages(
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -710,7 +699,6 @@ impl Auditor {
         )
     }
 
-    /// @return int-mask<self::STATUS_*>
     fn calculate_bitmask(
         &self,
         has_vulnerable_packages: bool,

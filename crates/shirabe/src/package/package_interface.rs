@@ -76,13 +76,11 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Sets source from which this package was installed (source/dist).
     ///
     /// @param ?string $type source/dist
-    /// @phpstan-param 'source'|'dist'|null $type
     fn set_installation_source(&mut self, r#type: Option<String>);
 
     /// Returns source from which this package was installed (source/dist).
     ///
     /// @return ?string source/dist
-    /// @phpstan-return 'source'|'dist'|null
     fn get_installation_source(&self) -> Option<String>;
 
     /// Returns the repository type of this package, e.g. git, svn
@@ -96,8 +94,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_source_url(&self) -> Option<String>;
 
     /// Returns the repository urls of this package including mirrors, e.g. git://github.com/naderman/composer.git
-    ///
-    /// @return list<string>
     fn get_source_urls(&self) -> Vec<String>;
 
     /// Returns the repository reference of this package, e.g. master, 1.0.0 or a commit hash for git
@@ -106,11 +102,8 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_source_reference(&self) -> Option<String>;
 
     /// Returns the source mirrors of this package
-    ///
-    /// @return ?list<array{url: non-empty-string, preferred: bool}>
     fn get_source_mirrors(&self) -> Option<Vec<Mirror>>;
 
-    /// @param  null|list<array{url: non-empty-string, preferred: bool}> $mirrors
     fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>);
 
     /// Returns the type of the distribution archive of this version, e.g. zip, tarball
@@ -119,13 +112,9 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_dist_type(&self) -> Option<String>;
 
     /// Returns the url of the distribution archive of this version
-    ///
-    /// @return ?non-empty-string
     fn get_dist_url(&self) -> Option<String>;
 
     /// Returns the urls of the distribution archive of this version, including mirrors
-    ///
-    /// @return non-empty-string[]
     fn get_dist_urls(&self) -> Vec<String>;
 
     /// Returns the reference of the distribution archive of this version, e.g. master, 1.0.0 or a commit hash for git
@@ -137,11 +126,8 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_dist_sha1_checksum(&self) -> Option<String>;
 
     /// Returns the dist mirrors of this package
-    ///
-    /// @return ?list<array{url: non-empty-string, preferred: bool}>
     fn get_dist_mirrors(&self) -> Option<Vec<Mirror>>;
 
-    /// @param  null|list<array{url: non-empty-string, preferred: bool}> $mirrors
     fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>);
 
     /// Returns the version of this package
@@ -167,8 +153,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_release_date(&self) -> Option<DateTime<Utc>>;
 
     /// Returns the stability of this package: one of (dev, alpha, beta, RC, stable)
-    ///
-    /// @phpstan-return 'stable'|'RC'|'beta'|'alpha'|'dev'
     fn get_stability(&self) -> &str;
 
     /// Returns a set of links to packages which need to be installed before
@@ -205,7 +189,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// combination with this package.
     ///
     /// @return array An array of package suggestions with descriptions
-    /// @phpstan-return array<string, string>
     fn get_suggests(&self) -> IndexMap<String, String>;
 
     /// PHP helper that switches on the link kind (require/require-dev/conflict/etc.).
@@ -228,7 +211,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// directories for autoloading using the type specified.
     ///
     /// @return array Mapping of autoloading rules
-    /// @phpstan-return AutoloadRules
     fn get_autoload(&self) -> IndexMap<String, PhpMixed>;
 
     /// Returns an associative array of dev autoloading rules
@@ -239,18 +221,13 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// directories for autoloading using the type specified.
     ///
     /// @return array Mapping of dev autoloading rules
-    /// @phpstan-return DevAutoloadRules
     fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed>;
 
     /// Returns a list of directories which should get added to PHP's
     /// include path.
-    ///
-    /// @return string[]
     fn get_include_paths(&self) -> Vec<String>;
 
     /// Returns the settings for php extension packages
-    ///
-    /// @phpstan-return PhpExtConfig|null
     fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>>;
 
     /// Stores a reference to the repository that owns the package
@@ -260,8 +237,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_repository(&self) -> Option<RepositoryInterfaceHandle>;
 
     /// Returns the package binaries
-    ///
-    /// @return string[]
     fn get_binaries(&self) -> Vec<String>;
 
     /// Returns package unique name, constructed from name and version.
@@ -278,13 +253,9 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn is_default_branch(&self) -> bool;
 
     /// Returns a list of options to download package dist files
-    ///
-    /// @return mixed[]
     fn get_transport_options(&self) -> IndexMap<String, PhpMixed>;
 
     /// Configures the list of options to download package dist files
-    ///
-    /// @param mixed[] $options
     fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>);
 
     fn set_source_reference(&mut self, reference: Option<String>);

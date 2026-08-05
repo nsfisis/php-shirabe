@@ -1662,7 +1662,6 @@ impl ShowCommand {
         combined.keys().map(|k| strtolower(k)).collect()
     }
 
-    /// @return array|string|string[]
     pub(crate) fn get_version_style(
         &self,
         latest_package: PackageInterfaceHandle,

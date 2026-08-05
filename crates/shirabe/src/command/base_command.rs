@@ -211,23 +211,16 @@ pub trait BaseCommand: Command {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>>;
 
-    /// @param array<string> $requirements
-    ///
-    /// @return array<string, string>
     fn format_requirements(
         &self,
         requirements: Vec<String>,
     ) -> anyhow::Result<IndexMap<String, String>>;
 
-    /// @param array<string> $requirements
-    ///
-    /// @return list<array{name: string, version?: string}>
     fn normalize_requirements(
         &self,
         requirements: Vec<String>,
     ) -> anyhow::Result<Vec<IndexMap<String, String>>>;
 
-    /// @param array<TableSeparator|mixed[]> $table
     fn render_table(
         &self,
         table: Vec<PhpMixed>,
@@ -237,8 +230,6 @@ pub trait BaseCommand: Command {
     fn get_terminal_width(&self) -> i64;
 
     /// @internal
-    /// @param 'format'|'audit-format' $optName
-    /// @return Auditor::FORMAT_*
     fn get_audit_format(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,

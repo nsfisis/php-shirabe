@@ -52,7 +52,6 @@ impl AuthHelper {
         }
     }
 
-    /// @param 'prompt'|bool $storeAuth
     pub fn store_auth(&self, origin: &str, store_auth: StoreAuth) -> anyhow::Result<()> {
         let mut store: Option<()> = None;
         let mut config = self.config.borrow_mut();
@@ -443,8 +442,6 @@ impl AuthHelper {
         })
     }
 
-    /// @param array<string, mixed> $options
-    ///
     /// @return array<string, mixed> updated options
     pub fn add_authentication_options(
         &mut self,

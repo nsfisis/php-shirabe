@@ -95,7 +95,6 @@ impl Git {
     ///
     /// As soon as a single command fails it will halt, so assume the commands are run as && in bash
     ///
-    /// @param non-empty-array<non-empty-list<string>> $commands
     /// @param mixed $commandOutput  the output will be written into this var if passed by ref
     ///                              if a callable is passed it will be used as output handler
     pub fn run_commands(
@@ -141,7 +140,6 @@ impl Git {
         self.run_command(command_callable, url, cwd, initial_clone, command_output)
     }
 
-    /// @param callable|array<callable> $commandCallable
     /// @param mixed       $commandOutput  the output will be written into this var if passed by ref
     ///                                    if a callable is passed it will be used as output handler
     fn run_command(
@@ -994,7 +992,6 @@ impl Git {
         String::new()
     }
 
-    /// @return list<string>
     pub fn get_no_show_signature_flags(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Vec<String> {
@@ -1023,7 +1020,6 @@ impl Git {
     ///
     /// @internal
     /// @param list<string> $arguments Additional arguments for git rev-list
-    /// @return non-empty-list<string>
     pub fn build_rev_list_command(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         arguments: Vec<String>,
@@ -1091,7 +1087,6 @@ impl Git {
         Ok(false)
     }
 
-    /// @return array<int, string>|null
     fn get_authentication_failure(&self, url: &str) -> Option<IndexMap<CaptureKey, String>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match3(
@@ -1249,7 +1244,6 @@ impl Git {
         Platform::clear_env("DYLD_LIBRARY_PATH");
     }
 
-    /// @return non-empty-string
     pub fn get_github_domains_regex(config: &Config) -> String {
         let domains: Vec<String> = match config.get("github-domains") {
             PhpMixed::List(l) => l
@@ -1262,7 +1256,6 @@ impl Git {
         format!("({})", implode("|", &escaped))
     }
 
-    /// @return non-empty-string
     pub fn get_gitlab_domains_regex(config: &Config) -> String {
         let domains: Vec<String> = match config.get("gitlab-domains") {
             PhpMixed::List(l) => l
@@ -1275,9 +1268,6 @@ impl Git {
         format!("({})", implode("|", &escaped))
     }
 
-    /// @param non-empty-string $message
-    ///
-    /// @return never
     fn throw_exception(&mut self, message: &str, url: &str) -> anyhow::Result<()> {
         // git might delete a directory when it fails and php will not know
         clearstatcache();
@@ -1352,7 +1342,6 @@ impl Git {
         *VERSION.lock().unwrap() = Some(version);
     }
 
-    /// @param string[] $credentials
     fn mask_credentials(&self, error: &str, credentials: &[String]) -> String {
         let mut masked_credentials: Vec<String> = vec![];
 

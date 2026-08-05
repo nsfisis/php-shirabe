@@ -381,7 +381,6 @@ impl FilesystemRepository {
         true
     }
 
-    /// @param array<mixed> $array
     fn dump_to_php_code(&self, array: &IndexMap<String, PhpMixed>, level: i64) -> String {
         let mut lines = String::from("array(\n");
         let level = level + 1;
@@ -448,7 +447,6 @@ impl FilesystemRepository {
         lines
     }
 
-    /// @param array<string, string> $installPaths
     fn generate_installed_versions(
         &mut self,
         installation_manager: &dyn InstallationManagerInterface,
@@ -612,9 +610,6 @@ impl FilesystemRepository {
         Ok(versions)
     }
 
-    /// @param array<string, string> $installPaths
-    /// @param array<string, int> $devPackages
-    /// @return array{pretty_version: string, version: string, reference: string|null, type: string, install_path: string, aliases: string[], dev_requirement: bool}
     fn dump_installed_package(
         &self,
         package: PackageInterfaceHandle,
@@ -693,9 +688,6 @@ impl FilesystemRepository {
         data
     }
 
-    /// @param array<string, string> $installPaths
-    /// @param array<string, int> $devPackages
-    /// @return array{name: string, pretty_version: string, version: string, reference: string|null, type: string, install_path: string, aliases: string[], dev: bool}
     fn dump_root_package(
         &self,
         package: RootPackageInterfaceHandle,

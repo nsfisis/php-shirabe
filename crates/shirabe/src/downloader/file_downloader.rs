@@ -720,7 +720,6 @@ impl FileDownloader {
 }
 
 impl FileDownloader {
-    /// @param PATHINFO_EXTENSION|PATHINFO_BASENAME $component
     fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
         pathinfo(
             PhpMixed::String(

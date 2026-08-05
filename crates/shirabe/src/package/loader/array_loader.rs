@@ -189,9 +189,6 @@ impl LoaderInterface for ArrayLoader {
 }
 
 impl ArrayLoader {
-    /// @param array<array<mixed>> $versions
-    ///
-    /// @return list<CompletePackage|CompleteAliasPackage>
     #[tracing::instrument(skip_all)]
     pub fn load_packages(
         &self,
@@ -773,10 +770,6 @@ impl ArrayLoader {
     /// @param  string                    $sourceVersion source package version (pretty version ideally)
     /// @param  string                    $description   link description (e.g. requires, replaces, ..)
     /// @param  array<string|int, string> $links         array of package name => constraint mappings
-    ///
-    /// @return Link[]
-    ///
-    /// @phpstan-param Link::TYPE_* $description
     pub fn parse_links(
         &self,
         source: &str,

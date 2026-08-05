@@ -95,8 +95,6 @@ impl TableCellStyle {
     }
 
     /// Gets options we need for tag for example fg, bg.
-    ///
-    /// @return string[]
     pub fn get_tag_options(&self) -> IndexMap<String, shirabe_php_shim::PhpMixed> {
         let mut result: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
         for (key, value) in self.get_options() {

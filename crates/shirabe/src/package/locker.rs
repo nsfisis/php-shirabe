@@ -339,7 +339,6 @@ impl Locker {
         Ok(requirements.into_iter().map(|(_, v)| v).collect())
     }
 
-    /// @return key-of<BasePackage::STABILITIES>
     pub fn get_minimum_stability(&mut self) -> anyhow::Result<String> {
         let lock_data = self.get_lock_data()?;
 
@@ -382,7 +381,6 @@ impl Locker {
         Ok(lock_data.get("prefer-lowest").and_then(|v| v.as_bool()))
     }
 
-    /// @return array<string, string>
     pub fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         let lock_data = self.get_lock_data()?;
 
@@ -399,7 +397,6 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    /// @return string[][]
     pub fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         let lock_data = self.get_lock_data()?;
 
@@ -435,7 +432,6 @@ impl Locker {
             .to_string())
     }
 
-    /// @return array<string, mixed>
     pub fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         if let Some(cache) = self.lock_data_cache.borrow().clone() {
             return Ok(cache);
@@ -719,7 +715,6 @@ impl Locker {
         lock_data
     }
 
-    /// @param PackageInterface[] $packages
     fn lock_packages(&mut self, packages: &[PackageInterfaceHandle]) -> anyhow::Result<PhpMixed> {
         let mut locked: Vec<IndexMap<String, PhpMixed>> = vec![];
 
@@ -891,7 +886,6 @@ impl Locker {
         Ok(datetime.map(|d| d.format(DATE_RFC3339).to_string()))
     }
 
-    /// @return array<string>
     pub fn get_missing_requirement_info(
         &mut self,
         package: RootPackageInterfaceHandle,

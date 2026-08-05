@@ -557,7 +557,6 @@ impl GitDownloader {
         }
     }
 
-    /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
     pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
@@ -593,7 +592,6 @@ impl GitDownloader {
         Ok(None)
     }
 
-    /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
     pub(crate) async fn stash_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);

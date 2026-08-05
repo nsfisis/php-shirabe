@@ -63,7 +63,6 @@ enum Decision {
 }
 
 impl CurlDownloader {
-    /// @param mixed[] $options
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -100,9 +99,6 @@ impl CurlDownloader {
         }
     }
 
-    /// @param mixed[]  $options
-    /// @param non-empty-string $url
-    ///
     /// Runs the request through the redirect/retry/status state machine until it resolves,
     /// mirroring what the PHP promise resolver + `tick()` loop used to do together.
     pub async fn download(

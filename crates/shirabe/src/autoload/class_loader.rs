@@ -56,7 +56,6 @@ pub struct ClassLoader {
 }
 
 impl ClassLoader {
-    /// @param string|null $vendorDir
     pub fn new(vendor_dir: Option<String>) -> Self {
         let this = Self {
             vendor_dir,
@@ -75,7 +74,6 @@ impl ClassLoader {
         this
     }
 
-    /// @return array<string, list<string>>
     pub fn get_prefixes(&self) -> IndexMap<String, Vec<String>> {
         if !self.prefixes_psr0.is_empty() {
             // PHP: call_user_func_array('array_merge', array_values($this->prefixesPsr0))
@@ -94,17 +92,14 @@ impl ClassLoader {
         IndexMap::new()
     }
 
-    /// @return array<string, list<string>>
     pub fn get_prefixes_psr4(&self) -> &IndexMap<String, Vec<String>> {
         &self.prefix_dirs_psr4
     }
 
-    /// @return list<string>
     pub fn get_fallback_dirs(&self) -> &Vec<String> {
         &self.fallback_dirs_psr0
     }
 
-    /// @return list<string>
     pub fn get_fallback_dirs_psr4(&self) -> &Vec<String> {
         &self.fallback_dirs_psr4
     }
@@ -369,13 +364,10 @@ impl ClassLoader {
     }
 
     /// Returns the currently registered loaders keyed by their corresponding vendor directories.
-    ///
-    /// @return array<string, self>
     pub fn get_registered_loaders() -> IndexMap<String, ClassLoader> {
         REGISTERED_LOADERS.lock().unwrap().clone()
     }
 
-    /// @return string|false
     fn find_file_with_extension(&self, class: &str, ext: &str) -> Option<String> {
         // PSR-4 lookup
         let logical_path_psr4 = format!("{}{}", strtr(class, "\\", DIRECTORY_SEPARATOR), ext);

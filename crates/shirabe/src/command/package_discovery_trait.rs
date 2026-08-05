@@ -60,7 +60,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         self.get_repos_mut().as_ref().unwrap().clone()
     }
 
-    /// @param key-of<BasePackage::STABILITIES>|null $minimumStability
     fn get_repository_set(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -91,7 +90,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         self.get_repository_sets_mut().get(&key).unwrap().clone()
     }
 
-    /// @return key-of<BasePackage::STABILITIES>
     fn get_minimum_stability(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -750,7 +748,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         ))
     }
 
-    /// @return array<string>
     fn find_similar(&self, package: &str) -> anyhow::Result<Vec<String>> {
         let results: Vec<SearchResult> = match (|| -> anyhow::Result<Vec<SearchResult>> {
             if self.get_repos_mut().is_none() {

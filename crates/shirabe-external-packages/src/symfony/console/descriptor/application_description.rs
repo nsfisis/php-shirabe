@@ -50,7 +50,6 @@ impl ApplicationDescription {
         self.namespaces.clone().unwrap()
     }
 
-    /// @return Command[]
     pub fn get_commands(
         &mut self,
     ) -> &IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>> {

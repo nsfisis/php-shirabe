@@ -741,7 +741,6 @@ impl GitBitbucketDriver {
 
     /// @phpstan-impure
     ///
-    /// @return true
     /// @throws \RuntimeException
     fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         match self.setup_fallback_driver(&self.generate_ssh_url()) {
@@ -775,7 +774,6 @@ impl GitBitbucketDriver {
         Ok(())
     }
 
-    /// @param  array<array{name: string, href: string}> $cloneLinks
     fn parse_clone_urls(&mut self, clone_links: Option<PhpMixed>) {
         let list = match clone_links {
             Some(PhpMixed::List(l)) => l,

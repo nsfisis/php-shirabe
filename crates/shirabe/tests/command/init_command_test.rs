@@ -53,7 +53,6 @@ fn opt_list(name: &str, values: &[&str]) -> (PhpMixed, PhpMixed) {
     )
 }
 
-/// @return iterable<string, array{0: string, 1: string|null, 2: string}>
 fn valid_author_string_provider() -> Vec<(&'static str, Option<&'static str>, &'static str)> {
     vec![
         // simple
@@ -159,7 +158,6 @@ fn test_namespace_from_missing_package_name() {
     assert_eq!(None, namespace);
 }
 
-/// @return iterable<string, array{0: array<string, mixed>, 1: array<string, mixed>}>
 fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
     vec![
         // name argument
@@ -384,7 +382,6 @@ enum InvalidExpectation {
     StderrMatches(&'static str),
 }
 
-/// @return iterable<string, array{0: class-string<\Throwable>|null, 1: string|null, 2: array<string, mixed>}>
 fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(PhpMixed, PhpMixed)>)> {
     vec![
         // invalid name argument

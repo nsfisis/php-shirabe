@@ -721,7 +721,6 @@ impl GitLabDriver {
 
     /// @phpstan-impure
     ///
-    /// @return true
     /// @throws \RuntimeException
     pub(crate) fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         let url = if !self.is_private {
@@ -1030,8 +1029,6 @@ impl GitLabDriver {
     }
 
     /// Gives back the loaded <gitlab-api>/projects/<owner>/<repo> result
-    ///
-    /// @return mixed[]|null
     pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         self.fetch_project()?;
 
@@ -1061,10 +1058,6 @@ impl GitLabDriver {
         None
     }
 
-    /// @param  array<string> $configuredDomains
-    /// @param  array<string> $urlParts
-    ///
-    /// @return string|false
     fn determine_origin(
         configured_domains: &PhpMixed,
         guessed_domain: String,

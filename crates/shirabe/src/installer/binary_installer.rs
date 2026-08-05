@@ -219,7 +219,6 @@ impl BinaryInstaller {
         "php".to_string()
     }
 
-    /// @return string[]
     pub(crate) fn get_binaries(&self, package: PackageInterfaceHandle) -> Vec<String> {
         package.get_binaries()
     }

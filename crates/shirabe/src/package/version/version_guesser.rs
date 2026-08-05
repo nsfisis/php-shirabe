@@ -94,10 +94,7 @@ impl VersionGuesser {
         }
     }
 
-    /// @param array<string, mixed> $packageConfig
     /// @param string               $path Path to guess into
-    ///
-    /// @phpstan-return Version|null
     pub fn guess_version(
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
@@ -145,9 +142,6 @@ impl VersionGuesser {
         Ok(None)
     }
 
-    /// @phpstan-param Version $versionData
-    ///
-    /// @phpstan-return Version
     fn postprocess(&self, mut version_data: VersionData) -> VersionData {
         // PHP: !empty($versionData['feature_version']) && $versionData['feature_version'] === $versionData['version'] && $versionData['feature_pretty_version'] === $versionData['pretty_version']
         let feature_matches = version_data
@@ -202,9 +196,6 @@ impl VersionGuesser {
         version_data
     }
 
-    /// @param array<string, mixed> $packageConfig
-    ///
-    /// @return array{version: string|null, commit: string|null, pretty_version: string|null, feature_version?: string|null, feature_pretty_version?: string|null}
     fn guess_git_version(
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
@@ -370,7 +361,6 @@ impl VersionGuesser {
         })
     }
 
-    /// @return array{version: string, pretty_version: string}|null
     fn version_from_git_tags(&mut self, path: &str) -> anyhow::Result<Option<(String, String)>> {
         // try to fetch current version from git tags
         let mut output = String::new();
@@ -393,9 +383,6 @@ impl VersionGuesser {
         Ok(None)
     }
 
-    /// @param array<string, mixed> $packageConfig
-    ///
-    /// @return array{version: string|null, commit: ''|null, pretty_version: string|null, feature_version?: string|null, feature_pretty_version?: string|null}|null
     fn guess_hg_version(
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
@@ -486,11 +473,6 @@ impl VersionGuesser {
         Ok(None)
     }
 
-    /// @param array<string, mixed>     $packageConfig
-    /// @param list<string>             $branches
-    /// @param list<string>             $scmCmdline
-    ///
-    /// @return array{version: string|null, pretty_version: string|null}
     fn guess_feature_version(
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,
@@ -613,7 +595,6 @@ impl VersionGuesser {
         })
     }
 
-    /// @param array<string, mixed> $packageConfig
     fn is_feature_branch(
         &self,
         package_config: &IndexMap<String, PhpMixed>,
@@ -642,7 +623,6 @@ impl VersionGuesser {
         )
     }
 
-    /// @return array{version: string|null, commit: '', pretty_version: string|null}
     fn guess_fossil_version(&mut self, path: &str) -> anyhow::Result<VersionData> {
         let mut version: Option<String> = None;
         let mut pretty_version: Option<String> = None;
@@ -688,9 +668,6 @@ impl VersionGuesser {
         })
     }
 
-    /// @param array<string, mixed> $packageConfig
-    ///
-    /// @return array{version: string, commit: '', pretty_version: string}|null
     fn guess_svn_version(
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,

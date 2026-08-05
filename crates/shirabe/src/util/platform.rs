@@ -58,10 +58,6 @@ impl Platform {
     }
 
     /// getenv() equivalent but reads from the runtime global variables first
-    ///
-    /// @param non-empty-string $name
-    ///
-    /// @return string|false
     pub fn get_env(name: &str) -> Option<String> {
         if let Some(value) = PHP_SERVER.lock().unwrap().get(name) {
             return Some(value.to_string_lossy().into_owned());
@@ -388,7 +384,6 @@ impl Platform {
         cached.unwrap_or(false)
     }
 
-    /// @return 'NUL'|'/dev/null'
     pub fn get_dev_null() -> String {
         if Self::is_windows() {
             return "NUL".to_string();

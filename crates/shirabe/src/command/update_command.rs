@@ -602,8 +602,6 @@ impl BaseCommand for UpdateCommand {
 }
 
 impl UpdateCommand {
-    /// @param array<string> $packages
-    /// @return array<string>
     fn get_packages_interactively(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,

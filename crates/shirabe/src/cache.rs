@@ -124,7 +124,6 @@ impl Cache {
         &self.root
     }
 
-    /// @return string|false
     pub fn read(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
             let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
@@ -344,8 +343,6 @@ impl Cache {
         false
     }
 
-    /// @return int|false
-    /// @phpstan-return int<0, max>|false
     pub fn get_age(&mut self, file: &str) -> Option<i64> {
         if self.is_enabled() {
             let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
@@ -463,7 +460,6 @@ impl Cache {
         false
     }
 
-    /// @return string|false
     pub fn sha1(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
             let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
@@ -476,7 +472,6 @@ impl Cache {
         None
     }
 
-    /// @return string|false
     pub fn sha256(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
             let file = Preg::replace(format!("{{[^{}]}}i", self.allowlist), "-", file);

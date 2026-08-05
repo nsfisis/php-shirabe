@@ -923,7 +923,6 @@ impl BaseCommand for InitCommand {
 }
 
 impl InitCommand {
-    /// @return array{name: string, email: string|null}
     fn parse_author_string(
         &self,
         author: &str,
@@ -968,7 +967,6 @@ impl InitCommand {
         .into())
     }
 
-    /// @return array<int, array{name: string, email?: string}>
     pub(crate) fn format_authors(
         &self,
         author: &str,
@@ -1007,7 +1005,6 @@ impl InitCommand {
         Some(implode("\\", &namespace))
     }
 
-    /// @return array<string, string>
     pub(crate) fn get_git_config(&self) -> IndexMap<String, String> {
         if self.git_config.borrow().is_some() {
             return self.git_config.borrow().clone().unwrap_or_default();
@@ -1161,7 +1158,6 @@ impl InitCommand {
         }
     }
 
-    /// @param array<string, string|array<string>> $options
     fn has_dependencies(&self, options: &IndexMap<String, PhpMixed>) -> bool {
         let requires = options.get("require").cloned().unwrap_or(PhpMixed::Null);
         let requires_arr_empty = match &requires {

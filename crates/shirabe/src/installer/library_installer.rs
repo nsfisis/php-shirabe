@@ -142,8 +142,6 @@ impl LibraryInstaller {
         install_path
     }
 
-    /// @return PromiseInterface|null
-    /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn install_code(
         &self,
         package: PackageInterfaceHandle,
@@ -156,8 +154,6 @@ impl LibraryInstaller {
             .await
     }
 
-    /// @return PromiseInterface|null
-    /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn update_code(
         &self,
         initial: PackageInterfaceHandle,
@@ -187,8 +183,6 @@ impl LibraryInstaller {
             .await
     }
 
-    /// @return PromiseInterface|null
-    /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn remove_code(
         &self,
         package: PackageInterfaceHandle,

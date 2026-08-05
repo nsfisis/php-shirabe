@@ -69,8 +69,6 @@ impl NoProxyPattern {
     }
 
     /// Returns false is the url cannot be parsed, otherwise a data object
-    ///
-    /// @return bool|stdClass
     pub(crate) fn get_url_data(&self, url: &str) -> anyhow::Result<Option<UrlData>> {
         let host = parse_url(url, PHP_URL_HOST);
         if empty(&host) {

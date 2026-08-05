@@ -423,8 +423,6 @@ impl PoolOptimizer {
         self.packages_to_remove.insert(id, true);
     }
 
-    /// @param array<string, array<string, array<string, list<BasePackage>>>> $identicalDefinitionsPerPackage
-    /// @param array<int, array<string, array{groupHash: string, dependencyHash: string}>> $packageIdenticalDefinitionLookup
     fn keep_package(
         &mut self,
         package: BasePackageHandle,
@@ -626,8 +624,6 @@ impl PoolOptimizer {
     /// Disjunctive require constraints need to be considered in their own group. E.g. "^2.14 || ^3.3" needs to generate
     /// two require constraint groups in order for us to keep the best matching package for "^2.14" AND "^3.3" as otherwise, we'd
     /// only keep either one which can cause trouble (e.g. when using --prefer-lowest).
-    ///
-    /// @return void
     fn extract_require_constraints_per_package(
         &mut self,
         package: &str,
@@ -644,8 +640,6 @@ impl PoolOptimizer {
     /// Disjunctive conflict constraints need to be considered in their own group. E.g. "^2.14 || ^3.3" needs to generate
     /// two conflict constraint groups in order for us to keep the best matching package for "^2.14" AND "^3.3" as otherwise, we'd
     /// only keep either one which can cause trouble (e.g. when using --prefer-lowest).
-    ///
-    /// @return void
     fn extract_conflict_constraints_per_package(
         &mut self,
         package: &str,
@@ -659,7 +653,6 @@ impl PoolOptimizer {
         }
     }
 
-    /// @return ConstraintInterface[]
     fn expand_disjunctive_multi_constraints(
         &self,
         constraint: AnyConstraint,

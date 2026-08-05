@@ -106,8 +106,6 @@ pub trait QuestionHelperInterface {
 
     /// Asks the question to the user (PHP private; on the trait so it can late-bind the hooks).
     ///
-    /// @return mixed
-    ///
     /// @throws RuntimeException In case the fallback is deactivated and the response cannot be hidden
     fn do_ask(
         &self,
@@ -318,7 +316,6 @@ impl QuestionHelper {
         STTY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
-    /// @return mixed
     fn get_default_answer(&self, question: &impl QuestionInterface) -> PhpMixed {
         let default = question.get_default();
 
@@ -380,7 +377,6 @@ impl QuestionHelper {
             .write(&[message], false, output_interface::OUTPUT_NORMAL);
     }
 
-    /// @return string[]
     pub(crate) fn format_choice_question_choices(
         &self,
         question: &ChoiceQuestion,
@@ -433,8 +429,6 @@ impl QuestionHelper {
     }
 
     /// Autocompletes a question.
-    ///
-    /// @param resource $inputStream
     fn autocomplete(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -851,10 +845,6 @@ impl QuestionHelper {
     }
 
     /// Sets console I/O to the specified code page and converts the user input.
-    ///
-    /// @param string|false $input
-    ///
-    /// @return string|false
     fn reset_io_codepage(&self, cp: i64, input: PhpMixed) -> PhpMixed {
         let mut input = input;
         if 0 != cp {
