@@ -249,12 +249,6 @@ pub fn get_debug_type_obj<T>(_value: &T) -> String {
     std::any::type_name::<T>().to_string()
 }
 
-pub fn instantiate_class(_class: &str, _args: Vec<PhpMixed>) -> PhpMixed {
-    // TODO(php-runtime): instantiating a class by name needs a runtime class registry (reflection),
-    // which the shim does not provide.
-    todo!()
-}
-
 pub fn php_to_string(value: &PhpMixed) -> String {
     match value {
         PhpMixed::Null => String::new(),

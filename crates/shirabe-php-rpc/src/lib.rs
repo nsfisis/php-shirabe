@@ -44,6 +44,14 @@ pub fn get_constant(name: &str) -> PhpMixed {
     call("constant", name)
 }
 
+/// PHP `class_exists($name)`, with autoloading, as the runtime sees it.
+pub fn class_exists(name: &str) -> bool {
+    match call("class_exists", name) {
+        PhpMixed::Bool(exists) => exists,
+        other => panic!("PHP RPC: `class_exists` returned an unexpected value: {other:?}"),
+    }
+}
+
 /// PHP `inet_pton($address)`.
 pub fn inet_pton(address: &str) -> PhpMixed {
     call("inet_pton", address)

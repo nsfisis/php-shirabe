@@ -2466,10 +2466,6 @@ impl ApplicationHandle {
                                         // recognizes user classes, so the arm stays
                                         // unreachable until the checks and the instantiation
                                         // go through the worker.
-                                        let _ = shirabe_php_shim::instantiate_class(
-                                            &dummy_str,
-                                            vec![PhpMixed::String(script.clone())],
-                                        );
                                         todo!(
                                             "plugin: import a user Command class as a live application command"
                                         );

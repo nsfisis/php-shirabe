@@ -1378,8 +1378,8 @@ impl PlatformRepository {
                         "libxslt",
                         libxslt_str.as_deref(),
                         None,
-                        &[],
                         &["xsl".to_string()],
+                        &[],
                     )?;
 
                     let info = self.runtime.get_extension_info("xsl")?;
@@ -1443,8 +1443,8 @@ impl PlatformRepository {
                             &format!("{}-libzip", name),
                             libzip_str.as_deref(),
                             None,
-                            &[],
                             &["zip".to_string()],
+                            &[],
                         )?;
                     }
                 }
@@ -1839,14 +1839,25 @@ impl PlatformRepository {
         package.as_complete().is_some()
     }
 
-    fn resource_bundle_get(_value: &PhpMixed, _key: &str) -> PhpMixed {
-        // TODO(plugin): proper ResourceBundle::get($key) dispatch on a PHP object.
-        PhpMixed::Null
+    /// PHP `$resourceBundle->get($key)`. A live PHP object has no `PhpMixed` counterpart, so
+    /// [`RuntimeInterface`] answers with the entries the caller reads instead of the object.
+    fn resource_bundle_get(value: &PhpMixed, key: &str) -> PhpMixed {
+        Self::php_object_field(value, key).unwrap_or(PhpMixed::Null)
     }
 
-    fn imagick_get_version_string(_value: &PhpMixed) -> String {
-        // TODO(plugin): proper Imagick->getVersion()['versionString'] dispatch.
-        "".to_string()
+    /// PHP `$imagick->getVersion()['versionString']`, read the same way.
+    fn imagick_get_version_string(value: &PhpMixed) -> String {
+        match Self::php_object_field(value, "versionString") {
+            Some(PhpMixed::String(version)) => version,
+            _ => String::new(),
+        }
+    }
+
+    fn php_object_field(value: &PhpMixed, key: &str) -> Option<PhpMixed> {
+        match value {
+            PhpMixed::Object(fields) | PhpMixed::Array(fields) => fields.get(key).cloned(),
+            _ => None,
+        }
     }
 
     fn php_array_to_string_vec(value: &PhpMixed) -> Vec<String> {

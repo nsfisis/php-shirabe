@@ -2,9 +2,10 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{
-    PhpMixed, class_exists, function_exists, html_entity_decode, implode, instantiate_class, ltrim,
-    php_regex, strip_tags, trim,
+    PhpMixed, RuntimeException, function_exists, html_entity_decode, implode, ltrim, php_regex,
+    strip_tags, trim,
 };
 
 /// Seam over the PHP runtime so PlatformRepository can be tested against mocked
@@ -57,19 +58,35 @@ impl RuntimeInterface for Runtime {
                 }
                 PhpMixed::Array(version)
             }
-            _ => todo!(),
+            (PhpMixed::List(spec), _) => match class_callable(spec) {
+                ("ResourceBundle", "create") => resource_bundle_create(arguments),
+                ("IntlChar", "getUnicodeVersion") => {
+                    php_value(shirabe_php_rpc::call_static_method(
+                        "IntlChar",
+                        "getUnicodeVersion",
+                        Vec::new(),
+                        None,
+                    ))
+                }
+                (class, method) => panic!(
+                    "the PHP callable `{class}::{method}` is not wired through the runtime seam"
+                ),
+            },
+            _ => panic!("the PHP callable {callable:?} is not wired through the runtime seam"),
         }
     }
 
     fn has_class(&self, class: &str) -> bool {
-        class_exists(class)
+        shirabe_php_rpc::class_exists(class)
     }
 
     fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> anyhow::Result<PhpMixed> {
-        if arguments.is_empty() {
-            Ok(instantiate_class(class, vec![]))
-        } else {
-            Ok(instantiate_class(class, arguments))
+        match class {
+            "Imagick" => imagick_version(arguments),
+            other => Err(anyhow::anyhow!(RuntimeException {
+                message: format!("the PHP class `{other}` is not wired through the runtime seam"),
+                code: 0,
+            })),
         }
     }
 
@@ -83,6 +100,83 @@ impl RuntimeInterface for Runtime {
 
     fn get_extension_info(&self, extension: &str) -> anyhow::Result<String> {
         Ok(shirabe_php_rpc::get_extension_info(extension))
+    }
+}
+
+/// The `[class, method]` pair of a PHP callable given in array form.
+fn class_callable(spec: &[PhpMixed]) -> (&str, &str) {
+    match spec {
+        [PhpMixed::String(class), PhpMixed::String(method)] => (class, method),
+        other => panic!("a PHP callable given as an array must be [class, method], got {other:?}"),
+    }
+}
+
+/// Unwraps an RPC outcome whose failure means the runtime probe itself is broken, not that the
+/// probed extension is absent.
+fn php_value(outcome: anyhow::Result<Result<PluginValue, PhpThrow>>) -> PhpMixed {
+    match outcome {
+        Ok(Ok(value)) => value
+            .to_php_mixed()
+            .expect("a runtime probe answers with plain values"),
+        Ok(Err(throw)) => panic!("the PHP runtime probe failed: {}", throw.message),
+        Err(e) => panic!("the PHP runtime probe could not be sent: {e:#}"),
+    }
+}
+
+/// PHP `ResourceBundle::create(...)`, whose result the caller reads `->get('Version')` off.
+/// A live PHP object has no `PhpMixed` counterpart, so that entry crosses in its place.
+fn resource_bundle_create(arguments: Vec<PhpMixed>) -> PhpMixed {
+    let bundle = match php_handle(shirabe_php_rpc::call_static_method(
+        "ResourceBundle",
+        "create",
+        arguments.iter().map(PluginValue::from_php_mixed).collect(),
+        None,
+    )) {
+        Some(phandle) => phandle,
+        // PHP returns null when the bundle cannot be opened.
+        None => return PhpMixed::Null,
+    };
+    let version = php_value(shirabe_php_rpc::call_php_method(
+        bundle,
+        "get",
+        vec![PluginValue::string("Version")],
+        None,
+    ));
+    let _ = shirabe_php_rpc::release_php_handle(bundle);
+    PhpMixed::Object(IndexMap::from([("Version".to_string(), version)]))
+}
+
+/// PHP `(new Imagick())->getVersion()`, reported as the entries the caller reads.
+fn imagick_version(arguments: Vec<PhpMixed>) -> anyhow::Result<PhpMixed> {
+    let imagick = php_handle(shirabe_php_rpc::new_object(
+        "Imagick",
+        arguments.iter().map(PluginValue::from_php_mixed).collect(),
+        None,
+    ))
+    .ok_or_else(|| {
+        anyhow::anyhow!(RuntimeException {
+            message: "`new Imagick` did not answer with an object".to_string(),
+            code: 0,
+        })
+    })?;
+    let version = php_value(shirabe_php_rpc::call_php_method(
+        imagick,
+        "getVersion",
+        Vec::new(),
+        None,
+    ));
+    let _ = shirabe_php_rpc::release_php_handle(imagick);
+    Ok(version)
+}
+
+/// The handle of a PHP-side object an RPC answered with, or `None` when it answered with null.
+fn php_handle(outcome: anyhow::Result<Result<PluginValue, PhpThrow>>) -> Option<u64> {
+    match outcome {
+        Ok(Ok(PluginValue::PhpHandle(handle))) => Some(handle.phandle),
+        Ok(Ok(PluginValue::Null)) => None,
+        Ok(Ok(other)) => panic!("the PHP runtime probe answered with {other:?}, not an object"),
+        Ok(Err(throw)) => panic!("the PHP runtime probe failed: {}", throw.message),
+        Err(e) => panic!("the PHP runtime probe could not be sent: {e:#}"),
     }
 }
 
