@@ -10,7 +10,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, json_encode};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException, json_encode};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -191,10 +191,12 @@ impl RepositoryManager {
                     Some(self.process.clone()),
                 )?,
             )),
-            other => todo!(
-                "dynamic class instantiation is not implemented for repository class {}",
-                other
-            ),
+            // TODO(plugin): `setRepositoryClass` lets a plugin register a repository class of
+            // its own, which needs a Rust-side counterpart before it can be built here.
+            other => Err(anyhow::anyhow!(RuntimeException {
+                message: format!("Repository class has no Rust implementation: {other}"),
+                code: 0,
+            })),
         }
     }
 
