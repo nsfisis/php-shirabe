@@ -15,7 +15,7 @@ use shirabe_external_packages::symfony::console::output::buffered_output::Buffer
 use shirabe_external_packages::symfony::console::output::output_interface::{
     OutputInterface, VERBOSITY_DEBUG, VERBOSITY_NORMAL,
 };
-use shirabe_php_shim::{PHP_EOL, trim};
+use shirabe_php_shim::{PHP_EOL, ob_get_clean, ob_start, trim};
 
 #[test]
 fn test_execute_captures_output() {
@@ -25,16 +25,16 @@ fn test_execute_captures_output() {
     assert_eq!(format!("foo{}", PHP_EOL), output);
 }
 
-#[ignore = "requires PHP output buffering (ob_start/ob_get_clean) to capture stdout; no equivalent symbol"]
+#[ignore = "shirabe_php_shim::ob_start/ob_get_clean are todo!(): the shim has no echo-to-buffer routing, and ProcessExecutor::execute with FORWARD_OUTPUT and io=None writes straight to the real process stdout"]
 #[test]
 fn test_execute_outputs_if_not_captured() {
-    // TODO(phase-d): requires PHP output buffering (ob_start/ob_get_clean) to capture
-    // stdout; no equivalent symbol. ProcessExecutor::execute with
-    // ProcessExecutor::FORWARD_OUTPUT and io=None writes straight to the real process
-    // stdout (see output_handler's `print!`), and there is no safe way to capture that
-    // from within a parallel cargo test process without redirecting the real stdout file
-    // descriptor, which is unsafe under `cargo test`'s default multi-threaded runner.
-    todo!()
+    let mut process = ProcessExecutor::new(None);
+    ob_start();
+    process
+        .execute("echo foo", ProcessExecutor::FORWARD_OUTPUT, None)
+        .unwrap();
+    let output = ob_get_clean();
+    assert_eq!(Some(format!("foo{}", PHP_EOL)), output);
 }
 
 #[test]
@@ -139,18 +139,17 @@ fn test_doesnt_hide_ports() {
     );
 }
 
-#[ignore = "splitLines is called with null in the PHP test, but split_lines accepts only &str (no ?string/Option overload)"]
 #[test]
 fn test_split_lines() {
-    // TODO(phase-d): splitLines is called with null in the PHP test
-    // ($process->splitLines(null)), but ProcessExecutor::split_lines here takes `&str`, not
-    // `Option<&str>` (PHP's `?string`). Porting this data point faithfully means widening
-    // split_lines's signature to Option<&str>, which touches every call site
-    // (package/version/version_guesser.rs, util/git.rs,
-    // repository/vcs/{hg,fossil,git,svn}_driver.rs — 13 call sites in total, all currently
-    // passing `&str`). That is a production API change beyond this test file; flagged for
-    // a design decision rather than made unilaterally.
-    todo!()
+    let process = ProcessExecutor::new(None);
+    assert!(process.split_lines("").is_empty());
+    // PHP: $process->splitLines(null). `split_lines` takes `&str` where PHP takes `?string`, and
+    // its body opens with `trim((string) $output)`, so the caller performs the null-to-"" cast.
+    assert!(process.split_lines("").is_empty());
+    assert_eq!(vec!["foo"], process.split_lines("foo"));
+    assert_eq!(vec!["foo", "bar"], process.split_lines("foo\nbar"));
+    assert_eq!(vec!["foo", "bar"], process.split_lines("foo\r\nbar"));
+    assert_eq!(vec!["foo", "bar"], process.split_lines("foo\r\nbar\n"));
 }
 
 #[test]
@@ -185,14 +184,13 @@ fn test_console_io_does_not_format_symfony_console_style() {
     );
 }
 
-#[ignore = "executeAsync returns a Process, not a cancelable promise; no promise/cancel symbol exists"]
+#[ignore = "none of the three symbols this test drives exist: execute_async returns a plain future with no cancel(), and ProcessExecutor has no count_active_jobs or wait (PHP's $jobs/$maxJobs queue is a tokio semaphore here)"]
 #[test]
 fn test_execute_async_cancel() {
-    // TODO(phase-d): PHP's executeAsync returns a React\Promise\PromiseInterface with
-    // cancel(); Rust's execute_async returns anyhow::Result<Process> directly (see the
-    // comment on ProcessExecutor::execute_async: "no test seam in the external-packages
-    // crate"), so there is no promise/cancel symbol to drive this test's
-    // `$promise->cancel()` step.
+    // TODO(phase-d): PHP's executeAsync returns a React\Promise\PromiseInterface with cancel(),
+    // and the test reads countActiveJobs() around it and then calls wait(). execute_async here
+    // returns a plain future with no cancel(), and ProcessExecutor has neither count_active_jobs
+    // nor wait: the PHP job queue those methods expose is a tokio semaphore in this port.
     todo!()
 }
 

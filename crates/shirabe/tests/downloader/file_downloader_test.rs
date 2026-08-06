@@ -177,20 +177,24 @@ fn test_download_but_file_is_unsaved() {
 }
 
 #[test]
-#[ignore = "requires PHPUnit mocks of Cache::copyTo/copyFrom asserting on $cacheKey plus PreFileDownloadEvent::setProcessedUrl dispatch, which is TODO(plugin) in FileDownloader::download"]
+#[ignore = "the listener is a closure that mutates the event (setProcessedUrl), but Callable::Closure receives `&dyn EventInterface`, so it cannot; and CacheMock has no copy_to/copy_from hooks to assert the cache key on"]
 fn test_download_with_custom_processed_url() {
-    // TODO(phase-d): requires PHPUnit mocks of Cache::copyTo/copyFrom asserting on $cacheKey
-    // plus PreFileDownloadEvent::setProcessedUrl dispatch, which is TODO(plugin) in
-    // FileDownloader::download.
+    // TODO(phase-d): the PRE_FILE_DOWNLOAD listener is a closure calling
+    // PreFileDownloadEvent::setProcessedUrl, but Callable::Closure is
+    // `Fn(&dyn EventInterface)`, so a listener cannot mutate the event it receives. The Cache
+    // half is likewise inexpressible: CacheMock carries only finder/gc overrides, with no
+    // copy_to/copy_from hook to assert the cache key on.
     todo!()
 }
 
 #[test]
-#[ignore = "requires PHPUnit mocks of Cache::copyTo/copyFrom asserting on $cacheKey plus PreFileDownloadEvent::setCustomCacheKey dispatch, which is TODO(plugin) in FileDownloader::download"]
+#[ignore = "the listener is a closure that mutates the event (setCustomCacheKey), but Callable::Closure receives `&dyn EventInterface`, so it cannot; and CacheMock has no copy_to/copy_from hooks to assert the cache key on"]
 fn test_download_with_custom_cache_key() {
-    // TODO(phase-d): requires PHPUnit mocks of Cache::copyTo/copyFrom asserting on $cacheKey
-    // plus PreFileDownloadEvent::setCustomCacheKey dispatch, which is TODO(plugin) in
-    // FileDownloader::download.
+    // TODO(phase-d): the PRE_FILE_DOWNLOAD listener is a closure calling
+    // PreFileDownloadEvent::setCustomCacheKey, but Callable::Closure is
+    // `Fn(&dyn EventInterface)`, so a listener cannot mutate the event it receives. The Cache
+    // half is likewise inexpressible: CacheMock carries only finder/gc overrides, with no
+    // copy_to/copy_from hook to assert the cache key on.
     todo!()
 }
 

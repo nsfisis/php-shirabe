@@ -757,16 +757,48 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
 }
 
 #[test]
-#[ignore = "exercises the deprecated addAuthenticationHeader wrapper (not ported) which relies on \
-trigger_error/E_USER_DEPRECATED; the PHP error-handler subsystem is not modeled"]
+#[ignore = "addAuthenticationHeader opens with trigger_error(E_USER_DEPRECATED), and \
+shirabe_php_shim::trigger_error is a todo!()"]
 fn test_add_authentication_header_with_custom_headers() {
-    // TODO(phase-d): exercises AuthHelper::addAuthenticationHeader, a deprecated wrapper
-    // around addAuthenticationOptions that PHP implements via
-    // trigger_error(E_USER_DEPRECATED). It has not been ported to Rust (no
-    // add_authentication_header method exists on AuthHelper) because the PHP
-    // error-handler subsystem it relies on is not modeled — same limitation as
-    // error_handler_test.rs.
-    todo!()
+    let mut f = set_up();
+    let headers = vec![
+        "Accept-Encoding: gzip".to_string(),
+        "Connection: close".to_string(),
+    ];
+    let origin = "example.org";
+    let url = "https://example.org/packages.json";
+    let custom_headers = vec![
+        "API-TOKEN: abc123".to_string(),
+        "X-CUSTOM-HEADER: value".to_string(),
+    ];
+    let headers_json = json_encode(&PhpMixed::List(
+        custom_headers
+            .iter()
+            .map(|h| PhpMixed::String(h.clone()))
+            .collect(),
+    ))
+    .unwrap();
+
+    expects_authentication(&f.io, origin, &headers_json, "custom-headers");
+
+    f.io.borrow_mut()
+        .expects(
+            vec![Expectation::text(
+                "Using custom HTTP headers for authentication",
+            )],
+            true,
+        )
+        .unwrap();
+
+    let mut expected_headers = headers.clone();
+    expected_headers.extend(custom_headers);
+
+    assert_eq!(
+        expected_headers,
+        f.auth_helper
+            .add_authentication_header(headers, origin, url)
+            .unwrap()
+    );
 }
 
 #[test]

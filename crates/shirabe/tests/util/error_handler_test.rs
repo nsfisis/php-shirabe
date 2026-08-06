@@ -5,16 +5,17 @@
 // trigger those by undefined-index access / array_merge misuse. There is no equivalent
 // runtime mechanism in Rust to port faithfully.
 
-// TODO(phase-d): ErrorHandler::register() installs a PHP set_error_handler; no Rust equivalent.
+use shirabe::util::ErrorHandler;
+use shirabe_php_shim::restore_error_handler;
+
 #[allow(dead_code)]
 fn set_up() {
-    todo!()
+    ErrorHandler::register(None);
 }
 
-// TODO(phase-d): restore_error_handler() is PHP runtime machinery; no Rust equivalent.
 #[allow(dead_code)]
 fn tear_down() {
-    todo!()
+    restore_error_handler();
 }
 
 #[allow(dead_code)]

@@ -101,6 +101,10 @@ pub struct EventDispatcher {
     /// when set, `get_listeners` returns this closure's result verbatim instead of resolving
     /// registered listeners and package scripts.
     get_listeners_override: Option<GetListenersOverride>,
+    /// For testing only. Mirrors PHPUnit's `getMockBuilder(EventDispatcher)->onlyMethods(['dispatchScript'])`:
+    /// when set, `dispatch_script` returns this closure's result instead of building and
+    /// dispatching a script event.
+    dispatch_script_override: Option<DispatchScriptOverride>,
 }
 
 /// For testing only. Holds a closure standing in for an overridden `getListeners` method.
@@ -109,6 +113,17 @@ pub struct GetListenersOverride(pub Box<dyn Fn(&dyn EventInterface) -> Vec<Calla
 impl std::fmt::Debug for GetListenersOverride {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("GetListenersOverride(..)")
+    }
+}
+
+/// For testing only. Holds a closure standing in for an overridden `dispatchScript` method.
+pub struct DispatchScriptOverride(
+    pub Box<dyn Fn(&str, bool, &[String], &IndexMap<String, PhpMixed>) -> anyhow::Result<i64>>,
+);
+
+impl std::fmt::Debug for DispatchScriptOverride {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DispatchScriptOverride(..)")
     }
 }
 
@@ -142,6 +157,7 @@ impl EventDispatcher {
             previous_hash: None,
             previous_listeners: IndexMap::new(),
             get_listeners_override: None,
+            dispatch_script_override: None,
         }
     }
 
@@ -153,6 +169,17 @@ impl EventDispatcher {
         callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>>,
     ) {
         self.get_listeners_override = Some(GetListenersOverride(callback));
+    }
+
+    /// For testing only. Installs a closure that overrides `dispatch_script`, mirroring PHPUnit's
+    /// `onlyMethods(['dispatchScript'])->willReturnCallback(...)`.
+    pub fn __set_dispatch_script_override(
+        &mut self,
+        callback: Box<
+            dyn Fn(&str, bool, &[String], &IndexMap<String, PhpMixed>) -> anyhow::Result<i64>,
+        >,
+    ) {
+        self.dispatch_script_override = Some(DispatchScriptOverride(callback));
     }
 
     /// For testing only. Exposes the protected `getPhpExecCommand`, mirroring the PHP tests'
@@ -197,6 +224,10 @@ impl EventDispatcher {
         additional_args: Vec<String>,
         flags: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<i64> {
+        if let Some(over) = &self.dispatch_script_override {
+            return (over.0)(event_name, dev_mode, &additional_args, &flags);
+        }
+
         let composer = self.composer();
         assert!(
             composer.is_full(),

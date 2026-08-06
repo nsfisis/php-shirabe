@@ -22,7 +22,7 @@ use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PHP_EOL, PHP_SERVER, PhpMixed, define, defined, time};
 
 fn set_up() {
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
@@ -40,15 +40,43 @@ impl Drop for TearDown {
     }
 }
 
-#[ignore = "no define() setter exists for the COMPOSER_DEV_WARNING_TIME constant (shim defined() is a fixed matches!)"]
+#[ignore = "shirabe_php_shim::define is a todo!() (there is no runtime constant registry), so COMPOSER_DEV_WARNING_TIME cannot be defined and defined() — a fixed matches! that omits it — keeps the warning branch unreachable"]
 #[test]
 fn test_dev_warning() {
     let _tear_down = TearDown;
     set_up();
 
-    // TODO(phase-d): no define() setter exists for the COMPOSER_DEV_WARNING_TIME constant (the
-    // shim's defined() is a fixed matches!), so this test's runtime define() cannot be reproduced.
-    todo!()
+    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+
+    if !defined("COMPOSER_DEV_WARNING_TIME") {
+        define("COMPOSER_DEV_WARNING_TIME", PhpMixed::Int(time() - 1));
+    }
+
+    let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            ArrayInput::new(
+                vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
+                None,
+            )
+            .unwrap(),
+        ));
+    let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
+    application.do_run(input, output_trait).unwrap();
+
+    let expected_output = format!(
+        "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>{}",
+        PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("PHP_SELF")
+            .unwrap_or_default()
+            .to_string_lossy(),
+        PHP_EOL
+    );
+    assert!(output.borrow().fetch().contains(&expected_output));
 }
 
 #[ignore = "SelfUpdateCommand::execute is intentionally stubbed with a Shirabe-specific \"not available\" message instead of the original Composer wording this test expects"]

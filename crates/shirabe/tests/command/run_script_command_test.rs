@@ -121,20 +121,239 @@ fn test_can_define_aliases() {
     drop(tear_down);
 }
 
+/// ref: RunScriptCommandTest::testExecutionOfSimpleSymfonyCommand
 #[test]
-#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommand.php) as a live application command (todo!() in application.rs: the worker-side console application exists, but the import arm is not wired to it), and the command's output would go to the worker's inherited stdio, which the in-process application tester cannot capture"]
+#[serial]
+#[ignore = "invoking the script name as a top-level composer command needs Application::do_run to import the user's PHP Command class as a live application command, which is a todo!() in application.rs, and the worker writes to inherited stdio the in-process application tester cannot capture"]
 fn test_execution_of_simple_symfony_command() {
-    // TODO(phase-d): the test invokes the script name as a top-level composer command, which
-    // requires Application::do_run to import the user's PHP Command class (MyCommand.php) as a
-    // live application command (todo!() in application.rs: the worker-side console application exists, but the import arm is not wired to it), and the worker writes to inherited stdio the tester cannot capture.
-    todo!()
+    let description = "Sample description for test command";
+    let tear_down = init_temp_composer(
+        Some(&serde_json::json!({
+            "scripts": {
+                "test-direct": "Test\\MyCommand",
+                "test-ref": ["@test-direct --inneropt innerarg"],
+            },
+            "scripts-descriptions": {
+                "test-direct": description,
+            },
+            "autoload": {
+                "psr-4": {
+                    "Test\\": "",
+                },
+            },
+        })),
+        None,
+        None,
+        true,
+    );
+
+    std::fs::write(
+        "MyCommand.php",
+        r#"<?php
+
+namespace Test;
+
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Command\Command;
+
+class MyCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this->setDefinition([
+            new InputArgument('req-arg', InputArgument::REQUIRED, 'Required arg.'),
+            new InputArgument('opt-arg', InputArgument::OPTIONAL, 'Optional arg.'),
+            new InputOption('inneropt', null, InputOption::VALUE_NONE, 'Option.'),
+            new InputOption('outeropt', null, InputOption::VALUE_OPTIONAL, 'Optional option.'),
+        ]);
+    }
+
+    public function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $output->writeln($input->getArgument('req-arg'));
+        $output->writeln((string) $input->getArgument('opt-arg'));
+        $output->writeln('inneropt: '.($input->getOption('inneropt') ? 'set' : 'unset'));
+        $output->writeln('outeropt: '.($input->getOption('outeropt') ? 'set' : 'unset'));
+
+        return 2;
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(
+            vec![
+                (PhpMixed::from("command"), PhpMixed::from("test-direct")),
+                (PhpMixed::from("--outeropt"), PhpMixed::from(true)),
+                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+            ],
+            RunOptions::default(),
+        )
+        .unwrap();
+
+    assert_eq!(
+        "lala\n\ninneropt: unset\nouteropt: set\n",
+        app_tester.get_display()
+    );
+    assert_eq!(2, app_tester.get_status_code());
+
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(
+            vec![
+                (PhpMixed::from("command"), PhpMixed::from("test-ref")),
+                (PhpMixed::from("--outeropt"), PhpMixed::from(true)),
+                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+            ],
+            RunOptions::default(),
+        )
+        .unwrap();
+
+    assert_eq!(
+        "innerarg\nlala\ninneropt: set\nouteropt: set\n",
+        app_tester.get_display()
+    );
+    assert_eq!(2, app_tester.get_status_code());
+
+    // check if the description from composer.json is correctly shown
+    let mut app_tester = get_application_tester();
+    let status_code = app_tester
+        .run(
+            vec![
+                (PhpMixed::from("command"), PhpMixed::from("run-script")),
+                (PhpMixed::from("--list"), PhpMixed::from(true)),
+            ],
+            RunOptions::default(),
+        )
+        .unwrap();
+    assert_eq!(0, status_code, "assertCommandIsSuccessful");
+    let output = app_tester.get_display();
+    assert!(
+        output.contains(description),
+        "The contents of scripts-description for the test script should be printed"
+    );
+
+    drop(tear_down);
 }
 
+/// ref: RunScriptCommandTest::testExecutionOfSymfonyCommandWithConfiguration
 #[test]
-#[ignore = "the test invokes the script name as a top-level composer command, which requires Application::do_run to import the user's PHP Command class (MyCommandWithDefinitions.php) as a live application command (todo!() in application.rs: the worker-side console application exists, but the import arm is not wired to it), and the command's output would go to the worker's inherited stdio, which the in-process application tester cannot capture"]
+#[serial]
+#[ignore = "invoking the script name as a top-level composer command needs Application::do_run to import the user's PHP Command class as a live application command, which is a todo!() in application.rs, and the worker writes to inherited stdio the in-process application tester cannot capture"]
 fn test_execution_of_symfony_command_with_configuration() {
-    // TODO(phase-d): the test invokes the script name as a top-level composer command, which
-    // requires Application::do_run to import the user's PHP Command class (MyCommandWithDefinitions.php)
-    // as a live application command (todo!() in application.rs: the worker-side console application exists, but the import arm is not wired to it), and the worker writes to inherited stdio the tester cannot capture.
-    todo!()
+    let cmd_name = "custom-cmd-123";
+    let cmd_alias = format!("{}-alias", cmd_name);
+    let cmd_desc = "This is a Symfony command with custom configuration";
+    let wrong_desc = "this should be ignored";
+
+    let tear_down = init_temp_composer(
+        Some(&serde_json::json!({
+            "scripts": {
+                cmd_name: "Test\\MyCommandWithDefinitions",
+            },
+            "scripts-descriptions": {
+                cmd_name: wrong_desc,
+            },
+            "autoload": {
+                "psr-4": {
+                    "Test\\": "",
+                },
+            },
+        })),
+        None,
+        None,
+        true,
+    );
+
+    std::fs::write(
+        "MyCommandWithDefinitions.php",
+        r#"<?php
+
+namespace Test;
+
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Command\Command;
+
+class MyCommandWithDefinitions extends Command
+{
+    protected function configure(): void
+    {
+        $this
+            ->setDescription('__CMD_DESC__')
+            ->setAliases(['__CMD_ALIAS__'])
+            ->setDefinition([new InputArgument('req-arg', InputArgument::REQUIRED, 'Required arg.')]);
+    }
+
+    public function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $output->writeln($input->getArgument('req-arg'));
+        return Command::SUCCESS;
+    }
+}
+"#
+        .replace("__CMD_DESC__", cmd_desc)
+        .replace("__CMD_ALIAS__", &cmd_alias),
+    )
+    .unwrap();
+
+    // makes sure the command executes with the name defined inside its `configure()`...
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(
+            vec![
+                (PhpMixed::from("command"), PhpMixed::from(cmd_name)),
+                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+            ],
+            RunOptions::default(),
+        )
+        .unwrap();
+    assert_eq!("lala\n", app_tester.get_display());
+
+    // ...with the alias defined there as well...
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(
+            vec![
+                (
+                    PhpMixed::from("command"),
+                    PhpMixed::from(cmd_alias.as_str()),
+                ),
+                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+            ],
+            RunOptions::default(),
+        )
+        .unwrap();
+    assert_eq!("lala\n", app_tester.get_display());
+
+    // ...and also uses its own description, instead of the one in composer.scripts-descriptions
+    let mut app_tester = get_application_tester();
+    let status_code = app_tester
+        .run(
+            vec![
+                (PhpMixed::from("command"), PhpMixed::from("run-script")),
+                (PhpMixed::from("--list"), PhpMixed::from(true)),
+            ],
+            RunOptions::default(),
+        )
+        .unwrap();
+    assert_eq!(0, status_code, "assertCommandIsSuccessful");
+    let output = app_tester.get_display();
+    assert!(
+        output.contains(cmd_desc),
+        "The custom description for the test script should be printed"
+    );
+    assert!(
+        !output.contains(wrong_desc),
+        "The dummy description shouldn't show"
+    );
+
+    drop(tear_down);
 }

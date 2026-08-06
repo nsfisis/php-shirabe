@@ -49,6 +49,12 @@ pub fn constant(_name: &str) -> PhpMixed {
     todo!()
 }
 
+pub fn define(_constant_name: &str, _value: PhpMixed) -> bool {
+    // TODO(php-runtime): defining a constant at runtime needs the same registry `constant` and
+    // `defined` would read from; the shim has none.
+    todo!()
+}
+
 // Models the constants defined in a standard modern PHP CLI environment on a
 // non-Windows platform with the common extensions loaded (curl, openssl, json).
 // Windows-only, HHVM and Composer-bootstrap constants are reported undefined.

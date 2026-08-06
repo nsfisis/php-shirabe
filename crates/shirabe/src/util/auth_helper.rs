@@ -436,6 +436,39 @@ impl AuthHelper {
         })
     }
 
+    /// @param string[] $headers
+    ///
+    /// @return string[] updated headers array
+    pub fn add_authentication_header(
+        &mut self,
+        headers: Vec<String>,
+        origin: &str,
+        url: &str,
+    ) -> anyhow::Result<Vec<String>> {
+        shirabe_php_shim::trigger_error(
+            "AuthHelper::addAuthenticationHeader is deprecated since Composer 2.9 use addAuthenticationOptions instead.",
+            shirabe_php_shim::E_USER_DEPRECATED,
+        );
+
+        let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
+        http.insert(
+            "header".to_string(),
+            PhpMixed::List(headers.into_iter().map(PhpMixed::String).collect()),
+        );
+        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
+        options.insert("http".to_string(), PhpMixed::Array(http));
+        let options = self.add_authentication_options(options, origin, url)?;
+
+        Ok(options["http"]
+            .as_array()
+            .and_then(|http| http.get("header"))
+            .and_then(|header| header.as_list())
+            .expect("addAuthenticationOptions always leaves http.header a list")
+            .iter()
+            .map(|v| v.as_string().unwrap_or("").to_string())
+            .collect())
+    }
+
     /// @return array<string, mixed> updated options
     pub fn add_authentication_options(
         &mut self,

@@ -10,15 +10,18 @@ use shirabe::event_dispatcher::EventDispatcher;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::installer::{InstallationManager, InstallerInterface};
 use shirabe::io::{BufferIO, IOInterface};
-use shirabe::package::handle::{AliasPackageHandle, PackageHandle, RootPackageHandle};
+use shirabe::package::handle::{
+    AliasPackageHandle, CompletePackageHandle, PackageHandle, RootPackageHandle,
+};
 use shirabe::package::{Link, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use shirabe::repository::{
     InstalledArrayRepository, InstalledRepositoryInterfaceHandle, WritableRepositoryInterface,
 };
+use shirabe::script::ScriptEvents;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_external_packages::symfony::console::output::output_interface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, dirname, preg_quote, realpath, strtr};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 use tempfile::TempDir;
@@ -125,6 +128,8 @@ struct SetUp {
     working_dir: String,
     vendor_dir: String,
     repository: InstalledArrayRepository,
+    /// ref: `$this->configValueMap['use-include-path']`, which testUseGlobalIncludePath mutates.
+    use_include_path: bool,
     im: InstallationManager,
     io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
     generator: AutoloadGenerator,
@@ -199,6 +204,7 @@ fn set_up() -> SetUp {
         working_dir,
         vendor_dir,
         repository,
+        use_include_path: false,
         im,
         io,
         generator,
@@ -213,7 +219,7 @@ impl SetUp {
         ConfigStubBuilder::new()
             .with("vendor-dir", PhpMixed::String(self.vendor_dir.clone()))
             .with("platform-check", PhpMixed::Bool(true))
-            .with("use-include-path", PhpMixed::Bool(false))
+            .with("use-include-path", PhpMixed::Bool(self.use_include_path))
             .build()
     }
 
@@ -1740,11 +1746,164 @@ fn test_files_autoload_order_by_dependencies() {
 }
 
 #[test]
-#[ignore = "needs getCanonicalPackages consecutive-call return values (different package set per dump)"]
+#[serial]
 fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
-    // TODO(phase-d): needs a repository mock returning a different package set on each of several
-    // consecutive dump() calls (PHPUnit consecutive-call mock); not modeled by InstalledArrayRepository.
-    todo!()
+    let mut s = set_up();
+    let autoload_package = new_root_pkg("root/a");
+    autoload_package.set_autoload(autoload(vec![("files", str_list(&["root.php"]))]));
+    autoload_package.__set_include_paths(vec!["/lib".to_string(), "/src".to_string()]);
+
+    let not_autoload_package = new_root_pkg("root/a");
+
+    let requires_ = || {
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+            ("c/c", link("a", "c/c", match_all(), None)),
+        ])
+    };
+    autoload_package.set_requires(requires_());
+    not_autoload_package.set_requires(requires_());
+
+    let a = new_pkg("a/a");
+    let b = new_pkg("b/b");
+    let c = new_pkg("c/c");
+    a.__set_autoload(autoload(vec![("files", str_list(&["test.php"]))]));
+    a.__set_include_paths(vec!["lib1".to_string(), "src1".to_string()]);
+    b.__set_autoload(autoload(vec![("files", str_list(&["test2.php"]))]));
+    b.__set_include_paths(vec!["lib2".to_string()]);
+    c.__set_autoload(autoload(vec![(
+        "files",
+        str_list(&["test3.php", "foo/bar/test4.php"]),
+    )]));
+    c.__set_include_paths(vec!["lib3".to_string()]);
+    c.__set_target_dir(Some("foo/bar".to_string()));
+    let autoload_packages: Vec<PackageInterfaceHandle> = vec![a.into(), b.into(), c.into()];
+
+    // PHP re-creates the three packages without autoload/include-path settings for the second and
+    // third `getCanonicalPackages` calls; the repository contents are swapped between dumps here.
+    let not_autoload_packages = || -> Vec<PackageInterfaceHandle> {
+        vec![
+            new_pkg("a/a").into(),
+            new_pkg("b/b").into(),
+            new_pkg("c/c").into(),
+        ]
+    };
+
+    s.ensure_dir(&format!("{}/a/a", s.vendor_dir));
+    s.ensure_dir(&format!("{}/b/b", s.vendor_dir));
+    s.ensure_dir(&format!("{}/c/c/foo/bar", s.vendor_dir));
+    s.put(
+        &format!("{}/a/a/test.php", s.vendor_dir),
+        "<?php function testFilesAutoloadGeneration1() {}",
+    );
+    s.put(
+        &format!("{}/b/b/test2.php", s.vendor_dir),
+        "<?php function testFilesAutoloadGeneration2() {}",
+    );
+    s.put(
+        &format!("{}/c/c/foo/bar/test3.php", s.vendor_dir),
+        "<?php function testFilesAutoloadGeneration3() {}",
+    );
+    s.put(
+        &format!("{}/c/c/foo/bar/test4.php", s.vendor_dir),
+        "<?php function testFilesAutoloadGeneration4() {}",
+    );
+    s.put(
+        &format!("{}/root.php", s.working_dir),
+        "<?php function testFilesAutoloadGenerationRoot() {}",
+    );
+
+    let vendor = s.vendor_dir.clone();
+    let composer_out = format!("{}/composer", vendor);
+    let fx = fixtures_dir();
+
+    s.set_canonical_packages(autoload_packages);
+    dump(
+        &mut s,
+        autoload_package.clone().into(),
+        false,
+        "FilesAutoload",
+    )
+    .unwrap();
+    assert_file_content_equals(
+        fx.join("autoload_functions.php").to_str().unwrap(),
+        &format!("{}/autoload.php", vendor),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_real_functions_with_include_paths.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/autoload_real.php", composer_out),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_static_functions_with_include_paths.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/autoload_static.php", composer_out),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_files_functions.php").to_str().unwrap(),
+        &format!("{}/autoload_files.php", composer_out),
+    );
+    assert_file_content_equals(
+        fx.join("include_paths_functions.php").to_str().unwrap(),
+        &format!("{}/include_paths.php", composer_out),
+    );
+
+    s.repository = InstalledArrayRepository::new().unwrap();
+    s.set_canonical_packages(not_autoload_packages());
+    dump(
+        &mut s,
+        autoload_package.clone().into(),
+        false,
+        "FilesAutoload",
+    )
+    .unwrap();
+    assert_file_content_equals(
+        fx.join("autoload_functions.php").to_str().unwrap(),
+        &format!("{}/autoload.php", vendor),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_real_functions_with_include_paths.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/autoload_real.php", composer_out),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_files_functions_with_removed_extra.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/autoload_files.php", composer_out),
+    );
+    assert_file_content_equals(
+        fx.join("include_paths_functions_with_removed_extra.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/include_paths.php", composer_out),
+    );
+
+    s.repository = InstalledArrayRepository::new().unwrap();
+    s.set_canonical_packages(not_autoload_packages());
+    dump(&mut s, not_autoload_package.into(), false, "FilesAutoload").unwrap();
+    assert_file_content_equals(
+        fx.join("autoload_functions.php").to_str().unwrap(),
+        &format!("{}/autoload.php", vendor),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_real_functions_with_removed_include_paths_and_autolad_files.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/autoload_real.php", composer_out),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_static_functions_with_removed_include_paths_and_autolad_files.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/autoload_static.php", composer_out),
+    );
+    assert!(!std::path::Path::new(&format!("{}/autoload_files.php", composer_out)).exists());
+    assert!(!std::path::Path::new(&format!("{}/include_paths.php", composer_out)).exists());
 }
 
 #[test]
@@ -1764,19 +1923,67 @@ fn test_include_paths_in_root_package() {
 }
 
 #[test]
-#[ignore = "EventDispatcher::dispatchScript spy not modeled"]
+#[serial]
 fn test_pre_and_post_events_are_dispatched_during_autoload_dump() {
-    // TODO(phase-d): requires spying on EventDispatcher::dispatchScript to record the events
-    // dispatched around the dump; no dispatcher spy/mock hook is modeled yet.
-    todo!()
+    let mut s = set_up();
+
+    let series = std::rc::Rc::new(std::cell::RefCell::new(vec![
+        (ScriptEvents::PRE_AUTOLOAD_DUMP, false),
+        (ScriptEvents::POST_AUTOLOAD_DUMP, false),
+    ]));
+    let dispatched = std::rc::Rc::new(std::cell::Cell::new(0));
+    let series_for_cb = series.clone();
+    let dispatched_for_cb = dispatched.clone();
+    s.event_dispatcher
+        .borrow_mut()
+        .__set_dispatch_script_override(Box::new(move |r#type, dev, _args, _flags| {
+            dispatched_for_cb.set(dispatched_for_cb.get() + 1);
+            let expected = series_for_cb.borrow_mut().remove(0);
+            assert_eq!(expected, (r#type, dev));
+
+            Ok(0)
+        }));
+
+    let package = new_root_pkg("root/a");
+    package.set_autoload(autoload(vec![(
+        "psr-0",
+        str_map(&[("Prefix", pstr("foo/bar/non/existing/"))]),
+    )]));
+
+    s.generator.set_run_scripts(true);
+    dump(&mut s, package.into(), true, "_8").unwrap();
+
+    assert_eq!(2, dispatched.get());
 }
 
 #[test]
-#[ignore = "asserts PHP get_include_path()/require behavior with use-include-path"]
+#[serial]
 fn test_use_global_include_path() {
-    // TODO(phase-d): asserts PHP get_include_path()/require() behavior driven by the
-    // use-include-path setting; no Rust equivalent.
-    todo!()
+    let mut s = set_up();
+    let package = new_root_pkg("root/a");
+    package.set_autoload(autoload(vec![(
+        "psr-0",
+        str_map(&[("Main\\Foo", pstr("")), ("Main\\Bar", pstr(""))]),
+    )]));
+    package.__set_target_dir(Some("Main/Foo/".to_string()));
+
+    s.use_include_path = true;
+
+    s.ensure_dir(&format!("{}/a", s.vendor_dir));
+
+    let composer_out = format!("{}/composer", s.vendor_dir);
+    dump(&mut s, package.into(), false, "IncludePath").unwrap();
+    let fx = fixtures_dir();
+    assert_file_content_equals(
+        fx.join("autoload_real_include_path.php").to_str().unwrap(),
+        &format!("{}/autoload_real.php", composer_out),
+    );
+    assert_file_content_equals(
+        fx.join("autoload_static_include_path.php")
+            .to_str()
+            .unwrap(),
+        &format!("{}/autoload_static.php", composer_out),
+    );
 }
 
 #[test]
@@ -1973,12 +2180,94 @@ fn test_up_level_relative_paths() {
 }
 
 #[test]
-#[ignore = "exercises buildPackageMap/parseAutoloads directly with multi-dump mutation"]
+#[serial]
 fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
-    // TODO(phase-d): exercises AutoloadGenerator::buildPackageMap/parseAutoloads directly across
-    // multiple dump() calls with the package list mutated between calls; needs those internals
-    // exposed to tests.
-    todo!()
+    let mut s = set_up();
+    let package = new_root_pkg("root/a");
+    package.set_requires(requires(vec![(
+        "dep/a",
+        link("root/a", "dep/a", match_all(), Some("requires")),
+    )]));
+    let dep = CompletePackageHandle::new("dep/a".to_string(), "1.0".to_string(), "1.0".to_string());
+
+    s.set_canonical_packages(vec![dep.clone().into()]);
+
+    dep.__set_autoload(autoload(vec![(
+        "psr-0",
+        str_map(&[("Foo", pstr("./src"))]),
+    )]));
+    dump(&mut s, package.clone().into(), true, "_19").unwrap();
+
+    let expected_namespace = "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'Foo' => array($vendorDir . '/dep/a/src'),\n);\n";
+    assert_str_equals_file(
+        expected_namespace,
+        &format!("{}/composer/autoload_namespaces.php", s.vendor_dir),
+    );
+
+    dep.__set_autoload(autoload(vec![(
+        "psr-4",
+        str_map(&[("Acme\\Foo\\", pstr("./src-psr4"))]),
+    )]));
+    dump(&mut s, package.clone().into(), true, "_19").unwrap();
+
+    let expected_psr4 = "<?php\n\n// autoload_psr4.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'Acme\\\\Foo\\\\' => array($vendorDir . '/dep/a/src-psr4'),\n);\n";
+    assert_str_equals_file(
+        expected_psr4,
+        &format!("{}/composer/autoload_psr4.php", s.vendor_dir),
+    );
+
+    dep.__set_autoload(autoload(vec![("classmap", str_list(&["classmap"]))]));
+    let expected_message = format!(
+        "Could not scan for classes inside \"{}/dep/a/classmap\" which does not appear to be a file nor a folder",
+        s.vendor_dir
+    );
+    if let Err(e) = dump(&mut s, package.clone().into(), true, "_19") {
+        assert_eq!(expected_message, e.to_string());
+    }
+
+    dep.__set_autoload(autoload(vec![("files", str_list(&["./test.php"]))]));
+    dump(&mut s, package.clone().into(), true, "_19").unwrap();
+    let files =
+        std::fs::read_to_string(format!("{}/composer/autoload_files.php", s.vendor_dir)).unwrap();
+    assert!(files.contains("$vendorDir . '/dep/a/test.php',\n"));
+
+    package.set_autoload(autoload(vec![(
+        "exclude-from-classmap",
+        str_list(&["../excludedroot", "root/excl"]),
+    )]));
+    dep.__set_autoload(autoload(vec![(
+        "exclude-from-classmap",
+        str_list(&["../../excluded", "foo/bar"]),
+    )]));
+    let map = s
+        .generator
+        .build_package_map(&mut s.im, package.clone().into(), vec![dep.clone().into()])
+        .unwrap();
+    let parsed = s
+        .generator
+        .parse_autoloads(map, package.into(), PhpMixed::Bool(false));
+    let excluded_root = format!(
+        "{}/excludedroot($|/)",
+        preg_quote(
+            &strtr(
+                &realpath(dirname(&s.working_dir)).unwrap_or_default(),
+                "\\",
+                "/"
+            ),
+            None
+        )
+    );
+    let root_excl = format!(
+        "{}/root/excl($|/)",
+        preg_quote(
+            &strtr(&realpath(&s.working_dir).unwrap_or_default(), "\\", "/"),
+            None
+        )
+    );
+    assert_eq!(
+        str_map(&[("0", pstr(&excluded_root)), ("1", pstr(&root_excl))]),
+        parsed["exclude-from-classmap"]
+    );
 }
 
 /// ref: AutoloadGeneratorTest::platformCheckProvider — builds the link map for a requires/provides/
