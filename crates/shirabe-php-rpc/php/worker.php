@@ -427,10 +427,14 @@ final class ShirabeRpcRuntime
     }
 }
 
-$client = @stream_socket_client('unix://' . $argv[1], $errno, $errstr);
+// The socket is one end of a socketpair the parent installed on this descriptor before exec;
+// there is nothing to connect to. See docs/dev/php-rpc.md.
+$client = @fopen('php://fd/' . $argv[1], 'r+b');
 if ($client === false) {
     exit(1);
 }
+// Frames must reach the parent as they are written, not when a buffer happens to fill.
+stream_set_write_buffer($client, 0);
 ShirabeRpcRuntime::$socket = $client;
 ShirabeRpcRuntime::$stubsDir = $argv[2] ?? null;
 

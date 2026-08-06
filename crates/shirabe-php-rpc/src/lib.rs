@@ -10,10 +10,9 @@ use frame::Frame;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::PhpMixed;
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex, OnceLock};
-use std::time::{Duration, Instant};
 
 /// PHP `\PHP_VERSION`.
 pub fn get_php_version() -> String {
@@ -734,13 +733,17 @@ fn recv_frame() -> anyhow::Result<Frame> {
     result.map_err(|e| anyhow::Error::new(e).context(guard.worker_state()))
 }
 
+/// The descriptor the worker's end of the RPC socket is installed on in the child. `pre_exec`
+/// dup2s onto it, which closes whatever the fork inherited there, so the number is ours to pick
+/// as long as it is above the three standard streams.
+const WORKER_SOCKET_FD: std::os::fd::RawFd = 3;
+
 fn spawn_worker() -> anyhow::Result<Worker> {
     let php = PhpExecutableFinder::new()
         .find(false)
         .ok_or_else(|| anyhow::anyhow!("no PHP executable found"))?;
 
     let tempdir = tempfile::tempdir()?;
-    let socket_path = tempdir.path().join("rpc.sock");
     let script_path = tempdir.path().join("worker.php");
     std::fs::write(&script_path, GLUE_SCRIPT)?;
 
@@ -751,50 +754,66 @@ fn spawn_worker() -> anyhow::Result<Worker> {
         std::fs::write(&path, contents)?;
     }
 
-    // Bind before spawning so the socket exists when the child connects.
-    let listener = UnixListener::bind(&socket_path)?;
-    listener.set_nonblocking(true)?;
+    // A connected pair, not a bound path: an AF_UNIX path has to fit in `sun_path` (108 bytes),
+    // which a long TMPDIR overruns, and the worker is a child we spawn ourselves, so it can
+    // inherit its end instead of connecting to one. The pair is connected from the start, so
+    // there is no accept to wait for either — a child that dies before reading shows up as EOF
+    // on the first call, with its exit status attached by `worker_state`.
+    let (stream, child_end) = UnixStream::pair()?;
+    let child_end = std::os::fd::OwnedFd::from(child_end);
 
-    // The socket lives in a 0700 temp dir already; restricting the socket file itself makes the
-    // protection independent of the directory permission.
-    std::fs::set_permissions(
-        &socket_path,
-        std::os::unix::fs::PermissionsExt::from_mode(0o600),
-    )?;
-
-    let child = std::process::Command::new(&php)
+    let mut command = std::process::Command::new(&php);
+    command
         // The Rust-side codec produces the byte representation of the default (and only
         // supported) serialize_precision; pin the child to it in case a distro php.ini overrides
         // the default.
         .arg("-d")
         .arg("serialize_precision=-1")
         .arg(&script_path)
-        .arg(&socket_path)
-        .arg(&stubs_dir)
-        .spawn()?;
-
-    // Poll for the child's connection with a bounded deadline so a child that never connects does
-    // not hang the caller.
-    let deadline = Instant::now() + Duration::from_secs(10);
-    let stream = loop {
-        match listener.accept() {
-            Ok((stream, _)) => break stream,
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                if Instant::now() >= deadline {
-                    anyhow::bail!("timed out waiting for the PHP worker to connect");
-                }
-                std::thread::sleep(Duration::from_millis(5));
-            }
-            Err(e) => return Err(e.into()),
-        }
-    };
-    stream.set_nonblocking(false)?;
+        .arg(WORKER_SOCKET_FD.to_string())
+        .arg(&stubs_dir);
+    // SAFETY: the closure only calls async-signal-safe syscalls, as required between fork and
+    // exec. It owns the child end, so the descriptor stays alive until the exec happens.
+    unsafe {
+        std::os::unix::process::CommandExt::pre_exec(&mut command, move || {
+            install_worker_socket_fd(&child_end)
+        });
+    }
+    let child = command.spawn()?;
+    // Dropping the command drops the pre_exec closure with it, closing the parent's copy of the
+    // child end. Without that the parent would never observe EOF on a dead worker.
+    drop(command);
 
     Ok(Worker {
         stream,
         child,
         _tempdir: tempdir,
     })
+}
+
+/// Moves the worker's end of the socket onto [`WORKER_SOCKET_FD`] in the freshly forked child.
+fn install_worker_socket_fd(child_end: &std::os::fd::OwnedFd) -> std::io::Result<()> {
+    use std::os::fd::{AsRawFd as _, FromRawFd as _, IntoRawFd as _};
+
+    if child_end.as_raw_fd() == WORKER_SOCKET_FD {
+        // dup2(fd, fd) is a no-op that leaves FD_CLOEXEC set, which would close the descriptor
+        // on exec; clear the flag by hand instead.
+        nix::fcntl::fcntl(
+            child_end,
+            nix::fcntl::FcntlArg::F_SETFD(nix::fcntl::FdFlag::empty()),
+        )?;
+        return Ok(());
+    }
+    // SAFETY: dup2_raw closes the target if it is open and makes it a duplicate of the child
+    // end; releasing the returned owner keeps it open across the exec.
+    let installed = unsafe {
+        nix::unistd::dup2_raw(
+            child_end,
+            std::os::fd::OwnedFd::from_raw_fd(WORKER_SOCKET_FD),
+        )?
+    };
+    let _ = installed.into_raw_fd();
+    Ok(())
 }
 
 #[cfg(test)]

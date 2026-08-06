@@ -2146,6 +2146,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "indexmap",
+ "nix",
  "shirabe-external-packages",
  "shirabe-php-shim",
  "shirabe-php-src",

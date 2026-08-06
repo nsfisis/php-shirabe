@@ -9,6 +9,7 @@ shirabe-php-shim.workspace = true
 shirabe-php-src.workspace = true
 anyhow.workspace = true
 indexmap.workspace = true
+nix.workspace = true
 tempfile.workspace = true
 
 [lints]

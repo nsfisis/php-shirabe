@@ -17,11 +17,16 @@ behavior.
 
 ## Transport
 
-- A Unix domain socket (no Windows support for now), bound in a `0700` temp dir with the socket
-  file itself chmodded to `0600`.
+- A `socketpair(2)` (no Windows support for now). The parent keeps one end and installs the
+  other on descriptor 3 in the child, from a `pre_exec` hook, so the worker opens it as
+  `php://fd/3` rather than connecting anywhere. A bound path would have to fit in `sun_path`
+  (108 bytes), which a long `TMPDIR` overruns, and it needs a `bind(2)` that sandboxes commonly
+  deny. The pair is connected from the start, so nothing has to wait for an `accept` either: a
+  child that dies before reading surfaces as EOF on the first call, with its exit status
+  attached.
 - The PHP glue code (`php/worker.php`) and the proxy stub classes (`php/stubs/`) are embedded in
-  the Rust binary and written to the temp dir at spawn time, so both halves of the protocol are
-  always the same commit.
+  the Rust binary and written to a `0700` temp dir at spawn time, so both halves of the protocol
+  are always the same commit.
 
 ### Frame layout
 
