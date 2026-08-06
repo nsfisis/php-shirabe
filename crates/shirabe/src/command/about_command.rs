@@ -7,13 +7,14 @@ use crate::composer;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::impl_php_class;
 
 #[derive(Debug)]
 pub struct AboutCommand {
     base_command_data: BaseCommandData,
 }
 
-shirabe_php_shim::impl_php_class!(AboutCommand, r"Composer\Command\AboutCommand");
+impl_php_class!(AboutCommand, r"Composer\Command\AboutCommand");
 
 impl Default for AboutCommand {
     fn default() -> Self {

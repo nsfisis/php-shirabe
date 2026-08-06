@@ -13,14 +13,14 @@ use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException};
-
-shirabe_php_shim::impl_php_class!(HgDownloader, r"Composer\Downloader\HgDownloader");
+use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class};
 
 #[derive(Debug)]
 pub struct HgDownloader {
     inner: VcsDownloaderBase,
 }
+
+impl_php_class!(HgDownloader, r"Composer\Downloader\HgDownloader");
 
 impl HgDownloader {
     pub fn new(

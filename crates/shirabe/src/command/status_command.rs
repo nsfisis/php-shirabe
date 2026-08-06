@@ -16,13 +16,14 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::impl_php_class;
 
 #[derive(Debug)]
 pub struct StatusCommand {
     base_command_data: BaseCommandData,
 }
 
-shirabe_php_shim::impl_php_class!(StatusCommand, r"Composer\Command\StatusCommand");
+impl_php_class!(StatusCommand, r"Composer\Command\StatusCommand");
 
 impl Default for StatusCommand {
     fn default() -> Self {

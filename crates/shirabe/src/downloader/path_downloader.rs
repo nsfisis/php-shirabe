@@ -24,15 +24,15 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::filesystem::Filesystem as SymfonyFilesystem;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed,
-    RuntimeException, file_exists, function_exists, is_dir, realpath,
+    RuntimeException, file_exists, function_exists, impl_php_class, is_dir, realpath,
 };
-
-shirabe_php_shim::impl_php_class!(PathDownloader, r"Composer\Downloader\PathDownloader");
 
 #[derive(Debug)]
 pub struct PathDownloader {
     pub(crate) inner: FileDownloader,
 }
+
+impl_php_class!(PathDownloader, r"Composer\Downloader\PathDownloader");
 
 impl PathDownloader {
     const STRATEGY_SYMLINK: i64 = 10;

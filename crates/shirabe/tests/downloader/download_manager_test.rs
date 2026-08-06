@@ -7,7 +7,7 @@ use shirabe::downloader::DownloaderInterface;
 use shirabe::downloader::download_manager::DownloadManager;
 use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, RuntimeException};
+use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class};
 use shirabe_semver::VersionParser;
 
 // PHP mocks `Composer\Downloader\DownloaderInterface` with getMockBuilder.
@@ -61,7 +61,7 @@ mockall::mock! {
 
 // PHPUnit reports a generated class name for `getMockBuilder(DownloaderInterface::class)`;
 // no ported assertion reads it, so the mock answers with the interface it stands in for.
-shirabe_php_shim::impl_php_class!(MockDownloader, r"Composer\Downloader\DownloaderInterface");
+impl_php_class!(MockDownloader, r"Composer\Downloader\DownloaderInterface");
 
 /// ref: DownloadManagerTest::createPackageMock
 ///

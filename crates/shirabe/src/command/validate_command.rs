@@ -16,13 +16,14 @@ use crate::util::Filesystem;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::impl_php_class;
 
 #[derive(Debug)]
 pub struct ValidateCommand {
     base_command_data: BaseCommandData,
 }
 
-shirabe_php_shim::impl_php_class!(ValidateCommand, r"Composer\Command\ValidateCommand");
+impl_php_class!(ValidateCommand, r"Composer\Command\ValidateCommand");
 
 impl Default for ValidateCommand {
     fn default() -> Self {

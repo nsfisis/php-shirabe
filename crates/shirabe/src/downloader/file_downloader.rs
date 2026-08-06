@@ -28,8 +28,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
     PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, file_exists,
-    filesize, get_class, hash, hash_file, is_dir, is_executable, parse_url, pathinfo, realpath,
-    rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+    filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable, parse_url,
+    pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -46,8 +46,6 @@ pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<String, PhpMixed>>> =
 /// @internal
 pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
-
-shirabe_php_shim::impl_php_class!(FileDownloader, r"Composer\Downloader\FileDownloader");
 
 /// Base downloader for files
 #[derive(Debug)]
@@ -82,6 +80,8 @@ pub struct FileDownloader {
     /// mutates it while downloads of other packages may be in flight on sibling futures).
     additional_cleanup_paths: std::cell::RefCell<IndexMap<String, Vec<String>>>,
 }
+
+impl_php_class!(FileDownloader, r"Composer\Downloader\FileDownloader");
 
 impl FileDownloader {
     pub fn reset_download_metadata() {

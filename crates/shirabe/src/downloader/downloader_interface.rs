@@ -3,8 +3,6 @@
 use crate::package::PackageInterfaceHandle;
 use shirabe_php_shim::PhpMixed;
 
-/// `PhpClass` is a supertrait because `DownloadManager::getDownloaderForPackage` reports
-/// `get_class($downloader)` in its error message, and Rust has no runtime class name.
 #[async_trait::async_trait(?Send)]
 pub trait DownloaderInterface: std::fmt::Debug + shirabe_php_shim::PhpClass {
     fn get_installation_source(&self) -> String;

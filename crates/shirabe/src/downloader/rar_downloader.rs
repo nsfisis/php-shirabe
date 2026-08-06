@@ -15,16 +15,17 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, class_exists, implode,
+    PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, class_exists, impl_php_class,
+    implode,
 };
-
-shirabe_php_shim::impl_php_class!(RarDownloader, r"Composer\Downloader\RarDownloader");
 
 #[derive(Debug)]
 pub struct RarDownloader {
     inner: FileDownloader,
     cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
 }
+
+impl_php_class!(RarDownloader, r"Composer\Downloader\RarDownloader");
 
 impl RarDownloader {
     pub fn new(

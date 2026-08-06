@@ -10,6 +10,7 @@ use crate::console::input::InputOption;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::impl_php_class;
 
 #[derive(Debug)]
 pub struct DependsCommand {
@@ -18,7 +19,7 @@ pub struct DependsCommand {
     colors: std::cell::RefCell<Vec<String>>,
 }
 
-shirabe_php_shim::impl_php_class!(DependsCommand, r"Composer\Command\DependsCommand");
+impl_php_class!(DependsCommand, r"Composer\Command\DependsCommand");
 
 impl Default for DependsCommand {
     fn default() -> Self {

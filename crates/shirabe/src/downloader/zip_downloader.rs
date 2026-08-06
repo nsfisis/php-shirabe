@@ -13,16 +13,14 @@ use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists,
-    hash_file, is_file, json_encode, php_regex, random_int, str_contains, str_replace, strlen,
-    substr, version_compare,
+    hash_file, impl_php_class, is_file, json_encode, php_regex, random_int, str_contains,
+    str_replace, strlen, substr, version_compare,
 };
 use std::sync::Mutex;
 
 static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<String>>>> = Mutex::new(None);
 static HAS_ZIP_ARCHIVE: Mutex<Option<bool>> = Mutex::new(None);
 static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
-
-shirabe_php_shim::impl_php_class!(ZipDownloader, r"Composer\Downloader\ZipDownloader");
 
 #[derive(Debug)]
 pub struct ZipDownloader {
@@ -31,6 +29,8 @@ pub struct ZipDownloader {
     // @phpstan-ignore property.onlyRead (helper property that is set via reflection for testing purposes)
     zip_archive_object: std::cell::RefCell<Option<ZipArchive>>,
 }
+
+impl_php_class!(ZipDownloader, r"Composer\Downloader\ZipDownloader");
 
 impl ZipDownloader {
     pub fn new(

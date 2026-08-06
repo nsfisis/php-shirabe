@@ -15,17 +15,17 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PATHINFO_FILENAME, PHP_URL_PATH, PhpMixed, RuntimeException,
-    extension_loaded, fclose, fopen, fwrite, gzclose, gzopen, gzread, implode, parse_url, pathinfo,
-    strtr,
+    extension_loaded, fclose, fopen, fwrite, gzclose, gzopen, gzread, impl_php_class, implode,
+    parse_url, pathinfo, strtr,
 };
-
-shirabe_php_shim::impl_php_class!(GzipDownloader, r"Composer\Downloader\GzipDownloader");
 
 #[derive(Debug)]
 pub struct GzipDownloader {
     inner: FileDownloader,
     cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
 }
+
+impl_php_class!(GzipDownloader, r"Composer\Downloader\GzipDownloader");
 
 impl GzipDownloader {
     pub fn new(

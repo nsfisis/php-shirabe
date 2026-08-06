@@ -19,11 +19,10 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array_strict, is_dir,
-    php_regex, preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
+    PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
+    in_array_strict, is_dir, php_regex, preg_quote, realpath, rtrim, strlen, strpos, substr, trim,
+    version_compare,
 };
-
-shirabe_php_shim::impl_php_class!(GitDownloader, r"Composer\Downloader\GitDownloader");
 
 #[derive(Debug)]
 pub struct GitDownloader {
@@ -36,6 +35,8 @@ pub struct GitDownloader {
     /// @var array<int, array<string, bool>>
     cached_packages: std::cell::RefCell<IndexMap<i64, IndexMap<String, bool>>>,
 }
+
+impl_php_class!(GitDownloader, r"Composer\Downloader\GitDownloader");
 
 impl GitDownloader {
     pub fn new(

@@ -15,18 +15,18 @@ use crate::util::Perforce;
 use crate::util::PerforceInterface;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
-shirabe_php_shim::impl_php_class!(
-    PerforceDownloader,
-    r"Composer\Downloader\PerforceDownloader"
-);
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 
 #[derive(Debug)]
 pub struct PerforceDownloader {
     inner: VcsDownloaderBase,
     pub(crate) perforce: std::cell::RefCell<Option<Box<dyn PerforceInterface>>>,
 }
+
+impl_php_class!(
+    PerforceDownloader,
+    r"Composer\Downloader\PerforceDownloader"
+);
 
 impl PerforceDownloader {
     pub fn new(

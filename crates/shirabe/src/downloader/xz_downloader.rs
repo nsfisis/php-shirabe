@@ -13,15 +13,15 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use anyhow::bail;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-
-shirabe_php_shim::impl_php_class!(XzDownloader, r"Composer\Downloader\XzDownloader");
+use shirabe_php_shim::{PhpMixed, impl_php_class};
 
 #[derive(Debug)]
 pub struct XzDownloader {
     inner: FileDownloader,
     cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
 }
+
+impl_php_class!(XzDownloader, r"Composer\Downloader\XzDownloader");
 
 impl XzDownloader {
     pub fn new(

@@ -16,15 +16,17 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, php_regex, version_compare};
-
-shirabe_php_shim::impl_php_class!(SvnDownloader, r"Composer\Downloader\SvnDownloader");
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, version_compare,
+};
 
 #[derive(Debug)]
 pub struct SvnDownloader {
     inner: VcsDownloaderBase,
     pub(crate) cache_credentials: std::cell::Cell<bool>,
 }
+
+impl_php_class!(SvnDownloader, r"Composer\Downloader\SvnDownloader");
 
 impl SvnDownloader {
     pub fn new(

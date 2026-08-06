@@ -9,6 +9,7 @@ use crate::console::input::InputOption;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::impl_php_class;
 
 #[derive(Debug)]
 pub struct ProhibitsCommand {
@@ -17,7 +18,7 @@ pub struct ProhibitsCommand {
     colors: std::cell::RefCell<Vec<String>>,
 }
 
-shirabe_php_shim::impl_php_class!(ProhibitsCommand, r"Composer\Command\ProhibitsCommand");
+impl_php_class!(ProhibitsCommand, r"Composer\Command\ProhibitsCommand");
 
 impl Default for ProhibitsCommand {
     fn default() -> Self {
