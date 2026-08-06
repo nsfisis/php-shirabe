@@ -65,6 +65,17 @@ losslessly), lists, ordered maps, and three handle descriptor kinds encoded as r
 - `{__rhandle, __class, __epoch[, __snapshot]}` — entity lives on the Rust side
 - `{__phandle, __class, __implements}` — entity lives in the PHP child
 - `{__pclass}` — a PHP class name
+- `{__pnew, __args[, __calls]}` — a materialized value (below)
+
+An immutable value has no entity to point at, so it crosses in neither table: the descriptor
+names the real class plus the constructor arguments (and any post-construction calls) needed to
+rebuild it, and each side builds a genuine instance of its own. `Composer\Package\Link` travels
+this way, together with the `composer/semver` constraint it holds — encoded structurally rather
+than re-parsed from its string form, which would lose the pretty strings and the conjunctive
+flag. The `\DateTimeInterface` release date uses the same shape. The two halves are
+`crates/shirabe/src/plugin/php_plugin_value.rs` and `Shirabe\MaterializedValue`; the set of
+classes that may cross is a closed list on both sides, so a descriptor can never name an
+arbitrary class.
 
 `PluginValue::Object` is encode-only: the wire erases the array/object distinction and object
 revival is banned (`unserialize(..., ['allowed_classes' => false])` is enforced on the PHP
@@ -168,6 +179,9 @@ by `scripts/plugin-stub-generator/generate-stubs` and must not be edited by hand
   surface (`getIO()`/`getComposer()`/...) answers from the Rust handoff.
 - `Shirabe\RustCommandStub` — the reverse stub for built-in commands registered into that
   application.
+- `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: it builds the
+  real value classes from a `__pnew` descriptor and describes such instances back in the same
+  shape.
 - `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle (through
   `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands

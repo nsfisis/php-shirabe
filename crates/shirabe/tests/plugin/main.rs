@@ -10,3 +10,4 @@ mod e2e_installers_test;
 mod e2e_normalize_test;
 mod plugin_installer_test;
 mod subscriber_test;
+mod value_round_trip_test;

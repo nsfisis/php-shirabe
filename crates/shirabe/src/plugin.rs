@@ -2,6 +2,7 @@ pub mod capability;
 pub mod capable;
 pub mod command_event;
 pub mod php_plugin_proxy;
+pub mod php_plugin_value;
 pub mod plugin_blocked_exception;
 pub mod plugin_events;
 pub mod plugin_interface;

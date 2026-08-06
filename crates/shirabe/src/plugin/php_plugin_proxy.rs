@@ -18,6 +18,9 @@ use crate::package::handle::AnyPackage;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::capability::{Capability, CommandProvider};
 use crate::plugin::capable::Capable;
+use crate::plugin::php_plugin_value::{
+    date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire,
+};
 use crate::plugin::plugin_interface::PluginInterface;
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
@@ -990,6 +993,38 @@ fn string_list_arg(method: &str, value: Option<&PluginValue>) -> Result<Vec<Stri
         .collect()
 }
 
+/// An `array<string, Link>` argument, keyed by the target package name as PHP keys it.
+fn link_map_arg(
+    method: &str,
+    value: Option<&PluginValue>,
+) -> Result<IndexMap<String, crate::package::Link>, PhpThrow> {
+    let entries: Vec<(Vec<u8>, &PluginValue)> = match value {
+        Some(PluginValue::Array(map)) => {
+            map.iter().map(|(key, item)| (key.clone(), item)).collect()
+        }
+        Some(PluginValue::List(items)) => items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (index.to_string().into_bytes(), item))
+            .collect(),
+        None | Some(PluginValue::Null) => Vec::new(),
+        other => {
+            return Err(runtime_throw(format!(
+                "{method} expects an array of Link values, got {other:?}"
+            )));
+        }
+    };
+    entries
+        .into_iter()
+        .map(|(key, item)| {
+            Ok((
+                String::from_utf8_lossy(&key).into_owned(),
+                link_from_wire(item)?,
+            ))
+        })
+        .collect()
+}
+
 /// A `list<array<string, string>>` argument (`authors`, `aliases`).
 fn string_map_list_arg(
     method: &str,
@@ -1189,18 +1224,22 @@ fn dispatch_package_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    // The link getters return `array<string, Link>`; only the empty case has a wire image so
-    // far (an empty PHP array crosses as a list).
+    // The link getters return `array<string, Link>`. Each link is rebuilt in the child as a
+    // real `Composer\Package\Link`, constraint included; an empty map crosses as a list, the
+    // wire image of an empty PHP array.
     //
-    // TODO(plugin): Link is a rust-snapshot value whose constraint field must materialize as a
-    // real composer/semver object in the child; the snapshot encoding does not exist yet.
-    let links = |links: IndexMap<String, crate::package::Link>| -> Result<PluginValue, PhpThrow> {
+    // TODO(plugin): links have no entity to intern against, so two calls of the same getter
+    // answer with distinct child-side objects where upstream returns the identical one.
+    let links = |links: IndexMap<String, crate::package::Link>| -> PluginValue {
         if links.is_empty() {
-            Ok(PluginValue::List(Vec::new()))
+            PluginValue::List(Vec::new())
         } else {
-            Err(runtime_throw(format!(
-                "the package method `{method_name}` returns Link values, whose encoding over RPC is not implemented yet"
-            )))
+            PluginValue::Array(
+                links
+                    .iter()
+                    .map(|(name, link)| (name.clone().into_bytes(), link_to_wire(link)))
+                    .collect(),
+            )
         }
     };
 
@@ -1359,16 +1398,8 @@ fn dispatch_package_method(
             }
             return Ok(PluginValue::Null);
         }
-        // TODO(plugin): the link setters take `array<string, Link>`, whose wire image is missing
-        // for the same reason the link getters below have none.
         "setRequires" | "setConflicts" | "setProvides" | "setReplaces" | "setDevRequires" => {
-            if !list_arg(method_name, args.first())?.is_empty()
-                || !map_arg(method_name, args.first())?.is_empty()
-            {
-                return Err(runtime_throw(format!(
-                    "the package method `{method_name}` takes Link values, whose encoding over RPC is not implemented yet"
-                )));
-            }
+            let links = link_map_arg(method_name, args.first())?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
                 runtime_throw(format!(
@@ -1376,33 +1407,27 @@ fn dispatch_package_method(
                 ))
             })?;
             match method_name {
-                "setRequires" => package.set_requires(IndexMap::new()),
-                "setConflicts" => package.set_conflicts(IndexMap::new()),
-                "setProvides" => package.set_provides(IndexMap::new()),
-                "setReplaces" => package.set_replaces(IndexMap::new()),
-                _ => package.set_dev_requires(IndexMap::new()),
+                "setRequires" => package.set_requires(links),
+                "setConflicts" => package.set_conflicts(links),
+                "setProvides" => package.set_provides(links),
+                "setReplaces" => package.set_replaces(links),
+                _ => package.set_dev_requires(links),
             }
             return Ok(PluginValue::Null);
         }
-        // TODO(plugin): a \DateTimeInterface argument has to be decoded from a real PHP object in
-        // the child, which needs the value-object encoding `getReleaseDate` is missing too.
         "setReleaseDate" => {
-            return match args.first() {
-                None | Some(PluginValue::Null) => {
-                    let mut borrowed = package.borrow_mut();
-                    let package = borrowed.as_package_mut().ok_or_else(|| {
-                        runtime_throw(
-                            "`setReleaseDate` is not available on an alias package over RPC"
-                                .to_string(),
-                        )
-                    })?;
-                    package.set_release_date(None);
-                    Ok(PluginValue::Null)
-                }
-                _ => Err(runtime_throw(
-                    "decoding a release date over RPC is not implemented yet".to_string(),
-                )),
+            let date = match args.first() {
+                None | Some(PluginValue::Null) => None,
+                Some(value) => Some(date_time_from_wire(value)?),
             };
+            let mut borrowed = package.borrow_mut();
+            let package = borrowed.as_package_mut().ok_or_else(|| {
+                runtime_throw(
+                    "`setReleaseDate` is not available on an alias package over RPC".to_string(),
+                )
+            })?;
+            package.set_release_date(date);
+            return Ok(PluginValue::Null);
         }
         "setScripts" | "setRepositories" | "setLicense" | "setKeywords" | "setDescription"
         | "setHomepage" | "setAuthors" | "setSupport" | "setFunding" | "setAbandoned"
@@ -1572,11 +1597,11 @@ fn dispatch_package_method(
             ))
         }
         "getStability" => Ok(PluginValue::string(package.get_stability().to_string())),
-        "getRequires" => links(package.get_requires()),
-        "getConflicts" => links(package.get_conflicts()),
-        "getProvides" => links(package.get_provides()),
-        "getReplaces" => links(package.get_replaces()),
-        "getDevRequires" => links(package.get_dev_requires()),
+        "getRequires" => Ok(links(package.get_requires())),
+        "getConflicts" => Ok(links(package.get_conflicts())),
+        "getProvides" => Ok(links(package.get_provides())),
+        "getReplaces" => Ok(links(package.get_replaces())),
+        "getDevRequires" => Ok(links(package.get_dev_requires())),
         "getSuggests" => {
             let suggests = package.get_suggests();
             if suggests.is_empty() {
@@ -1620,14 +1645,10 @@ fn dispatch_package_method(
                 .unwrap_or(&crate::package::base_package::STABILITY_STABLE),
         )),
         "getTransportOptions" => Ok(string_keyed_map(package.get_transport_options())),
-        "getReleaseDate" => match package.get_release_date() {
-            None => Ok(PluginValue::Null),
-            // TODO(plugin): a \DateTimeInterface has to materialize as a real PHP object in the
-            // child, which needs a snapshot encoding for value objects.
-            Some(_) => Err(runtime_throw(
-                "encoding the release date over RPC is not implemented yet".to_string(),
-            )),
-        },
+        "getReleaseDate" => Ok(match package.get_release_date() {
+            None => PluginValue::Null,
+            Some(date) => date_time_to_wire(&date),
+        }),
         other => Err(runtime_throw(format!(
             "the package method `{other}` is not available over RPC yet"
         ))),

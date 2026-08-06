@@ -661,6 +661,10 @@ const RUNTIME_FILES: &[(&str, &str)] = &[
         include_str!("../php/runtime/Composer/EventDispatcher/Event.php"),
     ),
     (
+        "Shirabe/MaterializedValue.php",
+        include_str!("../php/runtime/Shirabe/MaterializedValue.php"),
+    ),
+    (
         "Shirabe/RustCommandStub.php",
         include_str!("../php/runtime/Shirabe/RustCommandStub.php"),
     ),

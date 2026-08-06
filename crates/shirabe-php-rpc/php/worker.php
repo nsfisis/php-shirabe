@@ -227,6 +227,10 @@ final class ShirabeRpcRuntime
             // A natively-constructed dual-mode instance falls through to the P table below.
         }
         if (is_object($value)) {
+            $materialized = \Shirabe\MaterializedValue::describe($value);
+            if ($materialized !== null) {
+                return array_map([self::class, 'toWire'], $materialized);
+            }
             return ShirabePhpObjectRegistry::descriptor($value);
         }
         if (is_resource($value)) {
@@ -256,6 +260,9 @@ final class ShirabeRpcRuntime
         }
         if (isset($value['__pclass']) && count($value) === 1) {
             return $value['__pclass'];
+        }
+        if (isset($value['__pnew'])) {
+            return \Shirabe\MaterializedValue::build(array_map([self::class, 'fromWire'], $value));
         }
         return array_map([self::class, 'fromWire'], $value);
     }
