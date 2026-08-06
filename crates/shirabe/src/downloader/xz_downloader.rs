@@ -15,6 +15,8 @@ use anyhow::bail;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
+shirabe_php_shim::impl_php_class!(XzDownloader, r"Composer\Downloader\XzDownloader");
+
 #[derive(Debug)]
 pub struct XzDownloader {
     inner: FileDownloader,

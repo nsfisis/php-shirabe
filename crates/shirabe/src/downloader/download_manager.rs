@@ -149,7 +149,7 @@ impl DownloadManager {
             return Err(LogicException {
                 message: format!(
                     "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
-                    shirabe_php_shim::get_class_obj(&*downloader.borrow()),
+                    shirabe_php_shim::PhpClass::php_class_name(&*downloader.borrow()),
                     downloader_installation_source,
                     installation_source.unwrap_or_default(),
                     package,

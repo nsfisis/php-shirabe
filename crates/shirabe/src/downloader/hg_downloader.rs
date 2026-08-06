@@ -15,6 +15,8 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 
+shirabe_php_shim::impl_php_class!(HgDownloader, r"Composer\Downloader\HgDownloader");
+
 #[derive(Debug)]
 pub struct HgDownloader {
     inner: VcsDownloaderBase,

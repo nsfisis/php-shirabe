@@ -15,6 +15,8 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PharData, PhpMixed};
 
+shirabe_php_shim::impl_php_class!(TarDownloader, r"Composer\Downloader\TarDownloader");
+
 #[derive(Debug)]
 pub struct TarDownloader {
     inner: FileDownloader,

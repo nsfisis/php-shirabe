@@ -17,6 +17,11 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
+shirabe_php_shim::impl_php_class!(
+    PerforceDownloader,
+    r"Composer\Downloader\PerforceDownloader"
+);
+
 #[derive(Debug)]
 pub struct PerforceDownloader {
     inner: VcsDownloaderBase,

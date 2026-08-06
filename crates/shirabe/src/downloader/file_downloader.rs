@@ -47,6 +47,8 @@ pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<String, PhpMixed>>> =
 pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
+shirabe_php_shim::impl_php_class!(FileDownloader, r"Composer\Downloader\FileDownloader");
+
 /// Base downloader for files
 #[derive(Debug)]
 pub struct FileDownloader {

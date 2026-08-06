@@ -15,6 +15,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex};
 
+shirabe_php_shim::impl_php_class!(FossilDownloader, r"Composer\Downloader\FossilDownloader");
+
 #[derive(Debug)]
 pub struct FossilDownloader {
     inner: VcsDownloaderBase,

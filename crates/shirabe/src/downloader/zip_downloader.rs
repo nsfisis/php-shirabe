@@ -22,6 +22,8 @@ static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<String>>>> = Mutex::new(None);
 static HAS_ZIP_ARCHIVE: Mutex<Option<bool>> = Mutex::new(None);
 static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
 
+shirabe_php_shim::impl_php_class!(ZipDownloader, r"Composer\Downloader\ZipDownloader");
+
 #[derive(Debug)]
 pub struct ZipDownloader {
     inner: FileDownloader,

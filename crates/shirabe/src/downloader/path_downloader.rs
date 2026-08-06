@@ -27,6 +27,8 @@ use shirabe_php_shim::{
     RuntimeException, file_exists, function_exists, is_dir, realpath,
 };
 
+shirabe_php_shim::impl_php_class!(PathDownloader, r"Composer\Downloader\PathDownloader");
+
 #[derive(Debug)]
 pub struct PathDownloader {
     pub(crate) inner: FileDownloader,

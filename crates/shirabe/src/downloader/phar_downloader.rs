@@ -15,6 +15,8 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Phar, PhpMixed};
 
+shirabe_php_shim::impl_php_class!(PharDownloader, r"Composer\Downloader\PharDownloader");
+
 #[derive(Debug)]
 pub struct PharDownloader {
     inner: FileDownloader,

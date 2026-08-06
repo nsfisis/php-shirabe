@@ -59,6 +59,10 @@ mockall::mock! {
     }
 }
 
+// PHPUnit reports a generated class name for `getMockBuilder(DownloaderInterface::class)`;
+// no ported assertion reads it, so the mock answers with the interface it stands in for.
+shirabe_php_shim::impl_php_class!(MockDownloader, r"Composer\Downloader\DownloaderInterface");
+
 /// ref: DownloadManagerTest::createPackageMock
 ///
 /// PHPUnit returns a `PackageInterface` mock; a real CompletePackage with the
@@ -169,10 +173,6 @@ fn test_get_downloader_for_correctly_installed_dist_package() {
     assert!(std::rc::Rc::ptr_eq(&downloader, &result));
 }
 
-// The LogicException message uses get_class($downloader); the equivalent
-// `shirabe_php_shim::get_class_obj` is still a `todo!()`, so building the error
-// panics before `getDownloaderForPackage` can return it.
-#[ignore = "requires shirabe_php_shim::get_class_obj (PHP get_class), still todo!()"]
 #[test]
 fn test_get_downloader_for_incorrectly_installed_dist_package() {
     let package = create_package_mock();
@@ -206,9 +206,6 @@ fn test_get_downloader_for_correctly_installed_source_package() {
     assert!(std::rc::Rc::ptr_eq(&downloader, &result));
 }
 
-// See test_get_downloader_for_incorrectly_installed_dist_package: the LogicException
-// path depends on the still-unimplemented get_class_obj shim.
-#[ignore = "requires shirabe_php_shim::get_class_obj (PHP get_class), still todo!()"]
 #[test]
 fn test_get_downloader_for_incorrectly_installed_source_package() {
     let package = create_package_mock();

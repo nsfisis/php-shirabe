@@ -23,6 +23,8 @@ use shirabe_php_shim::{
     php_regex, preg_quote, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
 };
 
+shirabe_php_shim::impl_php_class!(GitDownloader, r"Composer\Downloader\GitDownloader");
+
 #[derive(Debug)]
 pub struct GitDownloader {
     inner: VcsDownloaderBase,

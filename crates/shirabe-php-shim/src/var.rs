@@ -230,15 +230,6 @@ pub fn get_class_err(_e: &anyhow::Error) -> String {
     todo!()
 }
 
-/// Overload accepting any object reference. PHP's `get_class($obj)` returns the
-/// class name; in Rust we don't have a runtime class name, so this stub is left
-/// as `todo!()`.
-pub fn get_class_obj<T: ?Sized>(_object: &T) -> String {
-    // TODO(php-runtime): PHP returns the object's class name; Rust has no runtime class name for an
-    // arbitrary `T` (the static type path is not the PHP class name).
-    todo!()
-}
-
 pub fn get_debug_type(value: &PhpMixed) -> String {
     match value {
         PhpMixed::Null => "null".to_string(),

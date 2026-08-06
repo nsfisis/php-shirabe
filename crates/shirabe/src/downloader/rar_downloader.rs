@@ -18,6 +18,8 @@ use shirabe_php_shim::{
     PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, class_exists, implode,
 };
 
+shirabe_php_shim::impl_php_class!(RarDownloader, r"Composer\Downloader\RarDownloader");
+
 #[derive(Debug)]
 pub struct RarDownloader {
     inner: FileDownloader,

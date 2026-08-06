@@ -19,6 +19,8 @@ use shirabe_php_shim::{
     strtr,
 };
 
+shirabe_php_shim::impl_php_class!(GzipDownloader, r"Composer\Downloader\GzipDownloader");
+
 #[derive(Debug)]
 pub struct GzipDownloader {
     inner: FileDownloader,
