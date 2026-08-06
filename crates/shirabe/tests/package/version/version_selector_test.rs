@@ -115,7 +115,6 @@ fn test_latest_version_is_returned() {
 }
 
 #[test]
-#[ignore = "PlatformRepository initialization calls shirabe_php_shim::runtime::constant() which is still todo!(); unrelated to the RepositorySet seam"]
 fn test_latest_version_is_returned_that_matches_php_requirements() {
     let package_name = "foo/bar";
 
@@ -212,7 +211,6 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
 }
 
 #[test]
-#[ignore = "PlatformRepository initialization calls shirabe_php_shim::runtime::constant() which is still todo!(); unrelated to the RepositorySet seam"]
 fn test_latest_version_is_returned_that_matches_ext_requirements() {
     let package_name = "foo/bar";
 
@@ -262,7 +260,6 @@ fn test_latest_version_is_returned_that_matches_ext_requirements() {
 }
 
 #[test]
-#[ignore = "PlatformRepository initialization calls shirabe_php_shim::runtime::constant() which is still todo!(); unrelated to the RepositorySet seam"]
 fn test_latest_version_is_returned_that_matches_platform_ext() {
     let package_name = "foo/bar";
 
@@ -306,7 +303,6 @@ fn test_latest_version_is_returned_that_matches_platform_ext() {
 }
 
 #[test]
-#[ignore = "PlatformRepository initialization calls shirabe_php_shim::runtime::constant() which is still todo!(); unrelated to the RepositorySet seam"]
 fn test_latest_version_is_returned_that_matches_composer_requirements() {
     let package_name = "foo/bar";
 
