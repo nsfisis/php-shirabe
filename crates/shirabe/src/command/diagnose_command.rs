@@ -77,396 +77,7 @@ impl DiagnoseCommand {
             .expect("DiagnoseCommand::configure uses static, valid metadata");
         command
     }
-}
 
-impl Command for DiagnoseCommand {
-    fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("diagnose")?;
-        self.set_description("Diagnoses the system to identify common errors");
-        self.set_help(
-            "The <info>diagnose</info> command checks common errors to help debugging problems.\n\n\
-             The process exit code will be 1 in case of warnings and 2 for errors.\n\n\
-             Read more at https://getcomposer.org/doc/03-cli.md#diagnose",
-        );
-        Ok(())
-    }
-
-    fn execute(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
-        let mut composer = self.try_composer(None, None);
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
-
-        let config: std::rc::Rc<std::cell::RefCell<Config>>;
-        if let Some(ref mut c) = composer {
-            let c = crate::composer::composer_full(c);
-            config = c.get_config();
-
-            let command_event = CommandEvent::new6(
-                PluginEvents::COMMAND,
-                "diagnose",
-                input,
-                output,
-                vec![],
-                IndexMap::new(),
-            );
-            c.get_event_dispatcher()
-                .borrow_mut()
-                .dispatch(Some(command_event.get_name()), None);
-            *self.process.borrow_mut() = Some(
-                c.get_loop()
-                    .borrow()
-                    .get_process_executor()
-                    .map(std::rc::Rc::clone)
-                    .unwrap_or_else(|| {
-                        std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                            io.clone(),
-                        ))))
-                    }),
-            );
-        } else {
-            config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
-
-            *self.process.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
-                ProcessExecutor::new(Some(io.clone())),
-            )));
-        }
-        let mut config_inner = IndexMap::new();
-        config_inner.insert("secure-http".to_string(), PhpMixed::Bool(false));
-        let mut secure_http_wrap: IndexMap<String, PhpMixed> = IndexMap::new();
-        secure_http_wrap.insert("config".to_string(), PhpMixed::Array(config_inner));
-        let config = config;
-        config
-            .borrow_mut()
-            .merge(&secure_http_wrap, Config::SOURCE_COMMAND);
-        let _ = config.borrow_mut().prohibit_url_by_config(
-            "http://repo.packagist.org",
-            Some(std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))),
-            &IndexMap::new(),
-        );
-
-        *self.http_downloader.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_http_downloader(io.clone(), &config, indexmap::IndexMap::new())?,
-        )));
-
-        if strpos(file!(), "phar:") == Some(0) {
-            io.write_no_newline("Checking pubkeys: ");
-            let r = self.check_pub_keys(&config.borrow())?;
-            self.output_result(r);
-
-            io.write_no_newline("Checking Composer version: ");
-            let r = self.check_version(&config)?;
-            self.output_result(r);
-        }
-
-        io.write(&format!(
-            "Composer version: <comment>{}</comment>",
-            composer::get_version()
-        ));
-
-        io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
-        let r = self.check_composer_audit(&config)?;
-        self.output_result(r);
-
-        let platform_overrides = config
-            .borrow_mut()
-            .get("platform")
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        let platform_overrides_unboxed: indexmap::IndexMap<String, PhpMixed> =
-            platform_overrides.into_iter().collect();
-        let mut platform_repo =
-            PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
-        let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
-            &mut platform_repo,
-            "php",
-            crate::repository::FindPackageConstraint::String("*".to_string()),
-        )?
-        .unwrap();
-        let mut php_version = php_pkg.get_pretty_version();
-        if let Some(cp) = php_pkg.as_complete()
-            && str_contains(&cp.get_description().unwrap_or_default(), "overridden")
-        {
-            php_version = format!(
-                "{} - {}",
-                php_version,
-                cp.get_description().unwrap_or_default()
-            );
-        }
-
-        io.write(&format!("PHP version: <comment>{}</comment>", php_version));
-
-        let diagnostics = shirabe_php_rpc::get_diagnostics();
-
-        if let Some(php_binary) = &diagnostics.php_binary {
-            io.write(&format!(
-                "PHP binary path: <comment>{}</comment>",
-                php_binary
-            ));
-        }
-
-        io.write(&format!(
-            "OpenSSL version: {}",
-            match &diagnostics.openssl_version_text {
-                Some(text) => format!("<comment>{}</comment>", text),
-                None => "<error>missing</error>".to_string(),
-            }
-        ));
-        io.write(&format!("curl version: {}", self.get_curl_version()));
-
-        let finder = ExecutableFinder::new();
-        let has_system_unzip = finder.find("unzip", None, &[]).is_some();
-        let mut bin_7zip = String::new();
-        let has_system_7zip = if finder
-            .find("7z", None, &["C:\\Program Files\\7-Zip".to_string()])
-            .is_some()
-        {
-            bin_7zip = "7z".to_string();
-            true
-        } else if !Platform::is_windows() && finder.find("7zz", None, &[]).is_some() {
-            bin_7zip = "7zz".to_string();
-            true
-        } else if !Platform::is_windows() && finder.find("7za", None, &[]).is_some() {
-            bin_7zip = "7za".to_string();
-            true
-        } else {
-            false
-        };
-
-        io.write(&format!(
-            "zip: {}, {}, {}{}",
-            if diagnostics.extension_loaded("zip") {
-                "<comment>extension present</comment>"
-            } else {
-                "<comment>extension not loaded</comment>"
-            },
-            if has_system_unzip {
-                "<comment>unzip present</comment>".to_string()
-            } else {
-                "<comment>unzip not available</comment>".to_string()
-            },
-            if has_system_7zip {
-                format!("<comment>7-Zip present ({})</comment>", bin_7zip)
-            } else {
-                "<comment>7-Zip not available</comment>".to_string()
-            },
-            if (has_system_7zip || has_system_unzip) && !diagnostics.function_exists("proc_open") {
-                ", <warning>proc_open is disabled or not present, unzip/7-z will not be usable</warning>"
-            } else {
-                ""
-            }
-        ));
-
-        if let Some(ref mut c) = composer {
-            let c = crate::composer::composer_full(c);
-            io.write(&format!(
-                "Active plugins: {}",
-                implode(
-                    ", ",
-                    &c.get_plugin_manager().borrow().get_registered_plugins()
-                )
-            ));
-
-            io.write_no_newline("Checking composer.json: ");
-            let r = self.check_composer_schema()?;
-            self.output_result(r);
-
-            if c.get_locker().borrow_mut().is_locked() {
-                io.write_no_newline("Checking composer.lock: ");
-                let locker = c.get_locker().clone();
-                let locker = locker.borrow();
-                let r = self.check_composer_lock_schema(&*locker)?;
-                self.output_result(r);
-            }
-        }
-
-        io.write_no_newline("Checking platform settings: ");
-        let r = self.check_platform()?;
-        self.output_result(r);
-
-        io.write_no_newline("Checking git settings: ");
-        let r = self.check_git();
-        self.output_result(PhpMixed::String(r));
-
-        io.write_no_newline("Checking http connectivity to packagist: ");
-        let r = self.check_http("http", &config)?;
-        self.output_result(r);
-
-        io.write_no_newline("Checking https connectivity to packagist: ");
-        let r = self.check_http("https", &config)?;
-        self.output_result(r);
-
-        let repositories = config.borrow().get_repositories();
-        for repo in repositories {
-            let repo_arr = repo.1.as_array().cloned().unwrap_or_default();
-            if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer")
-                && repo_arr.get("url").is_some()
-            {
-                let repo_arr_unboxed: indexmap::IndexMap<String, PhpMixed> = repo_arr
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect();
-                let composer_repo = ComposerRepository::new(
-                    repo_arr_unboxed,
-                    self.get_io().clone(),
-                    &config.borrow(),
-                    self.http_downloader.borrow().clone().unwrap(),
-                    None,
-                )
-                .unwrap();
-                // PHP: ReflectionMethod($composerRepo, 'getPackagesJsonUrl')
-                // We surface the same internal call by directly invoking the equivalent method.
-                // TODO(plugin): support reflection-based access if plugin code requires it.
-                let url = composer_repo.get_packages_json_url();
-                if !str_starts_with(&url, "http") {
-                    continue;
-                }
-                if str_starts_with(&url, "https://repo.packagist.org") {
-                    continue;
-                }
-                io.write_no_newline(&format!(
-                    "Checking connectivity to {}: ",
-                    repo_arr
-                        .get("url")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                ));
-                let r = self.check_composer_repo(&url, &config)?;
-                self.output_result(r);
-            }
-        }
-
-        let protos: Vec<&str> = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
-            vec!["http"]
-        } else {
-            vec!["http", "https"]
-        };
-        let proxy_check_result: anyhow::Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
-            for proto in &protos {
-                // Compute the proxy under a short-lived lock: `check_http_proxy` below transitively
-                // re-enters `ProxyManager::get_instance()` (via HttpDownloader -> CurlDownloader /
-                // RemoteFilesystem), and `std::sync::Mutex` is not reentrant, so the guard must not
-                // still be held when that call happens.
-                let proxy = ProxyManager::get_instance()
-                    .as_ref()
-                    .unwrap()
-                    .get_proxy_for_request(&format!("{}://repo.packagist.org", proto))
-                    .map_err(|e| anyhow::anyhow!(e))?;
-                if !proxy.get_status(None)?.is_empty() {
-                    let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };
-                    io.write_no_newline(&format!("Checking {} proxy with {}: ", r#type, proto));
-                    let r = self.check_http_proxy(&proxy, proto)?;
-                    self.output_result(r);
-                }
-            }
-            Ok(())
-        })();
-        if let Err(e) = proxy_check_result {
-            if let Some(_te) = e.downcast_ref::<TransportException>() {
-                io.write_no_newline("Checking HTTP proxy: ");
-                let status = self.check_connectivity_and_composer_network_http_enablement();
-                self.output_result(if is_string(&status) {
-                    status
-                } else {
-                    PhpMixed::String(format!("<error>[{}] {}</error>", get_class_err(&e), e))
-                });
-            } else {
-                return Err(e);
-            }
-        }
-
-        let oauth = config
-            .borrow_mut()
-            .get("github-oauth")
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        if oauth.len() as i64 > 0 {
-            for (domain, token) in &oauth {
-                io.write_no_newline(&format!("Checking {} oauth access: ", domain));
-                let r = self.check_github_oauth(domain, token.as_string().unwrap_or(""))?;
-                self.output_result(r);
-            }
-        } else {
-            io.write_no_newline("Checking github.com rate limit: ");
-            match self.get_github_rate_limit("github.com", None) {
-                Ok(rate) => {
-                    if !is_array(&rate) {
-                        self.output_result(rate);
-                    } else if let Some(arr) = rate.as_array() {
-                        let remaining = arr.get("remaining").and_then(|v| v.as_int()).unwrap_or(0);
-                        let limit = arr.get("limit").and_then(|v| v.as_int()).unwrap_or(0);
-                        if 10 > remaining {
-                            io.write("<warning>WARNING</warning>");
-                            io.write(&format!(
-                                "<comment>GitHub has a rate limit on their API. You currently have <options=bold>{}</options=bold> out of <options=bold>{}</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
-                                remaining, limit,
-                            ));
-                        } else {
-                            self.output_result(PhpMixed::Bool(true));
-                        }
-                    }
-                }
-                Err(e) => {
-                    if let Some(te) = e.downcast_ref::<TransportException>() {
-                        if te.get_code() == 401 {
-                            self.output_result(PhpMixed::String("<comment>The oauth token for github.com seems invalid, run \"composer config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
-                        } else {
-                            self.output_result(PhpMixed::String(format!(
-                                "<error>[{}] {}</error>",
-                                get_class_err(&e),
-                                e
-                            )));
-                        }
-                    } else {
-                        self.output_result(PhpMixed::String(format!(
-                            "<error>[{}] {}</error>",
-                            get_class_err(&e),
-                            e
-                        )));
-                    }
-                }
-            }
-        }
-
-        io.write_no_newline("Checking disk free space: ");
-        let r = self.check_disk_space(&config.borrow());
-        self.output_result(r);
-
-        Ok(self.exit_code.get())
-    }
-
-    fn initialize(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<()> {
-        base_command_initialize(self, input, output)
-    }
-
-    fn complete(
-        &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
-    ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
-    }
-
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl BaseCommand for DiagnoseCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
-        &self.base_command_data
-    }
-
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl DiagnoseCommand {
     fn check_composer_schema(&self) -> anyhow::Result<PhpMixed> {
         let validator = ConfigValidator::new(self.get_io().clone());
         let (errors, _, warnings) = validator.validate(&Factory::get_composer_file()?, 0, 0);
@@ -1510,4 +1121,391 @@ impl DiagnoseCommand {
 
         PhpMixed::Bool(true)
     }
+}
+
+impl Command for DiagnoseCommand {
+    fn configure(&self) -> anyhow::Result<()> {
+        self.set_name("diagnose")?;
+        self.set_description("Diagnoses the system to identify common errors");
+        self.set_help(
+            "The <info>diagnose</info> command checks common errors to help debugging problems.\n\n\
+             The process exit code will be 1 in case of warnings and 2 for errors.\n\n\
+             Read more at https://getcomposer.org/doc/03-cli.md#diagnose",
+        );
+        Ok(())
+    }
+
+    fn execute(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let mut composer = self.try_composer(None, None);
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
+
+        let config: std::rc::Rc<std::cell::RefCell<Config>>;
+        if let Some(ref mut c) = composer {
+            let c = crate::composer::composer_full(c);
+            config = c.get_config();
+
+            let command_event = CommandEvent::new6(
+                PluginEvents::COMMAND,
+                "diagnose",
+                input,
+                output,
+                vec![],
+                IndexMap::new(),
+            );
+            c.get_event_dispatcher()
+                .borrow_mut()
+                .dispatch(Some(command_event.get_name()), None);
+            *self.process.borrow_mut() = Some(
+                c.get_loop()
+                    .borrow()
+                    .get_process_executor()
+                    .map(std::rc::Rc::clone)
+                    .unwrap_or_else(|| {
+                        std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                            io.clone(),
+                        ))))
+                    }),
+            );
+        } else {
+            config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
+
+            *self.process.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
+                ProcessExecutor::new(Some(io.clone())),
+            )));
+        }
+        let mut config_inner = IndexMap::new();
+        config_inner.insert("secure-http".to_string(), PhpMixed::Bool(false));
+        let mut secure_http_wrap: IndexMap<String, PhpMixed> = IndexMap::new();
+        secure_http_wrap.insert("config".to_string(), PhpMixed::Array(config_inner));
+        let config = config;
+        config
+            .borrow_mut()
+            .merge(&secure_http_wrap, Config::SOURCE_COMMAND);
+        let _ = config.borrow_mut().prohibit_url_by_config(
+            "http://repo.packagist.org",
+            Some(std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))),
+            &IndexMap::new(),
+        );
+
+        *self.http_downloader.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            Factory::create_http_downloader(io.clone(), &config, indexmap::IndexMap::new())?,
+        )));
+
+        if strpos(file!(), "phar:") == Some(0) {
+            io.write_no_newline("Checking pubkeys: ");
+            let r = self.check_pub_keys(&config.borrow())?;
+            self.output_result(r);
+
+            io.write_no_newline("Checking Composer version: ");
+            let r = self.check_version(&config)?;
+            self.output_result(r);
+        }
+
+        io.write(&format!(
+            "Composer version: <comment>{}</comment>",
+            composer::get_version()
+        ));
+
+        io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
+        let r = self.check_composer_audit(&config)?;
+        self.output_result(r);
+
+        let platform_overrides = config
+            .borrow_mut()
+            .get("platform")
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let platform_overrides_unboxed: indexmap::IndexMap<String, PhpMixed> =
+            platform_overrides.into_iter().collect();
+        let mut platform_repo =
+            PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
+        let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
+            &mut platform_repo,
+            "php",
+            crate::repository::FindPackageConstraint::String("*".to_string()),
+        )?
+        .unwrap();
+        let mut php_version = php_pkg.get_pretty_version();
+        if let Some(cp) = php_pkg.as_complete()
+            && str_contains(&cp.get_description().unwrap_or_default(), "overridden")
+        {
+            php_version = format!(
+                "{} - {}",
+                php_version,
+                cp.get_description().unwrap_or_default()
+            );
+        }
+
+        io.write(&format!("PHP version: <comment>{}</comment>", php_version));
+
+        let diagnostics = shirabe_php_rpc::get_diagnostics();
+
+        if let Some(php_binary) = &diagnostics.php_binary {
+            io.write(&format!(
+                "PHP binary path: <comment>{}</comment>",
+                php_binary
+            ));
+        }
+
+        io.write(&format!(
+            "OpenSSL version: {}",
+            match &diagnostics.openssl_version_text {
+                Some(text) => format!("<comment>{}</comment>", text),
+                None => "<error>missing</error>".to_string(),
+            }
+        ));
+        io.write(&format!("curl version: {}", self.get_curl_version()));
+
+        let finder = ExecutableFinder::new();
+        let has_system_unzip = finder.find("unzip", None, &[]).is_some();
+        let mut bin_7zip = String::new();
+        let has_system_7zip = if finder
+            .find("7z", None, &["C:\\Program Files\\7-Zip".to_string()])
+            .is_some()
+        {
+            bin_7zip = "7z".to_string();
+            true
+        } else if !Platform::is_windows() && finder.find("7zz", None, &[]).is_some() {
+            bin_7zip = "7zz".to_string();
+            true
+        } else if !Platform::is_windows() && finder.find("7za", None, &[]).is_some() {
+            bin_7zip = "7za".to_string();
+            true
+        } else {
+            false
+        };
+
+        io.write(&format!(
+            "zip: {}, {}, {}{}",
+            if diagnostics.extension_loaded("zip") {
+                "<comment>extension present</comment>"
+            } else {
+                "<comment>extension not loaded</comment>"
+            },
+            if has_system_unzip {
+                "<comment>unzip present</comment>".to_string()
+            } else {
+                "<comment>unzip not available</comment>".to_string()
+            },
+            if has_system_7zip {
+                format!("<comment>7-Zip present ({})</comment>", bin_7zip)
+            } else {
+                "<comment>7-Zip not available</comment>".to_string()
+            },
+            if (has_system_7zip || has_system_unzip) && !diagnostics.function_exists("proc_open") {
+                ", <warning>proc_open is disabled or not present, unzip/7-z will not be usable</warning>"
+            } else {
+                ""
+            }
+        ));
+
+        if let Some(ref mut c) = composer {
+            let c = crate::composer::composer_full(c);
+            io.write(&format!(
+                "Active plugins: {}",
+                implode(
+                    ", ",
+                    &c.get_plugin_manager().borrow().get_registered_plugins()
+                )
+            ));
+
+            io.write_no_newline("Checking composer.json: ");
+            let r = self.check_composer_schema()?;
+            self.output_result(r);
+
+            if c.get_locker().borrow_mut().is_locked() {
+                io.write_no_newline("Checking composer.lock: ");
+                let locker = c.get_locker().clone();
+                let locker = locker.borrow();
+                let r = self.check_composer_lock_schema(&*locker)?;
+                self.output_result(r);
+            }
+        }
+
+        io.write_no_newline("Checking platform settings: ");
+        let r = self.check_platform()?;
+        self.output_result(r);
+
+        io.write_no_newline("Checking git settings: ");
+        let r = self.check_git();
+        self.output_result(PhpMixed::String(r));
+
+        io.write_no_newline("Checking http connectivity to packagist: ");
+        let r = self.check_http("http", &config)?;
+        self.output_result(r);
+
+        io.write_no_newline("Checking https connectivity to packagist: ");
+        let r = self.check_http("https", &config)?;
+        self.output_result(r);
+
+        let repositories = config.borrow().get_repositories();
+        for repo in repositories {
+            let repo_arr = repo.1.as_array().cloned().unwrap_or_default();
+            if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer")
+                && repo_arr.get("url").is_some()
+            {
+                let repo_arr_unboxed: indexmap::IndexMap<String, PhpMixed> = repo_arr
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+                let composer_repo = ComposerRepository::new(
+                    repo_arr_unboxed,
+                    self.get_io().clone(),
+                    &config.borrow(),
+                    self.http_downloader.borrow().clone().unwrap(),
+                    None,
+                )
+                .unwrap();
+                // PHP: ReflectionMethod($composerRepo, 'getPackagesJsonUrl')
+                // We surface the same internal call by directly invoking the equivalent method.
+                // TODO(plugin): support reflection-based access if plugin code requires it.
+                let url = composer_repo.get_packages_json_url();
+                if !str_starts_with(&url, "http") {
+                    continue;
+                }
+                if str_starts_with(&url, "https://repo.packagist.org") {
+                    continue;
+                }
+                io.write_no_newline(&format!(
+                    "Checking connectivity to {}: ",
+                    repo_arr
+                        .get("url")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
+                ));
+                let r = self.check_composer_repo(&url, &config)?;
+                self.output_result(r);
+            }
+        }
+
+        let protos: Vec<&str> = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
+            vec!["http"]
+        } else {
+            vec!["http", "https"]
+        };
+        let proxy_check_result: anyhow::Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
+            for proto in &protos {
+                // Compute the proxy under a short-lived lock: `check_http_proxy` below transitively
+                // re-enters `ProxyManager::get_instance()` (via HttpDownloader -> CurlDownloader /
+                // RemoteFilesystem), and `std::sync::Mutex` is not reentrant, so the guard must not
+                // still be held when that call happens.
+                let proxy = ProxyManager::get_instance()
+                    .as_ref()
+                    .unwrap()
+                    .get_proxy_for_request(&format!("{}://repo.packagist.org", proto))
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                if !proxy.get_status(None)?.is_empty() {
+                    let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };
+                    io.write_no_newline(&format!("Checking {} proxy with {}: ", r#type, proto));
+                    let r = self.check_http_proxy(&proxy, proto)?;
+                    self.output_result(r);
+                }
+            }
+            Ok(())
+        })();
+        if let Err(e) = proxy_check_result {
+            if let Some(_te) = e.downcast_ref::<TransportException>() {
+                io.write_no_newline("Checking HTTP proxy: ");
+                let status = self.check_connectivity_and_composer_network_http_enablement();
+                self.output_result(if is_string(&status) {
+                    status
+                } else {
+                    PhpMixed::String(format!("<error>[{}] {}</error>", get_class_err(&e), e))
+                });
+            } else {
+                return Err(e);
+            }
+        }
+
+        let oauth = config
+            .borrow_mut()
+            .get("github-oauth")
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        if oauth.len() as i64 > 0 {
+            for (domain, token) in &oauth {
+                io.write_no_newline(&format!("Checking {} oauth access: ", domain));
+                let r = self.check_github_oauth(domain, token.as_string().unwrap_or(""))?;
+                self.output_result(r);
+            }
+        } else {
+            io.write_no_newline("Checking github.com rate limit: ");
+            match self.get_github_rate_limit("github.com", None) {
+                Ok(rate) => {
+                    if !is_array(&rate) {
+                        self.output_result(rate);
+                    } else if let Some(arr) = rate.as_array() {
+                        let remaining = arr.get("remaining").and_then(|v| v.as_int()).unwrap_or(0);
+                        let limit = arr.get("limit").and_then(|v| v.as_int()).unwrap_or(0);
+                        if 10 > remaining {
+                            io.write("<warning>WARNING</warning>");
+                            io.write(&format!(
+                                "<comment>GitHub has a rate limit on their API. You currently have <options=bold>{}</options=bold> out of <options=bold>{}</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
+                                remaining, limit,
+                            ));
+                        } else {
+                            self.output_result(PhpMixed::Bool(true));
+                        }
+                    }
+                }
+                Err(e) => {
+                    if let Some(te) = e.downcast_ref::<TransportException>() {
+                        if te.get_code() == 401 {
+                            self.output_result(PhpMixed::String("<comment>The oauth token for github.com seems invalid, run \"composer config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
+                        } else {
+                            self.output_result(PhpMixed::String(format!(
+                                "<error>[{}] {}</error>",
+                                get_class_err(&e),
+                                e
+                            )));
+                        }
+                    } else {
+                        self.output_result(PhpMixed::String(format!(
+                            "<error>[{}] {}</error>",
+                            get_class_err(&e),
+                            e
+                        )));
+                    }
+                }
+            }
+        }
+
+        io.write_no_newline("Checking disk free space: ");
+        let r = self.check_disk_space(&config.borrow());
+        self.output_result(r);
+
+        Ok(self.exit_code.get())
+    }
+
+    fn initialize(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for DiagnoseCommand {
+    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+        &self.base_command_data
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

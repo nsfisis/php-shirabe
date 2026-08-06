@@ -130,67 +130,7 @@ impl ArrayInput {
 
         default
     }
-}
 
-/// Returns a stringified representation of the args passed to the command.
-impl std::fmt::Display for ArrayInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut params: Vec<String> = vec![];
-        for (param, val) in &self.parameters {
-            // $param && \is_string($param) && '-' === $param[0]
-            let is_option_key =
-                matches!(param, PhpMixed::String(s) if !s.is_empty() && s.as_bytes()[0] == b'-');
-            if is_option_key {
-                let param = param.as_string().unwrap();
-                let glue = if param.as_bytes().get(1) == Some(&b'-') {
-                    "="
-                } else {
-                    " "
-                };
-                if let PhpMixed::List(list) = val {
-                    for v in list {
-                        let v = shirabe_php_shim::php_to_string(v);
-                        params.push(format!(
-                            "{}{}",
-                            param,
-                            if !v.is_empty() {
-                                format!("{}{}", glue, self.inner.escape_token(&v))
-                            } else {
-                                String::new()
-                            }
-                        ));
-                    }
-                } else {
-                    let val = shirabe_php_shim::php_to_string(val);
-                    params.push(format!(
-                        "{}{}",
-                        param,
-                        if !val.is_empty() {
-                            format!("{}{}", glue, self.inner.escape_token(&val))
-                        } else {
-                            String::new()
-                        }
-                    ));
-                }
-            } else if let PhpMixed::List(list) = val {
-                let escaped: Vec<String> = list
-                    .iter()
-                    .map(|v| self.inner.escape_token(&shirabe_php_shim::php_to_string(v)))
-                    .collect();
-                params.push(shirabe_php_shim::implode(" ", &escaped));
-            } else {
-                params.push(
-                    self.inner
-                        .escape_token(&shirabe_php_shim::php_to_string(val)),
-                );
-            }
-        }
-
-        write!(f, "{}", shirabe_php_shim::implode(" ", &params))
-    }
-}
-
-impl ArrayInput {
     fn parse(&mut self) -> anyhow::Result<()> {
         // Clone to avoid borrowing self while mutating; PHP iterates over a copy semantically.
         let parameters = self.parameters.clone();
@@ -293,6 +233,64 @@ impl ArrayInput {
             .insert(shirabe_php_shim::php_to_string(name), value);
 
         Ok(())
+    }
+}
+
+/// Returns a stringified representation of the args passed to the command.
+impl std::fmt::Display for ArrayInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut params: Vec<String> = vec![];
+        for (param, val) in &self.parameters {
+            // $param && \is_string($param) && '-' === $param[0]
+            let is_option_key =
+                matches!(param, PhpMixed::String(s) if !s.is_empty() && s.as_bytes()[0] == b'-');
+            if is_option_key {
+                let param = param.as_string().unwrap();
+                let glue = if param.as_bytes().get(1) == Some(&b'-') {
+                    "="
+                } else {
+                    " "
+                };
+                if let PhpMixed::List(list) = val {
+                    for v in list {
+                        let v = shirabe_php_shim::php_to_string(v);
+                        params.push(format!(
+                            "{}{}",
+                            param,
+                            if !v.is_empty() {
+                                format!("{}{}", glue, self.inner.escape_token(&v))
+                            } else {
+                                String::new()
+                            }
+                        ));
+                    }
+                } else {
+                    let val = shirabe_php_shim::php_to_string(val);
+                    params.push(format!(
+                        "{}{}",
+                        param,
+                        if !val.is_empty() {
+                            format!("{}{}", glue, self.inner.escape_token(&val))
+                        } else {
+                            String::new()
+                        }
+                    ));
+                }
+            } else if let PhpMixed::List(list) = val {
+                let escaped: Vec<String> = list
+                    .iter()
+                    .map(|v| self.inner.escape_token(&shirabe_php_shim::php_to_string(v)))
+                    .collect();
+                params.push(shirabe_php_shim::implode(" ", &escaped));
+            } else {
+                params.push(
+                    self.inner
+                        .escape_token(&shirabe_php_shim::php_to_string(val)),
+                );
+            }
+        }
+
+        write!(f, "{}", shirabe_php_shim::implode(" ", &params))
     }
 }
 

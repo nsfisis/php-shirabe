@@ -60,6 +60,282 @@ impl ValidatingArrayLoader {
             flags,
         }
     }
+
+    pub fn get_warnings(&self) -> Vec<String> {
+        self.warnings.borrow().clone()
+    }
+
+    pub fn get_errors(&self) -> Vec<String> {
+        self.errors.borrow().clone()
+    }
+
+    pub fn has_package_naming_error(name: &str, is_link: bool) -> Option<String> {
+        if PlatformRepository::is_platform_package(name) {
+            return None;
+        }
+
+        if !Preg::is_match(
+            php_regex!(
+                "{^[a-z0-9](?:[_.-]?[a-z0-9]++)*+/[a-z0-9](?:(?:[_.]|-{1,2})?[a-z0-9]++)*+$}iD"
+            ),
+            name,
+        ) {
+            return Some(format!(
+                "{} is invalid, it should have a vendor name, a forward slash, and a package name. The vendor and package name can be words separated by -, . or _. The complete name should match \"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{{0,2}})[a-z0-9]+)*$\".",
+                name
+            ));
+        }
+
+        let reserved_names = [
+            "nul", "con", "prn", "aux", "com1", "com2", "com3", "com4", "com5", "com6", "com7",
+            "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+        ];
+        let lower = strtolower(name);
+        let bits: Vec<&str> = lower.split('/').collect();
+        if reserved_names.contains(&bits[0]) || reserved_names.contains(&bits[1]) {
+            return Some(format!(
+                "{} is reserved, package and vendor names can not match any of: {}.",
+                name,
+                reserved_names.join(", ")
+            ));
+        }
+
+        if Preg::is_match(php_regex!("{\\.json$}"), name) {
+            return Some(format!(
+                "{} is invalid, package names can not end in .json, consider renaming it or perhaps using a -json suffix instead.",
+                name
+            ));
+        }
+
+        if Preg::is_match(php_regex!("{[A-Z]}"), name) {
+            if is_link {
+                return Some(format!(
+                    "{} is invalid, it should not contain uppercase characters. Please use {} instead.",
+                    name,
+                    strtolower(name)
+                ));
+            }
+
+            let suggest_name = Preg::replace(
+                php_regex!("{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
+                "\\1\\3-\\2\\4",
+                name,
+            );
+            let suggest_name = strtolower(&suggest_name);
+
+            return Some(format!(
+                "{} is invalid, it should not contain uppercase characters. We suggest using {} instead.",
+                name, suggest_name
+            ));
+        }
+
+        None
+    }
+
+    fn validate_regex(&self, property: &str, regex: &str, mandatory: bool) -> bool {
+        if !self.validate_string(property, mandatory) {
+            return false;
+        }
+
+        let value = self.config.borrow()[property]
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        if !Preg::is_match(format!("{{^{}$}}u", regex), &value) {
+            let message = format!(
+                "{} : invalid value ({}), must match {}",
+                property, value, regex
+            );
+            if mandatory {
+                self.errors.borrow_mut().push(message);
+            } else {
+                self.warnings.borrow_mut().push(message);
+            }
+            self.config.borrow_mut().shift_remove(property);
+
+            return false;
+        }
+
+        true
+    }
+
+    fn validate_string(&self, property: &str, mandatory: bool) -> bool {
+        if self.config.borrow().contains_key(property)
+            && !is_string(&self.config.borrow()[property])
+        {
+            self.errors.borrow_mut().push(format!(
+                "{} : should be a string, {} given",
+                property,
+                get_debug_type(&self.config.borrow()[property])
+            ));
+            self.config.borrow_mut().shift_remove(property);
+
+            return false;
+        }
+
+        let is_empty = !self.config.borrow().contains_key(property)
+            || trim(
+                self.config.borrow()[property].as_string().unwrap_or(""),
+                Some(" \t\n\r\0\u{0B}"),
+            )
+            .is_empty();
+        if is_empty {
+            if mandatory {
+                self.errors
+                    .borrow_mut()
+                    .push(format!("{} : must be present", property));
+            }
+            self.config.borrow_mut().shift_remove(property);
+
+            return false;
+        }
+
+        true
+    }
+
+    fn validate_array(&self, property: &str, mandatory: bool) -> bool {
+        if self.config.borrow().contains_key(property) && !is_array(&self.config.borrow()[property])
+        {
+            self.errors.borrow_mut().push(format!(
+                "{} : should be an array, {} given",
+                property,
+                get_debug_type(&self.config.borrow()[property])
+            ));
+            self.config.borrow_mut().shift_remove(property);
+
+            return false;
+        }
+
+        let is_empty = !self.config.borrow().contains_key(property)
+            || match &self.config.borrow()[property] {
+                PhpMixed::Array(m) => m.is_empty(),
+                PhpMixed::List(l) => l.is_empty(),
+                // is_array() above guarantees the value is Array or List here.
+                _ => unreachable!("validate_array: non-array value survived the is_array check"),
+            };
+        if is_empty {
+            if mandatory {
+                self.errors.borrow_mut().push(format!(
+                    "{} : must be present and contain at least one element",
+                    property
+                ));
+            }
+            self.config.borrow_mut().shift_remove(property);
+
+            return false;
+        }
+
+        true
+    }
+
+    fn validate_flat_array(&self, property: &str, regex: Option<&str>, mandatory: bool) -> bool {
+        if !self.validate_array(property, mandatory) {
+            return false;
+        }
+
+        let mut pass = true;
+        let entries: Vec<(String, PhpMixed)> = self.config.borrow()[property]
+            .as_array()
+            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default();
+        for (key, value) in entries {
+            if !is_string(&value) && !is_numeric(&value) {
+                self.errors.borrow_mut().push(format!(
+                    "{}.{} : must be a string or int, {} given",
+                    property,
+                    key,
+                    get_debug_type(&value)
+                ));
+                if let Some(PhpMixed::Array(arr)) = self.config.borrow_mut().get_mut(property) {
+                    arr.shift_remove(&key);
+                }
+                pass = false;
+
+                continue;
+            }
+
+            if let Some(regex_str) = regex {
+                let value_str = php_to_string(&value);
+                if !Preg::is_match(format!("{{^{}$}}u", regex_str), &value_str) {
+                    self.warnings.borrow_mut().push(format!(
+                        "{}.{} : invalid value ({}), must match {}",
+                        property, key, value_str, regex_str
+                    ));
+                    if let Some(PhpMixed::Array(arr)) = self.config.borrow_mut().get_mut(property) {
+                        arr.shift_remove(&key);
+                    }
+                    pass = false;
+                }
+            }
+        }
+
+        pass
+    }
+
+    fn validate_url(&self, property: &str, mandatory: bool) -> bool {
+        if !self.validate_string(property, mandatory) {
+            return false;
+        }
+
+        let value = self.config.borrow()[property]
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        if !self.filter_url(&value, &["http", "https"]) {
+            self.warnings.borrow_mut().push(format!(
+                "{} : invalid value ({}), must be an http/https URL",
+                property, value
+            ));
+            self.config.borrow_mut().shift_remove(property);
+
+            return false;
+        }
+
+        true
+    }
+
+    fn filter_url(&self, value: &str, schemes: &[&str]) -> bool {
+        if value.is_empty() {
+            return true;
+        }
+
+        let bits = parse_url_all(value);
+        let bits_map = match bits {
+            PhpMixed::Array(m) => m,
+            _ => return false,
+        };
+        let scheme = bits_map
+            .get("scheme")
+            .and_then(|v| v.as_string())
+            .unwrap_or("");
+        let host = bits_map
+            .get("host")
+            .and_then(|v| v.as_string())
+            .unwrap_or("");
+        if scheme.is_empty() || host.is_empty() {
+            return false;
+        }
+
+        if !schemes.contains(&scheme) {
+            return false;
+        }
+
+        true
+    }
+
+    fn is_empty_array(val: Option<&PhpMixed>) -> bool {
+        match val {
+            Some(v) => match v {
+                PhpMixed::Array(m) => m.is_empty(),
+                PhpMixed::Null => true,
+                PhpMixed::Bool(false) => true,
+                PhpMixed::String(s) => s.is_empty(),
+                PhpMixed::Int(0) => true,
+                _ => false,
+            },
+            None => true,
+        }
+    }
 }
 
 impl LoaderInterface for ValidatingArrayLoader {
@@ -1325,283 +1601,5 @@ impl LoaderInterface for ValidatingArrayLoader {
         *self.config.borrow_mut() = IndexMap::new();
 
         Ok(package)
-    }
-}
-
-impl ValidatingArrayLoader {
-    pub fn get_warnings(&self) -> Vec<String> {
-        self.warnings.borrow().clone()
-    }
-
-    pub fn get_errors(&self) -> Vec<String> {
-        self.errors.borrow().clone()
-    }
-
-    pub fn has_package_naming_error(name: &str, is_link: bool) -> Option<String> {
-        if PlatformRepository::is_platform_package(name) {
-            return None;
-        }
-
-        if !Preg::is_match(
-            php_regex!(
-                "{^[a-z0-9](?:[_.-]?[a-z0-9]++)*+/[a-z0-9](?:(?:[_.]|-{1,2})?[a-z0-9]++)*+$}iD"
-            ),
-            name,
-        ) {
-            return Some(format!(
-                "{} is invalid, it should have a vendor name, a forward slash, and a package name. The vendor and package name can be words separated by -, . or _. The complete name should match \"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{{0,2}})[a-z0-9]+)*$\".",
-                name
-            ));
-        }
-
-        let reserved_names = [
-            "nul", "con", "prn", "aux", "com1", "com2", "com3", "com4", "com5", "com6", "com7",
-            "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
-        ];
-        let lower = strtolower(name);
-        let bits: Vec<&str> = lower.split('/').collect();
-        if reserved_names.contains(&bits[0]) || reserved_names.contains(&bits[1]) {
-            return Some(format!(
-                "{} is reserved, package and vendor names can not match any of: {}.",
-                name,
-                reserved_names.join(", ")
-            ));
-        }
-
-        if Preg::is_match(php_regex!("{\\.json$}"), name) {
-            return Some(format!(
-                "{} is invalid, package names can not end in .json, consider renaming it or perhaps using a -json suffix instead.",
-                name
-            ));
-        }
-
-        if Preg::is_match(php_regex!("{[A-Z]}"), name) {
-            if is_link {
-                return Some(format!(
-                    "{} is invalid, it should not contain uppercase characters. Please use {} instead.",
-                    name,
-                    strtolower(name)
-                ));
-            }
-
-            let suggest_name = Preg::replace(
-                php_regex!("{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
-                "\\1\\3-\\2\\4",
-                name,
-            );
-            let suggest_name = strtolower(&suggest_name);
-
-            return Some(format!(
-                "{} is invalid, it should not contain uppercase characters. We suggest using {} instead.",
-                name, suggest_name
-            ));
-        }
-
-        None
-    }
-
-    fn validate_regex(&self, property: &str, regex: &str, mandatory: bool) -> bool {
-        if !self.validate_string(property, mandatory) {
-            return false;
-        }
-
-        let value = self.config.borrow()[property]
-            .as_string()
-            .unwrap_or("")
-            .to_string();
-        if !Preg::is_match(format!("{{^{}$}}u", regex), &value) {
-            let message = format!(
-                "{} : invalid value ({}), must match {}",
-                property, value, regex
-            );
-            if mandatory {
-                self.errors.borrow_mut().push(message);
-            } else {
-                self.warnings.borrow_mut().push(message);
-            }
-            self.config.borrow_mut().shift_remove(property);
-
-            return false;
-        }
-
-        true
-    }
-
-    fn validate_string(&self, property: &str, mandatory: bool) -> bool {
-        if self.config.borrow().contains_key(property)
-            && !is_string(&self.config.borrow()[property])
-        {
-            self.errors.borrow_mut().push(format!(
-                "{} : should be a string, {} given",
-                property,
-                get_debug_type(&self.config.borrow()[property])
-            ));
-            self.config.borrow_mut().shift_remove(property);
-
-            return false;
-        }
-
-        let is_empty = !self.config.borrow().contains_key(property)
-            || trim(
-                self.config.borrow()[property].as_string().unwrap_or(""),
-                Some(" \t\n\r\0\u{0B}"),
-            )
-            .is_empty();
-        if is_empty {
-            if mandatory {
-                self.errors
-                    .borrow_mut()
-                    .push(format!("{} : must be present", property));
-            }
-            self.config.borrow_mut().shift_remove(property);
-
-            return false;
-        }
-
-        true
-    }
-
-    fn validate_array(&self, property: &str, mandatory: bool) -> bool {
-        if self.config.borrow().contains_key(property) && !is_array(&self.config.borrow()[property])
-        {
-            self.errors.borrow_mut().push(format!(
-                "{} : should be an array, {} given",
-                property,
-                get_debug_type(&self.config.borrow()[property])
-            ));
-            self.config.borrow_mut().shift_remove(property);
-
-            return false;
-        }
-
-        let is_empty = !self.config.borrow().contains_key(property)
-            || match &self.config.borrow()[property] {
-                PhpMixed::Array(m) => m.is_empty(),
-                PhpMixed::List(l) => l.is_empty(),
-                // is_array() above guarantees the value is Array or List here.
-                _ => unreachable!("validate_array: non-array value survived the is_array check"),
-            };
-        if is_empty {
-            if mandatory {
-                self.errors.borrow_mut().push(format!(
-                    "{} : must be present and contain at least one element",
-                    property
-                ));
-            }
-            self.config.borrow_mut().shift_remove(property);
-
-            return false;
-        }
-
-        true
-    }
-
-    fn validate_flat_array(&self, property: &str, regex: Option<&str>, mandatory: bool) -> bool {
-        if !self.validate_array(property, mandatory) {
-            return false;
-        }
-
-        let mut pass = true;
-        let entries: Vec<(String, PhpMixed)> = self.config.borrow()[property]
-            .as_array()
-            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-            .unwrap_or_default();
-        for (key, value) in entries {
-            if !is_string(&value) && !is_numeric(&value) {
-                self.errors.borrow_mut().push(format!(
-                    "{}.{} : must be a string or int, {} given",
-                    property,
-                    key,
-                    get_debug_type(&value)
-                ));
-                if let Some(PhpMixed::Array(arr)) = self.config.borrow_mut().get_mut(property) {
-                    arr.shift_remove(&key);
-                }
-                pass = false;
-
-                continue;
-            }
-
-            if let Some(regex_str) = regex {
-                let value_str = php_to_string(&value);
-                if !Preg::is_match(format!("{{^{}$}}u", regex_str), &value_str) {
-                    self.warnings.borrow_mut().push(format!(
-                        "{}.{} : invalid value ({}), must match {}",
-                        property, key, value_str, regex_str
-                    ));
-                    if let Some(PhpMixed::Array(arr)) = self.config.borrow_mut().get_mut(property) {
-                        arr.shift_remove(&key);
-                    }
-                    pass = false;
-                }
-            }
-        }
-
-        pass
-    }
-
-    fn validate_url(&self, property: &str, mandatory: bool) -> bool {
-        if !self.validate_string(property, mandatory) {
-            return false;
-        }
-
-        let value = self.config.borrow()[property]
-            .as_string()
-            .unwrap_or("")
-            .to_string();
-        if !self.filter_url(&value, &["http", "https"]) {
-            self.warnings.borrow_mut().push(format!(
-                "{} : invalid value ({}), must be an http/https URL",
-                property, value
-            ));
-            self.config.borrow_mut().shift_remove(property);
-
-            return false;
-        }
-
-        true
-    }
-
-    fn filter_url(&self, value: &str, schemes: &[&str]) -> bool {
-        if value.is_empty() {
-            return true;
-        }
-
-        let bits = parse_url_all(value);
-        let bits_map = match bits {
-            PhpMixed::Array(m) => m,
-            _ => return false,
-        };
-        let scheme = bits_map
-            .get("scheme")
-            .and_then(|v| v.as_string())
-            .unwrap_or("");
-        let host = bits_map
-            .get("host")
-            .and_then(|v| v.as_string())
-            .unwrap_or("");
-        if scheme.is_empty() || host.is_empty() {
-            return false;
-        }
-
-        if !schemes.contains(&scheme) {
-            return false;
-        }
-
-        true
-    }
-
-    fn is_empty_array(val: Option<&PhpMixed>) -> bool {
-        match val {
-            Some(v) => match v {
-                PhpMixed::Array(m) => m.is_empty(),
-                PhpMixed::Null => true,
-                PhpMixed::Bool(false) => true,
-                PhpMixed::String(s) => s.is_empty(),
-                PhpMixed::Int(0) => true,
-                _ => false,
-            },
-            None => true,
-        }
     }
 }

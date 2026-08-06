@@ -265,9 +265,7 @@ impl ZipArchive {
             _ => String::new(),
         }
     }
-}
 
-impl ZipArchive {
     pub const CREATE: i64 = 1;
     pub const OPSYS_UNIX: i64 = 3;
     pub const ER_SEEK: i64 = 4;

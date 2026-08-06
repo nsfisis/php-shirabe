@@ -150,6 +150,234 @@ impl FileDownloader {
 
         this
     }
+
+    /// Shared body of `ChangeReportInterface::get_local_changes`.
+    ///
+    /// PHP's `getLocalChanges` calls `$this->download()` / `$this->install()`, which late-bind
+    /// to the concrete downloader class (e.g. `ArchiveDownloader::install` extracts the archive
+    /// instead of copying the dist file). The Rust port embeds the parent class as `inner`, so
+    /// delegating downloaders must pass themselves as `this` to preserve that dispatch.
+    pub(crate) fn base_get_local_changes(
+        &self,
+        this: &dyn DownloaderInterface,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let prev_io = std::mem::replace(
+            &mut *self.io.borrow_mut(),
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
+        );
+        self.io
+            .borrow()
+            .borrow_mut()
+            .load_configuration(&mut self.config.borrow_mut())?;
+
+        let target_dir = Filesystem::trim_trailing_slash(path);
+        // PHP attaches an onRejected handler to capture the error and drives the promise via
+        // httpDownloader->wait() / process->wait(); the single-threaded sync bridge block_on's the
+        // download/install futures, so a rejection surfaces directly as the Err captured below.
+        let result: anyhow::Result<String> = (|| -> anyhow::Result<String> {
+            if is_dir(format!("{}_compare", target_dir)) {
+                self.filesystem
+                    .borrow_mut()
+                    .remove_directory(format!("{}_compare", target_dir))?;
+            }
+
+            sync_executor::block_on(this.download(
+                package.clone(),
+                &format!("{}_compare", target_dir),
+                None,
+                false,
+            ))?;
+            sync_executor::block_on(this.install(
+                package.clone(),
+                &format!("{}_compare", target_dir),
+                false,
+            ))?;
+
+            let mut comparer = Comparer::new();
+            comparer.set_source(format!("{}_compare", target_dir));
+            comparer.set_update(target_dir.clone());
+            comparer.do_compare();
+            let output = comparer.get_changed_as_string(true, false);
+            self.filesystem
+                .borrow_mut()
+                .remove_directory(format!("{}_compare", target_dir))?;
+            Ok(output)
+        })();
+
+        *self.io.borrow_mut() = prev_io;
+
+        let (e, output) = match result {
+            Ok(output) => (None, output),
+            Err(err) => (Some(err), String::new()),
+        };
+
+        if let Some(err) = e {
+            if self.io.borrow().is_debug() {
+                return Err(err);
+            }
+
+            return Ok(Some(format!(
+                "Failed to detect changes: [{}] {}",
+                get_class(&PhpMixed::Null),
+                err
+            )));
+        }
+
+        let output = trim(&output, None);
+
+        Ok(if strlen(&output) > 0 {
+            Some(output)
+        } else {
+            None
+        })
+    }
+
+    /// Shared body of `DownloaderInterface::update`; see `base_get_local_changes` for why the
+    /// concrete downloader is threaded in as `this`. The appendix is computed by the caller
+    /// because `getInstallOperationAppendix` is protected and not part of `DownloaderInterface`.
+    pub(crate) async fn base_update(
+        &self,
+        this: &dyn DownloaderInterface,
+        install_operation_appendix: &str,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        self.io.borrow().write_error(&format!(
+            "  - {}{}",
+            UpdateOperation::format(initial.clone(), target.clone(), false),
+            install_operation_appendix
+        ));
+
+        // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
+        let _ = this.remove(initial, path, false).await?;
+        this.install(target, path, false).await
+    }
+
+    fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
+        pathinfo(
+            parse_url(
+                &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
+                PHP_URL_PATH,
+            )
+            .as_string()
+            .unwrap_or(""),
+            component,
+        )
+    }
+
+    pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
+        let mut last_cache_writes = self.last_cache_writes.lock().unwrap();
+        if let Some(cache) = &self.cache
+            && last_cache_writes.contains_key(&package.get_name())
+        {
+            let key = last_cache_writes.get(&package.get_name()).unwrap().clone();
+            cache.borrow_mut().remove(&key);
+            last_cache_writes.shift_remove(&package.get_name());
+        }
+    }
+
+    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
+        self.additional_cleanup_paths
+            .borrow_mut()
+            .entry(package.get_name())
+            .or_default()
+            .push(path.to_string());
+    }
+
+    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
+        if let Some(paths) = self
+            .additional_cleanup_paths
+            .borrow_mut()
+            .get_mut(&package.get_name())
+        {
+            // PHP: array_search($path, ..., true)
+            let idx = paths.iter().position(|p| p == path);
+            if let Some(i) = idx {
+                paths.remove(i);
+            }
+            let _ = array_search;
+        }
+    }
+
+    /// Gets file name for specific package
+    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &str) -> String {
+        let extension = self.get_dist_path(package.clone(), PATHINFO_EXTENSION);
+        let extension = if extension.is_empty() {
+            package.get_dist_type().unwrap_or_default()
+        } else {
+            extension
+        };
+
+        rtrim(
+            &format!(
+                "{}/composer/tmp-{}.{}",
+                self.config
+                    .borrow_mut()
+                    .get("vendor-dir")
+                    .as_string()
+                    .unwrap_or(""),
+                hash(
+                    "md5",
+                    &format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
+                ),
+                extension
+            ),
+            Some("."),
+        )
+    }
+
+    /// Gets appendix message to add to the "- Upgrading x" string being output on update
+    fn get_install_operation_appendix(
+        &self,
+        _package: PackageInterfaceHandle,
+        _path: &str,
+    ) -> String {
+        String::new()
+    }
+
+    /// For testing only: invoke the crate-private `get_file_name`.
+    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &str) -> String {
+        self.get_file_name(package, path)
+    }
+
+    /// For testing only: invoke the crate-private `process_url`.
+    pub fn __process_url(
+        &self,
+        package: PackageInterfaceHandle,
+        url: &str,
+    ) -> anyhow::Result<String> {
+        self.process_url(package, url)
+    }
+
+    /// Process the download url
+    pub(crate) fn process_url(
+        &self,
+        package: PackageInterfaceHandle,
+        url: &str,
+    ) -> anyhow::Result<String> {
+        if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
+            return Err(RuntimeException {
+                message: "You must enable the openssl extension to download files via https"
+                    .to_string(),
+                code: 0,
+            }
+            .into());
+        }
+
+        let mut url = url.to_string();
+        if package.get_dist_reference().is_some() {
+            url = UrlUtil::update_dist_reference(
+                &self.config.borrow(),
+                url,
+                &package.get_dist_reference().unwrap(),
+            );
+        }
+
+        Ok(url)
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -601,238 +829,6 @@ impl ChangeReportInterface for FileDownloader {
         path: &str,
     ) -> anyhow::Result<Option<String>> {
         self.base_get_local_changes(self, package, path)
-    }
-}
-
-impl FileDownloader {
-    /// Shared body of `ChangeReportInterface::get_local_changes`.
-    ///
-    /// PHP's `getLocalChanges` calls `$this->download()` / `$this->install()`, which late-bind
-    /// to the concrete downloader class (e.g. `ArchiveDownloader::install` extracts the archive
-    /// instead of copying the dist file). The Rust port embeds the parent class as `inner`, so
-    /// delegating downloaders must pass themselves as `this` to preserve that dispatch.
-    pub(crate) fn base_get_local_changes(
-        &self,
-        this: &dyn DownloaderInterface,
-        package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
-        let prev_io = std::mem::replace(
-            &mut *self.io.borrow_mut(),
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
-        );
-        self.io
-            .borrow()
-            .borrow_mut()
-            .load_configuration(&mut self.config.borrow_mut())?;
-
-        let target_dir = Filesystem::trim_trailing_slash(path);
-        // PHP attaches an onRejected handler to capture the error and drives the promise via
-        // httpDownloader->wait() / process->wait(); the single-threaded sync bridge block_on's the
-        // download/install futures, so a rejection surfaces directly as the Err captured below.
-        let result: anyhow::Result<String> = (|| -> anyhow::Result<String> {
-            if is_dir(format!("{}_compare", target_dir)) {
-                self.filesystem
-                    .borrow_mut()
-                    .remove_directory(format!("{}_compare", target_dir))?;
-            }
-
-            sync_executor::block_on(this.download(
-                package.clone(),
-                &format!("{}_compare", target_dir),
-                None,
-                false,
-            ))?;
-            sync_executor::block_on(this.install(
-                package.clone(),
-                &format!("{}_compare", target_dir),
-                false,
-            ))?;
-
-            let mut comparer = Comparer::new();
-            comparer.set_source(format!("{}_compare", target_dir));
-            comparer.set_update(target_dir.clone());
-            comparer.do_compare();
-            let output = comparer.get_changed_as_string(true, false);
-            self.filesystem
-                .borrow_mut()
-                .remove_directory(format!("{}_compare", target_dir))?;
-            Ok(output)
-        })();
-
-        *self.io.borrow_mut() = prev_io;
-
-        let (e, output) = match result {
-            Ok(output) => (None, output),
-            Err(err) => (Some(err), String::new()),
-        };
-
-        if let Some(err) = e {
-            if self.io.borrow().is_debug() {
-                return Err(err);
-            }
-
-            return Ok(Some(format!(
-                "Failed to detect changes: [{}] {}",
-                get_class(&PhpMixed::Null),
-                err
-            )));
-        }
-
-        let output = trim(&output, None);
-
-        Ok(if strlen(&output) > 0 {
-            Some(output)
-        } else {
-            None
-        })
-    }
-
-    /// Shared body of `DownloaderInterface::update`; see `base_get_local_changes` for why the
-    /// concrete downloader is threaded in as `this`. The appendix is computed by the caller
-    /// because `getInstallOperationAppendix` is protected and not part of `DownloaderInterface`.
-    pub(crate) async fn base_update(
-        &self,
-        this: &dyn DownloaderInterface,
-        install_operation_appendix: &str,
-        initial: PackageInterfaceHandle,
-        target: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.borrow().write_error(&format!(
-            "  - {}{}",
-            UpdateOperation::format(initial.clone(), target.clone(), false),
-            install_operation_appendix
-        ));
-
-        // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
-        let _ = this.remove(initial, path, false).await?;
-        this.install(target, path, false).await
-    }
-}
-
-impl FileDownloader {
-    fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
-        pathinfo(
-            parse_url(
-                &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
-                PHP_URL_PATH,
-            )
-            .as_string()
-            .unwrap_or(""),
-            component,
-        )
-    }
-
-    pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
-        let mut last_cache_writes = self.last_cache_writes.lock().unwrap();
-        if let Some(cache) = &self.cache
-            && last_cache_writes.contains_key(&package.get_name())
-        {
-            let key = last_cache_writes.get(&package.get_name()).unwrap().clone();
-            cache.borrow_mut().remove(&key);
-            last_cache_writes.shift_remove(&package.get_name());
-        }
-    }
-
-    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
-        self.additional_cleanup_paths
-            .borrow_mut()
-            .entry(package.get_name())
-            .or_default()
-            .push(path.to_string());
-    }
-
-    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
-        if let Some(paths) = self
-            .additional_cleanup_paths
-            .borrow_mut()
-            .get_mut(&package.get_name())
-        {
-            // PHP: array_search($path, ..., true)
-            let idx = paths.iter().position(|p| p == path);
-            if let Some(i) = idx {
-                paths.remove(i);
-            }
-            let _ = array_search;
-        }
-    }
-
-    /// Gets file name for specific package
-    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &str) -> String {
-        let extension = self.get_dist_path(package.clone(), PATHINFO_EXTENSION);
-        let extension = if extension.is_empty() {
-            package.get_dist_type().unwrap_or_default()
-        } else {
-            extension
-        };
-
-        rtrim(
-            &format!(
-                "{}/composer/tmp-{}.{}",
-                self.config
-                    .borrow_mut()
-                    .get("vendor-dir")
-                    .as_string()
-                    .unwrap_or(""),
-                hash(
-                    "md5",
-                    &format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
-                ),
-                extension
-            ),
-            Some("."),
-        )
-    }
-
-    /// Gets appendix message to add to the "- Upgrading x" string being output on update
-    fn get_install_operation_appendix(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-    ) -> String {
-        String::new()
-    }
-
-    /// For testing only: invoke the crate-private `get_file_name`.
-    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &str) -> String {
-        self.get_file_name(package, path)
-    }
-
-    /// For testing only: invoke the crate-private `process_url`.
-    pub fn __process_url(
-        &self,
-        package: PackageInterfaceHandle,
-        url: &str,
-    ) -> anyhow::Result<String> {
-        self.process_url(package, url)
-    }
-
-    /// Process the download url
-    pub(crate) fn process_url(
-        &self,
-        package: PackageInterfaceHandle,
-        url: &str,
-    ) -> anyhow::Result<String> {
-        if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
-            return Err(RuntimeException {
-                message: "You must enable the openssl extension to download files via https"
-                    .to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        let mut url = url.to_string();
-        if package.get_dist_reference().is_some() {
-            url = UrlUtil::update_dist_reference(
-                &self.config.borrow(),
-                url,
-                &package.get_dist_reference().unwrap(),
-            );
-        }
-
-        Ok(url)
     }
 }
 

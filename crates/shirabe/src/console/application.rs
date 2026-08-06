@@ -2616,9 +2616,7 @@ impl ApplicationHandle {
             .borrow_mut()
             .get_composer(required, disable_plugins, disable_scripts)
     }
-}
 
-impl ApplicationHandle {
     /// Runs the current application (Symfony base; `parent::run`).
     pub fn base_run(
         &self,

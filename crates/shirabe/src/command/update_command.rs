@@ -62,6 +62,202 @@ impl UpdateCommand {
             .expect("UpdateCommand::configure uses static, valid metadata");
         command
     }
+
+    fn get_packages_interactively(
+        &self,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        composer: &PartialComposerHandle,
+        packages: Vec<String>,
+    ) -> anyhow::Result<Vec<String>> {
+        if !input.borrow().is_interactive() {
+            return Err(InvalidArgumentException {
+                message: "--interactive cannot be used in non-interactive terminals.".to_string(),
+                code: 0,
+            }
+            .into());
+        }
+
+        let composer_ref = crate::composer::composer_full(composer);
+        let platform_req_filter = self.get_platform_requirement_filter(input);
+        let stability_flags = composer_ref.get_package().get_stability_flags();
+        let requires = array_merge_map(
+            composer_ref.get_package().get_requires(),
+            composer_ref.get_package().get_dev_requires(),
+        );
+
+        let filter: Option<String> = if !packages.is_empty() {
+            Some(base_package::package_names_to_regexp(&packages, "%s"))
+        } else {
+            None
+        };
+
+        io.write_error3(
+            "<info>Loading packages that can be updated...</info>",
+            true,
+            io_interface::NORMAL,
+        );
+        let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
+        let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
+            if composer_ref.get_locker().borrow_mut().is_locked() {
+                let locked_repo = composer_ref
+                    .get_locker()
+                    .borrow_mut()
+                    .get_locked_repository(true)?;
+                locked_repo.borrow_mut().get_canonical_packages()?
+            } else {
+                composer_ref
+                    .get_repository_manager()
+                    .borrow()
+                    .get_local_repository()
+                    .get_packages()?
+            };
+        let mut version_selector = self.create_version_selector(composer)?;
+        for package in &installed_packages {
+            if let Some(filter) = &filter
+                && !Preg::is_match(filter, &package.get_name())
+            {
+                continue;
+            }
+            let current_version = package.get_pretty_version();
+            let constraint = requires
+                .get(&package.get_name())
+                .map(|link| link.get_pretty_constraint());
+            let stability = match stability_flags.get(&package.get_name()) {
+                Some(flag) => base_package::STABILITIES
+                    .iter()
+                    .find(|&(_, v)| v == flag)
+                    .map(|(k, _)| k.to_string())
+                    .unwrap_or_default(),
+                None => composer_ref.get_package().get_minimum_stability(),
+            };
+            let latest_version = version_selector.find_best_candidate(
+                &package.get_name(),
+                constraint,
+                &stability,
+                None,
+                0,
+                None,
+                ShowWarnings::Always,
+            )?;
+            let _ = &platform_req_filter;
+            if let Some(latest) = latest_version
+                && (package.get_version() != latest.get_version() || latest.is_dev())
+            {
+                autocompleter_values.insert(
+                    package.get_name(),
+                    format!(
+                        "<comment>{}</comment> => <comment>{}</comment>",
+                        current_version,
+                        latest.get_pretty_version(),
+                    ),
+                );
+            }
+        }
+        if installed_packages.is_empty() {
+            for (req, _constraint) in &requires {
+                if PlatformRepository::is_platform_package(req) {
+                    continue;
+                }
+                autocompleter_values.insert(req.to_string(), String::new());
+            }
+        }
+
+        if autocompleter_values.is_empty() {
+            return Err(RuntimeException {
+                message: "Could not find any package with new versions available".to_string(),
+                code: 0,
+            }
+            .into());
+        }
+
+        let select_result = io.select(
+            "Select packages: (Select more than one value separated by comma) ".to_string(),
+            PhpMixed::Array(
+                autocompleter_values
+                    .iter()
+                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                    .collect(),
+            ),
+            PhpMixed::Bool(false),
+            PhpMixed::Int(1),
+            "No package named \"%s\" is installed.".to_string(),
+            true,
+        )?;
+        let packages: Vec<String> = match select_result {
+            PhpMixed::List(l) => l
+                .into_iter()
+                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .collect(),
+            _ => Vec::new(),
+        };
+
+        let mut table = Table::new(output);
+        table.set_headers(vec!["Selected packages".into()]);
+        for package in &packages {
+            table.add_row(PhpMixed::List(vec![PhpMixed::String(package.clone())]).into());
+        }
+        table.render();
+
+        if io.ask_confirmation(
+            format!(
+                "Would you like to continue and update the above package{} [<comment>yes</comment>]? ",
+                if 1 == packages.len() { "" } else { "s" },
+            ),
+            true,
+        ) {
+            return Ok(packages);
+        }
+
+        Err(RuntimeException {
+            message: "Installation aborted.".to_string(),
+            code: 0,
+        }
+        .into())
+    }
+
+    fn create_version_selector(
+        &self,
+        composer: &PartialComposerHandle,
+    ) -> anyhow::Result<VersionSelector> {
+        let composer = crate::composer::composer_full(composer);
+        let root_aliases: Vec<crate::repository::RootAliasInput> = composer
+            .get_package()
+            .get_aliases()
+            .into_iter()
+            .map(|alias| crate::repository::RootAliasInput {
+                package: alias.get("package").cloned().unwrap_or_default(),
+                version: alias.get("version").cloned().unwrap_or_default(),
+                alias: alias.get("alias").cloned().unwrap_or_default(),
+                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
+            })
+            .collect();
+        let mut repository_set = RepositorySet::new(
+            &composer.get_package().get_minimum_stability(),
+            composer.get_package().get_stability_flags(),
+            root_aliases,
+            composer.get_package().get_references(),
+            IndexMap::new(),
+            IndexMap::new(),
+        );
+        let repositories: Vec<crate::repository::RepositoryInterfaceHandle> = composer
+            .get_repository_manager()
+            .borrow()
+            .get_repositories()
+            .iter()
+            .filter(|repository| !repository.is::<PlatformRepository>())
+            .cloned()
+            .collect();
+        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+            CompositeRepository::new(repositories),
+        ))?;
+
+        VersionSelector::new(
+            std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
+            None,
+        )
+    }
 }
 
 impl Command for UpdateCommand {
@@ -590,202 +786,4 @@ impl BaseCommand for UpdateCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl UpdateCommand {
-    fn get_packages_interactively(
-        &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        composer: &PartialComposerHandle,
-        packages: Vec<String>,
-    ) -> anyhow::Result<Vec<String>> {
-        if !input.borrow().is_interactive() {
-            return Err(InvalidArgumentException {
-                message: "--interactive cannot be used in non-interactive terminals.".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        let composer_ref = crate::composer::composer_full(composer);
-        let platform_req_filter = self.get_platform_requirement_filter(input);
-        let stability_flags = composer_ref.get_package().get_stability_flags();
-        let requires = array_merge_map(
-            composer_ref.get_package().get_requires(),
-            composer_ref.get_package().get_dev_requires(),
-        );
-
-        let filter: Option<String> = if !packages.is_empty() {
-            Some(base_package::package_names_to_regexp(&packages, "%s"))
-        } else {
-            None
-        };
-
-        io.write_error3(
-            "<info>Loading packages that can be updated...</info>",
-            true,
-            io_interface::NORMAL,
-        );
-        let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
-        let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
-            if composer_ref.get_locker().borrow_mut().is_locked() {
-                let locked_repo = composer_ref
-                    .get_locker()
-                    .borrow_mut()
-                    .get_locked_repository(true)?;
-                locked_repo.borrow_mut().get_canonical_packages()?
-            } else {
-                composer_ref
-                    .get_repository_manager()
-                    .borrow()
-                    .get_local_repository()
-                    .get_packages()?
-            };
-        let mut version_selector = self.create_version_selector(composer)?;
-        for package in &installed_packages {
-            if let Some(filter) = &filter
-                && !Preg::is_match(filter, &package.get_name())
-            {
-                continue;
-            }
-            let current_version = package.get_pretty_version();
-            let constraint = requires
-                .get(&package.get_name())
-                .map(|link| link.get_pretty_constraint());
-            let stability = match stability_flags.get(&package.get_name()) {
-                Some(flag) => base_package::STABILITIES
-                    .iter()
-                    .find(|&(_, v)| v == flag)
-                    .map(|(k, _)| k.to_string())
-                    .unwrap_or_default(),
-                None => composer_ref.get_package().get_minimum_stability(),
-            };
-            let latest_version = version_selector.find_best_candidate(
-                &package.get_name(),
-                constraint,
-                &stability,
-                None,
-                0,
-                None,
-                ShowWarnings::Always,
-            )?;
-            let _ = &platform_req_filter;
-            if let Some(latest) = latest_version
-                && (package.get_version() != latest.get_version() || latest.is_dev())
-            {
-                autocompleter_values.insert(
-                    package.get_name(),
-                    format!(
-                        "<comment>{}</comment> => <comment>{}</comment>",
-                        current_version,
-                        latest.get_pretty_version(),
-                    ),
-                );
-            }
-        }
-        if installed_packages.is_empty() {
-            for (req, _constraint) in &requires {
-                if PlatformRepository::is_platform_package(req) {
-                    continue;
-                }
-                autocompleter_values.insert(req.to_string(), String::new());
-            }
-        }
-
-        if autocompleter_values.is_empty() {
-            return Err(RuntimeException {
-                message: "Could not find any package with new versions available".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        let select_result = io.select(
-            "Select packages: (Select more than one value separated by comma) ".to_string(),
-            PhpMixed::Array(
-                autocompleter_values
-                    .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
-                    .collect(),
-            ),
-            PhpMixed::Bool(false),
-            PhpMixed::Int(1),
-            "No package named \"%s\" is installed.".to_string(),
-            true,
-        )?;
-        let packages: Vec<String> = match select_result {
-            PhpMixed::List(l) => l
-                .into_iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                .collect(),
-            _ => Vec::new(),
-        };
-
-        let mut table = Table::new(output);
-        table.set_headers(vec!["Selected packages".into()]);
-        for package in &packages {
-            table.add_row(PhpMixed::List(vec![PhpMixed::String(package.clone())]).into());
-        }
-        table.render();
-
-        if io.ask_confirmation(
-            format!(
-                "Would you like to continue and update the above package{} [<comment>yes</comment>]? ",
-                if 1 == packages.len() { "" } else { "s" },
-            ),
-            true,
-        ) {
-            return Ok(packages);
-        }
-
-        Err(RuntimeException {
-            message: "Installation aborted.".to_string(),
-            code: 0,
-        }
-        .into())
-    }
-
-    fn create_version_selector(
-        &self,
-        composer: &PartialComposerHandle,
-    ) -> anyhow::Result<VersionSelector> {
-        let composer = crate::composer::composer_full(composer);
-        let root_aliases: Vec<crate::repository::RootAliasInput> = composer
-            .get_package()
-            .get_aliases()
-            .into_iter()
-            .map(|alias| crate::repository::RootAliasInput {
-                package: alias.get("package").cloned().unwrap_or_default(),
-                version: alias.get("version").cloned().unwrap_or_default(),
-                alias: alias.get("alias").cloned().unwrap_or_default(),
-                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
-            })
-            .collect();
-        let mut repository_set = RepositorySet::new(
-            &composer.get_package().get_minimum_stability(),
-            composer.get_package().get_stability_flags(),
-            root_aliases,
-            composer.get_package().get_references(),
-            IndexMap::new(),
-            IndexMap::new(),
-        );
-        let repositories: Vec<crate::repository::RepositoryInterfaceHandle> = composer
-            .get_repository_manager()
-            .borrow()
-            .get_repositories()
-            .iter()
-            .filter(|repository| !repository.is::<PlatformRepository>())
-            .cloned()
-            .collect();
-        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-            CompositeRepository::new(repositories),
-        ))?;
-
-        VersionSelector::new(
-            std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
-            None,
-        )
-    }
 }

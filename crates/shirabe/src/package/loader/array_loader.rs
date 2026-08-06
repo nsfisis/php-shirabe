@@ -39,156 +39,7 @@ impl ArrayLoader {
             load_options,
         }
     }
-}
 
-enum CompleteOrRootPackage {
-    Complete(CompletePackage),
-    Root(RootPackage),
-}
-
-impl CompleteOrRootPackage {
-    fn package(&self) -> &Package {
-        match self {
-            Self::Complete(p) => &p.inner,
-            Self::Root(p) => &p.inner.inner,
-        }
-    }
-
-    fn package_mut(&mut self) -> &mut Package {
-        match self {
-            Self::Complete(p) => &mut p.inner,
-            Self::Root(p) => &mut p.inner.inner,
-        }
-    }
-
-    fn complete_mut(&mut self) -> &mut dyn CompletePackageInterface {
-        match self {
-            Self::Complete(p) => p,
-            Self::Root(p) => p,
-        }
-    }
-
-    fn is_root(&self) -> bool {
-        matches!(self, Self::Root(_))
-    }
-
-    fn get_name(&self) -> &str {
-        self.package().get_name()
-    }
-
-    fn get_pretty_version(&self) -> &str {
-        self.package().get_pretty_version()
-    }
-
-    fn into_handle(self) -> PackageInterfaceHandle {
-        match self {
-            Self::Complete(p) => CompletePackageHandle::from_complete_package(p).into(),
-            Self::Root(p) => RootPackageHandle::from_root_package(p).into(),
-        }
-    }
-}
-
-fn php_to_map(value: &PhpMixed) -> IndexMap<String, PhpMixed> {
-    match value {
-        PhpMixed::Array(m) => m.clone(),
-        _ => IndexMap::new(),
-    }
-}
-
-fn php_to_string_vec(value: &PhpMixed) -> Vec<String> {
-    match value {
-        PhpMixed::List(l) => l.iter().map(strval).collect(),
-        PhpMixed::Array(m) => m.values().map(strval).collect(),
-        _ => Vec::new(),
-    }
-}
-
-fn apply_link_setter(package: &mut Package, method: &str, links: IndexMap<String, Link>) {
-    if method == Link::TYPE_REQUIRE {
-        package.set_requires(links);
-    } else if method == Link::TYPE_DEV_REQUIRE {
-        package.set_dev_requires(links);
-    } else if method == Link::TYPE_CONFLICT {
-        package.set_conflicts(links);
-    } else if method == Link::TYPE_PROVIDE {
-        package.set_provides(links);
-    } else if method == Link::TYPE_REPLACE {
-        package.set_replaces(links);
-    }
-}
-
-fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
-    let entries: Vec<&PhpMixed> = match value {
-        PhpMixed::List(l) => l.iter().collect(),
-        PhpMixed::Array(m) => m.values().collect(),
-        _ => Vec::new(),
-    };
-    entries
-        .into_iter()
-        .filter_map(|entry| match entry {
-            PhpMixed::Array(m) => Some(Mirror {
-                url: m
-                    .get("url")
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("")
-                    .to_string(),
-                preferred: m.get("preferred").is_some_and(|v| v.to_bool()),
-            }),
-            _ => None,
-        })
-        .collect()
-}
-
-impl LoaderInterface for ArrayLoader {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn load(
-        &self,
-        mut config: IndexMap<String, PhpMixed>,
-        class: Option<String>,
-    ) -> anyhow::Result<PackageInterfaceHandle> {
-        let class = class.unwrap_or_else(|| "Composer\\Package\\CompletePackage".to_string());
-
-        if class != "Composer\\Package\\CompletePackage"
-            && class != "Composer\\Package\\RootPackage"
-        {
-            trigger_error(
-                "The $class arg is deprecated, please reach out to Composer maintainers ASAP if you still need this.",
-                E_USER_DEPRECATED,
-            );
-        }
-
-        let mut package = self.create_object(&config, &class)?;
-
-        for (r#type, opts) in SUPPORTED_LINK_TYPES.iter() {
-            let entry = config.get(*r#type);
-            let entry_is_array = entry
-                .map(|v| matches!(v, PhpMixed::Array(_)))
-                .unwrap_or(false);
-            if entry.is_none() || !entry_is_array {
-                continue;
-            }
-            let links = self.parse_links(
-                package.get_name(),
-                package.get_pretty_version(),
-                opts.method,
-                match entry.unwrap() {
-                    PhpMixed::Array(arr) => arr.clone(),
-                    _ => IndexMap::new(),
-                },
-            )?;
-            apply_link_setter(package.package_mut(), opts.method, links);
-        }
-
-        let package = self.configure_object(package, &mut config)?;
-
-        Ok(package)
-    }
-}
-
-impl ArrayLoader {
     #[tracing::instrument(skip_all)]
     pub fn load_packages(
         &self,
@@ -936,5 +787,152 @@ impl ArrayLoader {
         }
 
         Ok(None)
+    }
+}
+
+enum CompleteOrRootPackage {
+    Complete(CompletePackage),
+    Root(RootPackage),
+}
+
+impl CompleteOrRootPackage {
+    fn package(&self) -> &Package {
+        match self {
+            Self::Complete(p) => &p.inner,
+            Self::Root(p) => &p.inner.inner,
+        }
+    }
+
+    fn package_mut(&mut self) -> &mut Package {
+        match self {
+            Self::Complete(p) => &mut p.inner,
+            Self::Root(p) => &mut p.inner.inner,
+        }
+    }
+
+    fn complete_mut(&mut self) -> &mut dyn CompletePackageInterface {
+        match self {
+            Self::Complete(p) => p,
+            Self::Root(p) => p,
+        }
+    }
+
+    fn is_root(&self) -> bool {
+        matches!(self, Self::Root(_))
+    }
+
+    fn get_name(&self) -> &str {
+        self.package().get_name()
+    }
+
+    fn get_pretty_version(&self) -> &str {
+        self.package().get_pretty_version()
+    }
+
+    fn into_handle(self) -> PackageInterfaceHandle {
+        match self {
+            Self::Complete(p) => CompletePackageHandle::from_complete_package(p).into(),
+            Self::Root(p) => RootPackageHandle::from_root_package(p).into(),
+        }
+    }
+}
+
+fn php_to_map(value: &PhpMixed) -> IndexMap<String, PhpMixed> {
+    match value {
+        PhpMixed::Array(m) => m.clone(),
+        _ => IndexMap::new(),
+    }
+}
+
+fn php_to_string_vec(value: &PhpMixed) -> Vec<String> {
+    match value {
+        PhpMixed::List(l) => l.iter().map(strval).collect(),
+        PhpMixed::Array(m) => m.values().map(strval).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn apply_link_setter(package: &mut Package, method: &str, links: IndexMap<String, Link>) {
+    if method == Link::TYPE_REQUIRE {
+        package.set_requires(links);
+    } else if method == Link::TYPE_DEV_REQUIRE {
+        package.set_dev_requires(links);
+    } else if method == Link::TYPE_CONFLICT {
+        package.set_conflicts(links);
+    } else if method == Link::TYPE_PROVIDE {
+        package.set_provides(links);
+    } else if method == Link::TYPE_REPLACE {
+        package.set_replaces(links);
+    }
+}
+
+fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
+    let entries: Vec<&PhpMixed> = match value {
+        PhpMixed::List(l) => l.iter().collect(),
+        PhpMixed::Array(m) => m.values().collect(),
+        _ => Vec::new(),
+    };
+    entries
+        .into_iter()
+        .filter_map(|entry| match entry {
+            PhpMixed::Array(m) => Some(Mirror {
+                url: m
+                    .get("url")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string(),
+                preferred: m.get("preferred").is_some_and(|v| v.to_bool()),
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+impl LoaderInterface for ArrayLoader {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn load(
+        &self,
+        mut config: IndexMap<String, PhpMixed>,
+        class: Option<String>,
+    ) -> anyhow::Result<PackageInterfaceHandle> {
+        let class = class.unwrap_or_else(|| "Composer\\Package\\CompletePackage".to_string());
+
+        if class != "Composer\\Package\\CompletePackage"
+            && class != "Composer\\Package\\RootPackage"
+        {
+            trigger_error(
+                "The $class arg is deprecated, please reach out to Composer maintainers ASAP if you still need this.",
+                E_USER_DEPRECATED,
+            );
+        }
+
+        let mut package = self.create_object(&config, &class)?;
+
+        for (r#type, opts) in SUPPORTED_LINK_TYPES.iter() {
+            let entry = config.get(*r#type);
+            let entry_is_array = entry
+                .map(|v| matches!(v, PhpMixed::Array(_)))
+                .unwrap_or(false);
+            if entry.is_none() || !entry_is_array {
+                continue;
+            }
+            let links = self.parse_links(
+                package.get_name(),
+                package.get_pretty_version(),
+                opts.method,
+                match entry.unwrap() {
+                    PhpMixed::Array(arr) => arr.clone(),
+                    _ => IndexMap::new(),
+                },
+            )?;
+            apply_link_setter(package.package_mut(), opts.method, links);
+        }
+
+        let package = self.configure_object(package, &mut config)?;
+
+        Ok(package)
     }
 }

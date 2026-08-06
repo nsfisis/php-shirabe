@@ -41,6 +41,100 @@ impl ValidateCommand {
             .expect("ValidateCommand::configure uses static, valid metadata");
         command
     }
+
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
+    fn output_result(
+        &self,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        name: &str,
+        errors: &mut Vec<String>,
+        warnings: &mut Vec<String>,
+        check_publish: bool,
+        publish_errors: &mut Vec<String>,
+        check_lock: bool,
+        lock_errors: &mut Vec<String>,
+        print_schema_url: bool,
+    ) {
+        let mut do_print_schema_url = false;
+
+        if !errors.is_empty() {
+            io.write_error(&format!(
+                "<error>{} is invalid, the following errors/warnings were found:</error>",
+                name
+            ));
+        } else if !publish_errors.is_empty() && check_publish {
+            io.write_error(&format!(
+                "<info>{} is valid for simple usage with Composer but has</info>",
+                name
+            ));
+            io.write_error(
+                "<info>strict errors that make it unable to be published as a package</info>",
+            );
+            do_print_schema_url = print_schema_url;
+        } else if !warnings.is_empty() {
+            io.write_error(&format!(
+                "<info>{} is valid, but with a few warnings</info>",
+                name
+            ));
+            do_print_schema_url = print_schema_url;
+        } else if !lock_errors.is_empty() {
+            io.write(&format!(
+                "<info>{} is valid but your composer.lock has some {}</info>",
+                name,
+                if check_lock { "errors" } else { "warnings" }
+            ));
+        } else {
+            io.write(&format!("<info>{} is valid</info>", name));
+        }
+
+        if do_print_schema_url {
+            io.write_error("<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>");
+        }
+
+        if !errors.is_empty() {
+            *errors = errors.iter().map(|e| format!("- {}", e)).collect();
+            errors.insert(0, "# General errors".to_string());
+        }
+        if !warnings.is_empty() {
+            *warnings = warnings.iter().map(|w| format!("- {}", w)).collect();
+            warnings.insert(0, "# General warnings".to_string());
+        }
+
+        let mut extra_warnings: Vec<String> = vec![];
+
+        if !publish_errors.is_empty() && check_publish {
+            *publish_errors = publish_errors.iter().map(|e| format!("- {}", e)).collect();
+            publish_errors.insert(0, "# Publish errors".to_string());
+            errors.append(publish_errors);
+        }
+
+        if !lock_errors.is_empty() {
+            if check_lock {
+                lock_errors.insert(0, "# Lock file errors".to_string());
+                errors.append(lock_errors);
+            } else {
+                lock_errors.insert(0, "# Lock file warnings".to_string());
+                extra_warnings.append(lock_errors);
+            }
+        }
+
+        let all_warnings: Vec<String> = warnings.iter().cloned().chain(extra_warnings).collect();
+
+        for msg in errors.iter() {
+            if msg.starts_with('#') {
+                io.write_error(&format!("<error>{}</error>", msg));
+            } else {
+                io.write_error(msg);
+            }
+        }
+        for msg in &all_warnings {
+            if msg.starts_with('#') {
+                io.write_error(&format!("<warning>{}</warning>", msg));
+            } else {
+                io.write_error(msg);
+            }
+        }
+    }
 }
 
 impl Command for ValidateCommand {
@@ -327,100 +421,4 @@ impl BaseCommand for ValidateCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl ValidateCommand {
-    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
-    fn output_result(
-        &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        name: &str,
-        errors: &mut Vec<String>,
-        warnings: &mut Vec<String>,
-        check_publish: bool,
-        publish_errors: &mut Vec<String>,
-        check_lock: bool,
-        lock_errors: &mut Vec<String>,
-        print_schema_url: bool,
-    ) {
-        let mut do_print_schema_url = false;
-
-        if !errors.is_empty() {
-            io.write_error(&format!(
-                "<error>{} is invalid, the following errors/warnings were found:</error>",
-                name
-            ));
-        } else if !publish_errors.is_empty() && check_publish {
-            io.write_error(&format!(
-                "<info>{} is valid for simple usage with Composer but has</info>",
-                name
-            ));
-            io.write_error(
-                "<info>strict errors that make it unable to be published as a package</info>",
-            );
-            do_print_schema_url = print_schema_url;
-        } else if !warnings.is_empty() {
-            io.write_error(&format!(
-                "<info>{} is valid, but with a few warnings</info>",
-                name
-            ));
-            do_print_schema_url = print_schema_url;
-        } else if !lock_errors.is_empty() {
-            io.write(&format!(
-                "<info>{} is valid but your composer.lock has some {}</info>",
-                name,
-                if check_lock { "errors" } else { "warnings" }
-            ));
-        } else {
-            io.write(&format!("<info>{} is valid</info>", name));
-        }
-
-        if do_print_schema_url {
-            io.write_error("<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>");
-        }
-
-        if !errors.is_empty() {
-            *errors = errors.iter().map(|e| format!("- {}", e)).collect();
-            errors.insert(0, "# General errors".to_string());
-        }
-        if !warnings.is_empty() {
-            *warnings = warnings.iter().map(|w| format!("- {}", w)).collect();
-            warnings.insert(0, "# General warnings".to_string());
-        }
-
-        let mut extra_warnings: Vec<String> = vec![];
-
-        if !publish_errors.is_empty() && check_publish {
-            *publish_errors = publish_errors.iter().map(|e| format!("- {}", e)).collect();
-            publish_errors.insert(0, "# Publish errors".to_string());
-            errors.append(publish_errors);
-        }
-
-        if !lock_errors.is_empty() {
-            if check_lock {
-                lock_errors.insert(0, "# Lock file errors".to_string());
-                errors.append(lock_errors);
-            } else {
-                lock_errors.insert(0, "# Lock file warnings".to_string());
-                extra_warnings.append(lock_errors);
-            }
-        }
-
-        let all_warnings: Vec<String> = warnings.iter().cloned().chain(extra_warnings).collect();
-
-        for msg in errors.iter() {
-            if msg.starts_with('#') {
-                io.write_error(&format!("<error>{}</error>", msg));
-            } else {
-                io.write_error(msg);
-            }
-        }
-        for msg in &all_warnings {
-            if msg.starts_with('#') {
-                io.write_error(&format!("<warning>{}</warning>", msg));
-            } else {
-                io.write_error(msg);
-            }
-        }
-    }
 }

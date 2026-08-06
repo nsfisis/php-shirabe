@@ -81,213 +81,7 @@ impl CreateProjectCommand {
             .expect("CreateProjectCommand::configure uses static, valid metadata");
         command
     }
-}
 
-impl Command for CreateProjectCommand {
-    fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("create-project")?;
-        self.set_description("Creates new project from a package into given directory");
-        self.set_definition(&[
-                InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
-                InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
-                InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
-                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
-                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
-                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-                InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
-                InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories to look the package up, either by URL or using JSON arrays", None).unwrap().into(),
-                InputOption::new("repository-url", None, Some(InputOption::VALUE_REQUIRED), "DEPRECATED: Use --repository instead.", None).unwrap().into(),
-                InputOption::new("add-repository", None, Some(InputOption::VALUE_NONE), "Add the custom repository in the composer.json. If a lock file is present it will be deleted and an update will be run instead of install.", None).unwrap().into(),
-                InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Enables installation of require-dev packages (enabled by default, only present for BC).", None).unwrap().into(),
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None).unwrap().into(),
-                InputOption::new("no-custom-installers", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Use no-plugins instead.", None).unwrap().into(),
-                InputOption::new("no-scripts", None, Some(InputOption::VALUE_NONE), "Whether to prevent execution of all defined scripts in the root package.", None).unwrap().into(),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-                InputOption::new("no-secure-http", None, Some(InputOption::VALUE_NONE), "Disable the secure-http config option temporarily while installing the root package. Use at your own risk. Using this flag is a bad idea.", None).unwrap().into(),
-                InputOption::new("keep-vcs", None, Some(InputOption::VALUE_NONE), "Whether to prevent deleting the vcs folder.", None).unwrap().into(),
-                InputOption::new("remove-vcs", None, Some(InputOption::VALUE_NONE), "Whether to force deletion of the vcs folder without prompting.", None).unwrap().into(),
-                InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Whether to skip installation of the package dependencies.", None).unwrap().into(),
-                InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Whether to skip auditing of the installed package dependencies (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-                InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
-                InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
-                InputOption::new("ask", None, Some(InputOption::VALUE_NONE), "Whether to ask for project directory.", None).unwrap().into(),
-            ]);
-        self.set_help(
-                "The <info>create-project</info> command creates a new project from a given\n\
-                package into a new directory. If executed without params and in a directory\n\
-                with a composer.json file it installs the packages for the current project.\n\n\
-                You can use this command to bootstrap new projects or setup a clean\n\
-                version-controlled installation for developers of your project.\n\n\
-                <info>shirabe create-project vendor/project target-directory [version]</info>\n\n\
-                You can also specify the version with the package name using = or : as separator.\n\n\
-                <info>shirabe create-project vendor/project:version target-directory</info>\n\n\
-                To install unstable packages, either specify the version you want, or use the\n\
-                --stability=dev (where dev can be one of RC, beta, alpha or dev).\n\n\
-                To setup a developer workable version you should create the project using the source\n\
-                controlled code by appending the <info>'--prefer-source'</info> flag.\n\n\
-                To install a package from another repository than the default one you\n\
-                can pass the <info>'--repository=https://myrepository.org'</info> flag.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#create-project"
-            );
-        Ok(())
-    }
-
-    fn execute(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
-
-        let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config.borrow(), input.clone(), true)?;
-
-        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
-            io.write_error("<warning>You are using the deprecated option \"dev\". Dev packages are installed by default now.</warning>");
-        }
-        if input
-            .borrow()
-            .get_option("no-custom-installers")?
-            .as_bool()
-            .unwrap_or(false)
-        {
-            io.write_error("<warning>You are using the deprecated option \"no-custom-installers\". Use \"no-plugins\" instead.</warning>");
-            input
-                .borrow_mut()
-                .set_option("no-plugins", PhpMixed::Bool(true));
-        }
-
-        if input.borrow().is_interactive()
-            && input.borrow().get_option("ask")?.as_bool().unwrap_or(false)
-        {
-            let package = input.borrow().get_argument("package")?;
-            if package.is_null() {
-                return Err(RuntimeException {
-                    message: "Not enough arguments (missing: \"package\").".to_string(),
-                    code: 0,
-                }
-                .into());
-            }
-            let mut parts =
-                explode_with_limit("/", &strtolower(package.as_string().unwrap_or("")), 2);
-            let prompt = format!(
-                "New project directory [<comment>{}</comment>]: ",
-                array_pop(&mut parts).unwrap_or_default()
-            );
-            input
-                .borrow_mut()
-                .set_argument("directory", io.ask(prompt, PhpMixed::Null)?);
-        }
-
-        let repository_opt = input.borrow().get_option("repository")?;
-        let repository_url_opt = input.borrow().get_option("repository-url")?;
-        let repositories = if repository_opt
-            .as_list()
-            .map(|l| !l.is_empty())
-            .unwrap_or(false)
-        {
-            Some(repository_opt)
-        } else {
-            Some(repository_url_opt)
-        };
-
-        self.install_project(
-            io,
-            config,
-            input.clone(),
-            input
-                .borrow()
-                .get_argument("package")?
-                .as_string()
-                .map(|s| s.to_string()),
-            input
-                .borrow()
-                .get_argument("directory")?
-                .as_string()
-                .map(|s| s.to_string()),
-            input
-                .borrow()
-                .get_argument("version")?
-                .as_string()
-                .map(|s| s.to_string()),
-            input
-                .borrow()
-                .get_option("stability")?
-                .as_string()
-                .map(|s| s.to_string()),
-            prefer_source,
-            prefer_dist,
-            !input
-                .borrow()
-                .get_option("no-dev")?
-                .as_bool()
-                .unwrap_or(false),
-            repositories,
-            input
-                .borrow()
-                .get_option("no-plugins")?
-                .as_bool()
-                .unwrap_or(false),
-            input
-                .borrow()
-                .get_option("no-scripts")?
-                .as_bool()
-                .unwrap_or(false),
-            input
-                .borrow()
-                .get_option("no-progress")?
-                .as_bool()
-                .unwrap_or(false),
-            input
-                .borrow()
-                .get_option("no-install")?
-                .as_bool()
-                .unwrap_or(false),
-            Some(self.get_platform_requirement_filter(input.clone())?),
-            !input
-                .borrow()
-                .get_option("no-secure-http")?
-                .as_bool()
-                .unwrap_or(false),
-            input
-                .borrow()
-                .get_option("add-repository")?
-                .as_bool()
-                .unwrap_or(false),
-        )
-    }
-
-    fn initialize(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<()> {
-        base_command_initialize(self, input, output)
-    }
-
-    fn complete(
-        &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
-    ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
-    }
-
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl BaseCommand for CreateProjectCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
-        &self.base_command_data
-    }
-
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl CreateProjectCommand {
     /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
     pub fn install_project(
@@ -1056,4 +850,208 @@ impl CreateProjectCommand {
 
         Ok(installed_from_vcs)
     }
+}
+
+impl Command for CreateProjectCommand {
+    fn configure(&self) -> anyhow::Result<()> {
+        self.set_name("create-project")?;
+        self.set_description("Creates new project from a package into given directory");
+        self.set_definition(&[
+                InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
+                InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
+                InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
+                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
+                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
+                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
+                InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
+                InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories to look the package up, either by URL or using JSON arrays", None).unwrap().into(),
+                InputOption::new("repository-url", None, Some(InputOption::VALUE_REQUIRED), "DEPRECATED: Use --repository instead.", None).unwrap().into(),
+                InputOption::new("add-repository", None, Some(InputOption::VALUE_NONE), "Add the custom repository in the composer.json. If a lock file is present it will be deleted and an update will be run instead of install.", None).unwrap().into(),
+                InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Enables installation of require-dev packages (enabled by default, only present for BC).", None).unwrap().into(),
+                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None).unwrap().into(),
+                InputOption::new("no-custom-installers", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Use no-plugins instead.", None).unwrap().into(),
+                InputOption::new("no-scripts", None, Some(InputOption::VALUE_NONE), "Whether to prevent execution of all defined scripts in the root package.", None).unwrap().into(),
+                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
+                InputOption::new("no-secure-http", None, Some(InputOption::VALUE_NONE), "Disable the secure-http config option temporarily while installing the root package. Use at your own risk. Using this flag is a bad idea.", None).unwrap().into(),
+                InputOption::new("keep-vcs", None, Some(InputOption::VALUE_NONE), "Whether to prevent deleting the vcs folder.", None).unwrap().into(),
+                InputOption::new("remove-vcs", None, Some(InputOption::VALUE_NONE), "Whether to force deletion of the vcs folder without prompting.", None).unwrap().into(),
+                InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Whether to skip installation of the package dependencies.", None).unwrap().into(),
+                InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Whether to skip auditing of the installed package dependencies (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
+                InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+                InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
+                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
+                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
+                InputOption::new("ask", None, Some(InputOption::VALUE_NONE), "Whether to ask for project directory.", None).unwrap().into(),
+            ]);
+        self.set_help(
+                "The <info>create-project</info> command creates a new project from a given\n\
+                package into a new directory. If executed without params and in a directory\n\
+                with a composer.json file it installs the packages for the current project.\n\n\
+                You can use this command to bootstrap new projects or setup a clean\n\
+                version-controlled installation for developers of your project.\n\n\
+                <info>shirabe create-project vendor/project target-directory [version]</info>\n\n\
+                You can also specify the version with the package name using = or : as separator.\n\n\
+                <info>shirabe create-project vendor/project:version target-directory</info>\n\n\
+                To install unstable packages, either specify the version you want, or use the\n\
+                --stability=dev (where dev can be one of RC, beta, alpha or dev).\n\n\
+                To setup a developer workable version you should create the project using the source\n\
+                controlled code by appending the <info>'--prefer-source'</info> flag.\n\n\
+                To install a package from another repository than the default one you\n\
+                can pass the <info>'--repository=https://myrepository.org'</info> flag.\n\n\
+                Read more at https://getcomposer.org/doc/03-cli.md#create-project"
+            );
+        Ok(())
+    }
+
+    fn execute(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
+
+        let (prefer_source, prefer_dist) =
+            self.get_preferred_install_options(&config.borrow(), input.clone(), true)?;
+
+        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
+            io.write_error("<warning>You are using the deprecated option \"dev\". Dev packages are installed by default now.</warning>");
+        }
+        if input
+            .borrow()
+            .get_option("no-custom-installers")?
+            .as_bool()
+            .unwrap_or(false)
+        {
+            io.write_error("<warning>You are using the deprecated option \"no-custom-installers\". Use \"no-plugins\" instead.</warning>");
+            input
+                .borrow_mut()
+                .set_option("no-plugins", PhpMixed::Bool(true));
+        }
+
+        if input.borrow().is_interactive()
+            && input.borrow().get_option("ask")?.as_bool().unwrap_or(false)
+        {
+            let package = input.borrow().get_argument("package")?;
+            if package.is_null() {
+                return Err(RuntimeException {
+                    message: "Not enough arguments (missing: \"package\").".to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+            let mut parts =
+                explode_with_limit("/", &strtolower(package.as_string().unwrap_or("")), 2);
+            let prompt = format!(
+                "New project directory [<comment>{}</comment>]: ",
+                array_pop(&mut parts).unwrap_or_default()
+            );
+            input
+                .borrow_mut()
+                .set_argument("directory", io.ask(prompt, PhpMixed::Null)?);
+        }
+
+        let repository_opt = input.borrow().get_option("repository")?;
+        let repository_url_opt = input.borrow().get_option("repository-url")?;
+        let repositories = if repository_opt
+            .as_list()
+            .map(|l| !l.is_empty())
+            .unwrap_or(false)
+        {
+            Some(repository_opt)
+        } else {
+            Some(repository_url_opt)
+        };
+
+        self.install_project(
+            io,
+            config,
+            input.clone(),
+            input
+                .borrow()
+                .get_argument("package")?
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .borrow()
+                .get_argument("directory")?
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .borrow()
+                .get_argument("version")?
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .borrow()
+                .get_option("stability")?
+                .as_string()
+                .map(|s| s.to_string()),
+            prefer_source,
+            prefer_dist,
+            !input
+                .borrow()
+                .get_option("no-dev")?
+                .as_bool()
+                .unwrap_or(false),
+            repositories,
+            input
+                .borrow()
+                .get_option("no-plugins")?
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("no-scripts")?
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("no-progress")?
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("no-install")?
+                .as_bool()
+                .unwrap_or(false),
+            Some(self.get_platform_requirement_filter(input.clone())?),
+            !input
+                .borrow()
+                .get_option("no-secure-http")?
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("add-repository")?
+                .as_bool()
+                .unwrap_or(false),
+        )
+    }
+
+    fn initialize(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for CreateProjectCommand {
+    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+        &self.base_command_data
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

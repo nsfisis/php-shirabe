@@ -84,6 +84,370 @@ impl InitCommand {
             .expect("InitCommand::configure uses static, valid metadata");
         command
     }
+
+    fn parse_author_string(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3(
+            php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
+            author,
+            Some(&mut m),
+        ) {
+            let email = m.get(&CaptureKey::ByName("email".to_string())).cloned();
+            if let Some(ref email) = email
+                && !self.is_valid_email(email)
+            {
+                return Err(InvalidArgumentException {
+                    message: format!("Invalid email \"{}\"", email),
+                    code: 0,
+                }
+                .into());
+            }
+
+            let mut result: IndexMap<String, Option<String>> = IndexMap::new();
+            result.insert(
+                "name".to_string(),
+                Some(trim(
+                    &m.get(&CaptureKey::ByName("name".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
+                    None,
+                )),
+            );
+            result.insert("email".to_string(), email);
+
+            return Ok(result);
+        }
+
+        Err(InvalidArgumentException {
+            message: "Invalid author string.  Must be in the formats: Jane Doe or John Smith <john@example.com>"
+                .to_string(),
+            code: 0,
+        }
+        .into())
+    }
+
+    pub(crate) fn format_authors(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
+        let parsed = self.parse_author_string(author)?;
+        let mut author_map: IndexMap<String, PhpMixed> = IndexMap::new();
+        let name = parsed.get("name").cloned().unwrap_or(None);
+        let email = parsed.get("email").cloned().unwrap_or(None);
+        if let Some(name) = name {
+            author_map.insert("name".to_string(), PhpMixed::String(name));
+        }
+        if let Some(email) = email {
+            author_map.insert("email".to_string(), PhpMixed::String(email));
+        }
+
+        Ok(vec![author_map])
+    }
+
+    /// Extract namespace from package's vendor name.
+    ///
+    /// new_projects.acme-extra/package-name becomes "NewProjectsAcmeExtra\PackageName"
+    pub fn namespace_from_package_name(&self, package_name: &str) -> Option<String> {
+        if package_name.is_empty() || strpos(package_name, "/").is_none() {
+            return None;
+        }
+
+        let namespace: Vec<String> = array_map(
+            |part: &String| {
+                let part = Preg::replace(php_regex!(r"/[^a-z0-9]/i"), " ", part);
+                let part = ucwords(&part);
+                str_replace(" ", "", &part)
+            },
+            &explode("/", package_name),
+        );
+
+        Some(implode("\\", &namespace))
+    }
+
+    pub(crate) fn get_git_config(&self) -> IndexMap<String, String> {
+        if self.git_config.borrow().is_some() {
+            return self.git_config.borrow().clone().unwrap_or_default();
+        }
+
+        let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
+
+        let mut output = String::new();
+        if process.execute_args(
+            &["git".to_string(), "config".to_string(), "-l".to_string()],
+            &mut output,
+            None,
+        ) == 0
+        {
+            *self.git_config.borrow_mut() = Some(IndexMap::new());
+            let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
+            if Preg::is_match_all3(php_regex!(r"{^([^=]+)=(.*)$}m"), &output, Some(&mut m)) {
+                let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let values: Vec<String> =
+                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                for (key, value) in keys.iter().zip(values.iter()) {
+                    self.git_config
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .insert(key.clone(), value.clone());
+                }
+            }
+
+            return self.git_config.borrow().clone().unwrap_or_default();
+        }
+
+        *self.git_config.borrow_mut() = Some(IndexMap::new());
+        IndexMap::new()
+    }
+
+    /// Checks the local .gitignore file for the Composer vendor directory.
+    ///
+    /// Tested patterns include:
+    ///  "/$vendor"
+    ///  "$vendor"
+    ///  "$vendor/"
+    ///  "/$vendor/"
+    ///  "/$vendor/*"
+    ///  "$vendor/*"
+    pub(crate) fn has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
+        if !file_exists(ignore_file) {
+            return false;
+        }
+
+        let pattern = format!("{{^/?{}(/\\*?)?$}}", preg_quote(vendor, None));
+
+        let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
+        for line in &lines {
+            if Preg::is_match(&pattern, line) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(crate) fn add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
+        let mut contents = String::new();
+        if file_exists(ignore_file) {
+            contents = file_get_contents(ignore_file).unwrap_or_default();
+
+            if strpos(&contents, "\n") != Some(0) {
+                contents.push('\n');
+            }
+        }
+
+        file_put_contents(ignore_file, format!("{}{}\n", contents, vendor).as_bytes());
+    }
+
+    /// For testing only: invoke the private `parse_author_string`.
+    pub fn __parse_author_string(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
+        self.parse_author_string(author)
+    }
+
+    /// For testing only: invoke the crate-private `format_authors`.
+    pub fn __format_authors(
+        &self,
+        author: &str,
+    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
+        self.format_authors(author)
+    }
+
+    /// For testing only: invoke the crate-private `get_git_config`.
+    pub fn __get_git_config(&self) -> IndexMap<String, String> {
+        self.get_git_config()
+    }
+
+    /// For testing only: invoke the crate-private `has_vendor_ignore`.
+    pub fn __has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
+        self.has_vendor_ignore(ignore_file, vendor)
+    }
+
+    /// For testing only: invoke the crate-private `add_vendor_ignore`.
+    pub fn __add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
+        self.add_vendor_ignore(ignore_file, vendor)
+    }
+
+    pub(crate) fn is_valid_email(&self, email: &str) -> bool {
+        shirabe_php_shim::filter_var_email(email)
+    }
+
+    fn update_dependencies(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
+        let result = (|| -> anyhow::Result<i64> {
+            let application = self
+                .get_application()
+                .expect("a Composer command's application is always set");
+            let update_command = application.borrow_mut().find("update")?;
+            self.reset_composer()?;
+            let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
+            let command = update_command.borrow();
+            command.run(input, output)
+        })();
+
+        if result.is_err() {
+            self.get_io().borrow().write_error(
+                "Could not update dependencies. Run `composer update` to see more information.",
+            );
+        }
+    }
+
+    fn run_dump_autoload_command(
+        &self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
+        let result = (|| -> anyhow::Result<i64> {
+            let application = self
+                .get_application()
+                .expect("a Composer command's application is always set");
+            let command = application.borrow_mut().find("dump-autoload")?;
+            self.reset_composer()?;
+            let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
+            let command = command.borrow();
+            command.run(input, output)
+        })();
+
+        if result.is_err() {
+            self.get_io()
+                .borrow()
+                .write_error("Could not run dump-autoload.");
+        }
+    }
+
+    fn has_dependencies(&self, options: &IndexMap<String, PhpMixed>) -> bool {
+        let requires = options.get("require").cloned().unwrap_or(PhpMixed::Null);
+        let requires_arr_empty = match &requires {
+            PhpMixed::Array(m) => m.is_empty(),
+            PhpMixed::List(l) => l.is_empty(),
+            PhpMixed::Null => true,
+            _ => false,
+        };
+        let dev_requires = options.get("require-dev").cloned();
+        let dev_requires_arr_empty = match &dev_requires {
+            Some(PhpMixed::Array(m)) => m.is_empty(),
+            Some(PhpMixed::List(l)) => l.is_empty(),
+            Some(PhpMixed::Null) | None => true,
+            _ => false,
+        };
+
+        !requires_arr_empty || !dev_requires_arr_empty
+    }
+
+    fn sanitize_package_name_component(&self, name: &str) -> String {
+        let name = Preg::replace(
+            php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
+            "$1$3-$2$4",
+            name,
+        );
+        let name = strtolower(&name);
+        let name = Preg::replace(php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"), "", &name);
+
+        Preg::replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
+    }
+
+    fn get_default_package_name(&self) -> String {
+        let git = self.get_git_config();
+        let cwd = realpath(".").unwrap_or_default();
+        let name = basename(&cwd);
+        let name = self.sanitize_package_name_component(&name);
+
+        let mut vendor = name.clone();
+        let composer_default_vendor = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_VENDOR")
+            .map(|value| value.to_string_lossy().into_owned());
+        let server_username = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("USERNAME")
+            .map(|value| value.to_string_lossy().into_owned());
+        let server_user = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("USER")
+            .map(|value| value.to_string_lossy().into_owned());
+        if !empty(
+            &composer_default_vendor
+                .clone()
+                .map(PhpMixed::String)
+                .unwrap_or(PhpMixed::Null),
+        ) {
+            vendor = composer_default_vendor.unwrap_or_default();
+        } else if git.contains_key("github.user") {
+            vendor = git.get("github.user").cloned().unwrap_or_default();
+        } else if !empty(
+            &server_username
+                .clone()
+                .map(PhpMixed::String)
+                .unwrap_or(PhpMixed::Null),
+        ) {
+            vendor = server_username.unwrap_or_default();
+        } else if !empty(
+            &server_user
+                .clone()
+                .map(PhpMixed::String)
+                .unwrap_or(PhpMixed::Null),
+        ) {
+            vendor = server_user.unwrap_or_default();
+        } else if !get_current_user().is_empty() {
+            vendor = get_current_user();
+        }
+
+        let vendor = self.sanitize_package_name_component(&vendor);
+
+        format!("{}/{}", vendor, name)
+    }
+
+    fn get_default_author(&self) -> Option<String> {
+        let git = self.get_git_config();
+
+        let mut author_name: Option<String> = None;
+        let composer_default_author = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_AUTHOR")
+            .map(|value| value.to_string_lossy().into_owned());
+        if !empty(
+            &composer_default_author
+                .clone()
+                .map(PhpMixed::String)
+                .unwrap_or(PhpMixed::Null),
+        ) {
+            author_name = composer_default_author;
+        } else if git.contains_key("user.name") {
+            author_name = git.get("user.name").cloned();
+        }
+
+        let mut author_email: Option<String> = None;
+        let composer_default_email = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_EMAIL")
+            .map(|value| value.to_string_lossy().into_owned());
+        if !empty(
+            &composer_default_email
+                .clone()
+                .map(PhpMixed::String)
+                .unwrap_or(PhpMixed::Null),
+        ) {
+            author_email = composer_default_email;
+        } else if git.contains_key("user.email") {
+            author_email = git.get("user.email").cloned();
+        }
+
+        if let (Some(name), Some(email)) = (author_name, author_email) {
+            return Some(format!("{} <{}>", name, email));
+        }
+
+        None
+    }
 }
 
 impl Command for InitCommand {
@@ -920,370 +1284,4 @@ impl BaseCommand for InitCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl InitCommand {
-    fn parse_author_string(
-        &self,
-        author: &str,
-    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
-        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3(
-            php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
-            author,
-            Some(&mut m),
-        ) {
-            let email = m.get(&CaptureKey::ByName("email".to_string())).cloned();
-            if let Some(ref email) = email
-                && !self.is_valid_email(email)
-            {
-                return Err(InvalidArgumentException {
-                    message: format!("Invalid email \"{}\"", email),
-                    code: 0,
-                }
-                .into());
-            }
-
-            let mut result: IndexMap<String, Option<String>> = IndexMap::new();
-            result.insert(
-                "name".to_string(),
-                Some(trim(
-                    &m.get(&CaptureKey::ByName("name".to_string()))
-                        .cloned()
-                        .unwrap_or_default(),
-                    None,
-                )),
-            );
-            result.insert("email".to_string(), email);
-
-            return Ok(result);
-        }
-
-        Err(InvalidArgumentException {
-            message: "Invalid author string.  Must be in the formats: Jane Doe or John Smith <john@example.com>"
-                .to_string(),
-            code: 0,
-        }
-        .into())
-    }
-
-    pub(crate) fn format_authors(
-        &self,
-        author: &str,
-    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
-        let parsed = self.parse_author_string(author)?;
-        let mut author_map: IndexMap<String, PhpMixed> = IndexMap::new();
-        let name = parsed.get("name").cloned().unwrap_or(None);
-        let email = parsed.get("email").cloned().unwrap_or(None);
-        if let Some(name) = name {
-            author_map.insert("name".to_string(), PhpMixed::String(name));
-        }
-        if let Some(email) = email {
-            author_map.insert("email".to_string(), PhpMixed::String(email));
-        }
-
-        Ok(vec![author_map])
-    }
-
-    /// Extract namespace from package's vendor name.
-    ///
-    /// new_projects.acme-extra/package-name becomes "NewProjectsAcmeExtra\PackageName"
-    pub fn namespace_from_package_name(&self, package_name: &str) -> Option<String> {
-        if package_name.is_empty() || strpos(package_name, "/").is_none() {
-            return None;
-        }
-
-        let namespace: Vec<String> = array_map(
-            |part: &String| {
-                let part = Preg::replace(php_regex!(r"/[^a-z0-9]/i"), " ", part);
-                let part = ucwords(&part);
-                str_replace(" ", "", &part)
-            },
-            &explode("/", package_name),
-        );
-
-        Some(implode("\\", &namespace))
-    }
-
-    pub(crate) fn get_git_config(&self) -> IndexMap<String, String> {
-        if self.git_config.borrow().is_some() {
-            return self.git_config.borrow().clone().unwrap_or_default();
-        }
-
-        let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
-
-        let mut output = String::new();
-        if process.execute_args(
-            &["git".to_string(), "config".to_string(), "-l".to_string()],
-            &mut output,
-            None,
-        ) == 0
-        {
-            *self.git_config.borrow_mut() = Some(IndexMap::new());
-            let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
-            if Preg::is_match_all3(php_regex!(r"{^([^=]+)=(.*)$}m"), &output, Some(&mut m)) {
-                let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let values: Vec<String> =
-                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                for (key, value) in keys.iter().zip(values.iter()) {
-                    self.git_config
-                        .borrow_mut()
-                        .as_mut()
-                        .unwrap()
-                        .insert(key.clone(), value.clone());
-                }
-            }
-
-            return self.git_config.borrow().clone().unwrap_or_default();
-        }
-
-        *self.git_config.borrow_mut() = Some(IndexMap::new());
-        IndexMap::new()
-    }
-
-    /// Checks the local .gitignore file for the Composer vendor directory.
-    ///
-    /// Tested patterns include:
-    ///  "/$vendor"
-    ///  "$vendor"
-    ///  "$vendor/"
-    ///  "/$vendor/"
-    ///  "/$vendor/*"
-    ///  "$vendor/*"
-    pub(crate) fn has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
-        if !file_exists(ignore_file) {
-            return false;
-        }
-
-        let pattern = format!("{{^/?{}(/\\*?)?$}}", preg_quote(vendor, None));
-
-        let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
-        for line in &lines {
-            if Preg::is_match(&pattern, line) {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    pub(crate) fn add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
-        let mut contents = String::new();
-        if file_exists(ignore_file) {
-            contents = file_get_contents(ignore_file).unwrap_or_default();
-
-            if strpos(&contents, "\n") != Some(0) {
-                contents.push('\n');
-            }
-        }
-
-        file_put_contents(ignore_file, format!("{}{}\n", contents, vendor).as_bytes());
-    }
-
-    /// For testing only: invoke the private `parse_author_string`.
-    pub fn __parse_author_string(
-        &self,
-        author: &str,
-    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
-        self.parse_author_string(author)
-    }
-
-    /// For testing only: invoke the crate-private `format_authors`.
-    pub fn __format_authors(
-        &self,
-        author: &str,
-    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
-        self.format_authors(author)
-    }
-
-    /// For testing only: invoke the crate-private `get_git_config`.
-    pub fn __get_git_config(&self) -> IndexMap<String, String> {
-        self.get_git_config()
-    }
-
-    /// For testing only: invoke the crate-private `has_vendor_ignore`.
-    pub fn __has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
-        self.has_vendor_ignore(ignore_file, vendor)
-    }
-
-    /// For testing only: invoke the crate-private `add_vendor_ignore`.
-    pub fn __add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
-        self.add_vendor_ignore(ignore_file, vendor)
-    }
-
-    pub(crate) fn is_valid_email(&self, email: &str) -> bool {
-        shirabe_php_shim::filter_var_email(email)
-    }
-
-    fn update_dependencies(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
-        let result = (|| -> anyhow::Result<i64> {
-            let application = self
-                .get_application()
-                .expect("a Composer command's application is always set");
-            let update_command = application.borrow_mut().find("update")?;
-            self.reset_composer()?;
-            let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
-                std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
-            let command = update_command.borrow();
-            command.run(input, output)
-        })();
-
-        if result.is_err() {
-            self.get_io().borrow().write_error(
-                "Could not update dependencies. Run `composer update` to see more information.",
-            );
-        }
-    }
-
-    fn run_dump_autoload_command(
-        &self,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
-        let result = (|| -> anyhow::Result<i64> {
-            let application = self
-                .get_application()
-                .expect("a Composer command's application is always set");
-            let command = application.borrow_mut().find("dump-autoload")?;
-            self.reset_composer()?;
-            let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
-                std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
-            let command = command.borrow();
-            command.run(input, output)
-        })();
-
-        if result.is_err() {
-            self.get_io()
-                .borrow()
-                .write_error("Could not run dump-autoload.");
-        }
-    }
-
-    fn has_dependencies(&self, options: &IndexMap<String, PhpMixed>) -> bool {
-        let requires = options.get("require").cloned().unwrap_or(PhpMixed::Null);
-        let requires_arr_empty = match &requires {
-            PhpMixed::Array(m) => m.is_empty(),
-            PhpMixed::List(l) => l.is_empty(),
-            PhpMixed::Null => true,
-            _ => false,
-        };
-        let dev_requires = options.get("require-dev").cloned();
-        let dev_requires_arr_empty = match &dev_requires {
-            Some(PhpMixed::Array(m)) => m.is_empty(),
-            Some(PhpMixed::List(l)) => l.is_empty(),
-            Some(PhpMixed::Null) | None => true,
-            _ => false,
-        };
-
-        !requires_arr_empty || !dev_requires_arr_empty
-    }
-
-    fn sanitize_package_name_component(&self, name: &str) -> String {
-        let name = Preg::replace(
-            php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
-            "$1$3-$2$4",
-            name,
-        );
-        let name = strtolower(&name);
-        let name = Preg::replace(php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"), "", &name);
-
-        Preg::replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
-    }
-
-    fn get_default_package_name(&self) -> String {
-        let git = self.get_git_config();
-        let cwd = realpath(".").unwrap_or_default();
-        let name = basename(&cwd);
-        let name = self.sanitize_package_name_component(&name);
-
-        let mut vendor = name.clone();
-        let composer_default_vendor = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("COMPOSER_DEFAULT_VENDOR")
-            .map(|value| value.to_string_lossy().into_owned());
-        let server_username = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("USERNAME")
-            .map(|value| value.to_string_lossy().into_owned());
-        let server_user = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("USER")
-            .map(|value| value.to_string_lossy().into_owned());
-        if !empty(
-            &composer_default_vendor
-                .clone()
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-        ) {
-            vendor = composer_default_vendor.unwrap_or_default();
-        } else if git.contains_key("github.user") {
-            vendor = git.get("github.user").cloned().unwrap_or_default();
-        } else if !empty(
-            &server_username
-                .clone()
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-        ) {
-            vendor = server_username.unwrap_or_default();
-        } else if !empty(
-            &server_user
-                .clone()
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-        ) {
-            vendor = server_user.unwrap_or_default();
-        } else if !get_current_user().is_empty() {
-            vendor = get_current_user();
-        }
-
-        let vendor = self.sanitize_package_name_component(&vendor);
-
-        format!("{}/{}", vendor, name)
-    }
-
-    fn get_default_author(&self) -> Option<String> {
-        let git = self.get_git_config();
-
-        let mut author_name: Option<String> = None;
-        let composer_default_author = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("COMPOSER_DEFAULT_AUTHOR")
-            .map(|value| value.to_string_lossy().into_owned());
-        if !empty(
-            &composer_default_author
-                .clone()
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-        ) {
-            author_name = composer_default_author;
-        } else if git.contains_key("user.name") {
-            author_name = git.get("user.name").cloned();
-        }
-
-        let mut author_email: Option<String> = None;
-        let composer_default_email = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("COMPOSER_DEFAULT_EMAIL")
-            .map(|value| value.to_string_lossy().into_owned());
-        if !empty(
-            &composer_default_email
-                .clone()
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-        ) {
-            author_email = composer_default_email;
-        } else if git.contains_key("user.email") {
-            author_email = git.get("user.email").cloned();
-        }
-
-        if let (Some(name), Some(email)) = (author_name, author_email) {
-            return Some(format!("{} <{}>", name, email));
-        }
-
-        None
-    }
 }

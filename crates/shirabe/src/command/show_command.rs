@@ -81,1382 +81,7 @@ impl ShowCommand {
             .expect("ShowCommand::configure uses static, valid metadata");
         command
     }
-}
 
-impl Command for ShowCommand {
-    fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("show")?;
-        self.set_aliases(vec!["info".to_string()])?;
-        self.set_description("Shows information about packages");
-        let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
-            InputOption::new(
-                name,
-                shortcut.map(|s| PhpMixed::String(s.to_string())),
-                Some(InputOption::VALUE_NONE),
-                description,
-                None,
-            )
-            .unwrap()
-            .into()
-        };
-        self.set_definition(&[
-            InputArgument::new5(
-                "package",
-                Some(InputArgument::OPTIONAL),
-                "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.",
-                None,
-                self.suggest_package_based_on_mode(),
-            )
-            .unwrap()
-            .into(),
-            InputArgument::new(
-                "version",
-                Some(InputArgument::OPTIONAL),
-                "Version or version constraint to inspect",
-                None,
-            )
-            .unwrap()
-            .into(),
-            opt_none("all", None, "List all packages"),
-            opt_none("locked", None, "List all locked packages"),
-            opt_none(
-                "installed",
-                Some("i"),
-                "List installed packages only (enabled by default, only present for BC).",
-            ),
-            opt_none("platform", Some("p"), "List platform packages only"),
-            opt_none("available", Some("a"), "List available packages only"),
-            opt_none("self", Some("s"), "Show the root package information"),
-            opt_none("name-only", Some("N"), "List package names only"),
-            opt_none("path", Some("P"), "Show package paths"),
-            opt_none("tree", Some("t"), "List the dependencies as a tree"),
-            opt_none("latest", Some("l"), "Show the latest version"),
-            opt_none(
-                "outdated",
-                Some("o"),
-                "Show the latest version but only for packages that are outdated",
-            ),
-            InputOption::new6(
-                "ignore",
-                None,
-                Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
-                "Ignore specified package(s). Can contain wildcards (*). Use it with the --outdated option if you don't want to be informed about new versions of some packages.",
-                None,
-                self.suggest_installed_package(false, false),
-            )
-            .unwrap()
-            .into(),
-            opt_none(
-                "major-only",
-                Some("M"),
-                "Show only packages that have major SemVer-compatible updates. Use with the --latest or --outdated option.",
-            ),
-            opt_none(
-                "minor-only",
-                Some("m"),
-                "Show only packages that have minor SemVer-compatible updates. Use with the --latest or --outdated option.",
-            ),
-            opt_none(
-                "patch-only",
-                None,
-                "Show only packages that have patch SemVer-compatible updates. Use with the --latest or --outdated option.",
-            ),
-            opt_none(
-                "sort-by-age",
-                Some("A"),
-                "Displays the installed version's age, and sorts packages oldest first. Use with the --latest or --outdated option.",
-            ),
-            opt_none(
-                "direct",
-                Some("D"),
-                "Shows only packages that are directly required by the root package",
-            ),
-            opt_none(
-                "strict",
-                None,
-                "Return a non-zero exit code when there are outdated packages",
-            ),
-            InputOption::new6(
-                "format",
-                Some(PhpMixed::String("f".to_string())),
-                Some(InputOption::VALUE_REQUIRED),
-                "Format of the output: text or json",
-                Some(PhpMixed::String("text".to_string())),
-                SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
-            )
-            .unwrap()
-            .into(),
-            opt_none("no-dev", None, "Disables search in require-dev packages."),
-            InputOption::new(
-                "ignore-platform-req",
-                None,
-                Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
-                "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option",
-                None,
-            )
-            .unwrap()
-            .into(),
-            opt_none(
-                "ignore-platform-reqs",
-                None,
-                "Ignore all platform requirements (php & ext- packages). Use with the --outdated option",
-            ),
-        ]);
-        self.set_help(
-            "The show command displays detailed information about a package, or\n\
-             lists all packages available.\n\n\
-             Read more at https://getcomposer.org/doc/03-cli.md#show-info",
-        );
-        Ok(())
-    }
-
-    fn execute(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
-        *self.version_parser.borrow_mut() = VersionParser::new();
-        if input.borrow().get_option("tree")?.as_bool() == Some(true) {
-            self.init_styles(output.clone());
-        }
-
-        let composer = self.try_composer(None, None);
-
-        if input.borrow().get_option("installed")?.as_bool() == Some(true)
-            && input.borrow().get_option("self")?.as_bool() != Some(true)
-        {
-            self.get_io().write_error("<warning>You are using the deprecated option \"installed\". Only installed packages are shown by default now. The --all option can be used to show all packages.</warning>");
-        }
-
-        if input.borrow().get_option("outdated")?.as_bool() == Some(true) {
-            input
-                .borrow_mut()
-                .set_option("latest", PhpMixed::Bool(true));
-        } else if input
-            .borrow()
-            .get_option("ignore")?
-            .as_list()
-            .map_or(0, |l| l.len())
-            > 0
-        {
-            self.get_io().write_error("<warning>You are using the option \"ignore\" for action other than \"outdated\", it will be ignored.</warning>");
-        }
-
-        if input.borrow().get_option("direct")?.as_bool() == Some(true)
-            && (input.borrow().get_option("all")?.as_bool() == Some(true)
-                || input.borrow().get_option("available")?.as_bool() == Some(true)
-                || input.borrow().get_option("platform")?.as_bool() == Some(true))
-        {
-            self.get_io().write_error("The --direct (-D) option is not usable in combination with --all, --platform (-p) or --available (-a)");
-
-            return Ok(1);
-        }
-
-        if input.borrow().get_option("tree")?.as_bool() == Some(true)
-            && (input.borrow().get_option("all")?.as_bool() == Some(true)
-                || input.borrow().get_option("available")?.as_bool() == Some(true))
-        {
-            self.get_io().write_error("The --tree (-t) option is not usable in combination with --all or --available (-a)");
-
-            return Ok(1);
-        }
-
-        let only_count: usize = [
-            input.borrow().get_option("patch-only")?.as_bool() == Some(true),
-            input.borrow().get_option("minor-only")?.as_bool() == Some(true),
-            input.borrow().get_option("major-only")?.as_bool() == Some(true),
-        ]
-        .iter()
-        .filter(|b| **b)
-        .count();
-        if only_count > 1 {
-            self.get_io().write_error(
-                "Only one of --major-only, --minor-only or --patch-only can be used at once",
-            );
-
-            return Ok(1);
-        }
-
-        if input.borrow().get_option("tree")?.as_bool() == Some(true)
-            && input.borrow().get_option("latest")?.as_bool() == Some(true)
-        {
-            self.get_io().write_error(
-                "The --tree (-t) option is not usable in combination with --latest (-l)",
-            );
-
-            return Ok(1);
-        }
-
-        if input.borrow().get_option("tree")?.as_bool() == Some(true)
-            && input.borrow().get_option("path")?.as_bool() == Some(true)
-        {
-            self.get_io().write_error(
-                "The --tree (-t) option is not usable in combination with --path (-P)",
-            );
-
-            return Ok(1);
-        }
-
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .unwrap_or("text")
-            .to_string();
-        if !in_array_loose(
-            format.clone(),
-            &[
-                PhpMixed::String("text".to_string()),
-                PhpMixed::String("json".to_string()),
-            ],
-        ) {
-            self.get_io().write_error(&format!(
-                "Unsupported format \"{}\". See help for supported formats.",
-                format
-            ));
-
-            return Ok(1);
-        }
-
-        let platform_req_filter = self.get_platform_requirement_filter(input.clone())?;
-
-        // init repos
-        let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
-        if let Some(ref composer) = composer {
-            let composer = crate::composer::composer_full(composer);
-            if let Some(p) = composer
-                .get_config()
-                .borrow()
-                .get("platform")
-                .as_array()
-                .cloned()
-            {
-                platform_overrides = p.into_iter().collect();
-            }
-        }
-        let platform_repo =
-            PlatformRepositoryHandle::new(PlatformRepository::new(vec![], platform_overrides)?);
-        let mut locked_repo: Option<RepositoryInterfaceHandle> = None;
-
-        // The single-package $package binding from PHP gets surfaced here.
-        let mut single_package: Option<crate::package::CompletePackageInterfaceHandle> = None;
-        let mut versions_map: IndexMap<String, String> = IndexMap::new();
-        let installed_repo: RepositoryInterfaceHandle;
-        let repos: RepositoryInterfaceHandle;
-
-        if input.borrow().get_option("self")?.as_bool() == Some(true)
-            && input.borrow().get_option("installed")?.as_bool() != Some(true)
-            && input.borrow().get_option("locked")?.as_bool() != Some(true)
-        {
-            let composer = self.require_composer(None, None)?;
-            let package = crate::package::RootPackageInterfaceHandle::dup(
-                composer.borrow_partial().get_package(),
-            );
-            if input.borrow().get_option("name-only")?.as_bool() == Some(true) {
-                self.get_io().write(&package.get_name());
-
-                return Ok(0);
-            }
-            if input
-                .borrow()
-                .get_argument("package")?
-                .as_string()
-                .is_some()
-            {
-                return Err(InvalidArgumentException {
-                    message: "You cannot use --self together with a package name".to_string(),
-                    code: 0,
-                }
-                .into());
-            }
-            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
-            ]));
-            repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
-            ]));
-            single_package = Some(package.into());
-        } else if input.borrow().get_option("platform")?.as_bool() == Some(true) {
-            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                platform_repo.clone().into(),
-            ]));
-            repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                platform_repo.clone().into(),
-            ]));
-        } else if input.borrow().get_option("available")?.as_bool() == Some(true) {
-            let mut ir = InstalledRepository::new(vec![platform_repo.clone().into()]);
-            if let Some(ref composer) = composer {
-                let composer = crate::composer::composer_full(composer);
-                repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_repositories()
-                        .to_vec(),
-                ));
-                ir.add_repository(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_local_repository(),
-                );
-                installed_repo = RepositoryInterfaceHandle::new(ir);
-            } else {
-                let default_repos =
-                    RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
-                let names: Vec<String> = default_repos.keys().cloned().collect();
-                repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
-                    default_repos.into_values().collect(),
-                ));
-                self.get_io().write_error(&format!(
-                    "No composer.json found in the current directory, showing available packages from {}",
-                    names.join(", ")
-                ));
-                installed_repo = RepositoryInterfaceHandle::new(ir);
-            }
-        } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
-            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
-            let local_repo = composer_ref
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository();
-            let locker_rc = composer_ref.get_locker().clone();
-            let mut locker = locker_rc.borrow_mut();
-            if locker.is_locked() {
-                let lr_handle: RepositoryInterfaceHandle =
-                    locker.get_locked_repository(true)?.into();
-                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                    lr_handle.clone(),
-                    local_repo,
-                    platform_repo.clone().into(),
-                ]));
-                locked_repo = Some(lr_handle);
-            } else {
-                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                    local_repo,
-                    platform_repo.clone().into(),
-                ]));
-            }
-            let mut composite_input: Vec<RepositoryInterfaceHandle> =
-                vec![RepositoryInterfaceHandle::new(FilterRepository::new(
-                    installed_repo.clone(),
-                    {
-                        let mut m = IndexMap::new();
-                        m.insert("canonical".to_string(), PhpMixed::Bool(false));
-                        m
-                    },
-                )?)];
-            for r in composer_ref
-                .get_repository_manager()
-                .borrow()
-                .get_repositories()
-            {
-                composite_input.push(r.clone());
-            }
-            repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
-        } else if input.borrow().get_option("all")?.as_bool() == Some(true) {
-            let default_repos =
-                RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
-            let names: Vec<String> = default_repos.keys().cloned().collect();
-            self.get_io().write_error(&format!(
-                "No composer.json found in the current directory, showing available packages from {}",
-                names.join(", ")
-            ));
-            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                platform_repo.clone().into(),
-            ]));
-            let mut composite_input: Vec<RepositoryInterfaceHandle> = vec![installed_repo.clone()];
-            for (_k, v) in default_repos.into_iter() {
-                composite_input.push(v);
-            }
-            repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
-        } else if input.borrow().get_option("locked")?.as_bool() == Some(true) {
-            if composer.is_none()
-                || !crate::composer::composer_full(composer.as_ref().unwrap())
-                    .get_locker()
-                    .borrow_mut()
-                    .is_locked()
-            {
-                return Err(UnexpectedValueException {
-                    message: "A valid composer.json and composer.lock files is required to run this command with --locked".to_string(),
-                    code: 0,
-                }
-                .into());
-            }
-            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
-            let locker_rc = composer_ref.get_locker().clone();
-            let mut locker = locker_rc.borrow_mut();
-            let lr = locker.get_locked_repository(
-                input.borrow().get_option("no-dev")?.as_bool() != Some(true),
-            )?;
-            if input.borrow().get_option("self")?.as_bool() == Some(true) {
-                lr.add_package(
-                    crate::package::RootPackageInterfaceHandle::dup(composer_ref.get_package())
-                        .into(),
-                )?;
-            }
-            let lr_handle: RepositoryInterfaceHandle = lr.into();
-            locked_repo = Some(lr_handle.clone());
-            let new_repo =
-                RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle]));
-            installed_repo = new_repo.clone();
-            repos = new_repo;
-        } else {
-            // --installed / default case
-            let composer_local_owned;
-            let _guard_from_existing;
-            let composer_local = match composer.as_ref() {
-                Some(c) => {
-                    _guard_from_existing = crate::composer::composer_full(c);
-                    &*_guard_from_existing
-                }
-                None => {
-                    composer_local_owned = self.require_composer(None, None)?;
-                    _guard_from_existing = crate::composer::composer_full(&composer_local_owned);
-                    &*_guard_from_existing
-                }
-            };
-            let root_pkg = composer_local.get_package();
-
-            let root_repo: RepositoryInterfaceHandle =
-                if input.borrow().get_option("self")?.as_bool() == Some(true) {
-                    RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                        crate::package::RootPackageInterfaceHandle::dup(
-                            composer_local.get_package(),
-                        ),
-                    ))
-                } else {
-                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
-                };
-            if input.borrow().get_option("no-dev")?.as_bool() == Some(true) {
-                let local_packages = composer_local
-                    .get_repository_manager()
-                    .borrow()
-                    .get_local_repository()
-                    .get_packages()?;
-                let packages = RepositoryUtils::filter_required_packages(
-                    &local_packages,
-                    root_pkg.clone().into(),
-                    false,
-                    Vec::new(),
-                );
-                let cloned: Vec<crate::package::PackageInterfaceHandle> = packages
-                    .iter()
-                    .map(crate::package::PackageInterfaceHandle::dup)
-                    .collect();
-                let new_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                    root_repo,
-                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(
-                        cloned,
-                    )?),
-                ]));
-                installed_repo = new_repo.clone();
-                repos = new_repo;
-            } else {
-                let repository_manager = composer_local.get_repository_manager().clone();
-                let repository_manager = repository_manager.borrow();
-                let lr = repository_manager.get_local_repository();
-                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                    root_repo.clone(),
-                    lr.clone(),
-                ]));
-                repos =
-                    RepositoryInterfaceHandle::new(InstalledRepository::new(vec![root_repo, lr]));
-            }
-
-            if installed_repo.get_packages()?.is_empty() {
-                let has_non_platform_reqs = |reqs: &IndexMap<String, Link>| -> bool {
-                    reqs.keys()
-                        .any(|name| !PlatformRepository::is_platform_package(name))
-                };
-
-                if has_non_platform_reqs(&root_pkg.get_requires())
-                    || has_non_platform_reqs(&root_pkg.get_dev_requires())
-                {
-                    // Borrow is local; release composer_local borrow first.
-                    let _ = root_pkg;
-                    self.get_io().write_error("<warning>No dependencies installed. Try running composer install or update.</warning>");
-                }
-            }
-        }
-
-        if let Some(ref composer) = composer {
-            let composer = crate::composer::composer_full(composer);
-            let mut command_event = CommandEvent::new6(
-                PluginEvents::COMMAND,
-                "show",
-                input.clone(),
-                output,
-                vec![],
-                IndexMap::new(),
-            );
-            let command_event_name = command_event.get_name().to_string();
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
-        }
-
-        if input.borrow().get_option("latest")?.as_bool() == Some(true) && composer.is_none() {
-            self.get_io().write_error(
-                "No composer.json found in the current directory, disabling \"latest\" option",
-            );
-            input
-                .borrow_mut()
-                .set_option("latest", PhpMixed::Bool(false));
-        }
-
-        let package_filter: Option<String> = input
-            .borrow()
-            .get_argument("package")?
-            .as_string()
-            .map(|s| s.to_string());
-
-        // show single package or single version
-        if let Some(ref pkg) = single_package {
-            versions_map.insert(pkg.get_pretty_version(), pkg.get_version());
-        } else if let Some(ref pf) = package_filter
-            && !pf.contains('*')
-        {
-            let (matched_package, vers) = self.get_package(
-                &installed_repo,
-                &repos,
-                pf,
-                input.borrow().get_argument("version")?,
-            )?;
-
-            if let Some(ref pkg) = matched_package
-                && input.borrow().get_option("direct")?.as_bool() == Some(true)
-                && !in_array_strict(
-                    pkg.get_name(),
-                    &self
-                        .get_root_requires()
-                        .into_iter()
-                        .map(PhpMixed::String)
-                        .collect::<Vec<_>>(),
-                )
-            {
-                return Err(InvalidArgumentException {
-                                message: format!(
-                                    "Package \"{}\" is installed but not a direct dependent of the root package.",
-                                    pkg.get_name()
-                                ),
-                                code: 0,
-                            }
-                            .into());
-            }
-
-            if matched_package.is_none() {
-                let options = input.borrow().get_options();
-                let mut hint = String::new();
-                if input.borrow().get_option("locked")?.as_bool() == Some(true) {
-                    hint.push_str(" in lock file");
-                }
-                if let Some(working_dir) = options.get("working-dir").filter(|v| !v.is_null()) {
-                    hint.push_str(&format!(
-                        " in {}/composer.json",
-                        working_dir.as_string().unwrap_or("")
-                    ));
-                }
-                if PlatformRepository::is_platform_package(pf)
-                    && input.borrow().get_option("platform")?.as_bool() != Some(true)
-                {
-                    hint.push_str(", try using --platform (-p) to show platform packages");
-                }
-                if input.borrow().get_option("all")?.as_bool() != Some(true)
-                    && input.borrow().get_option("available")?.as_bool() != Some(true)
-                {
-                    hint.push_str(", try using --available (-a) to show all available packages");
-                }
-
-                return Err(InvalidArgumentException {
-                    message: format!("Package \"{}\" not found{}.", pf, hint),
-                    code: 0,
-                }
-                .into());
-            }
-            single_package = matched_package;
-            versions_map = vers;
-        }
-
-        if let Some(ref package) = single_package {
-            // assert(isset($versions));
-
-            let mut exit_code: i64 = 0;
-            if input.borrow().get_option("tree")?.as_bool() == Some(true) {
-                let array_tree =
-                    self.generate_package_tree(package.clone().into(), &installed_repo, &repos);
-
-                if format == "json" {
-                    let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
-                    wrapper.insert(
-                        "installed".to_string(),
-                        PhpMixed::List(vec![PhpMixed::Array(array_tree.into_iter().collect())]),
-                    );
-                    self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-                        wrapper.into_iter().collect(),
-                    ))?);
-                } else {
-                    self.display_package_tree(vec![array_tree]);
-                }
-
-                return Ok(exit_code);
-            }
-
-            let mut latest_package: Option<crate::package::PackageInterfaceHandle> = None;
-            if input.borrow().get_option("latest")?.as_bool() == Some(true) {
-                latest_package = self.find_latest_package(
-                    package.clone().into(),
-                    composer.as_ref().unwrap(),
-                    &platform_repo,
-                    input
-                        .borrow()
-                        .get_option("major-only")?
-                        .as_bool()
-                        .unwrap_or(false),
-                    input
-                        .borrow()
-                        .get_option("minor-only")?
-                        .as_bool()
-                        .unwrap_or(false),
-                    input
-                        .borrow()
-                        .get_option("patch-only")?
-                        .as_bool()
-                        .unwrap_or(false),
-                    platform_req_filter.clone(),
-                )?;
-            }
-            if input.borrow().get_option("outdated")?.as_bool() == Some(true)
-                && input.borrow().get_option("strict")?.as_bool() == Some(true)
-                && latest_package.is_some()
-                && latest_package
-                    .as_ref()
-                    .unwrap()
-                    .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-                    != package
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-                && (latest_package
-                    .as_ref()
-                    .unwrap()
-                    .as_complete()
-                    .is_none_or(|c| !c.is_abandoned()))
-            {
-                exit_code = 1;
-            }
-            if input.borrow().get_option("path")?.as_bool() == Some(true) {
-                self.get_io().write_no_newline(&package.get_name());
-                let path = {
-                    let composer_ref = composer.as_ref().unwrap();
-                    composer_ref
-                        .borrow_partial()
-                        .get_installation_manager()
-                        .borrow_mut()
-                        .get_install_path(package.clone().into())
-                };
-                if let Some(path) = path {
-                    let real = realpath(&path).unwrap_or_default();
-                    let trimmed = real.split(['\r', '\n']).next().unwrap_or("");
-                    self.get_io().write(&format!(" {}", trimmed));
-                } else {
-                    self.get_io().write(" null");
-                }
-
-                return Ok(exit_code);
-            }
-
-            if format == "json" {
-                self.print_package_info_as_json(
-                    package.clone(),
-                    &versions_map,
-                    &mut *installed_repo.borrow_mut(),
-                    latest_package,
-                )?;
-            } else {
-                self.print_package_info(
-                    package.clone(),
-                    &versions_map,
-                    &mut *installed_repo.borrow_mut(),
-                    latest_package,
-                )?;
-            }
-
-            return Ok(exit_code);
-        }
-
-        // show tree view if requested
-        if input.borrow().get_option("tree")?.as_bool() == Some(true) {
-            let root_requires = self.get_root_requires();
-            let mut packages = installed_repo.get_packages()?;
-            packages.sort_by(|a, b| {
-                let sa: String = a.to_string();
-                let sb: String = b.to_string();
-                sa.cmp(&sb)
-            });
-            let mut array_tree: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            for package in packages.iter() {
-                if in_array_strict(
-                    package.get_name(),
-                    &root_requires
-                        .iter()
-                        .map(|s| PhpMixed::String(s.clone()))
-                        .collect::<Vec<_>>(),
-                ) {
-                    array_tree.push(self.generate_package_tree(
-                        package.clone(),
-                        &installed_repo,
-                        &repos,
-                    ));
-                }
-            }
-
-            if format == "json" {
-                let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
-                wrapper.insert(
-                    "installed".to_string(),
-                    PhpMixed::List(
-                        array_tree
-                            .into_iter()
-                            .map(|m| PhpMixed::Array(m.into_iter().collect()))
-                            .collect(),
-                    ),
-                );
-                self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-                    wrapper.into_iter().collect(),
-                ))?);
-            } else {
-                self.display_package_tree(array_tree);
-            }
-
-            return Ok(0);
-        }
-
-        // list packages
-        let mut packages: IndexMap<String, IndexMap<String, PackageOrName>> = IndexMap::new();
-        let mut package_filter_regex: Option<String> = None;
-        if let Some(ref pf) = package_filter {
-            let escaped = shirabe_php_shim::preg_quote(pf, None);
-            package_filter_regex = Some(format!("{{^{}$}}i", escaped.replace("\\*", ".*?")));
-        }
-
-        let mut package_list_filter: Option<Vec<String>> = None;
-        if input.borrow().get_option("direct")?.as_bool() == Some(true) {
-            package_list_filter = Some(self.get_root_requires());
-        }
-
-        if input.borrow().get_option("path")?.as_bool() == Some(true) && composer.is_none() {
-            self.get_io().write_error(
-                "No composer.json found in the current directory, disabling \"path\" option",
-            );
-            input.borrow_mut().set_option("path", PhpMixed::Bool(false));
-        }
-
-        for repo in RepositoryUtils::flatten_repositories(repos, true) {
-            let r#type = if Self::same_repository(&repo, &platform_repo) {
-                "platform"
-            } else if locked_repo
-                .as_ref()
-                .is_some_and(|lr| Self::same_repository(&repo, lr))
-            {
-                "locked"
-            } else if Self::same_repository(&repo, &installed_repo)
-                || installed_repo
-                    .borrow()
-                    .as_any()
-                    .downcast_ref::<InstalledRepository>()
-                    .is_some_and(|ir| ir.get_repositories().iter().any(|r| r.ptr_eq(&repo)))
-            {
-                "installed"
-            } else {
-                "available"
-            };
-            let type_owned = r#type.to_string();
-            if let Some(cr_rc) = repo.downcast_rc::<ComposerRepository>() {
-                let names = cr_rc
-                    .borrow_mut()
-                    .get_package_names(package_filter.as_deref())?;
-                for name in names {
-                    packages
-                        .entry(type_owned.clone())
-                        .or_default()
-                        .insert(name.clone(), PackageOrName::Name(name));
-                }
-            } else {
-                for package in repo.get_packages()? {
-                    let existing = packages
-                        .get(&type_owned)
-                        .and_then(|m| m.get(&package.get_name()));
-                    let need_replace = match existing {
-                        None => true,
-                        Some(PackageOrName::Name(_)) => true,
-                        Some(PackageOrName::Pkg(existing)) => {
-                            version_compare(&existing.get_version(), &package.get_version(), "<")
-                        }
-                    };
-                    if need_replace {
-                        let mut p: crate::package::PackageInterfaceHandle = package.clone();
-                        while let Some(alias) = p.as_alias() {
-                            p = alias.get_alias_of().into();
-                        }
-                        let matches_filter = match &package_filter_regex {
-                            None => true,
-                            Some(r) => Preg::is_match(r, &p.get_name()),
-                        };
-                        if matches_filter {
-                            let matches_list = match &package_list_filter {
-                                None => true,
-                                Some(list) => in_array_strict(
-                                    p.get_name(),
-                                    &list
-                                        .iter()
-                                        .map(|s| PhpMixed::String(s.clone()))
-                                        .collect::<Vec<_>>(),
-                                ),
-                            };
-                            if matches_list {
-                                packages
-                                    .entry(type_owned.clone())
-                                    .or_default()
-                                    .insert(p.get_name(), PackageOrName::Pkg(p));
-                            }
-                        }
-                    }
-                }
-                if Self::same_repository(&repo, &platform_repo) {
-                    for (name, p) in platform_repo.borrow().get_disabled_packages() {
-                        packages
-                            .entry(type_owned.clone())
-                            .or_default()
-                            .insert(name.clone(), PackageOrName::Pkg(p.clone().into()));
-                    }
-                }
-            }
-        }
-
-        let show_all_types = input.borrow().get_option("all")?.as_bool() == Some(true);
-        let show_latest = input.borrow().get_option("latest")?.as_bool() == Some(true);
-        let show_major_only = input.borrow().get_option("major-only")?.as_bool() == Some(true);
-        let show_minor_only = input.borrow().get_option("minor-only")?.as_bool() == Some(true);
-        let show_patch_only = input.borrow().get_option("patch-only")?.as_bool() == Some(true);
-        let ignored_packages_regex = base_package::package_names_to_regexp(
-            &input
-                .borrow()
-                .get_option("ignore")?
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(strtolower))
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default(),
-            "{^(?:%s)$}iD",
-        );
-        let indent = if show_all_types { "  " } else { "" };
-        let mut latest_packages: IndexMap<String, crate::package::PackageInterfaceHandle> =
-            IndexMap::new();
-        let mut exit_code: i64 = 0;
-        let mut view_data: IndexMap<String, Vec<IndexMap<String, PhpMixed>>> = IndexMap::new();
-        let mut view_meta_data: IndexMap<String, ViewMetaData> = IndexMap::new();
-
-        let mut write_version = false;
-        let mut write_description = false;
-
-        let type_order: Vec<(&str, bool)> = vec![
-            ("platform", true),
-            ("locked", true),
-            ("available", false),
-            ("installed", true),
-        ];
-        for (r#type, show_version) in type_order.iter() {
-            if let Some(type_packages) = packages.get_mut(*r#type) {
-                type_packages.sort_keys();
-
-                let mut name_length: usize = 0;
-                let mut version_length: usize = 0;
-                let mut latest_length: usize = 0;
-                let mut release_date_length: usize = 0;
-
-                if show_latest && *show_version {
-                    for package_or_name in type_packages.values() {
-                        if let PackageOrName::Pkg(package) = package_or_name
-                            && !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())
-                        {
-                            let latest = self.find_latest_package(
-                                package.clone(),
-                                composer.as_ref().unwrap(),
-                                &platform_repo,
-                                show_major_only,
-                                show_minor_only,
-                                show_patch_only,
-                                platform_req_filter.clone(),
-                            )?;
-                            if latest.is_none() {
-                                continue;
-                            }
-
-                            latest_packages.insert(package.get_pretty_name(), latest.unwrap());
-                        }
-                    }
-                }
-
-                let write_path = input.borrow().get_option("name-only")?.as_bool() != Some(true)
-                    && input.borrow().get_option("path")?.as_bool() == Some(true);
-                write_version = input.borrow().get_option("name-only")?.as_bool() != Some(true)
-                    && input.borrow().get_option("path")?.as_bool() != Some(true)
-                    && *show_version;
-                let write_latest = write_version && show_latest;
-                write_description = input.borrow().get_option("name-only")?.as_bool() != Some(true)
-                    && input.borrow().get_option("path")?.as_bool() != Some(true);
-                let write_release_date = write_latest
-                    && (input.borrow().get_option("sort-by-age")?.as_bool() == Some(true)
-                        || format == "json");
-
-                let mut has_outdated_packages = false;
-
-                if input.borrow().get_option("sort-by-age")?.as_bool() == Some(true) {
-                    type_packages.sort_by(|_ka, a, _kb, b| match (a, b) {
-                        (PackageOrName::Pkg(a), PackageOrName::Pkg(b)) => {
-                            a.get_release_date().cmp(&b.get_release_date())
-                        }
-                        _ => std::cmp::Ordering::Equal,
-                    });
-                }
-
-                let mut view_type: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-                for package_or_name in type_packages.values() {
-                    let mut package_view_data: IndexMap<String, PhpMixed> = IndexMap::new();
-                    if let PackageOrName::Pkg(package) = package_or_name {
-                        let latest_package = if show_latest
-                            && latest_packages.contains_key(&package.get_pretty_name())
-                        {
-                            latest_packages.get(&package.get_pretty_name())
-                        } else {
-                            None
-                        };
-
-                        // Determine if Composer is checking outdated dependencies and if current package should trigger non-default exit code
-                        let mut package_is_up_to_date = if let Some(latest) = latest_package {
-                            latest.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            ) == package.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            ) && latest.as_complete().is_none_or(|c| !c.is_abandoned())
-                        } else {
-                            false
-                        };
-                        // When using --major-only, and no bigger version than current major is found then it is considered up to date
-                        package_is_up_to_date =
-                            package_is_up_to_date || (latest_package.is_none() && show_major_only);
-                        let package_is_ignored =
-                            Preg::is_match(&ignored_packages_regex, &package.get_pretty_name());
-                        if input.borrow().get_option("outdated")?.as_bool() == Some(true)
-                            && (package_is_up_to_date || package_is_ignored)
-                        {
-                            continue;
-                        }
-
-                        if input.borrow().get_option("outdated")?.as_bool() == Some(true)
-                            || input.borrow().get_option("strict")?.as_bool() == Some(true)
-                        {
-                            has_outdated_packages = true;
-                        }
-
-                        package_view_data.insert(
-                            "name".to_string(),
-                            PhpMixed::String(package.get_pretty_name()),
-                        );
-                        package_view_data.insert(
-                            "direct-dependency".to_string(),
-                            PhpMixed::Bool(in_array_strict(
-                                package.get_name(),
-                                &self
-                                    .get_root_requires()
-                                    .into_iter()
-                                    .map(PhpMixed::String)
-                                    .collect::<Vec<_>>(),
-                            )),
-                        );
-                        if format != "json"
-                            || input.borrow().get_option("name-only")?.as_bool() != Some(true)
-                        {
-                            package_view_data.insert(
-                                "homepage".to_string(),
-                                match package.as_complete() {
-                                    Some(c) => match c.get_homepage() {
-                                        Some(h) => PhpMixed::String(h),
-                                        None => PhpMixed::Null,
-                                    },
-                                    None => PhpMixed::Null,
-                                },
-                            );
-                            package_view_data.insert(
-                                "source".to_string(),
-                                match PackageInfo::get_view_source_url(package.clone()) {
-                                    Some(s) => PhpMixed::String(s),
-                                    None => PhpMixed::Null,
-                                },
-                            );
-                        }
-                        name_length = name_length.max(package.get_pretty_name().len());
-                        if write_version {
-                            let mut version_str = package.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            );
-                            if format == "text" {
-                                version_str = version_str.trim_start_matches('v').to_string();
-                            }
-                            version_length = version_length.max(version_str.len());
-                            package_view_data
-                                .insert("version".to_string(), PhpMixed::String(version_str));
-                        }
-                        if write_release_date {
-                            if let Some(release_date) = package.get_release_date() {
-                                let mut age = self
-                                    .get_relative_time(&release_date)
-                                    .replace(" ago", " old");
-                                if !age.contains(" old") {
-                                    age = format!("from {}", age);
-                                }
-                                release_date_length = release_date_length.max(age.len());
-                                package_view_data
-                                    .insert("release-age".to_string(), PhpMixed::String(age));
-                                package_view_data.insert(
-                                    "release-date".to_string(),
-                                    PhpMixed::String(release_date.format(DATE_ATOM).to_string()),
-                                );
-                            } else {
-                                package_view_data.insert(
-                                    "release-age".to_string(),
-                                    PhpMixed::String(String::new()),
-                                );
-                                package_view_data.insert(
-                                    "release-date".to_string(),
-                                    PhpMixed::String(String::new()),
-                                );
-                            }
-                        }
-                        if write_latest && let Some(latest) = latest_package {
-                            let mut latest_version_str = latest.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            );
-                            if format == "text" {
-                                latest_version_str =
-                                    latest_version_str.trim_start_matches('v').to_string();
-                            }
-                            let update_status =
-                                Self::get_update_status(latest.clone(), package.clone())?;
-                            latest_length = latest_length.max(latest_version_str.len());
-                            package_view_data
-                                .insert("latest".to_string(), PhpMixed::String(latest_version_str));
-                            package_view_data.insert(
-                                "latest-status".to_string(),
-                                PhpMixed::String(update_status),
-                            );
-
-                            if let Some(rd) = latest.get_release_date() {
-                                package_view_data.insert(
-                                    "latest-release-date".to_string(),
-                                    PhpMixed::String(rd.format(DATE_ATOM).to_string()),
-                                );
-                            } else {
-                                package_view_data.insert(
-                                    "latest-release-date".to_string(),
-                                    PhpMixed::String(String::new()),
-                                );
-                            }
-                        } else if write_latest {
-                            package_view_data.insert(
-                                "latest".to_string(),
-                                PhpMixed::String("[none matched]".to_string()),
-                            );
-                            package_view_data.insert(
-                                "latest-status".to_string(),
-                                PhpMixed::String("up-to-date".to_string()),
-                            );
-                            latest_length = latest_length.max("[none matched]".len());
-                        }
-                        if write_description && let Some(c) = package.as_complete() {
-                            package_view_data.insert(
-                                "description".to_string(),
-                                match c.get_description() {
-                                    Some(d) => PhpMixed::String(d),
-                                    None => PhpMixed::Null,
-                                },
-                            );
-                        }
-                        if write_path {
-                            let installation_manager = composer
-                                .as_ref()
-                                .unwrap()
-                                .borrow_partial()
-                                .get_installation_manager();
-                            let path: Option<String> = installation_manager
-                                .borrow_mut()
-                                .get_install_path(package.clone());
-                            if let Some(p) = path {
-                                let r = realpath(&p).unwrap_or_default();
-                                let trimmed = r.split(['\r', '\n']).next().unwrap_or("");
-                                package_view_data.insert(
-                                    "path".to_string(),
-                                    PhpMixed::String(trimmed.to_string()),
-                                );
-                            } else {
-                                package_view_data.insert("path".to_string(), PhpMixed::Null);
-                            }
-                        }
-
-                        let mut package_is_abandoned: PhpMixed = PhpMixed::Bool(false);
-                        if let Some(latest) = latest_package
-                            && let Some(c) = latest.as_complete()
-                            && c.is_abandoned()
-                        {
-                            let replacement_package_name = c.get_replacement_package();
-                            let replacement = if let Some(ref rp) = replacement_package_name {
-                                format!("Use {} instead", rp)
-                            } else {
-                                "No replacement was suggested".to_string()
-                            };
-                            let package_warning = format!(
-                                "Package {} is abandoned, you should avoid using it. {}.",
-                                package.get_pretty_name(),
-                                replacement
-                            );
-                            package_view_data
-                                .insert("warning".to_string(), PhpMixed::String(package_warning));
-                            package_is_abandoned = match replacement_package_name {
-                                Some(rp) => PhpMixed::String(rp),
-                                None => PhpMixed::Bool(true),
-                            };
-                        }
-
-                        package_view_data.insert("abandoned".to_string(), package_is_abandoned);
-                    } else if let PackageOrName::Name(name) = package_or_name {
-                        package_view_data
-                            .insert("name".to_string(), PhpMixed::String(name.clone()));
-                        name_length = name_length.max(name.len());
-                    }
-                    view_type.push(package_view_data);
-                }
-                view_data.insert(r#type.to_string(), view_type);
-                view_meta_data.insert(
-                    r#type.to_string(),
-                    ViewMetaData {
-                        name_length,
-                        version_length,
-                        latest_length,
-                        release_date_length,
-                        write_latest,
-                        write_release_date,
-                    },
-                );
-                if input.borrow().get_option("strict")?.as_bool() == Some(true)
-                    && has_outdated_packages
-                {
-                    exit_code = 1;
-                    break;
-                }
-            }
-        }
-
-        if format == "json" {
-            let mut json_map: IndexMap<String, PhpMixed> = IndexMap::new();
-            for (k, v) in view_data.iter() {
-                json_map.insert(
-                    k.clone(),
-                    PhpMixed::List(
-                        v.iter()
-                            .map(|m| {
-                                PhpMixed::Array(
-                                    m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                                )
-                            })
-                            .collect(),
-                    ),
-                );
-            }
-            let io = self.get_io();
-            io.write(&JsonFile::encode(&PhpMixed::Array(
-                json_map.into_iter().collect(),
-            ))?);
-        } else {
-            if input.borrow().get_option("latest")?.as_bool() == Some(true)
-                && view_data.values().any(|v| !v.is_empty())
-            {
-                let io = self.get_io();
-                if !io.is_decorated() {
-                    io.write_error("Legend:");
-                    io.write_error("! patch or minor release available - update recommended");
-                    io.write_error("~ major release available - update possible");
-                    if input.borrow().get_option("outdated")?.as_bool() != Some(true) {
-                        io.write_error("= up to date version");
-                    }
-                } else {
-                    io.write_error("<info>Color legend:</info>");
-                    io.write_error("- <highlight>patch or minor</highlight> release available - update recommended");
-                    io.write_error(
-                        "- <comment>major</comment> release available - update possible",
-                    );
-                    if input.borrow().get_option("outdated")?.as_bool() != Some(true) {
-                        io.write_error("- <info>up to date</info> version");
-                    }
-                }
-            }
-
-            let width = self.get_terminal_width();
-
-            for (r#type, packages) in view_data.iter() {
-                let meta = match view_meta_data.get(r#type) {
-                    Some(m) => m.clone(),
-                    None => continue,
-                };
-                let name_length = meta.name_length;
-                let version_length = meta.version_length;
-                let mut latest_length = meta.latest_length;
-                let release_date_length = meta.release_date_length;
-                let write_latest = meta.write_latest;
-                let write_release_date = meta.write_release_date;
-
-                let width_usize = width as usize;
-                let version_fits = name_length + version_length + 3 <= width_usize;
-                let latest_fits = name_length + version_length + latest_length + 3 <= width_usize;
-                let release_date_fits =
-                    name_length + version_length + latest_length + release_date_length + 3
-                        <= width_usize;
-                let description_fits =
-                    name_length + version_length + latest_length + release_date_length + 24
-                        <= width_usize;
-
-                if latest_fits && !self.get_io().is_decorated() {
-                    latest_length += 2;
-                }
-
-                if show_all_types {
-                    if r#type == "available" {
-                        self.get_io()
-                            .write(&format!("<comment>{}</comment>:", r#type));
-                    } else {
-                        self.get_io().write(&format!("<info>{}</info>:", r#type));
-                    }
-                }
-
-                if write_latest && input.borrow().get_option("direct")?.as_bool() != Some(true) {
-                    let mut direct_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-                    let mut transitive_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-                    for pkg in packages.iter() {
-                        let is_direct = pkg
-                            .get("direct-dependency")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
-                        if is_direct {
-                            direct_deps.push(pkg.clone());
-                        } else {
-                            transitive_deps.push(pkg.clone());
-                        }
-                    }
-
-                    self.get_io().write_error("");
-                    self.get_io()
-                        .write_error("<info>Direct dependencies required in composer.json:</>");
-                    if !direct_deps.is_empty() {
-                        self.print_packages(
-                            &direct_deps,
-                            indent,
-                            write_version && version_fits,
-                            latest_fits,
-                            write_description && description_fits,
-                            width_usize,
-                            version_length,
-                            name_length,
-                            latest_length,
-                            write_release_date && release_date_fits,
-                            release_date_length,
-                        );
-                    } else {
-                        self.get_io().write_error("Everything up to date");
-                    }
-                    self.get_io().write_error("");
-                    self.get_io().write_error(
-                        "<info>Transitive dependencies not required in composer.json:</>",
-                    );
-                    if !transitive_deps.is_empty() {
-                        self.print_packages(
-                            &transitive_deps,
-                            indent,
-                            write_version && version_fits,
-                            latest_fits,
-                            write_description && description_fits,
-                            width_usize,
-                            version_length,
-                            name_length,
-                            latest_length,
-                            write_release_date && release_date_fits,
-                            release_date_length,
-                        );
-                    } else {
-                        self.get_io().write_error("Everything up to date");
-                    }
-                } else {
-                    if write_latest && packages.is_empty() {
-                        self.get_io()
-                            .write_error("All your direct dependencies are up to date");
-                    } else {
-                        self.print_packages(
-                            packages,
-                            indent,
-                            write_version && version_fits,
-                            write_latest && latest_fits,
-                            write_description && description_fits,
-                            width_usize,
-                            version_length,
-                            name_length,
-                            latest_length,
-                            write_release_date && release_date_fits,
-                            release_date_length,
-                        );
-                    }
-                }
-
-                if show_all_types {
-                    self.get_io().write("");
-                }
-            }
-        }
-
-        Ok(exit_code)
-    }
-
-    fn initialize(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<()> {
-        base_command_initialize(self, input, output)
-    }
-
-    fn complete(
-        &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
-    ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
-    }
-
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl BaseCommand for ShowCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
-        &self.base_command_data
-    }
-
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl ShowCommand {
     /// PHP: protected function suggestPackageBasedOnMode(): \Closure
     pub(crate) fn suggest_package_based_on_mode(&self) -> crate::console::input::SuggestedValues {
         crate::console::input::SuggestedValues::Closure(Box::new(|this, input, suggestions| {
@@ -2906,6 +1531,1379 @@ impl ShowCommand {
     ) -> bool {
         a.ptr_eq(b)
     }
+}
+
+impl Command for ShowCommand {
+    fn configure(&self) -> anyhow::Result<()> {
+        self.set_name("show")?;
+        self.set_aliases(vec!["info".to_string()])?;
+        self.set_description("Shows information about packages");
+        let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
+            InputOption::new(
+                name,
+                shortcut.map(|s| PhpMixed::String(s.to_string())),
+                Some(InputOption::VALUE_NONE),
+                description,
+                None,
+            )
+            .unwrap()
+            .into()
+        };
+        self.set_definition(&[
+            InputArgument::new5(
+                "package",
+                Some(InputArgument::OPTIONAL),
+                "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.",
+                None,
+                self.suggest_package_based_on_mode(),
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "version",
+                Some(InputArgument::OPTIONAL),
+                "Version or version constraint to inspect",
+                None,
+            )
+            .unwrap()
+            .into(),
+            opt_none("all", None, "List all packages"),
+            opt_none("locked", None, "List all locked packages"),
+            opt_none(
+                "installed",
+                Some("i"),
+                "List installed packages only (enabled by default, only present for BC).",
+            ),
+            opt_none("platform", Some("p"), "List platform packages only"),
+            opt_none("available", Some("a"), "List available packages only"),
+            opt_none("self", Some("s"), "Show the root package information"),
+            opt_none("name-only", Some("N"), "List package names only"),
+            opt_none("path", Some("P"), "Show package paths"),
+            opt_none("tree", Some("t"), "List the dependencies as a tree"),
+            opt_none("latest", Some("l"), "Show the latest version"),
+            opt_none(
+                "outdated",
+                Some("o"),
+                "Show the latest version but only for packages that are outdated",
+            ),
+            InputOption::new6(
+                "ignore",
+                None,
+                Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
+                "Ignore specified package(s). Can contain wildcards (*). Use it with the --outdated option if you don't want to be informed about new versions of some packages.",
+                None,
+                self.suggest_installed_package(false, false),
+            )
+            .unwrap()
+            .into(),
+            opt_none(
+                "major-only",
+                Some("M"),
+                "Show only packages that have major SemVer-compatible updates. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "minor-only",
+                Some("m"),
+                "Show only packages that have minor SemVer-compatible updates. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "patch-only",
+                None,
+                "Show only packages that have patch SemVer-compatible updates. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "sort-by-age",
+                Some("A"),
+                "Displays the installed version's age, and sorts packages oldest first. Use with the --latest or --outdated option.",
+            ),
+            opt_none(
+                "direct",
+                Some("D"),
+                "Shows only packages that are directly required by the root package",
+            ),
+            opt_none(
+                "strict",
+                None,
+                "Return a non-zero exit code when there are outdated packages",
+            ),
+            InputOption::new6(
+                "format",
+                Some(PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Format of the output: text or json",
+                Some(PhpMixed::String("text".to_string())),
+                SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
+            )
+            .unwrap()
+            .into(),
+            opt_none("no-dev", None, "Disables search in require-dev packages."),
+            InputOption::new(
+                "ignore-platform-req",
+                None,
+                Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
+                "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option",
+                None,
+            )
+            .unwrap()
+            .into(),
+            opt_none(
+                "ignore-platform-reqs",
+                None,
+                "Ignore all platform requirements (php & ext- packages). Use with the --outdated option",
+            ),
+        ]);
+        self.set_help(
+            "The show command displays detailed information about a package, or\n\
+             lists all packages available.\n\n\
+             Read more at https://getcomposer.org/doc/03-cli.md#show-info",
+        );
+        Ok(())
+    }
+
+    fn execute(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        *self.version_parser.borrow_mut() = VersionParser::new();
+        if input.borrow().get_option("tree")?.as_bool() == Some(true) {
+            self.init_styles(output.clone());
+        }
+
+        let composer = self.try_composer(None, None);
+
+        if input.borrow().get_option("installed")?.as_bool() == Some(true)
+            && input.borrow().get_option("self")?.as_bool() != Some(true)
+        {
+            self.get_io().write_error("<warning>You are using the deprecated option \"installed\". Only installed packages are shown by default now. The --all option can be used to show all packages.</warning>");
+        }
+
+        if input.borrow().get_option("outdated")?.as_bool() == Some(true) {
+            input
+                .borrow_mut()
+                .set_option("latest", PhpMixed::Bool(true));
+        } else if input
+            .borrow()
+            .get_option("ignore")?
+            .as_list()
+            .map_or(0, |l| l.len())
+            > 0
+        {
+            self.get_io().write_error("<warning>You are using the option \"ignore\" for action other than \"outdated\", it will be ignored.</warning>");
+        }
+
+        if input.borrow().get_option("direct")?.as_bool() == Some(true)
+            && (input.borrow().get_option("all")?.as_bool() == Some(true)
+                || input.borrow().get_option("available")?.as_bool() == Some(true)
+                || input.borrow().get_option("platform")?.as_bool() == Some(true))
+        {
+            self.get_io().write_error("The --direct (-D) option is not usable in combination with --all, --platform (-p) or --available (-a)");
+
+            return Ok(1);
+        }
+
+        if input.borrow().get_option("tree")?.as_bool() == Some(true)
+            && (input.borrow().get_option("all")?.as_bool() == Some(true)
+                || input.borrow().get_option("available")?.as_bool() == Some(true))
+        {
+            self.get_io().write_error("The --tree (-t) option is not usable in combination with --all or --available (-a)");
+
+            return Ok(1);
+        }
+
+        let only_count: usize = [
+            input.borrow().get_option("patch-only")?.as_bool() == Some(true),
+            input.borrow().get_option("minor-only")?.as_bool() == Some(true),
+            input.borrow().get_option("major-only")?.as_bool() == Some(true),
+        ]
+        .iter()
+        .filter(|b| **b)
+        .count();
+        if only_count > 1 {
+            self.get_io().write_error(
+                "Only one of --major-only, --minor-only or --patch-only can be used at once",
+            );
+
+            return Ok(1);
+        }
+
+        if input.borrow().get_option("tree")?.as_bool() == Some(true)
+            && input.borrow().get_option("latest")?.as_bool() == Some(true)
+        {
+            self.get_io().write_error(
+                "The --tree (-t) option is not usable in combination with --latest (-l)",
+            );
+
+            return Ok(1);
+        }
+
+        if input.borrow().get_option("tree")?.as_bool() == Some(true)
+            && input.borrow().get_option("path")?.as_bool() == Some(true)
+        {
+            self.get_io().write_error(
+                "The --tree (-t) option is not usable in combination with --path (-P)",
+            );
+
+            return Ok(1);
+        }
+
+        let format = input
+            .borrow()
+            .get_option("format")?
+            .as_string()
+            .unwrap_or("text")
+            .to_string();
+        if !in_array_loose(
+            format.clone(),
+            &[
+                PhpMixed::String("text".to_string()),
+                PhpMixed::String("json".to_string()),
+            ],
+        ) {
+            self.get_io().write_error(&format!(
+                "Unsupported format \"{}\". See help for supported formats.",
+                format
+            ));
+
+            return Ok(1);
+        }
+
+        let platform_req_filter = self.get_platform_requirement_filter(input.clone())?;
+
+        // init repos
+        let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
+        if let Some(ref composer) = composer {
+            let composer = crate::composer::composer_full(composer);
+            if let Some(p) = composer
+                .get_config()
+                .borrow()
+                .get("platform")
+                .as_array()
+                .cloned()
+            {
+                platform_overrides = p.into_iter().collect();
+            }
+        }
+        let platform_repo =
+            PlatformRepositoryHandle::new(PlatformRepository::new(vec![], platform_overrides)?);
+        let mut locked_repo: Option<RepositoryInterfaceHandle> = None;
+
+        // The single-package $package binding from PHP gets surfaced here.
+        let mut single_package: Option<crate::package::CompletePackageInterfaceHandle> = None;
+        let mut versions_map: IndexMap<String, String> = IndexMap::new();
+        let installed_repo: RepositoryInterfaceHandle;
+        let repos: RepositoryInterfaceHandle;
+
+        if input.borrow().get_option("self")?.as_bool() == Some(true)
+            && input.borrow().get_option("installed")?.as_bool() != Some(true)
+            && input.borrow().get_option("locked")?.as_bool() != Some(true)
+        {
+            let composer = self.require_composer(None, None)?;
+            let package = crate::package::RootPackageInterfaceHandle::dup(
+                composer.borrow_partial().get_package(),
+            );
+            if input.borrow().get_option("name-only")?.as_bool() == Some(true) {
+                self.get_io().write(&package.get_name());
+
+                return Ok(0);
+            }
+            if input
+                .borrow()
+                .get_argument("package")?
+                .as_string()
+                .is_some()
+            {
+                return Err(InvalidArgumentException {
+                    message: "You cannot use --self together with a package name".to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
+            ]));
+            repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
+            ]));
+            single_package = Some(package.into());
+        } else if input.borrow().get_option("platform")?.as_bool() == Some(true) {
+            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                platform_repo.clone().into(),
+            ]));
+            repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                platform_repo.clone().into(),
+            ]));
+        } else if input.borrow().get_option("available")?.as_bool() == Some(true) {
+            let mut ir = InstalledRepository::new(vec![platform_repo.clone().into()]);
+            if let Some(ref composer) = composer {
+                let composer = crate::composer::composer_full(composer);
+                repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
+                    composer
+                        .get_repository_manager()
+                        .borrow()
+                        .get_repositories()
+                        .to_vec(),
+                ));
+                ir.add_repository(
+                    composer
+                        .get_repository_manager()
+                        .borrow()
+                        .get_local_repository(),
+                );
+                installed_repo = RepositoryInterfaceHandle::new(ir);
+            } else {
+                let default_repos =
+                    RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
+                let names: Vec<String> = default_repos.keys().cloned().collect();
+                repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
+                    default_repos.into_values().collect(),
+                ));
+                self.get_io().write_error(&format!(
+                    "No composer.json found in the current directory, showing available packages from {}",
+                    names.join(", ")
+                ));
+                installed_repo = RepositoryInterfaceHandle::new(ir);
+            }
+        } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
+            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
+            let local_repo = composer_ref
+                .get_repository_manager()
+                .borrow()
+                .get_local_repository();
+            let locker_rc = composer_ref.get_locker().clone();
+            let mut locker = locker_rc.borrow_mut();
+            if locker.is_locked() {
+                let lr_handle: RepositoryInterfaceHandle =
+                    locker.get_locked_repository(true)?.into();
+                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    lr_handle.clone(),
+                    local_repo,
+                    platform_repo.clone().into(),
+                ]));
+                locked_repo = Some(lr_handle);
+            } else {
+                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    local_repo,
+                    platform_repo.clone().into(),
+                ]));
+            }
+            let mut composite_input: Vec<RepositoryInterfaceHandle> =
+                vec![RepositoryInterfaceHandle::new(FilterRepository::new(
+                    installed_repo.clone(),
+                    {
+                        let mut m = IndexMap::new();
+                        m.insert("canonical".to_string(), PhpMixed::Bool(false));
+                        m
+                    },
+                )?)];
+            for r in composer_ref
+                .get_repository_manager()
+                .borrow()
+                .get_repositories()
+            {
+                composite_input.push(r.clone());
+            }
+            repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
+        } else if input.borrow().get_option("all")?.as_bool() == Some(true) {
+            let default_repos =
+                RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
+            let names: Vec<String> = default_repos.keys().cloned().collect();
+            self.get_io().write_error(&format!(
+                "No composer.json found in the current directory, showing available packages from {}",
+                names.join(", ")
+            ));
+            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                platform_repo.clone().into(),
+            ]));
+            let mut composite_input: Vec<RepositoryInterfaceHandle> = vec![installed_repo.clone()];
+            for (_k, v) in default_repos.into_iter() {
+                composite_input.push(v);
+            }
+            repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
+        } else if input.borrow().get_option("locked")?.as_bool() == Some(true) {
+            if composer.is_none()
+                || !crate::composer::composer_full(composer.as_ref().unwrap())
+                    .get_locker()
+                    .borrow_mut()
+                    .is_locked()
+            {
+                return Err(UnexpectedValueException {
+                    message: "A valid composer.json and composer.lock files is required to run this command with --locked".to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
+            let locker_rc = composer_ref.get_locker().clone();
+            let mut locker = locker_rc.borrow_mut();
+            let lr = locker.get_locked_repository(
+                input.borrow().get_option("no-dev")?.as_bool() != Some(true),
+            )?;
+            if input.borrow().get_option("self")?.as_bool() == Some(true) {
+                lr.add_package(
+                    crate::package::RootPackageInterfaceHandle::dup(composer_ref.get_package())
+                        .into(),
+                )?;
+            }
+            let lr_handle: RepositoryInterfaceHandle = lr.into();
+            locked_repo = Some(lr_handle.clone());
+            let new_repo =
+                RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle]));
+            installed_repo = new_repo.clone();
+            repos = new_repo;
+        } else {
+            // --installed / default case
+            let composer_local_owned;
+            let _guard_from_existing;
+            let composer_local = match composer.as_ref() {
+                Some(c) => {
+                    _guard_from_existing = crate::composer::composer_full(c);
+                    &*_guard_from_existing
+                }
+                None => {
+                    composer_local_owned = self.require_composer(None, None)?;
+                    _guard_from_existing = crate::composer::composer_full(&composer_local_owned);
+                    &*_guard_from_existing
+                }
+            };
+            let root_pkg = composer_local.get_package();
+
+            let root_repo: RepositoryInterfaceHandle =
+                if input.borrow().get_option("self")?.as_bool() == Some(true) {
+                    RepositoryInterfaceHandle::new(RootPackageRepository::new(
+                        crate::package::RootPackageInterfaceHandle::dup(
+                            composer_local.get_package(),
+                        ),
+                    ))
+                } else {
+                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
+                };
+            if input.borrow().get_option("no-dev")?.as_bool() == Some(true) {
+                let local_packages = composer_local
+                    .get_repository_manager()
+                    .borrow()
+                    .get_local_repository()
+                    .get_packages()?;
+                let packages = RepositoryUtils::filter_required_packages(
+                    &local_packages,
+                    root_pkg.clone().into(),
+                    false,
+                    Vec::new(),
+                );
+                let cloned: Vec<crate::package::PackageInterfaceHandle> = packages
+                    .iter()
+                    .map(crate::package::PackageInterfaceHandle::dup)
+                    .collect();
+                let new_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    root_repo,
+                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(
+                        cloned,
+                    )?),
+                ]));
+                installed_repo = new_repo.clone();
+                repos = new_repo;
+            } else {
+                let repository_manager = composer_local.get_repository_manager().clone();
+                let repository_manager = repository_manager.borrow();
+                let lr = repository_manager.get_local_repository();
+                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    root_repo.clone(),
+                    lr.clone(),
+                ]));
+                repos =
+                    RepositoryInterfaceHandle::new(InstalledRepository::new(vec![root_repo, lr]));
+            }
+
+            if installed_repo.get_packages()?.is_empty() {
+                let has_non_platform_reqs = |reqs: &IndexMap<String, Link>| -> bool {
+                    reqs.keys()
+                        .any(|name| !PlatformRepository::is_platform_package(name))
+                };
+
+                if has_non_platform_reqs(&root_pkg.get_requires())
+                    || has_non_platform_reqs(&root_pkg.get_dev_requires())
+                {
+                    // Borrow is local; release composer_local borrow first.
+                    let _ = root_pkg;
+                    self.get_io().write_error("<warning>No dependencies installed. Try running composer install or update.</warning>");
+                }
+            }
+        }
+
+        if let Some(ref composer) = composer {
+            let composer = crate::composer::composer_full(composer);
+            let mut command_event = CommandEvent::new6(
+                PluginEvents::COMMAND,
+                "show",
+                input.clone(),
+                output,
+                vec![],
+                IndexMap::new(),
+            );
+            let command_event_name = command_event.get_name().to_string();
+            composer
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+        }
+
+        if input.borrow().get_option("latest")?.as_bool() == Some(true) && composer.is_none() {
+            self.get_io().write_error(
+                "No composer.json found in the current directory, disabling \"latest\" option",
+            );
+            input
+                .borrow_mut()
+                .set_option("latest", PhpMixed::Bool(false));
+        }
+
+        let package_filter: Option<String> = input
+            .borrow()
+            .get_argument("package")?
+            .as_string()
+            .map(|s| s.to_string());
+
+        // show single package or single version
+        if let Some(ref pkg) = single_package {
+            versions_map.insert(pkg.get_pretty_version(), pkg.get_version());
+        } else if let Some(ref pf) = package_filter
+            && !pf.contains('*')
+        {
+            let (matched_package, vers) = self.get_package(
+                &installed_repo,
+                &repos,
+                pf,
+                input.borrow().get_argument("version")?,
+            )?;
+
+            if let Some(ref pkg) = matched_package
+                && input.borrow().get_option("direct")?.as_bool() == Some(true)
+                && !in_array_strict(
+                    pkg.get_name(),
+                    &self
+                        .get_root_requires()
+                        .into_iter()
+                        .map(PhpMixed::String)
+                        .collect::<Vec<_>>(),
+                )
+            {
+                return Err(InvalidArgumentException {
+                                message: format!(
+                                    "Package \"{}\" is installed but not a direct dependent of the root package.",
+                                    pkg.get_name()
+                                ),
+                                code: 0,
+                            }
+                            .into());
+            }
+
+            if matched_package.is_none() {
+                let options = input.borrow().get_options();
+                let mut hint = String::new();
+                if input.borrow().get_option("locked")?.as_bool() == Some(true) {
+                    hint.push_str(" in lock file");
+                }
+                if let Some(working_dir) = options.get("working-dir").filter(|v| !v.is_null()) {
+                    hint.push_str(&format!(
+                        " in {}/composer.json",
+                        working_dir.as_string().unwrap_or("")
+                    ));
+                }
+                if PlatformRepository::is_platform_package(pf)
+                    && input.borrow().get_option("platform")?.as_bool() != Some(true)
+                {
+                    hint.push_str(", try using --platform (-p) to show platform packages");
+                }
+                if input.borrow().get_option("all")?.as_bool() != Some(true)
+                    && input.borrow().get_option("available")?.as_bool() != Some(true)
+                {
+                    hint.push_str(", try using --available (-a) to show all available packages");
+                }
+
+                return Err(InvalidArgumentException {
+                    message: format!("Package \"{}\" not found{}.", pf, hint),
+                    code: 0,
+                }
+                .into());
+            }
+            single_package = matched_package;
+            versions_map = vers;
+        }
+
+        if let Some(ref package) = single_package {
+            // assert(isset($versions));
+
+            let mut exit_code: i64 = 0;
+            if input.borrow().get_option("tree")?.as_bool() == Some(true) {
+                let array_tree =
+                    self.generate_package_tree(package.clone().into(), &installed_repo, &repos);
+
+                if format == "json" {
+                    let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
+                    wrapper.insert(
+                        "installed".to_string(),
+                        PhpMixed::List(vec![PhpMixed::Array(array_tree.into_iter().collect())]),
+                    );
+                    self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
+                        wrapper.into_iter().collect(),
+                    ))?);
+                } else {
+                    self.display_package_tree(vec![array_tree]);
+                }
+
+                return Ok(exit_code);
+            }
+
+            let mut latest_package: Option<crate::package::PackageInterfaceHandle> = None;
+            if input.borrow().get_option("latest")?.as_bool() == Some(true) {
+                latest_package = self.find_latest_package(
+                    package.clone().into(),
+                    composer.as_ref().unwrap(),
+                    &platform_repo,
+                    input
+                        .borrow()
+                        .get_option("major-only")?
+                        .as_bool()
+                        .unwrap_or(false),
+                    input
+                        .borrow()
+                        .get_option("minor-only")?
+                        .as_bool()
+                        .unwrap_or(false),
+                    input
+                        .borrow()
+                        .get_option("patch-only")?
+                        .as_bool()
+                        .unwrap_or(false),
+                    platform_req_filter.clone(),
+                )?;
+            }
+            if input.borrow().get_option("outdated")?.as_bool() == Some(true)
+                && input.borrow().get_option("strict")?.as_bool() == Some(true)
+                && latest_package.is_some()
+                && latest_package
+                    .as_ref()
+                    .unwrap()
+                    .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                    != package
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                && (latest_package
+                    .as_ref()
+                    .unwrap()
+                    .as_complete()
+                    .is_none_or(|c| !c.is_abandoned()))
+            {
+                exit_code = 1;
+            }
+            if input.borrow().get_option("path")?.as_bool() == Some(true) {
+                self.get_io().write_no_newline(&package.get_name());
+                let path = {
+                    let composer_ref = composer.as_ref().unwrap();
+                    composer_ref
+                        .borrow_partial()
+                        .get_installation_manager()
+                        .borrow_mut()
+                        .get_install_path(package.clone().into())
+                };
+                if let Some(path) = path {
+                    let real = realpath(&path).unwrap_or_default();
+                    let trimmed = real.split(['\r', '\n']).next().unwrap_or("");
+                    self.get_io().write(&format!(" {}", trimmed));
+                } else {
+                    self.get_io().write(" null");
+                }
+
+                return Ok(exit_code);
+            }
+
+            if format == "json" {
+                self.print_package_info_as_json(
+                    package.clone(),
+                    &versions_map,
+                    &mut *installed_repo.borrow_mut(),
+                    latest_package,
+                )?;
+            } else {
+                self.print_package_info(
+                    package.clone(),
+                    &versions_map,
+                    &mut *installed_repo.borrow_mut(),
+                    latest_package,
+                )?;
+            }
+
+            return Ok(exit_code);
+        }
+
+        // show tree view if requested
+        if input.borrow().get_option("tree")?.as_bool() == Some(true) {
+            let root_requires = self.get_root_requires();
+            let mut packages = installed_repo.get_packages()?;
+            packages.sort_by(|a, b| {
+                let sa: String = a.to_string();
+                let sb: String = b.to_string();
+                sa.cmp(&sb)
+            });
+            let mut array_tree: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+            for package in packages.iter() {
+                if in_array_strict(
+                    package.get_name(),
+                    &root_requires
+                        .iter()
+                        .map(|s| PhpMixed::String(s.clone()))
+                        .collect::<Vec<_>>(),
+                ) {
+                    array_tree.push(self.generate_package_tree(
+                        package.clone(),
+                        &installed_repo,
+                        &repos,
+                    ));
+                }
+            }
+
+            if format == "json" {
+                let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
+                wrapper.insert(
+                    "installed".to_string(),
+                    PhpMixed::List(
+                        array_tree
+                            .into_iter()
+                            .map(|m| PhpMixed::Array(m.into_iter().collect()))
+                            .collect(),
+                    ),
+                );
+                self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
+                    wrapper.into_iter().collect(),
+                ))?);
+            } else {
+                self.display_package_tree(array_tree);
+            }
+
+            return Ok(0);
+        }
+
+        // list packages
+        let mut packages: IndexMap<String, IndexMap<String, PackageOrName>> = IndexMap::new();
+        let mut package_filter_regex: Option<String> = None;
+        if let Some(ref pf) = package_filter {
+            let escaped = shirabe_php_shim::preg_quote(pf, None);
+            package_filter_regex = Some(format!("{{^{}$}}i", escaped.replace("\\*", ".*?")));
+        }
+
+        let mut package_list_filter: Option<Vec<String>> = None;
+        if input.borrow().get_option("direct")?.as_bool() == Some(true) {
+            package_list_filter = Some(self.get_root_requires());
+        }
+
+        if input.borrow().get_option("path")?.as_bool() == Some(true) && composer.is_none() {
+            self.get_io().write_error(
+                "No composer.json found in the current directory, disabling \"path\" option",
+            );
+            input.borrow_mut().set_option("path", PhpMixed::Bool(false));
+        }
+
+        for repo in RepositoryUtils::flatten_repositories(repos, true) {
+            let r#type = if Self::same_repository(&repo, &platform_repo) {
+                "platform"
+            } else if locked_repo
+                .as_ref()
+                .is_some_and(|lr| Self::same_repository(&repo, lr))
+            {
+                "locked"
+            } else if Self::same_repository(&repo, &installed_repo)
+                || installed_repo
+                    .borrow()
+                    .as_any()
+                    .downcast_ref::<InstalledRepository>()
+                    .is_some_and(|ir| ir.get_repositories().iter().any(|r| r.ptr_eq(&repo)))
+            {
+                "installed"
+            } else {
+                "available"
+            };
+            let type_owned = r#type.to_string();
+            if let Some(cr_rc) = repo.downcast_rc::<ComposerRepository>() {
+                let names = cr_rc
+                    .borrow_mut()
+                    .get_package_names(package_filter.as_deref())?;
+                for name in names {
+                    packages
+                        .entry(type_owned.clone())
+                        .or_default()
+                        .insert(name.clone(), PackageOrName::Name(name));
+                }
+            } else {
+                for package in repo.get_packages()? {
+                    let existing = packages
+                        .get(&type_owned)
+                        .and_then(|m| m.get(&package.get_name()));
+                    let need_replace = match existing {
+                        None => true,
+                        Some(PackageOrName::Name(_)) => true,
+                        Some(PackageOrName::Pkg(existing)) => {
+                            version_compare(&existing.get_version(), &package.get_version(), "<")
+                        }
+                    };
+                    if need_replace {
+                        let mut p: crate::package::PackageInterfaceHandle = package.clone();
+                        while let Some(alias) = p.as_alias() {
+                            p = alias.get_alias_of().into();
+                        }
+                        let matches_filter = match &package_filter_regex {
+                            None => true,
+                            Some(r) => Preg::is_match(r, &p.get_name()),
+                        };
+                        if matches_filter {
+                            let matches_list = match &package_list_filter {
+                                None => true,
+                                Some(list) => in_array_strict(
+                                    p.get_name(),
+                                    &list
+                                        .iter()
+                                        .map(|s| PhpMixed::String(s.clone()))
+                                        .collect::<Vec<_>>(),
+                                ),
+                            };
+                            if matches_list {
+                                packages
+                                    .entry(type_owned.clone())
+                                    .or_default()
+                                    .insert(p.get_name(), PackageOrName::Pkg(p));
+                            }
+                        }
+                    }
+                }
+                if Self::same_repository(&repo, &platform_repo) {
+                    for (name, p) in platform_repo.borrow().get_disabled_packages() {
+                        packages
+                            .entry(type_owned.clone())
+                            .or_default()
+                            .insert(name.clone(), PackageOrName::Pkg(p.clone().into()));
+                    }
+                }
+            }
+        }
+
+        let show_all_types = input.borrow().get_option("all")?.as_bool() == Some(true);
+        let show_latest = input.borrow().get_option("latest")?.as_bool() == Some(true);
+        let show_major_only = input.borrow().get_option("major-only")?.as_bool() == Some(true);
+        let show_minor_only = input.borrow().get_option("minor-only")?.as_bool() == Some(true);
+        let show_patch_only = input.borrow().get_option("patch-only")?.as_bool() == Some(true);
+        let ignored_packages_regex = base_package::package_names_to_regexp(
+            &input
+                .borrow()
+                .get_option("ignore")?
+                .as_list()
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(strtolower))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+            "{^(?:%s)$}iD",
+        );
+        let indent = if show_all_types { "  " } else { "" };
+        let mut latest_packages: IndexMap<String, crate::package::PackageInterfaceHandle> =
+            IndexMap::new();
+        let mut exit_code: i64 = 0;
+        let mut view_data: IndexMap<String, Vec<IndexMap<String, PhpMixed>>> = IndexMap::new();
+        let mut view_meta_data: IndexMap<String, ViewMetaData> = IndexMap::new();
+
+        let mut write_version = false;
+        let mut write_description = false;
+
+        let type_order: Vec<(&str, bool)> = vec![
+            ("platform", true),
+            ("locked", true),
+            ("available", false),
+            ("installed", true),
+        ];
+        for (r#type, show_version) in type_order.iter() {
+            if let Some(type_packages) = packages.get_mut(*r#type) {
+                type_packages.sort_keys();
+
+                let mut name_length: usize = 0;
+                let mut version_length: usize = 0;
+                let mut latest_length: usize = 0;
+                let mut release_date_length: usize = 0;
+
+                if show_latest && *show_version {
+                    for package_or_name in type_packages.values() {
+                        if let PackageOrName::Pkg(package) = package_or_name
+                            && !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())
+                        {
+                            let latest = self.find_latest_package(
+                                package.clone(),
+                                composer.as_ref().unwrap(),
+                                &platform_repo,
+                                show_major_only,
+                                show_minor_only,
+                                show_patch_only,
+                                platform_req_filter.clone(),
+                            )?;
+                            if latest.is_none() {
+                                continue;
+                            }
+
+                            latest_packages.insert(package.get_pretty_name(), latest.unwrap());
+                        }
+                    }
+                }
+
+                let write_path = input.borrow().get_option("name-only")?.as_bool() != Some(true)
+                    && input.borrow().get_option("path")?.as_bool() == Some(true);
+                write_version = input.borrow().get_option("name-only")?.as_bool() != Some(true)
+                    && input.borrow().get_option("path")?.as_bool() != Some(true)
+                    && *show_version;
+                let write_latest = write_version && show_latest;
+                write_description = input.borrow().get_option("name-only")?.as_bool() != Some(true)
+                    && input.borrow().get_option("path")?.as_bool() != Some(true);
+                let write_release_date = write_latest
+                    && (input.borrow().get_option("sort-by-age")?.as_bool() == Some(true)
+                        || format == "json");
+
+                let mut has_outdated_packages = false;
+
+                if input.borrow().get_option("sort-by-age")?.as_bool() == Some(true) {
+                    type_packages.sort_by(|_ka, a, _kb, b| match (a, b) {
+                        (PackageOrName::Pkg(a), PackageOrName::Pkg(b)) => {
+                            a.get_release_date().cmp(&b.get_release_date())
+                        }
+                        _ => std::cmp::Ordering::Equal,
+                    });
+                }
+
+                let mut view_type: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+                for package_or_name in type_packages.values() {
+                    let mut package_view_data: IndexMap<String, PhpMixed> = IndexMap::new();
+                    if let PackageOrName::Pkg(package) = package_or_name {
+                        let latest_package = if show_latest
+                            && latest_packages.contains_key(&package.get_pretty_name())
+                        {
+                            latest_packages.get(&package.get_pretty_name())
+                        } else {
+                            None
+                        };
+
+                        // Determine if Composer is checking outdated dependencies and if current package should trigger non-default exit code
+                        let mut package_is_up_to_date = if let Some(latest) = latest_package {
+                            latest.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            ) == package.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            ) && latest.as_complete().is_none_or(|c| !c.is_abandoned())
+                        } else {
+                            false
+                        };
+                        // When using --major-only, and no bigger version than current major is found then it is considered up to date
+                        package_is_up_to_date =
+                            package_is_up_to_date || (latest_package.is_none() && show_major_only);
+                        let package_is_ignored =
+                            Preg::is_match(&ignored_packages_regex, &package.get_pretty_name());
+                        if input.borrow().get_option("outdated")?.as_bool() == Some(true)
+                            && (package_is_up_to_date || package_is_ignored)
+                        {
+                            continue;
+                        }
+
+                        if input.borrow().get_option("outdated")?.as_bool() == Some(true)
+                            || input.borrow().get_option("strict")?.as_bool() == Some(true)
+                        {
+                            has_outdated_packages = true;
+                        }
+
+                        package_view_data.insert(
+                            "name".to_string(),
+                            PhpMixed::String(package.get_pretty_name()),
+                        );
+                        package_view_data.insert(
+                            "direct-dependency".to_string(),
+                            PhpMixed::Bool(in_array_strict(
+                                package.get_name(),
+                                &self
+                                    .get_root_requires()
+                                    .into_iter()
+                                    .map(PhpMixed::String)
+                                    .collect::<Vec<_>>(),
+                            )),
+                        );
+                        if format != "json"
+                            || input.borrow().get_option("name-only")?.as_bool() != Some(true)
+                        {
+                            package_view_data.insert(
+                                "homepage".to_string(),
+                                match package.as_complete() {
+                                    Some(c) => match c.get_homepage() {
+                                        Some(h) => PhpMixed::String(h),
+                                        None => PhpMixed::Null,
+                                    },
+                                    None => PhpMixed::Null,
+                                },
+                            );
+                            package_view_data.insert(
+                                "source".to_string(),
+                                match PackageInfo::get_view_source_url(package.clone()) {
+                                    Some(s) => PhpMixed::String(s),
+                                    None => PhpMixed::Null,
+                                },
+                            );
+                        }
+                        name_length = name_length.max(package.get_pretty_name().len());
+                        if write_version {
+                            let mut version_str = package.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            );
+                            if format == "text" {
+                                version_str = version_str.trim_start_matches('v').to_string();
+                            }
+                            version_length = version_length.max(version_str.len());
+                            package_view_data
+                                .insert("version".to_string(), PhpMixed::String(version_str));
+                        }
+                        if write_release_date {
+                            if let Some(release_date) = package.get_release_date() {
+                                let mut age = self
+                                    .get_relative_time(&release_date)
+                                    .replace(" ago", " old");
+                                if !age.contains(" old") {
+                                    age = format!("from {}", age);
+                                }
+                                release_date_length = release_date_length.max(age.len());
+                                package_view_data
+                                    .insert("release-age".to_string(), PhpMixed::String(age));
+                                package_view_data.insert(
+                                    "release-date".to_string(),
+                                    PhpMixed::String(release_date.format(DATE_ATOM).to_string()),
+                                );
+                            } else {
+                                package_view_data.insert(
+                                    "release-age".to_string(),
+                                    PhpMixed::String(String::new()),
+                                );
+                                package_view_data.insert(
+                                    "release-date".to_string(),
+                                    PhpMixed::String(String::new()),
+                                );
+                            }
+                        }
+                        if write_latest && let Some(latest) = latest_package {
+                            let mut latest_version_str = latest.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            );
+                            if format == "text" {
+                                latest_version_str =
+                                    latest_version_str.trim_start_matches('v').to_string();
+                            }
+                            let update_status =
+                                Self::get_update_status(latest.clone(), package.clone())?;
+                            latest_length = latest_length.max(latest_version_str.len());
+                            package_view_data
+                                .insert("latest".to_string(), PhpMixed::String(latest_version_str));
+                            package_view_data.insert(
+                                "latest-status".to_string(),
+                                PhpMixed::String(update_status),
+                            );
+
+                            if let Some(rd) = latest.get_release_date() {
+                                package_view_data.insert(
+                                    "latest-release-date".to_string(),
+                                    PhpMixed::String(rd.format(DATE_ATOM).to_string()),
+                                );
+                            } else {
+                                package_view_data.insert(
+                                    "latest-release-date".to_string(),
+                                    PhpMixed::String(String::new()),
+                                );
+                            }
+                        } else if write_latest {
+                            package_view_data.insert(
+                                "latest".to_string(),
+                                PhpMixed::String("[none matched]".to_string()),
+                            );
+                            package_view_data.insert(
+                                "latest-status".to_string(),
+                                PhpMixed::String("up-to-date".to_string()),
+                            );
+                            latest_length = latest_length.max("[none matched]".len());
+                        }
+                        if write_description && let Some(c) = package.as_complete() {
+                            package_view_data.insert(
+                                "description".to_string(),
+                                match c.get_description() {
+                                    Some(d) => PhpMixed::String(d),
+                                    None => PhpMixed::Null,
+                                },
+                            );
+                        }
+                        if write_path {
+                            let installation_manager = composer
+                                .as_ref()
+                                .unwrap()
+                                .borrow_partial()
+                                .get_installation_manager();
+                            let path: Option<String> = installation_manager
+                                .borrow_mut()
+                                .get_install_path(package.clone());
+                            if let Some(p) = path {
+                                let r = realpath(&p).unwrap_or_default();
+                                let trimmed = r.split(['\r', '\n']).next().unwrap_or("");
+                                package_view_data.insert(
+                                    "path".to_string(),
+                                    PhpMixed::String(trimmed.to_string()),
+                                );
+                            } else {
+                                package_view_data.insert("path".to_string(), PhpMixed::Null);
+                            }
+                        }
+
+                        let mut package_is_abandoned: PhpMixed = PhpMixed::Bool(false);
+                        if let Some(latest) = latest_package
+                            && let Some(c) = latest.as_complete()
+                            && c.is_abandoned()
+                        {
+                            let replacement_package_name = c.get_replacement_package();
+                            let replacement = if let Some(ref rp) = replacement_package_name {
+                                format!("Use {} instead", rp)
+                            } else {
+                                "No replacement was suggested".to_string()
+                            };
+                            let package_warning = format!(
+                                "Package {} is abandoned, you should avoid using it. {}.",
+                                package.get_pretty_name(),
+                                replacement
+                            );
+                            package_view_data
+                                .insert("warning".to_string(), PhpMixed::String(package_warning));
+                            package_is_abandoned = match replacement_package_name {
+                                Some(rp) => PhpMixed::String(rp),
+                                None => PhpMixed::Bool(true),
+                            };
+                        }
+
+                        package_view_data.insert("abandoned".to_string(), package_is_abandoned);
+                    } else if let PackageOrName::Name(name) = package_or_name {
+                        package_view_data
+                            .insert("name".to_string(), PhpMixed::String(name.clone()));
+                        name_length = name_length.max(name.len());
+                    }
+                    view_type.push(package_view_data);
+                }
+                view_data.insert(r#type.to_string(), view_type);
+                view_meta_data.insert(
+                    r#type.to_string(),
+                    ViewMetaData {
+                        name_length,
+                        version_length,
+                        latest_length,
+                        release_date_length,
+                        write_latest,
+                        write_release_date,
+                    },
+                );
+                if input.borrow().get_option("strict")?.as_bool() == Some(true)
+                    && has_outdated_packages
+                {
+                    exit_code = 1;
+                    break;
+                }
+            }
+        }
+
+        if format == "json" {
+            let mut json_map: IndexMap<String, PhpMixed> = IndexMap::new();
+            for (k, v) in view_data.iter() {
+                json_map.insert(
+                    k.clone(),
+                    PhpMixed::List(
+                        v.iter()
+                            .map(|m| {
+                                PhpMixed::Array(
+                                    m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                                )
+                            })
+                            .collect(),
+                    ),
+                );
+            }
+            let io = self.get_io();
+            io.write(&JsonFile::encode(&PhpMixed::Array(
+                json_map.into_iter().collect(),
+            ))?);
+        } else {
+            if input.borrow().get_option("latest")?.as_bool() == Some(true)
+                && view_data.values().any(|v| !v.is_empty())
+            {
+                let io = self.get_io();
+                if !io.is_decorated() {
+                    io.write_error("Legend:");
+                    io.write_error("! patch or minor release available - update recommended");
+                    io.write_error("~ major release available - update possible");
+                    if input.borrow().get_option("outdated")?.as_bool() != Some(true) {
+                        io.write_error("= up to date version");
+                    }
+                } else {
+                    io.write_error("<info>Color legend:</info>");
+                    io.write_error("- <highlight>patch or minor</highlight> release available - update recommended");
+                    io.write_error(
+                        "- <comment>major</comment> release available - update possible",
+                    );
+                    if input.borrow().get_option("outdated")?.as_bool() != Some(true) {
+                        io.write_error("- <info>up to date</info> version");
+                    }
+                }
+            }
+
+            let width = self.get_terminal_width();
+
+            for (r#type, packages) in view_data.iter() {
+                let meta = match view_meta_data.get(r#type) {
+                    Some(m) => m.clone(),
+                    None => continue,
+                };
+                let name_length = meta.name_length;
+                let version_length = meta.version_length;
+                let mut latest_length = meta.latest_length;
+                let release_date_length = meta.release_date_length;
+                let write_latest = meta.write_latest;
+                let write_release_date = meta.write_release_date;
+
+                let width_usize = width as usize;
+                let version_fits = name_length + version_length + 3 <= width_usize;
+                let latest_fits = name_length + version_length + latest_length + 3 <= width_usize;
+                let release_date_fits =
+                    name_length + version_length + latest_length + release_date_length + 3
+                        <= width_usize;
+                let description_fits =
+                    name_length + version_length + latest_length + release_date_length + 24
+                        <= width_usize;
+
+                if latest_fits && !self.get_io().is_decorated() {
+                    latest_length += 2;
+                }
+
+                if show_all_types {
+                    if r#type == "available" {
+                        self.get_io()
+                            .write(&format!("<comment>{}</comment>:", r#type));
+                    } else {
+                        self.get_io().write(&format!("<info>{}</info>:", r#type));
+                    }
+                }
+
+                if write_latest && input.borrow().get_option("direct")?.as_bool() != Some(true) {
+                    let mut direct_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+                    let mut transitive_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+                    for pkg in packages.iter() {
+                        let is_direct = pkg
+                            .get("direct-dependency")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        if is_direct {
+                            direct_deps.push(pkg.clone());
+                        } else {
+                            transitive_deps.push(pkg.clone());
+                        }
+                    }
+
+                    self.get_io().write_error("");
+                    self.get_io()
+                        .write_error("<info>Direct dependencies required in composer.json:</>");
+                    if !direct_deps.is_empty() {
+                        self.print_packages(
+                            &direct_deps,
+                            indent,
+                            write_version && version_fits,
+                            latest_fits,
+                            write_description && description_fits,
+                            width_usize,
+                            version_length,
+                            name_length,
+                            latest_length,
+                            write_release_date && release_date_fits,
+                            release_date_length,
+                        );
+                    } else {
+                        self.get_io().write_error("Everything up to date");
+                    }
+                    self.get_io().write_error("");
+                    self.get_io().write_error(
+                        "<info>Transitive dependencies not required in composer.json:</>",
+                    );
+                    if !transitive_deps.is_empty() {
+                        self.print_packages(
+                            &transitive_deps,
+                            indent,
+                            write_version && version_fits,
+                            latest_fits,
+                            write_description && description_fits,
+                            width_usize,
+                            version_length,
+                            name_length,
+                            latest_length,
+                            write_release_date && release_date_fits,
+                            release_date_length,
+                        );
+                    } else {
+                        self.get_io().write_error("Everything up to date");
+                    }
+                } else {
+                    if write_latest && packages.is_empty() {
+                        self.get_io()
+                            .write_error("All your direct dependencies are up to date");
+                    } else {
+                        self.print_packages(
+                            packages,
+                            indent,
+                            write_version && version_fits,
+                            write_latest && latest_fits,
+                            write_description && description_fits,
+                            width_usize,
+                            version_length,
+                            name_length,
+                            latest_length,
+                            write_release_date && release_date_fits,
+                            release_date_length,
+                        );
+                    }
+                }
+
+                if show_all_types {
+                    self.get_io().write("");
+                }
+            }
+        }
+
+        Ok(exit_code)
+    }
+
+    fn initialize(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for ShowCommand {
+    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+        &self.base_command_data
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 #[derive(Debug)]

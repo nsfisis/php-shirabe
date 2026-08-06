@@ -44,6 +44,60 @@ impl AuditCommand {
             .expect("AuditCommand::configure uses static, valid metadata");
         command
     }
+
+    fn get_packages(
+        &self,
+        composer: &PartialComposerHandle,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> anyhow::Result<Vec<crate::package::PackageInterfaceHandle>> {
+        let composer = crate::composer::composer_full(composer);
+        if input
+            .borrow()
+            .get_option("locked")?
+            .as_bool()
+            .unwrap_or(false)
+        {
+            let locker = composer.get_locker().clone();
+            let mut locker = locker.borrow_mut();
+            if !locker.is_locked() {
+                return Err(UnexpectedValueException {
+                    message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),
+                    code: 0,
+                }.into());
+            }
+            let locked_repo = locker.get_locked_repository(
+                !input
+                    .borrow()
+                    .get_option("no-dev")?
+                    .as_bool()
+                    .unwrap_or(false),
+            )?;
+            return locked_repo.borrow_mut().get_packages();
+        }
+
+        let root_pkg = composer.get_package();
+        let local_repo = composer
+            .get_repository_manager()
+            .borrow()
+            .get_local_repository();
+        let mut installed_repo = InstalledRepository::new(vec![local_repo]);
+
+        if input
+            .borrow()
+            .get_option("no-dev")?
+            .as_bool()
+            .unwrap_or(false)
+        {
+            return Ok(RepositoryUtils::filter_required_packages(
+                &installed_repo.get_packages()?,
+                root_pkg.clone().into(),
+                false,
+                vec![],
+            ));
+        }
+
+        installed_repo.get_packages()
+    }
 }
 
 impl Command for AuditCommand {
@@ -254,60 +308,4 @@ impl BaseCommand for AuditCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl AuditCommand {
-    fn get_packages(
-        &self,
-        composer: &PartialComposerHandle,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Vec<crate::package::PackageInterfaceHandle>> {
-        let composer = crate::composer::composer_full(composer);
-        if input
-            .borrow()
-            .get_option("locked")?
-            .as_bool()
-            .unwrap_or(false)
-        {
-            let locker = composer.get_locker().clone();
-            let mut locker = locker.borrow_mut();
-            if !locker.is_locked() {
-                return Err(UnexpectedValueException {
-                    message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),
-                    code: 0,
-                }.into());
-            }
-            let locked_repo = locker.get_locked_repository(
-                !input
-                    .borrow()
-                    .get_option("no-dev")?
-                    .as_bool()
-                    .unwrap_or(false),
-            )?;
-            return locked_repo.borrow_mut().get_packages();
-        }
-
-        let root_pkg = composer.get_package();
-        let local_repo = composer
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
-        let mut installed_repo = InstalledRepository::new(vec![local_repo]);
-
-        if input
-            .borrow()
-            .get_option("no-dev")?
-            .as_bool()
-            .unwrap_or(false)
-        {
-            return Ok(RepositoryUtils::filter_required_packages(
-                &installed_repo.get_packages()?,
-                root_pkg.clone().into(),
-                false,
-                vec![],
-            ));
-        }
-
-        installed_repo.get_packages()
-    }
 }

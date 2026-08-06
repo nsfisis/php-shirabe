@@ -25,33 +25,7 @@ impl Request {
     pub const UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE: i64 =
         UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
     pub const UPDATE_LISTED_WITH_TRANSITIVE_DEPS: i64 = UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UpdateAllowTransitiveDeps {
-    /// Corresponds to PHP false.
-    False,
-    /// \Composer\DependencyResolver\Request::UPDATE_ONLY_LISTED
-    UpdateOnlyListed,
-    /// \Composer\DependencyResolver\Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE
-    UpdateListedWithTransitiveDepsNoRootRequire,
-    /// \Composer\DependencyResolver\Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS
-    UpdateListedWithTransitiveDeps,
-}
-
-#[derive(Debug)]
-pub struct Request {
-    pub(crate) locked_repository: Option<LockArrayRepositoryHandle>,
-    pub(crate) requires: IndexMap<String, AnyConstraint>,
-    pub(crate) fixed_packages: IndexMap<String, BasePackageHandle>,
-    pub(crate) locked_packages: IndexMap<String, BasePackageHandle>,
-    pub(crate) fixed_locked_packages: IndexMap<String, BasePackageHandle>,
-    pub(crate) update_allow_list: Vec<String>,
-    pub(crate) update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
-    restrict_packages: Option<Vec<String>>,
-}
-
-impl Request {
     pub fn new(locked_repository: Option<LockArrayRepositoryHandle>) -> Self {
         Self {
             locked_repository,
@@ -244,4 +218,28 @@ impl Request {
     pub fn get_restricted_packages(&self) -> Option<&Vec<String>> {
         self.restrict_packages.as_ref()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateAllowTransitiveDeps {
+    /// Corresponds to PHP false.
+    False,
+    /// \Composer\DependencyResolver\Request::UPDATE_ONLY_LISTED
+    UpdateOnlyListed,
+    /// \Composer\DependencyResolver\Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE
+    UpdateListedWithTransitiveDepsNoRootRequire,
+    /// \Composer\DependencyResolver\Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS
+    UpdateListedWithTransitiveDeps,
+}
+
+#[derive(Debug)]
+pub struct Request {
+    pub(crate) locked_repository: Option<LockArrayRepositoryHandle>,
+    pub(crate) requires: IndexMap<String, AnyConstraint>,
+    pub(crate) fixed_packages: IndexMap<String, BasePackageHandle>,
+    pub(crate) locked_packages: IndexMap<String, BasePackageHandle>,
+    pub(crate) fixed_locked_packages: IndexMap<String, BasePackageHandle>,
+    pub(crate) update_allow_list: Vec<String>,
+    pub(crate) update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
+    restrict_packages: Option<Vec<String>>,
 }

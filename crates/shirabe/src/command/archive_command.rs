@@ -80,155 +80,7 @@ impl ArchiveCommand {
             .expect("ArchiveCommand::configure uses static, valid metadata");
         command
     }
-}
 
-impl Command for ArchiveCommand {
-    fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("archive")?;
-        self.set_description("Creates an archive of this composer package");
-        self.set_definition(&[
-            InputArgument::new5("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
-            InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
-            InputOption::new6("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
-            InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
-            InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
-            InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),
-        ]);
-        self.set_help(
-            "The <info>archive</info> command creates an archive of the specified format\n\
-            containing the files and directories of the Composer project or the specified\n\
-            package in the specified version and writes it to the specified directory.\n\n\
-            <info>shirabe archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#archive"
-        );
-        Ok(())
-    }
-
-    fn execute(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
-        let composer = self.try_composer(None, None);
-
-        let config = if let Some(ref composer) = composer {
-            let config = composer.borrow_partial().get_config();
-            // TODO(plugin): dispatch CommandEvent
-            let command_event =
-                CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
-            let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
-            event_dispatcher
-                .borrow_mut()
-                .dispatch(Some(command_event.get_name()), None);
-            event_dispatcher.borrow_mut().dispatch_script(
-                ScriptEvents::PRE_ARCHIVE_CMD,
-                true,
-                vec![],
-                indexmap::IndexMap::new(),
-            );
-            config
-        } else {
-            std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?))
-        };
-
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                config
-                    .borrow_mut()
-                    .get("archive-format")
-                    .as_string()
-                    .unwrap_or("tar")
-                    .to_string()
-            });
-
-        let dir = input
-            .borrow()
-            .get_option("dir")?
-            .as_string()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                config
-                    .borrow_mut()
-                    .get("archive-dir")
-                    .as_string()
-                    .unwrap_or(".")
-                    .to_string()
-            });
-
-        let io = self.get_io().clone();
-        let return_code = self.archive(
-            io.clone(),
-            &config,
-            input
-                .borrow()
-                .get_argument("package")?
-                .as_string()
-                .map(|s| s.to_string()),
-            input
-                .borrow()
-                .get_argument("version")?
-                .as_string()
-                .map(|s| s.to_string()),
-            &format,
-            &dir,
-            input
-                .borrow()
-                .get_option("file")?
-                .as_string()
-                .map(|s| s.to_string()),
-            input
-                .borrow()
-                .get_option("ignore-filters")?
-                .as_bool()
-                .unwrap_or(false),
-            composer.as_ref(),
-        )?;
-
-        if return_code == 0
-            && let Some(ref composer) = composer
-        {
-            composer
-                .borrow_partial()
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::POST_ARCHIVE_CMD,
-                    true,
-                    vec![],
-                    indexmap::IndexMap::new(),
-                );
-        }
-
-        Ok(return_code)
-    }
-
-    fn initialize(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<()> {
-        if self.test_hooks.borrow().skip_initialize {
-            return Ok(());
-        }
-        base_command_initialize(self, input, output)
-    }
-
-    fn complete(
-        &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
-    ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
-    }
-
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl ArchiveCommand {
     /// For testing only: makes `initialize` a no-op (PHPUnit `onlyMethods(['initialize'])`).
     pub fn __test_skip_initialize(&self) {
         self.test_hooks.borrow_mut().skip_initialize = true;
@@ -244,17 +96,7 @@ impl ArchiveCommand {
     pub fn __test_archive_calls(&self) -> Vec<ArchiveCallRecord> {
         self.test_hooks.borrow().archive_calls.clone()
     }
-}
 
-impl BaseCommand for ArchiveCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
-        &self.base_command_data
-    }
-
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl ArchiveCommand {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn archive(
         &self,
@@ -473,4 +315,158 @@ impl ArchiveCommand {
 
         Ok(Some(complete))
     }
+}
+
+impl Command for ArchiveCommand {
+    fn configure(&self) -> anyhow::Result<()> {
+        self.set_name("archive")?;
+        self.set_description("Creates an archive of this composer package");
+        self.set_definition(&[
+            InputArgument::new5("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
+            InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
+            InputOption::new6("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
+            InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
+            InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),
+        ]);
+        self.set_help(
+            "The <info>archive</info> command creates an archive of the specified format\n\
+            containing the files and directories of the Composer project or the specified\n\
+            package in the specified version and writes it to the specified directory.\n\n\
+            <info>shirabe archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#archive"
+        );
+        Ok(())
+    }
+
+    fn execute(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let composer = self.try_composer(None, None);
+
+        let config = if let Some(ref composer) = composer {
+            let config = composer.borrow_partial().get_config();
+            // TODO(plugin): dispatch CommandEvent
+            let command_event =
+                CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
+            let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
+            event_dispatcher
+                .borrow_mut()
+                .dispatch(Some(command_event.get_name()), None);
+            event_dispatcher.borrow_mut().dispatch_script(
+                ScriptEvents::PRE_ARCHIVE_CMD,
+                true,
+                vec![],
+                indexmap::IndexMap::new(),
+            );
+            config
+        } else {
+            std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?))
+        };
+
+        let format = input
+            .borrow()
+            .get_option("format")?
+            .as_string()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                config
+                    .borrow_mut()
+                    .get("archive-format")
+                    .as_string()
+                    .unwrap_or("tar")
+                    .to_string()
+            });
+
+        let dir = input
+            .borrow()
+            .get_option("dir")?
+            .as_string()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                config
+                    .borrow_mut()
+                    .get("archive-dir")
+                    .as_string()
+                    .unwrap_or(".")
+                    .to_string()
+            });
+
+        let io = self.get_io().clone();
+        let return_code = self.archive(
+            io.clone(),
+            &config,
+            input
+                .borrow()
+                .get_argument("package")?
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .borrow()
+                .get_argument("version")?
+                .as_string()
+                .map(|s| s.to_string()),
+            &format,
+            &dir,
+            input
+                .borrow()
+                .get_option("file")?
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .borrow()
+                .get_option("ignore-filters")?
+                .as_bool()
+                .unwrap_or(false),
+            composer.as_ref(),
+        )?;
+
+        if return_code == 0
+            && let Some(ref composer) = composer
+        {
+            composer
+                .borrow_partial()
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch_script(
+                    ScriptEvents::POST_ARCHIVE_CMD,
+                    true,
+                    vec![],
+                    indexmap::IndexMap::new(),
+                );
+        }
+
+        Ok(return_code)
+    }
+
+    fn initialize(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        if self.test_hooks.borrow().skip_initialize {
+            return Ok(());
+        }
+        base_command_initialize(self, input, output)
+    }
+
+    fn complete(
+        &self,
+        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    ) -> anyhow::Result<()> {
+        crate::command::base_command::base_command_complete(self, input, suggestions)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for ArchiveCommand {
+    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+        &self.base_command_data
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

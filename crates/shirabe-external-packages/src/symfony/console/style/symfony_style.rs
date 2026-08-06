@@ -479,9 +479,7 @@ impl SymfonyStyle {
                 as Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>
         })
     }
-}
 
-impl SymfonyStyle {
     /// {@inheritdoc}
     pub fn writeln(&mut self, messages: PhpMixed, r#type: i64) {
         let messages: Vec<PhpMixed> = if !shirabe_php_shim::is_iterable(&messages) {

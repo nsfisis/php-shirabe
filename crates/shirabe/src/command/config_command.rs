@@ -61,15 +61,7 @@ impl ConfigCommand {
         "suggest",
         "extra",
     ];
-}
 
-impl Default for ConfigCommand {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ConfigCommand {
     pub fn new() -> Self {
         let command = ConfigCommand {
             base_command_data: BaseCommandData::new(None),
@@ -83,6 +75,372 @@ impl ConfigCommand {
             .configure()
             .expect("ConfigCommand::configure uses static, valid metadata");
         command
+    }
+
+    pub(crate) fn handle_single_value(
+        &self,
+        key: &str,
+        callbacks: &(ValidatorFn, NormalizerFn),
+        values: &[String],
+        method: &str,
+    ) -> anyhow::Result<()> {
+        let (validator, normalizer) = callbacks;
+        if 1 != values.len() {
+            return Err(RuntimeException {
+                message: "You can only pass one value. Example: shirabe config process-timeout 300"
+                    .to_string(),
+                code: 0,
+            }
+            .into());
+        }
+
+        let validation = validator(&PhpMixed::String(values[0].clone()));
+        if validation.as_bool() != Some(true) {
+            let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
+                format!(" ({})", validation.as_string().unwrap_or(""))
+            } else {
+                String::new()
+            };
+            return Err(RuntimeException {
+                message: format!("\"{}\" is an invalid value{}", values[0].clone(), suffix),
+                code: 0,
+            }
+            .into());
+        }
+
+        let normalized_value = normalizer(&PhpMixed::String(values[0].clone()));
+
+        if key == "disable-tls" {
+            let config = self.config.borrow().as_ref().unwrap().clone();
+            if !normalized_value.as_bool().unwrap_or(false)
+                && config
+                    .borrow()
+                    .get("disable-tls")
+                    .as_bool()
+                    .unwrap_or(false)
+            {
+                self.get_io().write_error(
+                    "<info>You are now running Composer with SSL/TLS protection enabled.</info>",
+                );
+            } else if normalized_value.as_bool().unwrap_or(false)
+                && !config
+                    .borrow()
+                    .get("disable-tls")
+                    .as_bool()
+                    .unwrap_or(false)
+            {
+                self.get_io().write_error("<warning>You are now running Composer with SSL/TLS protection disabled.</warning>");
+            }
+        }
+
+        let mut config_source = self.config_source.borrow_mut();
+        let config_source = config_source.as_mut().unwrap();
+        match method {
+            "addConfigSetting" => config_source.add_config_setting(key, normalized_value)?,
+            "addProperty" => config_source.add_property(key, normalized_value)?,
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
+    pub(crate) fn handle_multi_value(
+        &self,
+        key: &str,
+        callbacks: &(ValidatorFn, NormalizerFn),
+        values: &[String],
+        method: &str,
+    ) -> anyhow::Result<()> {
+        let (validator, normalizer) = callbacks;
+        let values_mixed =
+            PhpMixed::List(values.iter().map(|s| PhpMixed::String(s.clone())).collect());
+        let validation = validator(&values_mixed);
+        if validation.as_bool() != Some(true) {
+            let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
+                format!(" ({})", validation.as_string().unwrap_or(""))
+            } else {
+                String::new()
+            };
+            return Err(RuntimeException {
+                message: format!(
+                    "{} is an invalid value{}",
+                    PhpMixed::from(json_encode(&values_mixed).ok()),
+                    suffix
+                ),
+                code: 0,
+            }
+            .into());
+        }
+
+        let mut config_source = self.config_source.borrow_mut();
+        let config_source = config_source.as_mut().unwrap();
+        match method {
+            "addConfigSetting" => {
+                config_source.add_config_setting(key, normalizer(&values_mixed))?
+            }
+            "addProperty" => config_source.add_property(key, normalizer(&values_mixed))?,
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
+    /// Display the contents of the file in a pretty formatted way
+    pub(crate) fn list_configuration(
+        &self,
+        contents: PhpMixed,
+        raw_contents: PhpMixed,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        k: Option<String>,
+        show_source: bool,
+    ) {
+        let orig_k = k.clone();
+        let contents_arr = contents.as_array().cloned().unwrap_or_default();
+        let raw_contents_arr = raw_contents.as_array().cloned().unwrap_or_default();
+        let mut k = k;
+        for (key, value) in &contents_arr {
+            if k.is_none() && !matches!(key.as_str(), "config" | "repositories") {
+                continue;
+            }
+
+            let raw_val = raw_contents_arr.get(key).cloned().unwrap_or(PhpMixed::Null);
+
+            let value_inner = value.clone();
+
+            if is_array(&value_inner)
+                && (!is_numeric(&key_first_key(&value_inner).unwrap_or_default().into())
+                    || (key == "repositories" && k.is_none()))
+            {
+                let mut new_k = k.clone().unwrap_or_default();
+                new_k.push_str(&Preg::replace(
+                    php_regex!("{^config\\.}"),
+                    "",
+                    &format!("{}.", key),
+                ));
+                k = Some(new_k);
+                self.list_configuration(
+                    value_inner,
+                    raw_val,
+                    output.clone(),
+                    k.clone(),
+                    show_source,
+                );
+                k = orig_k.clone();
+
+                continue;
+            }
+
+            let value_display: String = if is_array(&value_inner) {
+                let arr_strs: Vec<String> = value_inner
+                    .as_list()
+                    .map(|l| {
+                        l.iter()
+                            .map(|val| {
+                                if is_array(val) {
+                                    json_encode(val).unwrap_or_default()
+                                } else {
+                                    val.as_string().unwrap_or("").to_string()
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                format!("[{}]", implode(", ", &arr_strs))
+            } else if is_bool(&value_inner) {
+                var_export(&value_inner, true)
+            } else {
+                value_inner.as_string().unwrap_or("").to_string()
+            };
+
+            let source = if show_source {
+                format!(
+                    " ({})",
+                    self.config
+                        .borrow()
+                        .as_ref()
+                        .unwrap()
+                        .borrow_mut()
+                        .get_source_of_value(&format!("{}{}", k.clone().unwrap_or_default(), key))
+                )
+            } else {
+                String::new()
+            };
+
+            let link: String =
+                if k.is_some() && strpos(k.as_ref().unwrap(), "repositories") == Some(0) {
+                    "https://getcomposer.org/doc/05-repositories.md".to_string()
+                } else {
+                    let id_source = if k.as_deref() == Some("") || k.is_none() {
+                        key.clone()
+                    } else {
+                        k.clone().unwrap()
+                    };
+                    let id = Preg::replace(php_regex!("{\\..*$}"), "", &id_source);
+                    let id = Preg::replace(
+                        php_regex!("{[^a-z0-9]}i"),
+                        "-",
+                        &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
+                    );
+                    let id = Preg::replace(php_regex!("{-+}"), "-", &id);
+                    format!("https://getcomposer.org/doc/06-config.md#{}", id)
+                };
+            if is_string(&raw_val)
+                && raw_val
+                    .as_string()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+                    != value_display
+            {
+                self.get_io().write3(
+                    &format!(
+                        "[<fg=yellow;href={}>{}{}</>] <info>{} ({})</info>{}",
+                        link,
+                        k.clone().unwrap_or_default(),
+                        key,
+                        raw_val.as_string().unwrap_or(""),
+                        value_display,
+                        source
+                    ),
+                    true,
+                    io_interface::QUIET,
+                );
+            } else {
+                self.get_io().write3(
+                    &format!(
+                        "[<fg=yellow;href={}>{}{}</>] <info>{}</info>{}",
+                        link,
+                        k.clone().unwrap_or_default(),
+                        key,
+                        value_display,
+                        source
+                    ),
+                    true,
+                    io_interface::QUIET,
+                );
+            }
+        }
+    }
+
+    /// Suggest setting-keys, while taking given options in account.
+    fn suggest_setting_keys(&self) -> crate::console::input::SuggestedValues {
+        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
+            if input.get_option("list")?.to_bool()
+                || input.get_option("editor")?.to_bool()
+                || input.get_option("auth")?.to_bool()
+            {
+                return Ok(vec![]);
+            }
+
+            let this = this
+                .as_any()
+                .downcast_ref::<ConfigCommand>()
+                .expect("suggestSettingKeys is bound to ConfigCommand");
+            // PHP passes the CompletionInput itself; the accessors only read from it, so a
+            // clone behind a fresh handle is equivalent.
+            let input_handle: std::rc::Rc<
+                std::cell::RefCell<
+                    dyn shirabe_external_packages::symfony::console::input::InputInterface,
+                >,
+            > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
+
+            // initialize configuration
+            let mut config = Factory::create_config(None, None)?;
+
+            // load configuration
+            let config_file = JsonFile::new(
+                this.get_composer_config_file(input_handle.clone(), &config)?,
+                None,
+                None,
+            )?;
+            if config_file.exists() {
+                let path = config_file.get_path().to_string();
+                let data = config_file.read()?.as_array().cloned().unwrap_or_default();
+                config.merge(&data, &path);
+            }
+
+            // load auth-configuration
+            let auth_config_file = JsonFile::new(
+                this.get_auth_config_file(input_handle.clone(), &config)?,
+                None,
+                None,
+            )?;
+            if auth_config_file.exists() {
+                let path = auth_config_file.get_path().to_string();
+                let mut data = IndexMap::new();
+                data.insert("config".to_string(), auth_config_file.read()?);
+                config.merge(&data, &path);
+            }
+
+            // collect all configuration setting-keys
+            let raw_config = config.raw();
+            let mut keys = flatten_setting_keys(
+                raw_config.get("config").cloned().unwrap_or(PhpMixed::Null),
+                "",
+            );
+            keys.extend(flatten_setting_keys(
+                raw_config
+                    .get("repositories")
+                    .cloned()
+                    .unwrap_or(PhpMixed::Null),
+                "repositories.",
+            ));
+
+            // if unsetting …
+            if input.get_option("unset")?.to_bool() {
+                // … keep only the currently customized setting-keys …
+                let sources = [
+                    config_file.get_path().to_string(),
+                    auth_config_file.get_path().to_string(),
+                ];
+                keys.retain(|key| sources.contains(&config.get_source_of_value(key)));
+
+            // … else if showing or setting a value …
+            } else {
+                // … add all configurable package-properties, no matter if it exist
+                keys.extend(
+                    Self::CONFIGURABLE_PACKAGE_PROPERTIES
+                        .iter()
+                        .map(|property| property.to_string()),
+                );
+
+                // it would be nice to distinguish between showing and setting
+                // a value, but that makes the implementation much more complex
+                // and partially impossible because symfony's implementation
+                // does not complete arguments followed by other arguments
+            }
+
+            // add all existing configurable package-properties
+            if config_file.exists() {
+                let properties: IndexMap<String, PhpMixed> = config_file
+                    .read()?
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(key, _)| {
+                        Self::CONFIGURABLE_PACKAGE_PROPERTIES.contains(&key.as_str())
+                    })
+                    .collect();
+
+                keys.extend(flatten_setting_keys(PhpMixed::Array(properties), ""));
+            }
+
+            // filter settings-keys by completion value
+            let completion_value = input.get_completion_value();
+
+            if !completion_value.is_empty() {
+                keys.retain(|key| key.starts_with(&completion_value));
+            }
+
+            keys.sort();
+
+            keys.dedup();
+            Ok(keys)
+        }))
+    }
+}
+
+impl Default for ConfigCommand {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1273,368 +1631,6 @@ impl BaseCommand for ConfigCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-impl ConfigCommand {
-    pub(crate) fn handle_single_value(
-        &self,
-        key: &str,
-        callbacks: &(ValidatorFn, NormalizerFn),
-        values: &[String],
-        method: &str,
-    ) -> anyhow::Result<()> {
-        let (validator, normalizer) = callbacks;
-        if 1 != values.len() {
-            return Err(RuntimeException {
-                message: "You can only pass one value. Example: shirabe config process-timeout 300"
-                    .to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        let validation = validator(&PhpMixed::String(values[0].clone()));
-        if validation.as_bool() != Some(true) {
-            let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                format!(" ({})", validation.as_string().unwrap_or(""))
-            } else {
-                String::new()
-            };
-            return Err(RuntimeException {
-                message: format!("\"{}\" is an invalid value{}", values[0].clone(), suffix),
-                code: 0,
-            }
-            .into());
-        }
-
-        let normalized_value = normalizer(&PhpMixed::String(values[0].clone()));
-
-        if key == "disable-tls" {
-            let config = self.config.borrow().as_ref().unwrap().clone();
-            if !normalized_value.as_bool().unwrap_or(false)
-                && config
-                    .borrow()
-                    .get("disable-tls")
-                    .as_bool()
-                    .unwrap_or(false)
-            {
-                self.get_io().write_error(
-                    "<info>You are now running Composer with SSL/TLS protection enabled.</info>",
-                );
-            } else if normalized_value.as_bool().unwrap_or(false)
-                && !config
-                    .borrow()
-                    .get("disable-tls")
-                    .as_bool()
-                    .unwrap_or(false)
-            {
-                self.get_io().write_error("<warning>You are now running Composer with SSL/TLS protection disabled.</warning>");
-            }
-        }
-
-        let mut config_source = self.config_source.borrow_mut();
-        let config_source = config_source.as_mut().unwrap();
-        match method {
-            "addConfigSetting" => config_source.add_config_setting(key, normalized_value)?,
-            "addProperty" => config_source.add_property(key, normalized_value)?,
-            _ => unreachable!(),
-        }
-        Ok(())
-    }
-
-    pub(crate) fn handle_multi_value(
-        &self,
-        key: &str,
-        callbacks: &(ValidatorFn, NormalizerFn),
-        values: &[String],
-        method: &str,
-    ) -> anyhow::Result<()> {
-        let (validator, normalizer) = callbacks;
-        let values_mixed =
-            PhpMixed::List(values.iter().map(|s| PhpMixed::String(s.clone())).collect());
-        let validation = validator(&values_mixed);
-        if validation.as_bool() != Some(true) {
-            let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                format!(" ({})", validation.as_string().unwrap_or(""))
-            } else {
-                String::new()
-            };
-            return Err(RuntimeException {
-                message: format!(
-                    "{} is an invalid value{}",
-                    PhpMixed::from(json_encode(&values_mixed).ok()),
-                    suffix
-                ),
-                code: 0,
-            }
-            .into());
-        }
-
-        let mut config_source = self.config_source.borrow_mut();
-        let config_source = config_source.as_mut().unwrap();
-        match method {
-            "addConfigSetting" => {
-                config_source.add_config_setting(key, normalizer(&values_mixed))?
-            }
-            "addProperty" => config_source.add_property(key, normalizer(&values_mixed))?,
-            _ => unreachable!(),
-        }
-        Ok(())
-    }
-
-    /// Display the contents of the file in a pretty formatted way
-    pub(crate) fn list_configuration(
-        &self,
-        contents: PhpMixed,
-        raw_contents: PhpMixed,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        k: Option<String>,
-        show_source: bool,
-    ) {
-        let orig_k = k.clone();
-        let contents_arr = contents.as_array().cloned().unwrap_or_default();
-        let raw_contents_arr = raw_contents.as_array().cloned().unwrap_or_default();
-        let mut k = k;
-        for (key, value) in &contents_arr {
-            if k.is_none() && !matches!(key.as_str(), "config" | "repositories") {
-                continue;
-            }
-
-            let raw_val = raw_contents_arr.get(key).cloned().unwrap_or(PhpMixed::Null);
-
-            let value_inner = value.clone();
-
-            if is_array(&value_inner)
-                && (!is_numeric(&key_first_key(&value_inner).unwrap_or_default().into())
-                    || (key == "repositories" && k.is_none()))
-            {
-                let mut new_k = k.clone().unwrap_or_default();
-                new_k.push_str(&Preg::replace(
-                    php_regex!("{^config\\.}"),
-                    "",
-                    &format!("{}.", key),
-                ));
-                k = Some(new_k);
-                self.list_configuration(
-                    value_inner,
-                    raw_val,
-                    output.clone(),
-                    k.clone(),
-                    show_source,
-                );
-                k = orig_k.clone();
-
-                continue;
-            }
-
-            let value_display: String = if is_array(&value_inner) {
-                let arr_strs: Vec<String> = value_inner
-                    .as_list()
-                    .map(|l| {
-                        l.iter()
-                            .map(|val| {
-                                if is_array(val) {
-                                    json_encode(val).unwrap_or_default()
-                                } else {
-                                    val.as_string().unwrap_or("").to_string()
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-                format!("[{}]", implode(", ", &arr_strs))
-            } else if is_bool(&value_inner) {
-                var_export(&value_inner, true)
-            } else {
-                value_inner.as_string().unwrap_or("").to_string()
-            };
-
-            let source = if show_source {
-                format!(
-                    " ({})",
-                    self.config
-                        .borrow()
-                        .as_ref()
-                        .unwrap()
-                        .borrow_mut()
-                        .get_source_of_value(&format!("{}{}", k.clone().unwrap_or_default(), key))
-                )
-            } else {
-                String::new()
-            };
-
-            let link: String =
-                if k.is_some() && strpos(k.as_ref().unwrap(), "repositories") == Some(0) {
-                    "https://getcomposer.org/doc/05-repositories.md".to_string()
-                } else {
-                    let id_source = if k.as_deref() == Some("") || k.is_none() {
-                        key.clone()
-                    } else {
-                        k.clone().unwrap()
-                    };
-                    let id = Preg::replace(php_regex!("{\\..*$}"), "", &id_source);
-                    let id = Preg::replace(
-                        php_regex!("{[^a-z0-9]}i"),
-                        "-",
-                        &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
-                    );
-                    let id = Preg::replace(php_regex!("{-+}"), "-", &id);
-                    format!("https://getcomposer.org/doc/06-config.md#{}", id)
-                };
-            if is_string(&raw_val)
-                && raw_val
-                    .as_string()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
-                    != value_display
-            {
-                self.get_io().write3(
-                    &format!(
-                        "[<fg=yellow;href={}>{}{}</>] <info>{} ({})</info>{}",
-                        link,
-                        k.clone().unwrap_or_default(),
-                        key,
-                        raw_val.as_string().unwrap_or(""),
-                        value_display,
-                        source
-                    ),
-                    true,
-                    io_interface::QUIET,
-                );
-            } else {
-                self.get_io().write3(
-                    &format!(
-                        "[<fg=yellow;href={}>{}{}</>] <info>{}</info>{}",
-                        link,
-                        k.clone().unwrap_or_default(),
-                        key,
-                        value_display,
-                        source
-                    ),
-                    true,
-                    io_interface::QUIET,
-                );
-            }
-        }
-    }
-
-    /// Suggest setting-keys, while taking given options in account.
-    fn suggest_setting_keys(&self) -> crate::console::input::SuggestedValues {
-        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
-            if input.get_option("list")?.to_bool()
-                || input.get_option("editor")?.to_bool()
-                || input.get_option("auth")?.to_bool()
-            {
-                return Ok(vec![]);
-            }
-
-            let this = this
-                .as_any()
-                .downcast_ref::<ConfigCommand>()
-                .expect("suggestSettingKeys is bound to ConfigCommand");
-            // PHP passes the CompletionInput itself; the accessors only read from it, so a
-            // clone behind a fresh handle is equivalent.
-            let input_handle: std::rc::Rc<
-                std::cell::RefCell<
-                    dyn shirabe_external_packages::symfony::console::input::InputInterface,
-                >,
-            > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
-
-            // initialize configuration
-            let mut config = Factory::create_config(None, None)?;
-
-            // load configuration
-            let config_file = JsonFile::new(
-                this.get_composer_config_file(input_handle.clone(), &config)?,
-                None,
-                None,
-            )?;
-            if config_file.exists() {
-                let path = config_file.get_path().to_string();
-                let data = config_file.read()?.as_array().cloned().unwrap_or_default();
-                config.merge(&data, &path);
-            }
-
-            // load auth-configuration
-            let auth_config_file = JsonFile::new(
-                this.get_auth_config_file(input_handle.clone(), &config)?,
-                None,
-                None,
-            )?;
-            if auth_config_file.exists() {
-                let path = auth_config_file.get_path().to_string();
-                let mut data = IndexMap::new();
-                data.insert("config".to_string(), auth_config_file.read()?);
-                config.merge(&data, &path);
-            }
-
-            // collect all configuration setting-keys
-            let raw_config = config.raw();
-            let mut keys = flatten_setting_keys(
-                raw_config.get("config").cloned().unwrap_or(PhpMixed::Null),
-                "",
-            );
-            keys.extend(flatten_setting_keys(
-                raw_config
-                    .get("repositories")
-                    .cloned()
-                    .unwrap_or(PhpMixed::Null),
-                "repositories.",
-            ));
-
-            // if unsetting …
-            if input.get_option("unset")?.to_bool() {
-                // … keep only the currently customized setting-keys …
-                let sources = [
-                    config_file.get_path().to_string(),
-                    auth_config_file.get_path().to_string(),
-                ];
-                keys.retain(|key| sources.contains(&config.get_source_of_value(key)));
-
-            // … else if showing or setting a value …
-            } else {
-                // … add all configurable package-properties, no matter if it exist
-                keys.extend(
-                    Self::CONFIGURABLE_PACKAGE_PROPERTIES
-                        .iter()
-                        .map(|property| property.to_string()),
-                );
-
-                // it would be nice to distinguish between showing and setting
-                // a value, but that makes the implementation much more complex
-                // and partially impossible because symfony's implementation
-                // does not complete arguments followed by other arguments
-            }
-
-            // add all existing configurable package-properties
-            if config_file.exists() {
-                let properties: IndexMap<String, PhpMixed> = config_file
-                    .read()?
-                    .as_array()
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|(key, _)| {
-                        Self::CONFIGURABLE_PACKAGE_PROPERTIES.contains(&key.as_str())
-                    })
-                    .collect();
-
-                keys.extend(flatten_setting_keys(PhpMixed::Array(properties), ""));
-            }
-
-            // filter settings-keys by completion value
-            let completion_value = input.get_completion_value();
-
-            if !completion_value.is_empty() {
-                keys.retain(|key| key.starts_with(&completion_value));
-            }
-
-            keys.sort();
-
-            keys.dedup();
-            Ok(keys)
-        }))
-    }
 }
 
 // PHP signature: function ($val): bool / ($val) -> bool/string
