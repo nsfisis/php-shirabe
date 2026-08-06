@@ -9,7 +9,7 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_rpc::value::{serialize, unserialize};
-use shirabe_php_rpc::{PluginValue, call_function};
+use shirabe_php_rpc::{PhpObject, PluginValue, call_function};
 
 fn php_available() -> bool {
     PhpExecutableFinder::new().find(false).is_some()
@@ -134,6 +134,83 @@ fn encode_direction_matches_php_for_nested_arrays() {
         deep = PluginValue::List(vec![deep]);
     }
     assert_php_agrees(&deep);
+}
+
+/// `DateTimeImmutable` is one of the classes the worker is allowed to revive, so the record
+/// makes the whole trip: PHP builds a real date out of the bytes this side wrote, and writes the
+/// same bytes back.
+#[test]
+fn encode_direction_matches_php_for_object_records() {
+    if !php_available() {
+        return;
+    }
+
+    let mut date = PhpObject::new("DateTimeImmutable");
+    date.set_public("date", PluginValue::string("2024-03-04 05:06:07.123456"));
+    date.set_public("timezone_type", PluginValue::Int(3));
+    date.set_public("timezone", PluginValue::string("UTC"));
+    assert_php_agrees(&PluginValue::PhpObject(date.clone()));
+
+    assert_php_agrees(&PluginValue::List(vec![
+        PluginValue::PhpObject(date),
+        PluginValue::Null,
+    ]));
+}
+
+#[test]
+fn decode_direction_matches_php_for_object_records() {
+    if !php_available() {
+        return;
+    }
+
+    let snippets = [
+        r#"return serialize(new DateTimeImmutable('2024-03-04 05:06:07.123456', new DateTimeZone('UTC')));"#,
+        r#"return serialize(new DateTime('2024-03-04 05:06:07.123456', new DateTimeZone('+09:00')));"#,
+        // Every visibility, so the whole mangling vocabulary round-trips.
+        r#"class ShirabeOracleProps { public $pub = 1; protected $prot = [1, 2]; private $priv = 'x'; }
+           return serialize(new ShirabeOracleProps());"#,
+        r#"$o = new stdClass; $o->nested = new stdClass; $o->nested->deep = "\xff"; return serialize($o);"#,
+    ];
+
+    for snippet in snippets {
+        let PluginValue::String(php_bytes) = php_eval(snippet) else {
+            panic!("snippet did not return a string: {snippet}");
+        };
+        let decoded = unserialize(&php_bytes)
+            .unwrap_or_else(|e| panic!("failed to decode PHP output for `{snippet}`: {e:#}"));
+        assert_eq!(
+            String::from_utf8_lossy(&serialize(&decoded)),
+            String::from_utf8_lossy(&php_bytes),
+            "re-encoding diverged for `{snippet}`"
+        );
+    }
+}
+
+/// PHP writes a repeated instance as a back-reference into its numbering of every value in the
+/// payload, so decoding one means counting exactly the way PHP counts.
+#[test]
+fn decode_direction_resolves_php_back_references() {
+    if !php_available() {
+        return;
+    }
+
+    let PluginValue::String(php_bytes) = php_eval(
+        r#"$c = new stdClass; $c->p = [1, "x"]; $e = new stdClass; $e->q = 2;
+           return serialize([$c, $c, $e, [$c, $e]]);"#,
+    ) else {
+        panic!("expected serialized bytes");
+    };
+    let decoded = unserialize(&php_bytes).expect("failed to decode PHP output");
+    let PluginValue::List(items) = decoded else {
+        panic!("expected a list, got {decoded:?}");
+    };
+    let PluginValue::List(inner) = &items[3] else {
+        panic!("expected a nested list, got {:?}", items[3]);
+    };
+    assert_eq!(items[0], items[1]);
+    assert_eq!(items[0], inner[0]);
+    assert_eq!(items[2], inner[1]);
+    assert_ne!(items[0], items[2]);
 }
 
 #[test]

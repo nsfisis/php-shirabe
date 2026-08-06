@@ -36,11 +36,55 @@ pub struct PhpClassHandle {
     pub class: String,
 }
 
-/// The value model of the plugin RPC boundary: PHP scalars, arrays, and handle descriptors.
+/// The `O:` record of a serialized PHP object: a class name and a property table, with the
+/// property names carrying PHP's visibility mangling (hence the accessors below rather than
+/// bare names).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhpObject {
+    pub class: String,
+    pub props: IndexMap<Vec<u8>, PluginValue>,
+}
+
+impl PhpObject {
+    pub fn new(class: impl Into<String>) -> PhpObject {
+        PhpObject {
+            class: class.into(),
+            props: IndexMap::new(),
+        }
+    }
+
+    /// A public property keeps its declared name.
+    pub fn public(&self, name: &str) -> Option<&PluginValue> {
+        self.props.get(name.as_bytes())
+    }
+
+    pub fn set_public(&mut self, name: &str, value: PluginValue) {
+        self.props.insert(name.as_bytes().to_vec(), value);
+    }
+
+    /// PHP mangles a protected property name to `\0*\0name`.
+    pub fn protected(&self, name: &str) -> Option<&PluginValue> {
+        self.props.get(protected_key(name).as_slice())
+    }
+
+    pub fn set_protected(&mut self, name: &str, value: PluginValue) {
+        self.props.insert(protected_key(name), value);
+    }
+}
+
+fn protected_key(name: &str) -> Vec<u8> {
+    let mut key = b"\0*\0".to_vec();
+    key.extend_from_slice(name.as_bytes());
+    key
+}
+
+/// The value model of the plugin RPC boundary: PHP scalars, arrays, object records, and handle
+/// descriptors.
 ///
 /// `Object` is encode-only: the wire representation of a PHP array does not distinguish arrays
 /// from objects, so the decoder only ever produces `List` (contiguous 0-based int keys) or
-/// `Array`. An encoded `Object` lands on the PHP side as a plain array.
+/// `Array`. An encoded `Object` lands on the PHP side as a plain array. A class-tagged object
+/// record is `PhpObject` instead, and does round-trip.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PluginValue {
     Null,
@@ -51,6 +95,7 @@ pub enum PluginValue {
     List(Vec<PluginValue>),
     Array(IndexMap<Vec<u8>, PluginValue>),
     Object(IndexMap<Vec<u8>, PluginValue>),
+    PhpObject(PhpObject),
     RustHandle(RustObjHandle),
     PhpHandle(PhpObjHandle),
     PhpClass(PhpClassHandle),
@@ -108,8 +153,13 @@ impl PluginValue {
                     .map(|(k, v)| Ok((String::from_utf8_lossy(k).into_owned(), v.to_php_mixed()?)))
                     .collect::<anyhow::Result<_>>()?,
             ),
-            PluginValue::RustHandle(_) | PluginValue::PhpHandle(_) | PluginValue::PhpClass(_) => {
-                bail!("a handle descriptor cannot be represented as PhpMixed: {self:?}")
+            PluginValue::PhpObject(_)
+            | PluginValue::RustHandle(_)
+            | PluginValue::PhpHandle(_)
+            | PluginValue::PhpClass(_) => {
+                bail!(
+                    "an object record or handle descriptor cannot be represented as PhpMixed: {self:?}"
+                )
             }
         })
     }
@@ -168,9 +218,25 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             }
             out.push(b'}');
         }
-        // An object lands on the PHP side as a plain array: `allowed_classes: false` bans `O:`
-        // records from the wire, so `Object` is a write-only label (see docs/dev/php-rpc.md).
+        // An object with no class lands on the PHP side as a plain array: the wire has no shape
+        // for it, so `Object` is a write-only label (see docs/dev/php-rpc.md).
         PluginValue::Array(map) | PluginValue::Object(map) => serialize_map(map, out),
+        PluginValue::PhpObject(object) => {
+            out.extend_from_slice(b"O:");
+            out.extend_from_slice(object.class.len().to_string().as_bytes());
+            out.extend_from_slice(b":\"");
+            out.extend_from_slice(object.class.as_bytes());
+            out.extend_from_slice(b"\":");
+            out.extend_from_slice(object.props.len().to_string().as_bytes());
+            out.extend_from_slice(b":{");
+            for (name, value) in &object.props {
+                // A property name is always written as a string, even a numeric one, and never
+                // as the int key an array of the same shape would get.
+                serialize_bytes(name, out);
+                serialize_into(value, out);
+            }
+            out.push(b'}');
+        }
         PluginValue::RustHandle(handle) => {
             let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
             map.insert(
@@ -267,10 +333,10 @@ fn canonical_int_key(key: &[u8]) -> Option<i64> {
 
 /// Decodes a whole `serialize()` payload into a `PluginValue`, rejecting trailing garbage.
 ///
-/// The decoder never produces `Object`: PHP's wire format erases the array/object distinction,
-/// and object revival is banned anyway (`allowed_classes: false` on the PHP side). Arrays whose
-/// keys are exactly `0..N` decode as `List`; anything else decodes as `Array`. Arrays carrying
-/// the reserved handle-descriptor key sets decode as the corresponding handle.
+/// The decoder never produces `Object`: PHP's wire format erases the array/object distinction
+/// for a class-less object. Arrays whose keys are exactly `0..N` decode as `List`; anything else
+/// decodes as `Array`. Arrays carrying the reserved handle-descriptor key sets decode as the
+/// corresponding handle, and an `O:` record decodes as `PhpObject`.
 pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
     let mut pos = 0;
     let value = parse_value(payload, &mut pos)?;
@@ -280,18 +346,24 @@ pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
     Ok(value)
 }
 
-/// One lexed step of a serialized payload: either a complete non-array value, or the opening of
-/// an array whose entries follow.
+/// One lexed step of a serialized payload: a complete scalar, the opening of a container whose
+/// entries follow, or a back-reference to an earlier value.
 enum Lex {
     Value(PluginValue),
-    ArrayOpen(usize),
+    /// The entry count, and the class name of an object record.
+    ContainerOpen(usize, Option<String>),
+    BackReference(usize),
 }
 
-/// An in-progress array while parsing iteratively. The parser deliberately does not recurse:
-/// nesting depth must never translate into call stack depth, so a hostile or corrupted payload
-/// cannot overflow the stack (the explicit depth cap exists on top of that).
-struct ArrayFrame {
+/// An in-progress array or object record while parsing iteratively. The parser deliberately does
+/// not recurse: nesting depth must never translate into call stack depth, so a hostile or
+/// corrupted payload cannot overflow the stack (the explicit depth cap exists on top of that).
+struct Frame {
     entries: IndexMap<Vec<u8>, PluginValue>,
+    /// The class name of an object record; `None` for an array.
+    class: Option<String>,
+    /// This container's own number in the payload's value numbering.
+    number: usize,
     count: usize,
     parsed: usize,
     is_list: bool,
@@ -299,8 +371,14 @@ struct ArrayFrame {
 }
 
 fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
-    let mut stack: Vec<ArrayFrame> = Vec::new();
+    let mut stack: Vec<Frame> = Vec::new();
     let mut completed: Option<PluginValue> = None;
+    // PHP numbers every value of a payload from 1 in document order — never a key, but including
+    // a back-reference itself — and an `r:` record names one of those numbers. Only an object can
+    // be named that way (an array crosses by copy), so only objects are kept for resolution;
+    // holding every value would cost a slot per scalar for payloads that never reference one.
+    let mut numbered_objects: IndexMap<usize, PluginValue> = IndexMap::new();
+    let mut values = 0;
 
     loop {
         if let Some(value) = completed.take() {
@@ -326,7 +404,12 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
                 }
                 *pos += 1;
                 let frame = stack.pop().expect("frame was just observed");
-                completed = Some(finish_array(frame)?);
+                let number = frame.number;
+                let value = finish_frame(frame)?;
+                if matches!(value, PluginValue::PhpObject(_)) {
+                    numbered_objects.insert(number, value.clone());
+                }
+                completed = Some(value);
                 continue;
             }
             let index = frame.parsed as i64;
@@ -340,21 +423,36 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
                     frame.pending_key = Some(bytes);
                 }
                 Lex::Value(other) => bail!("array key is neither int nor string: {other:?}"),
-                Lex::ArrayOpen(_) => bail!("array key is neither int nor string"),
+                Lex::ContainerOpen(..) | Lex::BackReference(_) => {
+                    bail!("array key is neither int nor string")
+                }
             }
             continue;
         }
 
+        values += 1;
         match lex(payload, pos)? {
             Lex::Value(value) => completed = Some(value),
-            Lex::ArrayOpen(count) => {
+            Lex::BackReference(number) => match numbered_objects.get(&number) {
+                // An immutable value has no identity to preserve on this side, so a repeated
+                // instance decodes as a copy of the one it names.
+                Some(value) => completed = Some(value.clone()),
+                None => bail!(
+                    "back-reference r:{number} at byte {} does not name a completed object; a \
+                     cyclic object graph cannot cross the plugin boundary",
+                    *pos
+                ),
+            },
+            Lex::ContainerOpen(count, class) => {
                 if stack.len() >= MAX_DECODE_DEPTH {
                     bail!(
                         "serialized value exceeds the maximum nesting depth of {MAX_DECODE_DEPTH}"
                     );
                 }
-                stack.push(ArrayFrame {
+                stack.push(Frame {
                     entries: IndexMap::new(),
+                    class,
+                    number: values,
                     count,
                     parsed: 0,
                     is_list: true,
@@ -412,23 +510,32 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         b"s:" => Ok(Lex::Value(PluginValue::String(parse_string_body(
             payload, pos,
         )?))),
-        b"a:" => {
-            let count_bytes = take_until(payload, pos, b':')?;
-            let count: usize = std::str::from_utf8(count_bytes)
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "malformed array count: {:?}",
-                        String::from_utf8_lossy(count_bytes)
-                    )
-                })?;
-            if payload.get(*pos) != Some(&b'{') {
-                bail!("expected opening brace at byte {}", *pos);
-            }
-            *pos += 1;
-            Ok(Lex::ArrayOpen(count))
+        b"a:" => Ok(Lex::ContainerOpen(parse_entry_count(payload, pos)?, None)),
+        b"O:" => {
+            let class = parse_quoted(payload, pos, b':')?;
+            let class = String::from_utf8(class)
+                .map_err(|_| anyhow::anyhow!("object record with a non-UTF-8 class name"))?;
+            Ok(Lex::ContainerOpen(
+                parse_entry_count(payload, pos)?,
+                Some(class),
+            ))
         }
+        b"r:" => {
+            let bytes = take_until(payload, pos, b';')?;
+            match std::str::from_utf8(bytes).ok().and_then(|s| s.parse().ok()) {
+                Some(number) => Ok(Lex::BackReference(number)),
+                None => bail!(
+                    "malformed back-reference: {:?}",
+                    String::from_utf8_lossy(bytes)
+                ),
+            }
+        }
+        // A PHP reference aliases a variable; nothing on this side can carry that aliasing, and
+        // no value the boundary produces is written by reference.
+        b"R:" => bail!(
+            "a PHP reference (`R:`) at byte {} cannot cross the plugin boundary",
+            *pos - 2
+        ),
         _ => bail!(
             "unknown serialized type tag {:?} at byte {}",
             String::from_utf8_lossy(tag),
@@ -437,7 +544,13 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
     }
 }
 
-fn finish_array(frame: ArrayFrame) -> anyhow::Result<PluginValue> {
+fn finish_frame(frame: Frame) -> anyhow::Result<PluginValue> {
+    if let Some(class) = frame.class {
+        return Ok(PluginValue::PhpObject(PhpObject {
+            class,
+            props: frame.entries,
+        }));
+    }
     if let Some(handle) = decode_handle(&frame.entries)? {
         return Ok(handle);
     }
@@ -448,7 +561,31 @@ fn finish_array(frame: ArrayFrame) -> anyhow::Result<PluginValue> {
     })
 }
 
+/// The `<count>:{` a container's entries follow.
+fn parse_entry_count(payload: &[u8], pos: &mut usize) -> anyhow::Result<usize> {
+    let count_bytes = take_until(payload, pos, b':')?;
+    let count: usize = std::str::from_utf8(count_bytes)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "malformed entry count: {:?}",
+                String::from_utf8_lossy(count_bytes)
+            )
+        })?;
+    if payload.get(*pos) != Some(&b'{') {
+        bail!("expected opening brace at byte {}", *pos);
+    }
+    *pos += 1;
+    Ok(count)
+}
+
 fn parse_string_body(payload: &[u8], pos: &mut usize) -> anyhow::Result<Vec<u8>> {
+    parse_quoted(payload, pos, b';')
+}
+
+/// A length-prefixed quoted run: `<len>:"<bytes>"` followed by `terminator`.
+fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Result<Vec<u8>> {
     let len_bytes = take_until(payload, pos, b':')?;
     let len: usize = std::str::from_utf8(len_bytes)
         .ok()
@@ -467,7 +604,7 @@ fn parse_string_body(payload: &[u8], pos: &mut usize) -> anyhow::Result<Vec<u8>>
         bail!("truncated string body at byte {}", *pos);
     };
     *pos += len;
-    if payload.get(*pos..*pos + 2) != Some(b"\";") {
+    if payload.get(*pos) != Some(&b'"') || payload.get(*pos + 1) != Some(&terminator) {
         bail!("expected closing quote at byte {}", *pos);
     }
     *pos += 2;
@@ -636,6 +773,81 @@ mod tests {
         let encoded = serialize(&PluginValue::Object(map.clone()));
         assert_eq!(encoded, serialize(&PluginValue::Array(map.clone())));
         assert_eq!(unserialize(&encoded).unwrap(), PluginValue::Array(map));
+    }
+
+    /// The bytes are what PHP writes for
+    /// `new MatchAllConstraint()` and `new DateTimeImmutable('2026-08-07 12:34:56.123456', new
+    /// DateTimeZone('UTC'))`: a protected property is mangled, a public one is not, and both are
+    /// written as string keys.
+    #[test]
+    fn encodes_object_records_like_php() {
+        let mut constraint = PhpObject::new("Composer\\Semver\\Constraint\\MatchAllConstraint");
+        constraint.set_protected("prettyString", PluginValue::Null);
+        assert_eq!(
+            serialize(&PluginValue::PhpObject(constraint)),
+            b"O:45:\"Composer\\Semver\\Constraint\\MatchAllConstraint\":1:{s:15:\"\0*\0prettyString\";N;}".as_slice(),
+        );
+
+        let mut date = PhpObject::new("DateTimeImmutable");
+        date.set_public("date", PluginValue::string("2026-08-07 12:34:56.123456"));
+        date.set_public("timezone_type", PluginValue::Int(3));
+        date.set_public("timezone", PluginValue::string("UTC"));
+        assert_eq!(
+            serialize(&PluginValue::PhpObject(date)),
+            b"O:17:\"DateTimeImmutable\":3:{s:4:\"date\";s:26:\"2026-08-07 12:34:56.123456\";s:13:\"timezone_type\";i:3;s:8:\"timezone\";s:3:\"UTC\";}".as_slice(),
+        );
+    }
+
+    #[test]
+    fn roundtrips_object_records() {
+        let mut inner = PhpObject::new("Composer\\Semver\\Constraint\\Constraint");
+        inner.set_protected("operator", PluginValue::Int(4));
+        inner.set_protected("version", PluginValue::string("1.0.0"));
+        let mut outer = PhpObject::new("Composer\\Package\\Link");
+        outer.set_protected("source", PluginValue::string("a/b"));
+        outer.set_protected("constraint", PluginValue::PhpObject(inner.clone()));
+        roundtrip(PluginValue::PhpObject(outer.clone()));
+
+        // Visibility is part of the property name: neither accessor sees the other's key.
+        assert_eq!(inner.protected("operator"), Some(&PluginValue::Int(4)));
+        assert_eq!(inner.public("operator"), None);
+        assert_eq!(outer.protected("prettyConstraint"), None);
+    }
+
+    /// PHP numbers every value of a payload, including the ones inside an object and the
+    /// back-references themselves, so resolving `r:` means counting exactly the same way. Both
+    /// payloads below are PHP's own output for `[$c, $c]` and `[$c, $c, $e, $e]`.
+    #[test]
+    fn resolves_back_references_by_phps_value_numbering() {
+        let decoded =
+            unserialize(b"a:2:{i:0;O:8:\"stdClass\":1:{s:1:\"p\";i:1;}i:1;r:2;}").unwrap();
+        let PluginValue::List(items) = decoded else {
+            panic!("expected a list, got {decoded:?}");
+        };
+        assert_eq!(items[0], items[1]);
+
+        let decoded = unserialize(
+            b"a:4:{i:0;O:8:\"stdClass\":1:{s:1:\"p\";i:1;}i:1;r:2;i:2;O:8:\"stdClass\":1:{s:1:\"q\";i:2;}i:3;r:5;}",
+        )
+        .unwrap();
+        let PluginValue::List(items) = decoded else {
+            panic!("expected a list, got {decoded:?}");
+        };
+        assert_eq!(items[0], items[1]);
+        assert_eq!(items[2], items[3]);
+        assert_ne!(items[0], items[2]);
+    }
+
+    #[test]
+    fn rejects_cyclic_object_graphs_and_php_references() {
+        let err = unserialize(b"O:8:\"stdClass\":1:{s:4:\"self\";r:1;}").unwrap_err();
+        assert!(err.to_string().contains("cyclic"), "{err}");
+
+        let err = unserialize(b"a:2:{i:0;i:1;i:1;R:2;}").unwrap_err();
+        assert!(err.to_string().contains("PHP reference"), "{err}");
+
+        let err = unserialize(b"a:1:{i:0;r:9;}").unwrap_err();
+        assert!(err.to_string().contains("r:9"), "{err}");
     }
 
     #[test]

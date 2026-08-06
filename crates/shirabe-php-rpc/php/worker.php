@@ -227,9 +227,11 @@ final class ShirabeRpcRuntime
             // A natively-constructed dual-mode instance falls through to the P table below.
         }
         if (is_object($value)) {
-            $materialized = \Shirabe\MaterializedValue::describe($value);
+            // A materialized value needs no descriptor: it crosses as the object record
+            // serialize() writes for it, which the Rust side decodes into its own value.
+            $materialized = \Shirabe\MaterializedValue::forWire($value);
             if ($materialized !== null) {
-                return array_map([self::class, 'toWire'], $materialized);
+                return $materialized;
             }
             return ShirabePhpObjectRegistry::descriptor($value);
         }
@@ -242,7 +244,10 @@ final class ShirabeRpcRuntime
         return $value;
     }
 
-    /** Converts a decoded wire value: handle descriptor arrays become live objects. */
+    /**
+     * Converts a decoded wire value: handle descriptor arrays become live objects. A
+     * materialized value arrives as a real instance already, revived by unserialize().
+     */
     public static function fromWire($value)
     {
         if (!is_array($value)) {
@@ -260,9 +265,6 @@ final class ShirabeRpcRuntime
         }
         if (isset($value['__pclass']) && count($value) === 1) {
             return $value['__pclass'];
-        }
-        if (isset($value['__pnew'])) {
-            return \Shirabe\MaterializedValue::build(array_map([self::class, 'fromWire'], $value));
         }
         return array_map([self::class, 'fromWire'], $value);
     }
@@ -287,7 +289,7 @@ final class ShirabeRpcRuntime
                 if ($inId !== $corrId) {
                     self::fail("protocol violation: response for unexpected corr_id {$inId}");
                 }
-                $fields = unserialize($payload, ['allowed_classes' => false]);
+                $fields = unserialize($payload, ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES]);
                 if (!is_array($fields)) {
                     self::fail('protocol violation: unparseable response payload');
                 }
@@ -314,7 +316,7 @@ final class ShirabeRpcRuntime
 
     public static function dispatchRequest(int $tag, int $corrId, string $payload): void
     {
-        $fields = unserialize($payload, ['allowed_classes' => false]);
+        $fields = unserialize($payload, ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES]);
         if (!is_array($fields)) {
             self::fail('protocol violation: unparseable frame payload');
         }
@@ -588,7 +590,9 @@ ShirabeRpcRuntime::$dispatch = [
     // Shirabe-internal helpers, not PHP builtins:
     '__shirabe_eval' => static fn($args) => eval($args[0]),
     // Round-trips raw serialize() bytes through the PHP core codec, for the codec oracle tests.
-    '__shirabe_oracle_roundtrip' => static fn($args) => serialize(unserialize($args[0], ['allowed_classes' => false])),
+    '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
+        unserialize($args[0], ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES])
+    ),
     '__shirabe_require' => static function ($args) {
         require_once $args[0];
         // The required file may have registered further prepending autoloaders (a Composer

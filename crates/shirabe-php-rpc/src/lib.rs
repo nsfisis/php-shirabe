@@ -4,7 +4,7 @@ pub mod frame;
 pub mod session;
 pub mod value;
 
-pub use value::{PhpClassHandle, PhpObjHandle, PluginValue, RustObjHandle};
+pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
 
 use frame::Frame;
 use indexmap::IndexMap;

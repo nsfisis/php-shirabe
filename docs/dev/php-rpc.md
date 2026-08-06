@@ -65,31 +65,38 @@ Payloads are encoded with a Rust reimplementation of the PHP `serialize()` gramm
 (`src/value.rs`), byte-compatible with the PHP core implementation under
 `serialize_precision=-1` (the float formatting itself is ported in `shirabe-php-src`). The value
 model is `PluginValue`: PHP scalars, byte strings (`Vec<u8>` — non-UTF-8 round-trips
-losslessly), lists, ordered maps, and three handle descriptor kinds encoded as reserved arrays:
+losslessly), lists, ordered maps, object records, and three handle descriptor kinds encoded as
+reserved arrays:
 
 - `{__rhandle, __class, __epoch[, __snapshot]}` — entity lives on the Rust side
 - `{__phandle, __class, __implements}` — entity lives in the PHP child
 - `{__pclass}` — a PHP class name
-- `{__pnew, __args[, __calls]}` — a materialized value (below)
 
-An immutable value has no entity to point at, so it crosses in neither table: the descriptor
-names the real class plus the constructor arguments (and any post-construction calls) needed to
-rebuild it, and each side builds a genuine instance of its own. `Composer\Package\Link` travels
-this way, together with the `composer/semver` constraint it holds — encoded structurally rather
-than re-parsed from its string form, which would lose the pretty strings and the conjunctive
-flag. The `\DateTimeInterface` release date uses the same shape. The two halves are
+An immutable value has no entity to point at, so it crosses in neither table: it travels as the
+object record `serialize()` writes for it (`PluginValue::PhpObject` — the class name and the
+property table, property names carrying PHP's visibility mangling), and each side rebuilds its
+own value from those fields. `unserialize()` revives the PHP one without running a constructor,
+which is what makes the two directions equivalent: a value whose state a constructor cannot
+express — an unset pretty string, a `Link` built without a pretty constraint — has no faithful
+constructor call, and no field has to be read back out through reflection.
+`Composer\Package\Link` travels this way, together with the `composer/semver` constraint it
+holds, and so does the `\DateTimeInterface` release date, rebased on UTC because the Rust side
+carries no timezone database. The two halves are
 `crates/shirabe/src/plugin/php_plugin_value.rs` and `Shirabe\MaterializedValue`; the set of
-classes that may cross is a closed list on both sides, so a descriptor can never name an
-arbitrary class.
+classes that may cross is a closed list on both sides — the PHP one is the `allowed_classes`
+list of every `unserialize()` — so a record can never name an arbitrary class.
 
-`PluginValue::Object` is encode-only: the wire erases the array/object distinction and object
-revival is banned (`unserialize(..., ['allowed_classes' => false])` is enforced on the PHP
-side), so the decoder only produces `List` (contiguous 0-based int keys) or `Array`. The
-decoder is iterative (input nesting never becomes call-stack depth) and additionally rejects
-payloads nested deeper than 512 levels.
+`PluginValue::Object` is encode-only: the wire erases the array/object distinction for a
+class-less object, so the decoder only produces `List` (contiguous 0-based int keys) or `Array`
+for an `a:` record. A repeated object instance arrives as PHP's `r:` back-reference, which the
+decoder resolves by copying the value it names (identity means nothing to a value on this side);
+a cyclic object graph and a PHP reference (`R:`) are both rejected. The decoder is iterative
+(input nesting never becomes call-stack depth) and additionally rejects payloads nested deeper
+than 512 levels.
 
 The codec is verified against the real PHP `serialize()`/`unserialize()` by oracle tests
-(`tests/oracle.rs`), with floats, non-UTF-8 byte strings and deep nesting as focus areas.
+(`tests/oracle.rs`), with floats, non-UTF-8 byte strings, object records and deep nesting as
+focus areas.
 
 ## Concurrency and reentrancy
 
@@ -184,9 +191,9 @@ by `scripts/plugin-stub-generator/generate-stubs` and must not be edited by hand
   surface (`getIO()`/`getComposer()`/...) answers from the Rust handoff.
 - `Shirabe\RustCommandStub` — the reverse stub for built-in commands registered into that
   application.
-- `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: it builds the
-  real value classes from a `__pnew` descriptor and describes such instances back in the same
-  shape.
+- `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: the closed list of
+  classes `unserialize()` may revive, and the hook that hands such an instance to `serialize()`
+  in place of a handle descriptor.
 - `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle (through
   `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands
