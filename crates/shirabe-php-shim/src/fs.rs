@@ -1075,9 +1075,8 @@ pub fn opendir(path: impl AsRef<std::path::Path>) -> Option<PhpDirHandle> {
     })
 }
 
-pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
-    let path = path.as_string().unwrap_or("");
-    let component = match option {
+pub fn pathinfo(path: &str, option: i64) -> String {
+    match option {
         PATHINFO_DIRNAME => dirname(path),
         PATHINFO_BASENAME => basename(path),
         PATHINFO_EXTENSION => {
@@ -1095,8 +1094,7 @@ pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
             }
         }
         _ => unreachable!("pathinfo called with an unsupported single-component option"),
-    };
-    PhpMixed::String(component)
+    }
 }
 
 // TODO(phase-c): returns Option<PathBuf>

@@ -375,15 +375,8 @@ impl Factory {
     }
 
     pub fn get_lock_file(composer_file: &str) -> String {
-        let ext = pathinfo(
-            PhpMixed::String(composer_file.to_string()),
-            PATHINFO_EXTENSION,
-        );
-        let is_json = match ext {
-            PhpMixed::String(s) => s == "json",
-            _ => false,
-        };
-        if is_json {
+        let ext = pathinfo(composer_file, PATHINFO_EXTENSION);
+        if ext == "json" {
             format!(
                 "{}lock",
                 substr(composer_file, 0, Some(composer_file.len() as i64 - 4))

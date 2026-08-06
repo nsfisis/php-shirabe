@@ -84,15 +84,12 @@ impl ArchiveDownloader for GzipDownloader {
             parse_url(
                 &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
                 PHP_URL_PATH,
-            ),
+            )
+            .as_string()
+            .unwrap_or(""),
             PATHINFO_FILENAME,
         );
-        let target_filepath = format!(
-            "{}{}{}",
-            path,
-            DIRECTORY_SEPARATOR,
-            filename.as_string().unwrap_or_default()
-        );
+        let target_filepath = format!("{}{}{}", path, DIRECTORY_SEPARATOR, filename);
 
         if !Platform::is_windows() {
             let command = vec![

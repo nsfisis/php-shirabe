@@ -8,9 +8,9 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
-    PhpMixed, RuntimeException, explode, getcwd, implode, in_array_strict, is_dir, is_file,
-    pathinfo, php_regex, preg_quote, realpath, str_replace, str_starts_with, stream_get_wrappers,
-    strlen, strpos, strrpos, strtr, substr,
+    RuntimeException, explode, getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote,
+    realpath, str_replace, str_starts_with, stream_get_wrappers, strlen, strpos, strrpos, strtr,
+    substr,
 };
 use std::path::PathBuf;
 
@@ -137,15 +137,8 @@ impl ClassMapGenerator {
                     }));
                 }
             };
-            let ext = pathinfo(PhpMixed::String(file_path.clone()), PATHINFO_EXTENSION);
-            if !in_array_strict(
-                ext,
-                &self
-                    .extensions
-                    .iter()
-                    .map(|e| PhpMixed::String(e.clone()))
-                    .collect::<Vec<_>>(),
-            ) {
+            let ext = pathinfo(&file_path, PATHINFO_EXTENSION);
+            if !self.extensions.contains(&ext) {
                 continue;
             }
 

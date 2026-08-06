@@ -1,7 +1,5 @@
 //! ref: composer/vendor/symfony/process/ExecutableFinder.php
 
-use shirabe_php_shim::PhpMixed;
-
 const CMD_BUILTINS: &[&str] = &[
     "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir", "echo",
     "endlocal", "erase", "exit", "for", "ftype", "goto", "help", "if", "label", "md", "mkdir",
@@ -58,21 +56,15 @@ impl ExecutableFinder {
             };
             suffixes.extend(exts);
         }
-        suffixes = if !shirabe_php_shim::pathinfo(
-            PhpMixed::String(name.to_string()),
-            shirabe_php_shim::PATHINFO_EXTENSION,
-        )
-        .as_string()
-        .unwrap_or("")
-        .is_empty()
-        {
-            let mut s = vec![String::new()];
-            s.extend(suffixes);
-            s
-        } else {
-            suffixes.push(String::new());
-            suffixes
-        };
+        suffixes =
+            if !shirabe_php_shim::pathinfo(name, shirabe_php_shim::PATHINFO_EXTENSION).is_empty() {
+                let mut s = vec![String::new()];
+                s.extend(suffixes);
+                s
+            } else {
+                suffixes.push(String::new());
+                suffixes
+            };
         for suffix in &suffixes {
             for dir in &dirs {
                 let dir = if dir.is_empty() { "." } else { dir.as_str() };

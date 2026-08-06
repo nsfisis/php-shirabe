@@ -712,20 +712,14 @@ impl FileDownloader {
 impl FileDownloader {
     fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
         pathinfo(
-            PhpMixed::String(
-                parse_url(
-                    &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
-                    PHP_URL_PATH,
-                )
-                .as_string()
-                .unwrap_or("")
-                .to_string(),
-            ),
+            parse_url(
+                &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
+                PHP_URL_PATH,
+            )
+            .as_string()
+            .unwrap_or(""),
             component,
         )
-        .as_string()
-        .unwrap_or("")
-        .to_string()
     }
 
     pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
