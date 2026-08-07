@@ -14,9 +14,7 @@ use shirabe::package::handle::{
     AliasPackageHandle, CompletePackageHandle, PackageHandle, RootPackageHandle,
 };
 use shirabe::package::{Link, PackageInterfaceHandle, RootPackageInterfaceHandle};
-use shirabe::repository::{
-    InstalledArrayRepository, InstalledRepositoryInterfaceHandle, WritableRepositoryInterface,
-};
+use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::script::ScriptEvents;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
@@ -127,10 +125,10 @@ struct SetUp {
     prev_cwd: std::path::PathBuf,
     working_dir: String,
     vendor_dir: String,
-    repository: InstalledArrayRepository,
+    repository: shirabe::repository::RepositoryInterfaceHandle,
     /// ref: `$this->configValueMap['use-include-path']`, which testUseGlobalIncludePath mutates.
     use_include_path: bool,
-    im: InstallationManager,
+    im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>>,
     io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
     generator: AutoloadGenerator,
     event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
@@ -181,9 +179,15 @@ fn set_up() -> SetUp {
     ));
 
     let dispatcher_io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
-    let im = make_installation_manager(&vendor_dir, dispatcher_io.clone());
+    let im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(make_installation_manager(
+            &vendor_dir,
+            dispatcher_io.clone(),
+        )));
 
-    let repository = InstalledArrayRepository::new().unwrap();
+    let repository = shirabe::repository::RepositoryInterfaceHandle::new(
+        InstalledArrayRepository::new().unwrap(),
+    );
 
     // EventDispatcher constructor is disabled in PHP and dispatch is never called when run-scripts
     // is off (the default), so a real dispatcher over an empty Composer is a faithful no-op stand-in.
@@ -237,7 +241,12 @@ impl SetUp {
 
     fn set_canonical_packages(&mut self, packages: Vec<PackageInterfaceHandle>) {
         for p in packages {
-            self.repository.add_package(p).unwrap();
+            self.repository
+                .borrow_mut()
+                .as_writable_repository_interface_mut()
+                .expect("the test repository is writable")
+                .add_package(p)
+                .unwrap();
         }
     }
 }
@@ -357,9 +366,9 @@ fn dump(
     } = s;
     generator.dump(
         &config,
-        repository,
+        repository.clone(),
         package,
-        im,
+        im.clone(),
         "composer",
         scan_psr_packages,
         Some(suffix.to_string()),
@@ -497,9 +506,10 @@ fn test_vendor_dir_same_as_working_dir() {
     let mut s = set_up();
     s.vendor_dir = s.working_dir.clone();
     // Re-register the install-path stub so getInstallPath uses the new vendor dir.
-    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
-        vendor_dir: s.vendor_dir.clone(),
-    }));
+    s.im.borrow()
+        .add_installer(std::rc::Rc::new(InstallPathStubInstaller {
+            vendor_dir: s.vendor_dir.clone(),
+        }));
 
     let package = new_root_pkg("root/a");
     package.set_autoload(autoload(vec![
@@ -557,9 +567,10 @@ fn test_root_package_autoloading_alternative_vendor_dir() {
     ]));
 
     s.vendor_dir = format!("{}/subdir", s.vendor_dir);
-    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
-        vendor_dir: s.vendor_dir.clone(),
-    }));
+    s.im.borrow()
+        .add_installer(std::rc::Rc::new(InstallPathStubInstaller {
+            vendor_dir: s.vendor_dir.clone(),
+        }));
 
     s.ensure_dir(&format!("{}/composer", s.vendor_dir));
     s.ensure_dir(&format!("{}/src", s.working_dir));
@@ -1851,7 +1862,9 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
         &format!("{}/include_paths.php", composer_out),
     );
 
-    s.repository = InstalledArrayRepository::new().unwrap();
+    s.repository = shirabe::repository::RepositoryInterfaceHandle::new(
+        InstalledArrayRepository::new().unwrap(),
+    );
     s.set_canonical_packages(not_autoload_packages());
     dump(
         &mut s,
@@ -1883,7 +1896,9 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
         &format!("{}/include_paths.php", composer_out),
     );
 
-    s.repository = InstalledArrayRepository::new().unwrap();
+    s.repository = shirabe::repository::RepositoryInterfaceHandle::new(
+        InstalledArrayRepository::new().unwrap(),
+    );
     s.set_canonical_packages(not_autoload_packages());
     dump(&mut s, not_autoload_package.into(), false, "FilesAutoload").unwrap();
     assert_file_content_equals(
@@ -2015,7 +2030,11 @@ fn test_vendor_dir_excluded_from_working_dir() {
 
     s.set_canonical_packages(vec![vendor_package.into()]);
 
-    let mut im = make_installation_manager(&vendor_dir, s.io.clone());
+    let im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(make_installation_manager(
+            &vendor_dir,
+            s.io.clone(),
+        )));
 
     s.ensure_dir(&format!("{}/src/Foo", working_dir));
     s.ensure_dir(&format!("{}/classmap", working_dir));
@@ -2049,9 +2068,9 @@ fn test_vendor_dir_excluded_from_working_dir() {
     s.generator
         .dump(
             &config,
-            &mut s.repository,
+            s.repository.clone(),
             package.into(),
-            &mut im,
+            im,
             "composer",
             true,
             Some("_13".to_string()),
@@ -2241,7 +2260,11 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     )]));
     let map = s
         .generator
-        .build_package_map(&mut s.im, package.clone().into(), vec![dep.clone().into()])
+        .build_package_map(
+            s.im.clone(),
+            package.clone().into(),
+            vec![dep.clone().into()],
+        )
         .unwrap();
     let parsed = s
         .generator

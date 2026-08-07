@@ -19,8 +19,7 @@ use shirabe::package::{
     LockerInterface, PackageInterfaceHandle, RootPackageHandle, RootPackageInterfaceHandle,
 };
 use shirabe::repository::{
-    InstalledArrayRepository, InstalledRepositoryInterface, RepositoryInterfaceHandle,
-    RepositoryManagerInterface,
+    InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use shirabe::script::Event as ScriptEvent;
 use shirabe::script::ScriptEvents;
@@ -405,30 +404,30 @@ mockall::mock! {
     #[derive(Debug)]
     pub AutoloadGenerator {}
     impl AutoloadGeneratorInterface for AutoloadGenerator {
-        fn set_dev_mode(&mut self, dev_mode: bool);
-        fn set_class_map_authoritative(&mut self, class_map_authoritative: bool);
-        fn set_apcu(&mut self, apcu: bool, apcu_prefix: Option<String>);
-        fn set_run_scripts(&mut self, run_scripts: bool);
-        fn set_dry_run(&mut self, dry_run: bool);
+        fn set_dev_mode(&self, dev_mode: bool);
+        fn set_class_map_authoritative(&self, class_map_authoritative: bool);
+        fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>);
+        fn set_run_scripts(&self, run_scripts: bool);
+        fn set_dry_run(&self, dry_run: bool);
         fn set_platform_requirement_filter(
-            &mut self,
+            &self,
             platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
         );
-        fn dump<'a>(
-            &mut self,
+        fn dump(
+            &self,
             config: &Config,
-            local_repo: &mut dyn InstalledRepositoryInterface,
+            local_repo: shirabe::repository::RepositoryInterfaceHandle,
             root_package: RootPackageInterfaceHandle,
-            installation_manager: &mut dyn InstallationManagerInterface,
+            installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
             target_dir: &str,
             scan_psr_packages: bool,
             suffix: Option<String>,
-            locker: Option<&'a mut dyn LockerInterface>,
+            locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
             strict_ambiguous: bool,
         ) -> anyhow::Result<ClassMap>;
         fn build_package_map(
             &self,
-            installation_manager: &mut dyn InstallationManagerInterface,
+            installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
             root_package: RootPackageInterfaceHandle,
             packages: Vec<PackageInterfaceHandle>,
         ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>>;

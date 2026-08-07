@@ -307,27 +307,23 @@ impl Command for ReinstallCommand {
 
             let autoload_generator = composer.get_autoload_generator();
             autoload_generator
-                .borrow_mut()
+                .borrow()
                 .set_class_map_authoritative(authoritative);
-            autoload_generator.borrow_mut().set_apcu(apcu, apcu_prefix);
+            autoload_generator.borrow().set_apcu(apcu, apcu_prefix);
             autoload_generator
-                .borrow_mut()
+                .borrow()
                 .set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
 
             let locker = composer.get_locker();
-            let mut local_repo_ref = local_repo.borrow_mut();
-            let repo = local_repo_ref
-                .as_installed_repository_interface_mut()
-                .expect("local repository must be an InstalledRepositoryInterface");
-            autoload_generator.borrow_mut().dump(
+            autoload_generator.borrow().dump(
                 &config.borrow(),
-                repo,
+                local_repo.clone(),
                 package.clone(),
-                &mut *installation_manager.borrow_mut(),
+                installation_manager.clone(),
                 "composer",
                 optimize,
                 None,
-                Some(&mut *locker.borrow_mut()),
+                Some(locker.clone()),
                 false,
             )?;
         }

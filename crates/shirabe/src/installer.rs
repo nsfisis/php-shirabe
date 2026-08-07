@@ -392,30 +392,27 @@ impl Installer {
             }
 
             self.autoload_generator
-                .borrow_mut()
+                .borrow()
                 .set_class_map_authoritative(self.class_map_authoritative);
             self.autoload_generator
-                .borrow_mut()
+                .borrow()
                 .set_apcu(self.apcu_autoloader, self.apcu_autoloader_prefix.clone());
             self.autoload_generator
-                .borrow_mut()
+                .borrow()
                 .set_run_scripts(self.run_scripts);
             self.autoload_generator
-                .borrow_mut()
+                .borrow()
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone());
             let local_repo_handle = self.repository_manager.borrow().get_local_repository();
-            let mut local_repo_ref = local_repo_handle.borrow_mut();
-            self.autoload_generator.borrow_mut().dump(
+            self.autoload_generator.borrow().dump(
                 &self.config.borrow(),
-                local_repo_ref
-                    .as_installed_repository_interface_mut()
-                    .unwrap(),
+                local_repo_handle,
                 self.package.clone(),
-                &mut *self.installation_manager.borrow_mut(),
+                self.installation_manager.clone(),
                 "composer",
                 self.optimize_autoloader,
                 None,
-                Some(&mut *self.locker.borrow_mut()),
+                Some(self.locker.clone()),
                 false,
             )?;
         }

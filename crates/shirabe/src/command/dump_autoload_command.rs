@@ -188,10 +188,7 @@ impl Command for DumpAutoloadCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            composer
-                .get_autoload_generator()
-                .borrow_mut()
-                .set_dry_run(true);
+            composer.get_autoload_generator().borrow().set_dry_run(true);
         }
         if input
             .borrow()
@@ -201,7 +198,7 @@ impl Command for DumpAutoloadCommand {
         {
             composer
                 .get_autoload_generator()
-                .borrow_mut()
+                .borrow()
                 .set_dev_mode(false);
         }
         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
@@ -221,24 +218,24 @@ impl Command for DumpAutoloadCommand {
             }
             composer
                 .get_autoload_generator()
-                .borrow_mut()
+                .borrow()
                 .set_dev_mode(true);
         }
         composer
             .get_autoload_generator()
-            .borrow_mut()
+            .borrow()
             .set_class_map_authoritative(authoritative);
         composer
             .get_autoload_generator()
-            .borrow_mut()
+            .borrow()
             .set_run_scripts(true);
         composer
             .get_autoload_generator()
-            .borrow_mut()
+            .borrow()
             .set_apcu(apcu, apcu_prefix);
         composer
             .get_autoload_generator()
-            .borrow_mut()
+            .borrow()
             .set_platform_requirement_filter(platform_requirement_filter);
         let strict_ambiguous = input
             .borrow()
@@ -256,22 +253,15 @@ impl Command for DumpAutoloadCommand {
         let autoload_generator = composer.get_autoload_generator();
 
         let config_ref = config.borrow();
-        let mut local_repo_ref = local_repo_handle.borrow_mut();
-        let local_repo = local_repo_ref
-            .as_installed_repository_interface_mut()
-            .expect("local repository must be an InstalledRepositoryInterface");
-        let mut installation_manager_ref = installation_manager.borrow_mut();
-        let mut locker_ref = locker.borrow_mut();
-
-        let class_map = autoload_generator.borrow_mut().dump(
+        let class_map = autoload_generator.borrow().dump(
             &config_ref,
-            local_repo,
+            local_repo_handle,
             package,
-            &mut *installation_manager_ref,
+            installation_manager,
             "composer",
             optimize,
             None,
-            Some(&mut *locker_ref),
+            Some(locker),
             strict_ambiguous,
         )?;
         let number_of_classes = class_map.map.len();

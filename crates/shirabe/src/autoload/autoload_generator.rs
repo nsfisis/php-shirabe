@@ -14,7 +14,6 @@ use crate::json::JsonFile;
 use crate::package::LockerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
-use crate::repository::InstalledRepositoryInterface;
 use crate::script::ScriptEvents;
 use crate::util::Filesystem;
 use crate::util::PackageSorter;
@@ -37,13 +36,16 @@ use shirabe_semver::constraint::Bound;
 pub struct AutoloadGenerator {
     event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    dev_mode: Option<bool>,
-    class_map_authoritative: bool,
-    apcu: bool,
-    apcu_prefix: Option<String>,
-    dry_run: bool,
-    run_scripts: bool,
-    platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
+    // `dump()` dispatches script events whose listeners reach back here through
+    // `Composer::getAutoloadGenerator()` and mutate this instance mid-dump.
+    dev_mode: std::cell::Cell<Option<bool>>,
+    class_map_authoritative: std::cell::Cell<bool>,
+    apcu: std::cell::Cell<bool>,
+    apcu_prefix: std::cell::RefCell<Option<String>>,
+    dry_run: std::cell::Cell<bool>,
+    run_scripts: std::cell::Cell<bool>,
+    platform_requirement_filter:
+        std::cell::RefCell<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
 }
 
 impl AutoloadGenerator {
@@ -57,71 +59,73 @@ impl AutoloadGenerator {
         Self {
             event_dispatcher,
             io,
-            dev_mode: None,
-            class_map_authoritative: false,
-            apcu: false,
-            apcu_prefix: None,
-            dry_run: false,
-            run_scripts: false,
-            platform_requirement_filter: PlatformRequirementFilterFactory::ignore_nothing(),
+            dev_mode: std::cell::Cell::new(None),
+            class_map_authoritative: std::cell::Cell::new(false),
+            apcu: std::cell::Cell::new(false),
+            apcu_prefix: std::cell::RefCell::new(None),
+            dry_run: std::cell::Cell::new(false),
+            run_scripts: std::cell::Cell::new(false),
+            platform_requirement_filter: std::cell::RefCell::new(
+                PlatformRequirementFilterFactory::ignore_nothing(),
+            ),
         }
     }
 
-    pub fn set_dev_mode(&mut self, dev_mode: bool) {
-        self.dev_mode = Some(dev_mode);
+    pub fn set_dev_mode(&self, dev_mode: bool) {
+        self.dev_mode.set(Some(dev_mode));
     }
 
     /// Whether generated autoloader considers the class map authoritative.
-    pub fn set_class_map_authoritative(&mut self, class_map_authoritative: bool) {
-        self.class_map_authoritative = class_map_authoritative;
+    pub fn set_class_map_authoritative(&self, class_map_authoritative: bool) {
+        self.class_map_authoritative.set(class_map_authoritative);
     }
 
     /// Whether generated autoloader considers APCu caching.
-    pub fn set_apcu(&mut self, apcu: bool, apcu_prefix: Option<String>) {
-        self.apcu = apcu;
-        self.apcu_prefix = apcu_prefix;
+    pub fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>) {
+        self.apcu.set(apcu);
+        *self.apcu_prefix.borrow_mut() = apcu_prefix;
     }
 
     /// Whether to run scripts or not
-    pub fn set_run_scripts(&mut self, run_scripts: bool) {
-        self.run_scripts = run_scripts;
+    pub fn set_run_scripts(&self, run_scripts: bool) {
+        self.run_scripts.set(run_scripts);
     }
 
     /// Whether to run in drymode or not
-    pub fn set_dry_run(&mut self, dry_run: bool) {
-        self.dry_run = dry_run;
+    pub fn set_dry_run(&self, dry_run: bool) {
+        self.dry_run.set(dry_run);
     }
 
     pub fn set_platform_requirement_filter(
-        &mut self,
+        &self,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) {
-        self.platform_requirement_filter = platform_requirement_filter;
+        *self.platform_requirement_filter.borrow_mut() = platform_requirement_filter;
     }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn dump(
-        &mut self,
+        &self,
         config: &Config,
-        local_repo: &mut dyn InstalledRepositoryInterface,
+        local_repo: crate::repository::RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: &mut dyn InstallationManagerInterface,
+        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         target_dir: &str,
         scan_psr_packages: bool,
         suffix: Option<String>,
-        locker: Option<&mut dyn LockerInterface>,
+        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         let mut scan_psr_packages = scan_psr_packages;
-        if self.class_map_authoritative {
+        if self.class_map_authoritative.get() {
             // Force scanPsrPackages when classmap is authoritative
             scan_psr_packages = true;
         }
 
         // auto-set devMode based on whether dev dependencies are installed or not
-        if self.dev_mode.is_none() {
+        if self.dev_mode.get().is_none() {
             // we assume no-dev mode if no vendor dir is present or it is too old to contain dev information
-            self.dev_mode = Some(false);
+            self.dev_mode.set(Some(false));
 
             let installed_json = JsonFile::new(
                 format!(
@@ -136,12 +140,12 @@ impl AutoloadGenerator {
                 if let Some(arr) = installed_json_data.as_array()
                     && let Some(dev) = arr.get("dev")
                 {
-                    self.dev_mode = dev.as_bool();
+                    self.dev_mode.set(dev.as_bool());
                 }
             }
         }
 
-        if self.run_scripts {
+        if self.run_scripts.get() {
             // set COMPOSER_DEV_MODE in case not set yet so it is available in the dump-autoload event listeners
             if shirabe_php_shim::PHP_SERVER
                 .lock()
@@ -151,7 +155,7 @@ impl AutoloadGenerator {
             {
                 Platform::put_env(
                     "COMPOSER_DEV_MODE",
-                    if self.dev_mode.unwrap_or(false) {
+                    if self.dev_mode.get().unwrap_or(false) {
                         "1"
                     } else {
                         "0"
@@ -163,7 +167,7 @@ impl AutoloadGenerator {
             additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
             self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::PRE_AUTOLOAD_DUMP,
-                self.dev_mode.unwrap_or(false),
+                self.dev_mode.get().unwrap_or(false),
                 vec![],
                 additional_args,
             )?;
@@ -249,7 +253,7 @@ return array(
             local_repo.get_canonical_packages()?,
         )?;
         let dev_package_names = local_repo.get_dev_package_names();
-        let filtered_dev_packages: PhpMixed = if self.dev_mode.unwrap_or(false) {
+        let filtered_dev_packages: PhpMixed = if self.dev_mode.get().unwrap_or(false) {
             // if dev mode is enabled, then we do not filter any dev packages out so disable this entirely
             PhpMixed::Bool(false)
         } else {
@@ -566,8 +570,10 @@ return array(
 
             if suffix.is_none() {
                 suffix = Some(if let Some(l) = locker {
-                    if l.is_locked() {
-                        l.get_lock_data()?
+                    let is_locked = l.borrow_mut().is_locked();
+                    if is_locked {
+                        l.borrow_mut()
+                            .get_lock_data()?
                             .get("content-hash")
                             .and_then(|v| v.as_string())
                             .unwrap_or("")
@@ -582,7 +588,7 @@ return array(
         }
         let suffix = suffix.unwrap_or_default();
 
-        if self.dry_run {
+        if self.dry_run.get() {
             return Ok(class_map);
         }
 
@@ -642,6 +648,7 @@ return array(
         let mut check_platform = config.get("platform-check").as_bool() != Some(false)
             && self
                 .platform_requirement_filter
+                .borrow()
                 .as_any()
                 .downcast_ref::<IgnoreAllPlatformRequirementFilter>()
                 .is_none();
@@ -701,12 +708,12 @@ return array(
             &format!("{}/LICENSE", target_dir),
         )?;
 
-        if self.run_scripts {
+        if self.run_scripts.get() {
             let mut additional_args: IndexMap<String, PhpMixed> = IndexMap::new();
             additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
             self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::POST_AUTOLOAD_DUMP,
-                self.dev_mode.unwrap_or(false),
+                self.dev_mode.get().unwrap_or(false),
                 vec![],
                 additional_args,
             )?;
@@ -774,7 +781,7 @@ return array(
 
     pub fn build_package_map(
         &self,
-        installation_manager: &mut dyn InstallationManagerInterface,
+        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
@@ -788,7 +795,9 @@ return array(
                 continue;
             }
             self.validate_package(package.clone())?;
-            let install_path = installation_manager.get_install_path(package.clone());
+            let install_path = installation_manager
+                .borrow()
+                .get_install_path(package.clone());
             package_map.push((package, install_path));
         }
 
@@ -1181,6 +1190,7 @@ return array(
             for (_k, link) in &package.get_requires() {
                 if self
                     .platform_requirement_filter
+                    .borrow()
                     .is_ignored(link.get_target())
                 {
                     continue;
@@ -1509,13 +1519,13 @@ class ComposerAutoloaderInit{}
             suffix
         ));
 
-        if self.class_map_authoritative {
+        if self.class_map_authoritative.get() {
             file.push_str("        $loader->setClassMapAuthoritative(true);\n");
         }
 
-        if self.apcu {
+        if self.apcu.get() {
             let apcu_prefix = var_export(
-                &PhpMixed::String(if let Some(ref prefix) = self.apcu_prefix {
+                &PhpMixed::String(if let Some(ref prefix) = *self.apcu_prefix.borrow() {
                     prefix.clone()
                 } else {
                     bin2hex(&random_bytes(10))
@@ -1839,7 +1849,7 @@ class ComposerStaticInit{}
 
             let mut autoload = package.get_autoload();
             let is_root = package.ptr_eq(&root_package.clone().into());
-            if self.dev_mode.unwrap_or(false) && is_root {
+            if self.dev_mode.get().unwrap_or(false) && is_root {
                 let merged = array_merge_recursive(vec![
                     PhpMixed::Array(autoload.into_iter().collect()),
                     PhpMixed::Array(root_package.get_dev_autoload().into_iter().collect()),
@@ -2131,31 +2141,31 @@ class ComposerStaticInit{}
 // may swap in a replacement. The interface captures the methods reached through Composer's accessor
 // and through the `Rc<RefCell<dyn AutoloadGeneratorInterface>>` references fed from it.
 pub trait AutoloadGeneratorInterface: std::fmt::Debug {
-    fn set_dev_mode(&mut self, dev_mode: bool);
-    fn set_class_map_authoritative(&mut self, class_map_authoritative: bool);
-    fn set_apcu(&mut self, apcu: bool, apcu_prefix: Option<String>);
-    fn set_run_scripts(&mut self, run_scripts: bool);
-    fn set_dry_run(&mut self, dry_run: bool);
+    fn set_dev_mode(&self, dev_mode: bool);
+    fn set_class_map_authoritative(&self, class_map_authoritative: bool);
+    fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>);
+    fn set_run_scripts(&self, run_scripts: bool);
+    fn set_dry_run(&self, dry_run: bool);
     fn set_platform_requirement_filter(
-        &mut self,
+        &self,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     );
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn dump(
-        &mut self,
+        &self,
         config: &Config,
-        local_repo: &mut dyn InstalledRepositoryInterface,
+        local_repo: crate::repository::RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: &mut dyn InstallationManagerInterface,
+        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         target_dir: &str,
         scan_psr_packages: bool,
         suffix: Option<String>,
-        locker: Option<&mut dyn LockerInterface>,
+        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap>;
     fn build_package_map(
         &self,
-        installation_manager: &mut dyn InstallationManagerInterface,
+        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>>;
@@ -2173,28 +2183,28 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
 }
 
 impl AutoloadGeneratorInterface for AutoloadGenerator {
-    fn set_dev_mode(&mut self, dev_mode: bool) {
+    fn set_dev_mode(&self, dev_mode: bool) {
         self.set_dev_mode(dev_mode);
     }
 
-    fn set_class_map_authoritative(&mut self, class_map_authoritative: bool) {
+    fn set_class_map_authoritative(&self, class_map_authoritative: bool) {
         self.set_class_map_authoritative(class_map_authoritative);
     }
 
-    fn set_apcu(&mut self, apcu: bool, apcu_prefix: Option<String>) {
+    fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>) {
         self.set_apcu(apcu, apcu_prefix);
     }
 
-    fn set_run_scripts(&mut self, run_scripts: bool) {
+    fn set_run_scripts(&self, run_scripts: bool) {
         self.set_run_scripts(run_scripts);
     }
 
-    fn set_dry_run(&mut self, dry_run: bool) {
+    fn set_dry_run(&self, dry_run: bool) {
         self.set_dry_run(dry_run);
     }
 
     fn set_platform_requirement_filter(
-        &mut self,
+        &self,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) {
         self.set_platform_requirement_filter(platform_requirement_filter);
@@ -2202,15 +2212,15 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn dump(
-        &mut self,
+        &self,
         config: &Config,
-        local_repo: &mut dyn InstalledRepositoryInterface,
+        local_repo: crate::repository::RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: &mut dyn InstallationManagerInterface,
+        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         target_dir: &str,
         scan_psr_packages: bool,
         suffix: Option<String>,
-        locker: Option<&mut dyn LockerInterface>,
+        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         self.dump(
@@ -2228,7 +2238,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
 
     fn build_package_map(
         &self,
-        installation_manager: &mut dyn InstallationManagerInterface,
+        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {

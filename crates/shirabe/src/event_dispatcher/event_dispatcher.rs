@@ -1541,7 +1541,7 @@ try {{
                     .map(|e| e.is_dev_mode())
             });
         if let Some(dev_mode) = dev_mode {
-            generator.borrow_mut().set_dev_mode(dev_mode);
+            generator.borrow().set_dev_mode(dev_mode);
             if dev_mode {
                 hash_input.push_str("/dev");
             }
@@ -1556,7 +1556,7 @@ try {{
 
         let installation_manager = composer.borrow().get_installation_manager();
         let package_map = generator.borrow().build_package_map(
-            &mut *installation_manager.borrow_mut(),
+            installation_manager.clone(),
             package.clone(),
             packages,
         )?;

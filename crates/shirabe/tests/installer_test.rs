@@ -34,8 +34,8 @@ use shirabe::package::{
     RootPackageInterfaceHandle,
 };
 use shirabe::repository::{
-    ArrayRepository, InstalledArrayRepository, InstalledRepositoryInterface,
-    RepositoryInterfaceHandle, RepositoryManager, RepositoryManagerInterface,
+    ArrayRepository, InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManager,
+    RepositoryManagerInterface,
 };
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
@@ -206,34 +206,38 @@ impl EventDispatcherInterface for StubEventDispatcher {
 struct StubAutoloadGenerator;
 
 impl AutoloadGeneratorInterface for StubAutoloadGenerator {
-    fn set_dev_mode(&mut self, _dev_mode: bool) {}
-    fn set_class_map_authoritative(&mut self, _class_map_authoritative: bool) {}
-    fn set_apcu(&mut self, _apcu: bool, _apcu_prefix: Option<String>) {}
-    fn set_run_scripts(&mut self, _run_scripts: bool) {}
-    fn set_dry_run(&mut self, _dry_run: bool) {}
+    fn set_dev_mode(&self, _dev_mode: bool) {}
+    fn set_class_map_authoritative(&self, _class_map_authoritative: bool) {}
+    fn set_apcu(&self, _apcu: bool, _apcu_prefix: Option<String>) {}
+    fn set_run_scripts(&self, _run_scripts: bool) {}
+    fn set_dry_run(&self, _dry_run: bool) {}
     fn set_platform_requirement_filter(
-        &mut self,
+        &self,
         _platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) {
     }
     #[allow(clippy::too_many_arguments)]
     fn dump(
-        &mut self,
+        &self,
         _config: &Config,
-        _local_repo: &mut dyn InstalledRepositoryInterface,
+        _local_repo: shirabe::repository::RepositoryInterfaceHandle,
         _root_package: RootPackageInterfaceHandle,
-        _installation_manager: &mut dyn shirabe::installer::InstallationManagerInterface,
+        _installation_manager: std::rc::Rc<
+            std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
+        >,
         _target_dir: &str,
         _scan_psr_packages: bool,
         _suffix: Option<String>,
-        _locker: Option<&mut dyn LockerInterface>,
+        _locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         _strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         Ok(ClassMap::new())
     }
     fn build_package_map(
         &self,
-        _installation_manager: &mut dyn shirabe::installer::InstallationManagerInterface,
+        _installation_manager: std::rc::Rc<
+            std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
+        >,
         _root_package: RootPackageInterfaceHandle,
         _packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
