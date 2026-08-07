@@ -21,6 +21,16 @@ pub const RELEASE_DATE: &str = "2026-04-14 13:31:52";
 pub const SOURCE_VERSION: &str = "";
 pub const RUNTIME_API_VERSION: &str = "2.2.2";
 
+/// The deadline after which a development build reports itself as outdated, or `None` for a build
+/// made from a tagged revision. Baked in by `build.rs`.
+///
+/// Composer declares this as the global constant COMPOSER_DEV_WARNING_TIME from its phar stub, so
+/// a plugin can read it back with `defined()`/`constant()`. Here it is a Rust constant, and
+/// plugins cannot observe it. Technically speaking, it is incompatible with Composer, but trivial
+/// enough.
+pub const COMPOSER_DEV_WARNING_TIME: Option<i64> =
+    include!(concat!(env!("OUT_DIR"), "/dev_warning_time.rs"));
+
 pub fn get_version() -> String {
     if VERSION == "@package_version@" {
         return SOURCE_VERSION.to_string();

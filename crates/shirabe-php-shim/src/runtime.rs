@@ -455,12 +455,6 @@ pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
     todo!()
 }
 
-pub fn composer_dev_warning_time() -> i64 {
-    // TODO(phase-c): COMPOSER_DEV_WARNING_TIME is a build-time constant baked into Composer's release
-    // artifact; it has no fixed value in source and must be provided by the build process.
-    todo!()
-}
-
 pub fn gc_collect_cycles() -> i64 {
     // Rust has no cycle collector; nothing is collected.
     0

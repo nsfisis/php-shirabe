@@ -2301,10 +2301,10 @@ impl ApplicationHandle {
                 io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 
-            if defined("COMPOSER_DEV_WARNING_TIME")
+            if let Some(dev_warning_time) = composer::COMPOSER_DEV_WARNING_TIME
                 && command_name.as_deref() != Some("self-update")
                 && command_name.as_deref() != Some("selfupdate")
-                && time() > shirabe_php_shim::composer_dev_warning_time()
+                && time() > dev_warning_time
             {
                 io.write_error(&format!(
                     "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",

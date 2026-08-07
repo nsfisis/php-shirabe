@@ -1,10 +1,5 @@
 //! ref: composer/tests/Composer/Test/ApplicationTest.php
 
-// These drive the console Application (doRun, command resolution, plugin disabling).
-// The tests exercising do_run's script-command registration (a todo!() pending the
-// Symfony command-registry model), or a runtime define() of COMPOSER_DEV_WARNING_TIME,
-// remain unportable.
-
 #[path = "common/bootstrap.rs"]
 mod bootstrap;
 #[path = "common/test_case.rs"]
@@ -40,7 +35,7 @@ impl Drop for TearDown {
     }
 }
 
-#[ignore = "shirabe_php_shim::define is a todo!() (there is no runtime constant registry), so COMPOSER_DEV_WARNING_TIME cannot be defined and defined() — a fixed matches! that omits it — keeps the warning branch unreachable"]
+#[ignore = "the dev warning deadline is a Rust constant baked in by build.rs, so a runtime define() of COMPOSER_DEV_WARNING_TIME cannot make Application take the warning branch"]
 #[test]
 fn test_dev_warning() {
     let _tear_down = TearDown;
