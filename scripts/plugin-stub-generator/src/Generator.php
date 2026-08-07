@@ -12,8 +12,7 @@ use PhpParser\Node\Stmt\Interface_;
 /**
  * Emits the proxy stub files deterministically from the Composer sources and the classifier
  * report. Anything the emitter cannot faithfully proxy (by-ref or variadic parameters,
- * magic methods, public properties, non-public constants) fails generation instead of
- * degrading silently.
+ * magic methods, non-public constants) fails generation instead of degrading silently.
  */
 final class Generator
 {
@@ -59,7 +58,6 @@ final class Generator
     PHP;
 
     private const PROPERTY_FORWARDERS = <<<'PHP'
-        /** The real class declares public properties; every access forwards to the entity. */
         public function __get($name)
         {
             return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
@@ -68,6 +66,16 @@ final class Generator
         public function __set($name, $value): void
         {
             \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        }
+
+        public function __isset($name): bool
+        {
+            return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        }
+
+        public function __unset($name): void
+        {
+            \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
         }
     PHP;
 
@@ -202,20 +210,13 @@ final class Generator
             $isRoot = true;
         }
 
-        $hasPublicInstanceProperties = false;
+        // Instance properties are entity state, so the stub declares none of them.
         $staticProperties = [];
         foreach ($class->getProperties() as $property) {
-            if (!$property->isPublic()) {
-                continue;
-            }
-            if ($property->isStatic()) {
+            if ($property->isPublic() && $property->isStatic()) {
                 // A public static property reads no instance state; its real declaration is
                 // materialized so it lives locally in the worker, like static methods.
                 $staticProperties[] = $file->verbatim($property->getStartLine(), $property->getEndLine());
-            } else {
-                // Instance properties are entity state: the stub declares none and lets the
-                // __get/__set forwarders below carry every access to the Rust side.
-                $hasPublicInstanceProperties = true;
             }
         }
 
@@ -331,6 +332,7 @@ final class Generator
         $members = [];
         if ($isRoot) {
             $members[] = self::BOILERPLATE;
+            $members[] = self::PROPERTY_FORWARDERS;
         }
         if ($isRoot || $constructor !== null) {
             $members[] = $this->renderConstructor($fqcn, $constructor, $file);
@@ -340,9 +342,6 @@ final class Generator
         }
         if ($staticProperties !== []) {
             $members[] = implode("\n", $staticProperties);
-        }
-        if ($hasPublicInstanceProperties) {
-            $members[] = self::PROPERTY_FORWARDERS;
         }
         $members = array_merge($members, $staticMethods, $methodTexts);
         $body = implode("\n\n", $members);

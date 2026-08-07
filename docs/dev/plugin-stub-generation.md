@@ -75,9 +75,12 @@ the generator's vendor directory or the classifier report is unavailable.
   materialized verbatim from the real source (they read no instance state and
   run locally in the worker), together with any non-public static helpers the
   methods call.
-* **Public instance properties** are not declared on the stub; `__get`/`__set`
-  forwarders carry every access (including dynamic-property writes) to the
-  Rust side, where an unsupported name is an explicit error.
+* **Instance properties** are not declared on the stub, whatever their
+  visibility: they are entity state. Every root stub instead carries
+  `__get`/`__set`/`__isset`/`__unset` forwarders, so each access reaches the
+  Rust side, where an unsupported name is an explicit error. They are emitted
+  unconditionally because PHP's own answer for an undeclared property — null on
+  a read, a dynamic property on a write, false on `isset()` — is silent.
 * **`__toString`** is forwarded like any other method. **`__clone`** is part of
   the boilerplate on every stub, whether or not the real class declares one:
   PHP has already copied the stub by the time it runs, so the copy asks the

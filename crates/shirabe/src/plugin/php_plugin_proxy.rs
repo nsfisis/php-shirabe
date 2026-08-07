@@ -305,6 +305,12 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
                 None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
             };
         }
+        if matches!(method_name, "__get" | "__set" | "__isset" | "__unset") {
+            return match entity {
+                Some(entity) => dispatch_property_access(&entity, method_name, &args),
+                None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+            };
+        }
         match entity {
             Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, &args),
             Some(RustEntity::Composer(composer)) => {
@@ -456,6 +462,47 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         PluginValue::Int(rhandle as i64),
         PluginValue::Int(0),
     ]))
+}
+
+/// Serves the `__get`/`__set`/`__isset`/`__unset` forwarders every proxy stub carries.
+fn dispatch_property_access(
+    entity: &RustEntity,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    let property = required_string_arg(method_name, args.first())?;
+    // `BasePackage::$id` is the one instance property the entities expose so far.
+    if let RustEntity::Package(package) = entity
+        && property == "id"
+    {
+        return match method_name {
+            "__get" => Ok(PluginValue::Int(
+                package.borrow().as_package_interface().get_id(),
+            )),
+            "__isset" => Ok(PluginValue::Bool(true)),
+            "__set" => {
+                let id = match args.get(1) {
+                    Some(PluginValue::Int(id)) => *id,
+                    other => {
+                        return Err(runtime_throw(format!(
+                            "the package property `id` takes an int, got {other:?}"
+                        )));
+                    }
+                };
+                package.borrow_mut().as_package_interface_mut().set_id(id);
+                Ok(PluginValue::Null)
+            }
+            _ => Err(runtime_throw(
+                "the package property `id` cannot be unset over RPC".to_string(),
+            )),
+        };
+    }
+    // TODO(plugin): the instance properties the proxied classes expose are widened on demand,
+    // driven by these explicit errors from real plugins. Each one has to decide how the state
+    // the real class keeps in that property is served from the Rust-side entity.
+    Err(runtime_throw(format!(
+        "the property `{property}` is not available over RPC yet"
+    )))
 }
 
 fn dispatch_composer_method(
@@ -1551,32 +1598,6 @@ fn dispatch_package_method(
                 _ => package.set_aliases(string_map_list_arg(method_name, args.first())?),
             }
             return Ok(PluginValue::Null);
-        }
-        // `BasePackage::$id` is the one public property of the package classes, so the stub's
-        // property forwarders only ever carry it.
-        "__get" | "__set" => {
-            let property = required_string_arg(method_name, args.first())?;
-            if property != "id" {
-                return Err(runtime_throw(format!(
-                    "the package property `{property}` is not available over RPC"
-                )));
-            }
-            return if method_name == "__get" {
-                Ok(PluginValue::Int(
-                    package.borrow().as_package_interface().get_id(),
-                ))
-            } else {
-                let id = match args.get(1) {
-                    Some(PluginValue::Int(id)) => *id,
-                    other => {
-                        return Err(runtime_throw(format!(
-                            "the package property `id` takes an int, got {other:?}"
-                        )));
-                    }
-                };
-                package.borrow_mut().as_package_interface_mut().set_id(id);
-                Ok(PluginValue::Null)
-            };
         }
         "equals" => {
             let other = package_from_arg(method_name, args.first())?;

@@ -53,6 +53,26 @@ class EventDispatcher implements \ShirabeRustStub
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
+    public function __get($name)
+    {
+        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+    }
+
+    public function __set($name, $value): void
+    {
+        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+    }
+
+    public function __isset($name): bool
+    {
+        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+    }
+
+    public function __unset($name): void
+    {
+        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+    }
+
     public function __construct(PartialComposer $composer, IOInterface $io, ?ProcessExecutor $process = null)
     {
         [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$composer, $io, $process]]);
