@@ -438,23 +438,6 @@ pub fn gc_enable() {
     // Rust has no cycle collector to enable.
 }
 
-pub fn react_promise_resolve(_value: PhpMixed) -> PhpMixed {
-    // TODO(phase-c): depends on the react/promise port (shirabe_external_packages), which is not yet
-    // available.
-    todo!()
-}
-
-pub fn ioncube_loader_iversion() -> i64 {
-    // TODO(phase-c): the ionCube loader is not present (extension_loaded reports it absent), so this
-    // function is never defined at runtime; left unimplemented.
-    todo!()
-}
-
-pub fn ioncube_loader_version() -> String {
-    // TODO(phase-c): see ioncube_loader_iversion.
-    todo!()
-}
-
 pub fn phpinfo(_what: i64) {
     // TODO(php-runtime): phpinfo() dumps the full PHP runtime configuration, which the shim does not
     // model.
