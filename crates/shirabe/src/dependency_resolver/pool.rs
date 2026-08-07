@@ -4,7 +4,7 @@ use crate::advisory::AnySecurityAdvisory;
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 use indexmap::IndexMap;
-use shirabe_php_shim::{STR_PAD_LEFT, str_pad};
+use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -305,11 +305,7 @@ impl Pool {
 
         if candidate_name == name {
             return constraint.is_none()
-                || CompilingMatcher::r#match(
-                    constraint.unwrap(),
-                    SimpleConstraint::OP_EQ,
-                    candidate_version,
-                );
+                || CompilingMatcher::r#match(constraint.unwrap(), CmpOp::Eq, candidate_version);
         }
 
         let provides = candidate.get_provides();

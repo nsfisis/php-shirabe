@@ -7,6 +7,7 @@ use crate::constraint::MultiConstraint;
 use crate::constraint::SimpleConstraint;
 use crate::interval::{DevConstraintSet, Interval};
 use indexmap::IndexMap;
+use shirabe_php_shim::{CmpOp, array_unique, version_compare, version_compare_ordering};
 use std::sync::{Mutex, OnceLock};
 
 #[derive(Debug, Clone)]
@@ -138,10 +139,10 @@ impl Intervals {
                 // with the start of the current interval and end of next interval, so
                 // [>=M, <N] || [>N, <P] => [>=M, !=N, <P] but M/P can be skipped if they are
                 // zero/+inf
-                if interval.get_end().get_operator() == "<" && i + 1 < count {
+                if interval.get_end().get_operator() == CmpOp::Lt && i + 1 < count {
                     let next_interval = &intervals.numeric[i + 1];
                     if interval.get_end().get_version() == next_interval.get_start().get_version()
-                        && next_interval.get_start().get_operator() == ">"
+                        && next_interval.get_start().get_operator() == CmpOp::Gt
                     {
                         // only add a start if we didn't already do so, can be skipped if we're
                         // looking at second interval in [>=M, <N] || [>N, <P] || [>P, <Q] where
@@ -188,8 +189,8 @@ impl Intervals {
 
                 // convert back >= x - <= x intervals to == x
                 if interval.get_start().get_version() == interval.get_end().get_version()
-                    && interval.get_start().get_operator() == ">="
-                    && interval.get_end().get_operator() == "<="
+                    && interval.get_start().get_operator() == CmpOp::Ge
+                    && interval.get_end().get_operator() == CmpOp::Le
                 {
                     constraints.push(
                         SimpleConstraint::new(
@@ -416,7 +417,7 @@ impl Intervals {
             branches
         };
 
-        branches.names = shirabe_php_shim::array_unique(&branches.names);
+        branches.names = array_unique(&branches.names);
 
         if numeric_groups.len() == 1 {
             return Ok(IntervalCollection {
@@ -443,13 +444,11 @@ impl Intervals {
         }
 
         borders.sort_by(|a, b| {
-            let order = shirabe_php_shim::version_compare_2(&a.0, &b.0);
-            if order == 0 {
+            let order = version_compare_ordering(&a.0, &b.0);
+            order.then_with(|| {
                 let diff = op_sort_order(&a.1) - op_sort_order(&b.1);
                 diff.cmp(&0)
-            } else {
-                order.cmp(&0)
-            }
+            })
         });
 
         let mut active_intervals: i64 = 0;
@@ -477,9 +476,9 @@ impl Intervals {
             } else if start.is_some() && active_intervals < activation_threshold {
                 let start_c = start.take().unwrap();
                 // filter out invalid intervals like > x - <= x, or >= x - < x
-                if shirabe_php_shim::version_compare(start_c.get_version(), version, "=")
-                    && ((start_c.get_operator() == ">" && operator == "<=")
-                        || (start_c.get_operator() == ">=" && operator == "<"))
+                if version_compare(start_c.get_version(), version, CmpOp::Eq)
+                    && ((start_c.get_operator() == CmpOp::Gt && operator == "<=")
+                        || (start_c.get_operator() == CmpOp::Ge && operator == "<"))
                 {
                     // skip invalid interval (equivalent to PHP's unset($intervals[$index]))
                 } else {
@@ -513,7 +512,7 @@ impl Intervals {
 
             // != dev-foo means any numeric version may match, we treat >/< like != they are not
             // really defined for branches
-            if op == "!=" {
+            if op == CmpOp::Ne {
                 intervals.push(Interval::new(
                     Interval::from_zero(),
                     Interval::until_positive_infinity(),
@@ -522,7 +521,7 @@ impl Intervals {
                     names: vec![constraint.get_version().to_string()],
                     exclude: true,
                 };
-            } else if op == "==" {
+            } else if op == CmpOp::Eq {
                 branches.names.push(constraint.get_version().to_string());
             }
 
@@ -532,7 +531,7 @@ impl Intervals {
             });
         }
 
-        if op.starts_with('>') {
+        if op.to_string().starts_with('>') {
             // > & >=
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
@@ -542,14 +541,14 @@ impl Intervals {
                 branches: Interval::no_dev(),
             });
         }
-        if op.starts_with('<') {
+        if op.to_string().starts_with('<') {
             // < & <=
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(Interval::from_zero(), constraint.clone())],
                 branches: Interval::no_dev(),
             });
         }
-        if op == "!=" {
+        if op == CmpOp::Ne {
             // convert !=x to intervals of 0 - <x && >x - +inf + dev*
             return Ok(IntervalCollection {
                 numeric: vec![

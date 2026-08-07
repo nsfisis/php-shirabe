@@ -1,6 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/MatchNoneConstraint.php
 
 use crate::constraint::Bound;
+use shirabe_php_shim::CmpOp;
 
 #[derive(Debug, Clone)]
 pub struct MatchNoneConstraint {
@@ -12,7 +13,7 @@ impl MatchNoneConstraint {
         Self { pretty_string }
     }
 
-    pub fn compile(&self, _other_operator: i64) -> String {
+    pub fn compile(&self, _other_operator: CmpOp) -> String {
         "false".to_string()
     }
 

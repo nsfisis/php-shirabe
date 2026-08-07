@@ -17,7 +17,7 @@ use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, version_compare,
+    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, version_compare,
 };
 
 #[derive(Debug)]
@@ -223,7 +223,11 @@ impl VcsDownloader for SvnDownloader {
             Some(self.inner.process.clone()),
         );
         let mut flags: Vec<String> = vec![];
-        if version_compare(&util.binary_version().unwrap_or_default(), "1.7.0", ">=") {
+        if version_compare(
+            &util.binary_version().unwrap_or_default(),
+            "1.7.0",
+            CmpOp::Ge,
+        ) {
             flags.push("--ignore-ancestry".to_string());
         }
 

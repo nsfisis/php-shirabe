@@ -43,7 +43,7 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
+    CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date, date_format_to_strftime, extension_loaded, impl_php_class, in_array_loose,
     in_array_strict, php_regex, realpath, strtolower, version_compare,
 };
@@ -841,9 +841,9 @@ impl ShowCommand {
             .collect();
         // uasort($versions, 'version_compare');
         versions_pairs.sort_by(|a, b| {
-            if version_compare(&a.1, &b.1, "<") {
+            if version_compare(&a.1, &b.1, CmpOp::Lt) {
                 std::cmp::Ordering::Less
-            } else if version_compare(&a.1, &b.1, ">") {
+            } else if version_compare(&a.1, &b.1, CmpOp::Gt) {
                 std::cmp::Ordering::Greater
             } else {
                 std::cmp::Ordering::Equal
@@ -1432,7 +1432,7 @@ impl ShowCommand {
                         return false;
                     }
 
-                    version_compare(&candidate.get_version(), &package_version, "<=")
+                    version_compare(&candidate.get_version(), &package_version, CmpOp::Le)
                 },
             ))
         };
@@ -2343,9 +2343,11 @@ impl Command for ShowCommand {
                     let need_replace = match existing {
                         None => true,
                         Some(PackageOrName::Name(_)) => true,
-                        Some(PackageOrName::Pkg(existing)) => {
-                            version_compare(&existing.get_version(), &package.get_version(), "<")
-                        }
+                        Some(PackageOrName::Pkg(existing)) => version_compare(
+                            &existing.get_version(),
+                            &package.get_version(),
+                            CmpOp::Lt,
+                        ),
                     };
                     if need_replace {
                         let mut p: crate::package::PackageInterfaceHandle = package.clone();

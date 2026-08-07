@@ -5,6 +5,7 @@ use crate::constraint::MatchAllConstraint;
 use crate::constraint::MatchNoneConstraint;
 use crate::constraint::MultiConstraint;
 use crate::constraint::SimpleConstraint;
+use shirabe_php_shim::CmpOp;
 
 /// Corresponds to PHP's `ConstraintInterface`.
 #[derive(Clone, Debug)]
@@ -36,7 +37,7 @@ impl AnyConstraint {
         }
     }
 
-    pub fn compile(&self, other_operator: i64) -> String {
+    pub fn compile(&self, other_operator: CmpOp) -> String {
         match self {
             Self::Simple(c) => c.compile(other_operator),
             Self::Multi(c) => c.compile(other_operator),
@@ -82,10 +83,10 @@ impl AnyConstraint {
         matches!(self, Self::Simple(_))
     }
 
-    pub fn get_operator(&self) -> &'static str {
+    pub fn get_operator(&self) -> Option<CmpOp> {
         match self {
-            Self::Simple(c) => c.get_operator(),
-            _ => "",
+            Self::Simple(c) => Some(c.get_operator()),
+            _ => None,
         }
     }
 

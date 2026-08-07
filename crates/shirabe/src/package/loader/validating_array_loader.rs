@@ -9,10 +9,10 @@ use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, filter_var_email,
-    get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string, json_encode,
-    parse_url_all, php_regex, php_to_string, str_replace, strcasecmp, strtolower, strtotime,
-    substr, trigger_error, trim, var_export,
+    CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values,
+    filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
+    json_encode, parse_url_all, php_regex, php_to_string, str_replace, strcasecmp, strtolower,
+    strtotime, substr, trigger_error, trim, var_export,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
@@ -1242,7 +1242,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                             && link_type == "require"
                             && link_constraint
                                 .as_constraint()
-                                .is_some_and(|c| ["==", "="].contains(&c.get_operator()))
+                                .is_some_and(|c| c.get_operator() == CmpOp::Eq)
                             && AnyConstraint::from(SimpleConstraint::new(
                                 ">=".to_string(),
                                 "1.0.0.0-dev".to_string(),

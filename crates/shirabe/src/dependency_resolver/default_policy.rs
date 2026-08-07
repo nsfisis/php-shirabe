@@ -6,6 +6,7 @@ use crate::package::BasePackageHandle;
 use crate::package::STABILITIES;
 use crate::util::Platform;
 use indexmap::IndexMap;
+use shirabe_php_shim::CmpOp;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -205,7 +206,7 @@ impl PolicyInterface for DefaultPolicy {
 
         CompilingMatcher::r#match(
             &SimpleConstraint::new(operator.to_string(), b.get_version(), None).into(),
-            SimpleConstraint::OP_EQ,
+            CmpOp::Eq,
             a.get_version(),
         )
     }

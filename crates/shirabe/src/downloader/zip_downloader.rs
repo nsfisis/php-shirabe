@@ -11,10 +11,10 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
-    ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists,
-    hash_file, impl_php_class, is_file, json_encode, php_regex, random_int, str_contains,
-    str_replace, strlen, substr, version_compare,
+    CmpOp, DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException,
+    UnexpectedValueException, ZipArchive, bin2hex, class_exists, file_exists, file_get_contents,
+    filesize, function_exists, hash_file, impl_php_class, is_file, json_encode, php_regex,
+    random_int, str_contains, str_replace, strlen, substr, version_compare,
 };
 use std::sync::Mutex;
 
@@ -120,7 +120,7 @@ impl ZipDownloader {
                     Some(&mut m),
                 ) {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                    if version_compare(&m1, "21.01", "<") {
+                    if version_compare(&m1, "21.01", CmpOp::Lt) {
                         self.inner.io.borrow().write_error(&format!(
                             "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
                             executable, m1, executable,

@@ -68,20 +68,6 @@ fn required_string(context: &str, value: Option<&PluginValue>) -> Result<String,
     }
 }
 
-/// PHP's `Constraint` keeps the operator as one of its `OP_*` codes, not as the string its
-/// constructor takes.
-fn operator_from_code(code: i64) -> Option<&'static str> {
-    Some(match code {
-        SimpleConstraint::OP_EQ => SimpleConstraint::STR_OP_EQ,
-        SimpleConstraint::OP_LT => SimpleConstraint::STR_OP_LT,
-        SimpleConstraint::OP_LE => SimpleConstraint::STR_OP_LE,
-        SimpleConstraint::OP_GT => SimpleConstraint::STR_OP_GT,
-        SimpleConstraint::OP_GE => SimpleConstraint::STR_OP_GE,
-        SimpleConstraint::OP_NE => SimpleConstraint::STR_OP_NE,
-        _ => return None,
-    })
-}
-
 fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
     // Whether the pretty string was ever set is observable (`getPrettyString()` falls back to the
     // string form), so an unset one crosses as null rather than as an absent property.
@@ -144,11 +130,12 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
     Ok(match object.class.as_str() {
         CONSTRAINT_CLASS => {
             let operator = match object.protected("operator") {
-                Some(PluginValue::Int(code)) => operator_from_code(*code).ok_or_else(|| {
-                    throw(format!(
-                        "a semver constraint has an unknown operator: {code}"
-                    ))
-                })?,
+                Some(PluginValue::Int(code)) => SimpleConstraint::from_operator_constant(*code)
+                    .ok_or_else(|| {
+                        throw(format!(
+                            "a semver constraint has an unknown operator: {code}"
+                        ))
+                    })?,
                 other => {
                     return Err(throw(format!(
                         "a semver constraint operator is not an int, got {other:?}"

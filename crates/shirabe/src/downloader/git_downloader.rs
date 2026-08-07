@@ -19,7 +19,7 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
+    CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
     in_array_strict, is_dir, php_regex, preg_quote, realpath, rtrim, strlen, strpos, substr, trim,
     version_compare,
 };
@@ -814,7 +814,7 @@ impl VcsDownloader for GitDownloader {
 
         // --dissociate option is only available since git 2.3.0-rc0
         if git_version.is_some()
-            && version_compare(git_version.as_deref().unwrap_or(""), "2.3.0-rc0", ">=")
+            && version_compare(git_version.as_deref().unwrap_or(""), "2.3.0-rc0", CmpOp::Ge)
             && Cache::is_usable(&cache_path)
         {
             self.inner.io.write_error3(

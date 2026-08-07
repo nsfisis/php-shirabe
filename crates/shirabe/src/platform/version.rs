@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{php_regex, version_compare};
+use shirabe_php_shim::{CmpOp, php_regex, version_compare};
 
 pub struct Version;
 
@@ -34,7 +34,7 @@ impl Version {
             .cloned()
             .unwrap_or_default();
 
-        let patch = if version_compare(&version, "3.0.0", "<") {
+        let patch = if version_compare(&version, "3.0.0", CmpOp::Lt) {
             format!(
                 ".{}",
                 Self::convert_alpha_version_to_int_version(&patch_str)

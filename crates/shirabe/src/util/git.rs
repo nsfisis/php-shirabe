@@ -16,10 +16,10 @@ use crate::util::{AuthHelper, StoreAuth};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map, clearstatcache,
-    explode, implode, in_array_loose, in_array_strict, is_dir, php_regex, preg_quote, rawurldecode,
-    rawurlencode, str_contains, str_ends_with, str_replace_array, strlen, strpos, substr, trim,
-    version_compare,
+    CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
+    clearstatcache, explode, implode, in_array_loose, in_array_strict, is_dir, php_regex,
+    preg_quote, rawurldecode, rawurlencode, str_contains, str_ends_with, str_replace_array, strlen,
+    strpos, substr, trim, version_compare,
 };
 use std::sync::Mutex;
 
@@ -982,7 +982,7 @@ impl Git {
     ) -> String {
         let git_version = Self::get_version(process);
         if let Some(v) = git_version
-            && version_compare(&v, "2.10.0-rc0", ">=")
+            && version_compare(&v, "2.10.0-rc0", CmpOp::Ge)
         {
             return " --no-show-signature".to_string();
         }
@@ -1010,7 +1010,7 @@ impl Git {
         let git_version = Self::get_version(process);
 
         git_version
-            .map(|v| version_compare(&v, "2.33.0-rc0", ">="))
+            .map(|v| version_compare(&v, "2.33.0-rc0", CmpOp::Ge))
             .unwrap_or(false)
     }
 
@@ -1212,7 +1212,7 @@ impl Git {
         // PHP: $process ?? new ProcessExecutor()
         let git_version = Self::get_version(process);
         if let Some(v) = git_version {
-            if version_compare(&v, "2.3.0", ">=") {
+            if version_compare(&v, "2.3.0", CmpOp::Ge) {
                 // added in git 2.3.0, prevents prompting the user for username/password
                 if Platform::get_env("GIT_TERMINAL_PROMPT").as_deref() != Some("0") {
                     Platform::put_env("GIT_TERMINAL_PROMPT", "0");

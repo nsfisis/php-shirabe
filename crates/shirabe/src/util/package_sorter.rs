@@ -3,7 +3,7 @@
 use crate::package::Link;
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
-use shirabe_php_shim::{strnatcasecmp, version_compare};
+use shirabe_php_shim::{CmpOp, strnatcasecmp, version_compare};
 
 pub struct PackageSorter;
 
@@ -21,7 +21,7 @@ impl PackageSorter {
             if candidate.is_default_branch() {
                 return Some(candidate);
             }
-            if version_compare(&highest.get_version(), &candidate.get_version(), "<") {
+            if version_compare(&highest.get_version(), &candidate.get_version(), CmpOp::Lt) {
                 highest = candidate;
             }
         }

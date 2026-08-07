@@ -39,7 +39,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
+    CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
     UnexpectedValueException, extension_loaded, hash, http_build_query, json_decode, parse_url_all,
     php_regex, realpath, strtolower, strtr, urlencode, var_export,
 };
@@ -2110,7 +2110,7 @@ impl ComposerRepository {
             }
 
             if let Some(c) = constraint
-                && !CompilingMatcher::r#match(c, SimpleConstraint::OP_EQ, version.clone())
+                && !CompilingMatcher::r#match(c, CmpOp::Eq, version.clone())
             {
                 continue;
             }

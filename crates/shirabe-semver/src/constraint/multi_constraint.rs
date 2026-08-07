@@ -3,6 +3,7 @@
 use crate::constraint::AnyConstraint;
 use crate::constraint::Bound;
 use crate::constraint::MatchAllConstraint;
+use shirabe_php_shim::CmpOp;
 
 #[derive(Debug, Clone)]
 pub struct MultiConstraint {
@@ -198,7 +199,7 @@ impl MultiConstraint {
         (constraints, conjunctive)
     }
 
-    pub fn compile(&self, other_operator: i64) -> String {
+    pub fn compile(&self, other_operator: CmpOp) -> String {
         let mut parts = Vec::new();
         for constraint in &self.constraints {
             let code = constraint.compile(other_operator);

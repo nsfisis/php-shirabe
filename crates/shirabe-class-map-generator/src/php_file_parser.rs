@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, error_get_last, file_exists,
+    CmpOp, HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, error_get_last, file_exists,
     file_get_contents, function_exists, is_file, is_readable, ltrim, php_strip_whitespace,
     str_replace_array, strrpos, substr, trim, version_compare,
 };
@@ -186,7 +186,8 @@ impl PhpFileParser {
             let mut extra_types = String::new();
             let mut extra_types_array: Vec<String> = vec![];
             if PHP_VERSION_ID >= 80100
-                || (HHVM_VERSION.is_some() && version_compare(HHVM_VERSION.unwrap(), "3.3", ">="))
+                || (HHVM_VERSION.is_some()
+                    && version_compare(HHVM_VERSION.unwrap(), "3.3", CmpOp::Ge))
             {
                 extra_types += "|enum";
                 extra_types_array = vec!["enum".to_string()];

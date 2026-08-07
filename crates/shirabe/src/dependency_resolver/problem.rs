@@ -13,8 +13,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare, php_regex,
-    phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
+    CmpOp, LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare,
+    php_regex, phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
     strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
@@ -284,9 +284,9 @@ impl Problem {
                     // uksort($versions, 'version_compare')
                     let mut keys: Vec<String> = versions.keys().cloned().collect();
                     keys.sort_by(|a, b| {
-                        if version_compare(a, b, "<") {
+                        if version_compare(a, b, CmpOp::Lt) {
                             std::cmp::Ordering::Less
-                        } else if version_compare(a, b, ">") {
+                        } else if version_compare(a, b, CmpOp::Gt) {
                             std::cmp::Ordering::Greater
                         } else {
                             std::cmp::Ordering::Equal
@@ -564,7 +564,7 @@ impl Problem {
 
         if let Some(c) = constraint
             && c.is_constraint()
-            && c.get_operator() == SimpleConstraint::STR_OP_EQ
+            && c.get_operator() == Some(CmpOp::Eq)
             && Preg::is_match3(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string(), None)
         {
             let new_constraint = Preg::replace(
@@ -578,12 +578,12 @@ impl Problem {
                     MultiConstraint::new(
                         vec![
                             AnyConstraint::Simple(SimpleConstraint::new(
-                                SimpleConstraint::STR_OP_EQ.to_string(),
+                                "==".to_string(),
                                 new_constraint.clone(),
                                 None,
                             )),
                             AnyConstraint::Simple(SimpleConstraint::new(
-                                SimpleConstraint::STR_OP_EQ.to_string(),
+                                "==".to_string(),
                                 str_replace("#", "+", &new_constraint),
                                 None,
                             )),
@@ -1102,9 +1102,9 @@ impl Problem {
             // uksort($package['versions'], 'version_compare')
             let mut keys: Vec<String> = package.versions.keys().cloned().collect();
             keys.sort_by(|a, b| {
-                if version_compare(a, b, "<") {
+                if version_compare(a, b, CmpOp::Lt) {
                     std::cmp::Ordering::Less
-                } else if version_compare(a, b, ">") {
+                } else if version_compare(a, b, CmpOp::Gt) {
                     std::cmp::Ordering::Greater
                 } else {
                     std::cmp::Ordering::Equal
@@ -1386,7 +1386,7 @@ impl Problem {
     pub(crate) fn constraint_to_text(constraint: Option<&AnyConstraint>) -> String {
         if let Some(c) = constraint
             && c.is_constraint()
-            && c.get_operator() == SimpleConstraint::STR_OP_EQ
+            && c.get_operator() == Some(CmpOp::Eq)
             && !str_starts_with(c.get_version(), "dev-")
         {
             if !Preg::is_match3(

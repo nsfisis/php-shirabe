@@ -27,7 +27,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
+    CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
     file_get_contents, implode, ksort, php_regex, preg_quote, strrpos, strtr_array, substr,
     trigger_error, trim, var_export, var_export_str, version_compare,
 };
@@ -263,7 +263,7 @@ impl PluginManager {
 
             if package.get_name() == "symfony/flex"
                 && Preg::is_match3(php_regex!("{^[0-9.]+$}"), &package.get_version(), None)
-                && version_compare(&package.get_version(), "1.9.8", "<")
+                && version_compare(&package.get_version(), "1.9.8", CmpOp::Lt)
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
                     package.get_name(),
@@ -1171,7 +1171,7 @@ impl PluginManager {
                 Some(l) => {
                     if l.is_locked() {
                         let api = l.get_plugin_api().unwrap_or_default();
-                        version_compare(&api, "2.2.0", "<")
+                        version_compare(&api, "2.2.0", CmpOp::Lt)
                     } else {
                         false
                     }

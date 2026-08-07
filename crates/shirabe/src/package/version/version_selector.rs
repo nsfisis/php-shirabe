@@ -18,7 +18,7 @@ use crate::repository::RepositorySetInterface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, php_regex, strtolower,
+    CmpOp, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, php_regex, strtolower,
     version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
@@ -123,9 +123,9 @@ impl VersionSelector {
                 return std::cmp::Ordering::Less;
             }
 
-            if version_compare(&b.get_version(), &a.get_version(), ">") {
+            if version_compare(&b.get_version(), &a.get_version(), CmpOp::Gt) {
                 std::cmp::Ordering::Greater
-            } else if version_compare(&b.get_version(), &a.get_version(), "<") {
+            } else if version_compare(&b.get_version(), &a.get_version(), CmpOp::Lt) {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Equal

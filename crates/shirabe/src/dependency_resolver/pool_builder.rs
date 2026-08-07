@@ -21,7 +21,7 @@ use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
+    CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
     number_format, round, strpos,
 };
 use shirabe_semver::CompilingMatcher;
@@ -29,7 +29,6 @@ use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct PoolBuilder {
@@ -289,7 +288,7 @@ impl PoolBuilder {
                     for (_idx, package_or_alias) in &package_and_aliases {
                         if CompilingMatcher::r#match(
                             &constraint,
-                            SimpleConstraint::OP_EQ,
+                            CmpOp::Eq,
                             package_or_alias.get_version(),
                         ) {
                             found = true;

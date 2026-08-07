@@ -39,10 +39,10 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, disk_free_space, file_exists, filter_var_boolean,
-    get_class_err, hash, impl_php_class, implode, is_array, is_string, php_regex, rtrim,
-    str_contains, str_replace, str_starts_with, strpos, strstr, strstr3, strtolower, trim,
-    version_compare,
+    CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, disk_free_space, file_exists,
+    filter_var_boolean, get_class_err, hash, impl_php_class, implode, is_array, is_string,
+    php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos, strstr, strstr3,
+    strtolower, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -153,7 +153,7 @@ impl DiagnoseCommand {
             None => return "<comment>No git process found</>".to_string(),
         };
 
-        if version_compare("2.24.0", &git_version, ">") {
+        if version_compare("2.24.0", &git_version, CmpOp::Gt) {
             return format!(
                 "<warning>Your git version ({}) is too old and possibly will cause issues. Please upgrade to git 2.24 or above</>",
                 git_version
@@ -889,9 +889,9 @@ impl DiagnoseCommand {
         }
 
         if diagnostics.has_php_windows_version_build
-            && (version_compare(&diagnostics.php_version, "7.2.23", "<")
-                || (version_compare(&diagnostics.php_version, "7.3.0", ">=")
-                    && version_compare(&diagnostics.php_version, "7.3.10", "<")))
+            && (version_compare(&diagnostics.php_version, "7.2.23", CmpOp::Lt)
+                || (version_compare(&diagnostics.php_version, "7.3.0", CmpOp::Ge)
+                    && version_compare(&diagnostics.php_version, "7.3.10", CmpOp::Lt)))
         {
             warnings.insert(
                 "onedrive".to_string(),

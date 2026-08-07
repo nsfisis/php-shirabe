@@ -265,22 +265,50 @@ pub fn spl_autoload_functions() -> Vec<PhpMixed> {
     Vec::new()
 }
 
-pub fn version_compare(_v1: &str, _v2: &str, _op: &str) -> bool {
-    let c = php_version_compare(_v1, _v2);
-    match _op {
-        "<" | "lt" => c < 0,
-        "<=" | "le" => c <= 0,
-        ">" | "gt" => c > 0,
-        ">=" | "ge" => c >= 0,
-        "==" | "=" | "eq" => c == 0,
-        "!=" | "<>" | "ne" => c != 0,
-        // TODO(phase-c): PHP returns null for an unknown operator; this bool signature reports false.
-        _ => false,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CmpOp {
+    Lt,
+    Le,
+    Eq,
+    Ne,
+    Ge,
+    Gt,
+}
+
+impl std::fmt::Display for CmpOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            CmpOp::Lt => "<",
+            CmpOp::Le => "<=",
+            CmpOp::Eq => "==",
+            CmpOp::Ne => "!=",
+            CmpOp::Ge => ">=",
+            CmpOp::Gt => ">",
+        })
     }
 }
 
-pub fn version_compare_2(_v1: &str, _v2: &str) -> i64 {
-    php_version_compare(_v1, _v2) as i64
+pub fn version_compare(v1: &str, v2: &str, op: CmpOp) -> bool {
+    let ord = version_compare_ordering(v1, v2);
+    match op {
+        CmpOp::Lt => ord.is_lt(),
+        CmpOp::Le => ord.is_le(),
+        CmpOp::Eq => ord.is_eq(),
+        CmpOp::Ne => ord.is_ne(),
+        CmpOp::Ge => ord.is_ge(),
+        CmpOp::Gt => ord.is_gt(),
+    }
+}
+
+pub fn version_compare_ordering(v1: &str, v2: &str) -> std::cmp::Ordering {
+    let ord = php_version_compare(v1, v2);
+    if ord < 0 {
+        std::cmp::Ordering::Less
+    } else if ord > 0 {
+        std::cmp::Ordering::Greater
+    } else {
+        std::cmp::Ordering::Equal
+    }
 }
 
 // TODO(php-runtime): the previous handler should be restored in the PHP runtime.

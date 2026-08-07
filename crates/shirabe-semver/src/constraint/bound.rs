@@ -1,6 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Bound.php
 
 use anyhow::bail;
+use shirabe_php_shim::version_compare_ordering;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bound {
@@ -42,7 +43,7 @@ impl Bound {
         }
 
         let compare_result =
-            shirabe_php_shim::version_compare_2(self.get_version(), other.get_version());
+            version_compare_ordering(self.get_version(), other.get_version()) as i8;
 
         if compare_result != 0 {
             return Ok((if operator == ">" { 1 } else { -1 }) == compare_result);

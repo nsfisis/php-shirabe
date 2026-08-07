@@ -1,6 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/MatchAllConstraint.php
 
 use crate::constraint::Bound;
+use shirabe_php_shim::CmpOp;
 
 #[derive(Debug, Clone, Default)]
 pub struct MatchAllConstraint {
@@ -12,7 +13,7 @@ impl MatchAllConstraint {
         Self { pretty_string }
     }
 
-    pub fn compile(&self, _other_operator: i64) -> String {
+    pub fn compile(&self, _other_operator: CmpOp) -> String {
         "true".to_string()
     }
 
