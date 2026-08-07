@@ -50,7 +50,7 @@ impl Problem {
 
     /// Add a rule as a reason
     pub fn add_rule(&mut self, rule: std::rc::Rc<std::cell::RefCell<Rule>>) {
-        let id = spl_object_hash(&*rule.borrow());
+        let id = spl_object_hash(rule.clone());
         self.add_reason(id, rule);
     }
 

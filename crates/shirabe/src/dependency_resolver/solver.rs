@@ -397,7 +397,7 @@ impl Solver {
             self.rules.add(new_rule.clone(), RuleSet::TYPE_LEARNED)?;
 
             self.learned_why
-                .insert(spl_object_hash(&*new_rule.borrow()), why);
+                .insert(spl_object_hash(new_rule.clone()), why);
 
             let rule_node = std::rc::Rc::new(std::cell::RefCell::new(RuleWatchNode::new(
                 new_rule.clone(),
@@ -610,7 +610,7 @@ impl Solver {
         conflict_rule: std::rc::Rc<std::cell::RefCell<Rule>>,
         rule_seen: &mut IndexMap<String, bool>,
     ) {
-        let why = spl_object_hash(&*conflict_rule.borrow());
+        let why = spl_object_hash(conflict_rule.clone());
         rule_seen.insert(why.clone(), true);
 
         if conflict_rule.borrow().get_type() == RuleSet::TYPE_LEARNED {
@@ -618,7 +618,7 @@ impl Solver {
             let problem_rules = self.learned_pool[learned_why as usize].clone();
 
             for problem_rule in problem_rules {
-                if !rule_seen.contains_key(&spl_object_hash(&*problem_rule.borrow())) {
+                if !rule_seen.contains_key(&spl_object_hash(problem_rule.clone())) {
                     self.analyze_unsolvable_rule(problem, problem_rule, rule_seen);
                 }
             }

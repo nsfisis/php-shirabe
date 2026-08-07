@@ -315,16 +315,24 @@ pub fn version_compare_ordering(v1: &str, v2: &str) -> std::cmp::Ordering {
 // Paired with set_error_handler, which is a no-op in this shim.
 pub fn restore_error_handler() {}
 
-pub fn spl_object_hash<T: ?Sized>(_object: &T) -> String {
-    // PHP returns a unique 32-char hex id per object instance; the object's address serves as the
-    // identity here.
-    // TODO(phase-c): as in PHP, an address can be reused after an object is freed, so uniqueness is
-    // not guaranteed across an object's whole lifetime without an object store.
-    format!("{:032x}", _object as *const T as *const u8 as usize)
+pub trait HasAddress {
+    fn address(&self) -> usize;
 }
 
-pub fn spl_object_hash_process<T>(_object: &T) -> String {
-    format!("{:032x}", _object as *const T as usize)
+impl<T: ?Sized> HasAddress for &T {
+    fn address(&self) -> usize {
+        *self as *const T as *const u8 as usize
+    }
+}
+
+impl<T: ?Sized> HasAddress for std::rc::Rc<T> {
+    fn address(&self) -> usize {
+        std::rc::Rc::as_ptr(self) as *const u8 as usize
+    }
+}
+
+pub fn spl_object_hash<T: HasAddress>(object: T) -> String {
+    format!("{:032x}", object.address())
 }
 
 // TODO(phase-c): the Windows branch of php_uname is missing. There PHP reports "Windows NT" as the

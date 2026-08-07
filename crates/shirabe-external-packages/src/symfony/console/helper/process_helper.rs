@@ -116,7 +116,7 @@ impl ProcessHelper {
         if verbosity <= output.borrow().get_verbosity() {
             let started = Self::formatter_start(
                 &formatter,
-                &shirabe_php_shim::spl_object_hash_process(&process),
+                &shirabe_php_shim::spl_object_hash(&process),
                 &self.escape_string(&process.get_command_line()),
             );
             output
@@ -163,7 +163,7 @@ impl ProcessHelper {
             };
             let stopped = Self::formatter_stop(
                 &formatter,
-                &shirabe_php_shim::spl_object_hash_process(&process),
+                &shirabe_php_shim::spl_object_hash(&process),
                 &message,
                 process.is_successful(),
             );
@@ -242,7 +242,7 @@ impl ProcessHelper {
             .borrow()
             .get_debug_formatter();
 
-        let object_hash = shirabe_php_shim::spl_object_hash_process(process);
+        let object_hash = shirabe_php_shim::spl_object_hash(process);
 
         Box::new(move |r#type: &str, buffer: &str| {
             let progressed = Self::formatter_progress(
