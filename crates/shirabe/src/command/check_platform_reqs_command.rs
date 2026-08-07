@@ -290,7 +290,7 @@ impl Command for CheckPlatformReqsCommand {
         requires_sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
         installed_repo.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-            PlatformRepository::new(vec![], indexmap::IndexMap::new())?,
+            PlatformRepository::new(vec![], indexmap::IndexMap::new(), None, None)?,
         ));
         let installed_repo_with_platform = installed_repo;
 

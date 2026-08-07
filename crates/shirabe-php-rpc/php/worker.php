@@ -455,6 +455,77 @@ ShirabeRpcRuntime::$stubAutoloader = static function (string $class): void {
 };
 spl_autoload_register(ShirabeRpcRuntime::$stubAutoloader, true, true);
 
+/**
+ * Port of Composer\Platform\Runtime, whose runtime queries feed the `platform` payload. Its
+ * parseHtmlExtensionInfo() has no counterpart here: the worker is always the CLI SAPI, so
+ * getExtensionInfo() never takes the branch that reformats phpinfo()'s HTML output.
+ */
+final class ShirabePlatformRuntime
+{
+    /** The constants the `platform` payload reports, named ltrim($class.'::'.$constant, ':'). */
+    public const CONSTANTS = [
+        'PHP_VERSION',
+        'PHP_DEBUG',
+        'PHP_ZTS',
+        'PHP_INT_SIZE',
+        'AF_INET6',
+        'GD_VERSION',
+        'GMP_VERSION',
+        'ICONV_VERSION',
+        'INTL_ICU_VERSION',
+        'LIBXML_DOTTED_VERSION',
+        'MB_ONIGURUMA_VERSION',
+        'OPENSSL_VERSION_TEXT',
+        'PCRE_VERSION',
+        'PGSQL_LIBPQ_VERSION',
+        'RD_KAFKA_VERSION',
+        'SODIUM_LIBRARY_VERSION',
+        'LIBXSLT_DOTTED_VERSION',
+        'ZipArchive::LIBZIP_VERSION',
+        'ZLIB_VERSION',
+    ];
+
+    /** The extensions whose info() output the `platform` payload reports when they are loaded. */
+    public const EXTENSION_INFO = [
+        'amqp',
+        'bz2',
+        'curl',
+        'date',
+        'fileinfo',
+        'gd',
+        'intl',
+        'ldap',
+        'mbstring',
+        'memcached',
+        'mongodb',
+        'mysqlnd',
+        'pcre',
+        'pdo_mysql',
+        'pdo_pgsql',
+        'pdo_sqlite',
+        'pgsql',
+        'pq',
+        'sqlite3',
+        'ssh2',
+        'xsl',
+        'yaml',
+        'zlib',
+    ];
+
+    /** The classes the `platform` payload reports the existence of. */
+    public const CLASSES = ['ResourceBundle', 'IntlChar'];
+
+    public static function getExtensionInfo(string $extension): string
+    {
+        $reflector = new ReflectionExtension($extension);
+
+        ob_start();
+        $reflector->info();
+
+        return (string) ob_get_clean();
+    }
+}
+
 // Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the diagnose payload
 // reports as `xdebug_active`.
 $xdebug_active = static function (): bool {
@@ -491,9 +562,6 @@ $xdebug_active = static function (): bool {
 
 ShirabeRpcRuntime::$dispatch = [
     'constant' => static fn($args) => defined($args[0]) ? constant($args[0]) : null,
-    'inet_pton' => static fn($args) => @inet_pton($args[0]),
-    'curl_version' => static fn($args) => function_exists('curl_version') ? (curl_version()['version'] ?? null) : null,
-    'get_loaded_extensions' => static fn($args) => get_loaded_extensions(),
     'get_all_ini_files' => static function ($args) {
         $paths = [(string) php_ini_loaded_file()];
         $scanned = php_ini_scanned_files();
@@ -502,14 +570,60 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return $paths;
     },
-    'extension_info' => static function ($args) {
-        if (!extension_loaded($args[0])) {
-            return '';
+    'platform' => static function ($args) {
+        $extensions = get_loaded_extensions();
+
+        $extension_versions = [];
+        foreach ($extensions as $extension) {
+            $version = phpversion($extension);
+            $extension_versions[$extension] = $version !== false ? $version : '0';
         }
-        $re = new ReflectionExtension($args[0]);
-        ob_start();
-        $re->info();
-        return (string) ob_get_clean();
+
+        $extension_info = [];
+        foreach (ShirabePlatformRuntime::EXTENSION_INFO as $extension) {
+            if (in_array($extension, $extensions, true)) {
+                $extension_info[$extension] = ShirabePlatformRuntime::getExtensionInfo($extension);
+            }
+        }
+
+        // Only the defined constants carry a value; `constant_names` tells the Rust side which
+        // names were looked up, so a name it reads but this list omits is an error rather than a
+        // silently undefined constant.
+        $constants = [];
+        foreach (ShirabePlatformRuntime::CONSTANTS as $constant) {
+            if (defined($constant)) {
+                $constants[$constant] = constant($constant);
+            }
+        }
+
+        $classes = [];
+        foreach (ShirabePlatformRuntime::CLASSES as $class) {
+            $classes[$class] = class_exists($class, false);
+        }
+
+        // The values below stand in for the PHP objects and calls PlatformRepository reaches
+        // through Composer\Platform\Runtime::invoke()/construct(), reduced to the entries it reads.
+        $resource_bundle = null;
+        if ($classes['ResourceBundle']) {
+            $bundle = ResourceBundle::create('root', 'ICUDATA', false);
+            if ($bundle !== null) {
+                $resource_bundle = ['Version' => $bundle->get('Version')];
+            }
+        }
+
+        return [
+            'extensions' => $extensions,
+            'extension_versions' => $extension_versions,
+            'extension_info' => $extension_info,
+            'constant_names' => ShirabePlatformRuntime::CONSTANTS,
+            'constants' => $constants,
+            'classes' => $classes,
+            'curl_version' => extension_loaded('curl') ? curl_version() : null,
+            'inet_pton_ipv6' => @inet_pton('::'),
+            'resource_bundle' => $resource_bundle,
+            'intl_char_unicode_version' => $classes['IntlChar'] ? IntlChar::getUnicodeVersion() : null,
+            'imagick' => extension_loaded('imagick') ? (new Imagick())->getVersion() : null,
+        ];
     },
     'diagnose' => static function ($args) use ($xdebug_active) {
         $extensions = [];

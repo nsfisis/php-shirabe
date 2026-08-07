@@ -1323,6 +1323,8 @@ impl Installer {
         Ok(PlatformRepositoryHandle::new(PlatformRepository::new(
             vec![],
             platform_overrides,
+            None,
+            None,
         )?))
     }
 

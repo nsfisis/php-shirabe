@@ -5,9 +5,7 @@ and its plugin/script machinery executes real PHP code. To mimic this behavior n
 runtime.
 
 The `shirabe-php-rpc` crate spawns the system PHP as a child process and talks to it over a Unix
-domain socket. There is exactly one child process per Shirabe process, shared by every caller;
-it hosts both the simple runtime queries (`get_php_version`, `has_constant`, ...) and the plugin
-protocol.
+domain socket. There is exactly one child process per Shirabe process, shared by every caller.
 
 ## Locating PHP
 
@@ -129,9 +127,17 @@ same dispatch while waiting for its own `Return`.
 
 ## Worker dispatch table
 
-`CallFunction` first consults the worker's dispatch table (composite queries like `diagnose`,
-Shirabe-internal helpers prefixed `__shirabe_`), then falls back to calling the named PHP
-function; an unknown name is an explicit error. Notable internal helpers:
+`CallFunction` first consults the worker's dispatch table (composite queries like `diagnose` and
+`platform`, Shirabe-internal helpers prefixed `__shirabe_`), then falls back to calling the named
+PHP function; an unknown name is an explicit error.
+
+A composite query answers everything one consumer needs about the runtime in a single round trip,
+because asking one constant and one extension at a time costs a round trip each. The Rust side
+decodes the answer into a struct cached in a `OnceLock` (`Diagnostics` for `diagnose`,
+`PlatformInfo` for `platform`) whose accessors panic on a name the worker does not report, so a
+consumer and the worker cannot drift apart unnoticed.
+
+Notable internal helpers:
 
 - `__shirabe_eval` — runs a Rust-generated PHP snippet and returns its `return` value (used by
   the `scripts` Command-class execution path and the `_composer_tmp` class-rename path of

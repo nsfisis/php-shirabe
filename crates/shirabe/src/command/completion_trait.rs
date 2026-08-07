@@ -80,14 +80,14 @@ pub trait CompletionTrait: BaseCommand {
                         .into_iter()
                         .map(|(k, v)| (k, PhpMixed::String(v)))
                         .collect();
-                    PlatformRepository::new(vec![], overrides)?
+                    PlatformRepository::new(vec![], overrides, None, None)?
                 } else {
                     let platform_cfg = composer.get_config().borrow().get("platform");
                     let overrides: IndexMap<String, PhpMixed> = platform_cfg
                         .as_array()
                         .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                         .unwrap_or_default();
-                    PlatformRepository::new(vec![], overrides)?
+                    PlatformRepository::new(vec![], overrides, None, None)?
                 };
                 if input.get_completion_value().is_empty() {
                     // to reduce noise, when no text is yet entered we list only two entries for ext- and lib- prefixes
@@ -286,7 +286,7 @@ pub trait CompletionTrait: BaseCommand {
                 .as_array()
                 .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();
-            let mut repos = PlatformRepository::new(vec![], overrides)?;
+            let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
             let pattern =
                 base_package::package_name_to_regexp(&format!("{}*", input.get_completion_value()));

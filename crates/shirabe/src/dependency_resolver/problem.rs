@@ -458,7 +458,7 @@ impl Problem {
                 );
 
                 // Per-extension version info can't be known statically; query the real PHP
-                // runtime via the RPC bridge, same as platform::runtime::Runtime::get_extension_version.
+                // runtime via the RPC bridge, as PHP's Composer\Platform\Runtime does.
                 let runtime_version = shirabe_php_rpc::phpversion(&ext);
                 let effective_version = match runtime_version {
                     None => "0".to_string(),

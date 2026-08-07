@@ -830,7 +830,7 @@ impl Command for InitCommand {
 
                 let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
                     vec![crate::repository::RepositoryInterfaceHandle::new(
-                        PlatformRepository::new(vec![], IndexMap::new())?,
+                        PlatformRepository::new(vec![], IndexMap::new(), None, None)?,
                     )];
                 let mut create_default_packagist_repo = true;
                 for repo in &repositories {

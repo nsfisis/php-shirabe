@@ -133,6 +133,8 @@ impl Command for SuggestsCommand {
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,
+                None,
+                None,
             )?));
             let locked_repo = composer.get_locker().borrow_mut().get_locked_repository(
                 !input
@@ -151,6 +153,8 @@ impl Command for SuggestsCommand {
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,
+                None,
+                None,
             )?));
             installed_repos.push(
                 composer

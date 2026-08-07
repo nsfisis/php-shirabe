@@ -1223,7 +1223,7 @@ impl Command for DiagnoseCommand {
         let platform_overrides_unboxed: indexmap::IndexMap<String, PhpMixed> =
             platform_overrides.into_iter().collect();
         let mut platform_repo =
-            PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
+            PlatformRepository::new(vec![], platform_overrides_unboxed, None, None).unwrap();
         let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
             &mut platform_repo,
             "php",

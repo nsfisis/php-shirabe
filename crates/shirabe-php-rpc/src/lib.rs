@@ -30,47 +30,9 @@ pub fn get_php_binary() -> String {
     }
 }
 
-/// PHP `defined($name)`.
-pub fn has_constant(name: &str) -> bool {
-    match call("defined", name) {
-        PhpMixed::Bool(b) => b,
-        other => panic!("PHP RPC: `defined` did not return a bool: {other:?}"),
-    }
-}
-
 /// PHP `constant($name)`.
-pub fn get_constant(name: &str) -> PhpMixed {
+fn get_constant(name: &str) -> PhpMixed {
     call("constant", name)
-}
-
-/// PHP `class_exists($name)`, with autoloading, as the runtime sees it.
-pub fn class_exists(name: &str) -> bool {
-    match call("class_exists", name) {
-        PhpMixed::Bool(exists) => exists,
-        other => panic!("PHP RPC: `class_exists` returned an unexpected value: {other:?}"),
-    }
-}
-
-/// PHP `inet_pton($address)`.
-pub fn inet_pton(address: &str) -> PhpMixed {
-    call("inet_pton", address)
-}
-
-/// PHP `curl_version()['version']`.
-pub fn curl_version() -> Option<String> {
-    match call("curl_version", "") {
-        PhpMixed::String(s) => Some(s),
-        PhpMixed::Null => None,
-        other => panic!("PHP RPC: `curl_version` returned an unexpected value: {other:?}"),
-    }
-}
-
-/// PHP `(new \ReflectionExtension($name))->info()` output.
-pub fn get_extension_info(name: &str) -> String {
-    match call("extension_info", name) {
-        PhpMixed::String(s) => s,
-        other => panic!("PHP RPC: `extension_info` did not return a string: {other:?}"),
-    }
 }
 
 /// `curl_version()`, together with the `CURL_*` constants the `diagnose` command consults. Every
@@ -89,7 +51,7 @@ pub struct Curl {
 }
 
 /// Everything the `diagnose` command needs to know about the PHP runtime, fetched in a single
-/// round trip because the command would otherwise probe the same runtime dozens of times.
+/// round trip because the command would otherwise query the same runtime dozens of times.
 #[derive(Debug)]
 pub struct Diagnostics {
     pub php_version: String,
@@ -118,28 +80,28 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
-    /// PHP `extension_loaded($name)`. Only the extensions the worker probes can be asked about;
+    /// PHP `extension_loaded($name)`. Only the extensions the worker reports can be asked about;
     /// any other name is a bug in the caller, not a missing extension.
     pub fn extension_loaded(&self, name: &str) -> bool {
         *self.extensions.get(name).unwrap_or_else(|| {
-            panic!("PHP RPC: extension `{name}` is not probed by the diagnose payload")
+            panic!("PHP RPC: extension `{name}` is not reported by the diagnose payload")
         })
     }
 
-    /// PHP `function_exists($name)`. See [`Diagnostics::extension_loaded`] for the fixed probe set.
+    /// PHP `function_exists($name)`. See [`Diagnostics::extension_loaded`] for the fixed set of names.
     pub fn function_exists(&self, name: &str) -> bool {
         *self.functions.get(name).unwrap_or_else(|| {
-            panic!("PHP RPC: function `{name}` is not probed by the diagnose payload")
+            panic!("PHP RPC: function `{name}` is not reported by the diagnose payload")
         })
     }
 
     /// PHP `ini_get($option)`, with PHP's `false` (no such setting) mapped to `None`. See
-    /// [`Diagnostics::extension_loaded`] for the fixed probe set.
+    /// [`Diagnostics::extension_loaded`] for the fixed set of names.
     pub fn ini_get(&self, option: &str) -> Option<&str> {
         self.ini_settings
             .get(option)
             .unwrap_or_else(|| {
-                panic!("PHP RPC: ini setting `{option}` is not probed by the diagnose payload")
+                panic!("PHP RPC: ini setting `{option}` is not reported by the diagnose payload")
             })
             .as_deref()
     }
@@ -155,121 +117,414 @@ pub fn get_diagnostics() -> &'static Diagnostics {
         let payload = payload
             .as_array()
             .unwrap_or_else(|| panic!("PHP RPC: `diagnose` did not return an array: {payload:?}"));
+        let payload = &Payload {
+            what: "diagnose",
+            map: payload,
+        };
 
         Diagnostics {
-            php_version: string_field(payload, "php_version"),
-            php_version_id: int_field(payload, "php_version_id"),
-            php_binary: nullable_string_field(payload, "php_binary"),
-            openssl_version_text: nullable_string_field(payload, "openssl_version_text"),
-            openssl_version_number: int_field(payload, "openssl_version_number"),
-            has_hhvm_version: bool_field(payload, "has_hhvm_version"),
-            has_php_windows_version_build: bool_field(payload, "has_php_windows_version_build"),
-            xdebug_active: bool_field(payload, "xdebug_active"),
-            ioncube_loader_iversion: int_field(payload, "ioncube_loader_iversion"),
-            ioncube_loader_version: string_field(payload, "ioncube_loader_version"),
-            phpinfo_general: string_field(payload, "phpinfo_general"),
+            php_version: payload.string("php_version"),
+            php_version_id: payload.int("php_version_id"),
+            php_binary: payload.nullable_string("php_binary"),
+            openssl_version_text: payload.nullable_string("openssl_version_text"),
+            openssl_version_number: payload.int("openssl_version_number"),
+            has_hhvm_version: payload.bool("has_hhvm_version"),
+            has_php_windows_version_build: payload.bool("has_php_windows_version_build"),
+            xdebug_active: payload.bool("xdebug_active"),
+            ioncube_loader_iversion: payload.int("ioncube_loader_iversion"),
+            ioncube_loader_version: payload.string("ioncube_loader_version"),
+            phpinfo_general: payload.string("phpinfo_general"),
             curl: curl_field(payload, "curl"),
-            extensions: map_field(payload, "extensions")
-                .iter()
-                .map(|(name, value)| (name.clone(), as_bool(value, name)))
-                .collect(),
-            functions: map_field(payload, "functions")
-                .iter()
-                .map(|(name, value)| (name.clone(), as_bool(value, name)))
-                .collect(),
-            ini_settings: map_field(payload, "ini")
-                .iter()
-                .map(|(name, value)| (name.clone(), as_nullable_string(value, name)))
+            extensions: payload.bool_map("extensions"),
+            functions: payload.bool_map("functions"),
+            ini_settings: payload
+                .entries("ini")
+                .map(|(name, value)| (name.clone(), as_nullable_string(value, "ini", name)))
                 .collect(),
         }
     })
 }
 
-fn field<'a>(payload: &'a IndexMap<String, PhpMixed>, key: &str) -> &'a PhpMixed {
-    payload
-        .get(key)
-        .unwrap_or_else(|| panic!("PHP RPC: `diagnose` payload has no `{key}` entry"))
+/// The constants the `platform` payload carries, in the worker's order.
+const PLATFORM_CONSTANTS: &[&str] = &[
+    "PHP_VERSION",
+    "PHP_DEBUG",
+    "PHP_ZTS",
+    "PHP_INT_SIZE",
+    "AF_INET6",
+    "GD_VERSION",
+    "GMP_VERSION",
+    "ICONV_VERSION",
+    "INTL_ICU_VERSION",
+    "LIBXML_DOTTED_VERSION",
+    "MB_ONIGURUMA_VERSION",
+    "OPENSSL_VERSION_TEXT",
+    "PCRE_VERSION",
+    "PGSQL_LIBPQ_VERSION",
+    "RD_KAFKA_VERSION",
+    "SODIUM_LIBRARY_VERSION",
+    "LIBXSLT_DOTTED_VERSION",
+    "ZipArchive::LIBZIP_VERSION",
+    "ZLIB_VERSION",
+];
+
+/// The classes the `platform` payload carries the existence of.
+const PLATFORM_CLASSES: &[&str] = &["ResourceBundle", "IntlChar"];
+
+/// Everything `PlatformRepository` needs to know about the PHP runtime, fetched in a single round
+/// trip because it would otherwise query the same runtime once per extension and constant.
+///
+/// The fields standing in for PHP objects (`resource_bundle`, `imagick`) carry the entries the
+/// consumer reads off them rather than the object itself.
+#[derive(Debug, Clone)]
+pub struct PlatformInfo {
+    extensions: Vec<String>,
+    extension_versions: IndexMap<String, String>,
+    extension_info: IndexMap<String, String>,
+    /// Keyed as `ltrim($class.'::'.$constant, ':')`; `None` for a reported but undefined constant.
+    constants: IndexMap<String, Option<PhpMixed>>,
+    classes: IndexMap<String, bool>,
+    /// `curl_version()`, or null when the curl extension is not loaded.
+    pub curl_version: PhpMixed,
+    /// `@inet_pton('::')`.
+    pub inet_pton_ipv6: PhpMixed,
+    /// `['Version' => ResourceBundle::create('root', 'ICUDATA', false)->get('Version')]`, or null
+    /// when the class is absent or the bundle cannot be opened.
+    pub resource_bundle: PhpMixed,
+    /// `IntlChar::getUnicodeVersion()`, or null when the class is absent.
+    pub intl_char_unicode_version: PhpMixed,
+    /// `(new Imagick())->getVersion()`, or null when the extension is not loaded.
+    pub imagick: PhpMixed,
 }
 
-fn string_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> String {
-    match field(payload, key) {
-        PhpMixed::String(s) => s.clone(),
-        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not a string: {other:?}"),
+impl Default for PlatformInfo {
+    /// A runtime with no extensions loaded, no classes defined and every reported constant
+    /// undefined.
+    fn default() -> Self {
+        PlatformInfo {
+            extensions: Vec::new(),
+            extension_versions: IndexMap::new(),
+            extension_info: IndexMap::new(),
+            constants: PLATFORM_CONSTANTS
+                .iter()
+                .map(|name| ((*name).to_string(), None))
+                .collect(),
+            classes: PLATFORM_CLASSES
+                .iter()
+                .map(|name| ((*name).to_string(), false))
+                .collect(),
+            curl_version: PhpMixed::Null,
+            inet_pton_ipv6: PhpMixed::Null,
+            resource_bundle: PhpMixed::Null,
+            intl_char_unicode_version: PhpMixed::Null,
+            imagick: PhpMixed::Null,
+        }
     }
 }
 
-fn nullable_string_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> Option<String> {
-    as_nullable_string(field(payload, key), key)
-}
+impl PlatformInfo {
+    /// PHP `get_loaded_extensions()`.
+    pub fn get_extensions(&self) -> &[String] {
+        &self.extensions
+    }
 
-fn int_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> i64 {
-    match field(payload, key) {
-        PhpMixed::Int(n) => *n,
-        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not an int: {other:?}"),
+    /// PHP `phpversion($extension)`, with PHP's `false` mapped to `'0'`.
+    pub fn get_extension_version(&self, extension: &str) -> &str {
+        self.extension_versions
+            .get(extension)
+            .unwrap_or_else(|| {
+                panic!("PHP RPC: extension `{extension}` is not loaded in the platform payload")
+            })
+            .as_str()
+    }
+
+    /// PHP `(new \ReflectionExtension($extension))->info()` output. Only the extensions the worker
+    /// reports can be asked about; any other name is a bug in the caller.
+    pub fn get_extension_info(&self, extension: &str) -> &str {
+        self.extension_info
+            .get(extension)
+            .unwrap_or_else(|| {
+                panic!("PHP RPC: extension `{extension}` info is not in the platform payload")
+            })
+            .as_str()
+    }
+
+    /// PHP `defined(ltrim($class.'::'.$constant, ':'))`. Only the constants the worker reports can
+    /// be asked about; any other name is a bug in the caller, not an undefined constant.
+    pub fn has_constant(&self, constant_name: &str, class: Option<&str>) -> bool {
+        self.constant(constant_name, class).is_some()
+    }
+
+    /// PHP `constant(ltrim($class.'::'.$constant, ':'))`, answering null for an undefined
+    /// constant. See [`PlatformInfo::has_constant`] for the fixed set of names.
+    pub fn get_constant(&self, constant_name: &str, class: Option<&str>) -> PhpMixed {
+        self.constant(constant_name, class)
+            .cloned()
+            .unwrap_or(PhpMixed::Null)
+    }
+
+    /// PHP `class_exists($class, false)`. See [`PlatformInfo::has_constant`] for the fixed set of
+    /// names.
+    pub fn has_class(&self, class: &str) -> bool {
+        *self.classes.get(class).unwrap_or_else(|| {
+            panic!("PHP RPC: class `{class}` is not reported by the platform payload")
+        })
+    }
+
+    /// For testing only: reports `extensions` as loaded, each at `version`.
+    pub fn __set_extensions(&mut self, extensions: Vec<String>, version: &str) {
+        self.extension_versions = extensions
+            .iter()
+            .map(|name| (name.clone(), version.to_string()))
+            .collect();
+        self.extensions = extensions;
+    }
+
+    /// For testing only: reports `info` as the `ReflectionExtension::info()` output of `extension`.
+    pub fn __set_extension_info(&mut self, extension: &str, info: &str) {
+        self.extension_info
+            .insert(extension.to_string(), info.to_string());
+    }
+
+    /// For testing only: reports the constant as defined with `value`. Panics on a constant the
+    /// worker does not report, so a test cannot describe a runtime the worker cannot report.
+    pub fn __set_constant(&mut self, constant_name: &str, class: Option<&str>, value: PhpMixed) {
+        let key = Self::constant_key(constant_name, class);
+        let entry = self.constants.get_mut(&key).unwrap_or_else(|| {
+            panic!("PHP RPC: constant `{key}` is not reported by the platform payload")
+        });
+        *entry = Some(value);
+    }
+
+    /// For testing only: reports the class as defined. See [`PlatformInfo::__set_constant`].
+    pub fn __set_class(&mut self, class: &str) {
+        let entry = self.classes.get_mut(class).unwrap_or_else(|| {
+            panic!("PHP RPC: class `{class}` is not reported by the platform payload")
+        });
+        *entry = true;
+    }
+
+    fn constant(&self, constant_name: &str, class: Option<&str>) -> Option<&PhpMixed> {
+        let key = Self::constant_key(constant_name, class);
+        self.constants
+            .get(&key)
+            .unwrap_or_else(|| {
+                panic!("PHP RPC: constant `{key}` is not reported by the platform payload")
+            })
+            .as_ref()
+    }
+
+    fn constant_key(constant_name: &str, class: Option<&str>) -> String {
+        match class {
+            Some(class) => format!("{class}::{constant_name}"),
+            None => constant_name.to_string(),
+        }
     }
 }
 
-fn bool_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> bool {
-    as_bool(field(payload, key), key)
+static PLATFORM_INFO: OnceLock<PlatformInfo> = OnceLock::new();
+
+/// PHP runtime information for `PlatformRepository`. The worker is queried once per process;
+/// subsequent calls reuse the cached payload.
+pub fn get_platform_info() -> &'static PlatformInfo {
+    PLATFORM_INFO.get_or_init(|| {
+        let payload = call("platform", "");
+        let payload = payload
+            .as_array()
+            .unwrap_or_else(|| panic!("PHP RPC: `platform` did not return an array: {payload:?}"));
+        let payload = &Payload {
+            what: "platform",
+            map: payload,
+        };
+
+        let constant_names = payload.string_list("constant_names");
+        assert_eq!(
+            constant_names
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            PLATFORM_CONSTANTS,
+            "PHP RPC: the worker reports different constants than the platform payload declares"
+        );
+        let constants = payload.map("constants");
+        let classes = payload.bool_map("classes");
+        assert_eq!(
+            classes.keys().map(String::as_str).collect::<Vec<_>>(),
+            PLATFORM_CLASSES,
+            "PHP RPC: the worker reports different classes than the platform payload declares"
+        );
+
+        PlatformInfo {
+            extensions: payload.string_list("extensions"),
+            extension_versions: payload.string_map("extension_versions"),
+            extension_info: payload.string_map("extension_info"),
+            constants: constant_names
+                .into_iter()
+                .map(|name| {
+                    let value = constants.and_then(|map| map.get(&name)).cloned();
+                    (name, value)
+                })
+                .collect(),
+            classes,
+            curl_version: payload.mixed("curl_version"),
+            inet_pton_ipv6: payload.mixed("inet_pton_ipv6"),
+            resource_bundle: payload.mixed("resource_bundle"),
+            intl_char_unicode_version: payload.mixed("intl_char_unicode_version"),
+            imagick: payload.mixed("imagick"),
+        }
+    })
 }
 
-fn map_field<'a>(
-    payload: &'a IndexMap<String, PhpMixed>,
-    key: &str,
-) -> &'a IndexMap<String, PhpMixed> {
-    match field(payload, key) {
-        PhpMixed::Array(map) => map,
-        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not an array: {other:?}"),
+/// One worker answer, named after the dispatch entry that produced it so a decoding failure says
+/// which payload was malformed.
+struct Payload<'a> {
+    what: &'static str,
+    map: &'a IndexMap<String, PhpMixed>,
+}
+
+impl Payload<'_> {
+    fn field(&self, key: &str) -> &PhpMixed {
+        self.map
+            .get(key)
+            .unwrap_or_else(|| panic!("PHP RPC: `{}` payload has no `{key}` entry", self.what))
+    }
+
+    fn mixed(&self, key: &str) -> PhpMixed {
+        self.field(key).clone()
+    }
+
+    fn string(&self, key: &str) -> String {
+        match self.field(key) {
+            PhpMixed::String(s) => s.clone(),
+            other => panic!(
+                "PHP RPC: `{}` payload entry `{key}` is not a string: {other:?}",
+                self.what
+            ),
+        }
+    }
+
+    fn nullable_string(&self, key: &str) -> Option<String> {
+        as_nullable_string(self.field(key), self.what, key)
+    }
+
+    fn int(&self, key: &str) -> i64 {
+        match self.field(key) {
+            PhpMixed::Int(n) => *n,
+            other => panic!(
+                "PHP RPC: `{}` payload entry `{key}` is not an int: {other:?}",
+                self.what
+            ),
+        }
+    }
+
+    fn bool(&self, key: &str) -> bool {
+        as_bool(self.field(key), self.what, key)
+    }
+
+    /// `None` for PHP's empty array, which carries no key type and so decodes as an empty list.
+    fn map(&self, key: &str) -> Option<&IndexMap<String, PhpMixed>> {
+        match self.field(key) {
+            PhpMixed::Array(map) => Some(map),
+            PhpMixed::List(items) if items.is_empty() => None,
+            other => panic!(
+                "PHP RPC: `{}` payload entry `{key}` is not an array: {other:?}",
+                self.what
+            ),
+        }
+    }
+
+    fn entries(&self, key: &str) -> impl Iterator<Item = (&String, &PhpMixed)> {
+        self.map(key).into_iter().flatten()
+    }
+
+    fn bool_map(&self, key: &str) -> IndexMap<String, bool> {
+        self.entries(key)
+            .map(|(name, value)| (name.clone(), as_bool(value, self.what, name)))
+            .collect()
+    }
+
+    fn string_map(&self, key: &str) -> IndexMap<String, String> {
+        self.entries(key)
+            .map(|(name, value)| match value {
+                PhpMixed::String(s) => (name.clone(), s.clone()),
+                other => panic!(
+                    "PHP RPC: `{}` payload entry `{key}[{name}]` is not a string: {other:?}",
+                    self.what
+                ),
+            })
+            .collect()
+    }
+
+    fn string_list(&self, key: &str) -> Vec<String> {
+        match self.field(key) {
+            PhpMixed::List(items) => items
+                .iter()
+                .map(|item| match item {
+                    PhpMixed::String(s) => s.clone(),
+                    other => panic!(
+                        "PHP RPC: `{}` payload entry `{key}` has a non-string element: {other:?}",
+                        self.what
+                    ),
+                })
+                .collect(),
+            other => panic!(
+                "PHP RPC: `{}` payload entry `{key}` is not a list: {other:?}",
+                self.what
+            ),
+        }
     }
 }
 
-fn as_bool(value: &PhpMixed, key: &str) -> bool {
+fn as_bool(value: &PhpMixed, what: &str, key: &str) -> bool {
     match value {
         PhpMixed::Bool(b) => *b,
-        other => panic!("PHP RPC: `diagnose` payload entry `{key}` is not a bool: {other:?}"),
+        other => panic!("PHP RPC: `{what}` payload entry `{key}` is not a bool: {other:?}"),
     }
 }
 
-fn nullable_int_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> Option<i64> {
-    match field(payload, key) {
-        PhpMixed::Int(n) => Some(*n),
-        PhpMixed::Null => None,
-        other => {
-            panic!("PHP RPC: `diagnose` payload entry `{key}` is not an int or null: {other:?}")
-        }
-    }
-}
-
-fn curl_field(payload: &IndexMap<String, PhpMixed>, key: &str) -> Option<Curl> {
-    let curl = match field(payload, key) {
-        PhpMixed::Null => return None,
-        PhpMixed::Array(map) => map,
-        other => {
-            panic!("PHP RPC: `diagnose` payload entry `{key}` is not an array or null: {other:?}")
-        }
-    };
-
-    Some(Curl {
-        version: string_field(curl, "version"),
-        libz_version: nullable_string_field(curl, "libz_version"),
-        brotli_version: nullable_string_field(curl, "brotli_version"),
-        ssl_version: nullable_string_field(curl, "ssl_version"),
-        features: nullable_int_field(curl, "features"),
-        version_zstd: nullable_int_field(curl, "version_zstd"),
-        version_http2: nullable_int_field(curl, "version_http2"),
-        has_http_version_2_0: bool_field(curl, "has_http_version_2_0"),
-        version_http3: nullable_int_field(curl, "version_http3"),
-    })
-}
-
-fn as_nullable_string(value: &PhpMixed, key: &str) -> Option<String> {
+fn as_nullable_string(value: &PhpMixed, what: &str, key: &str) -> Option<String> {
     match value {
         PhpMixed::String(s) => Some(s.clone()),
         PhpMixed::Null => None,
         other => {
-            panic!("PHP RPC: `diagnose` payload entry `{key}` is not a string or null: {other:?}")
+            panic!("PHP RPC: `{what}` payload entry `{key}` is not a string or null: {other:?}")
         }
     }
+}
+
+fn nullable_int_field(payload: &Payload, key: &str) -> Option<i64> {
+    let what = payload.what;
+    match payload.field(key) {
+        PhpMixed::Int(n) => Some(*n),
+        PhpMixed::Null => None,
+        other => {
+            panic!("PHP RPC: `{what}` payload entry `{key}` is not an int or null: {other:?}")
+        }
+    }
+}
+
+fn curl_field(payload: &Payload, key: &str) -> Option<Curl> {
+    let what = payload.what;
+    let curl = match payload.field(key) {
+        PhpMixed::Null => return None,
+        PhpMixed::Array(map) => map,
+        other => {
+            panic!("PHP RPC: `{what}` payload entry `{key}` is not an array or null: {other:?}")
+        }
+    };
+    let curl = &Payload { what, map: curl };
+
+    Some(Curl {
+        version: curl.string("version"),
+        libz_version: curl.nullable_string("libz_version"),
+        brotli_version: curl.nullable_string("brotli_version"),
+        ssl_version: curl.nullable_string("ssl_version"),
+        features: nullable_int_field(curl, "features"),
+        version_zstd: nullable_int_field(curl, "version_zstd"),
+        version_http2: nullable_int_field(curl, "version_http2"),
+        has_http_version_2_0: curl.bool("has_http_version_2_0"),
+        version_http3: nullable_int_field(curl, "version_http3"),
+    })
 }
 
 /// PHP `phpversion($extension)`.
@@ -279,11 +534,6 @@ pub fn phpversion(extension: &str) -> Option<String> {
         PhpMixed::Bool(false) => None,
         other => panic!("PHP RPC: `phpversion` returned an unexpected value: {other:?}"),
     }
-}
-
-/// PHP `get_loaded_extensions()`.
-pub fn get_loaded_extensions() -> Vec<String> {
-    string_list(call("get_loaded_extensions", ""), "get_loaded_extensions")
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` (minus the `self::$name` branch,
@@ -851,12 +1101,6 @@ mod tests {
             return;
         }
 
-        let extensions = get_loaded_extensions();
-        assert!(
-            extensions.iter().any(|extension| extension == "Core"),
-            "expected the Core extension among {extensions:?}",
-        );
-
         // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
         // string when no php.ini is loaded.
         assert!(!get_all_ini_files().is_empty());
@@ -910,20 +1154,38 @@ mod tests {
     }
 
     #[test]
-    fn queries_constants_when_php_available() {
+    fn queries_platform_info_when_php_available() {
         if PhpExecutableFinder::new().find(false).is_none() {
             // No PHP in this environment; the worker cannot start.
             return;
         }
 
-        assert!(has_constant("PHP_VERSION"));
-        assert!(!has_constant("SHIRABE_DOES_NOT_EXIST_XYZ"));
+        let platform_info = get_platform_info();
 
-        assert_eq!(get_constant("PHP_INT_SIZE"), PhpMixed::Int(8));
-        assert_eq!(get_constant("SHIRABE_DOES_NOT_EXIST_XYZ"), PhpMixed::Null);
-        match get_constant("PHP_VERSION") {
+        let extensions = platform_info.get_extensions();
+        assert!(
+            extensions.iter().any(|extension| extension == "Core"),
+            "expected the Core extension among {extensions:?}",
+        );
+        assert_eq!(
+            platform_info.get_extension_version("Core"),
+            get_php_version()
+        );
+
+        assert!(platform_info.has_constant("PHP_VERSION", None));
+        assert_eq!(
+            platform_info.get_constant("PHP_INT_SIZE", None),
+            PhpMixed::Int(8)
+        );
+        match platform_info.get_constant("PHP_VERSION", None) {
             PhpMixed::String(s) => assert!(!s.is_empty(), "expected a non-empty PHP_VERSION"),
             other => panic!("expected a string, got {other:?}"),
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "is not reported by the platform payload")]
+    fn platform_info_rejects_an_unreported_constant() {
+        PlatformInfo::default().has_constant("SHIRABE_DOES_NOT_EXIST_XYZ", None);
     }
 }

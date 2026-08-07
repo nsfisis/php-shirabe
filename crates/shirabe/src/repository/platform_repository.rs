@@ -11,16 +11,14 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::platform::HhvmDetector;
 use crate::platform::HhvmDetectorInterface;
-use crate::platform::Runtime;
-use crate::platform::RuntimeInterface;
 use crate::platform::Version;
 use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
     array_slice_strs, explode, get_class, implode, in_array_strict, is_string, php_regex,
@@ -47,27 +45,21 @@ pub struct PlatformRepository {
     pub(crate) version_parser: Option<VersionParser>,
     pub(crate) overrides: IndexMap<String, PlatformOverride>,
     pub(crate) disabled_packages: IndexMap<String, CompletePackageInterfaceHandle>,
-    pub(crate) runtime: Box<dyn RuntimeInterface>,
+    pub(crate) platform_info: Option<PlatformInfo>,
     pub(crate) hhvm_detector: Box<dyn HhvmDetectorInterface>,
 }
 
 impl PlatformRepository {
     const PLATFORM_PACKAGE_REGEX: &'static str = "{^(?:php(?:-64bit|-ipv6|-zts|-debug)?|hhvm|(?:ext|lib)-[a-z0-9](?:[_.-]?[a-z0-9]+)*|composer(?:-(?:plugin|runtime)-api)?)$}iD";
 
+    /// A `None` `platform_info` is resolved from the PHP worker on the first `initialize()`, so
+    /// constructing the repository on its own never starts the worker.
     pub fn new(
         packages: Vec<PackageInterfaceHandle>,
         overrides: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<Self> {
-        Self::new4(packages, overrides, None, None)
-    }
-
-    pub fn new4(
-        packages: Vec<PackageInterfaceHandle>,
-        overrides: IndexMap<String, PhpMixed>,
-        runtime: Option<Box<dyn RuntimeInterface>>,
+        platform_info: Option<PlatformInfo>,
         hhvm_detector: Option<Box<dyn HhvmDetectorInterface>>,
     ) -> anyhow::Result<Self> {
-        let runtime: Box<dyn RuntimeInterface> = runtime.unwrap_or_else(|| Box::new(Runtime));
         let hhvm_detector: Box<dyn HhvmDetectorInterface> =
             hhvm_detector.unwrap_or_else(|| Box::new(HhvmDetector::new(None, None)));
         let mut overrides_map: IndexMap<String, PlatformOverride> = IndexMap::new();
@@ -107,7 +99,7 @@ impl PlatformRepository {
             version_parser: None,
             overrides: overrides_map,
             disabled_packages: IndexMap::new(),
-            runtime,
+            platform_info,
             hhvm_detector,
         };
         for package in packages {
@@ -138,6 +130,11 @@ impl PlatformRepository {
     #[tracing::instrument(skip_all)]
     pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
+
+        let platform_info = self
+            .platform_info
+            .get_or_insert_with(|| shirabe_php_rpc::get_platform_info().clone())
+            .clone();
 
         let mut libraries: IndexMap<String, bool> = IndexMap::new();
 
@@ -214,7 +211,7 @@ impl PlatformRepository {
             CompletePackageHandle::from_complete_package(composer_runtime_api).into(),
         )?;
 
-        let php_version_const = self.runtime.get_constant("PHP_VERSION", None);
+        let php_version_const = platform_info.get_constant("PHP_VERSION", None);
         let php_version_str = match &php_version_const {
             PhpMixed::String(s) => s.clone(),
             _ => "".to_string(),
@@ -245,8 +242,7 @@ impl PlatformRepository {
         php.set_description("The PHP interpreter".to_string());
         self.add_package(CompletePackageHandle::from_complete_package(php).into())?;
 
-        if self
-            .runtime
+        if platform_info
             .get_constant("PHP_DEBUG", None)
             .as_bool()
             .unwrap_or(false)
@@ -260,9 +256,8 @@ impl PlatformRepository {
             self.add_package(CompletePackageHandle::from_complete_package(phpdebug).into())?;
         }
 
-        if self.runtime.has_constant("PHP_ZTS", None)
-            && self
-                .runtime
+        if platform_info.has_constant("PHP_ZTS", None)
+            && platform_info
                 .get_constant("PHP_ZTS", None)
                 .as_bool()
                 .unwrap_or(false)
@@ -276,8 +271,7 @@ impl PlatformRepository {
             self.add_package(CompletePackageHandle::from_complete_package(phpzts).into())?;
         }
 
-        if self
-            .runtime
+        if platform_info
             .get_constant("PHP_INT_SIZE", None)
             .as_int()
             .map(|v| v == 8)
@@ -294,15 +288,8 @@ impl PlatformRepository {
 
         // The AF_INET6 constant is only defined if ext-sockets is available but
         // IPv6 support might still be available.
-        let has_inet6 = self.runtime.has_constant("AF_INET6", None);
-        // PHP: Silencer::call([$this->runtime, 'invoke'], 'inet_pton', ['::'])
-        let inet_pton_check = Silencer::call(|| {
-            Ok::<PhpMixed, anyhow::Error>(self.runtime.invoke(
-                PhpMixed::String("inet_pton".to_string()),
-                vec![PhpMixed::String("::".to_string())],
-            ))
-        })
-        .unwrap_or(PhpMixed::Bool(false));
+        let has_inet6 = platform_info.has_constant("AF_INET6", None);
+        let inet_pton_check = &platform_info.inet_pton_ipv6;
         if has_inet6 || !matches!(inet_pton_check, PhpMixed::Bool(false)) {
             let mut php_ipv6 =
                 CompletePackage::new("php-ipv6".to_string(), version, pretty_version);
@@ -310,7 +297,7 @@ impl PlatformRepository {
             self.add_package(CompletePackageHandle::from_complete_package(php_ipv6).into())?;
         }
 
-        let loaded_extensions = self.runtime.get_extensions();
+        let loaded_extensions = platform_info.get_extensions().to_vec();
 
         // Extensions scanning
         for name in &loaded_extensions {
@@ -318,7 +305,7 @@ impl PlatformRepository {
                 continue;
             }
 
-            self.add_extension(name, &self.runtime.get_extension_version(name))?;
+            self.add_extension(name, platform_info.get_extension_version(name))?;
         }
 
         // Check for Xdebug in a restarted process
@@ -340,13 +327,13 @@ impl PlatformRepository {
         for name in &loaded_extensions {
             match name.as_str() {
                 "amqp" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // librabbitmq version => 0.9.0
                     let mut librabbitmq_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^librabbitmq version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut librabbitmq_matches),
                     ) {
                         self.add_library(
@@ -365,7 +352,7 @@ impl PlatformRepository {
                     let mut protocol_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^AMQP protocol version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut protocol_matches),
                     ) {
                         let version_str = protocol_matches
@@ -384,13 +371,13 @@ impl PlatformRepository {
                 }
 
                 "bz2" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // BZip2 Version => 1.0.6, 6-Sept-2010
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^BZip2 Version => (?<version>.*),/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -407,9 +394,7 @@ impl PlatformRepository {
                 }
 
                 "curl" => {
-                    let curl_version = self
-                        .runtime
-                        .invoke(PhpMixed::String("curl_version".to_string()), vec![]);
+                    let curl_version = &platform_info.curl_version;
                     let curl_version_str = curl_version
                         .as_array()
                         .and_then(|m| m.get("version"))
@@ -419,13 +404,13 @@ impl PlatformRepository {
                         self.add_library(&mut libraries, name, Some(cv), None, &[], &[])?;
                     }
 
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // SSL Version => OpenSSL/1.0.1t
                     let mut ssl_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("{^SSL Version => (?<library>[^/]+)/(?<version>.+)$}im"),
-                        &info,
+                        info,
                         Some(&mut ssl_matches),
                     ) {
                         let ssl_library_raw = ssl_matches
@@ -495,7 +480,7 @@ impl PlatformRepository {
                         php_regex!(
                             "{^libSSH Version => (?<library>[^/]+)/(?<version>.+?)(?:/.*)?$}im"
                         ),
-                        &info,
+                        info,
                         Some(&mut ssh_matches),
                     ) {
                         let ssh_library = ssh_matches
@@ -520,7 +505,7 @@ impl PlatformRepository {
                     let mut zlib_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("{^ZLib Version => (?<version>.+)$}im"),
-                        &info,
+                        info,
                         Some(&mut zlib_matches),
                     ) {
                         self.add_library(
@@ -537,13 +522,13 @@ impl PlatformRepository {
                 }
 
                 "date" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // timelib version => 2018.03
                     let mut timelib_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^timelib version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut timelib_matches),
                     ) {
                         self.add_library(
@@ -562,7 +547,7 @@ impl PlatformRepository {
                     let mut zoneinfo_source_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^Timezone Database => (?<source>internal|external)$/im"),
-                        &info,
+                        info,
                         Some(&mut zoneinfo_source_matches),
                     ) {
                         let external = zoneinfo_source_matches
@@ -574,7 +559,7 @@ impl PlatformRepository {
                             php_regex!(
                                 "/^\"Olson\" Timezone Database Version => (?<version>.+?)(?:\\.system)?$/im"
                             ),
-                            &info,
+                            info,
                             Some(&mut zoneinfo_matches),
                         ) {
                             let zoneinfo_version = zoneinfo_matches
@@ -608,13 +593,13 @@ impl PlatformRepository {
                 }
 
                 "fileinfo" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // libmagic => 537
                     let mut magic_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libmagic => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut magic_matches),
                     ) {
                         self.add_library(
@@ -631,7 +616,7 @@ impl PlatformRepository {
                 }
 
                 "gd" => {
-                    let gd_version = self.runtime.get_constant("GD_VERSION", None);
+                    let gd_version = platform_info.get_constant("GD_VERSION", None);
                     let gd_version_str = match &gd_version {
                         PhpMixed::String(s) => Some(s.clone()),
                         _ => None,
@@ -645,12 +630,12 @@ impl PlatformRepository {
                         &[],
                     )?;
 
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let mut libjpeg_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im"),
-                        &info,
+                        info,
                         Some(&mut libjpeg_matches),
                     ) {
                         let libjpeg_version = libjpeg_matches
@@ -671,7 +656,7 @@ impl PlatformRepository {
                     let mut libpng_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libPNG Version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut libpng_matches),
                     ) {
                         self.add_library(
@@ -689,7 +674,7 @@ impl PlatformRepository {
                     let mut freetype_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^FreeType Version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut freetype_matches),
                     ) {
                         self.add_library(
@@ -707,7 +692,7 @@ impl PlatformRepository {
                     let mut libxpm_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libXpm Version => (?<versionId>\\d+)$/im"),
-                        &info,
+                        info,
                         Some(&mut libxpm_matches),
                     ) {
                         let version_id: i64 = libxpm_matches
@@ -727,7 +712,7 @@ impl PlatformRepository {
                 }
 
                 "gmp" => {
-                    let gmp_version = self.runtime.get_constant("GMP_VERSION", None);
+                    let gmp_version = platform_info.get_constant("GMP_VERSION", None);
                     let gmp_version_str = match &gmp_version {
                         PhpMixed::String(s) => Some(s.clone()),
                         _ => None,
@@ -743,7 +728,7 @@ impl PlatformRepository {
                 }
 
                 "iconv" => {
-                    let iconv_version = self.runtime.get_constant("ICONV_VERSION", None);
+                    let iconv_version = platform_info.get_constant("ICONV_VERSION", None);
                     let iconv_version_str = match &iconv_version {
                         PhpMixed::String(s) => Some(s.clone()),
                         _ => None,
@@ -759,12 +744,12 @@ impl PlatformRepository {
                 }
 
                 "intl" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let description = "The ICU unicode and globalization support library";
                     // Truthy check is for testing only so we can make the condition fail
-                    if self.runtime.has_constant("INTL_ICU_VERSION", None) {
-                        let intl_icu_version = self.runtime.get_constant("INTL_ICU_VERSION", None);
+                    if platform_info.has_constant("INTL_ICU_VERSION", None) {
+                        let intl_icu_version = platform_info.get_constant("INTL_ICU_VERSION", None);
                         let intl_icu_str = match &intl_icu_version {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
@@ -781,7 +766,7 @@ impl PlatformRepository {
                         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
                             php_regex!("/^ICU version => (?<version>.+)$/im"),
-                            &info,
+                            info,
                             Some(&mut matches),
                         ) {
                             self.add_library(
@@ -801,7 +786,7 @@ impl PlatformRepository {
                     let mut zoneinfo_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^ICU TZData version => (?<version>.*)$/im"),
-                        &info,
+                        info,
                         Some(&mut zoneinfo_matches),
                     ) {
                         let zi_version = zoneinfo_matches
@@ -821,22 +806,11 @@ impl PlatformRepository {
                     }
 
                     // Add a separate version for the CLDR library version
-                    if self.runtime.has_class("ResourceBundle") {
-                        let resource_bundle = self.runtime.invoke(
-                            PhpMixed::List(vec![
-                                PhpMixed::String("ResourceBundle".to_string()),
-                                PhpMixed::String("create".to_string()),
-                            ]),
-                            vec![
-                                PhpMixed::String("root".to_string()),
-                                PhpMixed::String("ICUDATA".to_string()),
-                                PhpMixed::Bool(false),
-                            ],
-                        );
+                    if platform_info.has_class("ResourceBundle") {
+                        let resource_bundle = &platform_info.resource_bundle;
                         if !matches!(resource_bundle, PhpMixed::Null) {
-                            // TODO(plugin): `$resourceBundle->get('Version')` dynamic method call
                             let version_value =
-                                Self::resource_bundle_get(&resource_bundle, "Version");
+                                Self::resource_bundle_get(resource_bundle, "Version");
                             let version_str = match version_value {
                                 PhpMixed::String(s) => Some(s),
                                 _ => None,
@@ -852,16 +826,10 @@ impl PlatformRepository {
                         }
                     }
 
-                    if self.runtime.has_class("IntlChar") {
-                        let intl_char_versions = self.runtime.invoke(
-                            PhpMixed::List(vec![
-                                PhpMixed::String("IntlChar".to_string()),
-                                PhpMixed::String("getUnicodeVersion".to_string()),
-                            ]),
-                            vec![],
-                        );
+                    if platform_info.has_class("IntlChar") {
+                        let intl_char_versions = &platform_info.intl_char_unicode_version;
                         let sliced =
-                            shirabe_php_shim::array_slice_mixed(&intl_char_versions, 0, Some(3));
+                            shirabe_php_shim::array_slice_mixed(intl_char_versions, 0, Some(3));
                         let joined = implode(".", &Self::php_array_to_string_vec(&sliced));
                         self.add_library(
                             &mut libraries,
@@ -875,10 +843,9 @@ impl PlatformRepository {
                 }
 
                 "imagick" => {
-                    let image_magick_version = self.runtime.construct("Imagick", Vec::new())?;
-                    // TODO(plugin): `->getVersion()` is a dynamic method call on Imagick
+                    let image_magick_version = &platform_info.imagick;
                     let image_magick_version_str =
-                        Self::imagick_get_version_string(&image_magick_version);
+                        Self::imagick_get_version_string(image_magick_version);
                     // 6.x: ImageMagick 6.2.9 08/24/06 Q16 http://www.imagemagick.org
                     // 7.x: ImageMagick 7.0.8-34 Q16 x86_64 2019-03-23 https://imagemagick.org
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
@@ -907,17 +874,17 @@ impl PlatformRepository {
                 }
 
                 "ldap" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     let mut vendor_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^Vendor Version => (?<versionId>\\d+)$/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) && Preg::is_match3(
                         php_regex!("/^Vendor Name => (?<vendor>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut vendor_matches),
                     ) {
                         let version_id: i64 = matches
@@ -950,7 +917,7 @@ impl PlatformRepository {
                         .collect();
                     let libxml_provides: Vec<String> =
                         array_map_str_fn(|extension| format!("{}-libxml", extension), &intersected);
-                    let libxml_dotted = self.runtime.get_constant("LIBXML_DOTTED_VERSION", None);
+                    let libxml_dotted = platform_info.get_constant("LIBXML_DOTTED_VERSION", None);
                     let libxml_dotted_str = match &libxml_dotted {
                         PhpMixed::String(s) => Some(s.clone()),
                         _ => None,
@@ -966,13 +933,13 @@ impl PlatformRepository {
                 }
 
                 "mbstring" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // libmbfl version => 1.3.2
                     let mut libmbfl_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libmbfl version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut libmbfl_matches),
                     ) {
                         self.add_library(
@@ -987,8 +954,8 @@ impl PlatformRepository {
                         )?;
                     }
 
-                    if self.runtime.has_constant("MB_ONIGURUMA_VERSION", None) {
-                        let oniguruma = self.runtime.get_constant("MB_ONIGURUMA_VERSION", None);
+                    if platform_info.has_constant("MB_ONIGURUMA_VERSION", None) {
+                        let oniguruma = platform_info.get_constant("MB_ONIGURUMA_VERSION", None);
                         let oniguruma_str = match &oniguruma {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
@@ -1010,7 +977,7 @@ impl PlatformRepository {
                             php_regex!(
                                 "/^(?:oniguruma|Multibyte regex \\(oniguruma\\)) version => (?<version>.+)$/im"
                             ),
-                            &info,
+                            info,
                             Some(&mut oniguruma_matches),
                         ) {
                             self.add_library(
@@ -1028,13 +995,13 @@ impl PlatformRepository {
                 }
 
                 "memcached" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // libmemcached version => 1.0.18
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libmemcached version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1051,7 +1018,7 @@ impl PlatformRepository {
                 }
 
                 "openssl" => {
-                    let openssl_text = self.runtime.get_constant("OPENSSL_VERSION_TEXT", None);
+                    let openssl_text = platform_info.get_constant("OPENSSL_VERSION_TEXT", None);
                     let openssl_text_str = match &openssl_text {
                         PhpMixed::String(s) => s.clone(),
                         _ => "".to_string(),
@@ -1086,7 +1053,7 @@ impl PlatformRepository {
                 }
 
                 "pcre" => {
-                    let pcre_version = self.runtime.get_constant("PCRE_VERSION", None);
+                    let pcre_version = platform_info.get_constant("PCRE_VERSION", None);
                     let pcre_version_str = match &pcre_version {
                         PhpMixed::String(s) => s.clone(),
                         _ => "".to_string(),
@@ -1095,13 +1062,13 @@ impl PlatformRepository {
                         Preg::replace(php_regex!("{^(\\S+).*}"), "$1", &pcre_version_str);
                     self.add_library(&mut libraries, name, Some(&stripped), None, &[], &[])?;
 
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // PCRE Unicode Version => 12.1.0
                     let mut pcre_unicode_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^PCRE Unicode Version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut pcre_unicode_matches),
                     ) {
                         self.add_library(
@@ -1118,14 +1085,14 @@ impl PlatformRepository {
                 }
 
                 "mysqlnd" | "pdo_mysql" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!(
                             "/^(?:Client API version|Version) => mysqlnd (?<version>.+?) /mi"
                         ),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1142,12 +1109,12 @@ impl PlatformRepository {
                 }
 
                 "mongodb" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let mut libmongoc_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libmongoc bundled version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut libmongoc_matches),
                     ) {
                         self.add_library(
@@ -1165,7 +1132,7 @@ impl PlatformRepository {
                     let mut libbson_matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libbson bundled version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut libbson_matches),
                     ) {
                         self.add_library(
@@ -1182,8 +1149,8 @@ impl PlatformRepository {
                 }
 
                 "pgsql" => {
-                    if self.runtime.has_constant("PGSQL_LIBPQ_VERSION", None) {
-                        let pq_version = self.runtime.get_constant("PGSQL_LIBPQ_VERSION", None);
+                    if platform_info.has_constant("PGSQL_LIBPQ_VERSION", None) {
+                        let pq_version = platform_info.get_constant("PGSQL_LIBPQ_VERSION", None);
                         let pq_version_str = match &pq_version {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
@@ -1198,12 +1165,12 @@ impl PlatformRepository {
                         )?;
                     } else {
                         // intentional fall-through to next case...
-                        let info = self.runtime.get_extension_info(name)?;
+                        let info = platform_info.get_extension_info(name);
 
                         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
                             php_regex!("/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im"),
-                            &info,
+                            info,
                             Some(&mut matches),
                         ) {
                             self.add_library(
@@ -1221,12 +1188,12 @@ impl PlatformRepository {
                 }
 
                 "pdo_pgsql" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1243,14 +1210,14 @@ impl PlatformRepository {
                 }
 
                 "pq" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     // Used Library => Compiled => Linked
                     // libpq => 14.3 (Ubuntu 14.3-1.pgdg22.04+1) => 15.0.2
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libpq => (?<compiled>.+) => (?<linked>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1267,7 +1234,7 @@ impl PlatformRepository {
                 }
 
                 "rdkafka" => {
-                    if self.runtime.has_constant("RD_KAFKA_VERSION", None) {
+                    if platform_info.has_constant("RD_KAFKA_VERSION", None) {
                         // Interpreted as hex MM.mm.rr.xx:
                         //  - MM = Major
                         //  - mm = minor
@@ -1275,8 +1242,7 @@ impl PlatformRepository {
                         //  - xx = pre-release id (0xff is the final release)
                         //
                         // pre-release ID in practice is always 0xff even for RCs etc, so we ignore it
-                        let lib_rd_kafka_version_int = self
-                            .runtime
+                        let lib_rd_kafka_version_int = platform_info
                             .get_constant("RD_KAFKA_VERSION", None)
                             .as_int()
                             .unwrap_or(0);
@@ -1298,8 +1264,8 @@ impl PlatformRepository {
                 }
 
                 "libsodium" | "sodium" => {
-                    if self.runtime.has_constant("SODIUM_LIBRARY_VERSION", None) {
-                        let sodium = self.runtime.get_constant("SODIUM_LIBRARY_VERSION", None);
+                    if platform_info.has_constant("SODIUM_LIBRARY_VERSION", None) {
+                        let sodium = platform_info.get_constant("SODIUM_LIBRARY_VERSION", None);
                         let sodium_str = match &sodium {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
@@ -1324,12 +1290,12 @@ impl PlatformRepository {
                 }
 
                 "sqlite3" | "pdo_sqlite" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^SQLite Library => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1346,12 +1312,12 @@ impl PlatformRepository {
                 }
 
                 "ssh2" => {
-                    let info = self.runtime.get_extension_info(name)?;
+                    let info = platform_info.get_extension_info(name);
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^libssh2 version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1368,7 +1334,8 @@ impl PlatformRepository {
                 }
 
                 "xsl" => {
-                    let libxslt_version = self.runtime.get_constant("LIBXSLT_DOTTED_VERSION", None);
+                    let libxslt_version =
+                        platform_info.get_constant("LIBXSLT_DOTTED_VERSION", None);
                     let libxslt_str = match &libxslt_version {
                         PhpMixed::String(s) => Some(s.clone()),
                         _ => None,
@@ -1382,13 +1349,13 @@ impl PlatformRepository {
                         &[],
                     )?;
 
-                    let info = self.runtime.get_extension_info("xsl")?;
+                    let info = platform_info.get_extension_info("xsl");
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!(
                             "/^libxslt compiled against libxml Version => (?<version>.+)$/im"
                         ),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1405,12 +1372,12 @@ impl PlatformRepository {
                 }
 
                 "yaml" => {
-                    let info = self.runtime.get_extension_info("yaml")?;
+                    let info = platform_info.get_extension_info("yaml");
 
                     let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::is_match3(
                         php_regex!("/^LibYAML Version => (?<version>.+)$/im"),
-                        &info,
+                        info,
                         Some(&mut matches),
                     ) {
                         self.add_library(
@@ -1427,13 +1394,9 @@ impl PlatformRepository {
                 }
 
                 "zip" => {
-                    if self
-                        .runtime
-                        .has_constant("LIBZIP_VERSION", Some("ZipArchive".to_string()))
-                    {
-                        let libzip = self
-                            .runtime
-                            .get_constant("LIBZIP_VERSION", Some("ZipArchive".to_string()));
+                    if platform_info.has_constant("LIBZIP_VERSION", Some("ZipArchive")) {
+                        let libzip =
+                            platform_info.get_constant("LIBZIP_VERSION", Some("ZipArchive"));
                         let libzip_str = match &libzip {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
@@ -1450,8 +1413,8 @@ impl PlatformRepository {
                 }
 
                 "zlib" => {
-                    if self.runtime.has_constant("ZLIB_VERSION", None) {
-                        let zlib = self.runtime.get_constant("ZLIB_VERSION", None);
+                    if platform_info.has_constant("ZLIB_VERSION", None) {
+                        let zlib = platform_info.get_constant("ZLIB_VERSION", None);
                         let zlib_str = match &zlib {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
@@ -1467,11 +1430,11 @@ impl PlatformRepository {
 
                     // Linked Version => 1.2.8
                     } else {
-                        let info = self.runtime.get_extension_info(name)?;
+                        let info = platform_info.get_extension_info(name);
                         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                         if Preg::is_match3(
                             php_regex!("/^Linked Version => (?<version>.+)$/im"),
-                            &info,
+                            info,
                             Some(&mut matches),
                         ) {
                             self.add_library(
@@ -1840,7 +1803,7 @@ impl PlatformRepository {
     }
 
     /// PHP `$resourceBundle->get($key)`. A live PHP object has no `PhpMixed` counterpart, so
-    /// [`RuntimeInterface`] answers with the entries the caller reads instead of the object.
+    /// [`PlatformInfo`] carries the entries the caller reads instead of the object.
     fn resource_bundle_get(value: &PhpMixed, key: &str) -> PhpMixed {
         Self::php_object_field(value, key).unwrap_or(PhpMixed::Null)
     }

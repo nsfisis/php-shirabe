@@ -42,7 +42,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
             let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
                 vec![crate::repository::RepositoryInterfaceHandle::new(
-                    PlatformRepository::new(vec![], IndexMap::new())
+                    PlatformRepository::new(vec![], IndexMap::new(), None, None)
                         .expect("PlatformRepository::new should not fail"),
                 )];
             let io_owned: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();

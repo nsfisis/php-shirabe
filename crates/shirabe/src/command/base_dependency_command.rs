@@ -78,7 +78,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .map(|(k, v)| (k, PhpMixed::String(v)))
                 .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                PlatformRepository::new(vec![], platform_overrides)?,
+                PlatformRepository::new(vec![], platform_overrides, None, None)?,
             ));
         } else {
             let repository_manager = composer.get_repository_manager().clone();
@@ -109,7 +109,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .into_iter()
                 .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                PlatformRepository::new(vec![], platform_overrides)?,
+                PlatformRepository::new(vec![], platform_overrides, None, None)?,
             ));
         }
 

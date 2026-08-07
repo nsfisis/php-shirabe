@@ -916,8 +916,12 @@ impl Command for RequireCommand {
             .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
         // initialize self.repos as it is used by the PackageDiscoveryTrait
-        let platform_repo =
-            PlatformRepositoryHandle::new(PlatformRepository::new(vec![], platform_overrides_map)?);
+        let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
+            vec![],
+            platform_overrides_map,
+            None,
+            None,
+        )?);
         let mut combined: Vec<crate::repository::RepositoryInterfaceHandle> =
             vec![platform_repo.clone().into()];
         for repo in repos {

@@ -684,6 +684,8 @@ impl CreateProjectCommand {
                     .collect(),
                 _ => indexmap::IndexMap::new(),
             },
+            None,
+            None,
         )?;
 
         // find the latest version if there are multiple

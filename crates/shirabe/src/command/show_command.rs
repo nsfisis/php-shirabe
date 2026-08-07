@@ -1784,8 +1784,12 @@ impl Command for ShowCommand {
                 platform_overrides = p.into_iter().collect();
             }
         }
-        let platform_repo =
-            PlatformRepositoryHandle::new(PlatformRepository::new(vec![], platform_overrides)?);
+        let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
+            vec![],
+            platform_overrides,
+            None,
+            None,
+        )?);
         let mut locked_repo: Option<RepositoryInterfaceHandle> = None;
 
         // The single-package $package binding from PHP gets surfaced here.

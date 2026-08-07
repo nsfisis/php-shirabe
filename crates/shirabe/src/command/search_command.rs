@@ -111,7 +111,7 @@ impl Command for SearchCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let platform_repo = PlatformRepository::new4(vec![], IndexMap::new(), None, None)?;
+        let platform_repo = PlatformRepository::new(vec![], IndexMap::new(), None, None)?;
         let io = self.get_io();
 
         let format = input

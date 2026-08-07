@@ -1,30 +1,14 @@
 //! ref: composer/tests/Composer/Test/Repository/PlatformRepositoryTest.php
 
 use indexmap::IndexMap;
-use mockall::predicate::eq;
 use shirabe::package::{BasePackageHandle, Link};
-use shirabe::platform::{HhvmDetectorInterface, RuntimeInterface};
+use shirabe::platform::HhvmDetectorInterface;
 use shirabe::repository::{
     FindPackageConstraint, PlatformRepository, RepositoryInterface, SEARCH_NAME,
 };
+use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::SimpleConstraint;
-
-// The Runtime/HhvmDetector seams are concrete structs in PHP; the tests mock them
-// directly.
-mockall::mock! {
-    pub Runtime {}
-    impl RuntimeInterface for Runtime {
-        fn has_constant(&self, constant_name: &str, class: Option<String>) -> bool;
-        fn get_constant(&self, constant_name: &str, class: Option<String>) -> PhpMixed;
-        fn invoke(&self, callable: PhpMixed, arguments: Vec<PhpMixed>) -> PhpMixed;
-        fn has_class(&self, class: &str) -> bool;
-        fn construct(&self, class: &str, arguments: Vec<PhpMixed>) -> anyhow::Result<PhpMixed>;
-        fn get_extensions(&self) -> Vec<String>;
-        fn get_extension_version(&self, extension: &str) -> String;
-        fn get_extension_info(&self, extension: &str) -> anyhow::Result<String>;
-    }
-}
 
 mockall::mock! {
     pub HhvmDetector {}
@@ -34,25 +18,71 @@ mockall::mock! {
     }
 }
 
-// The seam traits require `Debug` (so `PlatformRepository` can derive it); mockall does
+// The seam trait requires `Debug` (so `PlatformRepository` can derive it); mockall does
 // not generate it for mocks.
-impl std::fmt::Debug for MockRuntime {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("MockRuntime")
-    }
-}
-
 impl std::fmt::Debug for MockHhvmDetector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("MockHhvmDetector")
     }
 }
 
-/// PHP: ltrim($class.'::'.$constant, ':')
-fn constant_key(constant_name: &str, class: Option<&str>) -> String {
-    format!("{}::{}", class.unwrap_or(""), constant_name)
-        .trim_start_matches(':')
-        .to_string()
+/// The payload form of what a dataset's `Runtime` mock answers: the listed constants and classes
+/// exist, and each extension is loaded at `extension_version` with `info` as its info() output.
+fn platform_info(
+    constants: Vec<(String, Option<String>, PhpMixed)>,
+    extensions: Vec<String>,
+    extension_version: &str,
+    info: Option<&str>,
+    functions: &[(PhpMixed, Vec<PhpMixed>, PhpMixed)],
+    class_definitions: &[ClassDef],
+) -> PlatformInfo {
+    let mut platform_info = PlatformInfo::default();
+
+    for (constant_name, class, value) in constants {
+        platform_info.__set_constant(&constant_name, class.as_deref(), value);
+    }
+
+    for extension in &extensions {
+        platform_info.__set_extension_info(extension, info.unwrap_or_default());
+    }
+    platform_info.__set_extensions(extensions, extension_version);
+
+    for (callable, arguments, result) in functions {
+        match (callable, arguments.as_slice()) {
+            (PhpMixed::String(name), []) if name == "curl_version" => {
+                platform_info.curl_version = result.clone();
+            }
+            (PhpMixed::String(name), [PhpMixed::String(address)])
+                if name == "inet_pton" && address == "::" =>
+            {
+                platform_info.inet_pton_ipv6 = result.clone();
+            }
+            (PhpMixed::List(spec), _) => match spec.as_slice() {
+                [PhpMixed::String(class), PhpMixed::String(method)]
+                    if class == "ResourceBundle" && method == "create" =>
+                {
+                    platform_info.resource_bundle = result.clone();
+                }
+                [PhpMixed::String(class), PhpMixed::String(method)]
+                    if class == "IntlChar" && method == "getUnicodeVersion" =>
+                {
+                    platform_info.intl_char_unicode_version = result.clone();
+                }
+                other => panic!("the platform payload does not report {other:?}"),
+            },
+            other => panic!("the platform payload does not report {other:?}"),
+        }
+    }
+
+    for definition in class_definitions {
+        match (definition.class, &definition.construct) {
+            ("Imagick", Some((_arguments, result))) => platform_info.imagick = result.clone(),
+            (class, None) => platform_info.__set_class(class),
+            (class, Some(_)) => panic!("the platform payload does not construct {class}"),
+        }
+    }
+
+    platform_info
 }
 
 #[test]
@@ -64,7 +94,7 @@ fn test_hhvm_package() {
         .returning(|| Some("2.1.0".to_string()));
 
     let mut platform_repository =
-        PlatformRepository::new4(vec![], IndexMap::new(), None, Some(Box::new(hhvm_detector)))
+        PlatformRepository::new(vec![], IndexMap::new(), None, Some(Box::new(hhvm_detector)))
             .unwrap();
 
     let hhvm = platform_repository
@@ -137,44 +167,20 @@ fn php_flavor_test_cases() -> Vec<(
 #[test]
 fn test_php_version() {
     for (constants, packages, functions) in php_flavor_test_cases() {
-        let constants_has = constants.clone();
-        let constants_get = constants.clone();
-
-        let mut runtime = MockRuntime::new();
-        runtime
-            .expect_get_extensions()
-            .times(..)
-            .returning(Vec::new);
-        runtime
-            .expect_has_constant()
-            .times(..)
-            .returning(move |constant, class| {
-                constants_has.contains_key(&constant_key(constant, class.as_deref()))
-            });
-        runtime
-            .expect_get_constant()
-            .times(..)
-            .returning(move |constant, class| {
-                constants_get
-                    .get(&constant_key(constant, class.as_deref()))
-                    .cloned()
-                    .unwrap_or(PhpMixed::Null)
-            });
-        runtime
-            .expect_invoke()
-            .times(..)
-            .returning(move |callable, arguments| {
-                for (c, a, ret) in &functions {
-                    if *c == callable && *a == arguments {
-                        return ret.clone();
-                    }
-                }
-                PhpMixed::Null
-            });
+        let platform_info = platform_info(
+            constants
+                .into_iter()
+                .map(|(constant_name, value)| (constant_name, None, value))
+                .collect(),
+            Vec::new(),
+            "",
+            None,
+            &functions,
+            &[],
+        );
 
         let mut repository =
-            PlatformRepository::new4(vec![], IndexMap::new(), Some(Box::new(runtime)), None)
-                .unwrap();
+            PlatformRepository::new(vec![], IndexMap::new(), Some(platform_info), None).unwrap();
 
         for (package_name, version) in packages {
             let package = repository
@@ -198,22 +204,16 @@ fn test_php_version() {
 
 #[test]
 fn test_inet_pton_regression() {
-    let mut runtime = MockRuntime::new();
     // PHP: ->expects(self::once())->method('invoke')->with('inet_pton', ['::'])->willReturn(false).
-    runtime
-        .expect_invoke()
-        .with(
-            eq(PhpMixed::String("inet_pton".to_string())),
-            eq(vec![PhpMixed::String("::".to_string())]),
-        )
-        .times(1)
-        .returning(|_callable, _arguments| PhpMixed::Bool(false));
-    // suppressing PHP_ZTS & AF_INET6
-    runtime
-        .expect_has_constant()
-        .times(..)
-        .returning(|_, _| false);
+    // TODO(phase-d): the payload reports the result of `@inet_pton('::')` instead of answering a
+    // call, so there is nothing left for the once() call-count check to observe.
+    let functions = [(
+        PhpMixed::String("inet_pton".to_string()),
+        vec![PhpMixed::String("::".to_string())],
+        PhpMixed::Bool(false),
+    )];
 
+    // suppressing PHP_ZTS & AF_INET6 by leaving them undefined
     let constants: IndexMap<String, PhpMixed> = IndexMap::from([
         (
             "PHP_VERSION".to_string(),
@@ -221,22 +221,21 @@ fn test_inet_pton_regression() {
         ),
         ("PHP_DEBUG".to_string(), PhpMixed::Bool(false)),
     ]);
-    runtime
-        .expect_get_constant()
-        .times(..)
-        .returning(move |constant, class| {
-            constants
-                .get(&constant_key(constant, class.as_deref()))
-                .cloned()
-                .unwrap_or(PhpMixed::Null)
-        });
-    runtime
-        .expect_get_extensions()
-        .times(..)
-        .returning(Vec::new);
+
+    let platform_info = platform_info(
+        constants
+            .into_iter()
+            .map(|(constant_name, value)| (constant_name, None, value))
+            .collect(),
+        Vec::new(),
+        "",
+        None,
+        &functions,
+        &[],
+    );
 
     let mut repository =
-        PlatformRepository::new4(vec![], IndexMap::new(), Some(Box::new(runtime)), None).unwrap();
+        PlatformRepository::new(vec![], IndexMap::new(), Some(platform_info), None).unwrap();
     let package = repository
         .find_package("php-ipv6", FindPackageConstraint::String("*".to_string()))
         .unwrap();
@@ -1630,79 +1629,17 @@ fn test_library_information() {
             PhpMixed::String("7.1.0".to_string()),
         ));
 
-        let functions = case.functions.clone();
-        let info = case.info.map(|s| s.to_string());
-
-        let exts_for_get = extensions.clone();
-        let constants_has = constants.clone();
-        let constants_get = constants.clone();
-
-        let mut runtime = MockRuntime::new();
-        runtime
-            .expect_get_extensions()
-            .times(..)
-            .returning(move || exts_for_get.clone());
-        runtime
-            .expect_get_extension_version()
-            .times(..)
-            .returning(move |_extension| extension_version.to_string());
-        runtime
-            .expect_get_extension_info()
-            .times(..)
-            .returning(move |_extension| Ok(info.clone().unwrap_or_default()));
-        runtime
-            .expect_invoke()
-            .times(..)
-            .returning(move |callable, arguments| {
-                for (c, a, ret) in &functions {
-                    if *c == callable && *a == arguments {
-                        return ret.clone();
-                    }
-                }
-                PhpMixed::Null
-            });
-        runtime
-            .expect_has_constant()
-            .times(..)
-            .returning(move |constant, class| {
-                constants_has
-                    .iter()
-                    .any(|(n, c, _)| n == constant && c.as_deref() == class.as_deref())
-            });
-        runtime
-            .expect_get_constant()
-            .times(..)
-            .returning(move |constant, class| {
-                constants_get
-                    .iter()
-                    .find(|(n, c, _)| n == constant && c.as_deref() == class.as_deref())
-                    .map(|(_, _, v)| v.clone())
-                    .unwrap_or(PhpMixed::Null)
-            });
-        let class_definitions_has = case.class_definitions.clone();
-        let class_definitions_construct = case.class_definitions.clone();
-        runtime
-            .expect_has_class()
-            .times(..)
-            .returning(move |class| class_definitions_has.iter().any(|d| d.class == class));
-        runtime
-            .expect_construct()
-            .times(..)
-            .returning(move |class, arguments| {
-                for d in &class_definitions_construct {
-                    if d.class == class
-                        && let Some((args, ret)) = &d.construct
-                        && *args == arguments
-                    {
-                        return Ok(ret.clone());
-                    }
-                }
-                Ok(PhpMixed::Null)
-            });
+        let platform_info = platform_info(
+            constants,
+            extensions.clone(),
+            extension_version,
+            case.info,
+            &case.functions,
+            &case.class_definitions,
+        );
 
         let mut platform_repository =
-            PlatformRepository::new4(vec![], IndexMap::new(), Some(Box::new(runtime)), None)
-                .unwrap();
+            PlatformRepository::new(vec![], IndexMap::new(), Some(platform_info), None).unwrap();
 
         let libraries: Vec<String> = platform_repository
             .search("lib".to_string(), SEARCH_NAME, None)
@@ -1794,33 +1731,22 @@ fn test_composer_platform_version() {
         ("PHP_DEBUG".to_string(), PhpMixed::Bool(false)),
     ]);
 
-    let mut runtime = MockRuntime::new();
-    runtime
-        .expect_get_extensions()
-        .times(..)
-        .returning(Vec::new);
-    runtime
-        .expect_get_constant()
-        .times(..)
-        .returning(move |constant, class| {
-            constants
-                .get(&constant_key(constant, class.as_deref()))
-                .cloned()
-                .unwrap_or(PhpMixed::Null)
-        });
     // PHP only stubs getExtensions/getConstant; PHPUnit auto-returns null/false for the
-    // other probed methods. Mirror that so initialize() does not hit unset expectations.
-    runtime
-        .expect_has_constant()
-        .times(..)
-        .returning(|_, _| false);
-    runtime
-        .expect_invoke()
-        .times(..)
-        .returning(|_, _| PhpMixed::Null);
+    // other methods, which is what the default payload reports.
+    let platform_info = platform_info(
+        constants
+            .into_iter()
+            .map(|(constant_name, value)| (constant_name, None, value))
+            .collect(),
+        Vec::new(),
+        "",
+        None,
+        &[],
+        &[],
+    );
 
     let mut platform_repository =
-        PlatformRepository::new4(vec![], IndexMap::new(), Some(Box::new(runtime)), None).unwrap();
+        PlatformRepository::new(vec![], IndexMap::new(), Some(platform_info), None).unwrap();
 
     let package = platform_repository
         .find_package(
