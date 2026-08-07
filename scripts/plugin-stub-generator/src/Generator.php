@@ -220,12 +220,11 @@ final class Generator
             }
         }
 
+        // Constants are compile-time data with no entity behind them, so the declaration is
+        // copied verbatim, visibility included: a local copy cannot diverge from the entity,
+        // and nothing that was unreadable in the real class becomes readable here.
         $constants = [];
         foreach ($class->getConstants() as $constant) {
-            if (!$constant->isPublic()) {
-                $this->errors[] = "$fqcn declares a non-public constant; materializing it is not supported";
-                continue;
-            }
             $constants[] = $file->verbatim($constant->getStartLine(), $constant->getEndLine());
         }
 

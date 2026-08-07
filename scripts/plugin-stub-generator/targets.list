@@ -26,3 +26,10 @@ Composer\Repository\FilesystemRepository
 Composer\Repository\InstalledFilesystemRepository
 Composer\Repository\RepositoryManager
 Composer\Installer\InstallationManager
+Composer\Installer\PackageEvent
+Composer\DependencyResolver\Operation\SolverOperation
+Composer\DependencyResolver\Operation\InstallOperation
+Composer\DependencyResolver\Operation\UpdateOperation
+Composer\DependencyResolver\Operation\UninstallOperation
+Composer\DependencyResolver\Operation\MarkAliasInstalledOperation
+Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation

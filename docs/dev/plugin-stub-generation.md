@@ -74,7 +74,8 @@ the generator's vendor directory or the classifier report is unavailable.
 * **Class constants, static methods and public static properties** are
   materialized verbatim from the real source (they read no instance state and
   run locally in the worker), together with any non-public static helpers the
-  methods call.
+  methods call. Constants keep their declared visibility, so a non-public one
+  stays unreadable from outside the stub as it is in the real class.
 * **Instance properties** are not declared on the stub, whatever their
   visibility: they are entity state. Every root stub instead carries
   `__get`/`__set`/`__isset`/`__unset` forwarders, so each access reaches the
@@ -103,8 +104,7 @@ Generation fails — instead of emitting something quietly wrong — on:
 * an omitted override diverging from the inherited stub signature,
 * a subclass target listed before its base class, or extending a class that is
   neither a target nor provided by `php/runtime/`,
-* a target whose FQCN is also provided by `php/runtime/`,
-* non-public class constants (materializing them is unsupported so far).
+* a target whose FQCN is also provided by `php/runtime/`.
 
 `generate-stubs` (in both modes) additionally fails when a `.php` file exists
 under the stubs directory that no target produces, or when `STUB_FILES` /

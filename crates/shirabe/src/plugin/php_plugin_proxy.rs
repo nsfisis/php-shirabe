@@ -8,6 +8,7 @@
 use crate::autoload::ClassLoader;
 use crate::command::BaseCommand;
 use crate::composer::ComposerHandle;
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
 use crate::event_dispatcher::{
     EventInterface, EventSubscriberInterface, SubscribedEventEntry, unwrap_php_result,
@@ -52,6 +53,7 @@ enum RustEntity {
     EventDispatcher(
         std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>,
     ),
+    Operation(std::rc::Rc<AnyOperation>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -71,6 +73,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::EventDispatcher(dispatcher) => {
             std::rc::Rc::as_ptr(dispatcher) as *const () as usize
         }
+        RustEntity::Operation(operation) => std::rc::Rc::as_ptr(operation) as *const () as usize,
     }
 }
 
@@ -169,12 +172,34 @@ fn repository_stub_class(repository: &RepositoryInterfaceHandle) -> Result<&'sta
     }
 }
 
+/// The proxy stub class matching a solver operation's concrete type.
+fn operation_stub_class(operation: &AnyOperation) -> &'static str {
+    match operation {
+        AnyOperation::Install(_) => "Composer\\DependencyResolver\\Operation\\InstallOperation",
+        AnyOperation::Update(_) => "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+        AnyOperation::Uninstall(_) => "Composer\\DependencyResolver\\Operation\\UninstallOperation",
+        AnyOperation::MarkAliasInstalled(_) => {
+            "Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation"
+        }
+        AnyOperation::MarkAliasUninstalled(_) => {
+            "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation"
+        }
+    }
+}
+
 /// Registers a package and returns its wire descriptor.
 pub(crate) fn package_handle_value(
     package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
 ) -> PluginValue {
     let class = package_stub_class(package);
     let rhandle = register_entity(RustEntity::Package(package.clone()));
+    rust_handle_value(rhandle, class)
+}
+
+/// Registers a solver operation and returns its wire descriptor.
+pub(crate) fn operation_handle_value(operation: &std::rc::Rc<AnyOperation>) -> PluginValue {
+    let class = operation_stub_class(operation);
+    let rhandle = register_entity(RustEntity::Operation(operation.clone()));
     rust_handle_value(rhandle, class)
 }
 
@@ -335,6 +360,9 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             Some(RustEntity::EventDispatcher(dispatcher)) => {
                 dispatch_event_dispatcher_method(&dispatcher, method_name, &args)
             }
+            Some(RustEntity::Operation(operation)) => {
+                dispatch_operation_method(&operation, method_name, &args)
+            }
             None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
         }
     }
@@ -368,7 +396,13 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             ))),
         }
     };
-    let entity = match class.as_str() {
+    let alias_package_arg =
+        |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
+            package_from_arg(&class, ctor_args.get(position))?
+                .as_alias()
+                .ok_or_else(|| runtime_throw(format!("{class} expects an AliasPackage")))
+        };
+    let package = match class.as_str() {
         "Composer\\Package\\Package" => AnyPackage::Package(crate::package::Package::new(
             string_arg(0)?,
             string_arg(1)?,
@@ -413,6 +447,50 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 string_arg(2)?,
             ))
         }
+        // A solver operation carries no state beyond the packages it names, so a plugin-built
+        // one is a complete instance rather than a second view on a Rust-side service.
+        "Composer\\DependencyResolver\\Operation\\InstallOperation" => {
+            return Ok(operation_construction_result(AnyOperation::Install(
+                crate::dependency_resolver::operation::InstallOperation::new(package_from_arg(
+                    &class,
+                    ctor_args.first(),
+                )?),
+            )));
+        }
+        "Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
+            return Ok(operation_construction_result(AnyOperation::Update(
+                crate::dependency_resolver::operation::UpdateOperation::new(
+                    package_from_arg(&class, ctor_args.first())?,
+                    package_from_arg(&class, ctor_args.get(1))?,
+                ),
+            )));
+        }
+        "Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
+            return Ok(operation_construction_result(AnyOperation::Uninstall(
+                crate::dependency_resolver::operation::UninstallOperation::new(package_from_arg(
+                    &class,
+                    ctor_args.first(),
+                )?),
+            )));
+        }
+        "Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
+            return Ok(operation_construction_result(
+                AnyOperation::MarkAliasInstalled(
+                    crate::dependency_resolver::operation::MarkAliasInstalledOperation::new(
+                        alias_package_arg(0)?,
+                    ),
+                ),
+            ));
+        }
+        "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation" => {
+            return Ok(operation_construction_result(
+                AnyOperation::MarkAliasUninstalled(
+                    crate::dependency_resolver::operation::MarkAliasUninstalledOperation::new(
+                        alias_package_arg(0)?,
+                    ),
+                ),
+            ));
+        }
         // TODO(plugin): the remaining proxied classes get a construction story on demand,
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is
@@ -424,12 +502,20 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
     };
     let rhandle = register_entity(RustEntity::Package(std::rc::Rc::new(
-        std::cell::RefCell::new(entity),
+        std::cell::RefCell::new(package),
     )));
-    Ok(PluginValue::List(vec![
-        PluginValue::Int(rhandle as i64),
-        PluginValue::Int(0),
-    ]))
+    Ok(construction_result(rhandle))
+}
+
+fn operation_construction_result(operation: AnyOperation) -> PluginValue {
+    construction_result(register_entity(RustEntity::Operation(std::rc::Rc::new(
+        operation,
+    ))))
+}
+
+/// The `[$rhandle, $epoch]` pair a proxy stub's constructor binds itself to.
+fn construction_result(rhandle: u64) -> PluginValue {
+    PluginValue::List(vec![PluginValue::Int(rhandle as i64), PluginValue::Int(0)])
 }
 
 /// Serves the `__clone` forwarder every proxy stub carries. Only entities whose Rust type
@@ -452,7 +538,8 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::InstallationManager(_)
         | RustEntity::RepositoryManager(_)
         | RustEntity::Repository(_)
-        | RustEntity::EventDispatcher(_) => {
+        | RustEntity::EventDispatcher(_)
+        | RustEntity::Operation(_) => {
             return Err(runtime_throw(
                 "cloning this Rust-side entity over RPC is not supported".to_string(),
             ));
@@ -810,12 +897,7 @@ fn dispatch_repository_manager_method(
     method_name: &str,
 ) -> Result<PluginValue, PhpThrow> {
     match method_name {
-        "getLocalRepository" => {
-            let local = rm.borrow().get_local_repository();
-            let class = repository_stub_class(&local)?;
-            let rhandle = register_entity(RustEntity::Repository(local));
-            Ok(rust_handle_value(rhandle, class))
-        }
+        "getLocalRepository" => repository_handle_value(&rm.borrow().get_local_repository()),
         // TODO(plugin): the remaining RepositoryManager surface is widened on demand, driven
         // by explicit errors from real plugins.
         other => Err(runtime_throw(format!(
@@ -1757,6 +1839,42 @@ fn dispatch_package_method(
         }),
         other => Err(runtime_throw(format!(
             "the package method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+fn dispatch_operation_method(
+    operation: &AnyOperation,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    match (method_name, operation) {
+        ("getOperationType", _) => Ok(PluginValue::string(operation.get_operation_type())),
+        ("show", _) => Ok(PluginValue::string(
+            operation.show(bool_arg(method_name, args.first())?),
+        )),
+        ("__toString", _) => Ok(PluginValue::string(operation.to_string())),
+        ("getPackage", AnyOperation::Install(op)) => {
+            Ok(package_handle_value(op.get_package().as_rc()))
+        }
+        ("getPackage", AnyOperation::Uninstall(op)) => {
+            Ok(package_handle_value(op.get_package().as_rc()))
+        }
+        ("getPackage", AnyOperation::MarkAliasInstalled(op)) => {
+            Ok(package_handle_value(op.get_package().as_rc()))
+        }
+        ("getPackage", AnyOperation::MarkAliasUninstalled(op)) => {
+            Ok(package_handle_value(op.get_package().as_rc()))
+        }
+        ("getInitialPackage", AnyOperation::Update(op)) => {
+            Ok(package_handle_value(op.get_initial_package().as_rc()))
+        }
+        ("getTargetPackage", AnyOperation::Update(op)) => {
+            Ok(package_handle_value(op.get_target_package().as_rc()))
+        }
+        (other, _) => Err(runtime_throw(format!(
+            "the operation method `{other}` is not available on a {} over RPC yet",
+            operation_stub_class(operation)
         ))),
     }
 }

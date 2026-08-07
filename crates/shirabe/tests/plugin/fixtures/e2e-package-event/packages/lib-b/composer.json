@@ -1,0 +1,5 @@
+{
+    "name": "shirabe-test/lib-b",
+    "version": "1.0.0",
+    "description": "Fixture dev package, so the recorded events carry devMode."
+}

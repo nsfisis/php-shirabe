@@ -327,16 +327,19 @@ impl InstallationManager {
             }),
         );
 
-        let all_operations: Vec<AnyOperation> = operations.clone();
+        // Shared rather than owned so that one operation reaches a plugin as one object, both
+        // through the whole batch pipeline and through its pre- and post-event.
+        let all_operations: Vec<std::rc::Rc<AnyOperation>> =
+            operations.into_iter().map(std::rc::Rc::new).collect();
 
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
-            let mut batches: Vec<IndexMap<i64, AnyOperation>> = vec![];
-            let mut batch: IndexMap<i64, AnyOperation> = IndexMap::new();
-            for (index, operation) in operations.into_iter().enumerate() {
+            let mut batches: Vec<IndexMap<i64, std::rc::Rc<AnyOperation>>> = vec![];
+            let mut batch: IndexMap<i64, std::rc::Rc<AnyOperation>> = IndexMap::new();
+            for (index, operation) in all_operations.iter().cloned().enumerate() {
                 let index = index as i64;
-                let package: Option<PackageInterfaceHandle> = match &operation {
+                let package: Option<PackageInterfaceHandle> = match &*operation {
                     AnyOperation::Update(update) => Some(update.get_target_package()),
                     AnyOperation::Install(install) => Some(install.get_package()),
                     _ => None,
@@ -409,7 +412,7 @@ impl InstallationManager {
     async fn download_and_execute_batch(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
-        operations: IndexMap<i64, AnyOperation>,
+        operations: IndexMap<i64, std::rc::Rc<AnyOperation>>,
         cleanup_promises: &mut IndexMap<
             i64,
             Box<
@@ -421,7 +424,7 @@ impl InstallationManager {
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
-        all_operations: Vec<AnyOperation>,
+        all_operations: Vec<std::rc::Rc<AnyOperation>>,
     ) -> anyhow::Result<()> {
         let mut promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
@@ -436,7 +439,7 @@ impl InstallationManager {
             }
 
             let package = operation.get_target_package();
-            let initial_package: Option<PackageInterfaceHandle> = match operation {
+            let initial_package: Option<PackageInterfaceHandle> = match &**operation {
                 AnyOperation::Update(update_op) => Some(update_op.get_initial_package()),
                 _ => None,
             };
@@ -505,10 +508,10 @@ impl InstallationManager {
 
         // execute operations in batches to make sure every plugin is installed in the
         // right order and activated before the packages depending on it are installed
-        let mut batches: Vec<IndexMap<i64, AnyOperation>> = vec![];
-        let mut batch: IndexMap<i64, AnyOperation> = IndexMap::new();
+        let mut batches: Vec<IndexMap<i64, std::rc::Rc<AnyOperation>>> = vec![];
+        let mut batch: IndexMap<i64, std::rc::Rc<AnyOperation>> = IndexMap::new();
         for (index, operation) in operations {
-            let package: Option<PackageInterfaceHandle> = match &operation {
+            let package: Option<PackageInterfaceHandle> = match &*operation {
                 AnyOperation::Update(update) => Some(update.get_target_package()),
                 AnyOperation::Install(install) => Some(install.get_package()),
                 _ => None,
@@ -551,7 +554,7 @@ impl InstallationManager {
     async fn execute_batch(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
-        operations: IndexMap<i64, AnyOperation>,
+        operations: IndexMap<i64, std::rc::Rc<AnyOperation>>,
         cleanup_promises: &IndexMap<
             i64,
             Box<
@@ -562,11 +565,13 @@ impl InstallationManager {
         >,
         dev_mode: bool,
         run_scripts: bool,
-        all_operations: &[AnyOperation],
+        all_operations: &[std::rc::Rc<AnyOperation>],
     ) -> anyhow::Result<()> {
         let mut promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
         > = vec![];
+        // @var array<callable(): void> $postExecCallbacks
+        let mut post_exec_callbacks: Vec<Box<dyn Fn() -> anyhow::Result<()>>> = vec![];
 
         for (index, operation) in operations {
             let op_type = operation.get_operation_type();
@@ -581,7 +586,7 @@ impl InstallationManager {
                         io_interface::NORMAL,
                     );
                 }
-                match &operation {
+                match &*operation {
                     AnyOperation::MarkAliasInstalled(op) => {
                         self.mark_alias_installed(&mut *repo.borrow_mut(), op)?;
                     }
@@ -595,7 +600,7 @@ impl InstallationManager {
             }
 
             let package = operation.get_target_package();
-            let initial_package: Option<PackageInterfaceHandle> = match &operation {
+            let initial_package: Option<PackageInterfaceHandle> = match &*operation {
                 AnyOperation::Update(update_op) => Some(update_op.get_initial_package()),
                 _ => None,
             };
@@ -607,11 +612,14 @@ impl InstallationManager {
                 _ => "",
             };
 
-            if run_scripts && self.event_dispatcher.is_some() {
-                // TODO(phase-c): dispatch_package_event takes Box<dyn RepositoryInterface>/Vec<Box<...>>
-                // but we hold a RefCell'd &mut dyn here. Needs structural rework (likely shared Rc
-                // on repo and ops).
-                let _ = (event_name, dev_mode, &repo, &all_operations, &operation);
+            if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
+                event_dispatcher.borrow_mut().dispatch_package_event(
+                    event_name,
+                    dev_mode,
+                    repo.clone(),
+                    all_operations.to_vec(),
+                    operation.clone(),
+                )?;
             }
 
             let installer = self.get_installer(&package.get_type())?;
@@ -620,16 +628,16 @@ impl InstallationManager {
             //      ->then(fn() => $this->{$opType}($repo, $operation))
             //      ->then($cleanupPromises[$index])
             //      ->then(fn() => $repo->write($devMode, $this), fn($e) => { "<op> of <pkg>
-            //      failed"; throw $e; })
-            //      ->then(fn() => dispatch POST_PACKAGE_* event);
+            //      failed"; throw $e; });
             // each package gets its own chain and the whole batch resolves via waitOnPromises.
+            let executed_operation = std::rc::Rc::clone(&operation);
             promises.push(Box::pin(async move {
                 let chain_result: anyhow::Result<()> = async {
                     installer
                         .prepare(op_type, package.clone(), initial_package.clone())
                         .await?;
 
-                    match &operation {
+                    match &*executed_operation {
                         AnyOperation::Install(op) => {
                             self.install(repo, op).await?;
                         }
@@ -668,24 +676,32 @@ impl InstallationManager {
                 // PHP: ->then(fn() => $repo->write($devMode, $this)) persists the repository after each op.
                 repo.borrow_mut().write(dev_mode, self)?;
 
-                let event_name_post = match op_type {
-                    "install" => PackageEvents::POST_PACKAGE_INSTALL,
-                    "update" => PackageEvents::POST_PACKAGE_UPDATE,
-                    "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
-                    _ => "",
-                };
-
-                if run_scripts && self.event_dispatcher.is_some() {
-                    // PHP dispatches the POST_PACKAGE_* event at the end of the chain via the event
-                    // dispatcher with repo/all_operations/operation.
-                    // TODO(phase-c): dispatch_package_event takes Box<dyn RepositoryInterface>/
-                    // Vec<Box<...>> but we hold a RefCell'd &mut dyn here. Needs structural rework
-                    // (likely shared Rc on repo and ops).
-                    let _ = event_name_post;
-                }
-
                 Ok(())
             }));
+
+            let event_name = match op_type {
+                "install" => PackageEvents::POST_PACKAGE_INSTALL,
+                "update" => PackageEvents::POST_PACKAGE_UPDATE,
+                "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
+                _ => "",
+            };
+
+            if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
+                let event_dispatcher = event_dispatcher.clone();
+                let repo = repo.clone();
+                let all_operations = all_operations.to_vec();
+                post_exec_callbacks.push(Box::new(move || {
+                    event_dispatcher.borrow_mut().dispatch_package_event(
+                        event_name,
+                        dev_mode,
+                        repo.clone(),
+                        all_operations.clone(),
+                        operation.clone(),
+                    )?;
+
+                    Ok(())
+                }));
+            }
         }
 
         if !promises.is_empty() {
@@ -693,6 +709,10 @@ impl InstallationManager {
         }
 
         Platform::workaround_filesystem_issues();
+
+        for cb in post_exec_callbacks {
+            cb()?;
+        }
 
         Ok(())
     }

@@ -1,0 +1,5 @@
+{
+    "name": "shirabe-test/lib-a",
+    "version": "1.0.0",
+    "description": "Fixture package installed while the recorder plugin is active."
+}

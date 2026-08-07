@@ -117,8 +117,9 @@ foreach ($iterator as $entry) {
     }
 }
 
-// The Rust side embeds every stub with include_str!; the two lists must not drift apart.
-$libRsText = (string) file_get_contents($libRs);
+// The Rust side embeds every stub with include_str!; the two lists must not drift apart. The
+// whitespace is squeezed out first because rustfmt wraps a long include_str! across lines.
+$libRsText = preg_replace('/\s+/', '', (string) file_get_contents($libRs));
 foreach ($files as $relative => $_) {
     if (!str_contains($libRsText, "include_str!(\"../php/stubs/$relative\")")) {
         $problems[] = "STUB_FILES in $libRs does not embed $relative";

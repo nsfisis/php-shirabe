@@ -1,0 +1,35 @@
+{
+    "name": "shirabe/e2e-package-event",
+    "description": "E2E fixture project: record the package events a plugin receives during install.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/package-event-recorder": "1.0.0",
+        "shirabe-test/lib-a": "1.0.0"
+    },
+    "require-dev": {
+        "shirabe-test/lib-b": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/package-event-recorder": true
+        }
+    }
+}

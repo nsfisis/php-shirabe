@@ -16,7 +16,7 @@ use crate::installer::PackageEvent;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
-use crate::repository::RepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
@@ -250,9 +250,9 @@ impl EventDispatcher {
         &mut self,
         event_name: &str,
         dev_mode: bool,
-        local_repo: Box<dyn RepositoryInterface>,
-        operations: Vec<AnyOperation>,
-        operation: AnyOperation,
+        local_repo: InstalledRepositoryInterfaceHandle,
+        operations: Vec<std::rc::Rc<AnyOperation>>,
+        operation: std::rc::Rc<AnyOperation>,
     ) -> anyhow::Result<i64> {
         let composer = self.composer();
         assert!(
@@ -432,8 +432,7 @@ impl EventDispatcher {
                     crate::io::VERBOSE,
                 );
                 let stub_class = Self::event_stub_class(event).ok_or_else(|| {
-                    // TODO(plugin): only the base Event and Script\Event proxy stubs exist so
-                    // far; installer/package/plugin events need their own stubs.
+                    // TODO(plugin): installer and plugin events have no proxy stub yet.
                     anyhow::anyhow!(RuntimeException {
                         message: format!(
                             "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
@@ -1154,8 +1153,7 @@ try {{
         }
 
         let stub_class = Self::event_stub_class(event).ok_or_else(|| {
-            // TODO(plugin): only the base Event and Script\Event proxy stubs exist so far;
-            // installer/package/plugin events need their own stubs.
+            // TODO(plugin): installer and plugin events have no proxy stub yet.
             anyhow::anyhow!(RuntimeException {
                 message: format!(
                     "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
@@ -1200,6 +1198,8 @@ try {{
     fn event_stub_class(event: &dyn EventInterface) -> Option<&'static str> {
         if event.as_any().downcast_ref::<ScriptEvent>().is_some() {
             Some("Composer\\Script\\Event")
+        } else if event.as_any().downcast_ref::<PackageEvent>().is_some() {
+            Some("Composer\\Installer\\PackageEvent")
         } else if event.as_any().downcast_ref::<Event>().is_some() {
             Some("Composer\\EventDispatcher\\Event")
         } else {
@@ -1755,39 +1755,75 @@ pub(crate) fn dispatch_event_method(
             event.get_flags().clone(),
         ))),
         "isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
-        "isDevMode" => match event.as_any().downcast_ref::<ScriptEvent>() {
-            Some(script_event) => Ok(PluginValue::Bool(script_event.is_dev_mode())),
-            None => Err(runtime_throw(
-                "isDevMode is only available on script events".to_string(),
+        "isDevMode" => match (script_event(event), package_event(event)) {
+            (Some(event), _) => Ok(PluginValue::Bool(event.is_dev_mode())),
+            (_, Some(event)) => Ok(PluginValue::Bool(event.is_dev_mode())),
+            _ => Err(runtime_throw(
+                "isDevMode is only available on script and package events".to_string(),
             )),
         },
-        "getComposer" => match event.as_any().downcast_ref::<ScriptEvent>() {
-            Some(script_event) => {
-                let composer = script_event.get_composer().upgrade().ok_or_else(|| {
-                    runtime_throw("the Composer instance of this event is gone".to_string())
-                })?;
-                let rhandle = crate::plugin::php_plugin_proxy::register_composer_entity(&composer);
-                Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
-                    rhandle,
-                    "Composer\\Composer",
-                ))
-            }
+        "getComposer" => {
+            let composer = match (script_event(event), package_event(event)) {
+                (Some(event), _) => event.get_composer().upgrade(),
+                (_, Some(event)) => event.get_composer().upgrade(),
+                _ => {
+                    return Err(runtime_throw(
+                        "getComposer is only available on script and package events".to_string(),
+                    ));
+                }
+            };
+            let composer = composer.ok_or_else(|| {
+                runtime_throw("the Composer instance of this event is gone".to_string())
+            })?;
+            let rhandle = crate::plugin::php_plugin_proxy::register_composer_entity(&composer);
+            Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
+                rhandle,
+                "Composer\\Composer",
+            ))
+        }
+        "getIO" => {
+            let io = match (script_event(event), package_event(event)) {
+                (Some(event), _) => event.get_io(),
+                (_, Some(event)) => event.get_io(),
+                _ => {
+                    return Err(runtime_throw(
+                        "getIO is only available on script and package events".to_string(),
+                    ));
+                }
+            };
+            let class = crate::plugin::php_plugin_proxy::io_stub_class(&io)
+                .map_err(|error| runtime_throw(error.to_string()))?;
+            let rhandle = crate::plugin::php_plugin_proxy::register_io_entity(&io);
+            Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
+                rhandle, class,
+            ))
+        }
+        "getLocalRepo" => match package_event(event) {
+            Some(event) => crate::plugin::php_plugin_proxy::repository_handle_value(
+                &event.get_local_repo().as_repository_handle(),
+            ),
             None => Err(runtime_throw(
-                "getComposer is only available on script events".to_string(),
+                "getLocalRepo is only available on package events".to_string(),
             )),
         },
-        "getIO" => match event.as_any().downcast_ref::<ScriptEvent>() {
-            Some(script_event) => {
-                let io = script_event.get_io();
-                let class = crate::plugin::php_plugin_proxy::io_stub_class(&io)
-                    .map_err(|error| runtime_throw(error.to_string()))?;
-                let rhandle = crate::plugin::php_plugin_proxy::register_io_entity(&io);
-                Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
-                    rhandle, class,
-                ))
-            }
+        "getOperations" => match package_event(event) {
+            Some(event) => Ok(PluginValue::List(
+                event
+                    .get_operations()
+                    .iter()
+                    .map(crate::plugin::php_plugin_proxy::operation_handle_value)
+                    .collect(),
+            )),
             None => Err(runtime_throw(
-                "getIO is only available on script events".to_string(),
+                "getOperations is only available on package events".to_string(),
+            )),
+        },
+        "getOperation" => match package_event(event) {
+            Some(event) => Ok(crate::plugin::php_plugin_proxy::operation_handle_value(
+                event.get_operation(),
+            )),
+            None => Err(runtime_throw(
+                "getOperation is only available on package events".to_string(),
             )),
         },
         // TODO(plugin): stopPropagation and the rest need full proxying of the object graph
@@ -1796,6 +1832,14 @@ pub(crate) fn dispatch_event_method(
             "the Event method `{other}` is not available over RPC yet"
         ))),
     }
+}
+
+fn script_event(event: &dyn EventInterface) -> Option<&ScriptEvent> {
+    event.as_any().downcast_ref::<ScriptEvent>()
+}
+
+fn package_event(event: &dyn EventInterface) -> Option<&PackageEvent> {
+    event.as_any().downcast_ref::<PackageEvent>()
 }
 
 fn runtime_throw(message: String) -> PhpThrow {

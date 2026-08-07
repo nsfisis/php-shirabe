@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/package-event-recorder",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin recording every PackageEvent it is subscribed to.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\PackageEvent\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\PackageEvent\\Plugin"
+    }
+}

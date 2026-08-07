@@ -5,19 +5,21 @@ use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::io::IOInterface;
-use crate::repository::RepositoryInterface;
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
+/// The operations are shared rather than owned so that the same operation crosses the plugin
+/// boundary as one object for both the pre- and the post-event, as it does in PHP.
 #[derive(Debug)]
 pub struct PackageEvent {
     inner: Event,
     composer: ComposerWeakHandle,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: bool,
-    local_repo: Box<dyn RepositoryInterface>,
-    operations: Vec<AnyOperation>,
-    operation: AnyOperation,
+    local_repo: InstalledRepositoryInterfaceHandle,
+    operations: Vec<std::rc::Rc<AnyOperation>>,
+    operation: std::rc::Rc<AnyOperation>,
 }
 
 impl PackageEvent {
@@ -26,9 +28,9 @@ impl PackageEvent {
         composer: ComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
-        local_repo: Box<dyn RepositoryInterface>,
-        operations: Vec<AnyOperation>,
-        operation: AnyOperation,
+        local_repo: InstalledRepositoryInterfaceHandle,
+        operations: Vec<std::rc::Rc<AnyOperation>>,
+        operation: std::rc::Rc<AnyOperation>,
     ) -> Self {
         Self {
             inner: Event::new(event_name, vec![], IndexMap::new()),
@@ -57,15 +59,15 @@ impl PackageEvent {
         self.dev_mode
     }
 
-    pub fn get_local_repo(&self) -> &dyn RepositoryInterface {
-        self.local_repo.as_ref()
+    pub fn get_local_repo(&self) -> InstalledRepositoryInterfaceHandle {
+        self.local_repo.clone()
     }
 
-    pub fn get_operations(&self) -> &Vec<AnyOperation> {
+    pub fn get_operations(&self) -> &Vec<std::rc::Rc<AnyOperation>> {
         &self.operations
     }
 
-    pub fn get_operation(&self) -> &AnyOperation {
+    pub fn get_operation(&self) -> &std::rc::Rc<AnyOperation> {
         &self.operation
     }
 }

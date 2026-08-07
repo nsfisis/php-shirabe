@@ -915,6 +915,38 @@ const STUB_FILES: &[(&str, &str)] = &[
         "Composer/Installer/InstallationManager.php",
         include_str!("../php/stubs/Composer/Installer/InstallationManager.php"),
     ),
+    (
+        "Composer/Installer/PackageEvent.php",
+        include_str!("../php/stubs/Composer/Installer/PackageEvent.php"),
+    ),
+    (
+        "Composer/DependencyResolver/Operation/SolverOperation.php",
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/SolverOperation.php"),
+    ),
+    (
+        "Composer/DependencyResolver/Operation/InstallOperation.php",
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/InstallOperation.php"),
+    ),
+    (
+        "Composer/DependencyResolver/Operation/UpdateOperation.php",
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UpdateOperation.php"),
+    ),
+    (
+        "Composer/DependencyResolver/Operation/UninstallOperation.php",
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UninstallOperation.php"),
+    ),
+    (
+        "Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php",
+        include_str!(
+            "../php/stubs/Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php"
+        ),
+    ),
+    (
+        "Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php",
+        include_str!(
+            "../php/stubs/Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php"
+        ),
+    ),
 ];
 
 /// Hand-written worker-side classes (two-world implementations with behavior of their own, not
