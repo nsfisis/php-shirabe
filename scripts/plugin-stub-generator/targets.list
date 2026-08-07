@@ -16,6 +16,9 @@ Composer\Package\BasePackage
 Composer\Package\Package
 Composer\Package\CompletePackage
 Composer\Package\RootPackage
+Composer\Package\AliasPackage
+Composer\Package\CompleteAliasPackage
+Composer\Package\RootAliasPackage
 Composer\Repository\ArrayRepository
 Composer\Repository\WritableArrayRepository
 Composer\Repository\InstalledArrayRepository

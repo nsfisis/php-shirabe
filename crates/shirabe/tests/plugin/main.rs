@@ -3,6 +3,7 @@ mod async_runtime;
 #[path = "../common/config_stub.rs"]
 mod config_stub;
 
+mod alias_package_test;
 mod e2e_command_provider_test;
 mod e2e_extension_installer_test;
 mod e2e_installer_test;

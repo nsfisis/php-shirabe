@@ -76,6 +76,26 @@ impl AnyPackage {
         }
     }
 
+    /// For `AliasPackage`'s own methods, which `PackageInterface` does not carry and the
+    /// alias subclasses inherit rather than redeclare.
+    pub fn as_alias_package(&self) -> Option<&AliasPackage> {
+        match self {
+            Self::AliasPackage(p) => Some(p),
+            Self::CompleteAliasPackage(p) => Some(&p.inner),
+            Self::RootAliasPackage(p) => Some(&p.inner.inner),
+            _ => None,
+        }
+    }
+
+    pub fn as_alias_package_mut(&mut self) -> Option<&mut AliasPackage> {
+        match self {
+            Self::AliasPackage(p) => Some(p),
+            Self::CompleteAliasPackage(p) => Some(&mut p.inner),
+            Self::RootAliasPackage(p) => Some(&mut p.inner.inner),
+            _ => None,
+        }
+    }
+
     pub fn as_root_package_interface(&self) -> Option<&dyn RootPackageInterface> {
         match self {
             Self::RootPackage(p) => Some(p),

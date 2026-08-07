@@ -876,6 +876,18 @@ const STUB_FILES: &[(&str, &str)] = &[
         include_str!("../php/stubs/Composer/Package/RootPackage.php"),
     ),
     (
+        "Composer/Package/AliasPackage.php",
+        include_str!("../php/stubs/Composer/Package/AliasPackage.php"),
+    ),
+    (
+        "Composer/Package/CompleteAliasPackage.php",
+        include_str!("../php/stubs/Composer/Package/CompleteAliasPackage.php"),
+    ),
+    (
+        "Composer/Package/RootAliasPackage.php",
+        include_str!("../php/stubs/Composer/Package/RootAliasPackage.php"),
+    ),
+    (
         "Composer/Repository/ArrayRepository.php",
         include_str!("../php/stubs/Composer/Repository/ArrayRepository.php"),
     ),

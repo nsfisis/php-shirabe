@@ -143,19 +143,14 @@ pub(crate) fn rust_handle_value(rhandle: u64, class: &str) -> PluginValue {
 }
 
 /// The proxy stub class matching a package's concrete variant.
-fn package_stub_class(
-    package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
-) -> Result<&'static str, PhpThrow> {
+fn package_stub_class(package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>) -> &'static str {
     match &*package.borrow() {
-        AnyPackage::Package(_) => Ok("Composer\\Package\\Package"),
-        AnyPackage::CompletePackage(_) => Ok("Composer\\Package\\CompletePackage"),
-        AnyPackage::RootPackage(_) => Ok("Composer\\Package\\RootPackage"),
-        // TODO(plugin): alias packages need proxy stubs of their own before they can cross.
-        AnyPackage::AliasPackage(_)
-        | AnyPackage::CompleteAliasPackage(_)
-        | AnyPackage::RootAliasPackage(_) => Err(runtime_throw(
-            "alias packages are not available over RPC yet".to_string(),
-        )),
+        AnyPackage::Package(_) => "Composer\\Package\\Package",
+        AnyPackage::CompletePackage(_) => "Composer\\Package\\CompletePackage",
+        AnyPackage::RootPackage(_) => "Composer\\Package\\RootPackage",
+        AnyPackage::AliasPackage(_) => "Composer\\Package\\AliasPackage",
+        AnyPackage::CompleteAliasPackage(_) => "Composer\\Package\\CompleteAliasPackage",
+        AnyPackage::RootAliasPackage(_) => "Composer\\Package\\RootAliasPackage",
     }
 }
 
@@ -177,10 +172,10 @@ fn repository_stub_class(repository: &RepositoryInterfaceHandle) -> Result<&'sta
 /// Registers a package and returns its wire descriptor.
 pub(crate) fn package_handle_value(
     package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
-) -> Result<PluginValue, PhpThrow> {
-    let class = package_stub_class(package)?;
+) -> PluginValue {
+    let class = package_stub_class(package);
     let rhandle = register_entity(RustEntity::Package(package.clone()));
-    Ok(rust_handle_value(rhandle, class))
+    rust_handle_value(rhandle, class)
 }
 
 /// The PHP class name (= proxy stub class) of a Rust IO instance, for the `__class` field of
@@ -376,6 +371,42 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         "Composer\\Package\\CompletePackage" => AnyPackage::CompletePackage(
             crate::package::CompletePackage::new(string_arg(0)?, string_arg(1)?, string_arg(2)?),
         ),
+        // The alias target has to be a package that already lives on the Rust side; an alias of
+        // an alias has no Rust representation, so its narrowing is an explicit error too.
+        "Composer\\Package\\AliasPackage" => {
+            let alias_of = package_from_arg(&class, ctor_args.first())?
+                .as_package()
+                .ok_or_else(|| runtime_throw(format!("{class} expects a real Package to alias")))?;
+            AnyPackage::AliasPackage(crate::package::AliasPackage::new(
+                alias_of,
+                string_arg(1)?,
+                string_arg(2)?,
+            ))
+        }
+        "Composer\\Package\\CompleteAliasPackage" => {
+            let alias_of = package_from_arg(&class, ctor_args.first())?
+                .as_complete_package()
+                .ok_or_else(|| {
+                    runtime_throw(format!("{class} expects a real CompletePackage to alias"))
+                })?;
+            AnyPackage::CompleteAliasPackage(crate::package::CompleteAliasPackage::new(
+                alias_of,
+                string_arg(1)?,
+                string_arg(2)?,
+            ))
+        }
+        "Composer\\Package\\RootAliasPackage" => {
+            let alias_of = package_from_arg(&class, ctor_args.first())?
+                .as_root_package()
+                .ok_or_else(|| {
+                    runtime_throw(format!("{class} expects a real RootPackage to alias"))
+                })?;
+            AnyPackage::RootAliasPackage(crate::package::RootAliasPackage::new(
+                alias_of,
+                string_arg(1)?,
+                string_arg(2)?,
+            ))
+        }
         // TODO(plugin): the remaining proxied classes get a construction story on demand,
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is
@@ -450,7 +481,7 @@ fn dispatch_composer_method(
         }
         "getPackage" => {
             let package = composer.borrow().get_package().as_rc().clone();
-            package_handle_value(&package)
+            Ok(package_handle_value(&package))
         }
         "getEventDispatcher" => {
             let dispatcher = composer.borrow().get_event_dispatcher();
@@ -791,7 +822,7 @@ fn dispatch_repository_method(
             })?;
             let mut items = Vec::with_capacity(packages.len());
             for package in packages {
-                items.push(package_handle_value(package.as_rc())?);
+                items.push(package_handle_value(package.as_rc()));
             }
             Ok(PluginValue::List(items))
         }
@@ -1340,6 +1371,31 @@ fn dispatch_package_method(
                 .set_transport_options(options);
             return Ok(PluginValue::Null);
         }
+        // `RootAliasPackage` overrides each of these to write through to its alias target, and
+        // `RootPackage` reaches the same base state either way, so both go through the interface.
+        "setRequires" | "setDevRequires" | "setConflicts" | "setProvides" | "setReplaces"
+        | "setAutoload" | "setDevAutoload" | "setSuggests" | "setExtra"
+            if package.borrow().is_root() =>
+        {
+            let mut borrowed = package.borrow_mut();
+            let package = borrowed
+                .as_root_package_interface_mut()
+                .expect("a root package exposes RootPackageInterface");
+            match method_name {
+                "setRequires" => package.set_requires(link_map_arg(method_name, args.first())?),
+                "setDevRequires" => {
+                    package.set_dev_requires(link_map_arg(method_name, args.first())?)
+                }
+                "setConflicts" => package.set_conflicts(link_map_arg(method_name, args.first())?),
+                "setProvides" => package.set_provides(link_map_arg(method_name, args.first())?),
+                "setReplaces" => package.set_replaces(link_map_arg(method_name, args.first())?),
+                "setAutoload" => package.set_autoload(map_arg(method_name, args.first())?),
+                "setDevAutoload" => package.set_dev_autoload(map_arg(method_name, args.first())?),
+                "setSuggests" => package.set_suggests(string_map_arg(method_name, args.first())?),
+                _ => package.set_extra(map_arg(method_name, args.first())?),
+            }
+            return Ok(PluginValue::Null);
+        }
         // `Package`'s own setters. The concrete subclasses inherit them (their PHP overrides in
         // `RootPackage` delegate to the same base state), so the base package answers for every
         // real variant.
@@ -1526,6 +1582,35 @@ fn dispatch_package_method(
             let other = package_from_arg(method_name, args.first())?;
             let this = PackageInterfaceHandle::from_rc_unchecked(package.clone());
             return Ok(PluginValue::Bool(this.equals(&other)));
+        }
+        // The subclasses narrow `getAliasOf`'s return type to their own alias target, but every
+        // variant holds the one entity.
+        "getAliasOf" | "isRootPackageAlias" | "hasSelfVersionRequires" => {
+            let borrowed = package.borrow();
+            let alias = borrowed.as_alias_package().ok_or_else(|| {
+                runtime_throw(format!(
+                    "`{method_name}` is not available on this package over RPC"
+                ))
+            })?;
+            return Ok(match method_name {
+                "getAliasOf" => package_handle_value(alias.get_alias_of().as_rc()),
+                "isRootPackageAlias" => PluginValue::Bool(alias.is_root_package_alias()),
+                _ => PluginValue::Bool(alias.has_self_version_requires()),
+            });
+        }
+        "setRootPackageAlias" => {
+            let value = bool_arg(method_name, args.first())?;
+            package
+                .borrow_mut()
+                .as_alias_package_mut()
+                .ok_or_else(|| {
+                    runtime_throw(
+                        "`setRootPackageAlias` is not available on this package over RPC"
+                            .to_string(),
+                    )
+                })?
+                .set_root_package_alias(value);
+            return Ok(PluginValue::Null);
         }
         _ => {}
     }
@@ -2138,16 +2223,14 @@ impl PhpInstallerProxy {
         ))
     }
 
-    fn package_arg(package: &PackageInterfaceHandle) -> anyhow::Result<PluginValue> {
-        Ok(package_handle_value(package.as_rc())?)
+    fn package_arg(package: &PackageInterfaceHandle) -> PluginValue {
+        package_handle_value(package.as_rc())
     }
 
-    fn optional_package_arg(
-        package: &Option<PackageInterfaceHandle>,
-    ) -> anyhow::Result<PluginValue> {
+    fn optional_package_arg(package: &Option<PackageInterfaceHandle>) -> PluginValue {
         match package {
             Some(package) => Self::package_arg(package),
-            None => Ok(PluginValue::Null),
+            None => PluginValue::Null,
         }
     }
 
@@ -2209,7 +2292,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
-        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)?];
+        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
         match self.call("isInstalled", args)? {
             PluginValue::Bool(installed) => Ok(installed),
             other => Err(self.unsupported_shape("isInstalled", &other)),
@@ -2222,8 +2305,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![
-            Self::package_arg(&package)?,
-            Self::optional_package_arg(&prev_package)?,
+            Self::package_arg(&package),
+            Self::optional_package_arg(&prev_package),
         ];
         let value = self.call("download", args)?;
         self.promise_result("download", value)
@@ -2237,8 +2320,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![
             PluginValue::string(r#type),
-            Self::package_arg(&package)?,
-            Self::optional_package_arg(&prev_package)?,
+            Self::package_arg(&package),
+            Self::optional_package_arg(&prev_package),
         ];
         let value = self.call("prepare", args)?;
         self.promise_result("prepare", value)
@@ -2249,7 +2332,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)?];
+        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
         let value = self.call("install", args)?;
         self.promise_result("install", value)
     }
@@ -2262,8 +2345,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![
             Self::repo_arg(repo)?,
-            Self::package_arg(&initial)?,
-            Self::package_arg(&target)?,
+            Self::package_arg(&initial),
+            Self::package_arg(&target),
         ];
         let value = self.call("update", args)?;
         self.promise_result("update", value)
@@ -2274,7 +2357,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)?];
+        let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
         let value = self.call("uninstall", args)?;
         self.promise_result("uninstall", value)
     }
@@ -2287,8 +2370,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![
             PluginValue::string(r#type),
-            Self::package_arg(&package)?,
-            Self::optional_package_arg(&prev_package)?,
+            Self::package_arg(&package),
+            Self::optional_package_arg(&prev_package),
         ];
         let value = self.call("cleanup", args)?;
         self.promise_result("cleanup", value)
@@ -2298,12 +2381,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         // PHP declares `getInstallPath(): string`; a failure here is a plugin error the
         // infallible signature cannot carry, so it aborts rather than answering a path that
         // would silently install the package in the wrong place.
-        let args = vec![Self::package_arg(&package).unwrap_or_else(|error| {
-            panic!(
-                "{}::getInstallPath argument failed: {error:#}",
-                self.handle.class
-            )
-        })];
+        let args = vec![Self::package_arg(&package)];
         let value = self.call("getInstallPath", args).unwrap_or_else(|error| {
             panic!(
                 "{}::getInstallPath failed over RPC: {error:#}",
