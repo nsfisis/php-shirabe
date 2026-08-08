@@ -19,8 +19,6 @@ pub const PATHINFO_EXTENSION: i64 = 4;
 pub const PATHINFO_DIRNAME: i64 = 1;
 pub const PATHINFO_BASENAME: i64 = 2;
 
-pub const PATH_SEPARATOR: &str = ":";
-
 /// PHP `PHP_MAXPATHLEN`: the platform's `MAXPATHLEN` (`MAX_PATH` on Windows).
 pub const PHP_MAXPATHLEN: i64 = if cfg!(windows) {
     260

@@ -31,7 +31,7 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
     is_callable, is_object, is_string, krsort, php_regex, preg_quote, realpath,
     spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
@@ -1413,19 +1413,16 @@ try {{
         if shirabe_php_shim::is_dir(&bin_dir) {
             let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
             let path_value = Platform::get_env(path_env).unwrap_or_default();
-            if !Preg::is_match(
-                format!(
-                    "{{(^|{}){}($|{})}}",
-                    PATH_SEPARATOR,
-                    preg_quote(&bin_dir, None),
-                    PATH_SEPARATOR
-                ),
-                &path_value,
-            ) {
-                Platform::put_env(
-                    path_env,
-                    &format!("{}{}{}", bin_dir, PATH_SEPARATOR, path_value),
-                );
+            if !std::env::split_paths(&path_value).any(|dir| dir == std::path::Path::new(&bin_dir))
+            {
+                let path_value = std::env::join_paths(
+                    std::iter::once(std::path::PathBuf::from(&bin_dir))
+                        .chain(std::env::split_paths(&path_value)),
+                )
+                .expect("bin-dir holds no path separator")
+                .into_string()
+                .unwrap();
+                Platform::put_env(path_env, &path_value);
             }
         }
     }

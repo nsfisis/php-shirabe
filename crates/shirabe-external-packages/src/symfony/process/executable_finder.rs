@@ -33,7 +33,9 @@ impl ExecutableFinder {
             .or_else(|| shirabe_php_shim::getenv("Path"))
             .map(|v| v.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let mut dirs = shirabe_php_shim::explode(shirabe_php_shim::PATH_SEPARATOR, &path);
+        let mut dirs: Vec<String> = std::env::split_paths(&path)
+            .map(|dir| dir.into_os_string().into_string().unwrap())
+            .collect();
         dirs.extend_from_slice(extra_dirs);
 
         let mut suffixes: Vec<String> = vec![];
@@ -42,9 +44,9 @@ impl ExecutableFinder {
                 shirabe_php_shim::getenv("PATHEXT").map(|v| v.to_string_lossy().into_owned());
             suffixes = self.suffixes.clone();
             let exts = match path_ext {
-                Some(ref ext) if !ext.is_empty() => {
-                    shirabe_php_shim::explode(shirabe_php_shim::PATH_SEPARATOR, ext)
-                }
+                Some(ref ext) if !ext.is_empty() => std::env::split_paths(ext)
+                    .map(|e| e.into_os_string().into_string().unwrap())
+                    .collect(),
                 _ => vec![
                     ".exe".to_string(),
                     ".bat".to_string(),

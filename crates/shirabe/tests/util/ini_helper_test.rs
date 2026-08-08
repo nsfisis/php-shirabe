@@ -2,7 +2,7 @@
 
 use shirabe::util::ini_helper::IniHelper;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{PATH_SEPARATOR, getenv, putenv};
+use shirabe_php_shim::{getenv, putenv};
 
 #[allow(dead_code)]
 fn set_up() -> TearDown {
@@ -39,7 +39,12 @@ impl Drop for TearDown {
 }
 
 fn set_env(paths: &[&str]) {
-    unsafe { putenv("COMPOSER_ORIGINAL_INIS", paths.join(PATH_SEPARATOR)) };
+    unsafe {
+        putenv(
+            "COMPOSER_ORIGINAL_INIS",
+            std::env::join_paths(paths).unwrap(),
+        )
+    };
 }
 
 #[test]
