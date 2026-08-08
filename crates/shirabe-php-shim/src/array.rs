@@ -395,14 +395,6 @@ pub fn array_splice<T>(
     array.splice(start..end, replacement).collect()
 }
 
-pub fn array_pop_first<T>(array: &mut Vec<T>) -> Option<T> {
-    if array.is_empty() {
-        None
-    } else {
-        Some(array.remove(0))
-    }
-}
-
 pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
     let mut acc: Vec<(MergeKey, PhpMixed)> = Vec::new();
     let mut next_int: i64 = 0;
@@ -531,17 +523,6 @@ where
     F: Fn(&T) -> U,
 {
     _array.iter().map(_callback).collect()
-}
-
-pub fn array_filter_use_key(
-    _array: &IndexMap<String, PhpMixed>,
-    _callback: Box<dyn Fn(&str) -> bool>,
-) -> IndexMap<String, PhpMixed> {
-    _array
-        .iter()
-        .filter(|(k, _)| _callback(k.as_str()))
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect()
 }
 
 pub fn array_chunk<T: Clone>(_array: &[T], _size: i64, _preserve_keys: bool) -> Vec<Vec<T>> {
@@ -686,16 +667,6 @@ pub fn sort<T: Ord>(_array: &mut Vec<T>) {
     _array.sort();
 }
 
-pub fn sort_with_flags<T: Ord>(array: &mut [T], flags: i64) {
-    if flags != SORT_REGULAR {
-        // TODO(phase-c): flag-specific comparison (SORT_NUMERIC/SORT_STRING/
-        // SORT_NATURAL/SORT_FLAG_CASE) cannot be expressed for a generic
-        // `T: Ord` element. No caller passes a non-regular flag yet.
-        todo!("sort() with flags other than SORT_REGULAR");
-    }
-    array.sort();
-}
-
 pub const SORT_REGULAR: i64 = 0;
 pub const SORT_NUMERIC: i64 = 1;
 pub const SORT_STRING: i64 = 2;
@@ -742,10 +713,6 @@ where
 
 pub fn sort_natural_flag_case(values: &mut [String]) {
     values.sort_by(|a, b| crate::strnatcasecmp(a, b).cmp(&0));
-}
-
-pub fn count_mixed(value: &PhpMixed) -> i64 {
-    count(value) as i64
 }
 
 pub fn count(value: &PhpMixed) -> usize {

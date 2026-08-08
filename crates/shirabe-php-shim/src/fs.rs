@@ -834,13 +834,6 @@ pub fn filemtime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
         .map(|d| d.as_secs() as i64)
 }
 
-pub fn fileowner(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
-    use std::os::unix::fs::MetadataExt;
-    std::fs::metadata(_filename.as_ref())
-        .ok()
-        .map(|m| m.uid() as i64)
-}
-
 pub fn unlink(path: impl AsRef<std::path::Path>) -> bool {
     std::fs::remove_file(path).is_ok()
 }
@@ -1028,29 +1021,6 @@ pub fn sys_get_temp_dir() -> String {
     std::env::temp_dir().to_string_lossy().into_owned()
 }
 
-pub fn tempnam(_dir: impl AsRef<std::path::Path>, _prefix: &str) -> Option<String> {
-    use std::os::unix::fs::PermissionsExt;
-    // TODO(phase-c): PHP falls back to the system temp dir when $dir is not writable; that fallback
-    // is not implemented here.
-    for _ in 0..1000 {
-        let name = format!("{}{:08x}", _prefix, fastrand::u32(..));
-        let path = _dir.as_ref().join(name);
-        match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(_) => {
-                // PHP creates the file with 0600 permissions.
-                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-                return path.to_str().map(ToOwned::to_owned);
-            }
-            Err(_) => continue,
-        }
-    }
-    None
-}
-
 // A directory-handle resource. This is a distinct resource kind from the byte streams modeled by
 // PhpResource; readdir/closedir have no callers yet, so it only records the opened path.
 // TODO(phase-c): give it real readdir/closedir behavior (cursor over the entries) when needed.
@@ -1109,14 +1079,6 @@ pub fn dirname(path: &str) -> String {
         Some(parent) if parent.as_os_str().is_empty() => ".".to_string(),
         Some(parent) => parent.to_str().expect("input was valid UTF-8").to_string(),
     }
-}
-
-pub fn dirname_levels(path: &str, levels: i64) -> String {
-    let mut result = path.to_string();
-    for _ in 0..levels {
-        result = dirname(&result);
-    }
-    result
 }
 
 pub fn basename(path: &str) -> String {

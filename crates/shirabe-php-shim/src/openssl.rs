@@ -11,32 +11,3 @@ pub fn openssl_x509_parse(
 ) -> Option<IndexMap<String, PhpMixed>> {
     todo!()
 }
-
-pub fn openssl_get_publickey(_certificate: &str) -> Option<PhpMixed> {
-    todo!()
-}
-
-pub fn openssl_pkey_get_details(_key: PhpMixed) -> Option<IndexMap<String, PhpMixed>> {
-    todo!()
-}
-
-pub fn openssl_verify(
-    _data: &str,
-    _signature: &[u8],
-    _pub_key_id: PhpMixed,
-    _algorithm: PhpMixed,
-) -> i64 {
-    todo!()
-}
-
-pub fn openssl_pkey_get_public(_public_key: &str) -> PhpMixed {
-    todo!()
-}
-
-pub fn openssl_get_md_methods() -> Vec<String> {
-    todo!()
-}
-
-pub fn openssl_free_key(_key: PhpMixed) {
-    todo!()
-}

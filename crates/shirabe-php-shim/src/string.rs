@@ -834,53 +834,6 @@ fn php_to_float(v: &PhpMixed) -> f64 {
     }
 }
 
-pub fn html_entity_decode(_s: &str) -> String {
-    // TODO(phase-c): only numeric entities and the most common named entities (the HTML 4.01 markup
-    // set PHP enables by default) are decoded; the full named-entity table is not ported.
-    let chars: Vec<char> = _s.chars().collect();
-    let mut out = String::with_capacity(_s.len());
-    let mut i = 0;
-    while i < chars.len() {
-        if chars[i] == '&' {
-            if let Some(rel) = chars[i + 1..].iter().position(|&c| c == ';') {
-                let entity: String = chars[i + 1..i + 1 + rel].iter().collect();
-                if let Some(decoded) = decode_html_entity(&entity) {
-                    out.push_str(&decoded);
-                    i = i + 1 + rel + 1;
-                    continue;
-                }
-            }
-            out.push('&');
-            i += 1;
-        } else {
-            out.push(chars[i]);
-            i += 1;
-        }
-    }
-    out
-}
-
-fn decode_html_entity(entity: &str) -> Option<String> {
-    if let Some(num) = entity.strip_prefix('#') {
-        let code = if let Some(hex) = num.strip_prefix('x').or_else(|| num.strip_prefix('X')) {
-            u32::from_str_radix(hex, 16).ok()?
-        } else {
-            num.parse::<u32>().ok()?
-        };
-        return char::from_u32(code).map(|c| c.to_string());
-    }
-    // PHP's default flags (ENT_QUOTES | ENT_HTML401) do not include the XML-only `apos`.
-    let c = match entity {
-        "amp" => '&',
-        "lt" => '<',
-        "gt" => '>',
-        "quot" => '"',
-        "nbsp" => '\u{00A0}',
-        _ => return None,
-    };
-    Some(c.to_string())
-}
-
 pub fn bin2hex(_data: &[u8]) -> String {
     _data.iter().map(|b| format!("{:02x}", b)).collect()
 }

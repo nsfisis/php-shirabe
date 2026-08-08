@@ -20,14 +20,6 @@ pub fn stream_resolve_include_path(filename: impl AsRef<std::path::Path>) -> Opt
     todo!()
 }
 
-/// PHP `stream_get_contents()` with an explicit max length.
-pub fn stream_get_contents_with_max(
-    stream: &PhpResource,
-    max_length: Option<i64>,
-) -> Option<String> {
-    stream_read_remaining(stream, max_length)
-}
-
 // Reads from the stream's current position: all remaining bytes, or up to `max_length` when given
 // (a negative max means "until end").
 fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Option<String> {
@@ -64,7 +56,7 @@ fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Optio
 
 // A stream context is modeled as an object holding the two arrays PHP keeps for it: the per-wrapper
 // `options` and the `params`. This is a self-contained value, so it round-trips through the
-// accessors below without any registry.
+// accessor below without any registry.
 pub fn stream_context_create(
     options: &IndexMap<String, PhpMixed>,
     params: Option<&IndexMap<String, PhpMixed>>,
@@ -87,24 +79,6 @@ pub fn stream_context_get_options(stream_or_context: &PhpMixed) -> IndexMap<Stri
             .unwrap_or_default(),
         _ => IndexMap::new(),
     }
-}
-
-pub fn stream_context_get_params(stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
-    let (options, params) = match stream_or_context {
-        PhpMixed::Object(context) | PhpMixed::Array(context) => (
-            context.get("options").cloned().unwrap_or_default(),
-            context
-                .get("params")
-                .and_then(PhpMixed::as_array)
-                .cloned()
-                .unwrap_or_default(),
-        ),
-        _ => (PhpMixed::default(), IndexMap::new()),
-    };
-    // PHP exposes the wrapper options under an "options" key alongside the params.
-    let mut result = params;
-    result.insert("options".to_string(), options);
-    result
 }
 
 pub fn stream_isatty(stream: PhpResource) -> bool {

@@ -206,12 +206,6 @@ pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
-pub fn instance_of<T>(_value: &PhpMixed) -> bool {
-    // TODO(php-runtime): PHP `instanceof` needs the runtime class of the value, which PhpMixed::Object
-    // does not carry.
-    todo!()
-}
-
 pub fn is_subclass_of(_object_or_class: &PhpMixed, _class_name: &str, _allow_string: bool) -> bool {
     // TODO(php-runtime): requires runtime class ancestry, which PhpMixed::Object does not carry.
     todo!()

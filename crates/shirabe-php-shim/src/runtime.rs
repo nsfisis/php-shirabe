@@ -368,11 +368,6 @@ pub fn require_php_file(_filename: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn php_require(_file: &str) -> PhpMixed {
-    // TODO(php-runtime): see require_php_file.
-    todo!()
-}
-
 pub fn memory_get_usage() -> i64 {
     // TODO(phase-c): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
     0
@@ -405,21 +400,6 @@ pub fn call_php_callable(_callback: &PhpMixed, _args: &[PhpMixed]) -> PhpMixed {
 // The shim does not raise PHP-level errors, so there is never a last error.
 pub fn error_get_last() -> Option<IndexMap<String, PhpMixed>> {
     None
-}
-
-pub fn globals_get(_name: &str) -> PhpMixed {
-    // TODO(php-runtime): the PHP $GLOBALS superglobal is not modeled in the shim.
-    todo!()
-}
-
-pub fn globals_set(_name: &str, _value: PhpMixed) {
-    // TODO(php-runtime): the PHP $GLOBALS superglobal is not modeled in the shim.
-    todo!()
-}
-
-pub fn clone<T: Clone>(_value: T) -> T {
-    // PHP's `clone` makes a (shallow) copy of an object; Rust's Clone is the closest equivalent.
-    _value
 }
 
 pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
