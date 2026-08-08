@@ -14,8 +14,8 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare,
-    php_regex, phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
-    strtolower, substr, substr_count, version_compare,
+    php_regex, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos, strtolower,
+    substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -389,7 +389,7 @@ impl Problem {
                 let version = Self::get_platform_package_version(
                     pool,
                     package_name,
-                    &phpversion("").unwrap_or_default(),
+                    &shirabe_php_rpc::phpversion("").unwrap_or_default(),
                 );
 
                 let msg = format!(
@@ -456,8 +456,6 @@ impl Problem {
                     Self::constraint_to_text(constraint)
                 );
 
-                // Per-extension version info can't be known statically; query the real PHP
-                // runtime via the RPC bridge, as PHP's Composer\Platform\Runtime does.
                 let runtime_version = shirabe_php_rpc::phpversion(&ext);
                 let effective_version = match runtime_version {
                     None => "0".to_string(),

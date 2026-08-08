@@ -185,16 +185,6 @@ pub fn get_loaded_extensions() -> Vec<String> {
     .collect()
 }
 
-pub fn phpversion(_extension: &str) -> Option<String> {
-    if _extension.is_empty() {
-        Some(PHP_VERSION.to_string())
-    } else {
-        // TODO(php-runtime): per-extension version strings are not modeled; PHP returns the extension's
-        // own version, or false when the extension is not loaded.
-        todo!()
-    }
-}
-
 // TODO(php-runtime): the callback should be registered in PHP runtime.
 pub fn set_error_handler(_callback: fn(i64, &str, &str, i64) -> bool) {}
 
