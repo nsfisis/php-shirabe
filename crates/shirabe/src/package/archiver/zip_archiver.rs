@@ -5,9 +5,7 @@ use crate::package::archiver::ArchiverInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    PhpMixed, RuntimeException, ZipArchive, class_exists, fileperms, method_exists, realpath,
-};
+use shirabe_php_shim::{RuntimeException, ZipArchive, class_exists, fileperms, realpath};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -71,16 +69,18 @@ impl ArchiverInterface for ZipArchiver {
                     ));
                 }
 
-                if filepath.is_dir() {
-                    zip.add_empty_dir(&relative_path.to_string_lossy());
-                } else {
-                    zip.add_file(&filepath, &relative_path.to_string_lossy());
-                }
+                // Ensure to preserve the permission umasks for the filepath in the archive.
+                let perms = fileperms(&filepath);
 
-                // setExternalAttributesName() is only available with libzip 0.11.2 or above
-                if method_exists(&PhpMixed::Null, "setExternalAttributesName") {
-                    let perms = fileperms(&filepath);
-                    zip.set_external_attributes_name(
+                if filepath.is_dir() {
+                    zip.add_empty_dir(
+                        &relative_path.to_string_lossy(),
+                        ZipArchive::OPSYS_UNIX,
+                        perms << 16,
+                    );
+                } else {
+                    zip.add_file(
+                        &filepath,
                         &relative_path.to_string_lossy(),
                         ZipArchive::OPSYS_UNIX,
                         perms << 16,

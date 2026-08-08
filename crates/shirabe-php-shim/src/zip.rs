@@ -218,17 +218,23 @@ impl ZipArchive {
         )))
     }
 
-    pub fn add_empty_dir(&self, local_name: &str) -> bool {
+    pub fn add_empty_dir(&self, local_name: &str, opsys: i64, attr: i64) -> bool {
         let mut state = self.state.borrow_mut();
         let ZipState::Writer { writer, .. } = &mut *state else {
             return false;
         };
         writer
-            .add_directory(local_name, SimpleFileOptions::default())
+            .add_directory(local_name, Self::entry_options(opsys, attr))
             .is_ok()
     }
 
-    pub fn add_file(&self, filepath: impl AsRef<std::path::Path>, local_name: &str) -> bool {
+    pub fn add_file(
+        &self,
+        filepath: impl AsRef<std::path::Path>,
+        local_name: &str,
+        opsys: i64,
+        attr: i64,
+    ) -> bool {
         let contents = match std::fs::read(filepath.as_ref()) {
             Ok(c) => c,
             Err(_) => return false,
@@ -238,21 +244,27 @@ impl ZipArchive {
             return false;
         };
         let options =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+            Self::entry_options(opsys, attr).compression_method(zip::CompressionMethod::Deflated);
         if writer.start_file(local_name, options).is_err() {
             return false;
         }
         std::io::Write::write_all(writer, &contents).is_ok()
     }
 
-    pub fn set_external_attributes_name(&self, _name: &str, _opsys: i64, _attr: i64) -> bool {
-        // TODO(phase-c): PHP's setExternalAttributesName mutates an already-added
-        // entry's external attributes (e.g. Unix permissions) after addFile. The
-        // `zip` crate fixes external attributes at start_file time via FileOptions
-        // and exposes no API to amend a written entry, so this cannot be faithfully
-        // reproduced without re-architecting add_file. Left unimplemented rather
-        // than silently dropping the permission bits.
-        todo!()
+    /// `opsys` and `attr` carry what PHP passes to `setExternalAttributesName`, which
+    /// amends an entry after `addFile`. The `zip` crate fixes external attributes when
+    /// the entry is started, so they are taken up front instead. `unix_permissions`
+    /// keeps only the low 9 mode bits, on top of which the crate restores `S_IFREG` for
+    /// files and `S_IFDIR` for directories; libzip stores `attr` verbatim, so
+    /// setuid/setgid/sticky bits and the remaining file types do not survive.
+    fn entry_options(opsys: i64, attr: i64) -> SimpleFileOptions {
+        let system = match opsys {
+            Self::OPSYS_UNIX => zip::System::Unix,
+            _ => todo!(),
+        };
+        SimpleFileOptions::default()
+            .system(system)
+            .unix_permissions((attr >> 16) as u32)
     }
 
     pub fn get_status_string(&self) -> String {
