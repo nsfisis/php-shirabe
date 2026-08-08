@@ -3,8 +3,8 @@
 use crate::autoload::ClassLoader;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    OutOfBoundsException, PhpMixed, array_flip, array_keys, array_merge, call_user_func_array,
-    implode, is_file, method_exists, php_dir, require_php_file, strtr_array, substr,
+    OutOfBoundsException, PhpMixed, array_flip_strings, array_keys, array_merge, implode, is_file,
+    method_exists, php_dir, require_php_file, strtr_array, substr,
 };
 use shirabe_semver::VersionParser;
 use std::sync::Mutex;
@@ -48,7 +48,6 @@ impl InstalledVersions {
                 .and_then(|v| v.as_array())
                 .cloned()
                 .unwrap_or_default();
-            // PHP: array_keys($installed['versions'])
             let keys: Vec<String> = array_keys(&versions);
             packages.push(keys);
         }
@@ -57,18 +56,8 @@ impl InstalledVersions {
             return packages.into_iter().next().unwrap();
         }
 
-        // PHP: array_keys(array_flip(\call_user_func_array('array_merge', $packages)))
-        let merged = call_user_func_array(
-            "array_merge",
-            &PhpMixed::List(
-                packages
-                    .into_iter()
-                    .map(|p| PhpMixed::List(p.into_iter().map(PhpMixed::String).collect()))
-                    .collect(),
-            ),
-        );
-        let flipped = array_flip(&merged);
-        array_keys(&flipped.as_array().cloned().unwrap_or_default())
+        let merged: Vec<String> = packages.into_iter().flatten().collect();
+        array_keys(&array_flip_strings(&merged))
     }
 
     /// Returns a list of all package names with a specific type e.g. 'library'
