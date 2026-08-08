@@ -383,13 +383,13 @@ impl ClassLoader {
                 sub_path = substr(&sub_path, 0, Some(last_pos as i64));
                 let search = format!("{}\\", sub_path);
                 if let Some(dirs) = self.prefix_dirs_psr4.get(&search) {
-                    let path_end = format!(
-                        "{}{}",
-                        std::path::MAIN_SEPARATOR,
-                        substr(&logical_path_psr4, (last_pos + 1) as i64, None)
-                    );
+                    let path_end = substr(&logical_path_psr4, (last_pos + 1) as i64, None);
                     for dir in dirs {
-                        let file = format!("{}{}", dir, path_end);
+                        let file = std::path::Path::new(dir)
+                            .join(&path_end)
+                            .into_os_string()
+                            .into_string()
+                            .unwrap();
                         if file_exists(&file) {
                             return Some(file);
                         }
@@ -400,7 +400,11 @@ impl ClassLoader {
 
         // PSR-4 fallback dirs
         for dir in &self.fallback_dirs_psr4 {
-            let file = format!("{}{}{}", dir, std::path::MAIN_SEPARATOR, logical_path_psr4);
+            let file = std::path::Path::new(dir)
+                .join(&logical_path_psr4)
+                .into_os_string()
+                .into_string()
+                .unwrap();
             if file_exists(&file) {
                 return Some(file);
             }
@@ -432,8 +436,11 @@ impl ClassLoader {
             for (prefix, dirs) in prefixes {
                 if Some(0) == strpos(class, prefix) {
                     for dir in dirs {
-                        let file =
-                            format!("{}{}{}", dir, std::path::MAIN_SEPARATOR, logical_path_psr0);
+                        let file = std::path::Path::new(dir)
+                            .join(&logical_path_psr0)
+                            .into_os_string()
+                            .into_string()
+                            .unwrap();
                         if file_exists(&file) {
                             return Some(file);
                         }
@@ -444,7 +451,11 @@ impl ClassLoader {
 
         // PSR-0 fallback dirs
         for dir in &self.fallback_dirs_psr0 {
-            let file = format!("{}{}{}", dir, std::path::MAIN_SEPARATOR, logical_path_psr0);
+            let file = std::path::Path::new(dir)
+                .join(&logical_path_psr0)
+                .into_os_string()
+                .into_string()
+                .unwrap();
             if file_exists(&file) {
                 return Some(file);
             }

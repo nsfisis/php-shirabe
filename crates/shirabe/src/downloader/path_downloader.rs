@@ -380,12 +380,11 @@ impl DownloaderInterface for PathDownloader {
                         {
                             let absolute_path =
                                 if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
-                                    format!(
-                                        "{}{}{}",
-                                        Platform::get_cwd(false)?,
-                                        std::path::MAIN_SEPARATOR,
-                                        path
-                                    )
+                                    std::path::Path::new(&Platform::get_cwd(false)?)
+                                        .join(&path)
+                                        .into_os_string()
+                                        .into_string()
+                                        .unwrap()
                                 } else {
                                     path.clone()
                                 };

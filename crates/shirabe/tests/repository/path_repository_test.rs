@@ -10,6 +10,7 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, file_get_contents, hash, realpath, serialize};
+use std::path::Path;
 
 fn fixtures_dir() -> String {
     format!(
@@ -49,8 +50,12 @@ fn coordinates(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
 
 #[test]
 fn test_load_package_from_file_system_with_incorrect_path() {
-    let repository_url = [fixtures_dir(), "path".to_string(), "missing".to_string()]
-        .join(std::path::MAIN_SEPARATOR_STR);
+    let repository_url = Path::new(&fixtures_dir())
+        .join("path")
+        .join("missing")
+        .into_os_string()
+        .into_string()
+        .unwrap();
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     assert!(repository.__get_packages().is_err());
@@ -58,12 +63,12 @@ fn test_load_package_from_file_system_with_incorrect_path() {
 
 #[test]
 fn test_load_package_from_file_system_with_version() {
-    let repository_url = [
-        fixtures_dir(),
-        "path".to_string(),
-        "with-version".to_string(),
-    ]
-    .join(std::path::MAIN_SEPARATOR_STR);
+    let repository_url = Path::new(&fixtures_dir())
+        .join("path")
+        .join("with-version")
+        .into_os_string()
+        .into_string()
+        .unwrap();
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     repository.__get_packages().unwrap();
@@ -78,12 +83,12 @@ fn test_load_package_from_file_system_with_version() {
 
 #[test]
 fn test_load_package_from_file_system_without_version() {
-    let repository_url = [
-        fixtures_dir(),
-        "path".to_string(),
-        "without-version".to_string(),
-    ]
-    .join(std::path::MAIN_SEPARATOR_STR);
+    let repository_url = Path::new(&fixtures_dir())
+        .join("path")
+        .join("without-version")
+        .into_os_string()
+        .into_string()
+        .unwrap();
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     let packages = repository.__get_packages().unwrap();
@@ -99,8 +104,12 @@ fn test_load_package_from_file_system_without_version() {
 
 #[test]
 fn test_load_package_from_file_system_with_wildcard() {
-    let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
+    let repository_url = Path::new(&fixtures_dir())
+        .join("path")
+        .join("*")
+        .into_os_string()
+        .into_string()
+        .unwrap();
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     let packages = repository.__get_packages().unwrap();
@@ -137,8 +146,12 @@ fn test_load_package_with_explicit_versions() {
     );
     let options = coordinates(vec![("versions", PhpMixed::Array(versions))]);
 
-    let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
+    let repository_url = Path::new(&fixtures_dir())
+        .join("path")
+        .join("*")
+        .into_os_string()
+        .into_string()
+        .unwrap();
     let mut repository = create_path_repo(coordinates(vec![
         ("url", PhpMixed::String(repository_url)),
         ("options", PhpMixed::Array(options)),
@@ -198,14 +211,16 @@ fn test_url_remains_relative() {
 
     // realpath() does not fully expand the paths
     // PHP Bug https://bugs.php.net/bug.php?id=72642
-    let repository_url = [
-        realpath(realpath(fixtures_dir().replace("/Fixtures", "")).unwrap_or_default())
+    let repository_url = Path::new(
+        &realpath(realpath(fixtures_dir().replace("/Fixtures", "")).unwrap_or_default())
             .unwrap_or_default(),
-        "Fixtures".to_string(),
-        "path".to_string(),
-        "with-version".to_string(),
-    ]
-    .join(std::path::MAIN_SEPARATOR_STR);
+    )
+    .join("Fixtures")
+    .join("path")
+    .join("with-version")
+    .into_os_string()
+    .into_string()
+    .unwrap();
     // getcwd() not necessarily match __DIR__
     // PHP Bug https://bugs.php.net/bug.php?id=73797
     let cwd = realpath(realpath(Platform::get_cwd(false).unwrap()).unwrap_or_default())
@@ -233,8 +248,12 @@ fn test_url_remains_relative() {
 #[test]
 fn test_reference_none() {
     let options = coordinates(vec![("reference", PhpMixed::String("none".to_string()))]);
-    let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
+    let repository_url = Path::new(&fixtures_dir())
+        .join("path")
+        .join("*")
+        .into_os_string()
+        .into_string()
+        .unwrap();
     let mut repository = create_path_repo(coordinates(vec![
         ("url", PhpMixed::String(repository_url)),
         ("options", PhpMixed::Array(options)),
@@ -254,8 +273,12 @@ fn test_reference_config() {
         ("reference", PhpMixed::String("config".to_string())),
         ("relative", PhpMixed::Bool(true)),
     ]);
-    let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
+    let repository_url = Path::new(&fixtures_dir())
+        .join("path")
+        .join("*")
+        .into_os_string()
+        .into_string()
+        .unwrap();
     let mut repository = create_path_repo(coordinates(vec![
         ("url", PhpMixed::String(repository_url)),
         ("options", PhpMixed::Array(options.clone())),

@@ -458,12 +458,11 @@ impl CreateProjectCommand {
         let mut directory = match directory {
             None => {
                 let mut parts = explode_with_limit("/", &name, 2);
-                format!(
-                    "{}{}{}",
-                    Platform::get_cwd(false)?,
-                    std::path::MAIN_SEPARATOR,
-                    array_pop(&mut parts).unwrap_or_default()
-                )
+                std::path::Path::new(&Platform::get_cwd(false)?)
+                    .join(array_pop(&mut parts).unwrap_or_default())
+                    .into_os_string()
+                    .into_string()
+                    .unwrap()
             }
             Some(directory) => directory,
         };
@@ -474,12 +473,11 @@ impl CreateProjectCommand {
         ))));
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(process))));
         if !fs.borrow().is_absolute_path(&directory) {
-            directory = format!(
-                "{}{}{}",
-                Platform::get_cwd(false)?,
-                std::path::MAIN_SEPARATOR,
-                directory
-            );
+            directory = std::path::Path::new(&Platform::get_cwd(false)?)
+                .join(&directory)
+                .into_os_string()
+                .into_string()
+                .unwrap();
         }
         if directory.is_empty() {
             return Err(UnexpectedValueException::new(

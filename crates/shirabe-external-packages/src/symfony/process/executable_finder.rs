@@ -66,7 +66,11 @@ impl ExecutableFinder {
         for suffix in &suffixes {
             for dir in &dirs {
                 let dir = if dir.is_empty() { "." } else { dir.as_str() };
-                let file = format!("{dir}{}{name}{suffix}", std::path::MAIN_SEPARATOR);
+                let file = std::path::Path::new(dir)
+                    .join(format!("{name}{suffix}"))
+                    .into_os_string()
+                    .into_string()
+                    .unwrap();
                 if shirabe_php_shim::is_file(&file)
                     && (cfg!(windows) || shirabe_php_shim::is_executable(&file))
                 {

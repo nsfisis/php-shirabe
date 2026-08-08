@@ -90,7 +90,11 @@ impl ArchiveDownloader for GzipDownloader {
             .unwrap_or(""),
             PATHINFO_FILENAME,
         );
-        let target_filepath = format!("{}{}{}", path, std::path::MAIN_SEPARATOR, filename);
+        let target_filepath = std::path::Path::new(path)
+            .join(&filename)
+            .into_os_string()
+            .into_string()
+            .unwrap();
 
         if !Platform::is_windows() {
             let command = vec![

@@ -488,12 +488,11 @@ impl Filesystem {
 
         let mut result = true;
         for file in &ri {
-            let target_path = format!(
-                "{}{}{}",
-                target,
-                std::path::MAIN_SEPARATOR,
-                ri.get_sub_pathname()
-            );
+            let target_path = Path::new(&target)
+                .join(ri.get_sub_pathname())
+                .into_os_string()
+                .into_string()
+                .unwrap();
             if file.is_dir() {
                 self.ensure_directory_exists(&target_path)?;
             } else {
