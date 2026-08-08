@@ -378,17 +378,9 @@ pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
     0
 }
 
-pub fn call_user_func<T>(_callback: &str, _args: &[PhpMixed]) -> T
-where
-    T: From<PhpMixed>,
-{
-    // TODO(php-runtime): invoking a function by name needs a runtime function registry; the shim has no
-    // way to resolve a callable from a string.
-    todo!()
-}
-
 pub fn call_user_func_array(_callback: &str, _args: &PhpMixed) -> PhpMixed {
-    // TODO(php-runtime): see call_user_func.
+    // TODO(php-runtime): invoking a function by name needs a runtime function registry; the shim has
+    // no way to resolve a callable from a string.
     todo!()
 }
 
