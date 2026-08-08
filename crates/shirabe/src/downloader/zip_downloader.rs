@@ -361,11 +361,13 @@ impl ZipDownloader {
 
         result.map_err(|e| {
             if let Some(err) = e.catch::<ErrorException>() {
-                RuntimeException::new(format!(
+                let message = format!(
                     "The archive for \"{}\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): {}",
                     package.get_name(),
                     err.get_message(),
-                )).into()
+                );
+                RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))
+                    .into()
             } else {
                 e
             }

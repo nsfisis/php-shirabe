@@ -1038,7 +1038,7 @@ impl GitHubDriver {
                         }
 
                         if !self.inner.io.is_interactive() {
-                            self.attempt_clone_fallback(Some(&e))
+                            self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))
                                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                             return Ok(Response::new(
@@ -1090,7 +1090,7 @@ impl GitHubDriver {
                         }
 
                         if !self.inner.io.is_interactive() && fetching_repo_data {
-                            self.attempt_clone_fallback(Some(&e))
+                            self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))
                                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                             return Ok(Response::new(
@@ -1177,7 +1177,7 @@ impl GitHubDriver {
             }
             Err(e) => {
                 if e.get_code() == 499 {
-                    self.attempt_clone_fallback(Some(&e))?;
+                    self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))?;
                 } else {
                     return Err((*e).into());
                 }
@@ -1227,14 +1227,14 @@ impl GitHubDriver {
     /// @throws \RuntimeException
     pub(crate) fn attempt_clone_fallback(
         &mut self,
-        e: Option<&TransportException>,
+        e: Option<std::sync::Arc<anyhow::Error>>,
     ) -> anyhow::Result<bool> {
         if !self.allow_git_fallback {
-            return Err(RuntimeException::new(format!(
-                "Fallback to git driver disabled{}",
-                e.map(|e| format!(": {}", e.get_message()))
-                    .unwrap_or_default()
-            ))
+            return Err(RuntimeException::with_code_and_previous(
+                "Fallback to git driver disabled".to_string(),
+                0,
+                e,
+            )
             .into());
         }
 

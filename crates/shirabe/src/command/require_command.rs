@@ -977,10 +977,14 @@ impl Command for RequireCommand {
                 if self.newly_created.get() {
                     self.revert_composer_file();
 
-                    return Err(RuntimeException::new(format!(
-                        "No composer.json present in the current directory ({}), this may be the cause of the following exception.",
-                        self.file.borrow()
-                    ))
+                    return Err(RuntimeException::with_code_and_previous(
+                        format!(
+                            "No composer.json present in the current directory ({}), this may be the cause of the following exception.",
+                            self.file.borrow()
+                        ),
+                        0,
+                        Some(std::sync::Arc::new(e)),
+                    )
                     .into());
                 }
 

@@ -12,7 +12,7 @@ impl IOException {
     pub fn new(
         message: String,
         code: i64,
-        previous: Option<std::sync::Arc<shirabe_php_shim::AnyThrowable>>,
+        previous: Option<std::sync::Arc<anyhow::Error>>,
         path: Option<String>,
     ) -> Self {
         Self {

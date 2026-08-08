@@ -90,8 +90,12 @@ impl GlobalCommand {
             }
         }
 
-        chdir(&home).map_err(|_e| {
-            RuntimeException::new(format!("Could not switch to home directory \"{}\"", home))
+        chdir(&home).map_err(|e| {
+            RuntimeException::with_code_and_previous(
+                format!("Could not switch to home directory \"{}\"", home),
+                0,
+                Some(std::sync::Arc::new(e)),
+            )
         })?;
 
         if !quiet {

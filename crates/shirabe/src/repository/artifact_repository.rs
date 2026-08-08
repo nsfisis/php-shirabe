@@ -224,11 +224,15 @@ impl ArtifactRepository {
             .unwrap_or_default();
         match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),
-            Err(exception) => Err(UnexpectedValueException::new(format!(
-                "Failed loading package in {}: {}",
-                pathname, exception
-            ))
-            .into()),
+            Err(exception) => {
+                let message = format!("Failed loading package in {}: {}", pathname, exception);
+                Err(UnexpectedValueException::with_code_and_previous(
+                    message,
+                    0,
+                    Some(std::sync::Arc::new(exception)),
+                )
+                .into())
+            }
         }
     }
 }

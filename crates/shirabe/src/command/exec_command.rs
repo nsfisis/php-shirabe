@@ -220,10 +220,11 @@ impl Command for ExecCommand {
             && getcwd().as_deref() != Some(iwd.as_str())
         {
             chdir(iwd).map_err(|e| {
-                RuntimeException::new(format!(
-                    "Could not switch back to working directory \"{}\"",
-                    iwd
-                ))
+                RuntimeException::with_code_and_previous(
+                    format!("Could not switch back to working directory \"{}\"", iwd),
+                    0,
+                    Some(std::sync::Arc::new(e)),
+                )
             })?;
         }
 

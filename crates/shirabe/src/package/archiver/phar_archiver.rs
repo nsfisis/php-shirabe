@@ -5,7 +5,7 @@ use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::archiver::ArchiverInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    FilesystemIterator, Phar, PharData, RuntimeException, bzcompress, file_exists,
+    AnyThrowable, FilesystemIterator, Phar, PharData, RuntimeException, bzcompress, file_exists,
     file_put_contents, function_exists, gzcompress, str_repeat, strrpos, unlink,
 };
 
@@ -147,7 +147,9 @@ impl ArchiverInterface for PharArchiver {
                 "Could not create archive '{}' from '{}': {}",
                 target_outer, sources, e
             );
-            RuntimeException::new(message).into()
+            let code = AnyThrowable::of(e.as_ref()).map_or(0, AnyThrowable::get_code);
+            RuntimeException::with_code_and_previous(message, code, Some(std::sync::Arc::new(e)))
+                .into()
         })
     }
 

@@ -19,8 +19,9 @@ use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string, json_encode,
-    ltrim, php_regex, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+    AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string,
+    json_encode, ltrim, php_regex, stripos, strpos, strtolower, strval, substr, trigger_error,
+    trim,
 };
 
 #[derive(Debug)]
@@ -112,11 +113,17 @@ impl ArrayLoader {
             {
                 Ok(v) => version = v,
                 Err(e) => {
-                    return Err(UnexpectedValueException::new(format!(
+                    let message = format!(
                         "Failed to normalize version for package \"{}\": {}",
                         config.get("name").and_then(|v| v.as_string()).unwrap_or(""),
                         e
-                    ))
+                    );
+                    let code = AnyThrowable::of(e.as_ref()).map_or(0, AnyThrowable::get_code);
+                    return Err(UnexpectedValueException::with_code_and_previous(
+                        message,
+                        code,
+                        Some(std::sync::Arc::new(e)),
+                    )
                     .into());
                 }
             }
@@ -654,11 +661,17 @@ impl ArrayLoader {
 
         let parsed_constraint = match self.version_parser.parse_constraints(&constraint) {
             Ok(c) => c,
-            Err(_e) => {
-                return Err(UnexpectedValueException::new(format!(
+            Err(e) => {
+                let message = format!(
                     "Link constraint in {} {} > {} should be a valid version constraint, got \"{}\"",
                     source, description, target, constraint
-                ))
+                );
+                let code = AnyThrowable::of(e.as_ref()).map_or(0, AnyThrowable::get_code);
+                return Err(UnexpectedValueException::with_code_and_previous(
+                    message,
+                    code,
+                    Some(std::sync::Arc::new(e)),
+                )
                 .into());
             }
         };

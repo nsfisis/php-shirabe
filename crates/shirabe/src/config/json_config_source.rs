@@ -148,11 +148,16 @@ impl JsonConfigSource {
                 };
                 // restore contents to the original state
                 file_put_contents(self.file.borrow().get_path(), contents.as_bytes());
-                return Err(RuntimeException::new(format!(
+                let message = format!(
                     "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {}{}",
                     PHP_EOL,
                     implode(PHP_EOL, jve.get_errors()),
-                ))
+                );
+                return Err(RuntimeException::with_code_and_previous(
+                    message,
+                    0,
+                    Some(std::sync::Arc::new(e)),
+                )
                 .into());
             }
         }

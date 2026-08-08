@@ -1,12 +1,16 @@
 use crate::PhpClass;
 
-/// The fields a PHP `\Throwable` carries: its message and code, and the exception it wraps. Ported
+/// The fields a PHP `\Throwable` carries: its message and code, and the error it wraps. Ported
 /// exception types embed this, either directly or through the parent exception they extend.
+///
+/// `previous` is any error rather than an [`AnyThrowable`], because the port reaches a `catch`
+/// carrying errors PHP would have raised as exception objects and the port raises as itself. One
+/// that does carry an exception is still reachable as such, through [`Catch`].
 #[derive(Debug, Clone)]
 pub struct ThrowableFields {
     message: String,
     code: i64,
-    previous: Option<std::sync::Arc<AnyThrowable>>,
+    previous: Option<std::sync::Arc<anyhow::Error>>,
 }
 
 impl ThrowableFields {
@@ -23,7 +27,7 @@ impl ThrowableFields {
         self.code = code;
     }
 
-    pub fn get_previous(&self) -> Option<&AnyThrowable> {
+    pub fn get_previous(&self) -> Option<&anyhow::Error> {
         self.previous.as_deref()
     }
 }
@@ -97,6 +101,15 @@ impl AnyThrowable {
         error.downcast_ref::<Self>()
     }
 
+    /// PHP has no `setPrevious`: an exception gets its `previous` from its constructor. The one
+    /// exception is a `finally` throwing over an exception already on its way out — the one the
+    /// `finally` threw propagates, and the engine makes the one it displaced its `previous`.
+    pub fn set_previous(&mut self, previous: std::sync::Arc<anyhow::Error>) {
+        self.downcast_mut::<ThrowableFields>()
+            .expect("every exception bottoms out at the ThrowableFields")
+            .previous = Some(previous);
+    }
+
     /// PHP's `catch (T $e)`: the exception seen as an instance of `T`, or `None` if it is not one.
     /// A subclass answers through the instance of `T` it embeds, so `T`'s own state is reachable
     /// the way PHP reaches an inherited property.
@@ -135,7 +148,7 @@ impl AnyThrowable {
         self.0.fields().get_code()
     }
 
-    pub fn get_previous(&self) -> Option<&AnyThrowable> {
+    pub fn get_previous(&self) -> Option<&anyhow::Error> {
         self.0.fields().get_previous()
     }
 }
@@ -149,7 +162,7 @@ impl std::fmt::Display for AnyThrowable {
 impl std::error::Error for AnyThrowable {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.get_previous()
-            .map(|previous| previous as &(dyn std::error::Error + 'static))
+            .map(|previous| &**previous as &(dyn std::error::Error + 'static))
     }
 }
 
@@ -277,7 +290,7 @@ macro_rules! impl_php_exception {
                 self.$field.set_code(code);
             }
 
-            pub fn get_previous(&self) -> Option<&$crate::AnyThrowable> {
+            pub fn get_previous(&self) -> Option<&::anyhow::Error> {
                 self.$field.get_previous()
             }
         }
@@ -306,7 +319,7 @@ macro_rules! define_php_exception {
             pub fn with_code_and_previous(
                 message: String,
                 code: i64,
-                previous: Option<std::sync::Arc<AnyThrowable>>,
+                previous: Option<std::sync::Arc<anyhow::Error>>,
             ) -> Self {
                 Self {
                     inner: ThrowableFields {
@@ -325,7 +338,7 @@ macro_rules! define_php_exception {
             pub fn with_code_and_previous(
                 message: String,
                 code: i64,
-                previous: Option<std::sync::Arc<AnyThrowable>>,
+                previous: Option<std::sync::Arc<anyhow::Error>>,
             ) -> Self {
                 Self {
                     inner: <$parent>::with_code_and_previous(message, code, previous),
@@ -399,7 +412,7 @@ impl ErrorException {
         severity: i64,
         filename: String,
         lineno: i64,
-        previous: Option<std::sync::Arc<AnyThrowable>>,
+        previous: Option<std::sync::Arc<anyhow::Error>>,
     ) -> Self {
         Self {
             inner: Exception::with_code_and_previous(message, code, previous),
@@ -518,8 +531,45 @@ mod tests {
     }
 
     #[test]
+    fn the_previous_is_any_error_a_catch_can_reach() {
+        let previous = std::sync::Arc::new(anyhow::Error::new(std::io::Error::other("io")));
+        let error: anyhow::Error =
+            Exception::with_code_and_previous("boom".to_string(), 0, Some(previous)).into();
+
+        assert_eq!(
+            error
+                .catch::<Exception>()
+                .and_then(|e| e.get_previous())
+                .map(ToString::to_string),
+            Some("io".to_string())
+        );
+    }
+
+    #[test]
+    fn set_previous_reaches_the_superclass_holding_it() {
+        let pending = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
+            "first".to_string(),
+        )));
+        let mut error: anyhow::Error = Subclass::new(7).into();
+
+        error
+            .downcast_mut::<AnyThrowable>()
+            .unwrap()
+            .set_previous(pending);
+
+        assert_eq!(
+            error
+                .catch::<Subclass>()
+                .and_then(|e| e.get_previous())
+                .and_then(|previous| previous.catch::<RuntimeException>())
+                .map(|previous| previous.get_message().to_string()),
+            Some("first".to_string())
+        );
+    }
+
+    #[test]
     fn the_previous_exception_is_the_error_source() {
-        let previous = std::sync::Arc::new(AnyThrowable::new(RuntimeException::new(
+        let previous = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
             "cause".to_string(),
         )));
         let error: anyhow::Error =

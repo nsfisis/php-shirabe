@@ -174,7 +174,13 @@ impl JsonFile {
                 // TransportException keeps its message verbatim; any other exception is wrapped
                 // with the "Could not read" prefix.
                 if let Some(te) = e.catch::<TransportException>() {
-                    return Err(RuntimeException::new(te.get_message().to_string()).into());
+                    let message = te.get_message().to_string();
+                    return Err(RuntimeException::with_code_and_previous(
+                        message,
+                        0,
+                        Some(std::sync::Arc::new(e)),
+                    )
+                    .into());
                 }
                 return Err(RuntimeException::new(format!(
                     "Could not read {}\n\n{}",

@@ -16,7 +16,7 @@ use crate::util::{AuthHelper, StoreAuth};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
+    AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
     clearstatcache, explode, implode, in_array_loose, in_array_strict, is_dir, php_regex,
     preg_quote, rawurldecode, rawurlencode, str_contains, str_ends_with, str_replace_array, strlen,
     strpos, substr, trim, version_compare,
@@ -839,7 +839,7 @@ impl Git {
                 Ok(())
             })();
             // finally
-            let _ = self.run_commands(
+            let finally_result = self.run_commands(
                 vec![vec![
                     "git".to_string(),
                     "remote".to_string(),
@@ -853,8 +853,19 @@ impl Git {
                 false,
                 (),
             );
+            let outcome = match finally_result {
+                Ok(()) => try_result,
+                Err(mut thrown) => {
+                    if let Some(pending) = try_result.err().map(std::sync::Arc::new)
+                        && let Some(exception) = thrown.downcast_mut::<AnyThrowable>()
+                    {
+                        exception.set_previous(pending);
+                    }
+                    Err(thrown)
+                }
+            };
 
-            if let Err(e) = try_result {
+            if let Err(e) = outcome {
                 self.io.write_error3(
                     &format!("<error>Sync mirror failed: {}</error>", e),
                     true,

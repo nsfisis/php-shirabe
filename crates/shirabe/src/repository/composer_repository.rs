@@ -40,9 +40,9 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
-    UnexpectedValueException, extension_loaded, hash, http_build_query, json_decode, parse_url_all,
-    php_regex, realpath, strtolower, strtr, urlencode, var_export,
+    AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
+    RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query,
+    json_decode, parse_url_all, php_regex, realpath, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
@@ -2695,17 +2695,21 @@ impl ComposerRepository {
         })();
 
         result.map_err(|e| {
-            RuntimeException::new(format!(
+            let message = format!(
                 "Could not load packages in {}{}: [{}] {}",
                 self.get_repo_name(),
                 source
                     .as_ref()
                     .map(|s| format!(" from {}", s))
                     .unwrap_or_default(),
-                "Exception",
+                AnyThrowable::of(e.as_ref()).map_or_else(
+                    || "Exception".to_string(),
+                    shirabe_php_shim::PhpClass::php_class_name,
+                ),
                 e
-            ))
-            .into()
+            );
+            RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))
+                .into()
         })
     }
 

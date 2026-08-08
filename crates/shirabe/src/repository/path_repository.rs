@@ -350,10 +350,11 @@ impl PathRepository {
 
             self.inner
                 .add_package(self.loader.load(package.clone(), None).map_err(|e| {
-                    RuntimeException::new(format!(
-                        "Failed loading the package in {}",
-                        composer_file_path
-                    ))
+                    RuntimeException::with_code_and_previous(
+                        format!("Failed loading the package in {}", composer_file_path),
+                        0,
+                        Some(std::sync::Arc::new(e)),
+                    )
                 })?);
         }
 
