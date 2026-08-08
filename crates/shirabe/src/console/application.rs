@@ -131,6 +131,9 @@ pub struct Application {
     disable_scripts_by_default: bool,
     /// Store the initial working directory at startup time
     initial_working_directory: Option<String>,
+    /// For testing only: see [__set_dev_warning_time](Application::__set_dev_warning_time) for
+    /// details.
+    dev_warning_time: Option<i64>,
     /// Self-reference used to hand commands their owning application (PHP's `$command->setApplication($this)`).
     /// Set by `new_shared`; the run flow threads the upgraded `Rc` so command callbacks never
     /// re-borrow the application while it is already borrowed.
@@ -193,6 +196,7 @@ impl Application {
             disable_plugins_by_default: false,
             disable_scripts_by_default: false,
             initial_working_directory,
+            dev_warning_time: composer::COMPOSER_DEV_WARNING_TIME,
             me: std::rc::Weak::new(),
         };
         if defined("SIGINT") && SignalRegistry::is_supported() {
@@ -2281,7 +2285,8 @@ impl ApplicationHandle {
                 io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 
-            if let Some(dev_warning_time) = composer::COMPOSER_DEV_WARNING_TIME
+            let dev_warning_time = application.borrow().dev_warning_time;
+            if let Some(dev_warning_time) = dev_warning_time
                 && command_name.as_deref() != Some("self-update")
                 && command_name.as_deref() != Some("selfupdate")
                 && time() > dev_warning_time
@@ -2568,6 +2573,12 @@ impl ApplicationHandle {
 
     pub fn set_catch_exceptions(&self, boolean: bool) {
         self.0.borrow_mut().set_catch_exceptions(boolean);
+    }
+
+    /// For testing only: simulating dynamically define COMPOSER_DEV_WARNING_TIME constant via
+    /// `define()` in PHP.
+    pub fn __set_dev_warning_time(&self, dev_warning_time: Option<i64>) {
+        self.0.borrow_mut().dev_warning_time = dev_warning_time;
     }
 
     /// For testing only: exposes the application as a Symfony base-application handle, the way

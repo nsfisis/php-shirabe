@@ -17,7 +17,7 @@ use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{PHP_EOL, PHP_SERVER, PhpMixed, define, defined, time};
+use shirabe_php_shim::{PHP_EOL, PHP_SERVER, PhpMixed, time};
 
 fn set_up() {
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
@@ -35,7 +35,6 @@ impl Drop for TearDown {
     }
 }
 
-#[ignore = "the dev warning deadline is a Rust constant baked in by build.rs, so a runtime define() of COMPOSER_DEV_WARNING_TIME cannot make Application take the warning branch"]
 #[test]
 fn test_dev_warning() {
     let _tear_down = TearDown;
@@ -43,9 +42,7 @@ fn test_dev_warning() {
 
     let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
 
-    if !defined("COMPOSER_DEV_WARNING_TIME") {
-        define("COMPOSER_DEV_WARNING_TIME", PhpMixed::Int(time() - 1));
-    }
+    application.__set_dev_warning_time(Some(time() - 1));
 
     let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
         None, false, None,
