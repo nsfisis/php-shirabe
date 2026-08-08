@@ -36,10 +36,9 @@ impl JsonManipulator {
             contents = "{}".to_string();
         }
         if !Preg::is_match3(php_regex!("#^\\{(.*)\\}$#s"), &contents, None) {
-            return Err(InvalidArgumentException {
-                message: "The json file must be an object ({})".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "The json file must be an object ({})".to_string(),
+            )
             .into());
         }
         let newline = if strpos(&contents, "\r\n").is_some() {
@@ -823,10 +822,10 @@ impl JsonManipulator {
                     );
                 }
             } else {
-                return Err(LogicException {
-                    message: format!("Nothing matched above for: {}", children),
-                    code: 0,
-                }
+                return Err(LogicException::new(format!(
+                    "Nothing matched above for: {}",
+                    children
+                ))
                 .into());
             }
         }
@@ -940,10 +939,7 @@ impl JsonManipulator {
             children_clean = Some(children.clone());
         }
 
-        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException {
-            message: "JsonManipulator: $childrenClean is not defined. Please report at https://github.com/composer/composer/issues/new.".to_string(),
-            code: 0,
-        })?;
+        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/composer/composer/issues/new.".to_string()))?;
 
         // no child data left, $name was the only key in
         let mut empty_match: IndexMap<String, String> = IndexMap::new();
@@ -1113,11 +1109,9 @@ impl JsonManipulator {
                 );
             }
         } else {
-            return Err(LogicException {
-                message: format!("Nothing matched above for: {}", children),
-                code: 0,
-            }
-            .into());
+            return Err(
+                LogicException::new(format!("Nothing matched above for: {}", children)).into(),
+            );
         }
 
         self.contents = format!("{}{}{}", node_start, children, node_end);
@@ -1132,10 +1126,9 @@ impl JsonManipulator {
         index: i64,
     ) -> anyhow::Result<bool> {
         if index < 0 {
-            return Err(InvalidArgumentException {
-                message: "Index can only be positive integer".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "Index can only be positive integer".to_string(),
+            )
             .into());
         }
 

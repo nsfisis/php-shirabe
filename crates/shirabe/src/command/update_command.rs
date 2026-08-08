@@ -72,10 +72,9 @@ impl UpdateCommand {
         packages: Vec<String>,
     ) -> anyhow::Result<Vec<String>> {
         if !input.borrow().is_interactive() {
-            return Err(InvalidArgumentException {
-                message: "--interactive cannot be used in non-interactive terminals.".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "--interactive cannot be used in non-interactive terminals.".to_string(),
+            )
             .into());
         }
 
@@ -165,10 +164,9 @@ impl UpdateCommand {
         }
 
         if autocompleter_values.is_empty() {
-            return Err(RuntimeException {
-                message: "Could not find any package with new versions available".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "Could not find any package with new versions available".to_string(),
+            )
             .into());
         }
 
@@ -210,11 +208,7 @@ impl UpdateCommand {
             return Ok(packages);
         }
 
-        Err(RuntimeException {
-            message: "Installation aborted.".to_string(),
-            code: 0,
-        }
-        .into())
+        Err(RuntimeException::new("Installation aborted.".to_string()).into())
     }
 
     fn create_version_selector(
@@ -450,10 +444,9 @@ impl Command for UpdateCommand {
             .unwrap_or(false)
         {
             if !composer.get_locker().borrow_mut().is_locked() {
-                return Err(InvalidArgumentException {
-                    message: "patch-only can only be used with a lock file present".to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "patch-only can only be used with a lock file present".to_string(),
+                )
                 .into());
             }
             for package in composer

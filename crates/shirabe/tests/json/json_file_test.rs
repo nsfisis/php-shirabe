@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use shirabe::json::{JsonEncodeOptions, JsonFile, JsonValidationException};
 use shirabe_external_packages::seld::json_lint::ParsingException;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 
 /// ref: JsonFileTest::expectParseException
@@ -269,14 +270,14 @@ fn test_schema_validation_error() {
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert!(e.get_errors().contains(&expected_error));
 
     let err = json
         .validate_schema(JsonFile::LAX_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert!(e.get_errors().contains(&expected_error));
 }
@@ -298,7 +299,7 @@ fn test_schema_validation_lax_additional_properties() {
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(
         format!("\"{}\" does not match the expected JSON schema", file),
         e.get_message()
@@ -327,7 +328,7 @@ fn test_schema_validation_lax_required() {
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
     assert!(errors.contains(&"name : \"name\" is a required property".to_string()));
@@ -338,7 +339,7 @@ fn test_schema_validation_lax_required() {
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert_eq!(
         &vec!["description : \"description\" is a required property".to_string()],
@@ -350,7 +351,7 @@ fn test_schema_validation_lax_required() {
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert_eq!(
         &vec!["name : \"name\" is a required property".to_string()],
@@ -362,7 +363,7 @@ fn test_schema_validation_lax_required() {
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
     assert!(errors.contains(&"name : \"name\" is a required property".to_string()));
@@ -373,7 +374,7 @@ fn test_schema_validation_lax_required() {
     let err = json
         .validate_schema(JsonFile::STRICT_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
     assert!(errors.contains(&"name : \"name\" is a required property".to_string()));
@@ -444,7 +445,7 @@ fn test_auth_schema_validation_with_custom_data_source() {
 
     let err = JsonFile::validate_json_schema("COMPOSER_AUTH", &json, JsonFile::AUTH_SCHEMA, None)
         .unwrap_err();
-    let e = err.downcast_ref::<JsonValidationException>().unwrap();
+    let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert_eq!(&vec![expected_error], e.get_errors());
 }
@@ -519,7 +520,7 @@ fn test_composer_lock_file_merge_conflict_complex() {
         std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-complex.txt")).unwrap();
 
     let err = JsonFile::parse_json(Some(&data), Some("/path/to/composer.lock")).unwrap_err();
-    assert!(err.downcast_ref::<ParsingException>().is_some());
+    assert!(err.is_instanceof::<ParsingException>());
 }
 
 #[test]
@@ -531,7 +532,7 @@ fn test_composer_lock_file_merge_conflict_complex_crlf() {
     .unwrap();
 
     let err = JsonFile::parse_json(Some(&data), Some("/path/to/composer.lock")).unwrap_err();
-    assert!(err.downcast_ref::<ParsingException>().is_some());
+    assert!(err.is_instanceof::<ParsingException>());
 }
 
 #[test]

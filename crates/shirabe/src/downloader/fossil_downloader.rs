@@ -47,14 +47,11 @@ impl FossilDownloader {
             .execute(&command, output, cwd.as_deref())?
             != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    command.join(" "),
-                    self.inner.process.borrow().get_error_output()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Failed to execute {}\n\n{}",
+                command.join(" "),
+                self.inner.process.borrow().get_error_output()
+            ))
             .into());
         }
         Ok(())
@@ -168,13 +165,10 @@ impl VcsDownloader for FossilDownloader {
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException {
-                message: format!(
-                    "The .fslckout file is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                    path
-                ),
-                code: 0,
-            }.into());
+            return Err(RuntimeException::new(format!(
+                "The .fslckout file is missing from {}, see https://getcomposer.org/commit-deps for more information",
+                path
+            )).into());
         }
 
         let real_path = shirabe_php_shim::realpath(path);

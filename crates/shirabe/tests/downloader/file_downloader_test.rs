@@ -17,6 +17,7 @@ use shirabe::util::HttpDownloader;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::r#loop::Loop;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
 };
@@ -84,7 +85,7 @@ fn test_download_for_package_without_dist_reference() {
 
     let e = result.expect_err("expected InvalidArgumentException");
     assert!(
-        e.downcast_ref::<InvalidArgumentException>().is_some(),
+        e.is_instanceof::<InvalidArgumentException>(),
         "expected InvalidArgumentException, got: {e}"
     );
 }
@@ -107,7 +108,7 @@ fn test_download_to_existing_file() {
 
     let e = result.expect_err("download to an existing file was expected to throw");
     assert!(
-        e.downcast_ref::<RuntimeException>().is_some(),
+        e.is_instanceof::<RuntimeException>(),
         "expected RuntimeException, got: {e}"
     );
     assert!(
@@ -167,7 +168,7 @@ fn test_download_but_file_is_unsaved() {
 
     let e = result.expect_err("download was expected to throw");
     assert!(
-        e.downcast_ref::<UnexpectedValueException>().is_some(),
+        e.is_instanceof::<UnexpectedValueException>(),
         "expected UnexpectedValueException, got: {e}"
     );
     assert!(
@@ -294,7 +295,7 @@ fn test_download_file_with_invalid_checksum() {
 
     let e = result.expect_err("download was expected to throw");
     assert!(
-        e.downcast_ref::<UnexpectedValueException>().is_some(),
+        e.is_instanceof::<UnexpectedValueException>(),
         "expected UnexpectedValueException, got: {e}"
     );
     assert!(

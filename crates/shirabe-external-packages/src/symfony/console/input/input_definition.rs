@@ -110,39 +110,30 @@ impl InputDefinition {
         let argument = std::rc::Rc::new(argument);
 
         if self.arguments.contains_key(argument.get_name()) {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!(
-                    "An argument with name \"{}\" already exists.",
-                    argument.get_name(),
-                ),
-                code: 0,
-            })
+            return Err(LogicException::new(format!(
+                "An argument with name \"{}\" already exists.",
+                argument.get_name(),
+            ))
             .into());
         }
 
         if let Some(last_array_argument) = &self.last_array_argument {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!(
-                    "Cannot add a required argument \"{}\" after an array argument \"{}\".",
-                    argument.get_name(),
-                    last_array_argument.get_name(),
-                ),
-                code: 0,
-            })
+            return Err(LogicException::new(format!(
+                "Cannot add a required argument \"{}\" after an array argument \"{}\".",
+                argument.get_name(),
+                last_array_argument.get_name(),
+            ))
             .into());
         }
 
         if argument.is_required()
             && let Some(last_optional_argument) = &self.last_optional_argument
         {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!(
-                    "Cannot add a required argument \"{}\" after an optional one \"{}\".",
-                    argument.get_name(),
-                    last_optional_argument.get_name(),
-                ),
-                code: 0,
-            })
+            return Err(LogicException::new(format!(
+                "Cannot add a required argument \"{}\" after an optional one \"{}\".",
+                argument.get_name(),
+                last_optional_argument.get_name(),
+            ))
             .into());
         }
 
@@ -165,13 +156,11 @@ impl InputDefinition {
     /// Returns an InputArgument by name or by position.
     pub fn get_argument(&self, name: &PhpMixed) -> anyhow::Result<std::rc::Rc<InputArgument>> {
         if !self.has_argument(name) {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"{}\" argument does not exist.", name.clone()),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "The \"{}\" argument does not exist.",
+                name.clone()
+            ))
+            .into());
         }
 
         match name {
@@ -260,17 +249,17 @@ impl InputDefinition {
         if let Some(existing) = self.options.get(option.get_name())
             && !option.equals(existing)
         {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!("An option named \"{}\" already exists.", option.get_name()),
-                code: 0,
-            })
+            return Err(LogicException::new(format!(
+                "An option named \"{}\" already exists.",
+                option.get_name()
+            ))
             .into());
         }
         if self.negations.contains_key(option.get_name()) {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: format!("An option named \"{}\" already exists.", option.get_name()),
-                code: 0,
-            })
+            return Err(LogicException::new(format!(
+                "An option named \"{}\" already exists.",
+                option.get_name()
+            ))
             .into());
         }
 
@@ -279,13 +268,10 @@ impl InputDefinition {
                 if let Some(existing_name) = self.shortcuts.get(&shortcut)
                     && !option.equals(&self.options[existing_name])
                 {
-                    return Err(LogicException(shirabe_php_shim::LogicException {
-                        message: format!(
-                            "An option with shortcut \"{}\" already exists.",
-                            shortcut.clone(),
-                        ),
-                        code: 0,
-                    })
+                    return Err(LogicException::new(format!(
+                        "An option with shortcut \"{}\" already exists.",
+                        shortcut.clone(),
+                    ))
                     .into());
                 }
             }
@@ -303,10 +289,10 @@ impl InputDefinition {
         if option.is_negatable() {
             let negated_name = format!("no-{}", option.get_name());
             if self.options.contains_key(&negated_name) {
-                return Err(LogicException(shirabe_php_shim::LogicException {
-                    message: format!("An option named \"{}\" already exists.", negated_name),
-                    code: 0,
-                })
+                return Err(LogicException::new(format!(
+                    "An option named \"{}\" already exists.",
+                    negated_name
+                ))
                 .into());
             }
             self.negations
@@ -319,13 +305,11 @@ impl InputDefinition {
     /// Returns an InputOption by name.
     pub fn get_option(&self, name: &str) -> anyhow::Result<std::rc::Rc<InputOption>> {
         if !self.has_option(name) {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"--{}\" option does not exist.", name),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "The \"--{}\" option does not exist.",
+                name
+            ))
+            .into());
         }
 
         Ok(std::rc::Rc::clone(&self.options[name]))
@@ -374,13 +358,11 @@ impl InputDefinition {
     /// Returns the InputOption name given a shortcut.
     pub fn shortcut_to_name(&self, shortcut: &str) -> anyhow::Result<String> {
         match self.shortcuts.get(shortcut) {
-            None => Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"-{}\" option does not exist.", shortcut),
-                    code: 0,
-                })
-                .into(),
-            ),
+            None => Err(InvalidArgumentException::new(format!(
+                "The \"-{}\" option does not exist.",
+                shortcut
+            ))
+            .into()),
             Some(name) => Ok(name.clone()),
         }
     }
@@ -388,13 +370,11 @@ impl InputDefinition {
     /// Returns the InputOption name given a negation.
     pub fn negation_to_name(&self, negation: &str) -> anyhow::Result<String> {
         match self.negations.get(negation) {
-            None => Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"--{}\" option does not exist.", negation),
-                    code: 0,
-                })
-                .into(),
-            ),
+            None => Err(InvalidArgumentException::new(format!(
+                "The \"--{}\" option does not exist.",
+                negation
+            ))
+            .into()),
             Some(name) => Ok(name.clone()),
         }
     }

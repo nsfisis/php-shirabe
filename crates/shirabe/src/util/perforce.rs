@@ -359,17 +359,13 @@ impl Perforce {
                 if index.is_none() {
                     return Ok(false);
                 }
-                return Err(Exception {
-                    message: format!("p4 command not found in path: {}", error_output),
-                    code: 0,
-                }
+                return Err(Exception::new(format!(
+                    "p4 command not found in path: {}",
+                    error_output
+                ))
                 .into());
             }
-            return Err(Exception {
-                message: format!("Invalid user name: {}", user),
-                code: 0,
-            }
-            .into());
+            return Err(Exception::new(format!("Invalid user name: {}", user)).into());
         }
 
         Ok(true)
@@ -497,11 +493,7 @@ impl Perforce {
         let spec = match fopen(&client_spec, "w") {
             Ok(spec) => spec,
             Err(e) => {
-                return Err(Exception {
-                    message: e.to_string(),
-                    code: 0,
-                }
-                .into());
+                return Err(Exception::new(e.to_string()).into());
             }
         };
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -509,11 +501,7 @@ impl Perforce {
         }));
         if let Err(e) = result {
             fclose(&spec);
-            return Err(Exception {
-                message: format!("{:?}", e),
-                code: 0,
-            }
-            .into());
+            return Err(Exception::new(format!("{:?}", e)).into());
         }
         fclose(&spec);
         Ok(())
@@ -565,13 +553,10 @@ impl Perforce {
                 process.run(None, indexmap::IndexMap::new())?;
 
                 if !process.is_successful() {
-                    return Err(Exception {
-                        message: format!(
-                            "Error logging in:{}",
-                            self.process.borrow().get_error_output()
-                        ),
-                        code: 0,
-                    }
+                    return Err(Exception::new(format!(
+                        "Error logging in:{}",
+                        self.process.borrow().get_error_output()
+                    ))
                     .into());
                 }
             }

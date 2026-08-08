@@ -55,6 +55,7 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyleInterface;
 use shirabe_external_packages::symfony::console::output::ConsoleOutput;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
     UnexpectedValueException, array_replace_recursive, class_exists, dirname, extension_loaded,
@@ -105,12 +106,8 @@ impl Factory {
                 .map(|s| s.is_empty())
                 .unwrap_or(true)
             {
-                return Err(anyhow::anyhow!(RuntimeException {
-                    message:
-                        "The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly"
-                            .to_string(),
-                    code: 0,
-                }));
+                return Err(RuntimeException::new("The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly"
+                            .to_string()).into());
             }
 
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
@@ -358,13 +355,10 @@ impl Factory {
             let env_trimmed = trim(&env_str, Some(" \t\n\r\0\u{0B}"));
             if !env_trimmed.is_empty() {
                 if is_dir(&env_trimmed) {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: format!(
-                            "The COMPOSER environment variable is set to {} which is a directory, this variable should point to a composer.json or be left unset.",
-                            env_trimmed
-                        ),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(format!(
+                        "The COMPOSER environment variable is set to {} which is a directory, this variable should point to a composer.json or be left unset.",
+                        env_trimmed
+                    )).into());
                 }
 
                 return Ok(env_trimmed);
@@ -465,25 +459,25 @@ impl Factory {
                 } else {
                     ""
                 };
-                return Err(anyhow::anyhow!(InvalidArgumentException {
-                    message: format!("{}{}{}", message, PHP_EOL, instructions),
-                    code: 0,
-                }));
+                return Err(InvalidArgumentException::new(format!(
+                    "{}{}{}",
+                    message, PHP_EOL, instructions
+                ))
+                .into());
             }
 
             if !Platform::is_input_completion_process()
                 && let Err(e) = file.validate_schema(JsonFile::LAX_SCHEMA, None)
             {
-                if let Some(jve) = e.downcast_ref::<JsonValidationException>() {
+                if let Some(jve) = e.catch::<JsonValidationException>() {
                     let errors = format!(
                         " - {}",
                         implode(&format!("{} - ", PHP_EOL), jve.get_errors())
                     );
                     let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
-                    return Err(anyhow::anyhow!(JsonValidationException::new(
-                        message,
-                        jve.get_errors().clone(),
-                    )));
+                    return Err(
+                        JsonValidationException::new(message, jve.get_errors().clone()).into(),
+                    );
                 }
                 return Err(e);
             }
@@ -1358,10 +1352,7 @@ impl Factory {
             factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
         // fullLoad=true guarantees a full Composer; narrow PartialComposer -> Composer (PHP `: Composer`).
         composer.as_full().ok_or_else(|| {
-            anyhow::anyhow!(RuntimeException {
-                message: "Composer expected with fullLoad=true".to_string(),
-                code: 0,
-            })
+            RuntimeException::new("Composer expected with fullLoad=true".to_string()).into()
         })
     }
 
@@ -1394,10 +1385,7 @@ impl Factory {
         let composer =
             factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
         composer.as_full().ok_or_else(|| {
-            anyhow::anyhow!(RuntimeException {
-                message: "Composer expected with fullLoad=true".to_string(),
-                code: 0,
-            })
+            RuntimeException::new("Composer expected with fullLoad=true".to_string()).into()
         })
     }
 
@@ -1465,12 +1453,8 @@ impl Factory {
             unsafe { WARNED = true };
             disable_tls = true;
         } else if !extension_loaded("openssl") {
-            return Err(anyhow::anyhow!(NoSslException(RuntimeException {
-                message:
-                    "The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true."
-                        .to_string(),
-                code: 0,
-            })));
+            return Err(NoSslException::new("The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true."
+                        .to_string()).into());
         }
         let mut http_downloader_options: IndexMap<String, PhpMixed> = IndexMap::new();
         if !disable_tls {
@@ -1509,7 +1493,7 @@ impl Factory {
         let http_downloader = match http_downloader_result {
             Ok(h) => h,
             Err(e) => {
-                if let Some(te) = e.downcast_ref::<TransportException>()
+                if let Some(te) = e.catch::<TransportException>()
                     && strpos(te.get_message(), "cafile").is_some()
                 {
                     io.write3(
@@ -1547,12 +1531,11 @@ impl Factory {
 
         let auth_data = json_decode(&composer_auth_env_str, false)?;
         if matches!(auth_data, PhpMixed::Null) {
-            return Err(anyhow::anyhow!(UnexpectedValueException {
-                message:
-                    "COMPOSER_AUTH environment variable is malformed, should be a valid JSON object"
-                        .to_string(),
-                code: 0,
-            }));
+            return Err(UnexpectedValueException::new(
+                "COMPOSER_AUTH environment variable is malformed, should be a valid JSON object"
+                    .to_string(),
+            )
+            .into());
         }
 
         if let Some(io_ref) = &io {
@@ -1591,12 +1574,8 @@ impl Factory {
     fn get_user_dir() -> anyhow::Result<String> {
         let home = Platform::get_env("HOME").unwrap_or_default();
         if home.is_empty() {
-            return Err(anyhow::anyhow!(RuntimeException {
-                message:
-                    "The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly"
-                        .to_string(),
-                code: 0,
-            }));
+            return Err(RuntimeException::new("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly"
+                        .to_string()).into());
         }
 
         Ok(trim(&strtr(&home, "\\", "/"), Some("/")))
@@ -1615,20 +1594,19 @@ impl Factory {
         let result = match file_or_data {
             ValidateJsonInput::File(file) => file.validate_schema(schema, None),
             ValidateJsonInput::Data(data) => {
-                let source = source.ok_or_else(|| {
-                    anyhow::anyhow!(InvalidArgumentException {
-                        message:
-                            "$source is required to be provided if $fileOrData is arbitrary data"
-                                .to_string(),
-                        code: 0,
-                    })
+                let source = source.ok_or_else(|| -> anyhow::Error {
+                    InvalidArgumentException::new(
+                        "$source is required to be provided if $fileOrData is arbitrary data"
+                            .to_string(),
+                    )
+                    .into()
                 })?;
                 JsonFile::validate_json_schema(source, &data, schema, None)
             }
         };
 
         if let Err(e) = result {
-            if let Some(jve) = e.downcast_ref::<JsonValidationException>() {
+            if let Some(jve) = e.catch::<JsonValidationException>() {
                 let msg = format!(
                     "{}, this may result in errors and should be resolved:{} - {}",
                     jve.get_message(),
@@ -1638,10 +1616,7 @@ impl Factory {
                 if let Some(io_ref) = io {
                     io_ref.write_error3(&format!("<warning>{}</>", msg), true, crate::io::NORMAL);
                 } else {
-                    return Err(anyhow::anyhow!(UnexpectedValueException {
-                        message: msg,
-                        code: 0
-                    }));
+                    return Err(UnexpectedValueException::new(msg).into());
                 }
             } else {
                 return Err(e);

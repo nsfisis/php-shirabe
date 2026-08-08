@@ -154,11 +154,9 @@ impl ArrayInput {
     /// Adds a short option value.
     fn add_short_option(&mut self, shortcut: &str, value: PhpMixed) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
-            return Err(InvalidOptionException(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"-{}\" option does not exist.", shortcut),
-                    code: 0,
-                },
+            return Err(InvalidOptionException::new(format!(
+                "The \"-{}\" option does not exist.",
+                shortcut
             ))
             .into());
         }
@@ -176,11 +174,9 @@ impl ArrayInput {
     fn add_long_option(&mut self, name: &str, mut value: PhpMixed) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
-                return Err(InvalidOptionException(InvalidArgumentException(
-                    shirabe_php_shim::InvalidArgumentException {
-                        message: format!("The \"--{}\" option does not exist.", name),
-                        code: 0,
-                    },
+                return Err(InvalidOptionException::new(format!(
+                    "The \"--{}\" option does not exist.",
+                    name
                 ))
                 .into());
             }
@@ -197,11 +193,9 @@ impl ArrayInput {
 
         if matches!(value, PhpMixed::Null) {
             if option.is_value_required() {
-                return Err(InvalidOptionException(InvalidArgumentException(
-                    shirabe_php_shim::InvalidArgumentException {
-                        message: format!("The \"--{}\" option requires a value.", name),
-                        code: 0,
-                    },
+                return Err(InvalidOptionException::new(format!(
+                    "The \"--{}\" option requires a value.",
+                    name
                 ))
                 .into());
             }
@@ -219,13 +213,11 @@ impl ArrayInput {
     /// Adds an argument value.
     fn add_argument(&mut self, name: &PhpMixed, value: PhpMixed) -> anyhow::Result<()> {
         if !self.inner.definition.has_argument(name) {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"{}\" argument does not exist.", name.clone()),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "The \"{}\" argument does not exist.",
+                name.clone()
+            ))
+            .into());
         }
 
         self.inner

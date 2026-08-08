@@ -4,6 +4,7 @@ use crate::test_case;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 
 fn s(v: &str) -> PhpMixed {
@@ -792,7 +793,7 @@ fn test_load_failure_throws_exception() {
             Ok(_) => panic!("Expected exception to be thrown"),
             Err(e) => {
                 let exception = e
-                    .downcast_ref::<InvalidPackageException>()
+                    .catch::<InvalidPackageException>()
                     .expect("Expected InvalidPackageException");
                 let mut errors: Vec<String> = exception.get_errors().to_vec();
                 expected_errors.sort();

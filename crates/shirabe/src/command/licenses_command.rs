@@ -128,10 +128,7 @@ impl Command for LicensesCommand {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
-                return Err(UnexpectedValueException {
-                    message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),
-                    code: 0,
-                }.into());
+                return Err(UnexpectedValueException::new("Valid composer.json and composer.lock files are required to run this command with --locked".to_string()).into());
             }
             let no_dev = input
                 .borrow()
@@ -314,13 +311,10 @@ impl Command for LicensesCommand {
                 );
             }
             _ => {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Unsupported format \"{}\".  See help for supported formats.",
-                        format
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Unsupported format \"{}\".  See help for supported formats.",
+                    format
+                ))
                 .into());
             }
         }

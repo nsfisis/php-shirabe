@@ -10,6 +10,7 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode, php_regex, time,
 };
@@ -248,9 +249,9 @@ impl GitLab {
                 Err(e) => {
                     // 401 is bad credentials,
                     // 403 is max login attempts exceeded
-                    match e.downcast::<TransportException>() {
-                        Ok(te) if te.code == 403 || te.code == 401 => {
-                            if te.code == 401 {
+                    match e.catch::<TransportException>() {
+                        Some(te) if te.get_code() == 403 || te.get_code() == 401 => {
+                            if te.get_code() == 401 {
                                 let response =
                                     te.get_response().and_then(|r| json_decode(r, true).ok());
                                 let is_invalid_grant = response
@@ -301,8 +302,7 @@ impl GitLab {
 
                             continue;
                         }
-                        Ok(te) => return Err(te.into()),
-                        Err(e) => return Err(e),
+                        _ => return Err(e),
                     }
                 }
             };
@@ -360,10 +360,9 @@ impl GitLab {
             return Ok(true);
         }
 
-        Err(RuntimeException {
-            message: "Invalid GitLab credentials 5 times in a row, aborting.".to_string(),
-            code: 0,
-        }
+        Err(RuntimeException::new(
+            "Invalid GitLab credentials 5 times in a row, aborting.".to_string(),
+        )
         .into())
     }
 
@@ -374,16 +373,17 @@ impl GitLab {
     ) -> anyhow::Result<bool> {
         let response = match self.refresh_token(scheme, origin_url) {
             Ok(r) => r,
-            Err(e) => match e.downcast::<TransportException>() {
-                Ok(te) => {
+            Err(e) => match e.catch::<TransportException>() {
+                Some(te) => {
+                    let message = te.get_message().to_string();
                     self.io.write_error3(
-                        &format!("Couldn't refresh access token: {}", te.message),
+                        &format!("Couldn't refresh access token: {}", message),
                         true,
                         io_interface::NORMAL,
                     );
                     return Ok(false);
                 }
-                Err(e) => return Err(e),
+                None => return Err(e),
             },
         };
 
@@ -488,10 +488,10 @@ impl GitLab {
         let refresh_token = match refresh_token {
             Some(t) => t,
             None => {
-                return Err(RuntimeException {
-                    message: format!("No GitLab refresh token present for {}.", origin_url),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "No GitLab refresh token present for {}.",
+                    origin_url
+                ))
                 .into());
             }
         };

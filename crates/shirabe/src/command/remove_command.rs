@@ -193,12 +193,10 @@ impl Command for RemoveCommand {
                 .as_bool()
                 .unwrap_or(false)
         {
-            return Err(anyhow::anyhow!(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: "Not enough arguments (missing: \"packages\").".to_string(),
-                    code: 0,
-                }
-            )));
+            return Err(InvalidArgumentException::new(
+                "Not enough arguments (missing: \"packages\").".to_string(),
+            )
+            .into());
         }
 
         let mut packages: Vec<String> = input
@@ -224,12 +222,11 @@ impl Command for RemoveCommand {
                 let locker = composer.get_locker().clone();
                 let mut locker = locker.borrow_mut();
                 if !locker.is_locked() {
-                    return Err(anyhow::anyhow!(UnexpectedValueException {
-                        message:
-                            "A valid composer.lock file is required to run this command with --unused"
-                                .to_string(),
-                        code: 0,
-                    }));
+                    return Err(UnexpectedValueException::new(
+                        "A valid composer.lock file is required to run this command with --unused"
+                            .to_string(),
+                    )
+                    .into());
                 }
             }
 

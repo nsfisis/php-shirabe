@@ -25,6 +25,7 @@ use shirabe_external_packages::symfony::console::helper::FormatBlockMessages;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
@@ -99,11 +100,9 @@ impl InitCommand {
             if let Some(ref email) = email
                 && !self.is_valid_email(email)
             {
-                return Err(InvalidArgumentException {
-                    message: format!("Invalid email \"{}\"", email),
-                    code: 0,
-                }
-                .into());
+                return Err(
+                    InvalidArgumentException::new(format!("Invalid email \"{}\"", email)).into(),
+                );
             }
 
             let mut result: IndexMap<String, Option<String>> = IndexMap::new();
@@ -121,11 +120,8 @@ impl InitCommand {
             return Ok(result);
         }
 
-        Err(InvalidArgumentException {
-            message: "Invalid author string.  Must be in the formats: Jane Doe or John Smith <john@example.com>"
-                .to_string(),
-            code: 0,
-        }
+        Err(InvalidArgumentException::new("Invalid author string.  Must be in the formats: Jane Doe or John Smith <john@example.com>"
+            .to_string())
         .into())
     }
 
@@ -517,13 +513,10 @@ impl Command for InitCommand {
                     .unwrap_or(""),
             )
         {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                    options.get("name").and_then(|v| v.as_string()).unwrap_or("")
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
+                options.get("name").and_then(|v| v.as_string()).unwrap_or("")
+            ))
             .into());
         }
 
@@ -678,7 +671,7 @@ impl Command for InitCommand {
         let validate_result = file_obj.validate_schema(JsonFile::LAX_SCHEMA, None);
         if let Err(e) = validate_result {
             // try to downcast to JsonValidationException
-            if let Some(json_err) = e.downcast_ref::<JsonValidationException>() {
+            if let Some(json_err) = e.catch::<JsonValidationException>() {
                 io.write_error3(
                     "<error>Schema validation error, aborting</error>",
                     true,
@@ -926,13 +919,10 @@ impl Command for InitCommand {
                         php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
                         value.as_string().unwrap_or(""),
                     ) {
-                        return Err(InvalidArgumentException {
-                            message: format!(
-                                "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                                value.as_string().unwrap_or("")
-                            ),
-                            code: 0,
-                        }
+                        return Err(InvalidArgumentException::new(format!(
+                            "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
+                            value.as_string().unwrap_or("")
+                        ))
                         .into());
                     }
 
@@ -1031,20 +1021,17 @@ impl Command for InitCommand {
                     }
 
                     if !base_package::STABILITIES.contains_key(value.as_string().unwrap_or("")) {
-                        return Err(InvalidArgumentException {
-                            message: format!(
-                                "Invalid minimum stability \"{}\". Must be empty or one of: {}",
-                                value.as_string().unwrap_or(""),
-                                implode(
-                                    ", ",
-                                    &base_package::STABILITIES
-                                        .keys()
-                                        .map(|k| k.to_string())
-                                        .collect::<Vec<_>>()
-                                )
-                            ),
-                            code: 0,
-                        }
+                        return Err(InvalidArgumentException::new(format!(
+                            "Invalid minimum stability \"{}\". Must be empty or one of: {}",
+                            value.as_string().unwrap_or(""),
+                            implode(
+                                ", ",
+                                &base_package::STABILITIES
+                                    .keys()
+                                    .map(|k| k.to_string())
+                                    .collect::<Vec<_>>()
+                            )
+                        ))
                         .into());
                     }
 
@@ -1107,13 +1094,10 @@ impl Command for InitCommand {
                 && !spdx.validate(license.as_string().unwrap_or(""))
                 && license.as_string() != Some("proprietary")
             {
-                return Err(InvalidArgumentException {
-                message: format!(
+                return Err(InvalidArgumentException::new(format!(
                     "Invalid license provided: {}. Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted.",
                     license.as_string().unwrap_or("")
-                ),
-                code: 0,
-            }
+                ))
             .into());
             }
             input.borrow_mut().set_option("license", license);
@@ -1246,13 +1230,10 @@ impl Command for InitCommand {
 
                 if !Preg::is_match(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default)
                 {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
-                            value_or_default,
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
+                        value_or_default,
+                    ))
                     .into());
                 }
 

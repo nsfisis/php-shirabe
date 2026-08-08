@@ -9,6 +9,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes,
     realpath,
@@ -155,7 +156,7 @@ pub trait ArchiveDownloader {
                         Ok(false) => {}
                         Err(e) => {
                             // ignore error, and simply do not renameAsOne
-                            if e.downcast_ref::<RuntimeException>().is_none() {
+                            if !e.is_instanceof::<RuntimeException>() {
                                 return Err(e);
                             }
                         }
@@ -273,14 +274,11 @@ fn rename_recursively(
         );
         if is_dir(&target) {
             if !is_dir(file) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Installing {} would lead to overwriting the {} directory with a file from the package, invalid operation.",
-                        package,
-                        target.display()
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Installing {} would lead to overwriting the {} directory with a file from the package, invalid operation.",
+                    package,
+                    target.display()
+                ))
                 .into());
             }
             rename_recursively(filesystem, package.clone(), file, &target)?;

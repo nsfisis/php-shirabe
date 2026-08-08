@@ -25,6 +25,7 @@ use crate::util::Silencer;
 use crate::util::Url as UrlUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
     PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, file_exists,
@@ -359,11 +360,9 @@ impl FileDownloader {
         url: &str,
     ) -> anyhow::Result<String> {
         if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
-            return Err(RuntimeException {
-                message: "You must enable the openssl extension to download files via https"
-                    .to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "You must enable the openssl extension to download files via https".to_string(),
+            )
             .into());
         }
 
@@ -400,10 +399,9 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_dist_url().is_none() {
-            return Err(InvalidArgumentException {
-                message: "The given package is missing url information".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "The given package is missing url information".to_string(),
+            )
             .into());
         }
 
@@ -558,15 +556,15 @@ impl DownloaderInterface for FileDownloader {
                         }
                         self.clear_last_cache_write(package.clone());
 
-                        if e.downcast_ref::<IrrecoverableDownloadException>().is_some() {
+                        if e.is_instanceof::<IrrecoverableDownloadException>() {
                             return Err(e);
                         }
 
-                        if e.downcast_ref::<MaxFileSizeExceededException>().is_some() {
+                        if e.is_instanceof::<MaxFileSizeExceededException>() {
                             return Err(e);
                         }
 
-                        if let Some(te) = e.downcast_ref::<TransportException>() {
+                        if let Some(te) = e.catch::<TransportException>() {
                             // if we got an http response with a proper code, then requesting again will probably not help, abort
                             if 0 != te.get_code() && !matches!(te.get_code(), 500 | 502 | 503 | 504)
                             {
@@ -592,7 +590,7 @@ impl DownloaderInterface for FileDownloader {
                         }
                         if !urls.is_empty() {
                             let code = e
-                                .downcast_ref::<TransportException>()
+                                .catch::<TransportException>()
                                 .map_or(0, |te| te.get_code());
                             if self.io.borrow().is_debug() {
                                 self.io.borrow().write_error(&format!(
@@ -628,13 +626,10 @@ impl DownloaderInterface for FileDownloader {
 
             // === $result->then(verify) ===
             if !file_exists(&file_name) {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "{} could not be saved to {}, make sure the directory is writable and you have internet connectivity",
-                        url.base, file_name
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "{} could not be saved to {}, make sure the directory is writable and you have internet connectivity",
+                    url.base, file_name
+                ))
                 .into());
             }
 
@@ -642,13 +637,10 @@ impl DownloaderInterface for FileDownloader {
                 && !checksum.is_empty()
                 && hash_file("sha1", &file_name).as_deref() != Some(checksum)
             {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "The checksum verification of the file failed (downloaded from {})",
-                        url.base
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "The checksum verification of the file failed (downloaded from {})",
+                    url.base
+                ))
                 .into());
             }
 
@@ -809,10 +801,10 @@ impl DownloaderInterface for FileDownloader {
         }
         let result = Filesystem::remove_directory_async_via(&self.filesystem, path).await?;
         if !result {
-            return Err(RuntimeException {
-                message: format!("Could not completely delete {}, aborting.", path),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not completely delete {}, aborting.",
+                path
+            ))
             .into());
         }
 

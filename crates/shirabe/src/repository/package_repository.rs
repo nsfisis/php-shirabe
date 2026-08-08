@@ -16,7 +16,7 @@ use crate::repository::{
 };
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, php_regex, var_export};
+use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, var_export};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -72,10 +72,7 @@ impl PackageRepository {
                         e,
                         shirabe_php_shim::json_encode(package).unwrap_or_default()
                     );
-                    return Ok(Err(InvalidRepositoryException(Exception {
-                        message: msg,
-                        code: 0,
-                    })));
+                    return Ok(Err(InvalidRepositoryException::new(msg)));
                 }
             };
             self.inner.add_package(package_loaded)?;
@@ -101,7 +98,7 @@ impl PackageRepository {
     // skips re-initializing it.
     fn ensure_initialized(&self) -> anyhow::Result<()> {
         if !self.inner.is_initialized() {
-            self.initialize()?.map_err(anyhow::Error::new)?;
+            self.initialize()?.map_err(anyhow::Error::from)?;
         }
         Ok(())
     }
@@ -234,15 +231,13 @@ impl AdvisoryProviderInterface for PackageRepository {
                     };
                 if !allow_partial_advisories && matches!(advisory, AnySecurityAdvisory::Partial(_))
                 {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: format!(
-                            "Advisory for {} could not be loaded as a full advisory from {}\n{}",
-                            package_name,
-                            self.get_repo_name()?,
-                            var_export(data, true)
-                        ),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(format!(
+                        "Advisory for {} could not be loaded as a full advisory from {}\n{}",
+                        package_name,
+                        self.get_repo_name()?,
+                        var_export(data, true)
+                    ))
+                    .into());
                 }
 
                 if !advisory.affected_versions().matches(package_constraint) {

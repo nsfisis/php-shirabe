@@ -9,6 +9,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
     array_reverse, array_shift, dirname, implode, in_array_strict, preg_quote, rtrim, str_replace,
@@ -99,14 +100,11 @@ impl DownloadManager {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
         if !self.downloaders.contains_key(&r#type) {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Unknown downloader type: {}. Available types: {}.",
-                    r#type,
-                    implode(", ", &array_keys(&self.downloaders)),
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Unknown downloader type: {}. Available types: {}.",
+                r#type,
+                implode(", ", &array_keys(&self.downloaders)),
+            ))
             .into());
         }
 
@@ -134,28 +132,22 @@ impl DownloadManager {
         } else if installation_source.as_deref() == Some("source") {
             self.get_downloader(&package.get_source_type().unwrap_or_default())?
         } else {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Package {} does not have an installation source set",
-                    package,
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package {} does not have an installation source set",
+                package,
+            ))
             .into());
         };
 
         let downloader_installation_source = downloader.borrow().get_installation_source();
         if installation_source.as_deref() != Some(&downloader_installation_source) {
-            return Err(LogicException {
-                message: format!(
-                    "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
-                    downloader.borrow().php_class_name(),
-                    downloader_installation_source,
-                    installation_source.unwrap_or_default(),
-                    package,
-                ),
-                code: 0,
-            }
+            return Err(LogicException::new(format!(
+                "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
+                downloader.borrow().php_class_name(),
+                downloader_installation_source,
+                installation_source.unwrap_or_default(),
+                package,
+            ))
             .into());
         }
 
@@ -227,19 +219,18 @@ impl DownloadManager {
             {
                 Ok(r) => r,
                 Err(e) => {
-                    let is_runtime = e.downcast_ref::<RuntimeException>().is_some();
-                    let is_irrecoverable =
-                        e.downcast_ref::<IrrecoverableDownloadException>().is_some();
-                    if is_runtime && !is_irrecoverable {
+                    if e.is_instanceof::<RuntimeException>()
+                        && !e.is_instanceof::<IrrecoverableDownloadException>()
+                    {
                         if sources.is_empty() {
                             return Err(e);
                         }
 
                         let message = e
-                            .downcast_ref::<RuntimeException>()
+                            .catch::<RuntimeException>()
                             .unwrap()
-                            .message
-                            .clone();
+                            .get_message()
+                            .to_string();
                         self.io.write_error3(
                             &format!(
                                 "    <warning>Failed to download {} from {}: {}</warning>",
@@ -352,17 +343,17 @@ impl DownloadManager {
                 Ok(p) => return Ok(p),
                 Err(e) => {
                     // PHP catches only \RuntimeException; other exceptions propagate uncaught.
-                    if e.downcast_ref::<RuntimeException>().is_none() {
+                    if !e.is_instanceof::<RuntimeException>() {
                         return Err(e);
                     }
                     if !self.io.is_interactive() {
                         return Err(e);
                     }
                     let message = e
-                        .downcast_ref::<RuntimeException>()
+                        .catch::<RuntimeException>()
                         .unwrap()
-                        .message
-                        .clone();
+                        .get_message()
+                        .to_string();
                     self.io.write_error3(
                         &format!("<error>    Update failed ({})</error>", message),
                         true,
@@ -477,10 +468,10 @@ impl DownloadManager {
         }
 
         if sources.is_empty() {
-            return Err(InvalidArgumentException {
-                message: format!("Package {} must have a source or dist specified", package),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package {} must have a source or dist specified",
+                package
+            ))
             .into());
         }
 

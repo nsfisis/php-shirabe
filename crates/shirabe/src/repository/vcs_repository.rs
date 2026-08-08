@@ -28,6 +28,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpClass, PhpMixed, php_regex, str_replace, strpos,
 };
@@ -305,10 +306,10 @@ impl VcsRepository {
         let driver_url = self.url.clone();
         self.ensure_driver();
         if self.driver.borrow().is_none() {
-            return Err(InvalidArgumentException {
-                message: format!("No driver found to handle VCS repository {}", driver_url),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "No driver found to handle VCS repository {}",
+                driver_url
+            ))
             .into());
         }
         *self.version_parser.borrow_mut() = Some(VersionParser::new());
@@ -351,7 +352,7 @@ impl VcsRepository {
                             }
                             Ok(None) => {}
                             Err(e) => {
-                                if let Some(te) = e.downcast_ref::<TransportException>()
+                                if let Some(te) = e.catch::<TransportException>()
                                     && self.should_rethrow_transport_exception(te)
                                 {
                                     return Err(e);
@@ -367,7 +368,7 @@ impl VcsRepository {
                     }
                 }
                 Err(e) => {
-                    if let Some(te) = e.downcast_ref::<TransportException>()
+                    if let Some(te) = e.catch::<TransportException>()
                         && self.should_rethrow_transport_exception(te)
                     {
                         return Err(e);
@@ -575,7 +576,7 @@ impl VcsRepository {
                 Ok(())
             })();
             if let Err(e) = result {
-                if let Some(te) = e.downcast_ref::<TransportException>() {
+                if let Some(te) = e.catch::<TransportException>() {
                     self.version_transport_exceptions
                         .borrow_mut()
                         .entry("tags".to_string())
@@ -589,7 +590,7 @@ impl VcsRepository {
                     }
                 }
                 if is_very_verbose {
-                    let detail = if let Some(te) = e.downcast_ref::<TransportException>() {
+                    let detail = if let Some(te) = e.catch::<TransportException>() {
                         format!(
                             "no composer file was found ({} HTTP status code)",
                             te.get_code()
@@ -786,7 +787,7 @@ impl VcsRepository {
                 Ok(())
             })();
             if let Err(e) = result {
-                if let Some(te) = e.downcast_ref::<TransportException>() {
+                if let Some(te) = e.catch::<TransportException>() {
                     self.version_transport_exceptions
                         .borrow_mut()
                         .entry("branches".to_string())

@@ -44,11 +44,7 @@ impl GenericRule {
         let binary = hash_raw(algo, &joined);
         match binary.get(..4) {
             Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
-            None => Err(RuntimeException {
-                message: format!("Failed unpacking: {}", joined),
-                code: 0,
-            }
-            .into()),
+            None => Err(RuntimeException::new(format!("Failed unpacking: {}", joined)).into()),
         }
     }
 

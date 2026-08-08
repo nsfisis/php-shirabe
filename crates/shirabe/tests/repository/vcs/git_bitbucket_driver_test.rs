@@ -10,6 +10,7 @@ use shirabe::repository::vcs::GitBitbucketDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::ProcessExecutor;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
 use tempfile::TempDir;
 
@@ -112,11 +113,11 @@ fn test_get_root_identifier_wrong_scm_type() {
 
     let err = driver.get_root_identifier().unwrap_err();
     let runtime = err
-        .downcast_ref::<RuntimeException>()
+        .catch::<RuntimeException>()
         .expect("expected RuntimeException");
     assert_eq!(
         "https://bitbucket.org/user/repo.git does not appear to be a git repository, use https://bitbucket.org/user/repo but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket",
-        runtime.message
+        runtime.get_message()
     );
 }
 
@@ -250,7 +251,7 @@ fn test_initialize_invalid_repository_url() {
     let result = get_driver("https://bitbucket.org/acme", io, config, http_downloader);
     let err = result.unwrap_err();
     assert!(
-        err.downcast_ref::<InvalidArgumentException>().is_some(),
+        err.is_instanceof::<InvalidArgumentException>(),
         "expected InvalidArgumentException, got: {err:?}"
     );
 }

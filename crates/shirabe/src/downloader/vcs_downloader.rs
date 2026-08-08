@@ -18,8 +18,9 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, explode,
-    get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
+    AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
+    array_shift, explode, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr,
+    trim,
 };
 
 #[derive(Debug)]
@@ -129,13 +130,10 @@ pub trait VcsDownloader:
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Package {} is missing reference information",
-                    package.get_pretty_name(),
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package {} is missing reference information",
+                package.get_pretty_name(),
+            ))
             .into());
         }
 
@@ -157,7 +155,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!("Failed: [{}] {}", get_class_err(&e), e),
+                            &format!(
+                                "Failed: [{}] {}",
+                                AnyThrowable::of(e.as_ref())
+                                    .expect("PHP reaches this only with a caught \\Throwable")
+                                    .php_class_name(),
+                                e
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -232,13 +236,10 @@ pub trait VcsDownloader:
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Package {} is missing reference information",
-                    package.get_pretty_name(),
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package {} is missing reference information",
+                package.get_pretty_name(),
+            ))
             .into());
         }
 
@@ -264,7 +265,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!("Failed: [{}] {}", get_class_err(&e), e),
+                            &format!(
+                                "Failed: [{}] {}",
+                                AnyThrowable::of(e.as_ref())
+                                    .expect("PHP reaches this only with a caught \\Throwable")
+                                    .php_class_name(),
+                                e
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -292,13 +299,10 @@ pub trait VcsDownloader:
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Package {} is missing reference information",
-                    target.get_pretty_name(),
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package {} is missing reference information",
+                target.get_pretty_name(),
+            ))
             .into());
         }
 
@@ -333,7 +337,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!("Failed: [{}] {}", get_class_err(&e), e),
+                            &format!(
+                                "Failed: [{}] {}",
+                                AnyThrowable::of(e.as_ref())
+                                    .expect("PHP reaches this only with a caught \\Throwable")
+                                    .php_class_name(),
+                                e
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -400,10 +410,10 @@ pub trait VcsDownloader:
 
         let result = Filesystem::remove_directory_async_via(self.filesystem(), path).await?;
         if !result {
-            return Err(RuntimeException {
-                message: format!("Could not completely delete {}, aborting.", path),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not completely delete {}, aborting.",
+                path
+            ))
             .into());
         }
 
@@ -441,10 +451,10 @@ pub trait VcsDownloader:
     ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
         if self.get_local_changes(package, path)?.is_some() {
-            return Err(RuntimeException {
-                message: format!("Source directory {} has uncommitted changes.", path),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Source directory {} has uncommitted changes.",
+                path
+            ))
             .into());
         }
 

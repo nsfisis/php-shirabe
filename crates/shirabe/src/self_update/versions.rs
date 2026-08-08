@@ -73,14 +73,11 @@ impl Versions {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         if !Self::CHANNELS.contains(&channel.as_str()) {
-            return Ok(Err(InvalidArgumentException {
-                message: format!(
-                    "Invalid channel {}, must be one of: {}",
-                    channel,
-                    Self::CHANNELS.join(", ")
-                ),
-                code: 0,
-            }));
+            return Ok(Err(InvalidArgumentException::new(format!(
+                "Invalid channel {}, must be one of: {}",
+                channel,
+                Self::CHANNELS.join(", ")
+            ))));
         }
 
         let channel_file = format!(
@@ -146,13 +143,10 @@ impl Versions {
             }
         }
 
-        Ok(Err(UnexpectedValueException {
-            message: format!(
-                "There is no version of Composer available for your PHP version ({})",
-                PHP_VERSION
-            ),
-            code: 0,
-        }))
+        Ok(Err(UnexpectedValueException::new(format!(
+            "There is no version of Composer available for your PHP version ({})",
+            PHP_VERSION
+        ))))
     }
 
     fn get_versions_data(&mut self) -> anyhow::Result<PhpMixed> {

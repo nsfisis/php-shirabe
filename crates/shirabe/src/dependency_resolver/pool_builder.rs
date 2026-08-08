@@ -147,11 +147,9 @@ impl PoolBuilder {
             self.warn_about_non_matching_update_allow_list(request)?;
 
             if request.get_locked_repository().is_none() {
-                return Err(LogicException {
-                    message: "No lock repo present and yet a partial update was requested."
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new(
+                    "No lock repo present and yet a partial update was requested.".to_string(),
+                )
                 .into());
             }
 
@@ -798,10 +796,9 @@ impl PoolBuilder {
 
     fn warn_about_non_matching_update_allow_list(&self, request: &Request) -> anyhow::Result<()> {
         if request.get_locked_repository().is_none() {
-            return Err(LogicException {
-                message: "No lock repo present and yet a partial update was requested.".to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new(
+                "No lock repo present and yet a partial update was requested.".to_string(),
+            )
             .into());
         }
 

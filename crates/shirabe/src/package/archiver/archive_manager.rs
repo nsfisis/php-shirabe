@@ -114,10 +114,9 @@ impl ArchiveManager {
         ignore_filters: bool,
     ) -> anyhow::Result<String> {
         if format.is_empty() {
-            return Err(anyhow::anyhow!(InvalidArgumentException {
-                message: "Format must be specified".to_string(),
-                code: 0,
-            }));
+            return Err(
+                InvalidArgumentException::new("Format must be specified".to_string()).into(),
+            );
         }
 
         let mut usable_archiver_idx: Option<usize> = None;
@@ -131,10 +130,11 @@ impl ArchiveManager {
         let usable_archiver_idx = match usable_archiver_idx {
             Some(i) => i,
             None => {
-                return Err(anyhow::anyhow!(RuntimeException {
-                    message: format!("No archiver found to support {} format", format),
-                    code: 0,
-                }));
+                return Err(RuntimeException::new(format!(
+                    "No archiver found to support {} format",
+                    format
+                ))
+                .into());
             }
         };
 

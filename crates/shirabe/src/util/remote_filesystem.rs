@@ -14,6 +14,7 @@ use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed, RuntimeException,
     STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
@@ -216,12 +217,11 @@ impl RemoteFilesystem {
         let mut file_url = file_url.to_string();
 
         if options.contains_key("prevent_ip_access_callable") {
-            return Err(anyhow::anyhow!(RuntimeException {
-                message:
-                    "RemoteFilesystem doesn't support the 'prevent_ip_access_callable' config."
-                        .to_string(),
-                code: 0,
-            }));
+            return Err(RuntimeException::new(
+                "RemoteFilesystem doesn't support the 'prevent_ip_access_callable' config."
+                    .to_string(),
+            )
+            .into());
         }
 
         if let Some(token) = options.get("gitlab-token").cloned() {
@@ -404,7 +404,7 @@ impl RemoteFilesystem {
         })();
         let mut caught_e: Option<anyhow::Error> = None;
         if let Err(mut e) = inner_result {
-            if let Some(te) = e.downcast_mut::<TransportException>() {
+            if let Some(te) = e.catch_mut::<TransportException>() {
                 if !http_response_header.is_empty() && !http_response_header[0].is_empty() {
                     te.set_headers(http_response_header.clone());
                     te.set_status_code(Self::find_status_code(&http_response_header));
@@ -535,7 +535,7 @@ impl RemoteFilesystem {
                     );
                 }
 
-                let mut e = TransportException::new_with_code(
+                let mut e = TransportException::new(
                     format!(
                         "The \"{}\" file could not be downloaded ({})",
                         self.file_url, http_response_header[0]
@@ -607,13 +607,14 @@ impl RemoteFilesystem {
         if result.is_some() && file_name.is_some() && !is_redirect {
             let result_str = result.as_deref().unwrap();
             if result_str.is_empty() {
-                return Err(anyhow::anyhow!(TransportException::new(
+                return Err(TransportException::new(
                     format!(
                         "\"{}\" appears broken, and returned an empty 200 response",
                         self.file_url
                     ),
                     0,
-                )));
+                )
+                .into());
             }
 
             // TODO(phase-c): PHP captures the file_put_contents warning here via set_error_handler
@@ -623,7 +624,7 @@ impl RemoteFilesystem {
             let write_result =
                 file_put_contents(file_name.as_deref().unwrap(), result_str.as_bytes());
             if write_result.is_none() {
-                return Err(anyhow::anyhow!(TransportException::new(
+                return Err(TransportException::new(
                     format!(
                         "The \"{}\" file could not be written to {}: {}",
                         self.file_url,
@@ -631,7 +632,8 @@ impl RemoteFilesystem {
                         put_error_message
                     ),
                     0,
-                )));
+                )
+                .into());
             }
             let _ = put_error_message;
         }
@@ -659,7 +661,7 @@ impl RemoteFilesystem {
         }
 
         if result.is_none() {
-            let mut e = TransportException::new_with_code(
+            let mut e = TransportException::new(
                 format!(
                     "The \"{}\" file could not be downloaded: {}",
                     self.file_url, error_message
@@ -750,11 +752,12 @@ impl RemoteFilesystem {
             && let Some(max) = max_file_size
             && Platform::strlen(r) >= max
         {
-            return Err(anyhow::anyhow!(MaxFileSizeExceededException::new(format!(
+            return Err(MaxFileSizeExceededException::new(format!(
                 "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
                 Platform::strlen(r),
                 max
-            ))));
+            ))
+            .into());
         }
 
         if PHP_VERSION_ID >= 80400 {
@@ -785,14 +788,15 @@ impl RemoteFilesystem {
         match notification_code {
             x if x == STREAM_NOTIFY_FAILURE => {
                 if 400 == message_code {
-                    return Err(anyhow::anyhow!(TransportException::new_with_code(
+                    return Err(TransportException::new(
                         format!(
                             "The '{}' URL could not be accessed: {}",
                             self.file_url,
                             message.unwrap_or_default()
                         ),
                         message_code,
-                    )));
+                    )
+                    .into());
                 }
             }
             x if x == STREAM_NOTIFY_FILE_SIZE_IS => {
@@ -848,10 +852,7 @@ impl RemoteFilesystem {
         self.retry = result.retry;
 
         if self.retry {
-            return Err(anyhow::anyhow!(TransportException::new(
-                "RETRY".to_string(),
-                0,
-            )));
+            return Err(TransportException::new("RETRY".to_string(), 0).into());
         }
         Ok(())
     }
@@ -1043,10 +1044,11 @@ impl RemoteFilesystem {
                     // RemoteFilesystem as a String; from_utf8_lossy can corrupt binary payloads
                     Some(d) => Some(String::from_utf8_lossy(&d).into_owned()),
                     None => {
-                        return Err(anyhow::anyhow!(TransportException::new(
+                        return Err(TransportException::new(
                             "Failed to decode zlib stream".to_string(),
                             0,
-                        )));
+                        )
+                        .into());
                     }
                 };
             }

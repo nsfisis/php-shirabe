@@ -348,7 +348,7 @@ impl ConsoleIO {
         let mut input = self.input.borrow_mut();
         question_helper
             .ask(&mut *input, error_output, question)?
-            .map_err(anyhow::Error::new)
+            .map_err(anyhow::Error::from)
     }
 }
 
@@ -490,18 +490,15 @@ impl IOInterfaceImmutable for ConsoleIO {
             >,
         > = Box::new(move |answer: Option<PhpMixed>| {
             validator(answer.unwrap_or(PhpMixed::Null)).map_err(|e| {
-                shirabe_external_packages::symfony::console::exception::InvalidArgumentException(
-                    shirabe_php_shim::InvalidArgumentException {
-                        message: e.to_string(),
-                        code: 0,
-                    },
+                shirabe_external_packages::symfony::console::exception::InvalidArgumentException::new(
+                    e.to_string(),
                 )
             })
         });
         question.set_validator(Some(adapted));
         question
             .set_max_attempts(attempts)
-            .map_err(|e| anyhow::anyhow!(e.0.message))?;
+            .map_err(|e| anyhow::anyhow!(e.0.get_message().to_string()))?;
 
         self.ask_question(&question)
     }

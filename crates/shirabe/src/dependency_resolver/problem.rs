@@ -82,10 +82,9 @@ impl Problem {
             let rule_ref = rule.borrow();
 
             if rule_ref.get_reason() != rule::RULE_ROOT_REQUIRE {
-                return Err(LogicException {
-                    message: "Single reason problems must contain a root require rule.".to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new(
+                    "Single reason problems must contain a root require rule.".to_string(),
+                )
                 .into());
             }
 

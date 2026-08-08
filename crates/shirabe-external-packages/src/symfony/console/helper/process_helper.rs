@@ -103,13 +103,10 @@ impl ProcessHelper {
                 };
             }
             None => {
-                anyhow::bail!(shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
-                        shirabe_php_shim::PhpMixed::String("ProcessHelper::run".to_string()),
-                    ),
-                    code: 0,
-                });
+                anyhow::bail!(shirabe_php_shim::InvalidArgumentException::new(format!(
+                    "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
+                    shirabe_php_shim::PhpMixed::String("ProcessHelper::run".to_string()),
+                )));
             }
         }
 

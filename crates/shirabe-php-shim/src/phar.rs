@@ -23,14 +23,12 @@ struct PharEntry {
 }
 
 fn corruption_error(path: &std::path::Path, detail: &str) -> anyhow::Error {
-    anyhow::anyhow!(UnexpectedValueException {
-        message: format!(
-            "internal corruption of phar \"{}\" ({})",
-            path.display(),
-            detail
-        ),
-        code: 0,
-    })
+    UnexpectedValueException::new(format!(
+        "internal corruption of phar \"{}\" ({})",
+        path.display(),
+        detail
+    ))
+    .into()
 }
 
 /// Reads a tar- or zip-based archive (optionally gzip/bzip2 compressed as a whole)
@@ -152,14 +150,12 @@ fn extract_entries(
     overwrite: bool,
 ) -> anyhow::Result<()> {
     let extract_error = |detail: String| {
-        anyhow::anyhow!(PharException {
-            message: format!(
-                "Extracting from phar \"{}\" failed: {}",
-                archive_path.display(),
-                detail
-            ),
-            code: 0,
-        })
+        PharException::new(format!(
+            "Extracting from phar \"{}\" failed: {}",
+            archive_path.display(),
+            detail
+        ))
+        .into()
     };
 
     std::fs::create_dir_all(directory).map_err(|e| extract_error(e.to_string()))?;
@@ -441,17 +437,18 @@ impl Phar {
 
 #[derive(Debug)]
 pub struct PharException {
-    pub message: String,
-    pub code: i64,
+    inner: crate::Exception,
 }
 
-impl std::fmt::Display for PharException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
+impl PharException {
+    pub fn new(message: String) -> Self {
+        Self {
+            inner: crate::Exception::new(message),
+        }
     }
 }
 
-impl std::error::Error for PharException {}
+crate::impl_php_exception!(PharException, inner, r"PharException");
 
 #[derive(Debug)]
 pub struct PharFileInfo {
@@ -514,13 +511,10 @@ impl PharData {
             None => false,
         };
         if !parent_exists {
-            return Err(anyhow::anyhow!(UnexpectedValueException {
-                message: format!(
-                    "Cannot create phar '{}', file extension (or combination) not recognised or the directory does not exist",
-                    path.display()
-                ),
-                code: 0,
-            }));
+            return Err(UnexpectedValueException::new(format!(
+                "Cannot create phar '{}', file extension (or combination) not recognised or the directory does not exist",
+                path.display()
+            )).into());
         }
         let format = format.unwrap_or(if path.to_string_lossy().ends_with(".zip") {
             Phar::ZIP
@@ -647,15 +641,13 @@ impl PharData {
             for file in iter {
                 let localname = file
                     .strip_prefix(base_directory)
-                    .map_err(|_| {
-                        anyhow::anyhow!(UnexpectedValueException {
-                            message: format!(
-                                "Iterator returned a path \"{}\" that is not in the base directory \"{}\"",
-                                file.display(),
-                                base_directory.display()
-                            ),
-                            code: 0,
-                        })
+                    .map_err(|_| -> anyhow::Error {
+                        UnexpectedValueException::new(format!(
+                            "Iterator returned a path \"{}\" that is not in the base directory \"{}\"",
+                            file.display(),
+                            base_directory.display()
+                        ))
+                        .into()
                     })?
                     .to_string_lossy()
                     .into_owned();
@@ -679,15 +671,13 @@ impl PharData {
             "PharData::compress: only tar-based archives can be compressed as a whole"
         );
         let tar_bytes = self.build_tar_bytes()?;
-        let write_error = |e: std::io::Error| {
-            anyhow::anyhow!(PharException {
-                message: format!(
-                    "Unable to compress phar archive \"{}\": {}",
-                    self.path.display(),
-                    e
-                ),
-                code: 0,
-            })
+        let write_error = |e: std::io::Error| -> anyhow::Error {
+            PharException::new(format!(
+                "Unable to compress phar archive \"{}\": {}",
+                self.path.display(),
+                e
+            ))
+            .into()
         };
         let (target, compressed) = match algo {
             Phar::GZ => {
@@ -725,27 +715,23 @@ impl PharData {
         }
         let bytes = self.build_tar_bytes()?;
         std::fs::write(&self.path, bytes).map_err(|e| {
-            anyhow::anyhow!(PharException {
-                message: format!(
-                    "Unable to write phar archive \"{}\": {}",
-                    self.path.display(),
-                    e
-                ),
-                code: 0,
-            })
+            PharException::new(format!(
+                "Unable to write phar archive \"{}\": {}",
+                self.path.display(),
+                e
+            ))
+            .into()
         })
     }
 
     fn build_tar_bytes(&self) -> anyhow::Result<Vec<u8>> {
         let write_error = |e: std::io::Error| {
-            anyhow::anyhow!(PharException {
-                message: format!(
-                    "Unable to write phar archive \"{}\": {}",
-                    self.path.display(),
-                    e
-                ),
-                code: 0,
-            })
+            PharException::new(format!(
+                "Unable to write phar archive \"{}\": {}",
+                self.path.display(),
+                e
+            ))
+            .into()
         };
         let mut builder = tar::Builder::new(Vec::new());
         for entry in self.entries.borrow().iter() {
@@ -802,15 +788,13 @@ impl PharData {
     }
 
     fn write_zip(&self) -> anyhow::Result<()> {
-        let write_error = |e: String| {
-            anyhow::anyhow!(PharException {
-                message: format!(
-                    "Unable to write phar archive \"{}\": {}",
-                    self.path.display(),
-                    e
-                ),
-                code: 0,
-            })
+        let write_error = |e: String| -> anyhow::Error {
+            PharException::new(format!(
+                "Unable to write phar archive \"{}\": {}",
+                self.path.display(),
+                e
+            ))
+            .into()
         };
         let file = std::fs::File::create(&self.path).map_err(|e| write_error(e.to_string()))?;
         let mut writer = zip::ZipWriter::new(file);
@@ -860,6 +844,7 @@ impl PharData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Catch as _;
 
     fn write_file(dir: &std::path::Path, name: &str, content: &[u8]) -> std::path::PathBuf {
         let path = dir.join(name);
@@ -934,9 +919,9 @@ mod tests {
         let error = PharData::new("/nonexistent-dir/foo.tar").unwrap_err();
         assert!(
             error
-                .downcast_ref::<UnexpectedValueException>()
+                .catch::<UnexpectedValueException>()
                 .unwrap()
-                .message
+                .get_message()
                 .starts_with("Cannot create phar")
         );
     }
@@ -1030,9 +1015,9 @@ mod tests {
         let error = Phar::new(&phar_path).unwrap_err();
         assert!(
             error
-                .downcast_ref::<UnexpectedValueException>()
+                .catch::<UnexpectedValueException>()
                 .unwrap()
-                .message
+                .get_message()
                 .contains("broken signature")
         );
     }

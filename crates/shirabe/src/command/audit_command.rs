@@ -60,10 +60,7 @@ impl AuditCommand {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
-                return Err(UnexpectedValueException {
-                    message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),
-                    code: 0,
-                }.into());
+                return Err(UnexpectedValueException::new("Valid composer.json and composer.lock files are required to run this command with --locked".to_string()).into());
             }
             let locked_repo = locker.get_locked_repository(
                 !input
@@ -228,19 +225,16 @@ impl Command for AuditCommand {
                     .collect::<Vec<_>>(),
             )
         {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "--abandoned must be one of {}.",
-                    implode(
-                        ", ",
-                        &Auditor::ABANDONEDS
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect::<Vec<_>>()
-                    )
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "--abandoned must be one of {}.",
+                implode(
+                    ", ",
+                    &Auditor::ABANDONEDS
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>()
+                )
+            ))
             .into());
         }
 

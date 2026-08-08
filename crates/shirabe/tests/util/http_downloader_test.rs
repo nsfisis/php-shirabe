@@ -11,6 +11,7 @@ use shirabe::io::io_interface;
 use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PHP_EOL, PhpMixed};
 
 // PHP performs a live HTTP get to assert the URL's user:pass is captured via
@@ -49,7 +50,7 @@ fn test_capture_authentication_params_from_url() {
     if let Err(e) = fs.get(
         "https://user:pass@github.com/composer/composer/404",
         IndexMap::new(),
-    ) && let Some(te) = e.downcast_ref::<TransportException>()
+    ) && let Some(te) = e.catch::<TransportException>()
     {
         assert_ne!(200, te.get_code());
     }

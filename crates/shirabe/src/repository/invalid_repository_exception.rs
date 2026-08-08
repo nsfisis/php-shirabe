@@ -8,14 +8,12 @@ pub struct InvalidRepositoryException(pub Exception);
 
 impl InvalidRepositoryException {
     pub fn new(message: String) -> Self {
-        Self(Exception { message, code: 0 })
+        Self(Exception::new(message))
     }
 }
 
-impl std::fmt::Display for InvalidRepositoryException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl std::error::Error for InvalidRepositoryException {}
+shirabe_php_shim::impl_php_exception!(
+    InvalidRepositoryException,
+    0,
+    r"Composer\Repository\InvalidRepositoryException"
+);

@@ -18,14 +18,6 @@ pub struct SolverProblemsException {
 impl SolverProblemsException {
     pub const ERROR_DEPENDENCY_RESOLUTION_FAILED: i64 = 2;
 
-    pub fn get_code(&self) -> i64 {
-        self.inner.code
-    }
-
-    pub fn get_message(&self) -> &str {
-        &self.inner.message
-    }
-
     pub fn new(
         problems: Vec<Problem>,
         learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
@@ -35,10 +27,7 @@ impl SolverProblemsException {
             problems.len()
         );
         Self {
-            inner: RuntimeException {
-                message,
-                code: Self::ERROR_DEPENDENCY_RESOLUTION_FAILED,
-            },
+            inner: RuntimeException::with_code(message, Self::ERROR_DEPENDENCY_RESOLUTION_FAILED),
             problems,
             learned_pool,
         }
@@ -170,10 +159,11 @@ impl SolverProblemsException {
     }
 }
 
-impl std::fmt::Display for SolverProblemsException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.message)
-    }
-}
-
-impl std::error::Error for SolverProblemsException {}
+// `learned_pool` holds `Rc<RefCell<Rule>>`, so this exception rides an inner `Result` rather than
+// an `anyhow::Error`.
+shirabe_php_shim::impl_php_exception!(
+    SolverProblemsException,
+    inner,
+    r"Composer\DependencyResolver\SolverProblemsException",
+    !Send
+);

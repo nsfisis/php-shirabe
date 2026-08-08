@@ -6,6 +6,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::HttpDownloader;
+use shirabe_php_shim::Catch as _;
 
 #[derive(Debug)]
 pub struct Forgejo {
@@ -121,8 +122,8 @@ impl Forgejo {
             Ok(_) => {}
             Err(e) => {
                 let code = e
-                    .downcast_ref::<crate::downloader::TransportException>()
-                    .map(|te| te.code)
+                    .catch::<crate::downloader::TransportException>()
+                    .map(|te| te.get_code())
                     .unwrap_or(0);
                 if [403, 401, 404].contains(&code) {
                     self.io.write_error3(

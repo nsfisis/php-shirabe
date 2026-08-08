@@ -16,10 +16,9 @@ impl MultiConflictRule {
         reason_data: ReasonData,
     ) -> anyhow::Result<Self> {
         if literals.len() < 3 {
-            return Err(RuntimeException {
-                message: "multi conflict rule requires at least 3 literals".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "multi conflict rule requires at least 3 literals".to_string(),
+            )
             .into());
         }
 
@@ -59,11 +58,7 @@ impl MultiConflictRule {
         let binary = hash_raw(algo, &format!("c:{}", joined));
         match binary.get(..4) {
             Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
-            None => Err(RuntimeException {
-                message: format!("Failed unpacking: {}", joined),
-                code: 0,
-            }
-            .into()),
+            None => Err(RuntimeException::new(format!("Failed unpacking: {}", joined)).into()),
         }
     }
 

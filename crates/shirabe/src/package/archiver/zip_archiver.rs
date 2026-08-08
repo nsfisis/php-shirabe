@@ -111,7 +111,7 @@ impl ArchiverInterface for ZipArchiver {
             sources,
             zip.get_status_string()
         );
-        Err(RuntimeException { message, code: 0 }.into())
+        Err(RuntimeException::new(message).into())
     }
 
     fn supports(&self, format: String, _source_type: Option<String>) -> bool {

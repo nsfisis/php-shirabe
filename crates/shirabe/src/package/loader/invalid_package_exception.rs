@@ -27,7 +27,7 @@ impl InvalidPackageException {
                 .join("\n")
         );
         Self {
-            inner: Exception { message, code: 0 },
+            inner: Exception::new(message),
             errors,
             warnings,
             data,
@@ -47,10 +47,8 @@ impl InvalidPackageException {
     }
 }
 
-impl std::fmt::Display for InvalidPackageException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.message)
-    }
-}
-
-impl std::error::Error for InvalidPackageException {}
+shirabe_php_shim::impl_php_exception!(
+    InvalidPackageException,
+    inner,
+    r"Composer\Package\Loader\InvalidPackageException"
+);

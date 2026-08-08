@@ -36,10 +36,9 @@ impl Platform {
                 return Ok(String::new());
             }
 
-            return Err(RuntimeException {
-                message: "Could not determine the current working directory".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "Could not determine the current working directory".to_string(),
+            )
             .into());
         }
 
@@ -159,11 +158,7 @@ impl Platform {
             }
         }
 
-        Err(RuntimeException {
-            message: "Could not determine user directory".to_string(),
-            code: 0,
-        }
-        .into())
+        Err(RuntimeException::new("Could not determine user directory".to_string()).into())
     }
 
     /// @return bool Whether the host machine is running on the Windows Subsystem for Linux (WSL)

@@ -175,11 +175,9 @@ impl ClassLoader {
             // Register directories for a new namespace.
             let length = strlen(prefix);
             if "\\" != &prefix[(length as usize - 1)..(length as usize)] {
-                return Err(InvalidArgumentException {
-                    message: "A non-empty PSR-4 prefix must end with a namespace separator."
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "A non-empty PSR-4 prefix must end with a namespace separator.".to_string(),
+                )
                 .into());
             }
             let first = prefix.chars().next().unwrap_or('\0').to_string();
@@ -226,11 +224,9 @@ impl ClassLoader {
         } else {
             let length = strlen(prefix);
             if "\\" != &prefix[(length as usize - 1)..(length as usize)] {
-                return Err(InvalidArgumentException {
-                    message: "A non-empty PSR-4 prefix must end with a namespace separator."
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "A non-empty PSR-4 prefix must end with a namespace separator.".to_string(),
+                )
                 .into());
             }
             let first = prefix.chars().next().unwrap_or('\0').to_string();

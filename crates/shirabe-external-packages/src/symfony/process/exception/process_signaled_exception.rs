@@ -1,11 +1,11 @@
 //! ref: composer/vendor/symfony/process/Exception/ProcessSignaledException.php
 
+use crate::symfony::process::exception::runtime_exception::RuntimeException;
 use crate::symfony::process::process::Process;
 
 #[derive(Debug)]
 pub struct ProcessSignaledException {
-    pub message: String,
-    pub code: i64,
+    inner: RuntimeException,
     signal: i64,
 }
 
@@ -14,8 +14,10 @@ impl ProcessSignaledException {
         let signal = process.get_term_signal()?;
 
         Ok(Self {
-            message: format!("The process has been signaled with signal \"{}\".", signal),
-            code: 0,
+            inner: RuntimeException::new(format!(
+                "The process has been signaled with signal \"{}\".",
+                signal
+            )),
             signal,
         })
     }
@@ -25,10 +27,8 @@ impl ProcessSignaledException {
     }
 }
 
-impl std::fmt::Display for ProcessSignaledException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for ProcessSignaledException {}
+shirabe_php_shim::impl_php_exception!(
+    ProcessSignaledException,
+    inner,
+    r"Symfony\Component\Process\Exception\ProcessSignaledException"
+);

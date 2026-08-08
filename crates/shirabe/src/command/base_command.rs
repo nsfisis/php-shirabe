@@ -294,10 +294,7 @@ impl BaseCommand for BaseCommandData {
         if self.composer.borrow().is_none() {
             let application = self.get_application();
             let Some(application) = application else {
-                return Err(RuntimeException {
-                    message: "Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new("Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance".to_string())
                 .into());
             };
             let composer = {
@@ -455,11 +452,9 @@ impl BaseCommand for BaseCommandData {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException {
-                    message: "--prefer-source can not be used together with --prefer-install"
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "--prefer-source can not be used together with --prefer-install".to_string(),
+                )
                 .into());
             }
             if input
@@ -468,11 +463,9 @@ impl BaseCommand for BaseCommandData {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException {
-                    message: "--prefer-dist can not be used together with --prefer-install"
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "--prefer-dist can not be used together with --prefer-install".to_string(),
+                )
                 .into());
             }
             let prefer_install = input.borrow().get_option("prefer-install")?;
@@ -492,13 +485,10 @@ impl BaseCommand for BaseCommandData {
                     prefer_source = false;
                 }
                 other => {
-                    return Err(UnexpectedValueException {
-                        message: format!(
-                            "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got {}",
-                            other
-                        ),
-                        code: 0,
-                    }
+                    return Err(UnexpectedValueException::new(format!(
+                        "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got {}",
+                        other
+                    ))
                     .into());
                 }
             }
@@ -551,12 +541,8 @@ impl BaseCommand for BaseCommandData {
         if !input.borrow().has_option("ignore-platform-reqs")
             || !input.borrow().has_option("ignore-platform-req")
         {
-            return Err(LogicException {
-                message:
-                    "Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."
-                        .to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new("Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."
+                .to_string())
             .into());
         }
 
@@ -585,14 +571,11 @@ impl BaseCommand for BaseCommandData {
         let requirements = self.normalize_requirements(requirements)?;
         for requirement in requirements {
             if !requirement.contains_key("version") {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "Option {} is missing a version constraint, use e.g. {}:^1.0",
-                        requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
-                        requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "Option {} is missing a version constraint, use e.g. {}:^1.0",
+                    requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
+                    requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
+                ))
                 .into());
             }
             requires.insert(
@@ -648,13 +631,10 @@ impl BaseCommand for BaseCommandData {
         opt_name: &str,
     ) -> anyhow::Result<String> {
         if !input.borrow().has_option(opt_name) {
-            return Err(LogicException {
-                message: format!(
-                    "This should not be called on a Command which has no {} option defined.",
-                    opt_name
-                ),
-                code: 0,
-            }
+            return Err(LogicException::new(format!(
+                "This should not be called on a Command which has no {} option defined.",
+                opt_name
+            ))
             .into());
         }
 
@@ -664,14 +644,11 @@ impl BaseCommand for BaseCommandData {
             .map(|s| PhpMixed::String(s.to_string()))
             .collect();
         if !in_array_strict(val.clone(), &formats) {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "--{} must be one of {}.",
-                    opt_name,
-                    Auditor::FORMATS.join(", ")
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "--{} must be one of {}.",
+                opt_name,
+                Auditor::FORMATS.join(", ")
+            ))
             .into());
         }
 

@@ -22,7 +22,7 @@ impl StreamContextFactory {
         url: &str,
         default_options: IndexMap<String, PhpMixed>,
         default_params: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<PhpMixed, TransportException> {
+    ) -> anyhow::Result<PhpMixed, Box<TransportException>> {
         let mut options: IndexMap<String, PhpMixed> = {
             let mut http = IndexMap::new();
             // specify defaults again to try and work better with curlwrappers enabled
@@ -66,7 +66,7 @@ impl StreamContextFactory {
         url: &str,
         mut options: IndexMap<String, PhpMixed>,
         for_curl: bool,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>, TransportException> {
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>, Box<TransportException>> {
         // Make sure the headers are in an array form
         let has_header = options
             .get("http")
@@ -105,23 +105,23 @@ impl StreamContextFactory {
 
                 if proxy.is_secure() {
                     if !extension_loaded("openssl") {
-                        return Err(TransportException::new(
+                        return Err(Box::new(TransportException::new(
                             "You must enable the openssl extension to use a secure proxy."
                                 .to_string(),
                             0,
-                        ));
+                        )));
                     }
                     if is_https_request {
-                        return Err(TransportException::new(
+                        return Err(Box::new(TransportException::new(
                             "You must enable the curl extension to make https requests through a secure proxy.".to_string(),
                             0,
-                        ));
+                        )));
                     }
                 } else if is_https_request && !extension_loaded("openssl") {
-                    return Err(TransportException::new(
+                    return Err(Box::new(TransportException::new(
                         "You must enable the openssl extension to make https requests through a proxy.".to_string(),
                         0,
-                    ));
+                    )));
                 }
 
                 // Header will be a Proxy-Authorization string or not set
@@ -224,7 +224,7 @@ impl StreamContextFactory {
         // `logger` was a PSR LoggerInterface; CaBundle is slated for removal so
         // it is now an unused `()` placeholder.
         logger: (),
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>, TransportException> {
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>, Box<TransportException>> {
         let ciphers = [
             "ECDHE-RSA-AES128-GCM-SHA256",
             "ECDHE-ECDSA-AES128-GCM-SHA256",
@@ -336,10 +336,10 @@ impl StreamContextFactory {
         if let Some(ref cafile) = cafile
             && (!Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger))
         {
-            return Err(TransportException::new(
+            return Err(Box::new(TransportException::new(
                 "The configured cafile was not valid or could not be read.".to_string(),
                 0,
-            ));
+            )));
         }
 
         let capath = defaults
@@ -351,10 +351,10 @@ impl StreamContextFactory {
         if let Some(ref capath) = capath
             && (!shirabe_php_shim::is_dir(capath) || !Filesystem::is_readable(capath))
         {
-            return Err(TransportException::new(
+            return Err(Box::new(TransportException::new(
                 "The configured capath was not valid or could not be read.".to_string(),
                 0,
-            ));
+            )));
         }
 
         // Disable TLS compression to prevent CRIME attacks where supported.

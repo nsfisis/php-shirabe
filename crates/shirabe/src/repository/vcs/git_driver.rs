@@ -15,6 +15,7 @@ use chrono::TimeZone;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
     sys_get_temp_dir,
@@ -52,13 +53,10 @@ impl GitDriver {
         if Filesystem::is_local_path(&self.inner.url) {
             self.inner.url = Preg::replace(php_regex!(r"{[\\/]\.git/?$}"), "", &self.inner.url);
             if !is_dir(&self.inner.url) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Failed to read package information from {} as the path does not exist",
-                        self.inner.url
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Failed to read package information from {} as the path does not exist",
+                    self.inner.url
+                ))
                 .into());
             }
             self.repo_dir = self.inner.url.clone();
@@ -73,10 +71,7 @@ impl GitDriver {
                 .unwrap_or("")
                 .to_string();
             if !Cache::is_usable(&cache_vcs_dir) {
-                return Err(RuntimeException {
-                    message: "GitDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new("GitDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())
                 .into());
             }
 
@@ -96,25 +91,19 @@ impl GitDriver {
             fs.ensure_directory_exists(&dirname(&self.repo_dir))?;
 
             if !is_writable(dirname(&self.repo_dir)) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
-                        self.inner.url,
-                        dirname(&self.repo_dir)
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
+                    self.inner.url,
+                    dirname(&self.repo_dir)
+                ))
                 .into());
             }
 
             if Preg::is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url) {
-                return Err(InvalidArgumentException {
-                    message: format!(
-                        "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
-                        self.inner.url
-                    ),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
+                    self.inner.url
+                ))
                 .into());
             }
 
@@ -126,13 +115,10 @@ impl GitDriver {
             );
             if !git_util.sync_mirror(&self.inner.url, &self.repo_dir)? {
                 if !is_dir(&self.repo_dir) {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Failed to clone {} to read package information from it",
-                            self.inner.url
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Failed to clone {} to read package information from it",
+                        self.inner.url
+                    ))
                     .into());
                 }
                 self.inner.io.write_error3(&format!(
@@ -250,13 +236,10 @@ impl GitDriver {
         identifier: &str,
     ) -> anyhow::Result<Option<String>> {
         if identifier.starts_with('-') {
-            return Err(RuntimeException {
-                message: format!(
-                    "Invalid git identifier detected. Identifier must not start with a -, given: {}",
-                    identifier
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Invalid git identifier detected. Identifier must not start with a -, given: {}",
+                identifier
+            ))
             .into());
         }
 
@@ -283,13 +266,10 @@ impl GitDriver {
         identifier: &str,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if identifier.starts_with('-') {
-            return Err(RuntimeException {
-                message: format!(
-                    "Invalid git identifier detected. Identifier must not start with a -, given: {}",
-                    identifier
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Invalid git identifier detected. Identifier must not start with a -, given: {}",
+                identifier
+            ))
             .into());
         }
 
@@ -459,7 +439,7 @@ impl GitDriver {
         ) {
             Ok(_) => Ok(true),
             Err(e) => {
-                if e.downcast_ref::<RuntimeException>().is_some() {
+                if e.is_instanceof::<RuntimeException>() {
                     Ok(false)
                 } else {
                     Err(e)
@@ -543,7 +523,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

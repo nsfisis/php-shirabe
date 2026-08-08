@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Downloader/MaxFileSizeExceededException.php
 
-use crate::downloader::TransportException;
+use crate::downloader::transport_exception::TransportException;
 
 #[derive(Debug)]
 pub struct MaxFileSizeExceededException(pub TransportException);
@@ -11,10 +11,8 @@ impl MaxFileSizeExceededException {
     }
 }
 
-impl std::fmt::Display for MaxFileSizeExceededException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl std::error::Error for MaxFileSizeExceededException {}
+shirabe_php_shim::impl_php_exception!(
+    MaxFileSizeExceededException,
+    0,
+    r"Composer\Downloader\MaxFileSizeExceededException"
+);

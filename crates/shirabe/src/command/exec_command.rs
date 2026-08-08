@@ -174,13 +174,10 @@ impl Command for ExecCommand {
                     .as_string()
                     .unwrap_or("")
                     .to_string();
-                return Err(RuntimeException {
-                    message: format!(
-                        "No binaries found in composer.json or in bin-dir ({})",
-                        bin_dir
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "No binaries found in composer.json or in bin-dir ({})",
+                    bin_dir
+                ))
                 .into());
             }
 
@@ -222,9 +219,11 @@ impl Command for ExecCommand {
         if let Some(ref iwd) = initial_working_directory
             && getcwd().as_deref() != Some(iwd.as_str())
         {
-            chdir(iwd).map_err(|e| RuntimeException {
-                message: format!("Could not switch back to working directory \"{}\"", iwd),
-                code: 0,
+            chdir(iwd).map_err(|e| {
+                RuntimeException::new(format!(
+                    "Could not switch back to working directory \"{}\"",
+                    iwd
+                ))
             })?;
         }
 

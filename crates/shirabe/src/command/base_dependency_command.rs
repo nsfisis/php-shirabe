@@ -63,12 +63,11 @@ pub trait BaseDependencyCommand: BaseCommand {
             let mut locker = locker.borrow_mut();
 
             if !locker.is_locked() {
-                return Err(anyhow::anyhow!(UnexpectedValueException {
-                    message:
-                        "A valid composer.lock file is required to run this command with --locked"
-                            .to_string(),
-                    code: 0,
-                }));
+                return Err(UnexpectedValueException::new(
+                    "A valid composer.lock file is required to run this command with --locked"
+                        .to_string(),
+                )
+                .into());
             }
 
             repos.push(locker.get_locked_repository(true)?.into());
@@ -134,10 +133,11 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         let packages = installed_repo.find_packages_with_replacers_and_providers(&needle, None)?;
         if packages.is_empty() {
-            return Err(anyhow::anyhow!(InvalidArgumentException {
-                message: format!("Could not find package \"{}\" in your project", needle),
-                code: 0,
-            }));
+            return Err(InvalidArgumentException::new(format!(
+                "Could not find package \"{}\" in your project",
+                needle
+            ))
+            .into());
         }
 
         let matched_package = installed_repo.find_package(

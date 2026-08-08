@@ -7,6 +7,7 @@ use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::Silencer;
 use indexmap::IndexMap;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents, file_put_contents,
     implode, is_writable,
@@ -32,24 +33,18 @@ impl JsonConfigSource {
         let contents;
         if self.file.borrow().exists() {
             if !is_writable(self.file.borrow().get_path()) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "The file \"{}\" is not writable.",
-                        self.file.borrow().get_path(),
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "The file \"{}\" is not writable.",
+                    self.file.borrow().get_path(),
+                ))
                 .into());
             }
 
             if !Filesystem::is_readable(self.file.borrow().get_path()) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "The file \"{}\" is not readable.",
-                        self.file.borrow().get_path(),
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "The file \"{}\" is not readable.",
+                    self.file.borrow().get_path(),
+                ))
                 .into());
             }
 
@@ -148,19 +143,16 @@ impl JsonConfigSource {
         {
             Ok(_) => {}
             Err(e) => {
-                let Some(jve) = e.downcast_ref::<JsonValidationException>() else {
+                let Some(jve) = e.catch::<JsonValidationException>() else {
                     return Err(e);
                 };
                 // restore contents to the original state
                 file_put_contents(self.file.borrow().get_path(), contents.as_bytes());
-                return Err(RuntimeException {
-                    message: format!(
-                        "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {}{}",
-                        PHP_EOL,
-                        implode(PHP_EOL, jve.get_errors()),
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {}{}",
+                    PHP_EOL,
+                    implode(PHP_EOL, jve.get_errors()),
+                ))
                 .into());
             }
         }
@@ -397,13 +389,10 @@ impl ConfigSourceInterface for JsonConfigSource {
                     }
                 }
                 let Some(index_to_insert) = index_to_insert else {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "The referenced repository \"{}\" does not exist.",
-                            reference_name,
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "The referenced repository \"{}\" does not exist.",
+                        reference_name,
+                    ))
                     .into());
                 };
 

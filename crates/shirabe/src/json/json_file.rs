@@ -11,6 +11,7 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::{ParsingException, ParsingExceptionDetails};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
@@ -108,10 +109,9 @@ impl JsonFile {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Self> {
         if http_downloader.is_none() && Preg::is_match(php_regex!(r"{^https?://}i"), &path) {
-            return Err(InvalidArgumentException {
-                message: "http urls require a HttpDownloader instance to be passed".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "http urls require a HttpDownloader instance to be passed".to_string(),
+            )
             .into());
         }
         Ok(Self {
@@ -145,10 +145,10 @@ impl JsonFile {
                     .map(|s| s.to_string()))
             } else {
                 if !Filesystem::is_readable(&self.path) {
-                    return Err(RuntimeException {
-                        message: format!("The file \"{}\" is not readable.", self.path),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "The file \"{}\" is not readable.",
+                        self.path
+                    ))
                     .into());
                 }
                 if let Some(io) = &self.io
@@ -173,17 +173,13 @@ impl JsonFile {
             Err(e) => {
                 // TransportException keeps its message verbatim; any other exception is wrapped
                 // with the "Could not read" prefix.
-                if let Some(te) = e.downcast_ref::<TransportException>() {
-                    return Err(RuntimeException {
-                        message: te.message.clone(),
-                        code: 0,
-                    }
-                    .into());
+                if let Some(te) = e.catch::<TransportException>() {
+                    return Err(RuntimeException::new(te.get_message().to_string()).into());
                 }
-                return Err(RuntimeException {
-                    message: format!("Could not read {}\n\n{}", self.path, e),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Could not read {}\n\n{}",
+                    self.path, e
+                ))
                 .into());
             }
         };
@@ -191,11 +187,7 @@ impl JsonFile {
         let json = match json {
             Some(j) => j,
             None => {
-                return Err(RuntimeException {
-                    message: format!("Could not read {}", self.path),
-                    code: 0,
-                }
-                .into());
+                return Err(RuntimeException::new(format!("Could not read {}", self.path)).into());
             }
         };
 
@@ -230,21 +222,18 @@ impl JsonFile {
         let dir = dirname(&self.path);
         if !is_dir(&dir) {
             if file_exists(&dir) {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "{} exists and is not a directory.",
-                        realpath(&dir).unwrap_or_default(),
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "{} exists and is not a directory.",
+                    realpath(&dir).unwrap_or_default(),
+                ))
                 .into());
             }
             // PHP: @mkdir($dir, 0777, true)
             if !Silencer::call(|| Ok(mkdir(&dir, 0o777, true))).unwrap_or(false) {
-                return Err(UnexpectedValueException {
-                    message: format!("{} does not exist and could not be created.", dir),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "{} does not exist and could not be created.",
+                    dir
+                ))
                 .into());
             }
         }
@@ -305,10 +294,10 @@ impl JsonFile {
     /// @return true                    true on success
     pub fn validate_schema(&self, schema: i64, schema_file: Option<&str>) -> anyhow::Result<bool> {
         if !Filesystem::is_readable(&self.path) {
-            return Err(RuntimeException {
-                message: format!("The file \"{}\" is not readable.", self.path),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "The file \"{}\" is not readable.",
+                self.path
+            ))
             .into());
         }
         let content = file_get_contents(&self.path).unwrap_or_default();
@@ -446,10 +435,8 @@ impl JsonFile {
         data: &T,
         options: JsonEncodeOptions,
     ) -> anyhow::Result<String> {
-        let json = json_encode_ex(data, options.to_flags()).map_err(|err| RuntimeException {
-            message: format!("JSON encoding failed: {}", err),
-            code: 0,
-        })?;
+        let json = json_encode_ex(data, options.to_flags())
+            .map_err(|err| RuntimeException::new(format!("JSON encoding failed: {}", err)))?;
 
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation

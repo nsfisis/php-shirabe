@@ -127,10 +127,9 @@ impl Question {
     /// Throws LogicException in case the autocompleter is also used.
     pub fn set_hidden(&mut self, hidden: bool) -> Result<&mut Self, LogicException> {
         if self.autocompleter_callback.is_some() {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: "A hidden question cannot use the autocompleter.".to_string(),
-                code: 0,
-            }));
+            return Err(LogicException::new(
+                "A hidden question cannot use the autocompleter.".to_string(),
+            ));
         }
 
         self.hidden = hidden;
@@ -225,10 +224,9 @@ impl Question {
         callback: Option<Box<dyn Fn(&str) -> Option<Vec<PhpMixed>>>>,
     ) -> Result<&mut Self, LogicException> {
         if self.hidden && callback.is_some() {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: "A hidden question cannot use the autocompleter.".to_string(),
-                code: 0,
-            }));
+            return Err(LogicException::new(
+                "A hidden question cannot use the autocompleter.".to_string(),
+            ));
         }
 
         self.autocompleter_callback = callback;
@@ -267,11 +265,8 @@ impl Question {
         if let Some(attempts) = attempts
             && attempts < 1
         {
-            return Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: "Maximum number of attempts must be a positive value.".to_string(),
-                    code: 0,
-                },
+            return Err(InvalidArgumentException::new(
+                "Maximum number of attempts must be a positive value.".to_string(),
             ));
         }
 

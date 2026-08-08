@@ -69,23 +69,17 @@ impl ArrayLoader {
         class: &str,
     ) -> anyhow::Result<CompleteOrRootPackage> {
         if !config.contains_key("name") {
-            return Err(UnexpectedValueException {
-                message: format!(
-                    "Unknown package has no name defined ({}).",
-                    json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default()
-                ),
-                code: 0,
-            }
+            return Err(UnexpectedValueException::new(format!(
+                "Unknown package has no name defined ({}).",
+                json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default()
+            ))
             .into());
         }
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
-            return Err(UnexpectedValueException {
-                message: format!(
-                    "Package {} has no version defined.",
-                    config.get("name").and_then(|v| v.as_string()).unwrap_or("")
-                ),
-                code: 0,
-            }
+            return Err(UnexpectedValueException::new(format!(
+                "Package {} has no version defined.",
+                config.get("name").and_then(|v| v.as_string()).unwrap_or("")
+            ))
             .into());
         }
         let mut config_version = config.get("version").cloned().unwrap_or(PhpMixed::Null);
@@ -118,14 +112,11 @@ impl ArrayLoader {
             {
                 Ok(v) => version = v,
                 Err(e) => {
-                    return Err(UnexpectedValueException {
-                        message: format!(
-                            "Failed to normalize version for package \"{}\": {}",
-                            config.get("name").and_then(|v| v.as_string()).unwrap_or(""),
-                            e
-                        ),
-                        code: 0,
-                    }
+                    return Err(UnexpectedValueException::new(format!(
+                        "Failed to normalize version for package \"{}\": {}",
+                        config.get("name").and_then(|v| v.as_string()).unwrap_or(""),
+                        e
+                    ))
                     .into());
                 }
             }
@@ -226,18 +217,14 @@ impl ArrayLoader {
                 })
                 .unwrap_or(false);
             if !has_required {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "Package {}'s source key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ...}},\n{} given.",
-
-                            config
-                                .get("name")
-                                .and_then(|v| v.as_string())
-                                .unwrap_or(""),
-                        json_encode(&source).unwrap_or_default(),
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "Package {}'s source key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ...}},\n{} given.",
+                    config
+                        .get("name")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or(""),
+                    json_encode(&source).unwrap_or_default(),
+                ))
                 .into());
             }
             let source_map = source_map.unwrap();
@@ -270,18 +257,14 @@ impl ArrayLoader {
                 .map(|m| m.contains_key("type") && m.contains_key("url"))
                 .unwrap_or(false);
             if !has_required {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "Package {}'s dist key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...}},\n{} given.",
-
-                            config
-                                .get("name")
-                                .and_then(|v| v.as_string())
-                                .unwrap_or(""),
-                        json_encode(&dist).unwrap_or_default(),
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "Package {}'s dist key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...}},\n{} given.",
+                    config
+                        .get("name")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or(""),
+                    json_encode(&dist).unwrap_or_default(),
+                ))
                 .into());
             }
             let dist_map = dist_map.unwrap();
@@ -672,13 +655,10 @@ impl ArrayLoader {
         let parsed_constraint = match self.version_parser.parse_constraints(&constraint) {
             Ok(c) => c,
             Err(_e) => {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "Link constraint in {} {} > {} should be a valid version constraint, got \"{}\"",
-                        source, description, target, constraint
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "Link constraint in {} {} > {} should be a valid version constraint, got \"{}\"",
+                    source, description, target, constraint
+                ))
                 .into());
             }
         };
@@ -702,11 +682,9 @@ impl ArrayLoader {
         config: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<Option<String>> {
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
-            return Err(UnexpectedValueException {
-                message: "no/invalid version defined".to_string(),
-                code: 0,
-            }
-            .into());
+            return Err(
+                UnexpectedValueException::new("no/invalid version defined".to_string()).into(),
+            );
         }
         let mut config_version = config.get("version").cloned().unwrap_or(PhpMixed::Null);
         if !is_string(&config_version) {

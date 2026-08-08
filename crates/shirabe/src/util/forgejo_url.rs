@@ -27,10 +27,10 @@ impl ForgejoUrl {
     pub fn create(repo_url: &str) -> anyhow::Result<Self> {
         match Self::try_from(Some(repo_url)) {
             Some(url) => Ok(url),
-            None => Err(InvalidArgumentException {
-                message: format!("This is not a valid Forgejo URL: {}", repo_url),
-                code: 0,
-            }
+            None => Err(InvalidArgumentException::new(format!(
+                "This is not a valid Forgejo URL: {}",
+                repo_url
+            ))
             .into()),
         }
     }

@@ -93,6 +93,7 @@ use shirabe_external_packages::symfony::console::style::style_interface::StyleIn
 use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_external_packages::symfony::console::terminal::Terminal;
 use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
     bin2hex, chdir, date_default_timezone_get, date_default_timezone_set, defined, dirname,
@@ -232,13 +233,10 @@ impl Application {
         if let Some(ref wd) = working_dir
             && !is_dir(wd)
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Invalid working directory specified, {} does not exist.",
-                    wd
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Invalid working directory specified, {} does not exist.",
+                wd
+            ))
             .into());
         }
 
@@ -250,8 +248,8 @@ impl Application {
         exception: &anyhow::Error,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        let is_logic_or_error = exception.downcast_ref::<ShimLogicException>().is_some();
-        if is_logic_or_error
+        if (exception.is_class::<ShimLogicException>()
+            || exception.is_instanceof::<shirabe_php_shim::Error>())
             && output.borrow().get_verbosity() < output_interface::VERBOSITY_VERBOSE
         {
             output
@@ -308,7 +306,7 @@ impl Application {
         }
 
         let message = exception.to_string();
-        if exception.downcast_ref::<TransportException>().is_some()
+        if exception.is_instanceof::<TransportException>()
             && str_contains(&message, "Unable to use a proxy")
         {
             io.write_error3(
@@ -320,7 +318,7 @@ impl Application {
         }
 
         if Platform::is_windows()
-            && exception.downcast_ref::<TransportException>().is_some()
+            && exception.is_instanceof::<TransportException>()
             && str_contains(&message, "unable to get local issuer certificate")
         {
             let avast_detect = glob("C:\\Program Files\\Avast*");
@@ -359,10 +357,7 @@ impl Application {
             io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", true, io_interface::QUIET);
         }
 
-        if exception
-            .downcast_ref::<ProcessTimedOutException>()
-            .is_some()
-        {
+        if exception.is_instanceof::<ProcessTimedOutException>() {
             io.write_error3(
                 "<error>The following exception is caused by a process timeout</error>",
                 true,
@@ -376,9 +371,7 @@ impl Application {
             && !self.io.is_interactive()
         {
             io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", true, io_interface::QUIET);
-        } else if exception
-            .downcast_ref::<CommandNotFoundException>()
-            .is_some()
+        } else if exception.is_instanceof::<CommandNotFoundException>()
             && self.get_disable_plugins_by_default()
         {
             io.write_error3("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, io_interface::QUIET);
@@ -416,9 +409,7 @@ impl Application {
             match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
                 Ok(c) => self.composer = Some(c.upcast()),
                 Err(e) => {
-                    if e.downcast_ref::<shirabe_php_shim::InvalidArgumentException>()
-                        .is_some()
-                    {
+                    if e.is_instanceof::<shirabe_php_shim::InvalidArgumentException>() {
                         if required {
                             self.io.write_error(&e.to_string());
                             if self.are_exceptions_caught() {
@@ -429,11 +420,11 @@ impl Application {
                             }
                             return Err(e);
                         }
-                    } else if e.downcast_ref::<JsonValidationException>().is_some()
-                        || e.downcast_ref::<RuntimeException>().is_some()
+                    } else if e.is_instanceof::<JsonValidationException>()
+                        || e.is_instanceof::<RuntimeException>()
                         // PHP's `catch (RuntimeException)` also catches subclasses;
                         // NoSslException is the one Factory::create raises.
-                        || e.downcast_ref::<NoSslException>().is_some()
+                        || e.is_instanceof::<NoSslException>()
                     {
                         if required {
                             return Err(e);
@@ -523,7 +514,7 @@ impl Application {
             Ok(()) => {}
             Err(e) => {
                 // Errors must be ignored, full binding/validation happens later when the command is known.
-                if !is_exception_interface(&e) {
+                if !throwable_is_exception_interface(e.as_ref()) {
                     return Err(e);
                 }
             }
@@ -712,10 +703,7 @@ impl Application {
 
     pub fn get_signal_registry(&self) -> anyhow::Result<&SignalRegistry> {
         match &self.signal_registry {
-            None => Err(ConsoleRuntimeException(shirabe_php_shim::RuntimeException {
-                message: "Signals are not supported. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string(),
-                code: 0,
-            })
+            None => Err(ConsoleRuntimeException::new("Signals are not supported. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string())
             .into()),
             Some(signal_registry) => Ok(signal_registry),
         }
@@ -988,17 +976,12 @@ impl Application {
                 message.push_str(&shirabe_php_shim::implode("\n    ", &alternatives));
             }
 
-            return Err(NamespaceNotFoundException(CommandNotFoundException::new(
-                message,
-                alternatives,
-                0,
-            ))
-            .into());
+            return Err(NamespaceNotFoundException::new(message, alternatives, 0).into());
         }
 
         let exact = namespaces.iter().any(|n| n == namespace);
         if namespaces.len() > 1 && !exact {
-            return Err(NamespaceNotFoundException(CommandNotFoundException::new(
+            return Err(NamespaceNotFoundException::new(
                 format!(
                     "The namespace \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
                     namespace,
@@ -1006,7 +989,7 @@ impl Application {
                 ),
                 namespaces,
                 0,
-            ))
+            )
             .into());
         }
 
@@ -1936,13 +1919,10 @@ impl ApplicationHandle {
         command.borrow().get_definition();
 
         if command.borrow().get_name().is_none() {
-            return Err(ConsoleLogicException(shirabe_php_shim::LogicException {
-                message: format!(
-                    "The command defined in \"{}\" cannot have an empty name.",
-                    shirabe_php_shim::get_debug_type_obj(&command),
-                ),
-                code: 0,
-            })
+            return Err(ConsoleLogicException::new(format!(
+                "The command defined in \"{}\" cannot have an empty name.",
+                shirabe_php_shim::get_debug_type_obj(&command),
+            ))
             .into());
         }
 
@@ -2057,7 +2037,7 @@ impl ApplicationHandle {
                     command_name = cmd.borrow().get_name();
                 }
                 Err(e) => {
-                    if e.downcast_ref::<CommandNotFoundException>().is_some() {
+                    if e.is_instanceof::<CommandNotFoundException>() {
                         // we'll check command validity again later after plugins are loaded
                         command_name = None;
                     }
@@ -2223,9 +2203,9 @@ impl ApplicationHandle {
             })() {
                 Ok(_) => {}
                 Err(e) => {
-                    if e.downcast_ref::<NoSslException>().is_some() {
+                    if e.is_instanceof::<NoSslException>() {
                         // suppress these as they are not relevant at this point
-                    } else if let Some(pe) = e.downcast_ref::<ParsingException>() {
+                    } else if let Some(pe) = e.catch::<ParsingException>() {
                         let details = pe.get_details();
 
                         let file = realpath(Factory::get_composer_file().unwrap_or_default());
@@ -2233,7 +2213,7 @@ impl ApplicationHandle {
                         let line = details.line;
 
                         let mut ghe = GithubActionError::new(io.clone());
-                        ghe.emit(&pe.message, file.as_deref(), line);
+                        ghe.emit(pe.get_message(), file.as_deref(), line);
 
                         return Err(e);
                     } else {
@@ -2542,7 +2522,7 @@ impl ApplicationHandle {
 
         let outcome = match result_outcome {
             Ok(r) => Ok(r),
-            Err(e) => {
+            Err(mut e) => {
                 // PHP's `exit` bypasses parent::doRun()'s catch entirely; re-raise it untouched so
                 // the GitHub Actions annotation and error hints below are skipped.
                 if e.downcast_ref::<shirabe_php_shim::ExitException>()
@@ -2550,7 +2530,7 @@ impl ApplicationHandle {
                 {
                     return Err(e);
                 }
-                if let Some(see) = e.downcast_ref::<ScriptExecutionException>() {
+                if let Some(see) = e.catch::<ScriptExecutionException>() {
                     if application.borrow().get_disable_plugins_by_default()
                         && application.borrow().is_running_as_root()
                         && !io.is_interactive()
@@ -2572,15 +2552,9 @@ impl ApplicationHandle {
 
                     // override TransportException's code for the purpose of parent::run() using it as process exit code
                     // as http error codes are all beyond the 255 range of permitted exit codes
-                    // TODO(phase-c): PHP's `instanceof TransportException` also matches the subclass
-                    // MaxFileSizeExceededException, which is a newtype here and is not matched by this downcast.
-                    let e = match e.downcast::<TransportException>() {
-                        Ok(mut e) => {
-                            e.code = Installer::ERROR_TRANSPORT_EXCEPTION;
-                            anyhow::Error::new(e)
-                        }
-                        Err(e) => e,
-                    };
+                    if let Some(te) = e.catch_mut::<TransportException>() {
+                        te.set_code(Installer::ERROR_TRANSPORT_EXCEPTION);
+                    }
 
                     Err(e)
                 }
@@ -2691,9 +2665,7 @@ impl ApplicationHandle {
 
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
-                // TODO(phase-c): anyhow::Error has no PHP-style getCode(); the exit code derived
-                // from the exception's `code` field needs the downcast strategy decided.
-                let exit_code = shirabe_php_shim::php_exception_get_code(&e);
+                let exit_code = throwable_get_code(e.as_ref()) as i32;
                 if shirabe_php_shim::is_numeric_string(&exit_code.to_string()) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
@@ -2735,7 +2707,7 @@ impl ApplicationHandle {
             Ok(()) => {}
             Err(e) => {
                 // Errors must be ignored, full binding/validation happens later when the command is known.
-                if !is_exception_interface(&e) {
+                if !throwable_is_exception_interface(e.as_ref()) {
                     return Err(e);
                 }
             }
@@ -2814,8 +2786,9 @@ impl ApplicationHandle {
             Err(e) => {
                 // if (!($e instanceof CommandNotFoundException && !$e instanceof NamespaceNotFoundException)
                 //     || 1 !== count($alternatives = $e->getAlternatives()) || !$input->isInteractive())
-                let alternatives: Option<Vec<String>> = downcast_command_not_found(&e)
-                    .filter(|_| !is_namespace_not_found(&e))
+                let alternatives: Option<Vec<String>> = e
+                    .catch::<CommandNotFoundException>()
+                    .filter(|_| !e.is_instanceof::<NamespaceNotFoundException>())
                     .map(|cnf| cnf.get_alternatives().clone());
 
                 let single_alternative = match &alternatives {
@@ -2907,10 +2880,7 @@ impl ApplicationHandle {
 
             if !command_signals.is_empty() {
                 if application.borrow().signal_registry.is_none() {
-                    return Err(ConsoleRuntimeException(shirabe_php_shim::RuntimeException {
-                        message: "Unable to subscribe to signal events. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string(),
-                        code: 0,
-                    })
+                    return Err(ConsoleRuntimeException::new("Unable to subscribe to signal events. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string())
                     .into());
                 }
 
@@ -2994,133 +2964,35 @@ impl BaseApplication for Application {
     }
 }
 
-/// Helper mirroring PHP's `$e instanceof ExceptionInterface`.
-fn is_exception_interface(e: &anyhow::Error) -> bool {
-    // anyhow::Error stores concrete error types; enumerate the console exceptions
-    // that implement ExceptionInterface (PHP's `$e instanceof ExceptionInterface`).
-    e.downcast_ref::<CommandNotFoundException>().is_some()
-        || e.downcast_ref::<NamespaceNotFoundException>().is_some()
-        || e.downcast_ref::<ConsoleLogicException>().is_some()
-        || e.downcast_ref::<ConsoleRuntimeException>().is_some()
-        || e.downcast_ref::<ConsoleInvalidArgumentException>()
-            .is_some()
-        || e.downcast_ref::<InvalidOptionException>().is_some()
-        || e.downcast_ref::<MissingInputException>().is_some()
-}
-
-/// `is_exception_interface` for a node of the `anyhow::Error` source chain (`&dyn Error`), used
-/// while walking the getPrevious() chain in `do_render_throwable`.
+/// PHP's `$e instanceof ExceptionInterface`, enumerating the console exceptions that implement it.
+// TODO(plugin): a plugin can throw an exception class of its own that implements
+// ExceptionInterface, and no enumeration on this side can name it. Answering that needs the
+// interfaces a thrown exception implements, not just its superclasses.
 fn throwable_is_exception_interface(e: &(dyn std::error::Error + 'static)) -> bool {
-    e.downcast_ref::<CommandNotFoundException>().is_some()
-        || e.downcast_ref::<NamespaceNotFoundException>().is_some()
-        || e.downcast_ref::<ConsoleLogicException>().is_some()
-        || e.downcast_ref::<ConsoleRuntimeException>().is_some()
-        || e.downcast_ref::<ConsoleInvalidArgumentException>()
-            .is_some()
-        || e.downcast_ref::<InvalidOptionException>().is_some()
-        || e.downcast_ref::<MissingInputException>().is_some()
+    shirabe_php_shim::AnyThrowable::of(e).is_some_and(|e| {
+        e.is_instanceof::<CommandNotFoundException>()
+            || e.is_instanceof::<NamespaceNotFoundException>()
+            || e.is_instanceof::<ConsoleLogicException>()
+            || e.is_instanceof::<ConsoleRuntimeException>()
+            || e.is_instanceof::<ConsoleInvalidArgumentException>()
+            || e.is_instanceof::<InvalidOptionException>()
+            || e.is_instanceof::<MissingInputException>()
+    })
 }
 
-/// PHP's `$e->getCode()` for a node of the source chain. Enumerates the flat standard exception
-/// structs that carry a `code`; everything else defaults to PHP's 0.
+/// PHP's `$e->getCode()` for a node of the source chain; everything the port does not recognize as
+/// an exception defaults to PHP's 0.
 fn throwable_get_code(e: &(dyn std::error::Error + 'static)) -> i64 {
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::Exception>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::RuntimeException>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::UnexpectedValueException>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::InvalidArgumentException>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::TypeError>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::LogicException>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::BadMethodCallException>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::OutOfBoundsException>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::ErrorException>() {
-        return e.code;
-    }
-    if let Some(e) = e.downcast_ref::<shirabe_php_shim::PharException>() {
-        return e.code;
-    }
-    0
+    shirabe_php_shim::AnyThrowable::of(e).map_or(0, shirabe_php_shim::AnyThrowable::get_code)
 }
 
 /// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
-/// is verbose. PHP returns the exception's fully-qualified class name; Rust has no runtime FQCN, so
-/// this maps the enumerable exception types to their PHP class names and falls back to `Exception`.
-/// TODO(phase-c): the fully-qualified name (e.g. `Composer\...`) cannot be reproduced faithfully.
+/// is verbose.
 fn throwable_debug_type(e: &(dyn std::error::Error + 'static)) -> String {
-    let name = if e
-        .downcast_ref::<shirabe_php_shim::RuntimeException>()
-        .is_some()
-    {
-        "RuntimeException"
-    } else if e
-        .downcast_ref::<shirabe_php_shim::UnexpectedValueException>()
-        .is_some()
-    {
-        "UnexpectedValueException"
-    } else if e
-        .downcast_ref::<shirabe_php_shim::InvalidArgumentException>()
-        .is_some()
-    {
-        "InvalidArgumentException"
-    } else if e.downcast_ref::<shirabe_php_shim::TypeError>().is_some() {
-        "TypeError"
-    } else if e
-        .downcast_ref::<shirabe_php_shim::LogicException>()
-        .is_some()
-    {
-        "LogicException"
-    } else if e
-        .downcast_ref::<shirabe_php_shim::BadMethodCallException>()
-        .is_some()
-    {
-        "BadMethodCallException"
-    } else if e
-        .downcast_ref::<shirabe_php_shim::OutOfBoundsException>()
-        .is_some()
-    {
-        "OutOfBoundsException"
-    } else if e
-        .downcast_ref::<shirabe_php_shim::ErrorException>()
-        .is_some()
-    {
-        "ErrorException"
-    } else if e
-        .downcast_ref::<shirabe_php_shim::PharException>()
-        .is_some()
-    {
-        "PharException"
-    } else {
-        "Exception"
-    };
-    name.to_string()
-}
-
-/// Helper mirroring PHP's `$e instanceof CommandNotFoundException`.
-fn downcast_command_not_found(e: &anyhow::Error) -> Option<&CommandNotFoundException> {
-    if let Some(cnf) = e.downcast_ref::<CommandNotFoundException>() {
-        return Some(cnf);
-    }
-    e.downcast_ref::<NamespaceNotFoundException>().map(|n| &n.0)
-}
-
-/// Helper mirroring PHP's `$e instanceof NamespaceNotFoundException`.
-fn is_namespace_not_found(e: &anyhow::Error) -> bool {
-    e.downcast_ref::<NamespaceNotFoundException>().is_some()
+    shirabe_php_shim::AnyThrowable::of(e).map_or_else(
+        || "Exception".to_string(),
+        shirabe_php_shim::PhpClass::php_class_name,
+    )
 }
 
 /// Borrows the shared input as a mutable `dyn InputInterface` for passing to
@@ -3161,13 +3033,11 @@ pub(crate) fn register_worker_reverse_application(
 pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow::Result<i64> {
     let application = WORKER_REVERSE_APPLICATION
         .with(|slot| slot.borrow().as_ref().and_then(std::rc::Weak::upgrade))
-        .ok_or_else(|| {
-            anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                message: format!(
-                    "cannot run command {name}: no application is registered for worker callbacks"
-                ),
-                code: 0,
-            })
+        .ok_or_else(|| -> anyhow::Error {
+            shirabe_php_shim::RuntimeException::new(format!(
+                "cannot run command {name}: no application is registered for worker callbacks"
+            ))
+            .into()
         })?;
     let command = application.borrow_mut().find(name)?;
     // PHP's `(string) $input` omits the command name when the input was built without an

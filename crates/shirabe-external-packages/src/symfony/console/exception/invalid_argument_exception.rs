@@ -5,12 +5,16 @@ use super::exception_interface::ExceptionInterface;
 #[derive(Debug)]
 pub struct InvalidArgumentException(pub shirabe_php_shim::InvalidArgumentException);
 
-impl std::fmt::Display for InvalidArgumentException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl InvalidArgumentException {
+    pub fn new(message: String) -> Self {
+        Self(shirabe_php_shim::InvalidArgumentException::new(message))
     }
 }
 
-impl std::error::Error for InvalidArgumentException {}
+shirabe_php_shim::impl_php_exception!(
+    InvalidArgumentException,
+    0,
+    r"Symfony\Component\Console\Exception\InvalidArgumentException"
+);
 
 impl ExceptionInterface for InvalidArgumentException {}

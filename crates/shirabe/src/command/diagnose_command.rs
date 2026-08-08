@@ -38,11 +38,12 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, disk_free_space, file_exists,
-    filter_var_boolean, get_class_err, hash, impl_php_class, implode, is_array, is_string,
-    php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos, strstr, strstr3,
-    strtolower, trim, version_compare,
+    AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpClass as _, PhpMixed,
+    disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class, implode, is_array,
+    is_string, php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos, strstr,
+    strstr3, strtolower, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -106,7 +107,7 @@ impl DiagnoseCommand {
         match json.validate_schema(JsonFile::LOCK_SCHEMA, None) {
             Ok(_) => {}
             Err(e) => {
-                if let Some(jve) = e.downcast_ref::<JsonValidationException>() {
+                if let Some(jve) = e.catch::<JsonValidationException>() {
                     let mut output = String::new();
                     for error in jve.get_errors() {
                         output.push_str(&format!("<error>{}</error>{}", error, PHP_EOL));
@@ -191,7 +192,7 @@ impl DiagnoseCommand {
             ) {
             Ok(_) => {}
             Err(e) => {
-                if let Some(te) = e.downcast_ref::<TransportException>() {
+                if let Some(te) = e.catch::<TransportException>() {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
@@ -202,7 +203,7 @@ impl DiagnoseCommand {
                     result_list.push(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
                         std::any::type_name_of_val(te),
-                        te.message
+                        te.get_message()
                     )));
                 } else {
                     return Err(e);
@@ -249,7 +250,7 @@ impl DiagnoseCommand {
         {
             Ok(_) => {}
             Err(e) => {
-                if let Some(te) = e.downcast_ref::<TransportException>() {
+                if let Some(te) = e.catch::<TransportException>() {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
@@ -260,7 +261,7 @@ impl DiagnoseCommand {
                     result_list.push(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
                         std::any::type_name_of_val(te),
-                        te.message
+                        te.get_message()
                     )));
                 } else {
                     return Err(e);
@@ -394,7 +395,7 @@ impl DiagnoseCommand {
                 )))
             }
             Err(e) => {
-                if let Some(te) = e.downcast_ref::<TransportException>()
+                if let Some(te) = e.catch::<TransportException>()
                     && te.get_code() == 401
                 {
                     return Ok(PhpMixed::String(format!(
@@ -404,7 +405,9 @@ impl DiagnoseCommand {
                 }
                 Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
-                    get_class_err(&e),
+                    AnyThrowable::of(e.as_ref())
+                        .expect("PHP reaches this only with a caught \\Throwable")
+                        .php_class_name(),
                     e
                 )))
             }
@@ -540,13 +543,16 @@ impl DiagnoseCommand {
             Ok(Err(e)) => {
                 return Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
-                    "UnexpectedValueException", e.message
+                    "UnexpectedValueException",
+                    e.get_message()
                 )));
             }
             Err(e) => {
                 return Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
-                    get_class_err(&e),
+                    AnyThrowable::of(e.as_ref())
+                        .expect("PHP reaches this only with a caught \\Throwable")
+                        .php_class_name(),
                     e
                 )));
             }
@@ -960,13 +966,10 @@ impl DiagnoseCommand {
                         PHP_EOL, PHP_EOL
                     ),
                     other => {
-                        return Err(InvalidArgumentException {
-                            message: format!(
-                                "DiagnoseCommand: Unknown error type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
-                                other,
-                            ),
-                            code: 0,
-                        }
+                        return Err(InvalidArgumentException::new(format!(
+                            "DiagnoseCommand: Unknown error type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
+                            other,
+                        ))
                         .into());
                     }
                 };
@@ -1042,13 +1045,10 @@ impl DiagnoseCommand {
                         PHP_EOL
                     ),
                     other => {
-                        return Err(InvalidArgumentException {
-                            message: format!(
-                                "DiagnoseCommand: Unknown warning type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
-                                other,
-                            ),
-                            code: 0,
-                        }
+                        return Err(InvalidArgumentException::new(format!(
+                            "DiagnoseCommand: Unknown warning type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
+                            other,
+                        ))
                         .into());
                     }
                 };
@@ -1409,13 +1409,19 @@ impl Command for DiagnoseCommand {
             Ok(())
         })();
         if let Err(e) = proxy_check_result {
-            if let Some(_te) = e.downcast_ref::<TransportException>() {
+            if let Some(_te) = e.catch::<TransportException>() {
                 io.write_no_newline("Checking HTTP proxy: ");
                 let status = self.check_connectivity_and_composer_network_http_enablement();
                 self.output_result(if is_string(&status) {
                     status
                 } else {
-                    PhpMixed::String(format!("<error>[{}] {}</error>", get_class_err(&e), e))
+                    PhpMixed::String(format!(
+                        "<error>[{}] {}</error>",
+                        AnyThrowable::of(e.as_ref())
+                            .expect("PHP reaches this only with a caught \\Throwable")
+                            .php_class_name(),
+                        e
+                    ))
                 });
             } else {
                 return Err(e);
@@ -1455,20 +1461,24 @@ impl Command for DiagnoseCommand {
                     }
                 }
                 Err(e) => {
-                    if let Some(te) = e.downcast_ref::<TransportException>() {
+                    if let Some(te) = e.catch::<TransportException>() {
                         if te.get_code() == 401 {
                             self.output_result(PhpMixed::String("<comment>The oauth token for github.com seems invalid, run \"composer config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
                         } else {
                             self.output_result(PhpMixed::String(format!(
                                 "<error>[{}] {}</error>",
-                                get_class_err(&e),
+                                AnyThrowable::of(e.as_ref())
+                                    .expect("PHP reaches this only with a caught \\Throwable")
+                                    .php_class_name(),
                                 e
                             )));
                         }
                     } else {
                         self.output_result(PhpMixed::String(format!(
                             "<error>[{}] {}</error>",
-                            get_class_err(&e),
+                            AnyThrowable::of(e.as_ref())
+                                .expect("PHP reaches this only with a caught \\Throwable")
+                                .php_class_name(),
                             e
                         )));
                     }

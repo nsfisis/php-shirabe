@@ -60,7 +60,7 @@ static TIMEOUT_WARNING: AtomicBool = AtomicBool::new(false);
 enum Decision {
     Retry { url: String, delay_ms: Option<u64> },
     Done(Response),
-    Failed(TransportException),
+    Failed(anyhow::Error),
 }
 
 impl CurlDownloader {
@@ -108,7 +108,7 @@ impl CurlDownloader {
         url: &str,
         mut options: IndexMap<String, PhpMixed>,
         copy_to: Option<&str>,
-    ) -> anyhow::Result<Result<Response, TransportException>> {
+    ) -> anyhow::Result<Result<Response, anyhow::Error>> {
         let mut attributes: IndexMap<String, PhpMixed> = {
             let mut m = IndexMap::new();
             m.insert("retryAuthFailure".to_string(), PhpMixed::Bool(true));
@@ -178,7 +178,7 @@ impl CurlDownloader {
             .as_ref()
             .map(|pm| pm.get_proxy_for_request(url))
             .transpose()
-            .map_err(|e| anyhow::anyhow!(e.message))?
+            .map_err(|e| anyhow::anyhow!(e.get_message().to_string()))?
             .and_then(|p| p.get_status(Some(" using proxy (%s)")).ok())
             .unwrap_or_default();
         // `attributes.redirects == 0 && attributes.retries == 0` in PHP is always true here since
@@ -206,7 +206,7 @@ impl CurlDownloader {
             )?;
             let send_options =
                 crate::util::StreamContextFactory::init_options(&current_url, send_options, true)
-                    .map_err(|e| anyhow::anyhow!(e.message))?;
+                    .map_err(|e| anyhow::anyhow!(e.get_message().to_string()))?;
 
             let send_result = self
                 .send_once(&current_url, &send_options, copy_to, &attributes)
@@ -304,26 +304,24 @@ impl CurlDownloader {
                 if let Some(filename) = filename {
                     unlink_silent(format!("{}~", filename));
                 }
-                // PHP throws a MaxFileSizeExceededException (a TransportException subclass) with
-                // the raw "Maximum allowed download size reached..." message verbatim rather than
-                // wrapping it in the generic curl-error text.
+                // The message carries the raw "Maximum allowed download size reached..." text
+                // rather than the generic curl-error wrapper used below.
                 if transport_err.is_max_file_size {
                     return Ok(Decision::Failed(
-                        MaxFileSizeExceededException(TransportException::new(
-                            transport_err.message,
-                            0,
-                        ))
-                        .0,
+                        MaxFileSizeExceededException::new(transport_err.message).into(),
                     ));
                 }
-                return Ok(Decision::Failed(TransportException::new(
-                    format!(
-                        "curl error while downloading {}: {}",
-                        Url::sanitize(url.to_string()),
-                        transport_err.message
-                    ),
-                    0,
-                )));
+                return Ok(Decision::Failed(
+                    TransportException::new(
+                        format!(
+                            "curl error while downloading {}: {}",
+                            Url::sanitize(url.to_string()),
+                            transport_err.message
+                        ),
+                        0,
+                    )
+                    .into(),
+                ));
             }
         };
 
@@ -373,7 +371,7 @@ impl CurlDownloader {
                 });
             }
             Ok(_) => {}
-            Err(e) => return Ok(Decision::Failed(e)),
+            Err(e) => return Ok(Decision::Failed((*e).into())),
         }
 
         // Handle 3xx redirects, 304 Not Modified excluded.
@@ -401,7 +399,7 @@ impl CurlDownloader {
                     if let Some(filename) = filename {
                         unlink_silent(format!("{}~", filename));
                     }
-                    return Ok(Decision::Failed(e));
+                    return Ok(Decision::Failed((*e).into()));
                 }
             }
         }
@@ -443,7 +441,7 @@ impl CurlDownloader {
             e.set_headers(curl_response.inner.get_headers().clone());
             e.set_status_code(Some(curl_response.inner.get_status_code()));
             e.set_response(curl_response.inner.get_body().map(|s| s.to_string()));
-            return Ok(Decision::Failed(e));
+            return Ok(Decision::Failed((*e).into()));
         }
 
         // storeAuth on success.
@@ -625,7 +623,7 @@ impl CurlDownloader {
         url: &str,
         attributes: &IndexMap<String, PhpMixed>,
         response: &CurlResponse,
-    ) -> anyhow::Result<Result<String, TransportException>> {
+    ) -> anyhow::Result<Result<String, Box<TransportException>>> {
         let mut target_url = String::new();
         if let Some(location_header) = response.inner.get_header("location")
             && !location_header.is_empty()
@@ -682,14 +680,14 @@ impl CurlDownloader {
             return Ok(Ok(target_url));
         }
 
-        Ok(Err(TransportException::new(
+        Ok(Err(Box::new(TransportException::new(
             format!(
                 "The \"{}\" file could not be downloaded, got redirect without Location ({})",
                 url,
                 response.inner.get_status_message().unwrap_or_default()
             ),
             0,
-        )))
+        ))))
     }
 
     fn is_authenticated_retry_needed(
@@ -699,7 +697,7 @@ impl CurlDownloader {
         filename: Option<&str>,
         attributes: &IndexMap<String, PhpMixed>,
         response: &CurlResponse,
-    ) -> anyhow::Result<Result<PromptAuthResult, TransportException>> {
+    ) -> anyhow::Result<Result<PromptAuthResult, Box<TransportException>>> {
         let retry_auth_failure = attributes
             .get("retryAuthFailure")
             .and_then(|b| b.as_bool())
@@ -808,7 +806,7 @@ impl CurlDownloader {
         filename: Option<&str>,
         response: &CurlResponse,
         error_message: &str,
-    ) -> TransportException {
+    ) -> Box<TransportException> {
         if let Some(filename) = filename {
             unlink_silent(format!("{}~", filename));
         }
@@ -836,13 +834,13 @@ impl CurlDownloader {
             );
         }
 
-        TransportException::new(
+        Box::new(TransportException::new(
             format!(
                 "The \"{}\" file could not be downloaded ({}){}",
                 url, error_message, details
             ),
             response.inner.get_status_code(),
-        )
+        ))
     }
 
     fn method_is_get(options: &IndexMap<String, PhpMixed>) -> bool {

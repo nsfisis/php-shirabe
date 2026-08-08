@@ -977,13 +977,10 @@ impl Command for RequireCommand {
                 if self.newly_created.get() {
                     self.revert_composer_file();
 
-                    return Err(RuntimeException {
-                        message: format!(
-                            "No composer.json present in the current directory ({}), this may be the cause of the following exception.",
-                            self.file.borrow()
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "No composer.json present in the current directory ({}), this may be the cause of the following exception.",
+                        self.file.borrow()
+                    ))
                     .into());
                 }
 

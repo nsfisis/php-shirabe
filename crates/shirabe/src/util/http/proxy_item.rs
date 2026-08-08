@@ -20,28 +20,22 @@ impl ProxyItem {
         let syntax_error = format!("unsupported `{}` syntax", env_name);
 
         if strpbrk(&proxy_url, "\r\n\t").is_some() {
-            return Err(RuntimeException {
-                message: syntax_error,
-                code: 0,
-            });
+            return Err(RuntimeException::new(syntax_error));
         }
 
         let proxy_parsed = parse_url_all(&proxy_url);
         let proxy = match proxy_parsed.as_array() {
             None => {
-                return Err(RuntimeException {
-                    message: syntax_error,
-                    code: 0,
-                });
+                return Err(RuntimeException::new(syntax_error));
             }
             Some(a) => a.clone(),
         };
 
         if !proxy.contains_key("host") {
-            return Err(RuntimeException {
-                message: format!("unable to find proxy host in {}", env_name),
-                code: 0,
-            });
+            return Err(RuntimeException::new(format!(
+                "unable to find proxy host in {}",
+                env_name
+            )));
         }
 
         let scheme = if proxy.contains_key("scheme") {
@@ -100,16 +94,16 @@ impl ProxyItem {
         // but is considered valid depending on the PHP or Curl version.
         let port = match port {
             None => {
-                return Err(RuntimeException {
-                    message: format!("unable to find proxy port in {}", env_name),
-                    code: 0,
-                });
+                return Err(RuntimeException::new(format!(
+                    "unable to find proxy port in {}",
+                    env_name
+                )));
             }
             Some(0) => {
-                return Err(RuntimeException {
-                    message: format!("port 0 is reserved in {}", env_name),
-                    code: 0,
-                });
+                return Err(RuntimeException::new(format!(
+                    "port 0 is reserved in {}",
+                    env_name
+                )));
             }
             Some(p) => p,
         };

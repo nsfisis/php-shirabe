@@ -71,11 +71,8 @@ impl StrictConfirmationQuestion {
         Box::new(|answer: Option<PhpMixed>| {
             let answer = answer.unwrap_or(PhpMixed::Null);
             if !is_bool(&answer) {
-                return Err(InvalidArgumentException(
-                    shirabe_php_shim::InvalidArgumentException {
-                        message: "Please answer yes, y, no, or n.".to_string(),
-                        code: 0,
-                    },
+                return Err(InvalidArgumentException::new(
+                    "Please answer yes, y, no, or n.".to_string(),
                 ));
             }
             Ok(answer)

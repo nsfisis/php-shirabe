@@ -9,10 +9,11 @@ use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{LogicException, PhpMixed, time};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
-    err.downcast_ref::<TransportException>().map(|te| te.code)
+    err.catch::<TransportException>().map(|te| te.get_code())
 }
 
 #[derive(Debug)]
@@ -167,24 +168,18 @@ impl Bitbucket {
         let token_map = match token {
             PhpMixed::Array(ref m) => m.clone(),
             _ => {
-                return Err(LogicException {
-                    message: format!(
-                        "Expected a token configured with expires_in and access_token present, got {}",
-                        shirabe_php_shim::json_encode(&token).unwrap_or_default()
-                    ),
-                    code: 0,
-                }
+                return Err(LogicException::new(format!(
+                    "Expected a token configured with expires_in and access_token present, got {}",
+                    shirabe_php_shim::json_encode(&token).unwrap_or_default()
+                ))
                 .into());
             }
         };
         if !token_map.contains_key("expires_in") || !token_map.contains_key("access_token") {
-            return Err(LogicException {
-                message: format!(
-                    "Expected a token configured with expires_in and access_token present, got {}",
-                    shirabe_php_shim::json_encode(&token).unwrap_or_default()
-                ),
-                code: 0,
-            }
+            return Err(LogicException::new(format!(
+                "Expected a token configured with expires_in and access_token present, got {}",
+                shirabe_php_shim::json_encode(&token).unwrap_or_default()
+            ))
             .into());
         }
         self.token = Some(token_map.into_iter().collect());
@@ -350,11 +345,7 @@ impl Bitbucket {
 
         match access_token {
             Some(t) => Ok(t),
-            None => Err(LogicException {
-                message: "Failed to initialize token above".to_string(),
-                code: 0,
-            }
-            .into()),
+            None => Err(LogicException::new("Failed to initialize token above".to_string()).into()),
         }
     }
 
@@ -370,9 +361,10 @@ impl Bitbucket {
             .get_config_source_mut()
             .remove_config_setting(&format!("bitbucket-oauth.{}", origin_url))?;
 
-        let token = self.token.as_ref().ok_or_else(|| LogicException {
-            message: "Expected a token configured with expires_in present, got null".to_string(),
-            code: 0,
+        let token = self.token.as_ref().ok_or_else(|| {
+            LogicException::new(
+                "Expected a token configured with expires_in present, got null".to_string(),
+            )
         })?;
         let expires_in = token
             .get("expires_in")
@@ -380,13 +372,10 @@ impl Bitbucket {
             .ok_or_else(|| {
                 let token_mixed =
                     PhpMixed::Array(token.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                LogicException {
-                    message: format!(
-                        "Expected a token configured with expires_in present, got {}",
-                        shirabe_php_shim::json_encode(&token_mixed).unwrap_or_default()
-                    ),
-                    code: 0,
-                }
+                LogicException::new(format!(
+                    "Expected a token configured with expires_in present, got {}",
+                    shirabe_php_shim::json_encode(&token_mixed).unwrap_or_default()
+                ))
             })?;
 
         let t = self.time.unwrap_or_else(time);

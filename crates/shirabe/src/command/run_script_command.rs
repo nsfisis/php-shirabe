@@ -16,6 +16,7 @@ use shirabe_external_packages::symfony::console::exception::CommandNotFoundExcep
 use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{InvalidArgumentException, RuntimeException};
 use shirabe_php_shim::{PhpMixed, impl_php_class};
 
@@ -102,8 +103,8 @@ impl RunScriptCommand {
                 match application.borrow_mut().find(&name) {
                     Ok(cmd) => description = cmd.borrow().get_description(),
                     Err(e)
-                        if e.downcast_ref::<CommandNotFoundException>().is_some()
-                            || e.downcast_ref::<NamespaceNotFoundException>().is_some() => {}
+                        if e.is_instanceof::<CommandNotFoundException>()
+                            || e.is_instanceof::<NamespaceNotFoundException>() => {}
                     Err(e) => return Err(e),
                 }
             }
@@ -255,10 +256,9 @@ impl Command for RunScriptCommand {
 
         let script = match input.borrow().get_argument("script")?.as_string() {
             None => {
-                return Err(RuntimeException {
-                    message: "Missing required argument \"script\"".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(
+                    "Missing required argument \"script\"".to_string(),
+                )
                 .into());
             }
             Some(s) => s.to_string(),
@@ -267,10 +267,10 @@ impl Command for RunScriptCommand {
         if !self.script_events.contains(&script.as_str()) {
             let const_name = script.to_uppercase().replace('-', "_");
             if ScriptEvents::is_defined(&const_name) {
-                return Err(InvalidArgumentException {
-                    message: format!("Script \"{}\" cannot be run with this command", script),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "Script \"{}\" cannot be run with this command",
+                    script
+                ))
                 .into());
             }
         }
@@ -299,10 +299,10 @@ impl Command for RunScriptCommand {
         );
         let has_listeners = dispatcher.borrow_mut().has_event_listeners(&event);
         if !has_listeners {
-            return Err(InvalidArgumentException {
-                message: format!("Script \"{}\" is not defined in this package", script),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Script \"{}\" is not defined in this package",
+                script
+            ))
             .into());
         }
 
@@ -320,12 +320,10 @@ impl Command for RunScriptCommand {
         if let Some(timeout_val) = input.borrow().get_option("timeout")?.as_string() {
             let timeout_str = timeout_val.to_string();
             if !timeout_str.chars().all(|c| c.is_ascii_digit()) {
-                return Err(RuntimeException {
-                    message:
-                        "Timeout value must be numeric and positive if defined, or 0 for forever"
-                            .to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(
+                    "Timeout value must be numeric and positive if defined, or 0 for forever"
+                        .to_string(),
+                )
                 .into());
             }
             let timeout: i64 = timeout_str.parse().unwrap_or(0);

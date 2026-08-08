@@ -180,7 +180,7 @@ impl Cache {
                     self.io.write_error3(
                         &format!(
                             "<warning>Failed to write into cache: {}</warning>",
-                            e.message
+                            e.get_message()
                         ),
                         true,
                         crate::io::DEBUG,
@@ -190,7 +190,7 @@ impl Cache {
                         php_regex!(
                             r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}"
                         ),
-                        &e.message,
+                        e.get_message(),
                         Some(&mut m),
                     ) {
                         // Remove partial file.

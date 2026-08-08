@@ -309,13 +309,11 @@ impl RuleSetGenerator {
                 }
 
                 // otherwise, looks like a bug
-                return Err(anyhow::anyhow!(shirabe_php_shim::LogicException {
-                    message: format!(
-                        "Fixed package {} was not added to solver pool.",
-                        package.get_pretty_string()
-                    ),
-                    code: 0,
-                }));
+                return Err(shirabe_php_shim::LogicException::new(format!(
+                    "Fixed package {} was not added to solver pool.",
+                    package.get_pretty_string()
+                ))
+                .into());
             }
 
             self.add_rules_for_package(package.clone(), platform_requirement_filter);

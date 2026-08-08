@@ -420,7 +420,7 @@ impl Filesystem {
             shirabe_php_shim::SKIP_DOTS
         };
         let dir = shirabe_php_shim::recursive_directory_iterator(&origin_dir, flags)
-            .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
         let iterator = shirabe_php_shim::recursive_iterator_iterator(
             dir,
             shirabe_php_shim::RecursiveIteratorIterator::SELF_FIRST,

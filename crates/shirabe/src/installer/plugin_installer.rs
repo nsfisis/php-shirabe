@@ -121,13 +121,10 @@ impl InstallerInterface for PluginInstaller {
         let extra = package.get_extra();
         let class = extra.get("class").cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
-            return Err(UnexpectedValueException {
-                message: format!(
-                    "Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.",
-                    package.get_pretty_name()
-                ),
-                code: 0,
-            }.into());
+            return Err(UnexpectedValueException::new(format!(
+                "Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.",
+                package.get_pretty_name()
+            )).into());
         }
 
         self.inner.download(package, prev_package).await

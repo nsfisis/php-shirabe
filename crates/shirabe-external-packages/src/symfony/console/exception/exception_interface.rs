@@ -1,3 +1,3 @@
 //! ref: composer/vendor/symfony/console/Exception/ExceptionInterface.php
 
-pub trait ExceptionInterface: std::error::Error {}
+pub trait ExceptionInterface: shirabe_php_shim::Throwable {}

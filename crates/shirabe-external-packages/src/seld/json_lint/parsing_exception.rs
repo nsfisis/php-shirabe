@@ -25,22 +25,16 @@ pub struct ParsingExceptionDetails {
 
 #[derive(Debug)]
 pub struct ParsingException {
-    pub message: String,
-    pub code: i64,
+    inner: shirabe_php_shim::Exception,
     pub(crate) details: Box<ParsingExceptionDetails>,
 }
 
 impl ParsingException {
     pub fn new(message: String, details: ParsingExceptionDetails) -> Self {
         Self {
-            message,
-            code: 0,
+            inner: shirabe_php_shim::Exception::new(message),
             details: Box::new(details),
         }
-    }
-
-    pub fn get_message(&self) -> &str {
-        &self.message
     }
 
     pub fn get_details(&self) -> &ParsingExceptionDetails {
@@ -48,10 +42,4 @@ impl ParsingException {
     }
 }
 
-impl std::fmt::Display for ParsingException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for ParsingException {}
+shirabe_php_shim::impl_php_exception!(ParsingException, inner, r"Seld\JsonLint\ParsingException");

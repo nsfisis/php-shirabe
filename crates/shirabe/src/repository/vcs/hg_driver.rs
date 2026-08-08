@@ -12,6 +12,7 @@ use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex};
 
 #[derive(Debug)]
@@ -53,10 +54,7 @@ impl HgDriver {
                 .unwrap_or("")
                 .to_string();
             if !Cache::is_usable(&cache_vcs_dir) {
-                return Err(RuntimeException {
-                    message: "HgDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string(),
-                    code: 0,
-                }.into());
+                return Err(RuntimeException::new("HgDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
             }
 
             let sanitized = Preg::replace(
@@ -70,13 +68,10 @@ impl HgDriver {
             fs.ensure_directory_exists(&cache_vcs_dir)?;
 
             if !is_writable(dirname(&self.repo_dir)) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
-                        self.inner.url, cache_vcs_dir
-                    ),
-                    code: 0,
-                }.into());
+                return Err(RuntimeException::new(format!(
+                    "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
+                    self.inner.url, cache_vcs_dir
+                )).into());
             }
 
             self.inner.config.borrow_mut().prohibit_url_by_config(
@@ -167,13 +162,10 @@ impl HgDriver {
 
     pub fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
         if identifier.starts_with('-') {
-            return Err(RuntimeException {
-                message: format!(
-                    "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
-                    identifier
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
+                identifier
+            ))
             .into());
         }
 
@@ -203,13 +195,10 @@ impl HgDriver {
         identifier: &str,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if identifier.starts_with('-') {
-            return Err(RuntimeException {
-                message: format!(
-                    "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
-                    identifier
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
+                identifier
+            ))
             .into());
         }
 
@@ -443,7 +432,7 @@ impl crate::repository::vcs::VcsDriverInterface for HgDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

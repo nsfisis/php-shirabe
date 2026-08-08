@@ -79,10 +79,7 @@ impl PerforceDriver {
             .unwrap_or("")
             .to_string();
         if !Cache::is_usable(&cache_vcs_dir) {
-            return Err(RuntimeException {
-                message: "PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string(),
-                code: 0,
-            }.into());
+            return Err(RuntimeException::new("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
         }
 
         let repo_dir = format!("{}/{}", cache_vcs_dir, self.depot);
@@ -180,11 +177,10 @@ impl PerforceDriver {
     }
 
     pub fn get_contents(&self, _url: &str) -> anyhow::Result<Response> {
-        Err(BadMethodCallException {
-            message: "Not implemented/used in PerforceDriver".to_string(),
-            code: 0,
-        }
-        .into())
+        Err(
+            BadMethodCallException::new("Not implemented/used in PerforceDriver".to_string())
+                .into(),
+        )
     }
 
     pub fn supports(

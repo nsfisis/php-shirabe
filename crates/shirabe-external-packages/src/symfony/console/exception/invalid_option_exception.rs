@@ -1,17 +1,21 @@
 //! ref: composer/vendor/symfony/console/Exception/InvalidOptionException.php
 
 use super::exception_interface::ExceptionInterface;
-use super::invalid_argument_exception::InvalidArgumentException;
+use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]
 pub struct InvalidOptionException(pub InvalidArgumentException);
 
-impl std::fmt::Display for InvalidOptionException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl InvalidOptionException {
+    pub fn new(message: String) -> Self {
+        Self(InvalidArgumentException::new(message))
     }
 }
 
-impl std::error::Error for InvalidOptionException {}
+shirabe_php_shim::impl_php_exception!(
+    InvalidOptionException,
+    0,
+    r"Symfony\Component\Console\Exception\InvalidOptionException"
+);
 
 impl ExceptionInterface for InvalidOptionException {}

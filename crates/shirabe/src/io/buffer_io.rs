@@ -30,10 +30,9 @@ impl BufferIO {
         let stream = match fopen("php://memory", "rw") {
             Ok(stream) => stream,
             Err(_) => {
-                return Err(RuntimeException {
-                    message: "Unable to open memory output stream".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(
+                    "Unable to open memory output stream".to_string(),
+                )
                 .into());
             }
         };
@@ -116,10 +115,7 @@ impl BufferIO {
 
         let mut input = self.inner.input.borrow_mut();
         let Some(streamable) = input.as_streamable_mut() else {
-            return Err(RuntimeException {
-                message: "Setting the user inputs requires at least the version 3.2 of the symfony/console component.".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new("Setting the user inputs requires at least the version 3.2 of the symfony/console component.".to_string())
             .into());
         };
 
@@ -133,10 +129,9 @@ impl BufferIO {
         let stream = match fopen("php://memory", "r+") {
             Ok(stream) => stream,
             Err(_) => {
-                return Err(RuntimeException {
-                    message: "Unable to open memory output stream".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(
+                    "Unable to open memory output stream".to_string(),
+                )
                 .into());
             }
         };

@@ -103,13 +103,10 @@ impl AuditConfig {
                         .map(|s| s.to_string());
 
                     if !["audit", "block", "all"].contains(&apply.as_str()) {
-                        return Err(InvalidArgumentException {
-                            message: format!(
-                                "Invalid 'apply' value for '{}': {}. Expected 'audit', 'block', or 'all'.",
-                                key, apply
-                            ),
-                            code: 0,
-                        }.into());
+                        return Err(InvalidArgumentException::new(format!(
+                            "Invalid 'apply' value for '{}': {}. Expected 'audit', 'block', or 'all'.",
+                            key, apply
+                        )).into());
                     }
 
                     (key.clone(), apply, reason)

@@ -92,10 +92,11 @@ impl ClassMap {
     pub fn get_class_path(&self, class_name: &str) -> anyhow::Result<&str> {
         match self.map.get(class_name) {
             Some(path) => Ok(path.as_str()),
-            None => Err(anyhow::anyhow!(OutOfBoundsException {
-                message: format!("Class {} is not present in the map", class_name),
-                code: 0,
-            })),
+            None => Err(OutOfBoundsException::new(format!(
+                "Class {} is not present in the map",
+                class_name
+            ))
+            .into()),
         }
     }
 

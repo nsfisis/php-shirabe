@@ -58,13 +58,7 @@ impl ErrorHandler {
                 return Ok(true);
             }
 
-            return Err(ErrorException {
-                message,
-                code: 0,
-                severity: level,
-                filename: file,
-                lineno: line,
-            });
+            return Err(ErrorException::new(message, 0, level, file, line, None));
         }
 
         let io = IO.with(|cell| cell.borrow().clone());

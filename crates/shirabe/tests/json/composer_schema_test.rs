@@ -9,6 +9,7 @@
 //! which property) is identical to upstream.
 
 use shirabe::json::{JsonFile, JsonValidationException};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::json_decode;
 
 const NAME_PATTERN: &str = r#"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$"#;
@@ -22,7 +23,7 @@ fn check(json: &str) -> Vec<String> {
     match JsonFile::validate_json_schema("test", &data, JsonFile::LAX_SCHEMA, None) {
         Ok(_) => Vec::new(),
         Err(e) => e
-            .downcast_ref::<JsonValidationException>()
+            .catch::<JsonValidationException>()
             .unwrap()
             .get_errors()
             .clone(),

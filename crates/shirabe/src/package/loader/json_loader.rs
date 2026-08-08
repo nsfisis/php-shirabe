@@ -34,10 +34,7 @@ impl JsonLoader {
         let config: IndexMap<String, PhpMixed> = match config {
             PhpMixed::Array(m) => m,
             _ => {
-                return Err(TypeError {
-                    message: "Composer\\Package\\Loader\\LoaderInterface::load(): Argument #1 ($config) must be of type array".to_string(),
-                    code: 0,
-                }
+                return Err(TypeError::new("Composer\\Package\\Loader\\LoaderInterface::load(): Argument #1 ($config) must be of type array".to_string())
                 .into());
             }
         };

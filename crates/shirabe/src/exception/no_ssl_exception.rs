@@ -6,10 +6,10 @@ use shirabe_php_shim::RuntimeException;
 #[derive(Debug)]
 pub struct NoSslException(pub RuntimeException);
 
-impl std::fmt::Display for NoSslException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+impl NoSslException {
+    pub fn new(message: String) -> Self {
+        Self(RuntimeException::new(message))
     }
 }
 
-impl std::error::Error for NoSslException {}
+shirabe_php_shim::impl_php_exception!(NoSslException, 0, r"Composer\Exception\NoSslException");

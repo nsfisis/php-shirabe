@@ -303,13 +303,10 @@ impl ArchiveCommand {
         };
 
         let Some(complete) = package.as_complete() else {
-            return Err(LogicException {
-                message: format!(
-                    "Expected a CompletePackageInterface instance but found {}",
-                    get_debug_type(&shirabe_php_shim::PhpMixed::Null)
-                ),
-                code: 0,
-            }
+            return Err(LogicException::new(format!(
+                "Expected a CompletePackageInterface instance but found {}",
+                get_debug_type(&shirabe_php_shim::PhpMixed::Null)
+            ))
             .into());
         };
 

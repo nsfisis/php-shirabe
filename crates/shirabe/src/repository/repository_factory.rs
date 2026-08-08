@@ -73,10 +73,7 @@ impl RepositoryFactory {
                 repo_config.insert("json".to_string(), PhpMixed::String(repository.to_string()));
                 return Ok(repo_config);
             } else {
-                return Err(InvalidArgumentException {
-                    message: format!("Invalid repository URL ({}) given. This file does not contain a valid composer repository.", repository),
-                    code: 0,
-                }.into());
+                return Err(InvalidArgumentException::new(format!("Invalid repository URL ({}) given. This file does not contain a valid composer repository.", repository)).into());
             }
         }
 
@@ -87,10 +84,7 @@ impl RepositoryFactory {
             return Ok(repo_config);
         }
 
-        Err(InvalidArgumentException {
-            message: format!("Invalid repository url ({}) given. Has to be a .json file, an http url or a JSON object.", repository),
-            code: 0,
-        }.into())
+        Err(InvalidArgumentException::new(format!("Invalid repository url ({}) given. Has to be a .json file, an http url or a JSON object.", repository)).into())
     }
 
     pub fn from_string(
@@ -121,13 +115,9 @@ impl RepositoryFactory {
         let repos =
             Self::create_repos(rm, vec![PhpMixed::Array(repo_config.into_iter().collect())])?;
         // PHP: return current($repos);
-        let (_, first) = repos
-            .into_iter()
-            .next()
-            .ok_or_else(|| UnexpectedValueException {
-                message: "create_repos returned no repository".to_string(),
-                code: 0,
-            })?;
+        let (_, first) = repos.into_iter().next().ok_or_else(|| {
+            UnexpectedValueException::new("create_repos returned no repository".to_string())
+        })?;
         Ok(first)
     }
 
@@ -149,10 +139,11 @@ impl RepositoryFactory {
         let rm = if let Some(rm) = rm {
             rm
         } else {
-            let io = io.ok_or_else(|| InvalidArgumentException {
-                message: "This function requires either an IOInterface or a RepositoryManager"
-                    .to_string(),
-                code: 0,
+            let io = io.ok_or_else(|| {
+                InvalidArgumentException::new(
+                    "This function requires either an IOInterface or a RepositoryManager"
+                        .to_string(),
+                )
             })?;
             owned_rm = Self::manager(
                 io.clone(),
@@ -243,21 +234,15 @@ impl RepositoryFactory {
         for (index, repo) in repo_configs.into_iter().enumerate() {
             match &repo {
                 PhpMixed::String(_) => {
-                    return Err(UnexpectedValueException {
-                        message: "\"repositories\" should be an array of repository definitions, only a single repository was given".to_string(),
-                        code: 0,
-                    }.into());
+                    return Err(UnexpectedValueException::new("\"repositories\" should be an array of repository definitions, only a single repository was given".to_string()).into());
                 }
                 PhpMixed::Array(repo_arr) => {
                     if !repo_arr.contains_key("type") {
-                        return Err(UnexpectedValueException {
-                            message: format!(
-                                "Repository \"{}\" ({}) must have a type defined",
-                                index,
-                                json_encode(&repo).unwrap_or_default()
-                            ),
-                            code: 0,
-                        }
+                        return Err(UnexpectedValueException::new(format!(
+                            "Repository \"{}\" ({}) must have a type defined",
+                            index,
+                            json_encode(&repo).unwrap_or_default()
+                        ))
                         .into());
                     }
                     let repo_type = repo_arr
@@ -296,15 +281,12 @@ impl RepositoryFactory {
                     }
                 }
                 _ => {
-                    return Err(UnexpectedValueException {
-                        message: format!(
-                            "Repository \"{}\" ({}) should be an array, {} given",
-                            index,
-                            json_encode(&repo).unwrap_or_default(),
-                            get_debug_type(&repo)
-                        ),
-                        code: 0,
-                    }
+                    return Err(UnexpectedValueException::new(format!(
+                        "Repository \"{}\" ({}) should be an array, {} given",
+                        index,
+                        json_encode(&repo).unwrap_or_default(),
+                        get_debug_type(&repo)
+                    ))
                     .into());
                 }
             }

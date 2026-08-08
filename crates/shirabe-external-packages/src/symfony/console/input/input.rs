@@ -80,13 +80,10 @@ impl Input {
         );
 
         if !missing_arguments.is_empty() {
-            return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: format!(
-                    "Not enough arguments (missing: \"{}\").",
-                    shirabe_php_shim::implode(", ", &missing_arguments),
-                ),
-                code: 0,
-            })
+            return Err(RuntimeException::new(format!(
+                "Not enough arguments (missing: \"{}\").",
+                shirabe_php_shim::implode(", ", &missing_arguments),
+            ))
             .into());
         }
 
@@ -113,13 +110,11 @@ impl Input {
             .definition
             .has_argument(&PhpMixed::String(name.to_string()))
         {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"{}\" argument does not exist.", name),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "The \"{}\" argument does not exist.",
+                name
+            ))
+            .into());
         }
 
         Ok(match self.arguments.get(name) {
@@ -137,13 +132,11 @@ impl Input {
             .definition
             .has_argument(&PhpMixed::String(name.to_string()))
         {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"{}\" argument does not exist.", name),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "The \"{}\" argument does not exist.",
+                name
+            ))
+            .into());
         }
 
         self.arguments.insert(name.to_string(), value);
@@ -174,13 +167,11 @@ impl Input {
         }
 
         if !self.definition.has_option(name) {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"{}\" option does not exist.", name),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "The \"{}\" option does not exist.",
+                name
+            ))
+            .into());
         }
 
         Ok(if self.options.contains_key(name) {
@@ -198,13 +189,11 @@ impl Input {
 
             return Ok(());
         } else if !self.definition.has_option(name) {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("The \"{}\" option does not exist.", name),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "The \"{}\" option does not exist.",
+                name
+            ))
+            .into());
         }
 
         self.options.insert(name.to_string(), value);

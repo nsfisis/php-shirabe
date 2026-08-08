@@ -81,11 +81,9 @@ impl CompleteCommand {
     ) -> anyhow::Result<CompletionInput> {
         let current_index = input.get_option("current")?;
         if !current_index.to_bool() || !shirabe_php_shim::ctype_digit(&current_index.to_string()) {
-            anyhow::bail!(shirabe_php_shim::RuntimeException {
-                message: "The \"--current\" option must be set and it must be an integer."
-                    .to_string(),
-                code: 0,
-            });
+            anyhow::bail!(shirabe_php_shim::RuntimeException::new(
+                "The \"--current\" option must be set and it must be an integer.".to_string()
+            ));
         }
 
         let tokens: Vec<String> = match input.get_option("input")?.as_list() {
@@ -251,10 +249,9 @@ impl Command for CompleteCommand {
 
             let shell = input.borrow().get_option("shell")?;
             if !shell.to_bool() {
-                anyhow::bail!(shirabe_php_shim::RuntimeException {
-                    message: "The \"--shell\" option must be set.".to_string(),
-                    code: 0,
-                });
+                anyhow::bail!(shirabe_php_shim::RuntimeException::new(
+                    "The \"--shell\" option must be set.".to_string()
+                ));
             }
 
             let completion_output = self
@@ -263,18 +260,15 @@ impl Command for CompleteCommand {
                 .cloned()
                 .unwrap_or(PhpMixed::Bool(false));
             if !completion_output.to_bool() {
-                anyhow::bail!(shirabe_php_shim::RuntimeException {
-                    message: format!(
-                        "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
-                        shell,
-                        self.completion_outputs
-                            .keys()
-                            .cloned()
-                            .collect::<Vec<_>>()
-                            .join("\", \"")
-                    ),
-                    code: 0,
-                });
+                anyhow::bail!(shirabe_php_shim::RuntimeException::new(format!(
+                    "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
+                    shell,
+                    self.completion_outputs
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("\", \"")
+                )));
             }
 
             let mut completion_input = self.create_completion_input(&*input.borrow())?;

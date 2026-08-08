@@ -85,17 +85,14 @@ impl PathDownloader {
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<String> {
-        let url = package.get_dist_url().ok_or_else(|| RuntimeException {
-            message: format!(
+        let url = package.get_dist_url().ok_or_else(|| {
+            RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot install.",
                 package.get_pretty_name()
-            ),
-            code: 0,
+            ))
         })?;
-        let real_url = realpath(&url).ok_or_else(|| RuntimeException {
-            message: format!("Failed to realpath {}", url),
-            code: 0,
-        })?;
+        let real_url = realpath(&url)
+            .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
 
         if realpath(path).as_deref() == Some(&real_url) {
             return Ok(": Source already present".to_string());
@@ -157,10 +154,7 @@ impl PathDownloader {
             && !self.safe_junctions()
         {
             if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException {
-                    message: "You are on an old Windows / old PHP combo which does not allow Composer to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new("You are on an old Windows / old PHP combo which does not allow Composer to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
                 .into());
             }
             current_strategy = Self::STRATEGY_MIRROR;
@@ -173,10 +167,7 @@ impl PathDownloader {
             && !function_exists("symlink")
         {
             if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException {
-                    message: "Your PHP has the symlink() function disabled which does not allow Composer to use symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new("Your PHP has the symlink() function disabled which does not allow Composer to use symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
                 .into());
             }
             current_strategy = Self::STRATEGY_MIRROR;
@@ -243,26 +234,22 @@ impl DownloaderInterface for PathDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
-        let url = package.get_dist_url().ok_or_else(|| RuntimeException {
-            message: format!(
+        let url = package.get_dist_url().ok_or_else(|| {
+            RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot download.",
                 package.get_pretty_name()
-            ),
-            code: 0,
+            ))
         })?;
         let real_url = realpath(&url);
         if real_url.is_none()
             || !file_exists(real_url.as_deref().unwrap_or(""))
             || !is_dir(real_url.as_deref().unwrap_or(""))
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Source path \"{}\" is not found for package {}",
-                    url,
-                    package.get_name()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Source path \"{}\" is not found for package {}",
+                url,
+                package.get_name()
+            ))
             .into());
         }
         let real_url = real_url.unwrap();
@@ -282,15 +269,12 @@ impl DownloaderInterface for PathDownloader {
             //
             // Please see https://github.com/composer/composer/pull/5974 and https://github.com/composer/composer/pull/6174
             // for previous attempts that were shut down because they did not work well enough or introduced too many risks.
-            return Err(RuntimeException {
-                message: format!(
-                    "Package {} cannot install to \"{}\" inside its source at \"{}\"",
-                    package.get_name(),
-                    realpath(&path).unwrap_or_default(),
-                    real_url
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Package {} cannot install to \"{}\" inside its source at \"{}\"",
+                package.get_name(),
+                realpath(&path).unwrap_or_default(),
+                real_url
+            ))
             .into());
         }
 
@@ -316,17 +300,14 @@ impl DownloaderInterface for PathDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
-        let url = package.get_dist_url().ok_or_else(|| RuntimeException {
-            message: format!(
+        let url = package.get_dist_url().ok_or_else(|| {
+            RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot install.",
                 package.get_pretty_name()
-            ),
-            code: 0,
+            ))
         })?;
-        let real_url = realpath(&url).ok_or_else(|| RuntimeException {
-            message: format!("Failed to realpath {}", url),
-            code: 0,
-        })?;
+        let real_url = realpath(&url)
+            .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
 
         if realpath(&path).as_deref() == Some(&real_url) {
             if output {
@@ -442,13 +423,10 @@ impl DownloaderInterface for PathDownloader {
                         current_strategy = Self::STRATEGY_MIRROR;
                         is_fallback = true;
                     } else {
-                        return Err(RuntimeException {
-                            message: format!(
-                                "Symlink from \"{}\" to \"{}\" failed!",
-                                real_url, path
-                            ),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Symlink from \"{}\" to \"{}\" failed!",
+                            real_url, path
+                        ))
                         .into());
                     }
                 }
@@ -537,25 +515,21 @@ impl DownloaderInterface for PathDownloader {
                     true,
                     io_interface::NORMAL,
                 );
-                return Err(RuntimeException {
-                    message: format!(
-                        "Could not reliably remove junction for package {}",
-                        package.get_name()
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Could not reliably remove junction for package {}",
+                    package.get_name()
+                ))
                 .into());
             }
 
             return Ok(None);
         }
 
-        let url = package.get_dist_url().ok_or_else(|| RuntimeException {
-            message: format!(
+        let url = package.get_dist_url().ok_or_else(|| {
+            RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot remove.",
                 package.get_pretty_name()
-            ),
-            code: 0,
+            ))
         })?;
 
         // ensure that the source path (dist url) is not the same as the install path, which

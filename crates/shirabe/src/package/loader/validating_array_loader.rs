@@ -1583,11 +1583,12 @@ impl LoaderInterface for ValidatingArrayLoader {
         }
 
         if !self.errors.borrow().is_empty() {
-            return Err(anyhow::anyhow!(InvalidPackageException::new(
+            return Err(InvalidPackageException::new(
                 self.errors.borrow().clone(),
                 self.warnings.borrow().clone(),
                 config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-            )));
+            )
+            .into());
         }
 
         let package = self.loader.load(

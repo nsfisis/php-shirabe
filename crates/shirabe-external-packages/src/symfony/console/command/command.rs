@@ -138,12 +138,10 @@ impl CommandData {
         let mut matches: Vec<Option<String>> = Vec::new();
         if !shirabe_php_shim::preg_match(php_regex!(r"/^[^\:]++(\:[^\:]++)*$/"), name, &mut matches)
         {
-            return Ok(Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: format!("Command name \"{}\" is invalid.", name),
-                    code: 0,
-                },
-            )));
+            return Ok(Err(InvalidArgumentException::new(format!(
+                "Command name \"{}\" is invalid.",
+                name
+            ))));
         }
 
         Ok(Ok(()))
@@ -847,14 +845,11 @@ impl Command for CommandData {
         let helper_set = match &*helper_set_ref {
             None => {
                 return Ok(Err(
-                    crate::symfony::console::exception::logic_exception::LogicException(
-                        shirabe_php_shim::LogicException {
-                            message: format!(
-                                "Cannot retrieve helper \"{}\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.",
-                                name
-                            ),
-                            code: 0,
-                        },
+                    crate::symfony::console::exception::logic_exception::LogicException::new(
+                        format!(
+                            "Cannot retrieve helper \"{}\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.",
+                            name
+                        ),
                     ),
                 ));
             }

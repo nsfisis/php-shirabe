@@ -359,14 +359,11 @@ impl ShowCommand {
         if let Some(ref mp) = matched_package
             && mp.as_complete().is_none()
         {
-            return Err(LogicException {
-                    message: format!(
-                        "ShowCommand::getPackage can only work with CompletePackageInterface, but got {}",
-                        shirabe_php_shim::get_class(&PhpMixed::Null)
-                    ),
-                    code: 0,
-                }
-                .into());
+            return Err(LogicException::new(format!(
+                "ShowCommand::getPackage can only work with CompletePackageInterface, but got {}",
+                shirabe_php_shim::get_class(&PhpMixed::Null)
+            ))
+            .into());
         }
 
         let matched_package = matched_package.and_then(|mp| mp.as_complete());
@@ -1817,10 +1814,9 @@ impl Command for ShowCommand {
                 .as_string()
                 .is_some()
             {
-                return Err(InvalidArgumentException {
-                    message: "You cannot use --self together with a package name".to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "You cannot use --self together with a package name".to_string(),
+                )
                 .into());
             }
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
@@ -1931,10 +1927,7 @@ impl Command for ShowCommand {
                     .borrow_mut()
                     .is_locked()
             {
-                return Err(UnexpectedValueException {
-                    message: "A valid composer.json and composer.lock files is required to run this command with --locked".to_string(),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new("A valid composer.json and composer.lock files is required to run this command with --locked".to_string())
                 .into());
             }
             let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
@@ -2090,14 +2083,11 @@ impl Command for ShowCommand {
                         .collect::<Vec<_>>(),
                 )
             {
-                return Err(InvalidArgumentException {
-                                message: format!(
-                                    "Package \"{}\" is installed but not a direct dependent of the root package.",
-                                    pkg.get_name()
-                                ),
-                                code: 0,
-                            }
-                            .into());
+                return Err(InvalidArgumentException::new(format!(
+                    "Package \"{}\" is installed but not a direct dependent of the root package.",
+                    pkg.get_name()
+                ))
+                .into());
             }
 
             if matched_package.is_none() {
@@ -2123,10 +2113,10 @@ impl Command for ShowCommand {
                     hint.push_str(", try using --available (-a) to show all available packages");
                 }
 
-                return Err(InvalidArgumentException {
-                    message: format!("Package \"{}\" not found{}.", pf, hint),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "Package \"{}\" not found{}.",
+                    pf, hint
+                ))
                 .into());
             }
             single_package = matched_package;

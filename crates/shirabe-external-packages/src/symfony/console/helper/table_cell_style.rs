@@ -52,15 +52,10 @@ impl TableCellStyle {
             .cloned()
             .collect();
         if !diff.is_empty() {
-            return Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The TableCellStyle does not support the following options: '{}'.",
-                        diff.join("', '"),
-                    ),
-                    code: 0,
-                },
-            ));
+            return Err(InvalidArgumentException::new(format!(
+                "The TableCellStyle does not support the following options: '{}'.",
+                diff.join("', '"),
+            )));
         }
 
         if let Some(align) = options.get("align") {
@@ -69,15 +64,10 @@ impl TableCellStyle {
                 _ => String::new(),
             };
             if align_map(&align).is_none() {
-                return Err(InvalidArgumentException(
-                    shirabe_php_shim::InvalidArgumentException {
-                        message: format!(
-                            "Wrong align value. Value must be following: '{}'.",
-                            align_map_keys().join("', '"),
-                        ),
-                        code: 0,
-                    },
-                ));
+                return Err(InvalidArgumentException::new(format!(
+                    "Wrong align value. Value must be following: '{}'.",
+                    align_map_keys().join("', '"),
+                )));
             }
         }
 

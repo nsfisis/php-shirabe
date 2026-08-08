@@ -305,10 +305,10 @@ impl BumpCommand {
         let contents = match file_get_contents(json.get_path()) {
             Some(c) => c,
             None => {
-                return Err(shirabe_php_shim::RuntimeException {
-                    message: format!("Unable to read {} contents.", json.get_path()),
-                    code: 0,
-                }
+                return Err(shirabe_php_shim::RuntimeException::new(format!(
+                    "Unable to read {} contents.",
+                    json.get_path()
+                ))
                 .into());
             }
         };
@@ -325,10 +325,10 @@ impl BumpCommand {
 
         match file_put_contents(json.get_path(), manipulator.get_contents().as_bytes()) {
             Some(_) => Ok(true),
-            None => Err(shirabe_php_shim::RuntimeException {
-                message: format!("Unable to write new {} contents.", json.get_path()),
-                code: 0,
-            }
+            None => Err(shirabe_php_shim::RuntimeException::new(format!(
+                "Unable to write new {} contents.",
+                json.get_path()
+            ))
             .into()),
         }
     }

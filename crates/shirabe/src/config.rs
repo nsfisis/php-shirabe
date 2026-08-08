@@ -658,10 +658,10 @@ impl Config {
                     &raw,
                     Some(&mut matches),
                 ) {
-                    return Err(RuntimeException {
-                        message: format!("Could not parse the value of '{}': {}", key, raw),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Could not parse the value of '{}': {}",
+                        key, raw
+                    ))
                     .into());
                 }
                 let mut size = matches
@@ -735,13 +735,10 @@ impl Config {
                         PhpMixed::String("symlink".to_string()),
                     ],
                 ) {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Invalid value for 'bin-compat': {}. Expected auto, full or proxy",
-                            value
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Invalid value for 'bin-compat': {}. Expected auto, full or proxy",
+                        value
+                    ))
                     .into());
                 }
 
@@ -760,13 +757,10 @@ impl Config {
                 if !matches!(env, PhpMixed::Bool(false)) {
                     let env_str = env.as_string().unwrap_or("").to_string();
                     if !matches!(env_str.as_str(), "stash" | "true" | "false" | "1" | "0") {
-                        return Err(RuntimeException {
-                            message: format!(
-                                "Invalid value for COMPOSER_DISCARD_CHANGES: {}. Expected 1, 0, true, false or stash",
-                                env_str
-                            ),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Invalid value for COMPOSER_DISCARD_CHANGES: {}. Expected 1, 0, true, false or stash",
+                            env_str
+                        ))
                         .into());
                     }
                     if env_str == "stash" {
@@ -782,13 +776,10 @@ impl Config {
                 let val = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                 let allowed = matches!(&val, PhpMixed::Bool(_)) || val.as_string() == Some("stash");
                 if !allowed {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Invalid value for 'discard-changes': {:?}. Expected true, false or stash",
-                            val
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Invalid value for 'discard-changes': {:?}. Expected true, false or stash",
+                        val
+                    ))
                     .into());
                 }
 
@@ -824,10 +815,7 @@ impl Config {
                 }
                 let first = protos.first().cloned();
                 if first.as_deref() == Some("http") {
-                    return Err(RuntimeException {
-                        message: "The http protocol for github is not available anymore, update your config's github-protocols to use \"https\", \"git\" or \"ssh\"".to_string(),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new("The http protocol for github is not available anymore, update your config's github-protocols to use \"https\", \"git\" or \"ssh\"".to_string())
                     .into());
                 }
 
@@ -860,14 +848,11 @@ impl Config {
                             .map(|s| PhpMixed::String(s.clone()))
                             .collect::<Vec<_>>(),
                     ) {
-                        return Err(RuntimeException {
-                            message: format!(
-                                "Invalid value for COMPOSER_AUDIT_ABANDONED: {}. Expected one of {}.",
-                                abandoned_env_str,
-                                implode(", ", &valid_choices),
-                            ),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Invalid value for COMPOSER_AUDIT_ABANDONED: {}. Expected one of {}.",
+                            abandoned_env_str,
+                            implode(", ", &valid_choices),
+                        ))
                         .into());
                     }
                     if let PhpMixed::Array(ref mut m) = result {
@@ -880,13 +865,10 @@ impl Config {
                 if !matches!(block_abandoned_env, PhpMixed::Bool(false)) {
                     let env_str = block_abandoned_env.as_string().unwrap_or("").to_string();
                     if !matches!(env_str.as_str(), "0" | "1") {
-                        return Err(RuntimeException {
-                            message: format!(
-                                "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: {}. Expected 0 or 1.",
-                                env_str
-                            ),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: {}. Expected 0 or 1.",
+                            env_str
+                        ))
                         .into());
                     }
                     if let PhpMixed::Array(ref mut m) = result {

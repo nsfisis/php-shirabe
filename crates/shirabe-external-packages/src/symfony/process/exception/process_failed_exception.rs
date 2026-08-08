@@ -1,12 +1,12 @@
 //! ref: composer/vendor/symfony/process/Exception/ProcessFailedException.php
 
 use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::symfony::process::exception::runtime_exception::RuntimeException;
 use crate::symfony::process::process::Process;
 
 #[derive(Debug)]
 pub struct ProcessFailedException {
-    pub message: String,
-    pub code: i64,
+    inner: RuntimeException,
 }
 
 impl ProcessFailedException {
@@ -36,16 +36,13 @@ impl ProcessFailedException {
         );
 
         Ok(Self {
-            message: error,
-            code: 0,
+            inner: RuntimeException::new(error),
         })
     }
 }
 
-impl std::fmt::Display for ProcessFailedException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for ProcessFailedException {}
+shirabe_php_shim::impl_php_exception!(
+    ProcessFailedException,
+    inner,
+    r"Symfony\Component\Process\Exception\ProcessFailedException"
+);

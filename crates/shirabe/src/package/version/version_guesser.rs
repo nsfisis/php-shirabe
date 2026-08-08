@@ -750,10 +750,9 @@ impl VersionGuesser {
         let version = match version {
             Some(v) if !v.is_empty() => v,
             _ => {
-                return Err(RuntimeException {
-                    message: "COMPOSER_ROOT_VERSION not set or empty".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(
+                    "COMPOSER_ROOT_VERSION not set or empty".to_string(),
+                )
                 .into());
             }
         };

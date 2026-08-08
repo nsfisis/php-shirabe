@@ -642,10 +642,7 @@ impl ProgressBar {
             "remaining".to_string(),
             Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
-                    return Ok(Err(LogicException(shirabe_php_shim::LogicException {
-                        message: "Unable to display the remaining time if the maximum number of steps is not set.".to_string(),
-                        code: 0,
-                    })));
+                    return Ok(Err(LogicException::new("Unable to display the remaining time if the maximum number of steps is not set.".to_string())));
                 }
 
                 Ok(Ok(shirabe_php_shim::PhpMixed::String(
@@ -658,10 +655,7 @@ impl ProgressBar {
             "estimated".to_string(),
             Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
-                    return Ok(Err(LogicException(shirabe_php_shim::LogicException {
-                        message: "Unable to display the estimated time if the maximum number of steps is not set.".to_string(),
-                        code: 0,
-                    })));
+                    return Ok(Err(LogicException::new("Unable to display the estimated time if the maximum number of steps is not set.".to_string())));
                 }
 
                 Ok(Ok(shirabe_php_shim::PhpMixed::String(
@@ -814,10 +808,7 @@ impl ProgressBar {
                         let formatter = formatters.as_ref().unwrap().get(&name).unwrap();
                         formatter(self, &self.output)
                     });
-                    match formatter_result? {
-                        Ok(text) => text,
-                        Err(e) => return Err(anyhow::Error::new(e)),
-                    }
+                    formatter_result??
                 } else if let Some(message) = self.messages.get(&name) {
                     shirabe_php_shim::PhpMixed::String(message.clone())
                 } else {

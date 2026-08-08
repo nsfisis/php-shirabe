@@ -10,10 +10,9 @@ pub struct Zip;
 impl Zip {
     pub fn get_composer_json(path_to_zip: &str) -> anyhow::Result<Option<String>> {
         if !extension_loaded("zip") {
-            return Err(RuntimeException {
-                message: "The Zip Util requires PHP's zip extension".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "The Zip Util requires PHP's zip extension".to_string(),
+            )
             .into());
         }
 
@@ -64,13 +63,10 @@ impl Zip {
             if dir_name == "." {
                 top_level_paths.insert(name, true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                            implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
+                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())
+                    ))
                     .into());
                 }
                 continue;
@@ -80,13 +76,10 @@ impl Zip {
             if !dir_name.contains('\\') && !dir_name.contains('/') {
                 top_level_paths.insert(format!("{}/", dir_name), true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                            implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
+                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())
+                    ))
                     .into());
                 }
             }
@@ -101,12 +94,10 @@ impl Zip {
             }
         }
 
-        Err(RuntimeException {
-            message:
-                "No composer.json found either at the top level or within the topmost directory"
-                    .to_string(),
-            code: 0,
-        }
+        Err(RuntimeException::new(
+            "No composer.json found either at the top level or within the topmost directory"
+                .to_string(),
+        )
         .into())
     }
 }

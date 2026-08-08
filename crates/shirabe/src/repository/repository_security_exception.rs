@@ -6,10 +6,14 @@ use shirabe_php_shim::Exception;
 #[derive(Debug)]
 pub struct RepositorySecurityException(pub Exception);
 
-impl std::fmt::Display for RepositorySecurityException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+impl RepositorySecurityException {
+    pub fn new(message: String) -> Self {
+        Self(Exception::new(message))
     }
 }
 
-impl std::error::Error for RepositorySecurityException {}
+shirabe_php_shim::impl_php_exception!(
+    RepositorySecurityException,
+    0,
+    r"Composer\Repository\RepositorySecurityException"
+);

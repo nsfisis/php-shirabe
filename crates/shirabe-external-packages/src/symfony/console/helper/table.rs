@@ -325,12 +325,10 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException(
-            shirabe_php_shim::InvalidArgumentException {
-                message: format!("Style \"{}\" is not defined.", name),
-                code: 0,
-            },
-        )))
+        Ok(Err(InvalidArgumentException::new(format!(
+            "Style \"{}\" is not defined.",
+            name
+        ))))
     }
 
     /// Sets table style.
@@ -454,14 +452,11 @@ impl Table {
     /// Adds a row to the table, and re-renders the table.
     pub fn append_row(&mut self, row: Row) -> anyhow::Result<Result<&mut Self, RuntimeException>> {
         if !Self::output_is_console_section(&self.output) {
-            return Ok(Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: format!(
-                    "Output should be an instance of \"{}\" when calling \"{}\".",
-                    "Symfony\\Component\\Console\\Output\\ConsoleSectionOutput",
-                    "Symfony\\Component\\Console\\Helper\\Table::appendRow",
-                ),
-                code: 0,
-            })));
+            return Ok(Err(RuntimeException::new(format!(
+                "Output should be an instance of \"{}\" when calling \"{}\".",
+                "Symfony\\Component\\Console\\Output\\ConsoleSectionOutput",
+                "Symfony\\Component\\Console\\Helper\\Table::appendRow",
+            ))));
         }
 
         if self.rendered {
@@ -1373,12 +1368,10 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException(
-            shirabe_php_shim::InvalidArgumentException {
-                message: format!("Style \"{}\" is not defined.", name),
-                code: 0,
-            },
-        )))
+        Ok(Err(InvalidArgumentException::new(format!(
+            "Style \"{}\" is not defined.",
+            name
+        ))))
     }
 
     fn formatter_is_wrappable(

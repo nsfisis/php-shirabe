@@ -732,10 +732,9 @@ impl PackageInterface for Package {
         if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade())
             && !std::rc::Rc::ptr_eq(&existing, repository.as_rc())
         {
-            return Err(LogicException {
-                message: "A package can only be added to one repository".to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new(
+                "A package can only be added to one repository".to_string(),
+            )
             .into());
         }
         self.repository = Some(repository.downgrade());

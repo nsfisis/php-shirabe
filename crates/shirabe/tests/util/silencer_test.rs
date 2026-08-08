@@ -35,11 +35,7 @@ fn test_silencer() {
 fn test_silenced_exception() {
     let verification = format!("{}", microtime());
     let err = Silencer::call(|| -> anyhow::Result<()> {
-        Err(RuntimeException {
-            message: verification.clone(),
-            code: 0,
-        }
-        .into())
+        Err(RuntimeException::new(verification.clone()).into())
     })
     .unwrap_err();
     assert_eq!(verification, err.to_string());

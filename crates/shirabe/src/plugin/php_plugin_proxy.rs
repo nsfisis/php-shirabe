@@ -2057,10 +2057,9 @@ impl PhpPluginProxy {
             Ok(_) => Ok(()),
             // TODO(plugin): the original exception class is collapsed to RuntimeException on
             // this side of the boundary.
-            Err(throw) => Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                message: throw.message,
-                code: throw.code,
-            })),
+            Err(throw) => {
+                Err(shirabe_php_shim::RuntimeException::with_code(throw.message, throw.code).into())
+            }
         }
     }
 
@@ -2080,10 +2079,9 @@ impl PhpPluginProxy {
         )?;
         match outcome {
             Ok(value) => Ok(value.to_php_mixed()?),
-            Err(throw) => Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                message: throw.message,
-                code: throw.code,
-            })),
+            Err(throw) => {
+                Err(shirabe_php_shim::RuntimeException::with_code(throw.message, throw.code).into())
+            }
         }
     }
 }
@@ -2160,10 +2158,11 @@ impl EventSubscriberInterface for PhpPluginProxy {
             // TODO(plugin): the original exception class is collapsed to RuntimeException on
             // this side of the boundary.
             Err(throw) => {
-                return Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                    message: throw.message,
-                    code: throw.code,
-                }));
+                return Err(shirabe_php_shim::RuntimeException::with_code(
+                    throw.message,
+                    throw.code,
+                )
+                .into());
             }
         };
         decode_subscribed_events(&self.class, value)
@@ -2191,10 +2190,11 @@ impl Capable for PhpPluginProxy {
             // TODO(plugin): the original exception class is collapsed to RuntimeException on
             // this side of the boundary.
             Err(throw) => {
-                return Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                    message: throw.message,
-                    code: throw.code,
-                }));
+                return Err(shirabe_php_shim::RuntimeException::with_code(
+                    throw.message,
+                    throw.code,
+                )
+                .into());
             }
         };
         // PHP: `(array) $plugin->getCapabilities()` — the interface declares no return type,
@@ -2289,12 +2289,10 @@ fn decode_listener_priority(
 }
 
 fn subscribed_events_shape_error(class: &str, value: &PluginValue) -> anyhow::Error {
-    anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-        message: format!(
-            "{class}::getSubscribedEvents() returned an unsupported shape over RPC: {value:?}"
-        ),
-        code: 0,
-    })
+    shirabe_php_shim::RuntimeException::new(format!(
+        "{class}::getSubscribedEvents() returned an unsupported shape over RPC: {value:?}"
+    ))
+    .into()
 }
 
 impl Drop for PhpPluginProxy {
@@ -2407,13 +2405,11 @@ impl PhpInstallerProxy {
     }
 
     fn unsupported_shape(&self, method: &str, value: &PluginValue) -> anyhow::Error {
-        anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-            message: format!(
-                "{}::{method}() returned an unsupported shape over RPC: {value:?}",
-                self.handle.class
-            ),
-            code: 0,
-        })
+        shirabe_php_shim::RuntimeException::new(format!(
+            "{}::{method}() returned an unsupported shape over RPC: {value:?}",
+            self.handle.class
+        ))
+        .into()
     }
 }
 
@@ -2632,15 +2628,11 @@ impl CommandProvider for PhpCommandProviderProxy {
             PluginValue::List(items) => items,
             PluginValue::Array(map) => map.into_values().collect(),
             _ => {
-                return Err(anyhow::anyhow!(
-                    shirabe_php_shim::UnexpectedValueException {
-                        message: format!(
-                            "Plugin capability {} failed to return an array from getCommands",
-                            self.handle.class
-                        ),
-                        code: 0,
-                    }
-                ));
+                return Err(shirabe_php_shim::UnexpectedValueException::new(format!(
+                    "Plugin capability {} failed to return an array from getCommands",
+                    self.handle.class
+                ))
+                .into());
             }
         };
         let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>> = Vec::new();
@@ -2661,13 +2653,10 @@ impl CommandProvider for PhpCommandProviderProxy {
 }
 
 fn invalid_command_error(capability: &PhpObjHandle) -> anyhow::Error {
-    anyhow::anyhow!(shirabe_php_shim::UnexpectedValueException {
-        message: format!(
-            "Plugin capability {} returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects",
-            capability.class
-        ),
-        code: 0,
-    })
+    shirabe_php_shim::UnexpectedValueException::new(format!(
+        "Plugin capability {} returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects",
+        capability.class
+    )).into()
 }
 
 impl Drop for PhpCommandProviderProxy {
@@ -2820,12 +2809,11 @@ impl PhpConsoleApplicationContext {
         let app = match value {
             PluginValue::PhpHandle(app) => app,
             other => {
-                return Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                    message: format!(
+                return Err(shirabe_php_shim::RuntimeException::new(
+                    format!(
                         "__shirabe_console_application_boot returned an unsupported shape over RPC: {other:?}"
-                    ),
-                    code: 0,
-                }));
+                    )
+                ).into());
             }
         };
         *self.app.borrow_mut() = Some(app.clone());
@@ -3058,13 +3046,11 @@ impl PhpCommandProxy {
         method: &str,
         value: &PluginValue,
     ) -> anyhow::Error {
-        anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-            message: format!(
-                "{}::{method}() returned an unsupported shape over RPC: {value:?}",
-                handle.class
-            ),
-            code: 0,
-        })
+        shirabe_php_shim::RuntimeException::new(format!(
+            "{}::{method}() returned an unsupported shape over RPC: {value:?}",
+            handle.class
+        ))
+        .into()
     }
 }
 
@@ -3081,14 +3067,11 @@ impl Command for PhpCommandProxy {
     ) -> anyhow::Result<i64> {
         let context = CONSOLE_APP_CONTEXT
             .with(|slot| slot.borrow().clone())
-            .ok_or_else(|| {
-                anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-                    message: format!(
+            .ok_or_else(|| -> anyhow::Error {
+                shirabe_php_shim::RuntimeException::new(format!(
                         "cannot run plugin-provided command {}: no worker-side console application context was published",
                         self.handle.class
-                    ),
-                    code: 0,
-                })
+                    )).into()
             })?;
         let app = context.booted_app()?;
         let input_line = input.borrow().__to_string();
@@ -3110,13 +3093,12 @@ impl Command for PhpCommandProxy {
     ) -> anyhow::Result<i64> {
         // `run` above never reaches this template hook; a direct call would bypass the
         // worker-side binding, so it stays an explicit error.
-        Err(anyhow::anyhow!(shirabe_php_shim::RuntimeException {
-            message: format!(
+        Err(shirabe_php_shim::RuntimeException::new(
+            format!(
                 "plugin-provided command {} executes in the PHP worker through run(); execute() must not be called directly",
                 self.handle.class
-            ),
-            code: 0,
-        }))
+            )
+        ).into())
     }
 
     fn is_proxy_command(&self) -> bool {

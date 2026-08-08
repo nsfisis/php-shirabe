@@ -57,11 +57,8 @@ impl OutputFormatterStyleStack {
             }
         }
 
-        Ok(Err(InvalidArgumentException(
-            shirabe_php_shim::InvalidArgumentException {
-                message: "Incorrectly nested style tag found.".to_string(),
-                code: 0,
-            },
+        Ok(Err(InvalidArgumentException::new(
+            "Incorrectly nested style tag found.".to_string(),
         )))
     }
 

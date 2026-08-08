@@ -9,6 +9,7 @@ use Shirabe\Lint\Linters\CargoWorkspaceDependencies;
 use Shirabe\Lint\Linters\ContiguousUseBlock;
 use Shirabe\Lint\Linters\NoBannedUse;
 use Shirabe\Lint\Linters\NoDecorativeSectionComment;
+use Shirabe\Lint\Linters\NoExceptionDowncast;
 use Shirabe\Lint\Linters\NoFormatTrailingComma;
 use Shirabe\Lint\Linters\NoModRs;
 use Shirabe\Lint\Linters\NoStdCollectionsMaps;
@@ -25,6 +26,14 @@ $runner = new Runner($rootDir, [
     [new NoBannedUse(), []],
     [new NoDecorativeSectionComment(), [
         'crates/shirabe-semver/src/version_parser.rs',
+    ]],
+    [new NoExceptionDowncast(), [
+        // Defines the box and the walk the rule points at.
+        'crates/shirabe-php-shim/src/exception.rs',
+        // Downcast a panic payload, not an error: PHP's error handler throws an \ErrorException
+        // where these call sites `catch` it.
+        'crates/shirabe/src/cache.rs',
+        'crates/shirabe/src/util/filesystem.rs',
     ]],
     [new NoFormatTrailingComma(), [
         'crates/shirabe/src/package/loader/root_package_loader.rs',

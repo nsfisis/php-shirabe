@@ -35,27 +35,18 @@ impl TableCell {
             .cloned()
             .collect();
         if !diff.is_empty() {
-            return Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "The TableCell does not support the following options: '{}'.",
-                        diff.join("', '"),
-                    ),
-                    code: 0,
-                },
-            ));
+            return Err(InvalidArgumentException::new(format!(
+                "The TableCell does not support the following options: '{}'.",
+                diff.join("', '"),
+            )));
         }
 
         if let Some(style) = options.get("style")
             && !matches!(style, TableCellOption::Style(_))
             && !matches!(style, TableCellOption::Null)
         {
-            return Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: "The style option must be an instance of \"TableCellStyle\"."
-                        .to_string(),
-                    code: 0,
-                },
+            return Err(InvalidArgumentException::new(
+                "The style option must be an instance of \"TableCellStyle\".".to_string(),
             ));
         }
 

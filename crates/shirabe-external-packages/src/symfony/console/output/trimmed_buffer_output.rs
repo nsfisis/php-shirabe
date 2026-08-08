@@ -21,16 +21,10 @@ impl TrimmedBufferOutput {
         formatter: Option<std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>>,
     ) -> Result<Self, InvalidArgumentException> {
         if max_length <= 0 {
-            return Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "\"{}()\" expects a strictly positive maxLength. Got {}.",
-                        "Symfony\\Component\\Console\\Output\\TrimmedBufferOutput::__construct",
-                        max_length,
-                    ),
-                    code: 0,
-                },
-            ));
+            return Err(InvalidArgumentException::new(format!(
+                "\"{}()\" expects a strictly positive maxLength. Got {}.",
+                "Symfony\\Component\\Console\\Output\\TrimmedBufferOutput::__construct", max_length,
+            )));
         }
 
         Ok(Self {

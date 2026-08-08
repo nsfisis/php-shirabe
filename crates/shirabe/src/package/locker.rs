@@ -26,6 +26,7 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::ParsingException;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array_loose,
@@ -194,10 +195,7 @@ impl Locker {
             if let Some(packages_dev) = lock_data.get("packages-dev").cloned() {
                 locked_packages = array_merge(locked_packages, packages_dev);
             } else {
-                return Err(RuntimeException {
-                    message: "The lock file does not contain require-dev information, run install with the --no-dev option or delete it and run composer update to generate a new lock file.".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new("The lock file does not contain require-dev information, run install with the --no-dev option or delete it and run composer update to generate a new lock file.".to_string())
                 .into());
             }
         }
@@ -270,12 +268,10 @@ impl Locker {
             return Ok(packages);
         }
 
-        Err(RuntimeException {
-            message:
-                "Your composer.lock is invalid. Run \"composer update\" to generate a new one."
-                    .to_string(),
-            code: 0,
-        }
+        Err(RuntimeException::new(
+            "Your composer.lock is invalid. Run \"composer update\" to generate a new one."
+                .to_string(),
+        )
         .into())
     }
 
@@ -438,10 +434,9 @@ impl Locker {
         }
 
         if !self.lock_file.exists() {
-            return Err(LogicException {
-                message: "No lockfile found. Unable to read locked packages".to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new(
+                "No lockfile found. Unable to read locked packages".to_string(),
+            )
             .into());
         }
 
@@ -582,7 +577,7 @@ impl Locker {
         let is_locked = match self.is_locked_result() {
             Ok(b) => b,
             Err(e) => {
-                if e.downcast_ref::<ParsingException>().is_some() {
+                if e.is_instanceof::<ParsingException>() {
                     false
                 } else {
                     return Err(e);
@@ -641,13 +636,10 @@ impl Locker {
         let contents = match contents {
             Some(s) => s,
             None => {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Unable to read {} contents to update the lock file hash.",
-                        composer_json.get_path()
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Unable to read {} contents to update the lock file hash.",
+                    composer_json.get_path()
+                ))
                 .into());
             }
         };
@@ -720,13 +712,10 @@ impl Locker {
             let version = package.get_pretty_version();
 
             if name.is_empty() || version.is_empty() {
-                return Err(LogicException {
-                    message: format!(
-                        "Package \"{}\" has no version or name and can not be locked",
-                        package,
-                    ),
-                    code: 0,
-                }
+                return Err(LogicException::new(format!(
+                    "Package \"{}\" has no version or name and can not be locked",
+                    package,
+                ))
                 .into());
             }
 

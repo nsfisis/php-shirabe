@@ -166,10 +166,7 @@ impl Rule {
 
     pub fn disable(&mut self) -> anyhow::Result<()> {
         if let Rule::MultiConflict(_) = self {
-            return Err(RuntimeException {
-                message: "Disabling multi conflict rules is not possible. Please contact composer at https://github.com/composer/composer to let us debug what lead to this situation.".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new("Disabling multi conflict rules is not possible. Please contact composer at https://github.com/composer/composer to let us debug what lead to this situation.".to_string())
             .into());
         }
         *self.bitfield_mut() =
@@ -291,11 +288,7 @@ impl Rule {
                 Ok(source_package)
             }
 
-            _ => Err(LogicException {
-                message: "Not implemented".to_string(),
-                code: 0,
-            }
-            .into()),
+            _ => Err(LogicException::new("Not implemented".to_string()).into()),
         }
     }
 

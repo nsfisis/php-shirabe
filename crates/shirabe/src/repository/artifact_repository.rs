@@ -47,10 +47,9 @@ impl ArtifactRepository {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<Self> {
         if !extension_loaded("zip") {
-            return Err(RuntimeException {
-                message: "The artifact repository requires PHP's zip extension".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "The artifact repository requires PHP's zip extension".to_string(),
+            )
             .into());
         }
 
@@ -171,13 +170,10 @@ impl ArtifactRepository {
         } else if file_extension == "zip" {
             file_type = "zip";
         } else {
-            return Err(RuntimeException {
-                message: format!(
-                    "Files with \"{}\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported.",
-                    file_extension
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Files with \"{}\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported.",
+                file_extension
+            ))
             .into());
         }
 
@@ -228,10 +224,10 @@ impl ArtifactRepository {
             .unwrap_or_default();
         match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),
-            Err(exception) => Err(UnexpectedValueException {
-                message: format!("Failed loading package in {}: {}", pathname, exception),
-                code: 0,
-            }
+            Err(exception) => Err(UnexpectedValueException::new(format!(
+                "Failed loading package in {}: {}",
+                pathname, exception
+            ))
             .into()),
         }
     }

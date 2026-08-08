@@ -12,17 +12,12 @@ impl SolverBugException {
             Please report the command you ran, the exact error you received, and your composer.json on https://github.com/composer/composer/issues - thank you!\n",
             message
         );
-        SolverBugException(RuntimeException {
-            message: full_message,
-            code: 0,
-        })
+        SolverBugException(RuntimeException::new(full_message))
     }
 }
 
-impl std::fmt::Display for SolverBugException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl std::error::Error for SolverBugException {}
+shirabe_php_shim::impl_php_exception!(
+    SolverBugException,
+    0,
+    r"Composer\DependencyResolver\SolverBugException"
+);

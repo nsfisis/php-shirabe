@@ -15,6 +15,7 @@ use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_key_exists, array_map,
     array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array_loose,
@@ -77,13 +78,10 @@ impl GitHubDriver {
             &self.inner.url,
             Some(&mut match_),
         ) {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "The GitHub repository URL {} is invalid.",
-                    self.inner.url.clone(),
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "The GitHub repository URL {} is invalid.",
+                self.inner.url.clone(),
+            ))
             .into());
         }
 
@@ -737,7 +735,7 @@ impl GitHubDriver {
         );
         let mut resource = self
             .get_contents(&resource_url, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.message))?
+            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
             .decode_json()?;
 
         // The GitHub contents API only returns files up to 1MB as base64 encoded files
@@ -765,7 +763,7 @@ impl GitHubDriver {
                 .to_string();
             resource = self
                 .get_contents(&git_url, false)
-                .map_err(|e| anyhow::anyhow!("{}", e.message))?
+                .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
                 .decode_json()?;
         }
 
@@ -789,10 +787,10 @@ impl GitHubDriver {
         let content = match content {
             Some(c) => String::from_utf8_lossy(&c).to_string(),
             None => {
-                return Err(RuntimeException {
-                    message: format!("Could not retrieve {} for {}", file, identifier),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Could not retrieve {} for {}",
+                    file, identifier
+                ))
                 .into());
             }
         };
@@ -817,7 +815,7 @@ impl GitHubDriver {
         );
         let commit = self
             .get_contents(&resource, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.message))?
+            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
             .decode_json()?;
 
         let date_str = match commit {
@@ -853,7 +851,7 @@ impl GitHubDriver {
             loop {
                 let response = self
                     .get_contents(resource.as_deref().unwrap_or(""), false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
@@ -903,7 +901,7 @@ impl GitHubDriver {
             loop {
                 let response = self
                     .get_contents(resource.as_deref().unwrap_or(""), false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
@@ -1015,7 +1013,7 @@ impl GitHubDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> anyhow::Result<Response, TransportException> {
+    ) -> anyhow::Result<Response, Box<TransportException>> {
         let response_result = self.inner.get_contents(url);
         match response_result {
             Ok(r) => Ok(r),
@@ -1028,7 +1026,7 @@ impl GitHubDriver {
                 )
                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
-                match e.code {
+                match e.get_code() {
                     401 | 404 => {
                         // try to authorize only if we are fetching the main /repos/foo/bar data, otherwise it must be a real 404
                         if !fetching_repo_data {
@@ -1178,10 +1176,10 @@ impl GitHubDriver {
                 };
             }
             Err(e) => {
-                if e.code == 499 {
+                if e.get_code() == 499 {
                     self.attempt_clone_fallback(Some(&e))?;
                 } else {
-                    return Err(e.into());
+                    return Err((*e).into());
                 }
             }
         }
@@ -1232,13 +1230,11 @@ impl GitHubDriver {
         e: Option<&TransportException>,
     ) -> anyhow::Result<bool> {
         if !self.allow_git_fallback {
-            return Err(RuntimeException {
-                message: format!(
-                    "Fallback to git driver disabled{}",
-                    e.map(|e| format!(": {}", e.message)).unwrap_or_default()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Fallback to git driver disabled{}",
+                e.map(|e| format!(": {}", e.get_message()))
+                    .unwrap_or_default()
+            ))
             .into());
         }
 
@@ -1269,11 +1265,9 @@ impl GitHubDriver {
 
     pub(crate) fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
         if !self.allow_git_fallback {
-            return Err(RuntimeException {
-                message: "Fallback to git driver disabled".to_string(),
-                code: 0,
-            }
-            .into());
+            return Err(
+                RuntimeException::new("Fallback to git driver disabled".to_string()).into(),
+            );
         }
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
@@ -1377,7 +1371,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

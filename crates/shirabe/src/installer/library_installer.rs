@@ -210,14 +210,11 @@ impl LibraryInstaller {
         assert!(
             self.download_manager.is_some(),
             "{}",
-            LogicException {
-                message: format!(
+            LogicException::new(format!(
                     "{} should be initialized with a fully loaded Composer instance to be able to install/... packages",
                     "LibraryInstaller",
-                ),
-                code: 0,
-            }
-            .message
+                ))
+            .get_message()
         );
 
         self.download_manager.as_ref().unwrap()
@@ -345,10 +342,10 @@ impl InstallerInterface for LibraryInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException {
-                message: format!("Package is not installed: {}", initial),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package is not installed: {}",
+                initial
+            ))
             .into());
         }
 
@@ -378,10 +375,10 @@ impl InstallerInterface for LibraryInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException {
-                message: format!("Package is not installed: {}", package),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package is not installed: {}",
+                package
+            ))
             .into());
         }
 

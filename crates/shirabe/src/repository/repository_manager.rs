@@ -100,10 +100,10 @@ impl RepositoryManager {
         name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         if !self.repository_classes.contains_key(r#type) {
-            return Err(InvalidArgumentException {
-                message: format!("Repository type is not registered: {}", r#type),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Repository type is not registered: {}",
+                r#type
+            ))
             .into());
         }
 
@@ -193,10 +193,10 @@ impl RepositoryManager {
             )),
             // TODO(plugin): `setRepositoryClass` lets a plugin register a repository class of
             // its own, which needs a Rust-side counterpart before it can be built here.
-            other => Err(anyhow::anyhow!(RuntimeException {
-                message: format!("Repository class has no Rust implementation: {other}"),
-                code: 0,
-            })),
+            other => Err(RuntimeException::new(format!(
+                "Repository class has no Rust implementation: {other}"
+            ))
+            .into()),
         }
     }
 

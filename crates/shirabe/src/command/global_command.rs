@@ -61,11 +61,10 @@ impl GlobalCommand {
         } else if let Some(completion_input) = input_any.downcast_ref::<CompletionInput>() {
             Ok(completion_input.to_string())
         } else {
-            Err(LogicException {
-                message: "Expected an Input instance that is stringable".to_string(),
-                code: 0,
-            }
-            .into())
+            Err(
+                LogicException::new("Expected an Input instance that is stringable".to_string())
+                    .into(),
+            )
         }
     }
 
@@ -85,17 +84,14 @@ impl GlobalCommand {
             let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(&home)?;
             if !Path::new(&home).is_dir() {
-                return Err(RuntimeException {
-                    message: "Could not create home directory".to_string(),
-                    code: 0,
-                }
-                .into());
+                return Err(
+                    RuntimeException::new("Could not create home directory".to_string()).into(),
+                );
             }
         }
 
-        chdir(&home).map_err(|_e| RuntimeException {
-            message: format!("Could not switch to home directory \"{}\"", home),
-            code: 0,
+        chdir(&home).map_err(|_e| {
+            RuntimeException::new(format!("Could not switch to home directory \"{}\"", home))
         })?;
 
         if !quiet {

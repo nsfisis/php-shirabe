@@ -202,11 +202,10 @@ impl InstalledVersions {
             return Ok(implode(" || ", &ranges));
         }
 
-        Err(OutOfBoundsException {
-            message: format!("Package \"{}\" is not installed", package_name),
-            code: 0,
-        }
-        .into())
+        Err(
+            OutOfBoundsException::new(format!("Package \"{}\" is not installed", package_name))
+                .into(),
+        )
     }
 
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as version, use satisfies or getVersionRanges if you need to know if a given version is present
@@ -229,11 +228,10 @@ impl InstalledVersions {
                 .map(|s| s.to_string()));
         }
 
-        Err(OutOfBoundsException {
-            message: format!("Package \"{}\" is not installed", package_name),
-            code: 0,
-        }
-        .into())
+        Err(
+            OutOfBoundsException::new(format!("Package \"{}\" is not installed", package_name))
+                .into(),
+        )
     }
 
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as version, use satisfies or getVersionRanges if you need to know if a given version is present
@@ -256,11 +254,10 @@ impl InstalledVersions {
                 .map(|s| s.to_string()));
         }
 
-        Err(OutOfBoundsException {
-            message: format!("Package \"{}\" is not installed", package_name),
-            code: 0,
-        }
-        .into())
+        Err(
+            OutOfBoundsException::new(format!("Package \"{}\" is not installed", package_name))
+                .into(),
+        )
     }
 
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as reference
@@ -283,11 +280,10 @@ impl InstalledVersions {
                 .map(|s| s.to_string()));
         }
 
-        Err(OutOfBoundsException {
-            message: format!("Package \"{}\" is not installed", package_name),
-            code: 0,
-        }
-        .into())
+        Err(
+            OutOfBoundsException::new(format!("Package \"{}\" is not installed", package_name))
+                .into(),
+        )
     }
 
     /// @return string|null If the package is being replaced or provided but is not really installed, null will be returned as install path. Packages of type metapackages also have a null install path.
@@ -309,11 +305,10 @@ impl InstalledVersions {
             });
         }
 
-        Err(OutOfBoundsException {
-            message: format!("Package \"{}\" is not installed", package_name),
-            code: 0,
-        }
-        .into())
+        Err(
+            OutOfBoundsException::new(format!("Package \"{}\" is not installed", package_name))
+                .into(),
+        )
     }
 
     pub fn get_root_package() -> IndexMap<String, PhpMixed> {

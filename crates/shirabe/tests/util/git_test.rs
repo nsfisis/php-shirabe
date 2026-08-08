@@ -11,6 +11,7 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::git::Git;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 
 // No-op ConfigSourceInterface, equivalent to PHPUnit's
@@ -195,7 +196,7 @@ fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive
     );
 
     let err = result.expect_err("expected a RuntimeException");
-    assert!(err.downcast_ref::<RuntimeException>().is_some());
+    assert!(err.is_instanceof::<RuntimeException>());
 }
 
 // privateGithubWithCredentialsProvider helper.

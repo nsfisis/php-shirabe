@@ -124,9 +124,11 @@ impl Filesystem {
         // `rm -rf`/`rmdir` subprocess via the String-based ProcessExecutor, so it has to be
         // representable as UTF-8.
         let directory = directory.as_ref();
-        let directory = directory.to_str().ok_or_else(|| RuntimeException {
-            message: format!("Path contains invalid UTF-8: {}", directory.display()),
-            code: 0,
+        let directory = directory.to_str().ok_or_else(|| {
+            RuntimeException::new(format!(
+                "Path contains invalid UTF-8: {}",
+                directory.display()
+            ))
         })?;
         let edge_case_result = self.remove_edge_cases(directory, true)?;
         if let Some(r) = edge_case_result {
@@ -246,10 +248,7 @@ impl Filesystem {
         }
 
         if Preg::is_match3(php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"), directory, None) {
-            return Err(RuntimeException {
-                message: format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory))
             .into());
         }
 
@@ -309,42 +308,36 @@ impl Filesystem {
     pub fn ensure_directory_exists(&mut self, directory: &str) -> anyhow::Result<()> {
         if !is_dir(directory) {
             if file_exists(directory) {
-                return Err(RuntimeException {
-                    message: format!("{} exists and is not a directory.", directory),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "{} exists and is not a directory.",
+                    directory
+                ))
                 .into());
             }
 
             if is_link(directory) && !self.unlink_implementation(Path::new(directory)) {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Could not delete symbolic link {}: {}",
-                        directory,
-                        error_get_last()
-                            .as_ref()
-                            .and_then(|m| m.get("message"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or("")
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Could not delete symbolic link {}: {}",
+                    directory,
+                    error_get_last()
+                        .as_ref()
+                        .and_then(|m| m.get("message"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
+                ))
                 .into());
             }
 
             if !mkdir(directory, 0o777, true) {
-                let e = RuntimeException {
-                    message: format!(
-                        "{} does not exist and could not be created: {}",
-                        directory,
-                        error_get_last()
-                            .as_ref()
-                            .and_then(|m| m.get("message"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or("")
-                    ),
-                    code: 0,
-                };
+                let e = RuntimeException::new(format!(
+                    "{} does not exist and could not be created: {}",
+                    directory,
+                    error_get_last()
+                        .as_ref()
+                        .and_then(|m| m.get("message"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
+                ));
 
                 // in pathological cases with paths like path/to/broken-symlink/../foo is_dir will fail to detect path/to/foo
                 // but normalizing the ../ away first makes it work so we attempt this just in case, and if it still fails we
@@ -390,7 +383,7 @@ impl Filesystem {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
 
-                return Err(RuntimeException { message, code: 0 }.into());
+                return Err(RuntimeException::new(message).into());
             }
         }
 
@@ -423,7 +416,7 @@ impl Filesystem {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
 
-                return Err(RuntimeException { message, code: 0 }.into());
+                return Err(RuntimeException::new(message).into());
             }
         }
 
@@ -464,7 +457,7 @@ impl Filesystem {
 
                     // if copy fails we attempt to copy it manually as this can help bypass issues with VirtualBox shared folders
                     // see https://github.com/composer/composer/issues/12057
-                    if str_contains(&e.message, "Bad address") {
+                    if str_contains(e.get_message(), "Bad address") {
                         let (source_handle, target_handle) =
                             match (fopen(source, "r"), fopen(&target, "w")) {
                                 (Ok(source_handle), Ok(target_handle)) => {
@@ -520,13 +513,11 @@ impl Filesystem {
         // TODO(phase-c):
         // The fallbacks below (copy_then_remove and the mv/xcopy subprocesses) operate on
         // path strings, so beyond this point the paths have to be representable as UTF-8.
-        let source = source.to_str().ok_or_else(|| RuntimeException {
-            message: format!("Path contains invalid UTF-8: {}", source.display()),
-            code: 0,
+        let source = source.to_str().ok_or_else(|| {
+            RuntimeException::new(format!("Path contains invalid UTF-8: {}", source.display()))
         })?;
-        let target = target.to_str().ok_or_else(|| RuntimeException {
-            message: format!("Path contains invalid UTF-8: {}", target.display()),
-            code: 0,
+        let target = target.to_str().ok_or_else(|| {
+            RuntimeException::new(format!("Path contains invalid UTF-8: {}", target.display()))
         })?;
 
         if !function_exists("proc_open") {
@@ -735,11 +726,9 @@ impl Filesystem {
     pub fn size(&self, path: impl AsRef<Path>) -> anyhow::Result<i64> {
         let path = path.as_ref();
         if !file_exists(path) {
-            return Err(RuntimeException {
-                message: format!("{} does not exist.", path.display()),
-                code: 0,
-            }
-            .into());
+            return Err(
+                RuntimeException::new(format!("{} does not exist.", path.display())).into(),
+            );
         }
         if is_dir(path) {
             return self.directory_size(path);
@@ -987,13 +976,10 @@ impl Filesystem {
     /// Creates an NTFS junction.
     pub fn junction(&mut self, target: &str, junction: &str) -> anyhow::Result<()> {
         if !Platform::is_windows() {
-            return Err(LogicException {
-                message: format!(
-                    "Function {} is not available on non-Windows platform",
-                    "Composer\\Util\\Filesystem"
-                ),
-                code: 0,
-            }
+            return Err(LogicException::new(format!(
+                "Function {} is not available on non-Windows platform",
+                "Composer\\Util\\Filesystem"
+            ))
             .into());
         }
         if !is_dir(target) {

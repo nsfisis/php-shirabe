@@ -1,7 +1,6 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php
 
 use crate::php_file_cleaner::PhpFileCleaner;
-use anyhow::anyhow;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -18,10 +17,7 @@ impl PhpFileParser {
         let extra_types = Self::get_extra_types();
 
         if !function_exists("php_strip_whitespace") {
-            return Err(anyhow!(RuntimeException {
-                message: "Classmap generation relies on the php_strip_whitespace function, but it has been disabled by the disable_functions directive.".to_string(),
-                code: 0,
-            }));
+            return Err(RuntimeException::new("Classmap generation relies on the php_strip_whitespace function, but it has been disabled by the disable_functions directive.".to_string()).into());
         }
 
         // Use @ here instead of Silencer to actively suppress 'unhelpful' output
@@ -63,7 +59,7 @@ impl PhpFileParser {
                 );
             }
 
-            return Err(anyhow!(RuntimeException { message, code: 0 }));
+            return Err(RuntimeException::new(message).into());
         }
 
         // return early if there is no chance of matching anything in this file

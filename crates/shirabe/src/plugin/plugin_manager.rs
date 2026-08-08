@@ -234,10 +234,7 @@ impl PluginManager {
             let requires_composer = match requires_composer {
                 Some(r) => r,
                 None => {
-                    return Err(RuntimeException {
-                        message: format!("Plugin {} is missing a require statement for a version of the composer-plugin-api package.", package.get_name()),
-                        code: 0,
-                    }.into());
+                    return Err(RuntimeException::new(format!("Plugin {} is missing a require statement for a version of the composer-plugin-api package.", package.get_name())).into());
                 }
             };
 
@@ -316,10 +313,7 @@ impl PluginManager {
             _ => false,
         };
         if class_is_empty {
-            return Err(UnexpectedValueException {
-                message: format!("Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.", package.get_pretty_name()),
-                code: 0,
-            }.into());
+            return Err(UnexpectedValueException::new(format!("Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.", package.get_pretty_name())).into());
         }
         // PHP: is_array($extra['class']) ? $extra['class'] : [$extra['class']] — an associative
         // array iterates its values too, and a non-string entry reaches class_exists() where it
@@ -470,14 +464,11 @@ impl PluginManager {
 
             if old_installer_plugin {
                 if !self.php_runtime_is_a(&class, "Composer\\Installer\\InstallerInterface")? {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Installer\\InstallerInterface",
-                            package.get_name(),
-                            class
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Installer\\InstallerInterface",
+                        package.get_name(),
+                        class
+                    ))
                     .into());
                 }
                 self.io.write_error(&format!(
@@ -511,14 +502,11 @@ impl PluginManager {
                     .push(PluginOrInstaller::Installer(installer));
             } else if self.php_runtime_class_exists(&class, true)? {
                 if !self.php_runtime_is_a(&class, "Composer\\Plugin\\PluginInterface")? {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Plugin\\PluginInterface",
-                            package.get_name(),
-                            class
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Plugin\\PluginInterface",
+                        package.get_name(),
+                        class
+                    ))
                     .into());
                 }
                 let handle = self.php_runtime_new_object(&class)?;
@@ -534,14 +522,11 @@ impl PluginManager {
                     .or_default()
                     .push(PluginOrInstaller::Plugin(plugin));
             } else if fail_on_missing_classes {
-                return Err(UnexpectedValueException {
-                    message: format!(
-                        "Plugin {} could not be initialized, class not found: {}",
-                        package.get_name(),
-                        class
-                    ),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(format!(
+                    "Plugin {} could not be initialized, class not found: {}",
+                    package.get_name(),
+                    class
+                ))
                 .into());
             }
         }
@@ -1033,14 +1018,11 @@ impl PluginManager {
         // || !trim(...)). Once the first branch has declined, a present key always fails one
         // of the three disjuncts, so a present key unconditionally throws here.
         if let Some(value) = capabilities.get(capability) {
-            return Err(UnexpectedValueException {
-                message: format!(
-                    "Plugin {} provided invalid capability class name(s), got {}",
-                    plugin.get_class_name(),
-                    var_export(value, true)
-                ),
-                code: 0,
-            }
+            return Err(UnexpectedValueException::new(format!(
+                "Plugin {} provided invalid capability class name(s), got {}",
+                plugin.get_class_name(),
+                var_export(value, true)
+            ))
             .into());
         }
 
@@ -1066,14 +1048,11 @@ impl PluginManager {
             Some(&mut PluginRpcDispatcher::default()),
         ))?;
         if !matches!(exists, PluginValue::Bool(true)) {
-            return Err(RuntimeException {
-                message: format!(
-                    "Cannot instantiate Capability, as class {} from plugin {} does not exist.",
-                    capability_class,
-                    plugin.get_class_name()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Cannot instantiate Capability, as class {} from plugin {} does not exist.",
+                capability_class,
+                plugin.get_class_name()
+            ))
             .into());
         }
 
@@ -1116,12 +1095,9 @@ impl PluginManager {
         if !php_is_a(&handle, "Composer\\Plugin\\Capability\\Capability")?
             || !php_is_a(&handle, capability_class_name)?
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Class {capability_class} must implement both Composer\\Plugin\\Capability\\Capability and {capability_class_name}."
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Class {capability_class} must implement both Composer\\Plugin\\Capability\\Capability and {capability_class_name}."
+            ))
             .into());
         }
 

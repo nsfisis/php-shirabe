@@ -26,13 +26,11 @@ impl InputArgument {
         let mode = match mode {
             None => Self::OPTIONAL,
             Some(m) if !(1..=7).contains(&m) => {
-                return Err(
-                    InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                        message: format!("Argument mode \"{}\" is not valid.", m),
-                        code: 0,
-                    })
-                    .into(),
-                );
+                return Err(InvalidArgumentException::new(format!(
+                    "Argument mode \"{}\" is not valid.",
+                    m
+                ))
+                .into());
             }
             Some(m) => m,
         };
@@ -63,11 +61,9 @@ impl InputArgument {
 
     pub fn set_default(&mut self, default: PhpMixed) -> anyhow::Result<()> {
         if self.is_required() && !matches!(default, PhpMixed::Null) {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: "Cannot set a default value except for InputArgument::OPTIONAL mode."
-                    .to_string(),
-                code: 0,
-            })
+            return Err(LogicException::new(
+                "Cannot set a default value except for InputArgument::OPTIONAL mode.".to_string(),
+            )
             .into());
         }
 
@@ -76,11 +72,9 @@ impl InputArgument {
                 PhpMixed::Null => PhpMixed::List(vec![]),
                 PhpMixed::List(_) => default,
                 _ => {
-                    return Err(LogicException(shirabe_php_shim::LogicException {
-                        message: "A default value for an array argument must be an array."
-                            .to_string(),
-                        code: 0,
-                    })
+                    return Err(LogicException::new(
+                        "A default value for an array argument must be an array.".to_string(),
+                    )
                     .into());
                 }
             }

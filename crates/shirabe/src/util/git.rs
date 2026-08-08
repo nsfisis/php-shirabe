@@ -64,11 +64,7 @@ impl Git {
             );
             match io {
                 None => {
-                    return Err(RuntimeException {
-                        message: msg,
-                        code: 0,
-                    }
-                    .into());
+                    return Err(RuntimeException::new(msg).into());
                 }
                 Some(io) => {
                     io.write_error3(
@@ -215,13 +211,10 @@ impl Git {
         };
 
         if Preg::is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url) {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
-                    url
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
+                url
+            ))
             .into());
         }
 
@@ -1277,22 +1270,15 @@ impl Git {
             Option::<&str>::None,
         ) != 0
         {
-            return Err(RuntimeException {
-                message: Url::sanitize(format!(
-                    "Failed to clone {}, git was not found, check that it is installed and in your PATH env.\n\n{}",
-                    url,
-                    self.process.borrow().get_error_output()
-                )),
-                code: 0,
-            }
+            return Err(RuntimeException::new(Url::sanitize(format!(
+                "Failed to clone {}, git was not found, check that it is installed and in your PATH env.\n\n{}",
+                url,
+                self.process.borrow().get_error_output()
+            )))
             .into());
         }
 
-        Err(RuntimeException {
-            message: Url::sanitize(message.to_string()),
-            code: 0,
-        }
-        .into())
+        Err(RuntimeException::new(Url::sanitize(message.to_string())).into())
     }
 
     /// Retrieves the current git version.

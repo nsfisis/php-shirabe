@@ -48,7 +48,7 @@ impl RequestProxy {
     pub fn get_curl_options(
         &self,
         ssl_options: &IndexMap<String, PhpMixed>,
-    ) -> Result<IndexMap<i64, PhpMixed>, TransportException> {
+    ) -> Result<IndexMap<i64, PhpMixed>, Box<TransportException>> {
         // PHP guards an HTTPS proxy behind `is_secure() && !supports_secure_proxy()` because
         // libcurl < 7.52.0 cannot speak TLS to a proxy. Shirabe always can (see
         // supports_secure_proxy), so the guard is dropped.
@@ -90,10 +90,9 @@ impl RequestProxy {
             return Ok(format.replace("%s", self.status.as_deref().unwrap()));
         }
 
-        Err(InvalidArgumentException {
-            message: "String format specifier is missing".to_string(),
-            code: 0,
-        })
+        Err(InvalidArgumentException::new(
+            "String format specifier is missing".to_string(),
+        ))
     }
 
     pub fn is_excluded_by_no_proxy(&self) -> bool {

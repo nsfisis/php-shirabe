@@ -75,13 +75,10 @@ impl SvnDownloader {
             Some(path),
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Could not reset changes\n\n:{}",
-                    self.inner.process.borrow().get_error_output()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not reset changes\n\n:{}",
+                self.inner.process.borrow().get_error_output()
+            ))
             .into());
         }
 
@@ -96,10 +93,10 @@ impl SvnDownloader {
         path: &str,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path)?.is_some() {
-            return Err(RuntimeException {
-                message: format!("Source directory {} has uncommitted changes.", path),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Source directory {} has uncommitted changes.",
+                path
+            ))
             .into());
         }
 
@@ -143,10 +140,9 @@ impl VcsDownloader for SvnDownloader {
             Some(self.inner.process.clone()),
         );
         if util.binary_version().is_none() {
-            return Err(RuntimeException {
-                message: "svn was not found in your PATH, skipping source download".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "svn was not found in your PATH, skipping source download".to_string(),
+            )
             .into());
         }
 
@@ -206,13 +202,10 @@ impl VcsDownloader for SvnDownloader {
         let r#ref = target.get_source_reference();
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException {
-                message: format!(
-                    "The .svn directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                    path
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "The .svn directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
+                path
+            ))
             .into());
         }
 
@@ -324,11 +317,7 @@ impl VcsDownloader for SvnDownloader {
                     break;
                 }
                 Some("n") => {
-                    return Err(RuntimeException {
-                        message: "Update aborted".to_string(),
-                        code: 0,
-                    }
-                    .into());
+                    return Err(RuntimeException::new("Update aborted".to_string()).into());
                 }
                 Some("v") => {
                     for line in &changes {
@@ -384,14 +373,11 @@ impl VcsDownloader for SvnDownloader {
                 .execute_args(&command, &mut output, Some(path))
                 != 0
             {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Failed to execute {}\n\n{}",
-                        command.join(" "),
-                        self.inner.process.borrow().get_error_output()
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Failed to execute {}\n\n{}",
+                    command.join(" "),
+                    self.inner.process.borrow().get_error_output()
+                ))
                 .into());
             }
 
@@ -403,10 +389,10 @@ impl VcsDownloader for SvnDownloader {
                     .cloned()
                     .unwrap_or_default()
             } else {
-                return Err(RuntimeException {
-                    message: format!("Unable to determine svn url for path {}", path),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Unable to determine svn url for path {}",
+                    path
+                ))
                 .into());
             };
 
@@ -431,10 +417,11 @@ impl VcsDownloader for SvnDownloader {
             util.set_cache_credentials(self.cache_credentials.get());
             util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())
                 .map_err(|e| {
-                    RuntimeException {
-                        message: format!("Failed to execute {}\n\n{}", command.join(" "), e),
-                        code: 0,
-                    }
+                    RuntimeException::new(format!(
+                        "Failed to execute {}\n\n{}",
+                        command.join(" "),
+                        e
+                    ))
                     .into()
                 })
         } else {

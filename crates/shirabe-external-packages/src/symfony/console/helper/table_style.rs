@@ -70,10 +70,9 @@ impl TableStyle {
         padding_char: String,
     ) -> anyhow::Result<Result<&mut Self, LogicException>> {
         if padding_char.is_empty() {
-            return Ok(Err(LogicException(shirabe_php_shim::LogicException {
-                message: "The padding char must not be empty.".to_string(),
-                code: 0,
-            })));
+            return Ok(Err(LogicException::new(
+                "The padding char must not be empty.".to_string(),
+            )));
         }
 
         self.padding_char = padding_char;
@@ -254,13 +253,8 @@ impl TableStyle {
         ]
         .contains(&pad_type)
         {
-            return Ok(Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: "Invalid padding type. Expected one of (STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH)."
-                        .to_string(),
-                    code: 0,
-                },
-            )));
+            return Ok(Err(InvalidArgumentException::new("Invalid padding type. Expected one of (STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH)."
+                .to_string())));
         }
 
         self.pad_type = pad_type;

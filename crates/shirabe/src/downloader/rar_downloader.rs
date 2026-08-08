@@ -114,39 +114,30 @@ impl ArchiveDownloader for RarDownloader {
                     process_error.as_deref().unwrap_or(""),
                 )
             };
-            return Err(RuntimeException {
-                message: error,
-                code: 0,
-            }
-            .into());
+            return Err(RuntimeException::new(error).into());
         }
 
         let rar_archive = RarArchive::open(file);
         if rar_archive.is_none() {
-            return Err(UnexpectedValueException {
-                message: format!("Could not open RAR archive: {}", file),
-                code: 0,
-            }
+            return Err(UnexpectedValueException::new(format!(
+                "Could not open RAR archive: {}",
+                file
+            ))
             .into());
         }
         let rar_archive = rar_archive.unwrap();
 
         let entries = rar_archive.get_entries();
         if entries.is_none() {
-            return Err(RuntimeException {
-                message: "Could not retrieve RAR archive entries".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "Could not retrieve RAR archive entries".to_string(),
+            )
             .into());
         }
 
         for entry in entries.unwrap() {
             if !entry.extract(path) {
-                return Err(RuntimeException {
-                    message: "Could not extract entry".to_string(),
-                    code: 0,
-                }
-                .into());
+                return Err(RuntimeException::new("Could not extract entry".to_string()).into());
             }
         }
 

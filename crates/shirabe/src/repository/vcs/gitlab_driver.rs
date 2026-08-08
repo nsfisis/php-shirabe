@@ -16,6 +16,7 @@ use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array_loose, is_array,
@@ -82,13 +83,10 @@ impl GitLabDriver {
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match3(Self::URL_REGEX, &self.inner.url, Some(&mut match_)) {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
-                    self.inner.url.clone(),
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
+                self.inner.url.clone(),
+            ))
             .into());
         }
 
@@ -134,13 +132,10 @@ impl GitLabDriver {
         let origin = match origin {
             Some(o) => o,
             None => {
-                return Err(LogicException {
-                    message: format!(
-                        "It should not be possible to create a gitlab driver with an unparsable origin URL ({})",
-                        self.inner.url
-                    ),
-                    code: 0,
-                }
+                return Err(LogicException::new(format!(
+                    "It should not be possible to create a gitlab driver with an unparsable origin URL ({})",
+                    self.inner.url
+                ))
                 .into());
             }
         };
@@ -153,10 +148,9 @@ impl GitLabDriver {
         {
             // https treated as a synonym for http.
             if !matches!(protocol, "git" | "http" | "https") {
-                return Err(RuntimeException {
-                    message: "gitlab-protocol must be one of git, http.".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(
+                    "gitlab-protocol must be one of git, http.".to_string(),
+                )
                 .into());
             }
             self.protocol = if protocol == "git" {
@@ -424,8 +418,8 @@ impl GitLabDriver {
         let content = match self.get_contents(&resource, false) {
             Ok(response) => response.get_body().map(|s| s.to_string()),
             Err(e) => {
-                if e.code != 404 {
-                    return Err(e.into());
+                if e.get_code() != 404 {
+                    return Err((*e).into());
                 }
 
                 return Ok(None);
@@ -617,7 +611,7 @@ impl GitLabDriver {
         loop {
             let response = self
                 .get_contents(resource.as_deref().unwrap_or(""), false)
-                .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+                .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
             let data = response.decode_json()?;
 
             if let PhpMixed::List(ref list) = data {
@@ -676,7 +670,7 @@ impl GitLabDriver {
         let resource = self.get_api_url();
         let project = self
             .get_contents(&resource, true)
-            .map_err(|e| anyhow::anyhow!("{}", e.message))?
+            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
             .decode_json()?;
         self.project = match project {
             PhpMixed::Array(m) => Some(m),
@@ -769,7 +763,7 @@ impl GitLabDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> anyhow::Result<Response, TransportException> {
+    ) -> anyhow::Result<Response, Box<TransportException>> {
         let response_result = self.inner.get_contents(url);
         match response_result {
             Ok(response) => {
@@ -839,21 +833,21 @@ impl GitLabDriver {
                             .and_then(|v| v.as_string())
                             == Some("disabled")
                         {
-                            return Err(TransportException::new(
+                            return Err(Box::new(TransportException::new(
                                 "The GitLab repository is disabled in the project".to_string(),
                                 400,
-                            ));
+                            )));
                         }
 
                         if !empty(&json_map.get("id").cloned().unwrap_or(PhpMixed::Null)) {
                             self.is_private = false;
                         }
 
-                        return Err(TransportException::new(
+                        return Err(Box::new(TransportException::new(
                             "GitLab API seems to not be authenticated as it did not return a default_branch"
                                     .to_string(),
                             401,
-                        ));
+                        )));
                     }
                 }
 
@@ -868,7 +862,7 @@ impl GitLabDriver {
                 )
                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
-                match e.code {
+                match e.get_code() {
                     401 | 404 => {
                         // try to authorize only if we are fetching the main /repos/foo/bar data, otherwise it must be a real 404
                         if !fetching_repo_data {
@@ -901,7 +895,9 @@ impl GitLabDriver {
                         self.inner.io.write_error3(
                             &format!(
                                 "<warning>Failed to download {}/{}:{}</warning>",
-                                self.namespace, self.repository, e.message
+                                self.namespace,
+                                self.repository,
+                                e.get_message()
                             ),
                             true,
                             io_interface::NORMAL,
@@ -1142,7 +1138,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

@@ -469,12 +469,7 @@ impl SymfonyStyle {
     ) -> Option<Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>> {
         validator.map(|validator| {
             Box::new(move |value: Option<PhpMixed>| {
-                validator(value).map_err(|e| {
-                    InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                        message: e.to_string(),
-                        code: 0,
-                    })
-                })
+                validator(value).map_err(|e| InvalidArgumentException::new(e.to_string()))
             })
                 as Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>
         })

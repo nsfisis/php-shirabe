@@ -65,24 +65,20 @@ impl PlatformRepository {
         let mut overrides_map: IndexMap<String, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
             if !is_string(&version) && !matches!(version, PhpMixed::Bool(false)) {
-                return Err(anyhow::anyhow!(UnexpectedValueException {
-                    message: format!(
-                        "config.platform.{} should be a string or false, but got {} {}",
-                        name,
-                        shirabe_php_shim::get_debug_type(&version),
-                        var_export(&version, true)
-                    ),
-                    code: 0,
-                }));
+                return Err(UnexpectedValueException::new(format!(
+                    "config.platform.{} should be a string or false, but got {} {}",
+                    name,
+                    shirabe_php_shim::get_debug_type(&version),
+                    var_export(&version, true)
+                ))
+                .into());
             }
             if name == "php" && matches!(version, PhpMixed::Bool(false)) {
-                return Err(anyhow::anyhow!(UnexpectedValueException {
-                    message: format!(
-                        "config.platform.{} cannot be set to false as you cannot disable php entirely.",
-                        name
-                    ),
-                    code: 0,
-                }));
+                return Err(UnexpectedValueException::new(format!(
+                    "config.platform.{} cannot be set to false as you cannot disable php entirely.",
+                    name
+                ))
+                .into());
             }
             overrides_map.insert(
                 strtolower(&name),
@@ -153,13 +149,11 @@ impl PlatformRepository {
         for r#override in &overrides {
             // Check that it's a platform package.
             if !Self::is_platform_package(&r#override.name) {
-                return Err(anyhow::anyhow!(InvalidArgumentException {
-                    message: format!(
-                        "Invalid platform package name in config.platform: {}",
-                        r#override.name
-                    ),
-                    code: 0,
-                }));
+                return Err(InvalidArgumentException::new(format!(
+                    "Invalid platform package name in config.platform: {}",
+                    r#override.name
+                ))
+                .into());
             }
 
             if !matches!(r#override.version, PhpMixed::Bool(false)) {
@@ -1488,13 +1482,11 @@ impl PlatformRepository {
 
     pub fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         if package.as_complete().is_none() {
-            return Err(anyhow::anyhow!(UnexpectedValueException {
-                message: format!(
-                    "Expected CompletePackage but got {}",
-                    get_class(&PhpMixed::Null)
-                ),
-                code: 0,
-            }));
+            return Err(UnexpectedValueException::new(format!(
+                "Expected CompletePackage but got {}",
+                get_class(&PhpMixed::Null)
+            ))
+            .into());
         }
 
         let name = package.get_name();

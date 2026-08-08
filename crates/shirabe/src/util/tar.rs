@@ -20,10 +20,8 @@ impl Tar {
     /// UTF-8 could never survive the JSON parsing that follows in PHP either.
     fn content_to_string(content: Vec<u8>) -> anyhow::Result<String> {
         String::from_utf8(content).map_err(|_| {
-            anyhow::anyhow!(RuntimeException {
-                message: "composer.json in the archive is not valid UTF-8".to_string(),
-                code: 0,
-            })
+            RuntimeException::new("composer.json in the archive is not valid UTF-8".to_string())
+                .into()
         })
     }
 
@@ -38,17 +36,14 @@ impl Tar {
             if folder_file.is_dir() {
                 top_level_paths.insert(name, true);
                 if top_level_paths.len() > 1 {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: format!(
-                            "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                            top_level_paths
-                                .keys()
-                                .cloned()
-                                .collect::<Vec<_>>()
-                                .join(",")
-                        ),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(format!(
+                        "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
+                        top_level_paths
+                            .keys()
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )).into());
                 }
             }
         }
@@ -63,11 +58,10 @@ impl Tar {
             return Self::content_to_string(file.get_content());
         }
 
-        Err(anyhow::anyhow!(RuntimeException {
-            message:
-                "No composer.json found either at the top level or within the topmost directory"
-                    .to_string(),
-            code: 0,
-        }))
+        Err(RuntimeException::new(
+            "No composer.json found either at the top level or within the topmost directory"
+                .to_string(),
+        )
+        .into())
     }
 }

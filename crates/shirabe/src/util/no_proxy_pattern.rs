@@ -153,27 +153,24 @@ impl NoProxyPattern {
         let mask = network.netmask.as_deref().unwrap_or_default();
         let ip = target.ip.as_slice();
         if net.is_empty() {
-            return Err(RuntimeException {
-                message: format!(
-                    "Could not parse network IP {}",
-                    String::from_utf8_lossy(net)
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not parse network IP {}",
+                String::from_utf8_lossy(net)
+            ))
             .into());
         }
         if mask.is_empty() {
-            return Err(RuntimeException {
-                message: format!("Could not parse netmask {}", String::from_utf8_lossy(mask)),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not parse netmask {}",
+                String::from_utf8_lossy(mask)
+            ))
             .into());
         }
         if ip.is_empty() {
-            return Err(RuntimeException {
-                message: format!("Could not parse target IP {}", String::from_utf8_lossy(ip)),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not parse target IP {}",
+                String::from_utf8_lossy(ip)
+            ))
             .into());
         }
 
@@ -327,23 +324,17 @@ impl NoProxyPattern {
 
         // Get the network from the address and mask
         if netmask.is_empty() {
-            return Err(RuntimeException {
-                message: format!(
-                    "Could not parse netmask {}",
-                    String::from_utf8_lossy(&netmask)
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not parse netmask {}",
+                String::from_utf8_lossy(&netmask)
+            ))
             .into());
         }
         if range_ip.is_empty() {
-            return Err(RuntimeException {
-                message: format!(
-                    "Could not parse range IP {}",
-                    String::from_utf8_lossy(range_ip)
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not parse range IP {}",
+                String::from_utf8_lossy(range_ip)
+            ))
             .into());
         }
 

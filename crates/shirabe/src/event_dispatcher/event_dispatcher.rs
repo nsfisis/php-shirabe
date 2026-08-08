@@ -29,6 +29,7 @@ use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,
 };
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PATH_SEPARATOR, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
@@ -201,13 +202,9 @@ impl EventDispatcher {
     ) -> anyhow::Result<i64> {
         match event {
             None => {
-                let name = event_name.ok_or_else(|| {
-                    anyhow::anyhow!(InvalidArgumentException {
-                        message:
-                            "If no $event is passed in to Composer\\EventDispatcher\\EventDispatcher::dispatch you have to pass in an $eventName, got null."
-                                .to_string(),
-                        code: 0,
-                    })
+                let name = event_name.ok_or_else(|| -> anyhow::Error {
+                    InvalidArgumentException::new("If no $event is passed in to Composer\\EventDispatcher\\EventDispatcher::dispatch you have to pass in an $eventName, got null."
+                                .to_string()).into()
                 })?;
                 let mut event = Event::new(name.to_string(), Vec::new(), IndexMap::new());
                 self.do_dispatch(&mut event)
@@ -411,15 +408,12 @@ impl EventDispatcher {
                     Some(&mut PluginRpcDispatcher::default()),
                 ))?;
                 if !matches!(is_callable_value, PluginValue::Bool(true)) {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: format!(
-                            "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
-                            handle.class,
-                            method_name,
-                            event.get_name()
-                        ),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(format!(
+                        "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
+                        handle.class,
+                        method_name,
+                        event.get_name()
+                    )).into());
                 }
                 self.io.write_error3(
                     &format!(
@@ -431,18 +425,17 @@ impl EventDispatcher {
                     true,
                     crate::io::VERBOSE,
                 );
-                let stub_class = Self::event_stub_class(event).ok_or_else(|| {
-                    // TODO(plugin): installer and plugin events have no proxy stub yet.
-                    anyhow::anyhow!(RuntimeException {
-                        message: format!(
-                            "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
-                            event.get_name(),
-                            handle.class,
-                            method_name,
-                        ),
-                        code: 0,
-                    })
-                })?;
+                let stub_class =
+                    Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
+                        // TODO(plugin): installer and plugin events have no proxy stub yet.
+                        RuntimeException::new(format!(
+                        "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
+                        event.get_name(),
+                        handle.class,
+                        method_name,
+                    ))
+                    .into()
+                    })?;
                 let event_rhandle = shirabe_php_rpc::alloc_rhandle();
                 let mut dispatcher = PluginRpcDispatcher {
                     event: Some((event_rhandle, event)),
@@ -469,10 +462,7 @@ impl EventDispatcher {
                     // TODO(plugin): the original exception class is collapsed to
                     // RuntimeException on this side of the boundary.
                     Err(throw) => {
-                        return Err(anyhow::anyhow!(RuntimeException {
-                            message: throw.message,
-                            code: throw.code,
-                        }));
+                        return Err(RuntimeException::with_code(throw.message, throw.code).into());
                     }
                 };
             } else if !is_string_callable {
@@ -494,15 +484,12 @@ impl EventDispatcher {
                         }
                         _ => ("?".to_string(), "?".to_string()),
                     };
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: format!(
-                            "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
-                            class_name,
-                            method,
-                            event.get_name()
-                        ),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(format!(
+                        "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
+                        class_name,
+                        method,
+                        event.get_name()
+                    )).into());
                 }
                 if let Callable::ArrayCallable(first, method_name) = &callable {
                     let prefix = if is_object(first.as_ref()) {
@@ -594,15 +581,14 @@ impl EventDispatcher {
                                     exit_code
                                 ), true, crate::io::QUIET);
 
-                                return Err(anyhow::anyhow!(ScriptExecutionException(
-                                    RuntimeException {
-                                        message: format!(
-                                            "Error Output: {}",
-                                            self.process.borrow().get_error_output()
-                                        ),
-                                        code: exit_code,
-                                    }
-                                )));
+                                return Err(ScriptExecutionException::new(
+                                    format!(
+                                        "Error Output: {}",
+                                        self.process.borrow().get_error_output()
+                                    ),
+                                    exit_code,
+                                )
+                                .into());
                             }
                         } else {
                             if self
@@ -638,7 +624,7 @@ impl EventDispatcher {
                             match self.dispatch(Some(&script_name), Some(&mut script_event)) {
                                 Ok(v) => r#return = v,
                                 Err(e) => {
-                                    if e.downcast_ref::<ScriptExecutionException>().is_some() {
+                                    if e.is_instanceof::<ScriptExecutionException>() {
                                         self.io.write_error3(
                                             &format!(
                                                 "<error>Script {} was called via {}</error>",
@@ -839,10 +825,9 @@ try {{
                                     true,
                                     crate::io::QUIET,
                                 );
-                                return Err(anyhow::anyhow!(RuntimeException {
-                                    message: throw.message,
-                                    code: throw.code,
-                                }));
+                                return Err(
+                                    RuntimeException::with_code(throw.message, throw.code).into()
+                                );
                             }
                         };
                         let command_output = result
@@ -876,7 +861,7 @@ try {{
                                 true,
                                 crate::io::QUIET,
                             );
-                            return Err(anyhow::anyhow!(RuntimeException { message, code }));
+                            return Err(RuntimeException::with_code(message, code).into());
                         }
                         r#return = match result.as_array().and_then(|map| map.get("status")) {
                             Some(PhpMixed::Int(status)) => *status,
@@ -1043,15 +1028,14 @@ try {{
                                 exit_code
                             ), true, crate::io::QUIET);
 
-                            return Err(anyhow::anyhow!(ScriptExecutionException(
-                                RuntimeException {
-                                    message: format!(
-                                        "Error Output: {}",
-                                        self.process.borrow().get_error_output()
-                                    ),
-                                    code: exit_code,
-                                }
-                            )));
+                            return Err(ScriptExecutionException::new(
+                                format!(
+                                    "Error Output: {}",
+                                    self.process.borrow().get_error_output()
+                                ),
+                                exit_code,
+                            )
+                            .into());
                         }
                     }
                     _ => {
@@ -1097,10 +1081,10 @@ try {{
         let php_path = match php_path {
             Some(p) => p,
             None => {
-                return Err(anyhow::anyhow!(RuntimeException {
-                    message: "Failed to locate PHP binary to execute ".to_string(),
-                    code: 0,
-                }));
+                return Err(RuntimeException::new(
+                    "Failed to locate PHP binary to execute ".to_string(),
+                )
+                .into());
             }
         };
         let php_args = finder.find_arguments();
@@ -1152,17 +1136,15 @@ try {{
             );
         }
 
-        let stub_class = Self::event_stub_class(event).ok_or_else(|| {
+        let stub_class = Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
             // TODO(plugin): installer and plugin events have no proxy stub yet.
-            anyhow::anyhow!(RuntimeException {
-                message: format!(
-                    "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
-                    event.get_name(),
-                    class_name,
-                    method_name,
-                ),
-                code: 0,
-            })
+            RuntimeException::new(format!(
+                "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
+                event.get_name(),
+                class_name,
+                method_name,
+            ))
+            .into()
         })?;
 
         Self::ensure_script_autoloader()?;
@@ -1186,10 +1168,7 @@ try {{
             Ok(value) => Ok(value.to_php_mixed()?),
             // TODO(plugin): the original exception class is collapsed to RuntimeException on
             // this side of the boundary.
-            Err(throw) => Err(anyhow::anyhow!(RuntimeException {
-                message: throw.message,
-                code: throw.code,
-            })),
+            Err(throw) => Err(RuntimeException::with_code(throw.message, throw.code).into()),
         }
     }
 
@@ -1395,13 +1374,11 @@ try {{
     fn push_event(&mut self, event: &dyn EventInterface) -> anyhow::Result<i64> {
         let event_name = event.get_name().to_string();
         if self.event_stack.iter().any(|n| n == &event_name) {
-            return Err(anyhow::anyhow!(RuntimeException {
-                message: format!(
-                    "Circular call to script handler '{}' detected",
-                    PhpMixed::String(event_name),
-                ),
-                code: 0,
-            }));
+            return Err(RuntimeException::new(format!(
+                "Circular call to script handler '{}' detected",
+                PhpMixed::String(event_name),
+            ))
+            .into());
         }
 
         Ok(array_push(&mut self.event_stack, event_name))
@@ -1597,13 +1574,13 @@ try {{
     pub(crate) fn ensure_composer_php_runtime() -> anyhow::Result<()> {
         // TODO(plugin): the real PHP classes are taken from a Composer checkout for now; how
         // they ship with a released Shirabe binary is part of the plugin distribution work.
-        let autoload = Self::composer_php_runtime_autoload().ok_or_else(|| {
-            anyhow::anyhow!(RuntimeException {
-                message: "unable to locate the Composer PHP runtime; set SHIRABE_COMPOSER_PHP_DIR \
+        let autoload = Self::composer_php_runtime_autoload().ok_or_else(|| -> anyhow::Error {
+            RuntimeException::new(
+                "unable to locate the Composer PHP runtime; set SHIRABE_COMPOSER_PHP_DIR \
                           to a Composer checkout with its vendor directory installed"
                     .to_string(),
-                code: 0,
-            })
+            )
+            .into()
         })?;
         unwrap_php_result(call_function(
             "__shirabe_require",
@@ -1857,10 +1834,7 @@ pub(crate) fn unwrap_php_result(
 ) -> anyhow::Result<PluginValue> {
     match outcome? {
         Ok(value) => Ok(value),
-        Err(throw) => Err(anyhow::anyhow!(RuntimeException {
-            message: throw.message,
-            code: throw.code,
-        })),
+        Err(throw) => Err(RuntimeException::with_code(throw.message, throw.code).into()),
     }
 }
 

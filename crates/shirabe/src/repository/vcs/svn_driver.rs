@@ -14,6 +14,7 @@ use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, php_regex, stripos, strrpos, strtr, substr, trim,
 };
@@ -199,14 +200,14 @@ impl SvnDriver {
                 Ok(c) => c,
                 Err(e) => {
                     // PHP catches only TransportException; other exceptions propagate uncaught.
-                    if e.downcast_ref::<TransportException>().is_none() {
+                    if !e.is_instanceof::<TransportException>() {
                         return Err(e);
                     }
                     let message = e
-                        .downcast_ref::<TransportException>()
+                        .catch::<TransportException>()
                         .unwrap()
-                        .message
-                        .clone();
+                        .get_message()
+                        .to_string();
                     if stripos(&message, "path not found").is_none()
                         && stripos(&message, "svn: warning: W160013").is_none()
                     {
@@ -277,8 +278,8 @@ impl SvnDriver {
         ) {
             Ok(o) => o,
             Err(e) => {
-                if let Some(e) = e.downcast_ref::<RuntimeException>() {
-                    return Err(TransportException::new(e.message.clone(), 0).into());
+                if let Some(e) = e.catch::<RuntimeException>() {
+                    return Err(TransportException::new(e.get_message().to_string(), 0).into());
                 }
                 return Err(e);
             }
@@ -567,24 +568,18 @@ impl SvnDriver {
             Ok(o) => Ok(o),
             Err(e) => {
                 if self.util.as_mut().unwrap().binary_version().is_none() {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Failed to load {}, svn was not found, check that it is installed and in your PATH env.\n\n{}",
-                            self.inner.url,
-                            self.inner.process.borrow().get_error_output(),
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Failed to load {}, svn was not found, check that it is installed and in your PATH env.\n\n{}",
+                        self.inner.url,
+                        self.inner.process.borrow().get_error_output(),
+                    ))
                     .into());
                 }
 
-                Err(RuntimeException {
-                    message: format!(
-                        "Repository {} could not be processed, {}",
-                        self.inner.url, e,
-                    ),
-                    code: 0,
-                }
+                Err(RuntimeException::new(format!(
+                    "Repository {} could not be processed, {}",
+                    self.inner.url, e,
+                ))
                 .into())
             }
         }
@@ -655,7 +650,7 @@ impl crate::repository::vcs::VcsDriverInterface for SvnDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

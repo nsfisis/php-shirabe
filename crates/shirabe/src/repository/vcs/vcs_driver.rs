@@ -13,6 +13,7 @@ use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded, php_regex};
 
 #[derive(Debug)]
@@ -66,7 +67,7 @@ impl VcsDriverBase {
         "http"
     }
 
-    pub fn get_contents(&self, url: &str) -> anyhow::Result<Response, TransportException> {
+    pub fn get_contents(&self, url: &str) -> anyhow::Result<Response, Box<TransportException>> {
         let options_mixed = self
             .repo_config
             .get("options")
@@ -79,9 +80,11 @@ impl VcsDriverBase {
         self.http_downloader
             .borrow_mut()
             .get(url, options)
-            .map_err(|e| match e.downcast::<TransportException>() {
-                Ok(te) => te,
-                Err(other) => TransportException::new(other.to_string(), 0),
+            .map_err(|e| {
+                Box::new(match e.catch::<TransportException>() {
+                    Some(te) => te.clone(),
+                    None => TransportException::new(e.to_string(), 0),
+                })
             })
     }
 
@@ -299,7 +302,7 @@ pub trait VcsDriver: VcsDriverInterface {
         "http"
     }
 
-    fn get_contents(&self, url: &str) -> anyhow::Result<Response, TransportException> {
+    fn get_contents(&self, url: &str) -> anyhow::Result<Response, Box<TransportException>> {
         let options_mixed = self
             .repo_config()
             .get("options")
@@ -312,9 +315,11 @@ pub trait VcsDriver: VcsDriverInterface {
         self.http_downloader()
             .borrow_mut()
             .get(url, options)
-            .map_err(|e| match e.downcast::<TransportException>() {
-                Ok(te) => te,
-                Err(other) => TransportException::new(other.to_string(), 0),
+            .map_err(|e| {
+                Box::new(match e.catch::<TransportException>() {
+                    Some(te) => te.clone(),
+                    None => TransportException::new(e.to_string(), 0),
+                })
             })
     }
 

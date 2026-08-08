@@ -146,13 +146,10 @@ impl ZipArchive {
 
     pub fn extract_to(&self, path: impl AsRef<std::path::Path>) -> Result<bool, ErrorException> {
         if let Some(mock) = &self.mock {
-            return mock.extract_to.clone().map_err(|message| ErrorException {
-                message,
-                code: 0,
-                severity: 1,
-                filename: String::new(),
-                lineno: 0,
-            });
+            return mock
+                .extract_to
+                .clone()
+                .map_err(|message| ErrorException::new(message, 0, 1, String::new(), 0, None));
         }
         let mut state = self.state.borrow_mut();
         let ZipState::Reader(archive) = &mut *state else {

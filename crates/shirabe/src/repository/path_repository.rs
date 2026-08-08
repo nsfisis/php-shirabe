@@ -56,11 +56,9 @@ impl PathRepository {
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<Self> {
         if !repo_config.contains_key("url") {
-            return Err(RuntimeException {
-                message: "You must specify the `url` configuration for the path repository"
-                    .to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "You must specify the `url` configuration for the path repository".to_string(),
+            )
             .into());
         }
 
@@ -172,13 +170,10 @@ impl PathRepository {
                 }
             }
 
-            return Err(RuntimeException {
-                message: format!(
-                    "The `url` supplied for the path ({}) repository does not exist",
-                    self.url
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "The `url` supplied for the path ({}) repository does not exist",
+                self.url
+            ))
             .into());
         }
 
@@ -355,10 +350,10 @@ impl PathRepository {
 
             self.inner
                 .add_package(self.loader.load(package.clone(), None).map_err(|e| {
-                    RuntimeException {
-                        message: format!("Failed loading the package in {}", composer_file_path),
-                        code: 0,
-                    }
+                    RuntimeException::new(format!(
+                        "Failed loading the package in {}",
+                        composer_file_path
+                    ))
                 })?);
         }
 
@@ -371,13 +366,10 @@ impl PathRepository {
         if defined("GLOB_BRACE") {
             flags |= GLOB_BRACE;
         } else if self.url.contains('{') || self.url.contains('}') {
-            return Err(RuntimeException {
-                message: format!(
-                    "The operating system does not support GLOB_BRACE which is required for the url {}",
-                    self.url
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "The operating system does not support GLOB_BRACE which is required for the url {}",
+                self.url
+            ))
             .into());
         }
 

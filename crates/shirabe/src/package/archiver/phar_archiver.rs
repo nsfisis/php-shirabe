@@ -101,10 +101,10 @@ impl ArchiverInterface for PharArchiver {
                 } else if format == "tar.gz" || format == "tar.bz2" {
                     let compress_algo = *compress_formats.get(format.as_str()).unwrap();
                     if !PharData::can_compress(compress_algo) {
-                        return Err(RuntimeException {
-                            message: format!("Can not compress to {} format", format),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Can not compress to {} format",
+                            format
+                        ))
                         .into());
                     }
                     if format == "tar.gz" && function_exists("gzcompress") {
@@ -124,10 +124,10 @@ impl ArchiverInterface for PharArchiver {
             if compress_formats.contains_key(format.as_str()) {
                 let compress_algo = *compress_formats.get(format.as_str()).unwrap();
                 if !PharData::can_compress(compress_algo) {
-                    return Err(RuntimeException {
-                        message: format!("Can not compress to {} format", format),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Can not compress to {} format",
+                        format
+                    ))
                     .into());
                 }
 
@@ -147,7 +147,7 @@ impl ArchiverInterface for PharArchiver {
                 "Could not create archive '{}' from '{}': {}",
                 target_outer, sources, e
             );
-            anyhow::anyhow!(RuntimeException { message, code: 0 })
+            RuntimeException::new(message).into()
         })
     }
 

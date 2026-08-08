@@ -1,11 +1,10 @@
 //! ref: composer/src/Composer/Downloader/TransportException.php
 
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, RuntimeException};
 
 #[derive(Debug, Clone)]
 pub struct TransportException {
-    pub message: String,
-    pub code: i64,
+    inner: RuntimeException,
     pub(crate) headers: Option<Vec<String>>,
     pub(crate) response: Option<String>,
     pub(crate) status_code: Option<i64>,
@@ -15,27 +14,12 @@ pub struct TransportException {
 impl TransportException {
     pub fn new(message: String, code: i64) -> Self {
         Self {
-            message,
-            code,
+            inner: RuntimeException::with_code(message, code),
             headers: None,
             response: None,
             status_code: None,
             response_info: vec![],
         }
-    }
-
-    /// PHP exposes ($message, $code = 0) — alias of `new` used at call sites where the
-    /// status/exception code is provided up-front.
-    pub fn new_with_code(message: String, code: i64) -> Self {
-        Self::new(message, code)
-    }
-
-    pub fn get_code(&self) -> i64 {
-        self.code
-    }
-
-    pub fn get_message(&self) -> &str {
-        &self.message
     }
 
     pub fn set_headers(&mut self, headers: Vec<String>) {
@@ -71,10 +55,8 @@ impl TransportException {
     }
 }
 
-impl std::fmt::Display for TransportException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for TransportException {}
+shirabe_php_shim::impl_php_exception!(
+    TransportException,
+    inner,
+    r"Composer\Downloader\TransportException"
+);

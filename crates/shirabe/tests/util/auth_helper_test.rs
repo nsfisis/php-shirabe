@@ -7,6 +7,7 @@ use shirabe::config::ConfigSourceInterface;
 use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, base64_encode, json_encode};
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
@@ -560,7 +561,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
     let err = auth_helper
         .store_auth(origin, StoreAuth::Prompt)
         .expect_err("expected a RuntimeException");
-    assert!(err.downcast_ref::<RuntimeException>().is_some());
+    assert!(err.is_instanceof::<RuntimeException>());
 
     // Mirrors PHP's `->with('Do you want to store credentials for '.$origin.' in '.
     // $configSourceName.' ? [Yn] ', $this->anything(), null, 'y')` verification on askAndValidate.
@@ -639,7 +640,7 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
     );
 
     let err = result.expect_err("expected a TransportException");
-    assert!(err.downcast_ref::<TransportException>().is_some());
+    assert!(err.is_instanceof::<TransportException>());
 
     assert_eq!(
         vec![(

@@ -184,13 +184,10 @@ pub fn recursive_directory_iterator(
 ) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
     let root = _path.as_ref().to_path_buf();
     if !root.is_dir() {
-        return Err(UnexpectedValueException {
-            message: format!(
-                "RecursiveDirectoryIterator::__construct({}): Failed to open directory",
-                root.display()
-            ),
-            code: 0,
-        });
+        return Err(UnexpectedValueException::new(format!(
+            "RecursiveDirectoryIterator::__construct({}): Failed to open directory",
+            root.display()
+        )));
     }
     Ok(RecursiveDirectoryIterator {
         root,
@@ -255,12 +252,11 @@ pub fn directory_iterator(
     path: impl AsRef<std::path::Path>,
 ) -> Result<Vec<DirectoryIteratorEntry>, UnexpectedValueException> {
     let base = path.as_ref();
-    let rd = std::fs::read_dir(base).map_err(|_| UnexpectedValueException {
-        message: format!(
+    let rd = std::fs::read_dir(base).map_err(|_| {
+        UnexpectedValueException::new(format!(
             "DirectoryIterator::__construct({}): Failed to open directory",
             base.display()
-        ),
-        code: 0,
+        ))
     })?;
     // PHP's DirectoryIterator yields the "." and ".." entries before the real ones.
     let mut entries = vec![

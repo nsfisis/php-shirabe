@@ -5,12 +5,16 @@ use super::exception_interface::ExceptionInterface;
 #[derive(Debug)]
 pub struct RuntimeException(pub shirabe_php_shim::RuntimeException);
 
-impl std::fmt::Display for RuntimeException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl RuntimeException {
+    pub fn new(message: String) -> Self {
+        Self(shirabe_php_shim::RuntimeException::new(message))
     }
 }
 
-impl std::error::Error for RuntimeException {}
+shirabe_php_shim::impl_php_exception!(
+    RuntimeException,
+    0,
+    r"Symfony\Component\Console\Exception\RuntimeException"
+);
 
 impl ExceptionInterface for RuntimeException {}

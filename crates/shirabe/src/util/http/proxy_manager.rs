@@ -71,12 +71,12 @@ impl ProxyManager {
     pub fn get_proxy_for_request(
         &self,
         request_url: &str,
-    ) -> Result<RequestProxy, TransportException> {
+    ) -> Result<RequestProxy, Box<TransportException>> {
         if let Some(ref error) = self.error {
-            return Err(TransportException::new(
+            return Err(Box::new(TransportException::new(
                 format!("Unable to use a proxy: {}", error),
                 0,
-            ));
+            )));
         }
 
         let scheme = request_url.split("://").next().unwrap_or("").to_string();

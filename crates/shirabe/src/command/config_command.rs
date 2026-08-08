@@ -86,11 +86,10 @@ impl ConfigCommand {
     ) -> anyhow::Result<()> {
         let (validator, normalizer) = callbacks;
         if 1 != values.len() {
-            return Err(RuntimeException {
-                message: "You can only pass one value. Example: shirabe config process-timeout 300"
+            return Err(RuntimeException::new(
+                "You can only pass one value. Example: shirabe config process-timeout 300"
                     .to_string(),
-                code: 0,
-            }
+            )
             .into());
         }
 
@@ -101,10 +100,11 @@ impl ConfigCommand {
             } else {
                 String::new()
             };
-            return Err(RuntimeException {
-                message: format!("\"{}\" is an invalid value{}", values[0].clone(), suffix),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "\"{}\" is an invalid value{}",
+                values[0].clone(),
+                suffix
+            ))
             .into());
         }
 
@@ -160,14 +160,11 @@ impl ConfigCommand {
             } else {
                 String::new()
             };
-            return Err(RuntimeException {
-                message: format!(
-                    "{} is an invalid value{}",
-                    PhpMixed::from(json_encode(&values_mixed).ok()),
-                    suffix
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "{} is an invalid value{}",
+                PhpMixed::from(json_encode(&values_mixed).ok()),
+                suffix
+            ))
             .into());
         }
 
@@ -679,10 +676,9 @@ impl Command for ConfigCommand {
             .unwrap_or_default();
         if !setting_values.is_empty() && input.borrow().get_option("unset")?.as_bool() == Some(true)
         {
-            return Err(RuntimeException {
-                message: "You can not combine a setting value with --unset".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "You can not combine a setting value with --unset".to_string(),
+            )
             .into());
         }
 
@@ -731,10 +727,10 @@ impl Command for ConfigCommand {
                     {
                         Some(v) => v.clone(),
                         None => {
-                            return Err(InvalidArgumentException {
-                                message: format!("There is no {} repository defined", repo_key),
-                                code: 0,
-                            }
+                            return Err(InvalidArgumentException::new(format!(
+                                "There is no {} repository defined",
+                                repo_key
+                            ))
                             .into());
                         }
                     };
@@ -766,11 +762,9 @@ impl Command for ConfigCommand {
                 }
 
                 if !r#match {
-                    return Err(RuntimeException {
-                        message: format!("{} is not defined.", setting_key),
-                        code: 0,
-                    }
-                    .into());
+                    return Err(
+                        RuntimeException::new(format!("{} is not defined.", setting_key)).into(),
+                    );
                 }
 
                 value = cursor;
@@ -847,11 +841,9 @@ impl Command for ConfigCommand {
                 value = v.clone();
                 source = "defaults".to_string();
             } else {
-                return Err(RuntimeException {
-                    message: format!("{} is not defined", setting_key),
-                    code: 0,
-                }
-                .into());
+                return Err(
+                    RuntimeException::new(format!("{} is not defined", setting_key)).into(),
+                );
             }
 
             let value_str = if is_array(&value) || is_object(&value) || is_bool(&value) {
@@ -961,13 +953,10 @@ impl Command for ConfigCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Invalid value for {}. Should be one of: auto, source, or dist",
-                        setting_key
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Invalid value for {}. Should be one of: auto, source, or dist",
+                    setting_key
+                ))
                 .into());
             }
 
@@ -998,10 +987,10 @@ impl Command for ConfigCommand {
             }
 
             if !boolean_validator(&PhpMixed::String(values[0].clone())) {
-                return Err(RuntimeException {
-                    message: format!("\"{}\" is an invalid value", values[0].clone()),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "\"{}\" is an invalid value",
+                    values[0].clone()
+                ))
                 .into());
             }
 
@@ -1025,10 +1014,7 @@ impl Command for ConfigCommand {
                 || multi_props.contains_key(&setting_key)
                 || strpos(&setting_key, "extra.") == Some(0))
         {
-            return Err(InvalidArgumentException {
-                message: format!("The {} property can not be set in the global config.json file. Use `composer global config` to apply changes to the global composer.json", setting_key),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!("The {} property can not be set in the global config.json file. Use `composer global config` to apply changes to the global composer.json", setting_key))
             .into());
         }
         if input.borrow().get_option("unset")?.as_bool() == Some(true)
@@ -1122,10 +1108,7 @@ impl Command for ConfigCommand {
                 }
             }
 
-            return Err(RuntimeException {
-                message: "You must pass the type and a url. Example: shirabe config repositories.foo vcs https://bar.com".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe config repositories.foo vcs https://bar.com".to_string())
             .into());
         }
 
@@ -1308,10 +1291,10 @@ impl Command for ConfigCommand {
             if input.borrow().get_option("json")?.as_bool() == Some(true) {
                 value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                 if !is_array(&value) {
-                    return Err(RuntimeException {
-                        message: format!("Expected an array or object for {}", setting_key),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Expected an array or object for {}",
+                        setting_key
+                    ))
                     .into());
                 }
             }
@@ -1349,10 +1332,10 @@ impl Command for ConfigCommand {
                         }
                         value = PhpMixed::Array(merged);
                     } else {
-                        return Err(RuntimeException {
-                            message: format!("Cannot merge array and object for {}", setting_key),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Cannot merge array and object for {}",
+                            setting_key
+                        ))
                         .into());
                     }
                 }
@@ -1394,13 +1377,10 @@ impl Command for ConfigCommand {
             let key = format!("{}.{}", matches[1], matches[2]);
             if matches[1] == "bitbucket-oauth" {
                 if 2 != values.len() {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Expected two arguments (consumer-key, consumer-secret), got {}",
-                            values.len()
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Expected two arguments (consumer-key, consumer-secret), got {}",
+                        values.len()
+                    ))
                     .into());
                 }
                 self.config_source
@@ -1441,10 +1421,9 @@ impl Command for ConfigCommand {
                 "github-oauth" | "gitlab-oauth" | "gitlab-token" | "bearer"
             ) {
                 if 1 != values.len() {
-                    return Err(RuntimeException {
-                        message: "Too many arguments, expected only one token".to_string(),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(
+                        "Too many arguments, expected only one token".to_string(),
+                    )
                     .into());
                 }
                 self.config_source
@@ -1459,13 +1438,10 @@ impl Command for ConfigCommand {
                     .add_config_setting(&key, PhpMixed::String(values[0].clone()));
             } else if matches[1] == "http-basic" {
                 if 2 != values.len() {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Expected two arguments (username, password), got {}",
-                            values.len()
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Expected two arguments (username, password), got {}",
+                        values.len()
+                    ))
                     .into());
                 }
                 self.config_source
@@ -1483,10 +1459,9 @@ impl Command for ConfigCommand {
                     .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches[1] == "custom-headers" {
                 if values.is_empty() {
-                    return Err(RuntimeException {
-                        message: "Expected at least one argument (header), got none".to_string(),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(
+                        "Expected at least one argument (header), got none".to_string(),
+                    )
                     .into());
                 }
 
@@ -1494,12 +1469,10 @@ impl Command for ConfigCommand {
                 let mut formatted_headers: Vec<PhpMixed> = vec![];
                 for header in &values {
                     if !is_string(&PhpMixed::String(header.clone())) {
-                        return Err(RuntimeException {
-                            message:
-                                "Headers must be strings in \"Header-Name: Header-Value\" format"
-                                    .to_string(),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(
+                            "Headers must be strings in \"Header-Name: Header-Value\" format"
+                                .to_string(),
+                        )
                         .into());
                     }
 
@@ -1510,13 +1483,10 @@ impl Command for ConfigCommand {
                         header,
                         Some(&mut header_parts),
                     ) {
-                        return Err(RuntimeException {
-                            message: format!(
-                                "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
-                                header
-                            ),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
+                            header
+                        ))
                         .into());
                     }
 
@@ -1535,13 +1505,10 @@ impl Command for ConfigCommand {
                     .add_config_setting(&key, PhpMixed::List(formatted_headers));
             } else if matches[1] == "forgejo-token" {
                 if 2 != values.len() {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Expected two arguments (username, access token), got {}",
-                            values.len()
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Expected two arguments (username, access token), got {}",
+                        values.len()
+                    ))
                     .into());
                 }
                 self.config_source
@@ -1604,13 +1571,10 @@ impl Command for ConfigCommand {
             return Ok(0);
         }
 
-        Err(InvalidArgumentException {
-            message: format!(
-                "Setting {} does not exist or is not supported by this command",
-                setting_key
-            ),
-            code: 0,
-        }
+        Err(InvalidArgumentException::new(format!(
+            "Setting {} does not exist or is not supported by this command",
+            setting_key
+        ))
         .into())
     }
 

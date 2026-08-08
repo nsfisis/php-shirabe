@@ -7,19 +7,13 @@ use shirabe_php_shim::RuntimeException;
 pub struct ScriptExecutionException(pub RuntimeException);
 
 impl ScriptExecutionException {
-    pub fn get_code(&self) -> i64 {
-        self.0.code
-    }
-
-    pub fn get_message(&self) -> &str {
-        &self.0.message
+    pub fn new(message: String, code: i64) -> Self {
+        Self(RuntimeException::with_code(message, code))
     }
 }
 
-impl std::fmt::Display for ScriptExecutionException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl std::error::Error for ScriptExecutionException {}
+shirabe_php_shim::impl_php_exception!(
+    ScriptExecutionException,
+    0,
+    r"Composer\EventDispatcher\ScriptExecutionException"
+);

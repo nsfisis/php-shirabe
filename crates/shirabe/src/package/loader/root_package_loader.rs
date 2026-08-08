@@ -78,10 +78,7 @@ impl RootPackageLoader {
             config["name"].as_string().unwrap_or(""),
             false,
         ) {
-            return Err(anyhow::anyhow!(RuntimeException {
-                message: format!("Your package name {}", err),
-                code: 0,
-            }));
+            return Err(RuntimeException::new(format!("Your package name {}", err)).into());
         }
 
         let mut auto_versioned = false;
@@ -197,13 +194,10 @@ impl RootPackageLoader {
 
                 let package_name = config["name"].as_string().unwrap_or("").to_string();
                 if links.contains_key(&package_name) {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: format!(
-                            "Root package '{}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?",
-                            package_name
-                        ),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(format!(
+                        "Root package '{}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?",
+                        package_name
+                    )).into());
                 }
             }
         }
@@ -216,10 +210,7 @@ impl RootPackageLoader {
                     if let Some(err) =
                         ValidatingArrayLoader::has_package_naming_error(link_name, true)
                     {
-                        return Err(anyhow::anyhow!(RuntimeException {
-                            message: format!("{}.{}", link_type, err),
-                            code: 0,
-                        }));
+                        return Err(RuntimeException::new(format!("{}.{}", link_type, err)).into());
                     }
                 }
             }
@@ -291,14 +282,11 @@ impl RootPackageLoader {
                 return {
                     panic!(
                         "{}",
-                        UnexpectedValueException {
-                            message: format!(
+                        UnexpectedValueException::new(format!(
                                 "Invalid alias definition in \"{}\": \"{}\". Aliases should be in the form \"exact-version as other-exact-version\".",
                                 req_name, req_version
-                            ),
-                            code: 0,
-                        }
-                        .message
+                            ))
+                        .get_message()
                     )
                 };
             }

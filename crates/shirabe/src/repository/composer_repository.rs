@@ -38,6 +38,7 @@ use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_metadata_minifier::MetadataMinifier;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
     UnexpectedValueException, extension_loaded, hash, http_build_query, json_decode, parse_url_all,
@@ -183,10 +184,9 @@ impl ComposerRepository {
             .to_string();
         repo_config.insert("url".to_string(), PhpMixed::String(url_after.clone()));
         if url_after.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "The repository url must not be an empty string".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "The repository url must not be an empty string".to_string(),
+            )
             .into());
         }
 
@@ -214,10 +214,10 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .is_some_and(|s| !s.is_empty());
         if url_bits_arr.is_none() || !scheme_present {
-            return Err(UnexpectedValueException {
-                message: format!("Invalid url given for Composer repository: {}", current_url),
-                code: 0,
-            }
+            return Err(UnexpectedValueException::new(format!(
+                "Invalid url given for Composer repository: {}",
+                current_url
+            ))
             .into());
         }
 
@@ -387,12 +387,10 @@ impl ComposerRepository {
 
             if self.has_partial_packages()? {
                 if self.partial_packages_by_name.is_none() {
-                    return Err(LogicException {
-                        message:
-                            "hasPartialPackages failed to initialize $this->partialPackagesByName"
-                                .to_string(),
-                        code: 0,
-                    }
+                    return Err(LogicException::new(
+                        "hasPartialPackages failed to initialize $this->partialPackagesByName"
+                            .to_string(),
+                    )
                     .into());
                 }
 
@@ -403,17 +401,11 @@ impl ComposerRepository {
                     .create_packages(flat, Some("packages.json inline packages".to_string()));
             }
 
-            return Err(LogicException {
-                message: "Composer repositories that have lazy providers and no available-packages list can not load the complete list of packages, use getPackageNames instead.".to_string(),
-                code: 0,
-            }.into());
+            return Err(LogicException::new("Composer repositories that have lazy providers and no available-packages list can not load the complete list of packages, use getPackageNames instead.".to_string()).into());
         }
 
         if has_providers {
-            return Err(LogicException {
-                message: "Composer repositories that have providers can not load the complete list of packages, use getPackageNames instead.".to_string(),
-                code: 0,
-            }.into());
+            return Err(LogicException::new("Composer repositories that have providers can not load the complete list of packages, use getPackageNames instead.".to_string()).into());
         }
 
         // PHP relies on ArrayRepository::getPackages() invoking the virtual initialize(),
@@ -516,10 +508,9 @@ impl ComposerRepository {
 
     fn load_package_list(&mut self, package_filter: Option<&str>) -> anyhow::Result<Vec<String>> {
         if self.list_url.is_none() {
-            return Err(LogicException {
-                message: "Make sure to call loadRootServerFile before loadPackageList".to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new(
+                "Make sure to call loadRootServerFile before loadPackageList".to_string(),
+            )
             .into());
         }
 
@@ -636,10 +627,7 @@ impl ComposerRepository {
                 let constraint = package_name_map.get(&name).and_then(|c| c.clone());
                 for (_uid, candidate) in candidates.iter() {
                     if candidate.get_name() != name {
-                        return Err(LogicException {
-                            message: "whatProvides should never return a package with a different name than the requested one".to_string(),
-                            code: 0,
-                        }.into());
+                        return Err(LogicException::new("whatProvides should never return a package with a different name than the requested one".to_string()).into());
                     }
                     names_found.insert(name.clone(), true);
 
@@ -946,16 +934,13 @@ impl ComposerRepository {
             if !allow_partial_advisories && !is_full {
                 let data_mixed =
                     PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                return Err(RuntimeException {
-                    message: format!(
-                        "Advisory for {} could not be loaded as a full advisory from {}{}{}",
-                        name,
-                        repo_name,
-                        PHP_EOL,
-                        var_export(&data_mixed, true),
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Advisory for {} could not be loaded as a full advisory from {}{}{}",
+                    name,
+                    repo_name,
+                    PHP_EOL,
+                    var_export(&data_mixed, true),
+                ))
                 .into());
             }
             let affected_versions: &AnyConstraint = advisory.affected_versions();
@@ -1151,7 +1136,7 @@ impl ComposerRepository {
             ) {
                 Ok(resp) => resp.decode_json()?,
                 Err(e) => {
-                    if let Some(te) = e.downcast_ref::<TransportException>()
+                    if let Some(te) = e.catch::<TransportException>()
                         && te.get_status_code() == Some(404)
                     {
                         return Ok(result);
@@ -1183,11 +1168,10 @@ impl ComposerRepository {
 
         if self.has_partial_packages()? {
             if self.partial_packages_by_name.is_none() {
-                return Err(LogicException {
-                    message: "hasPartialPackages failed to initialize $this->partialPackagesByName"
+                return Err(LogicException::new(
+                    "hasPartialPackages failed to initialize $this->partialPackagesByName"
                         .to_string(),
-                    code: 0,
-                }
+                )
                 .into());
             }
             for (_name, versions) in self.partial_packages_by_name.as_ref().unwrap().iter() {
@@ -1438,7 +1422,7 @@ impl ComposerRepository {
                     }
                     Err(e) => {
                         // 404s are acceptable for lazy provider repos
-                        if let Some(te) = e.downcast_ref::<TransportException>() {
+                        if let Some(te) = e.catch::<TransportException>() {
                             let status_code = te.get_status_code();
                             if self.lazy_providers_url.is_some()
                                 && matches!(status_code, Some(404 | 499))
@@ -1726,12 +1710,10 @@ impl ComposerRepository {
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
 
         if self.lazy_providers_url.is_none() {
-            return Err(LogicException {
-                message:
-                    "loadAsyncPackages only supports v2 protocol composer repos with a metadata-url"
-                        .to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new(
+                "loadAsyncPackages only supports v2 protocol composer repos with a metadata-url"
+                    .to_string(),
+            )
             .into());
         }
 
@@ -1964,10 +1946,7 @@ impl ComposerRepository {
         package_name: Option<&str>,
     ) -> anyhow::Result<PhpMixed> {
         if self.lazy_providers_url.is_none() {
-            return Err(LogicException {
-                message: "startCachedAsyncDownload only supports v2 protocol composer repos with a metadata-url".to_string(),
-                code: 0,
-            }.into());
+            return Err(LogicException::new("startCachedAsyncDownload only supports v2 protocol composer repos with a metadata-url".to_string()).into());
         }
 
         let name = strtolower(file_name);
@@ -2142,13 +2121,11 @@ impl ComposerRepository {
         }
 
         if !extension_loaded("openssl") && self.url.starts_with("https") {
-            return Err(RuntimeException {
-                message: format!(
-                    "You must enable the openssl extension in your php.ini to load information from {}",
-                    self.url
-                ),
-                code: 0,
-            }.into());
+            return Err(RuntimeException::new(format!(
+                "You must enable the openssl extension in your php.ini to load information from {}",
+                self.url
+            ))
+            .into());
         }
 
         let mut data: Option<IndexMap<String, PhpMixed>> = None;
@@ -2387,13 +2364,10 @@ impl ComposerRepository {
                     api_url: api_url.clone(),
                 });
                 if api_url.is_none() && !self.has_available_package_list {
-                    return Err(UnexpectedValueException {
-                        message: format!(
-                            "Invalid security advisory configuration on {}: If the repository does not provide a security-advisories.api-url then available-packages or available-package-patterns are required to be provided for performance reason.",
-                            self.get_repo_name()
-                        ),
-                        code: 0,
-                    }.into());
+                    return Err(UnexpectedValueException::new(format!(
+                        "Invalid security advisory configuration on {}: If the repository does not provide a security-advisories.api-url then available-packages or available-package-patterns are required to be provided for performance reason.",
+                        self.get_repo_name()
+                    )).into());
                 }
             }
         }
@@ -2457,10 +2431,9 @@ impl ComposerRepository {
 
     fn canonicalize_url(&self, url: &str) -> anyhow::Result<String> {
         if url.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "Expected a string with a value and not an empty string".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "Expected a string with a value and not an empty string".to_string(),
+            )
             .into());
         }
 
@@ -2491,11 +2464,9 @@ impl ComposerRepository {
         let data = self.load_root_server_file(None)?;
         let data = match data {
             RootData::True => {
-                return Err(LogicException {
-                    message: "loadRootServerFile should not return true during initialization"
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new(
+                    "loadRootServerFile should not return true during initialization".to_string(),
+                )
                 .into());
             }
             RootData::Data(d) => d,
@@ -2724,19 +2695,16 @@ impl ComposerRepository {
         })();
 
         result.map_err(|e| {
-            RuntimeException {
-                message: format!(
-                    "Could not load packages in {}{}: [{}] {}",
-                    self.get_repo_name(),
-                    source
-                        .as_ref()
-                        .map(|s| format!(" from {}", s))
-                        .unwrap_or_default(),
-                    "Exception",
-                    e
-                ),
-                code: 0,
-            }
+            RuntimeException::new(format!(
+                "Could not load packages in {}{}: [{}] {}",
+                self.get_repo_name(),
+                source
+                    .as_ref()
+                    .map(|s| format!(" from {}", s))
+                    .unwrap_or_default(),
+                "Exception",
+                e
+            ))
             .into()
         })
     }
@@ -2749,10 +2717,9 @@ impl ComposerRepository {
         store_last_modified_time: bool,
     ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         if filename.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "$filename should not be an empty string".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "$filename should not be an empty string".to_string(),
+            )
             .into());
         }
 
@@ -2830,13 +2797,10 @@ impl ComposerRepository {
                     }
 
                     // TODO use scarier wording once we know for sure it doesn't do false positives anymore
-                    return Err(RepositorySecurityException(shirabe_php_shim::Exception {
-                            message: format!(
-                                "The contents of {} do not match its signature. This could indicate a man-in-the-middle attack or e.g. antivirus software corrupting files. Try running composer again and report this if you think it is a mistake.",
-                                filename
-                            ),
-                            code: 0,
-                        }).into());
+                    return Err(RepositorySecurityException::new(format!(
+                        "The contents of {} do not match its signature. This could indicate a man-in-the-middle attack or e.g. antivirus software corrupting files. Try running composer again and report this if you think it is a mistake.",
+                        filename
+                    )).into());
                 }
 
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
@@ -2904,15 +2868,15 @@ impl ComposerRepository {
                     if e.downcast_ref::<RetryMarker>().is_some() {
                         continue;
                     }
-                    if e.downcast_ref::<LogicException>().is_some() {
+                    if e.is_instanceof::<LogicException>() {
                         return Err(e);
                     }
-                    if let Some(te) = e.downcast_ref::<TransportException>()
+                    if let Some(te) = e.catch::<TransportException>()
                         && te.get_status_code() == Some(404)
                     {
                         return Err(e);
                     }
-                    if e.downcast_ref::<RepositorySecurityException>().is_some() {
+                    if e.is_instanceof::<RepositorySecurityException>() {
                         return Err(e);
                     }
 
@@ -2948,10 +2912,7 @@ impl ComposerRepository {
 
         match data {
             Some(d) => Ok(d),
-            None => Err(LogicException {
-                message: "ComposerRepository: Undefined $data. Please report at https://github.com/composer/composer/issues/new.".to_string(),
-                code: 0,
-            }.into()),
+            None => Err(LogicException::new("ComposerRepository: Undefined $data. Please report at https://github.com/composer/composer/issues/new.".to_string()).into()),
         }
     }
 
@@ -2962,10 +2923,9 @@ impl ComposerRepository {
         last_modified_time: &str,
     ) -> anyhow::Result<FetchFileIfLastModifiedResult> {
         if filename.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "$filename should not be an empty string".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "$filename should not be an empty string".to_string(),
+            )
             .into());
         }
 
@@ -3079,10 +3039,10 @@ impl ComposerRepository {
         match result {
             Ok(v) => Ok(v),
             Err(e) => {
-                if e.downcast_ref::<LogicException>().is_some() {
+                if e.is_instanceof::<LogicException>() {
                     return Err(e);
                 }
-                if let Some(te) = e.downcast_ref::<TransportException>()
+                if let Some(te) = e.catch::<TransportException>()
                     && te.get_status_code() == Some(404)
                 {
                     return Err(e);
@@ -3109,10 +3069,9 @@ impl ComposerRepository {
         last_modified_time: Option<&str>,
     ) -> anyhow::Result<PhpMixed> {
         if filename.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "$filename should not be an empty string".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "$filename should not be an empty string".to_string(),
+            )
             .into());
         }
 
@@ -3263,7 +3222,7 @@ impl ComposerRepository {
         cache_key: &str,
         last_modified_time: Option<&str>,
     ) -> anyhow::Result<PhpMixed> {
-        if let Some(te) = e.downcast_ref::<TransportException>()
+        if let Some(te) = e.catch::<TransportException>()
             && te.get_status_code() == Some(404)
         {
             self.packages_not_found_cache
@@ -3289,7 +3248,7 @@ impl ComposerRepository {
         }
 
         // special error code returned when network is being artificially disabled
-        if let Some(te) = e.downcast_ref::<TransportException>()
+        if let Some(te) = e.catch::<TransportException>()
             && te.get_status_code() == Some(499)
         {
             let resp = Response::new(self.url.clone(), Some(404), Vec::new(), Some(String::new()));
@@ -3364,10 +3323,7 @@ impl ComposerRepository {
     /// @return true if the package name is present in availablePackages or matched by availablePackagePatterns
     pub(crate) fn lazy_providers_repo_contains(&self, name: &str) -> anyhow::Result<bool> {
         if !self.has_available_package_list {
-            return Err(LogicException {
-                message: "lazyProvidersRepoContains should not be called unless hasAvailablePackageList is true".to_string(),
-                code: 0,
-            }.into());
+            return Err(LogicException::new("lazyProvidersRepoContains should not be called unless hasAvailablePackageList is true".to_string()).into());
         }
 
         if let Some(ref available) = self.available_packages

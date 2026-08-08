@@ -42,6 +42,7 @@ use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, RuntimeException,
     UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd,
@@ -311,7 +312,7 @@ impl CreateProjectCommand {
                     }
                 }
                 Err(e) => {
-                    if e.downcast_ref::<PluginBlockedException>().is_some() {
+                    if e.is_instanceof::<PluginBlockedException>() {
                         io.write_error("<error>Hint: To allow running the config command recommended below before dependencies are installed, run create-project with --no-install.</error>");
                         io.write_error(&format!(
                             "<error>You can then cd into {}, configure allow-plugins, and finally run a composer install to complete the process.</error>",
@@ -365,11 +366,7 @@ impl CreateProjectCommand {
             for dir in &dirs {
                 if !fs.remove_directory(dir)? {
                     had_error = Some(
-                        RuntimeException {
-                            message: format!("Could not remove {}", dir.display()),
-                            code: 0,
-                        }
-                        .into(),
+                        RuntimeException::new(format!("Could not remove {}", dir.display())).into(),
                     );
                     break;
                 }
@@ -485,10 +482,9 @@ impl CreateProjectCommand {
             );
         }
         if directory.is_empty() {
-            return Err(UnexpectedValueException {
-                message: "Got an empty target directory, something went wrong".to_string(),
-                code: 0,
-            }
+            return Err(UnexpectedValueException::new(
+                "Got an empty target directory, something went wrong".to_string(),
+            )
             .into());
         }
 
@@ -513,20 +509,17 @@ impl CreateProjectCommand {
 
         if file_exists(&directory) {
             if !is_dir(&directory) {
-                return Err(InvalidArgumentException {
-                    message: format!(
-                        "Cannot create project directory at \"{}\", it exists as a file.",
-                        directory
-                    ),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "Cannot create project directory at \"{}\", it exists as a file.",
+                    directory
+                ))
                 .into());
             }
             if !fs.borrow().is_dir_empty(&directory) {
-                return Err(InvalidArgumentException {
-                    message: format!("Project directory \"{}\" is not empty.", directory),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "Project directory \"{}\" is not empty.",
+                    directory
+                ))
                 .into());
             }
         }
@@ -575,20 +568,17 @@ impl CreateProjectCommand {
             .unwrap_or_default();
 
         if !STABILITIES.contains_key(stability.as_str()) {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Invalid stability provided ({}), must be one of: {}",
-                    stability,
-                    implode(
-                        ", ",
-                        &STABILITIES
-                            .keys()
-                            .map(|k| k.to_string())
-                            .collect::<Vec<_>>()
-                    )
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Invalid stability provided ({}), must be one of: {}",
+                stability,
+                implode(
+                    ", ",
+                    &STABILITIES
+                        .keys()
+                        .map(|k| k.to_string())
+                        .collect::<Vec<_>>()
+                )
+            ))
             .into());
         }
 
@@ -730,21 +720,14 @@ impl CreateProjectCommand {
                     )?
                     .is_some()
             {
-                return Err(InvalidArgumentException {
-                    message: format!(
-                        "{} in a version installable using your PHP version, PHP extensions and Composer version.",
-                        error_message
-                    ),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "{} in a version installable using your PHP version, PHP extensions and Composer version.",
+                    error_message
+                ))
                 .into());
             }
 
-            return Err(InvalidArgumentException {
-                message: format!("{}.", error_message),
-                code: 0,
-            }
-            .into());
+            return Err(InvalidArgumentException::new(format!("{}.", error_message)).into());
         }
         let mut package = package.unwrap();
 
@@ -936,10 +919,9 @@ impl Command for CreateProjectCommand {
         {
             let package = input.borrow().get_argument("package")?;
             if package.is_null() {
-                return Err(RuntimeException {
-                    message: "Not enough arguments (missing: \"package\").".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(
+                    "Not enough arguments (missing: \"package\").".to_string(),
+                )
                 .into());
             }
             let mut parts =

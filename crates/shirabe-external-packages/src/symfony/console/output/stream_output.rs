@@ -37,12 +37,8 @@ impl StreamOutput {
         let verbosity = verbosity.unwrap_or(VERBOSITY_NORMAL);
 
         if shirabe_php_shim::get_resource_type(&stream) != "stream" {
-            return Ok(Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: "The StreamOutput class needs a stream as its first argument."
-                        .to_string(),
-                    code: 0,
-                },
+            return Ok(Err(InvalidArgumentException::new(
+                "The StreamOutput class needs a stream as its first argument.".to_string(),
             )));
         }
 

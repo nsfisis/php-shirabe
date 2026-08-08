@@ -1,21 +1,17 @@
 //! ref: composer/vendor/symfony/console/Exception/CommandNotFoundException.php
 
 use super::exception_interface::ExceptionInterface;
-use super::invalid_argument_exception::InvalidArgumentException;
 
 #[derive(Debug)]
 pub struct CommandNotFoundException {
-    inner: InvalidArgumentException,
+    inner: shirabe_php_shim::InvalidArgumentException,
     alternatives: Vec<String>,
 }
 
 impl CommandNotFoundException {
     pub fn new(message: String, alternatives: Vec<String>, code: i64) -> Self {
         Self {
-            inner: InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                message,
-                code,
-            }),
+            inner: shirabe_php_shim::InvalidArgumentException::with_code(message, code),
             alternatives,
         }
     }
@@ -25,12 +21,10 @@ impl CommandNotFoundException {
     }
 }
 
-impl std::fmt::Display for CommandNotFoundException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner)
-    }
-}
-
-impl std::error::Error for CommandNotFoundException {}
+shirabe_php_shim::impl_php_exception!(
+    CommandNotFoundException,
+    inner,
+    r"Symfony\Component\Console\Exception\CommandNotFoundException"
+);
 
 impl ExceptionInterface for CommandNotFoundException {}

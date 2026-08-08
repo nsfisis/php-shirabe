@@ -13,6 +13,7 @@ use shirabe_external_packages::symfony::process::Process;
 use shirabe_external_packages::symfony::process::ProcessMock;
 use shirabe_external_packages::symfony::process::exception::ProcessSignaledException;
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
     escapeshellarg, explode, implode, in_array_strict, is_array, is_dir, is_numeric, is_string,
@@ -253,17 +254,13 @@ impl ProcessExecutor {
                 Some(Self::get_timeout() as f64),
             )?;
         } else {
-            return Err(LogicException {
-                message: "Invalid command type".to_string(),
-                code: 0,
-            }
-            .into());
+            return Err(LogicException::new("Invalid command type".to_string()).into());
         }
 
         if !Platform::is_windows() && tty {
             // PHP: try { $process->setTty(true); } catch (RuntimeException $e) { /* ignore */ }
             if let Err(e) = process.set_tty(true)
-                && e.downcast_ref::<SymfonyProcessRuntimeException>().is_none()
+                && !e.is_instanceof::<SymfonyProcessRuntimeException>()
             {
                 return Err(e);
             }
@@ -312,7 +309,7 @@ impl ProcessExecutor {
         let final_result: anyhow::Result<()> = match result {
             Ok(()) => Ok(()),
             Err(e) => {
-                if let Some(pse) = e.downcast_ref::<ProcessSignaledException>() {
+                if let Some(pse) = e.catch::<ProcessSignaledException>() {
                     if signal_handler.is_triggered() {
                         // exiting as we were signaled and the child process exited too due to the signal
                         signal_handler.exit_with_last_signal();
@@ -451,21 +448,18 @@ impl ProcessExecutor {
             // strict-mode mismatch) extends `\RuntimeException`, so PHP call sites that
             // `catch (\RuntimeException $e)` around a mock-driven git/hg/svn call (e.g.
             // `GitDriver::supports`) treat a mismatch as an ordinary recoverable failure. Using
-            // the same `RuntimeException` type here keeps `downcast_ref::<RuntimeException>()`
-            // checks working the same way against a mismatch.
-            return Err(RuntimeException {
-                message: format!(
-                    "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
-                    command,
-                    cwd.unwrap_or(""),
-                    PHP_EOL,
-                    expected,
-                    PHP_EOL,
-                    PHP_EOL,
-                    received
-                ),
-                code: 0,
-            }
+            // the same `RuntimeException` type here keeps `catch::<RuntimeException>()` checks
+            // working the same way against a mismatch.
+            return Err(RuntimeException::new(format!(
+                "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
+                command,
+                cwd.unwrap_or(""),
+                PHP_EOL,
+                expected,
+                PHP_EOL,
+                PHP_EOL,
+                received
+            ))
             .into());
         }
 
@@ -645,10 +639,7 @@ impl ProcessExecutor {
 
         Box::pin(async move {
             if !allow_async {
-                return Err(LogicException {
-                    message: "You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new("You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string())
                 .into());
             }
 
@@ -682,11 +673,7 @@ impl ProcessExecutor {
                     Some(Self::get_timeout() as f64),
                 )?
             } else {
-                return Err(LogicException {
-                    message: "Invalid command type".to_string(),
-                    code: 0,
-                }
-                .into());
+                return Err(LogicException::new("Invalid command type".to_string()).into());
             };
 
             process.start(None, IndexMap::new())?;

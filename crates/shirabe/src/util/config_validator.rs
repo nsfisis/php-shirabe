@@ -10,6 +10,7 @@ use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, php_regex};
 use shirabe_spdx_licenses::SpdxLicenses;
 
@@ -55,7 +56,7 @@ impl ConfigValidator {
         match schema_result {
             Ok(()) => {}
             Err(e) => {
-                if let Some(validation_e) = e.downcast_ref::<JsonValidationException>() {
+                if let Some(validation_e) = e.catch::<JsonValidationException>() {
                     for message in validation_e.get_errors() {
                         if lax_valid {
                             publish_errors.push(message.clone());
@@ -298,7 +299,7 @@ impl ConfigValidator {
         ) {
             Ok(_) => {}
             Err(e) => {
-                if let Some(invalid_e) = e.downcast_ref::<InvalidPackageException>() {
+                if let Some(invalid_e) = e.catch::<InvalidPackageException>() {
                     errors.extend_from_slice(invalid_e.get_errors());
                 }
             }

@@ -422,13 +422,10 @@ impl Auditor {
                         .map(|buffer_io| &buffer_io.inner)
                 });
                 if io_as_console.is_none() {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            "Cannot use table format with {}",
-                            get_class(&PhpMixed::Null)
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        "Cannot use table format with {}",
+                        get_class(&PhpMixed::Null)
+                    ))
                     .into());
                 }
                 self.output_advisories_table(io_as_console.unwrap(), advisories)?;
@@ -441,11 +438,9 @@ impl Auditor {
                 Ok(())
             }
             Self::FORMAT_SUMMARY => Ok(()),
-            _ => Err(InvalidArgumentException {
-                message: format!("Invalid format \"{}\".", format),
-                code: 0,
+            _ => {
+                Err(InvalidArgumentException::new(format!("Invalid format \"{}\".", format)).into())
             }
-            .into()),
         }
     }
 
@@ -597,13 +592,10 @@ impl Auditor {
                 .map(|buffer_io| &buffer_io.inner)
         });
         if io_as_console.is_none() {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Cannot use table format with {}",
-                    get_class(&PhpMixed::Null)
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Cannot use table format with {}",
+                get_class(&PhpMixed::Null)
+            ))
             .into());
         }
 

@@ -2,20 +2,19 @@
 
 #[derive(Debug)]
 pub struct LogicException {
-    pub message: String,
-    pub code: i64,
+    inner: shirabe_php_shim::LogicException,
 }
 
 impl LogicException {
     pub fn new(message: String) -> Self {
-        Self { message, code: 0 }
+        Self {
+            inner: shirabe_php_shim::LogicException::new(message),
+        }
     }
 }
 
-impl std::fmt::Display for LogicException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for LogicException {}
+shirabe_php_shim::impl_php_exception!(
+    LogicException,
+    inner,
+    r"Symfony\Component\Process\Exception\LogicException"
+);

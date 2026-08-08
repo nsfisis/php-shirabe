@@ -79,13 +79,11 @@ impl DescriptorHelper {
         };
 
         if !self.descriptors.contains_key(&format) {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: format!("Unsupported format \"{}\".", format.clone()),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "Unsupported format \"{}\".",
+                format.clone()
+            ))
+            .into());
         }
 
         let descriptor = self.descriptors.get_mut(&format).unwrap();

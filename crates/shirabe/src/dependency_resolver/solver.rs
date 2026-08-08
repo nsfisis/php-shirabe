@@ -381,10 +381,11 @@ impl Solver {
             let (learn_literal, new_level, new_rule, why) = self.analyze(level, rule)?;
 
             if new_level <= 0 || new_level >= level {
-                return Err(anyhow::anyhow!(SolverBugException::new(format!(
+                return Err(SolverBugException::new(format!(
                     "Trying to revert to invalid level {} from level {}.",
                     new_level, level
-                ))));
+                ))
+                .into());
             }
 
             level = new_level;
@@ -505,12 +506,12 @@ impl Solver {
 
                 let inner_literal = loop {
                     if decision_id <= 0 {
-                        return Err(anyhow::anyhow!(SolverBugException::new(format!(
+                        return Err(SolverBugException::new(format!(
                             "Reached invalid decision id {} while looking through {} for a literal present in the analyzed rule {}.",
                             decision_id,
                             rule.borrow(),
                             analyzed_rule.borrow()
-                        ))));
+                        )).into());
                     }
 
                     decision_id -= 1;
@@ -587,10 +588,11 @@ impl Solver {
         let learned_literal = match learned_literal {
             Some(l) => l,
             None => {
-                return Err(anyhow::anyhow!(SolverBugException::new(format!(
+                return Err(SolverBugException::new(format!(
                     "Did not find a learnable literal in analyzed rule {}.",
                     analyzed_rule.borrow()
-                ))));
+                ))
+                .into());
             }
         };
 

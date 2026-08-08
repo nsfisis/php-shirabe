@@ -49,13 +49,10 @@ impl FilterRepository {
                     ));
                 }
                 _ => {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            r#""only" key for repository {} should be an array"#,
-                            repo.get_repo_name()?
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        r#""only" key for repository {} should be an array"#,
+                        repo.get_repo_name()?
+                    ))
                     .into());
                 }
             }
@@ -79,25 +76,19 @@ impl FilterRepository {
                     ));
                 }
                 _ => {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            r#""exclude" key for repository {} should be an array"#,
-                            repo.get_repo_name()?
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        r#""exclude" key for repository {} should be an array"#,
+                        repo.get_repo_name()?
+                    ))
                     .into());
                 }
             }
         }
         if exclude.is_some() && only.is_some() {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    r#"Only one of "only" and "exclude" can be specified for repository {}"#,
-                    repo.get_repo_name()?
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                r#"Only one of "only" and "exclude" can be specified for repository {}"#,
+                repo.get_repo_name()?
+            ))
             .into());
         }
         if let Some(canonical_val) = options.get("canonical") {
@@ -106,13 +97,10 @@ impl FilterRepository {
                     canonical = *b;
                 }
                 _ => {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            r#""canonical" key for repository {} should be a boolean"#,
-                            repo.get_repo_name()?
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        r#""canonical" key for repository {} should be a boolean"#,
+                        repo.get_repo_name()?
+                    ))
                     .into());
                 }
             }

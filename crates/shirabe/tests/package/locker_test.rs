@@ -10,6 +10,7 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::plugin::plugin_interface;
 use shirabe::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
 use shirabe::util::process_executor::ProcessExecutor;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{LogicException, PhpMixed, hash};
 use tempfile::TempDir;
 
@@ -83,7 +84,7 @@ fn test_get_not_locked_packages() {
         .get_locked_repository(false)
         .expect_err("getLockedRepository should fail when no lock file exists");
     assert!(
-        err.downcast_ref::<LogicException>().is_some(),
+        err.is_instanceof::<LogicException>(),
         "expected LogicException, got: {err}"
     );
 }
@@ -219,7 +220,7 @@ fn test_lock_bad_packages() {
         )
         .expect_err("setLockData should fail for a package with no version");
     assert!(
-        err.downcast_ref::<LogicException>().is_some(),
+        err.is_instanceof::<LogicException>(),
         "expected LogicException, got: {err}"
     );
 }

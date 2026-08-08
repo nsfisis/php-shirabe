@@ -80,11 +80,7 @@ impl AuthHelper {
                     ) {
                         return Ok(PhpMixed::String(input));
                     }
-                    Err(RuntimeException {
-                        message: "Please answer (y)es or (n)o".to_string(),
-                        code: 0,
-                    }
-                    .into())
+                    Err(RuntimeException::new("Please answer (y)es or (n)o".to_string()).into())
                 }),
                 None,
                 PhpMixed::String("y".to_string()),

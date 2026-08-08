@@ -52,10 +52,10 @@ impl InstallerInterface for ProjectInstaller {
         if std::path::Path::new(install_path).exists()
             && !self.filesystem.borrow().is_dir_empty(install_path)
         {
-            return Err(InvalidArgumentException {
-                message: format!("Project directory {} is not empty.", install_path),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Project directory {} is not empty.",
+                install_path
+            ))
             .into());
         }
         if !std::path::Path::new(install_path).is_dir() {
@@ -109,11 +109,7 @@ impl InstallerInterface for ProjectInstaller {
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Err(InvalidArgumentException {
-            message: "not supported".to_string(),
-            code: 0,
-        }
-        .into())
+        Err(InvalidArgumentException::new("not supported".to_string()).into())
     }
 
     async fn uninstall(
@@ -121,11 +117,7 @@ impl InstallerInterface for ProjectInstaller {
         _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Err(InvalidArgumentException {
-            message: "not supported".to_string(),
-            code: 0,
-        }
-        .into())
+        Err(InvalidArgumentException::new("not supported".to_string()).into())
     }
 
     fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {

@@ -185,12 +185,7 @@ pub trait QuestionHelperInterface {
                 }
 
                 if matches!(read, PhpMixed::Bool(false)) {
-                    return Ok(Err(MissingInputException(RuntimeException(
-                        shirabe_php_shim::RuntimeException {
-                            message: "Aborted.".to_string(),
-                            code: 0,
-                        },
-                    ))));
+                    return Ok(Err(MissingInputException::new("Aborted.".to_string())));
                 }
                 r = read;
                 if question.is_trimmable() {
@@ -263,17 +258,19 @@ pub trait QuestionHelperInterface {
                     // The validator return type is fixed to InvalidArgumentException here, so the
                     // RuntimeException rethrow branch is statically unreachable; record the error
                     // and retry.
-                    error = Some(shirabe_php_shim::Exception {
-                        message: e.0.message.clone(),
-                        code: e.0.code,
-                    });
+                    error = Some(shirabe_php_shim::Exception::with_code(
+                        e.get_message().to_string(),
+                        e.get_code(),
+                    ));
                 }
             }
         }
 
         // throw $error;
         Err(anyhow::Error::msg(
-            error.map(|e| e.message).unwrap_or_default(),
+            error
+                .map(|e| e.get_message().to_string())
+                .unwrap_or_default(),
         ))
     }
 
@@ -415,12 +412,12 @@ impl QuestionHelper {
             let formatter = helper_set.borrow().get_formatter();
 
             formatter.borrow().format_block(
-                FormatBlockMessages::String(error.message.clone()),
+                FormatBlockMessages::String(error.get_message().to_string()),
                 "error",
                 false,
             )
         } else {
-            format!("<error>{}</error>", error.message)
+            format!("<error>{}</error>", error.get_message())
         };
 
         output
@@ -491,12 +488,7 @@ impl QuestionHelper {
                     && matches!(question.get_default(), PhpMixed::Null))
             {
                 shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
-                return Err(MissingInputException(RuntimeException(
-                    shirabe_php_shim::RuntimeException {
-                        message: "Aborted.".to_string(),
-                        code: 0,
-                    },
-                )));
+                return Err(MissingInputException::new("Aborted.".to_string()));
             } else if c.as_deref() == Some("\u{7f}") {
                 // Backspace Character
                 if 0 == num_matches && 0 != i {
@@ -730,10 +722,9 @@ impl QuestionHelper {
             stty_mode = shirabe_php_shim::shell_exec("stty -g").unwrap_or_default();
             shirabe_php_shim::shell_exec("stty -echo");
         } else if self.is_interactive_input(input_stream) {
-            return Ok(Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: "Unable to hide the response.".to_string(),
-                code: 0,
-            })));
+            return Ok(Err(RuntimeException::new(
+                "Unable to hide the response.".to_string(),
+            )));
         }
 
         let value = shirabe_php_shim::fgets(input_stream, Some(4096));
@@ -745,13 +736,7 @@ impl QuestionHelper {
         let mut value = match value {
             Some(value) => value,
             None => {
-                return Err(MissingInputException(RuntimeException(
-                    shirabe_php_shim::RuntimeException {
-                        message: "Aborted.".to_string(),
-                        code: 0,
-                    },
-                ))
-                .into());
+                return Err(MissingInputException::new("Aborted.".to_string()).into());
             }
         };
         if trimmable {

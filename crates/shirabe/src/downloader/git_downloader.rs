@@ -86,14 +86,11 @@ impl GitDownloader {
             .execute_args(&command, &mut output, Some(&path))
             != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    implode(" ", &command),
-                    self.inner.process.borrow().get_error_output(),
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Failed to execute {}\n\n{}",
+                implode(" ", &command),
+                self.inner.process.borrow().get_error_output(),
+            ))
             .into());
         }
 
@@ -186,14 +183,11 @@ impl GitDownloader {
                         Some(&path),
                     ) != 0
                     {
-                        return Err(RuntimeException {
-                            message: format!(
-                                "Failed to execute {}\n\n{}",
-                                implode(" ", &command),
-                                self.inner.process.borrow().get_error_output(),
-                            ),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Failed to execute {}\n\n{}",
+                            implode(" ", &command),
+                            self.inner.process.borrow().get_error_output(),
+                        ))
                         .into());
                     }
 
@@ -232,14 +226,11 @@ impl GitDownloader {
                     .execute_args(&command, &mut output, Some(&path))
                     != 0
                 {
-                    return Err(RuntimeException {
-                        message: format!(
-                            "Failed to execute {}\n\n{}",
-                            implode(" ", &command),
-                            self.inner.process.borrow().get_error_output(),
-                        ),
-                        code: 0,
-                    }
+                    return Err(RuntimeException::new(format!(
+                        "Failed to execute {}\n\n{}",
+                        implode(" ", &command),
+                        self.inner.process.borrow().get_error_output(),
+                    ))
                     .into());
                 }
                 refs = trim(&output, None);
@@ -486,15 +477,12 @@ impl GitDownloader {
 
         let command = format!("{} && {}", implode(" ", &command1), implode(" ", &command2));
 
-        Err(RuntimeException {
-            message: Url::sanitize(format!(
-                "Failed to execute {}\n\n{}{}",
-                command,
-                self.inner.process.borrow().get_error_output(),
-                exception_extra,
-            )),
-            code: 0,
-        }
+        Err(RuntimeException::new(Url::sanitize(format!(
+            "Failed to execute {}\n\n{}{}",
+            command,
+            self.inner.process.borrow().get_error_output(),
+            exception_extra,
+        )))
         .into())
     }
 
@@ -570,11 +558,9 @@ impl GitDownloader {
             Some(&path),
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!("Could not reset changes\n\n:{}", output),
-                code: 0,
-            }
-            .into());
+            return Err(
+                RuntimeException::new(format!("Could not reset changes\n\n:{}", output)).into(),
+            );
         }
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -583,11 +569,9 @@ impl GitDownloader {
             Some(&path),
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!("Could not reset changes\n\n:{}", output),
-                code: 0,
-            }
-            .into());
+            return Err(
+                RuntimeException::new(format!("Could not reset changes\n\n:{}", output)).into(),
+            );
         }
 
         self.has_discarded_changes.borrow_mut().insert(path, true);
@@ -609,11 +593,9 @@ impl GitDownloader {
             Some(&path),
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!("Could not stash changes\n\n:{}", output),
-                code: 0,
-            }
-            .into());
+            return Err(
+                RuntimeException::new(format!("Could not stash changes\n\n:{}", output)).into(),
+            );
         }
 
         self.has_stashed_changes.borrow_mut().insert(path, true);
@@ -631,11 +613,9 @@ impl GitDownloader {
             Some(&path),
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!("Could not view diff\n\n:{}", output),
-                code: 0,
-            }
-            .into());
+            return Err(
+                RuntimeException::new(format!("Could not view diff\n\n:{}", output)).into(),
+            );
         }
 
         self.inner
@@ -692,10 +672,10 @@ impl GitDownloader {
         path: &str,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path)?.is_some() {
-            return Err(RuntimeException {
-                message: format!("Source directory {} has uncommitted changes.", path),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Source directory {} has uncommitted changes.",
+                path
+            ))
             .into());
         }
 
@@ -738,14 +718,11 @@ impl ChangeReportInterface for GitDownloader {
             .execute_args(&command, &mut output, Some(path))
             != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    implode(" ", &command),
-                    self.inner.process.borrow().get_error_output(),
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Failed to execute {}\n\n{}",
+                implode(" ", &command),
+                self.inner.process.borrow().get_error_output(),
+            ))
             .into());
         }
 
@@ -848,10 +825,9 @@ impl VcsDownloader for GitDownloader {
                     .insert(r#ref.as_deref().unwrap_or("").to_string(), true);
             }
         } else if git_version.is_none() {
-            return Err(RuntimeException {
-                message: "git was not found in your PATH, skipping source download".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "git was not found in your PATH, skipping source download".to_string(),
+            )
             .into());
         }
 
@@ -975,13 +951,10 @@ impl VcsDownloader for GitDownloader {
                 ],
             ];
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException {
-                    message: format!(
-                        "The required git reference for {} is not in cache and network is disabled, aborting",
-                        package.get_name(),
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "The required git reference for {} is not in cache and network is disabled, aborting",
+                    package.get_name(),
+                ))
                 .into());
             }
         }
@@ -1022,13 +995,10 @@ impl VcsDownloader for GitDownloader {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
-            return Err(RuntimeException {
-                message: format!(
-                    "The .git directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                    path
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "The .git directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
+                path
+            ))
             .into());
         }
 
@@ -1060,13 +1030,10 @@ impl VcsDownloader for GitDownloader {
             msg = format!("Checking out {}", self.get_short_hash(&r#ref));
             remote_url = "%url%".to_string();
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException {
-                    message: format!(
-                        "The required git reference for {} is not in cache and network is disabled, aborting",
-                        target.get_name(),
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "The required git reference for {} is not in cache and network is disabled, aborting",
+                    target.get_name(),
+                ))
                 .into());
             }
         }
@@ -1196,13 +1163,10 @@ impl VcsDownloader for GitDownloader {
                     .as_bool()
                     != Some(true))
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Source directory {} has unpushed changes on the current branch: \n{}",
-                    path, unpushed
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Source directory {} has unpushed changes on the current branch: \n{}",
+                path, unpushed
+            ))
             .into());
         }
 
@@ -1285,11 +1249,7 @@ impl VcsDownloader for GitDownloader {
                     }
                 }
                 Some("n") => {
-                    return Err(RuntimeException {
-                        message: "Update aborted".to_string(),
-                        code: 0,
-                    }
-                    .into());
+                    return Err(RuntimeException::new("Update aborted".to_string()).into());
                 }
                 Some("v") => {
                     self.inner
@@ -1362,13 +1322,10 @@ impl VcsDownloader for GitDownloader {
                 Some(&path),
             ) != 0
             {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Failed to apply stashed changes:\n\n{}",
-                        self.inner.process.borrow().get_error_output()
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Failed to apply stashed changes:\n\n{}",
+                    self.inner.process.borrow().get_error_output()
+                ))
                 .into());
             }
         }
@@ -1399,14 +1356,11 @@ impl VcsDownloader for GitDownloader {
             .execute_args(&command, &mut output, Some(&path))
             != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    implode(" ", &command),
-                    self.inner.process.borrow().get_error_output(),
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Failed to execute {}\n\n{}",
+                implode(" ", &command),
+                self.inner.process.borrow().get_error_output(),
+            ))
             .into());
         }
 

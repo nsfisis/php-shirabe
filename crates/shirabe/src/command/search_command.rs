@@ -181,10 +181,9 @@ impl Command for SearchCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException {
-                    message: "--only-name and --only-vendor cannot be used together".to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "--only-name and --only-vendor cannot be used together".to_string(),
+                )
                 .into());
             }
             mode = repository_interface::SEARCH_NAME;

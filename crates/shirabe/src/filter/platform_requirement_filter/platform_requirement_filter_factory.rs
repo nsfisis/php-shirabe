@@ -38,13 +38,10 @@ impl PlatformRequirementFilterFactory {
                     list,
                 )?))
             }
-            other => Err(anyhow::anyhow!(InvalidArgumentException {
-                message: format!(
-                    "PlatformRequirementFilter: Unknown $boolOrList parameter {}. Please report at https://github.com/composer/composer/issues/new.",
-                    shirabe_php_shim::get_debug_type(&other)
-                ),
-                code: 0,
-            })),
+            other => Err(InvalidArgumentException::new(format!(
+                "PlatformRequirementFilter: Unknown $boolOrList parameter {}. Please report at https://github.com/composer/composer/issues/new.",
+                shirabe_php_shim::get_debug_type(&other)
+            )).into()),
         }
     }
 

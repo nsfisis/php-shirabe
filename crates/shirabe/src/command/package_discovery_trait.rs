@@ -22,6 +22,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
@@ -359,11 +360,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 ));
                             }
 
-                            Err(Exception {
-                                message: "Not a valid selection".to_string(),
-                                code: 0,
-                            }
-                            .into())
+                            Err(Exception::new("Not a valid selection".to_string()).into())
                         },
                     );
 
@@ -541,17 +538,14 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     ShowWarnings::Always,
                 )?;
                 if let Some(candidate) = candidate {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            "Package {} has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
-                            name,
-                            self.get_platform_exception_details(
-                                candidate,
-                                platform_repo,
-                            )?,
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        "Package {} has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
+                        name,
+                        self.get_platform_exception_details(
+                            candidate,
+                            platform_repo,
+                        )?,
+                    ))
                     .into());
                 }
             }
@@ -577,34 +571,28 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     ShowWarnings::Always,
                 )?;
                 if let Some(all_repos_package) = all_repos_package {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            "Package {} exists in {} and {} which has a higher repository priority. The packages from the higher priority repository do not match your minimum-stability and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
-                            name,
-                            all_repos_package
-                                .get_repository()
-                                .map(|r| r.get_repo_name())
-                                .transpose()?
-                                .unwrap_or_default(),
-                            package
-                                .get_repository()
-                                .map(|r| r.get_repo_name())
-                                .transpose()?
-                                .unwrap_or_default(),
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        "Package {} exists in {} and {} which has a higher repository priority. The packages from the higher priority repository do not match your minimum-stability and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
+                        name,
+                        all_repos_package
+                            .get_repository()
+                            .map(|r| r.get_repo_name())
+                            .transpose()?
+                            .unwrap_or_default(),
+                        package
+                            .get_repository()
+                            .map(|r| r.get_repo_name())
+                            .transpose()?
+                            .unwrap_or_default(),
+                    ))
                     .into());
                 }
 
-                return Err(InvalidArgumentException {
-                    message: format!(
-                        "Could not find a version of package {} matching your minimum-stability ({}). Require it with an explicit version constraint allowing its desired stability.",
-                        name,
-                        effective_minimum_stability,
-                    ),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "Could not find a version of package {} matching your minimum-stability ({}). Require it with an explicit version constraint allowing its desired stability.",
+                    name,
+                    effective_minimum_stability,
+                ))
                 .into());
             }
             // Check whether the PHP version was the problem for all versions
@@ -639,18 +627,15 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         );
                     }
 
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            "Could not find package {} in any version matching your PHP version, PHP extensions and Composer version{}{}",
-                            name,
-                            self.get_platform_exception_details(
-                                candidate,
-                                platform_repo,
-                            )?,
-                            additional,
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        "Could not find package {} in any version matching your PHP version, PHP extensions and Composer version{}{}",
+                        name,
+                        self.get_platform_exception_details(
+                            candidate,
+                            platform_repo,
+                        )?,
+                        additional,
+                    ))
                     .into());
                 }
             }
@@ -665,13 +650,10 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         .map(|s| PhpMixed::String(s.clone()))
                         .collect::<Vec<_>>(),
                 ) {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            "Could not find package {}. It was however found via repository search, which indicates a consistency issue with the repository.",
-                            name,
-                        ),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!(
+                        "Could not find package {}. It was however found via repository search, which indicates a consistency issue with the repository.",
+                        name,
+                    ))
                     .into());
                 }
 
@@ -704,30 +686,24 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     }
                 }
 
-                return Err(InvalidArgumentException {
-                    message: format!(
-                        "Could not find package {}.\n\nDid you mean {}?\n    {}",
-                        name,
-                        if similar.len() > 1 {
-                            "one of these"
-                        } else {
-                            "this"
-                        },
-                        implode("\n    ", &similar),
-                    ),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(format!(
+                    "Could not find package {}.\n\nDid you mean {}?\n    {}",
+                    name,
+                    if similar.len() > 1 {
+                        "one of these"
+                    } else {
+                        "this"
+                    },
+                    implode("\n    ", &similar),
+                ))
                 .into());
             }
 
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "Could not find a matching version of package {}. Check the package spelling, your version constraint and that the package is available in a stability which matches your minimum-stability ({}).",
-                    name,
-                    effective_minimum_stability,
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Could not find a matching version of package {}. Check the package spelling, your version constraint and that the package is available in a stability which matches your minimum-stability ({}).",
+                name,
+                effective_minimum_stability,
+            ))
             .into());
         }
 
@@ -745,11 +721,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
     fn find_similar(&self, package: &str) -> anyhow::Result<Vec<String>> {
         let results: Vec<SearchResult> = match (|| -> anyhow::Result<Vec<SearchResult>> {
             if self.get_repos_mut().is_none() {
-                return Err(LogicException {
-                    message: "findSimilar was called before $this->repos was initialized"
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new(
+                    "findSimilar was called before $this->repos was initialized".to_string(),
+                )
                 .into());
             }
             self.get_repos_mut()
@@ -760,7 +734,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             Ok(r) => r,
             Err(e) => {
                 // PHP: if ($e instanceof \LogicException) throw $e;
-                if e.downcast_ref::<LogicException>().is_some() {
+                if e.is_instanceof::<LogicException>() {
                     return Err(e);
                 }
 

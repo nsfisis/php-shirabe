@@ -11,7 +11,7 @@ pub struct JsonValidationException {
 impl JsonValidationException {
     pub fn new(message: String, errors: Vec<String>) -> Self {
         Self {
-            inner: Exception { message, code: 0 },
+            inner: Exception::new(message),
             errors,
         }
     }
@@ -19,16 +19,10 @@ impl JsonValidationException {
     pub fn get_errors(&self) -> &Vec<String> {
         &self.errors
     }
-
-    pub fn get_message(&self) -> &str {
-        &self.inner.message
-    }
 }
 
-impl std::fmt::Display for JsonValidationException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.message)
-    }
-}
-
-impl std::error::Error for JsonValidationException {}
+shirabe_php_shim::impl_php_exception!(
+    JsonValidationException,
+    inner,
+    r"Composer\Json\JsonValidationException"
+);

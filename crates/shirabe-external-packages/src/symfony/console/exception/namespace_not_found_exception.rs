@@ -6,12 +6,16 @@ use super::exception_interface::ExceptionInterface;
 #[derive(Debug)]
 pub struct NamespaceNotFoundException(pub CommandNotFoundException);
 
-impl std::fmt::Display for NamespaceNotFoundException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl NamespaceNotFoundException {
+    pub fn new(message: String, alternatives: Vec<String>, code: i64) -> Self {
+        Self(CommandNotFoundException::new(message, alternatives, code))
     }
 }
 
-impl std::error::Error for NamespaceNotFoundException {}
+shirabe_php_shim::impl_php_exception!(
+    NamespaceNotFoundException,
+    0,
+    r"Symfony\Component\Console\Exception\NamespaceNotFoundException"
+);
 
 impl ExceptionInterface for NamespaceNotFoundException {}

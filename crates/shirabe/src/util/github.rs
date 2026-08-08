@@ -9,6 +9,7 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, date, in_array_loose, php_regex, stripos, strtolower};
 
 #[derive(Debug)]
@@ -233,7 +234,7 @@ impl GitHub {
             Ok(_) => {}
             Err(te) => {
                 let code = te
-                    .downcast_ref::<crate::downloader::TransportException>()
+                    .catch::<crate::downloader::TransportException>()
                     .map(|t| t.get_code())
                     .unwrap_or(0);
                 if code == 403 || code == 401 {

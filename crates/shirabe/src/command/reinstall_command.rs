@@ -98,12 +98,10 @@ impl Command for ReinstallCommand {
 
         if type_count > 0 {
             if packages_count > 0 {
-                return Err(InvalidArgumentException {
-                    message:
-                        "You cannot specify package names and filter by type at the same time."
-                            .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "You cannot specify package names and filter by type at the same time."
+                        .to_string(),
+                )
                 .into());
             }
             let filter_types: Vec<String> = type_option
@@ -122,11 +120,9 @@ impl Command for ReinstallCommand {
             }
         } else {
             if packages_count == 0 {
-                return Err(InvalidArgumentException {
-                    message: "You must pass one or more package names to be reinstalled."
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "You must pass one or more package names to be reinstalled.".to_string(),
+                )
                 .into());
             }
             let patterns: Vec<String> = packages_arg

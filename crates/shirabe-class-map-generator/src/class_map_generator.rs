@@ -74,19 +74,15 @@ impl ClassMapGenerator {
         excluded_dirs: Vec<String>,
     ) -> anyhow::Result<()> {
         if !matches!(autoload_type, "psr-0" | "psr-4" | "classmap") {
-            return Err(anyhow::anyhow!(InvalidArgumentException {
-                message: "$autoloadType must be one of: \"psr-0\", \"psr-4\" or \"classmap\""
-                    .to_string(),
-                code: 0,
-            }));
+            return Err(InvalidArgumentException::new(
+                "$autoloadType must be one of: \"psr-0\", \"psr-4\" or \"classmap\"".to_string(),
+            )
+            .into());
         }
 
         let base_path: Option<String> = if autoload_type != "classmap" {
             if namespace.is_none() {
-                return Err(anyhow::anyhow!(InvalidArgumentException {
-                    message: "$namespace must be given (even if it is an empty string if you do not want to filter) when specifying a psr-0 or psr-4 autoload type".to_string(),
-                    code: 0,
-                }));
+                return Err(InvalidArgumentException::new("$namespace must be given (even if it is an empty string if you do not want to filter) when specifying a psr-0 or psr-4 autoload type".to_string()).into());
             }
             Some(path.to_owned())
         } else {
@@ -116,13 +112,10 @@ impl ClassMapGenerator {
                 .iter()
                 .collect()
         } else {
-            return Err(anyhow::anyhow!(RuntimeException {
-                message: format!(
-                    "Could not scan for classes inside \"{}\" which does not appear to be a file nor a folder",
-                    path
-                ),
-                code: 0,
-            }));
+            return Err(RuntimeException::new(format!(
+                "Could not scan for classes inside \"{}\" which does not appear to be a file nor a folder",
+                path
+            )).into());
         };
 
         let cwd = realpath(getcwd().unwrap_or_default()).unwrap_or_default();
@@ -131,10 +124,11 @@ impl ClassMapGenerator {
             let mut file_path = match file.to_str() {
                 Some(s) => s.to_string(),
                 None => {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: format!("Path contains invalid UTF-8: {}", file.display()),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(format!(
+                        "Path contains invalid UTF-8: {}",
+                        file.display()
+                    ))
+                    .into());
                 }
             };
             let ext = pathinfo(&file_path, PATHINFO_EXTENSION);
@@ -158,10 +152,11 @@ impl ClassMapGenerator {
             }
 
             if file_path.is_empty() {
-                return Err(anyhow::anyhow!(LogicException {
-                    message: format!("Got an empty $filePath for {}", file.display()),
-                    code: 0,
-                }));
+                return Err(LogicException::new(format!(
+                    "Got an empty $filePath for {}",
+                    file.display()
+                ))
+                .into());
             }
 
             let real_path = if is_stream_wrapper_path {
@@ -170,13 +165,11 @@ impl ClassMapGenerator {
                 match realpath(&file_path) {
                     Some(p) => p,
                     None => {
-                        return Err(anyhow::anyhow!(RuntimeException {
-                            message: format!(
-                                "realpath of {} failed to resolve, got false",
-                                file_path
-                            ),
-                            code: 0,
-                        }));
+                        return Err(RuntimeException::new(format!(
+                            "realpath of {} failed to resolve, got false",
+                            file_path
+                        ))
+                        .into());
                     }
                 }
             };
@@ -284,10 +277,10 @@ impl ClassMapGenerator {
                 };
                 sub_path = str_replace("\\", DIRECTORY_SEPARATOR, &sub_namespace);
             } else {
-                return Err(anyhow::anyhow!(InvalidArgumentException {
-                    message: "$namespaceType must be \"psr-0\" or \"psr-4\"".to_string(),
-                    code: 0,
-                }));
+                return Err(InvalidArgumentException::new(
+                    "$namespaceType must be \"psr-0\" or \"psr-4\"".to_string(),
+                )
+                .into());
             }
 
             if sub_path == real_sub_path {
@@ -403,10 +396,10 @@ impl ClassMapGenerator {
     fn get_cwd() -> anyhow::Result<String> {
         match getcwd() {
             Some(cwd) => Ok(cwd),
-            None => Err(anyhow::anyhow!(RuntimeException {
-                message: "Could not determine the current working directory".to_string(),
-                code: 0,
-            })),
+            None => Err(RuntimeException::new(
+                "Could not determine the current working directory".to_string(),
+            )
+            .into()),
         }
     }
 }

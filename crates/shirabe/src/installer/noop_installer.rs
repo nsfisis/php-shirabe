@@ -69,10 +69,10 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(initial.clone())? {
-            return Err(InvalidArgumentException {
-                message: format!("Package is not installed: {}", initial),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package is not installed: {}",
+                initial
+            ))
             .into());
         }
 
@@ -91,10 +91,10 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(package.clone())? {
-            return Err(InvalidArgumentException {
-                message: format!("Package is not installed: {}", package),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package is not installed: {}",
+                package
+            ))
             .into());
         }
         repo.remove_package(package);

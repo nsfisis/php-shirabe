@@ -28,6 +28,7 @@ pub use package_event::*;
 pub use package_events::*;
 pub use plugin_installer::*;
 pub use project_installer::*;
+use shirabe_php_shim::Catch as _;
 pub use suggested_packages_reporter::*;
 
 use crate::io::io_interface;
@@ -226,10 +227,11 @@ impl Installer {
         gc_disable();
 
         if self.update_allow_list.is_some() && self.update_mirrors {
-            return Err(RuntimeException {
-                message: "The installer options updateMirrors and updateAllowList are mutually exclusive.".to_string(),
-                code: 0,
-            }.into());
+            return Err(RuntimeException::new(
+                "The installer options updateMirrors and updateAllowList are mutually exclusive."
+                    .to_string(),
+            )
+            .into());
         }
 
         let is_fresh_install = self
@@ -535,7 +537,7 @@ impl Installer {
                         });
                     }
                     Err(e) => {
-                        if let Some(te) = e.downcast_ref::<TransportException>() {
+                        if let Some(te) = e.catch::<TransportException>() {
                             self.io
                                 .error(&format!("Failed to audit {} packages.", target), &[]);
                             if self.io.is_verbose() {
@@ -570,27 +572,25 @@ impl Installer {
         let mut locked_repository: Option<crate::repository::LockArrayRepositoryHandle> = None;
 
         let try_load_locked = || -> anyhow::Result<
-            Result<Option<crate::repository::LockArrayRepositoryHandle>, ParsingException>,
+            Result<Option<crate::repository::LockArrayRepositoryHandle>, anyhow::Error>,
         > {
-                if self.locker.borrow_mut().is_locked() {
-                    match self.locker.borrow_mut().get_locked_repository(true) {
-                        Ok(r) => Ok(Ok(Some(r))),
-                        Err(e) => match e.downcast::<ParsingException>() {
-                            Ok(p) => Ok(Err(p)),
-                            Err(other) => Err(other),
-                        },
-                    }
-                } else {
-                    Ok(Ok(None))
+            if self.locker.borrow_mut().is_locked() {
+                match self.locker.borrow_mut().get_locked_repository(true) {
+                    Ok(r) => Ok(Ok(Some(r))),
+                    Err(e) if e.is_instanceof::<ParsingException>() => Ok(Err(e)),
+                    Err(e) => Err(e),
                 }
-            };
+            } else {
+                Ok(Ok(None))
+            }
+        };
 
         match try_load_locked()? {
             Ok(r) => locked_repository = r,
             Err(e) => {
                 if self.update_allow_list.is_some() || self.update_mirrors {
                     // in case we are doing a partial update or updating mirrors, the lock file is needed so we error
-                    return Err(e.into());
+                    return Err(e);
                 }
                 // otherwise, ignoring parse errors as the lock file will be regenerated from scratch when
                 // doing a full update

@@ -1,11 +1,11 @@
 //! ref: composer/vendor/symfony/process/Exception/ProcessTimedOutException.php
 
+use crate::symfony::process::exception::runtime_exception::RuntimeException;
 use crate::symfony::process::process::Process;
 
 #[derive(Debug)]
 pub struct ProcessTimedOutException {
-    pub message: String,
-    pub code: i64,
+    inner: RuntimeException,
 }
 
 impl ProcessTimedOutException {
@@ -18,14 +18,14 @@ impl ProcessTimedOutException {
             exceeded_timeout.map(|t| t.to_string()).unwrap_or_default(),
         );
 
-        Self { message, code: 0 }
+        Self {
+            inner: RuntimeException::new(message),
+        }
     }
 }
 
-impl std::fmt::Display for ProcessTimedOutException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for ProcessTimedOutException {}
+shirabe_php_shim::impl_php_exception!(
+    ProcessTimedOutException,
+    inner,
+    r"Symfony\Component\Process\Exception\ProcessTimedOutException"
+);

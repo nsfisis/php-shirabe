@@ -253,15 +253,11 @@ impl OutputFormatterInterface for OutputFormatter {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>>
     {
         if !self.has_style(name) {
-            return Err(anyhow::anyhow!(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
-                    message: format!(
-                        "Undefined style: \"{}\".",
-                        shirabe_php_shim::PhpMixed::String(name.to_string()),
-                    ),
-                    code: 0,
-                },
-            )));
+            return Err(InvalidArgumentException::new(format!(
+                "Undefined style: \"{}\".",
+                shirabe_php_shim::PhpMixed::String(name.to_string()),
+            ))
+            .into());
         }
 
         Ok(std::rc::Rc::clone(

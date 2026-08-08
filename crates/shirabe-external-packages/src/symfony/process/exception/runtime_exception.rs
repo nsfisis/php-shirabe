@@ -2,20 +2,19 @@
 
 #[derive(Debug)]
 pub struct RuntimeException {
-    pub message: String,
-    pub code: i64,
+    inner: shirabe_php_shim::RuntimeException,
 }
 
 impl RuntimeException {
     pub fn new(message: String) -> Self {
-        Self { message, code: 0 }
+        Self {
+            inner: shirabe_php_shim::RuntimeException::new(message),
+        }
     }
 }
 
-impl std::fmt::Display for RuntimeException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for RuntimeException {}
+shirabe_php_shim::impl_php_exception!(
+    RuntimeException,
+    inner,
+    r"Symfony\Component\Process\Exception\RuntimeException"
+);

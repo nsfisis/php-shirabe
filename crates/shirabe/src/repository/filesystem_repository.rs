@@ -19,9 +19,9 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Exception, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_flip, dirname, get_class_err, get_debug_type, in_array_strict, is_array, is_null,
-    is_string, ksort, realpath, str_repeat, usort, var_export,
+    AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
+    UnexpectedValueException, array_flip, dirname, get_debug_type, in_array_strict, is_array,
+    is_null, is_string, ksort, realpath, str_repeat, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -57,10 +57,9 @@ impl FilesystemRepository {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         if dump_versions && root_package.is_none() {
-            return Err(InvalidArgumentException {
-                message: "Expected a root package instance if $dumpVersions is true".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "Expected a root package instance if $dumpVersions is true".to_string(),
+            )
             .into());
         }
         Ok(Self {
@@ -134,10 +133,9 @@ impl FilesystemRepository {
             }
 
             if !is_array(&packages_value) {
-                return Err(UnexpectedValueException {
-                    message: "Could not parse package list from the repository".to_string(),
-                    code: 0,
-                }
+                return Err(UnexpectedValueException::new(
+                    "Could not parse package list from the repository".to_string(),
+                )
                 .into());
             }
 
@@ -145,15 +143,14 @@ impl FilesystemRepository {
         })() {
             Ok(p) => p,
             Err(e) => {
-                return Err(InvalidRepositoryException(Exception {
-                    message: format!(
-                        "Invalid repository data in {}, packages could not be loaded: [{}] {}",
-                        self.file.get_path(),
-                        get_class_err(&e),
-                        e,
-                    ),
-                    code: 0,
-                })
+                return Err(InvalidRepositoryException::new(format!(
+                    "Invalid repository data in {}, packages could not be loaded: [{}] {}",
+                    self.file.get_path(),
+                    AnyThrowable::of(e.as_ref())
+                        .expect("PHP reaches this only with a caught \\Throwable")
+                        .php_class_name(),
+                    e,
+                ))
                 .into());
             }
         };
@@ -464,12 +461,10 @@ impl FilesystemRepository {
             self.inner.get_packages()?.into_iter().collect();
         let mut current_root: RootPackageInterfaceHandle = match &self.root_package {
             None => {
-                return Err(LogicException {
-                    message:
-                        "It should not be possible to dump packages if no root package is given"
-                            .to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new(
+                    "It should not be possible to dump packages if no root package is given"
+                        .to_string(),
+                )
                 .into());
             }
             Some(r) => r.clone(),

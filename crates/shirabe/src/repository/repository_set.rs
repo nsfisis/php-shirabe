@@ -21,6 +21,7 @@ use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
 use crate::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
 use indexmap::IndexMap;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{LogicException, RuntimeException, ksort, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -155,10 +156,7 @@ impl RepositorySet {
     /// @param RepositoryInterface $repo A package repository
     pub fn add_repository(&mut self, repo: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         if self.locked {
-            return Err(RuntimeException {
-                message: "Pool has already been created from this repository set, it cannot be modified anymore.".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new("Pool has already been created from this repository set, it cannot be modified anymore.".to_string())
             .into());
         }
 
@@ -374,17 +372,17 @@ impl RepositorySet {
                 Err(e) => {
                     // PHP catches only \Composer\Downloader\TransportException; other
                     // exceptions propagate uncaught.
-                    if e.downcast_ref::<TransportException>().is_none() {
+                    if !e.is_instanceof::<TransportException>() {
                         return Err(e);
                     }
                     if !ignore_unreachable {
                         return Err(e);
                     }
                     let message = e
-                        .downcast_ref::<TransportException>()
+                        .catch::<TransportException>()
                         .unwrap()
-                        .message
-                        .clone();
+                        .get_message()
+                        .to_string();
                     unreachable_repos.push(message);
                 }
             }
@@ -482,11 +480,9 @@ impl RepositorySet {
                     || repo_ref.as_any().is::<InstalledRepository>()
             };
             if is_installed && !self.allow_installed_repositories {
-                return Err(LogicException {
-                    message: "The pool can not accept packages from an installed repository"
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new(
+                    "The pool can not accept packages from an installed repository".to_string(),
+                )
                 .into());
             }
         }
@@ -505,11 +501,9 @@ impl RepositorySet {
                     || repo_ref.as_any().is::<InstalledRepository>()
             };
             if is_installed && !self.allow_installed_repositories {
-                return Err(LogicException {
-                    message: "The pool can not accept packages from an installed repository"
-                        .to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new(
+                    "The pool can not accept packages from an installed repository".to_string(),
+                )
                 .into());
             }
         }
@@ -582,10 +576,7 @@ impl RepositorySet {
         let mut allowed_packages: Vec<String> = vec![];
         for package_name in &package_names {
             if PlatformRepository::is_platform_package(package_name) {
-                return Err(LogicException {
-                    message: "createPoolForPackage(s) can not be used for platform packages, as they are never loaded by the PoolBuilder which expects them to be fixed. Use createPoolWithAllPackages or pass in a proper request with the platform packages you need fixed in it.".to_string(),
-                    code: 0,
-                }
+                return Err(LogicException::new("createPoolForPackage(s) can not be used for platform packages, as they are never loaded by the PoolBuilder which expects them to be fixed. Use createPoolWithAllPackages or pass in a proper request with the platform packages you need fixed in it.".to_string())
                 .into());
             }
 

@@ -76,13 +76,10 @@ impl VersionSelector {
         show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         if !base_package::STABILITIES.contains_key(preferred_stability) {
-            return Err(shirabe_php_shim::UnexpectedValueException {
-                message: format!(
-                    "Expected a valid stability name as 3rd argument, got {}",
-                    preferred_stability
-                ),
-                code: 0,
-            }
+            return Err(shirabe_php_shim::UnexpectedValueException::new(format!(
+                "Expected a valid stability name as 3rd argument, got {}",
+                preferred_stability
+            ))
             .into());
         }
 

@@ -86,10 +86,10 @@ impl InstallerInterface for MetapackageInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException {
-                message: format!("Package is not installed: {}", initial),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package is not installed: {}",
+                initial
+            ))
             .into());
         }
 
@@ -115,10 +115,10 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException {
-                message: format!("Package is not installed: {}", package),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "Package is not installed: {}",
+                package
+            ))
             .into());
         }
 

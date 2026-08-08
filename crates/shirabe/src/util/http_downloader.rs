@@ -17,6 +17,7 @@ use crate::util::http::Response;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
     file_get_contents, function_exists, implode, is_numeric, php_regex, rawurldecode,
@@ -205,19 +206,14 @@ impl HttpDownloader {
             return self.mock_get(url, &options);
         }
         if url.is_empty() {
-            return Err(InvalidArgumentException {
-                message: "$url must not be an empty string".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(
+                "$url must not be an empty string".to_string(),
+            )
             .into());
         }
         if !sync && !self.allow_async {
-            return Err(LogicException {
-                message:
-                    "You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"
-                        .to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"
+                .to_string())
             .into());
         }
 
@@ -321,7 +317,7 @@ impl HttpDownloader {
             let curl = self.curl.as_ref().unwrap();
             return match curl.download(&origin, url, options, copy_to).await {
                 Ok(Ok(response)) => Ok(response),
-                Ok(Err(transport_exception)) => Err(transport_exception.into()),
+                Ok(Err(e)) => Err(e),
                 Err(e) => Err(e),
             };
         }
@@ -463,7 +459,7 @@ impl HttpDownloader {
 
     /// @internal
     pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<String>> {
-        let e_as_transport: Option<&TransportException> = e.downcast_ref::<TransportException>();
+        let e_as_transport: Option<&TransportException> = e.catch::<TransportException>();
         e_as_transport?;
         let e_as_transport = e_as_transport.unwrap();
 
@@ -600,11 +596,7 @@ impl HttpDownloader {
         options: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<Response> {
         if file_url.is_empty() {
-            return Err(LogicException {
-                message: "url cannot be an empty string".to_string(),
-                code: 0,
-            }
-            .into());
+            return Err(LogicException::new("url cannot be an empty string".to_string()).into());
         }
 
         let mock = self

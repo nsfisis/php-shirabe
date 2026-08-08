@@ -12,6 +12,7 @@ use crate::util::ProcessExecutor;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex,
 };
@@ -77,10 +78,7 @@ impl FossilDriver {
                 .unwrap_or("")
                 .to_string();
             if !Cache::is_usable(&cache_repo_dir) || !Cache::is_usable(&cache_vcs_dir) {
-                return Err(RuntimeException {
-                    message: "FossilDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string(),
-                    code: 0,
-                }
+                return Err(RuntimeException::new("FossilDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())
                 .into());
             }
 
@@ -105,13 +103,10 @@ impl FossilDriver {
             None,
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "fossil was not found, check that it is installed and in your PATH env.\n\n{}",
-                    self.inner.process.borrow().get_error_output()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "fossil was not found, check that it is installed and in your PATH env.\n\n{}",
+                self.inner.process.borrow().get_error_output()
+            ))
             .into());
         }
         Ok(())
@@ -124,13 +119,10 @@ impl FossilDriver {
         fs.ensure_directory_exists(&self.checkout_dir)?;
 
         if !is_writable(dirname(&self.checkout_dir)) {
-            return Err(RuntimeException {
-                message: format!(
-                    "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
-                    self.inner.url, self.checkout_dir
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
+                self.inner.url, self.checkout_dir
+            ))
             .into());
         }
 
@@ -173,13 +165,10 @@ impl FossilDriver {
             ) != 0
             {
                 let output = self.inner.process.borrow().get_error_output().to_string();
-                return Err(RuntimeException {
-                    message: format!(
-                        "Failed to clone {} to repository {}\n\n{}",
-                        self.inner.url, repo_file, output
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Failed to clone {} to repository {}\n\n{}",
+                    self.inner.url, repo_file, output
+                ))
                 .into());
             }
 
@@ -192,13 +181,10 @@ impl FossilDriver {
             ) != 0
             {
                 let output = self.inner.process.borrow().get_error_output().to_string();
-                return Err(RuntimeException {
-                    message: format!(
-                        "Failed to open repository {} in {}\n\n{}",
-                        repo_file, self.checkout_dir, output
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "Failed to open repository {} in {}\n\n{}",
+                    repo_file, self.checkout_dir, output
+                ))
                 .into());
             }
         }
@@ -231,13 +217,10 @@ impl FossilDriver {
 
     pub fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
         if identifier.starts_with('-') {
-            return Err(RuntimeException {
-                message: format!(
-                    "Invalid fossil identifier detected. Identifier must not start with a -, given: {}",
-                    identifier
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Invalid fossil identifier detected. Identifier must not start with a -, given: {}",
+                identifier
+            ))
             .into());
         }
 
@@ -420,7 +403,7 @@ impl crate::repository::vcs::VcsDriverInterface for FossilDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

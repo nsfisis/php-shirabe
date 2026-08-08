@@ -16,6 +16,7 @@ use crate::util::ForgejoUrl;
 use crate::util::http::Response;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, php_regex, urlencode,
 };
@@ -107,7 +108,7 @@ impl ForgejoDriver {
         );
         let response = self
             .get_contents(&resource_url, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
         let mut resource = response.decode_json()?;
 
         // The Forgejo contents API only returns files up to 1MB as base64 encoded files;
@@ -134,7 +135,7 @@ impl ForgejoDriver {
             if let Some(git_url) = git_url {
                 resource = self
                     .get_contents(&git_url, false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.message))?
+                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
                     .decode_json()?;
             }
         }
@@ -157,22 +158,22 @@ impl ForgejoDriver {
             Some(b64) => match base64_decode(&b64) {
                 Some(bytes) => match String::from_utf8(bytes) {
                     Ok(s) => Ok(Some(s)),
-                    Err(_) => Err(RuntimeException {
-                        message: format!("Could not retrieve {} for {}", file, identifier),
-                        code: 0,
-                    }
+                    Err(_) => Err(RuntimeException::new(format!(
+                        "Could not retrieve {} for {}",
+                        file, identifier
+                    ))
                     .into()),
                 },
-                None => Err(RuntimeException {
-                    message: format!("Could not retrieve {} for {}", file, identifier),
-                    code: 0,
-                }
+                None => Err(RuntimeException::new(format!(
+                    "Could not retrieve {} for {}",
+                    file, identifier
+                ))
                 .into()),
             },
-            None => Err(RuntimeException {
-                message: format!("Could not retrieve {} for {}", file, identifier),
-                code: 0,
-            }
+            None => Err(RuntimeException::new(format!(
+                "Could not retrieve {} for {}",
+                file, identifier
+            ))
             .into()),
         }
     }
@@ -193,7 +194,7 @@ impl ForgejoDriver {
         );
         let commit = self
             .get_contents(&resource_url, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.message))?
+            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
             .decode_json()?;
 
         let date_str = if let PhpMixed::Array(ref arr) = commit {
@@ -208,9 +209,8 @@ impl ForgejoDriver {
             None
         };
 
-        let date_str = date_str.ok_or_else(|| RuntimeException {
-            message: format!("Could not parse commit date for {}", identifier),
-            code: 0,
+        let date_str = date_str.ok_or_else(|| {
+            RuntimeException::new(format!("Could not parse commit date for {}", identifier))
         })?;
 
         let date: chrono::DateTime<chrono::FixedOffset> = shirabe_php_shim::date_create(&date_str)?;
@@ -243,7 +243,7 @@ impl ForgejoDriver {
             while let Some(url) = resource {
                 let response = self
                     .get_contents(&url, false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
@@ -286,7 +286,7 @@ impl ForgejoDriver {
             while let Some(url) = resource {
                 let response = self
                     .get_contents(&url, false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.message))?;
+                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
@@ -599,7 +599,7 @@ impl ForgejoDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> anyhow::Result<Response, TransportException> {
+    ) -> anyhow::Result<Response, Box<TransportException>> {
         match self.inner.get_contents(url) {
             Ok(response) => Ok(response),
             Err(e) => match e.get_code() {
@@ -610,14 +610,7 @@ impl ForgejoDriver {
 
                     if !self.inner.io.is_interactive() {
                         self.attempt_clone_fallback()
-                            .map_err(|inner_e| TransportException {
-                                message: inner_e.to_string(),
-                                code: 0,
-                                headers: None,
-                                response: None,
-                                status_code: None,
-                                response_info: vec![],
-                            })?;
+                            .map_err(|inner_e| TransportException::new(inner_e.to_string(), 0))?;
 
                         return Ok(Response::new(
                             "dummy".to_string(),
@@ -645,14 +638,7 @@ impl ForgejoDriver {
                         );
                         let auth_result = forgejo
                             .authorize_o_auth_interactively(&origin_url, message.as_deref())
-                            .map_err(|inner_e| TransportException {
-                                message: inner_e.to_string(),
-                                code: 0,
-                                headers: None,
-                                response: None,
-                                status_code: None,
-                                response_info: vec![],
-                            })?;
+                            .map_err(|inner_e| TransportException::new(inner_e.to_string(), 0))?;
 
                         if let Ok(true) = auth_result {
                             return self.inner.get_contents(url);
@@ -734,7 +720,7 @@ impl crate::repository::vcs::VcsDriverInterface for ForgejoDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

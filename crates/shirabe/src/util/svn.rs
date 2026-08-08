@@ -177,11 +177,7 @@ impl Svn {
             && stripos(&full_output, "svn: E170001:").is_none()
             && stripos(&full_output, "svn: E215004:").is_none()
         {
-            return Err(RuntimeException {
-                message: full_output,
-                code: 0,
-            }
-            .into());
+            return Err(RuntimeException::new(full_output).into());
         }
 
         if !self.has_auth() {
@@ -196,11 +192,7 @@ impl Svn {
             return self.execute_with_auth_retry(svn_command, cwd, url, path, verbose);
         }
 
-        Err(RuntimeException {
-            message: format!("wrong credentials provided ({})", full_output),
-            code: 0,
-        }
-        .into())
+        Err(RuntimeException::new(format!("wrong credentials provided ({})", full_output)).into())
     }
 
     pub fn set_cache_credentials(&mut self, cache_credentials: bool) {
@@ -213,10 +205,9 @@ impl Svn {
     pub(crate) fn do_auth_dance(&mut self) -> anyhow::Result<&mut Self> {
         // cannot ask for credentials in non interactive mode
         if !self.io.is_interactive() {
-            return Err(RuntimeException {
-                message: "can not ask for authentication in non interactive mode".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "can not ask for authentication in non interactive mode".to_string(),
+            )
             .into());
         }
 
@@ -310,11 +301,7 @@ impl Svn {
     /// @throws \LogicException
     pub(crate) fn get_password(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
-            return Err(LogicException {
-                message: "No svn auth detected.".to_string(),
-                code: 0,
-            }
-            .into());
+            return Err(LogicException::new("No svn auth detected.".to_string()).into());
         }
 
         Ok(self.credentials.as_ref().unwrap().password.clone())
@@ -325,11 +312,7 @@ impl Svn {
     /// @throws \LogicException
     pub(crate) fn get_username(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
-            return Err(LogicException {
-                message: "No svn auth detected.".to_string(),
-                code: 0,
-            }
-            .into());
+            return Err(LogicException::new("No svn auth detected.".to_string()).into());
         }
 
         Ok(self.credentials.as_ref().unwrap().username.clone())

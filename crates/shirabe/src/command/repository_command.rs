@@ -362,26 +362,20 @@ impl Command for RepositoryCommand {
             }
             "add" => {
                 if name.is_none() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "You must pass a repository name. Example: composer repo add foo vcs https://example.org".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new("You must pass a repository name. Example: composer repo add foo vcs https://example.org".to_string()).into());
                 }
                 if arg1.is_none() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "You must pass the type and a url, or a JSON string.".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(
+                        "You must pass the type and a url, or a JSON string.".to_string(),
+                    )
+                    .into());
                 }
                 let arg1_str = arg1.as_deref().unwrap();
                 let repo_config: PhpMixed = if Preg::is_match(php_regex!(r"{^\s*\{}"), arg1_str) {
                     JsonFile::parse_json(Some(arg1_str), None)?
                 } else {
                     if arg2.is_none() {
-                        return Err(anyhow::anyhow!(RuntimeException {
-                            message: "You must pass the type and a url. Example: composer repo add foo vcs https://example.org".to_string(),
-                            code: 0,
-                        }));
+                        return Err(RuntimeException::new("You must pass the type and a url. Example: composer repo add foo vcs https://example.org".to_string()).into());
                     }
                     let mut m = IndexMap::new();
                     m.insert("type".to_string(), PhpMixed::String(arg1_str.to_string()));
@@ -400,19 +394,19 @@ impl Command for RepositoryCommand {
                     .as_string()
                     .map(|s| s.to_string());
                 if before.is_some() && after.is_some() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "You can not combine --before and --after".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(
+                        "You can not combine --before and --after".to_string(),
+                    )
+                    .into());
                 }
 
                 if before.is_some() || after.is_some() {
                     if matches!(repo_config, PhpMixed::Bool(false)) {
-                        return Err(anyhow::anyhow!(RuntimeException {
-                            message: "Cannot use --before/--after with boolean repository values"
+                        return Err(RuntimeException::new(
+                            "Cannot use --before/--after with boolean repository values"
                                 .to_string(),
-                            code: 0,
-                        }));
+                        )
+                        .into());
                     }
                     let reference_name = before.as_deref().or(after.as_deref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
@@ -443,10 +437,10 @@ impl Command for RepositoryCommand {
             }
             "remove" | "rm" | "delete" => {
                 if name.is_none() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "You must pass the repository name to remove.".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(
+                        "You must pass the repository name to remove.".to_string(),
+                    )
+                    .into());
                 }
                 let name_str = name.as_deref().unwrap();
                 self.config_source
@@ -465,10 +459,10 @@ impl Command for RepositoryCommand {
             }
             "set-url" | "seturl" => {
                 if name.is_none() || arg1.is_none() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "Usage: composer repo set-url <name> <new-url>".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(
+                        "Usage: composer repo set-url <name> <new-url>".to_string(),
+                    )
+                    .into());
                 }
                 self.config_source
                     .borrow_mut()
@@ -479,10 +473,10 @@ impl Command for RepositoryCommand {
             }
             "get-url" | "geturl" => {
                 if name.is_none() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "Usage: composer repo get-url <name>".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(
+                        "Usage: composer repo get-url <name>".to_string(),
+                    )
+                    .into());
                 }
                 let name_str = name.as_deref().unwrap();
                 if let Some(repo) = repos.get(name_str)
@@ -493,10 +487,11 @@ impl Command for RepositoryCommand {
                         self.get_io().write(url);
                         return Ok(0);
                     }
-                    return Err(anyhow::anyhow!(InvalidArgumentException {
-                        message: format!("The {} repository does not have a URL", name_str),
-                        code: 0,
-                    }));
+                    return Err(InvalidArgumentException::new(format!(
+                        "The {} repository does not have a URL",
+                        name_str
+                    ))
+                    .into());
                 }
                 for (_key, val) in &repos {
                     if let PhpMixed::Array(ref repo_map) = *val
@@ -508,23 +503,25 @@ impl Command for RepositoryCommand {
                             self.get_io().write(url);
                             return Ok(0);
                         }
-                        return Err(anyhow::anyhow!(InvalidArgumentException {
-                            message: format!("The {} repository does not have a URL", name_str),
-                            code: 0,
-                        }));
+                        return Err(InvalidArgumentException::new(format!(
+                            "The {} repository does not have a URL",
+                            name_str
+                        ))
+                        .into());
                     }
                 }
-                Err(anyhow::anyhow!(InvalidArgumentException {
-                    message: format!("There is no {} repository defined", name_str),
-                    code: 0,
-                }))
+                Err(InvalidArgumentException::new(format!(
+                    "There is no {} repository defined",
+                    name_str
+                ))
+                .into())
             }
             "disable" => {
                 if name.is_none() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "Usage: composer repo disable packagist.org".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(
+                        "Usage: composer repo disable packagist.org".to_string(),
+                    )
+                    .into());
                 }
                 let name_str = name.as_deref().unwrap();
                 if ["packagist", "packagist.org"].contains(&name_str) {
@@ -540,17 +537,14 @@ impl Command for RepositoryCommand {
                         .add_repository("packagist.org", PhpMixed::Bool(false), append);
                     return Ok(0);
                 }
-                Err(anyhow::anyhow!(RuntimeException {
-                    message: "Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.".to_string(),
-                    code: 0,
-                }))
+                Err(RuntimeException::new("Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.".to_string()).into())
             }
             "enable" => {
                 if name.is_none() {
-                    return Err(anyhow::anyhow!(RuntimeException {
-                        message: "Usage: composer repo enable packagist.org".to_string(),
-                        code: 0,
-                    }));
+                    return Err(RuntimeException::new(
+                        "Usage: composer repo enable packagist.org".to_string(),
+                    )
+                    .into());
                 }
                 let name_str = name.as_deref().unwrap();
                 if ["packagist", "packagist.org"].contains(&name_str) {
@@ -561,19 +555,16 @@ impl Command for RepositoryCommand {
                         .remove_repository("packagist.org");
                     return Ok(0);
                 }
-                Err(anyhow::anyhow!(RuntimeException {
-                    message: "Only packagist.org can be enabled/disabled using this command."
-                        .to_string(),
-                    code: 0,
-                }))
+                Err(RuntimeException::new(
+                    "Only packagist.org can be enabled/disabled using this command.".to_string(),
+                )
+                .into())
             }
-            _ => Err(anyhow::anyhow!(InvalidArgumentException {
-                message: format!(
-                    "Unknown action \"{}\". Use list, add, remove, set-url, get-url, enable, disable",
-                    action
-                ),
-                code: 0,
-            })),
+            _ => Err(InvalidArgumentException::new(format!(
+                "Unknown action \"{}\". Use list, add, remove, set-url, get-url, enable, disable",
+                action
+            ))
+            .into()),
         }
     }
 

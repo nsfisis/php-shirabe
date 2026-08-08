@@ -191,11 +191,7 @@ impl InstallationManager {
             }
         }
 
-        Err(InvalidArgumentException {
-            message: format!("Unknown installer type: {}", r#type),
-            code: 0,
-        }
-        .into())
+        Err(InvalidArgumentException::new(format!("Unknown installer type: {}", r#type)).into())
     }
 
     /// Checks whether provided package is installed in one of the registered installers.

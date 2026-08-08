@@ -127,10 +127,7 @@ impl ArchiveDownloader for GzipDownloader {
                 implode(" ", &command),
                 self.inner.process.borrow().get_error_output(),
             );
-            return Err(anyhow::anyhow!(RuntimeException {
-                message: process_error,
-                code: 0
-            }));
+            return Err(RuntimeException::new(process_error).into());
         }
 
         self.extract_using_ext(file, &target_filepath);

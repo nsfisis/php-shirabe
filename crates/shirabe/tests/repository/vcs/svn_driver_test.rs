@@ -11,6 +11,7 @@ use shirabe::repository::vcs::SvnDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::MockHandler;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 use tempfile::TempDir;
 
@@ -130,10 +131,10 @@ fn test_wrong_credentials_in_url() {
     let mut svn = SvnDriver::new(repo_config, console, config, http_downloader, process);
     let err = svn.initialize().unwrap_err();
     let runtime = err
-        .downcast_ref::<RuntimeException>()
+        .catch::<RuntimeException>()
         .expect("expected RuntimeException");
     assert_eq!(
         "Repository https://till:secret@corp.svn.local/repo could not be processed, wrong credentials provided (svn: OPTIONS of 'https://corp.svn.local/repo': authorization failed: Could not authenticate to server: rejected Basic challenge (https://corp.svn.local/))",
-        runtime.message
+        runtime.get_message()
     );
 }

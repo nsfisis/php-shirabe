@@ -28,10 +28,10 @@ impl ArchivableFilesFinder {
 
         let sources_real_path = realpath(sources);
         if sources_real_path.is_none() {
-            return Err(RuntimeException {
-                message: format!("Could not realpath() the source directory \"{}\"", sources),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Could not realpath() the source directory \"{}\"",
+                sources
+            ))
             .into());
         }
         let sources = fs.normalize_path(&sources_real_path.unwrap());

@@ -222,14 +222,6 @@ pub fn get_class(_object: &PhpMixed) -> String {
     todo!()
 }
 
-// Overload accepting an `anyhow::Error` (PHP's `get_class($e)` is commonly used on exceptions).
-pub fn get_class_err(_e: &anyhow::Error) -> String {
-    // TODO(phase-c): PHP returns the exception's class name. anyhow::Error carries the concrete
-    // exception type, but mapping each ported exception struct to its PHP class name is not yet
-    // wired up (cf. php_exception_get_code which downcasts case by case).
-    todo!()
-}
-
 pub fn get_debug_type(value: &PhpMixed) -> String {
     match value {
         PhpMixed::Null => "null".to_string(),

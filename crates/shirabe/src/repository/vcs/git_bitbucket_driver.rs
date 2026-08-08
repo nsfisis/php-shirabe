@@ -16,6 +16,7 @@ use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
     array_search_mixed, extension_loaded, http_build_query_mixed, implode, is_array, php_regex,
@@ -90,13 +91,10 @@ impl GitBitbucketDriver {
             &self.inner.url,
             Some(&mut m),
         ) {
-            return Err(InvalidArgumentException {
-                message: format!(
-                    "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
-                    self.inner.url.clone(),
-                ),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!(
+                "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
+                self.inner.url.clone(),
+            ))
             .into());
         }
 
@@ -706,7 +704,7 @@ impl GitBitbucketDriver {
                         if !self.inner.io.has_authentication(&self.inner.origin_url)
                             && bitbucket_util.authorize_oauth(&self.inner.origin_url)
                         {
-                            return self.inner.get_contents(url).map_err(anyhow::Error::from);
+                            return self.inner.get_contents(url).map_err(|e| (*e).into());
                         }
 
                         if !self.inner.io.is_interactive() && fetching_repo_data {
@@ -722,7 +720,7 @@ impl GitBitbucketDriver {
                     }
                 }
 
-                Err(e.into())
+                Err((*e).into())
             }
         }
     }
@@ -742,7 +740,7 @@ impl GitBitbucketDriver {
         match self.setup_fallback_driver(&self.generate_ssh_url()) {
             Ok(()) => Ok(true),
             Err(e) => {
-                if e.downcast_ref::<RuntimeException>().is_some() {
+                if e.is_instanceof::<RuntimeException>() {
                     self.fallback_driver = None;
 
                     self.inner.io.write_error(&format!(
@@ -799,11 +797,10 @@ impl GitBitbucketDriver {
         if self.root_identifier.is_none() {
             if !self.get_repo_data()? {
                 if self.fallback_driver.is_none() {
-                    return Err(LogicException {
-                        message: "A fallback driver should be setup if getRepoData returns false"
+                    return Err(LogicException::new(
+                        "A fallback driver should be setup if getRepoData returns false"
                             .to_string(),
-                        code: 0,
-                    }
+                    )
                     .into());
                 }
 
@@ -811,13 +808,10 @@ impl GitBitbucketDriver {
             }
 
             if self.vcs_type.as_deref() != Some("git") {
-                return Err(RuntimeException {
-                    message: format!(
-                        "{} does not appear to be a git repository, use {} but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket",
-                        self.inner.url, self.clone_https_url
-                    ),
-                    code: 0,
-                }
+                return Err(RuntimeException::new(format!(
+                    "{} does not appear to be a git repository, use {} but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket",
+                    self.inner.url, self.clone_https_url
+                ))
                 .into());
             }
 
@@ -918,7 +912,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitBitbucketDriver {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
-                if e.downcast_ref::<TransportException>().is_some() {
+                if e.is_instanceof::<TransportException>() {
                     Ok(false)
                 } else {
                     Err(e)

@@ -127,16 +127,11 @@ impl StringInput {
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
             } else {
                 // should never happen
-                return Err(
-                    InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                        message: format!(
-                            "Unable to parse input near \"... {} ...\".",
-                            shirabe_php_shim::substr(input, cursor, Some(10)),
-                        ),
-                        code: 0,
-                    })
-                    .into(),
-                );
+                return Err(InvalidArgumentException::new(format!(
+                    "Unable to parse input near \"... {} ...\".",
+                    shirabe_php_shim::substr(input, cursor, Some(10)),
+                ))
+                .into());
             }
         }
 

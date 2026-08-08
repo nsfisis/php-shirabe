@@ -27,10 +27,9 @@ impl ChoiceQuestion {
         default: Option<PhpMixed>,
     ) -> Result<Self, LogicException> {
         if choices.is_empty() {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: "Choice question must have at least 1 choice available.".to_string(),
-                code: 0,
-            }));
+            return Err(LogicException::new(
+                "Choice question must have at least 1 choice available.".to_string(),
+            ));
         }
 
         let mut this = Self {
@@ -129,15 +128,10 @@ impl ChoiceQuestion {
                     &shirabe_php_shim::strval(&selected),
                     &mut matches,
                 ) {
-                    return Err(InvalidArgumentException(
-                        shirabe_php_shim::InvalidArgumentException {
-                            message: shirabe_php_shim::sprintf(
-                                &error_message,
-                                std::slice::from_ref(&selected),
-                            ),
-                            code: 0,
-                        },
-                    ));
+                    return Err(InvalidArgumentException::new(shirabe_php_shim::sprintf(
+                        &error_message,
+                        std::slice::from_ref(&selected),
+                    )));
                 }
 
                 shirabe_php_shim::explode(",", &shirabe_php_shim::strval(&selected))
@@ -168,15 +162,10 @@ impl ChoiceQuestion {
                 }
 
                 if results.len() > 1 {
-                    return Err(InvalidArgumentException(
-                        shirabe_php_shim::InvalidArgumentException {
-                            message: format!(
-                                "The provided answer is ambiguous. Value should be one of \"{}\".",
-                                shirabe_php_shim::implode("\" or \"", &results),
-                            ),
-                            code: 0,
-                        },
-                    ));
+                    return Err(InvalidArgumentException::new(format!(
+                        "The provided answer is ambiguous. Value should be one of \"{}\".",
+                        shirabe_php_shim::implode("\" or \"", &results),
+                    )));
                 }
 
                 // array_search($value, $choices)
@@ -210,15 +199,10 @@ impl ChoiceQuestion {
 
                 // false === $result
                 if matches!(result, PhpMixed::Bool(false)) {
-                    return Err(InvalidArgumentException(
-                        shirabe_php_shim::InvalidArgumentException {
-                            message: shirabe_php_shim::sprintf(
-                                &error_message,
-                                std::slice::from_ref(value),
-                            ),
-                            code: 0,
-                        },
-                    ));
+                    return Err(InvalidArgumentException::new(shirabe_php_shim::sprintf(
+                        &error_message,
+                        std::slice::from_ref(value),
+                    )));
                 }
 
                 // For associative choices, consistently return the key as string:

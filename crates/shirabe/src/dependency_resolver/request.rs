@@ -47,15 +47,12 @@ impl Request {
         let package_name = strtolower(package_name);
         let constraint = constraint.unwrap_or_else(|| MatchAllConstraint::new(None).into());
         if self.requires.contains_key(&package_name) {
-            return Err(LogicException {
-                message: format!(
-                    "Overwriting requires seems like a bug ({} {} => {}, check why it is happening, might be a root alias",
-                    package_name,
-                    self.requires[&package_name].get_pretty_string(),
-                    constraint.get_pretty_string()
-                ),
-                code: 0,
-            }
+            return Err(LogicException::new(format!(
+                "Overwriting requires seems like a bug ({} {} => {}, check why it is happening, might be a root alias",
+                package_name,
+                self.requires[&package_name].get_pretty_string(),
+                constraint.get_pretty_string()
+            ))
             .into());
         }
         self.requires.insert(package_name, constraint);

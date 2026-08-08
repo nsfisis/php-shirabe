@@ -102,14 +102,11 @@ impl Decisions {
 
         panic!(
             "{}",
-            LogicException {
-                message: format!(
-                    "Did not find a decision rule using {}",
-                    literal_or_package_id
-                ),
-                code: 0,
-            }
-            .message
+            LogicException::new(format!(
+                "Did not find a decision rule using {}",
+                literal_or_package_id
+            ))
+            .get_message()
         );
     }
 
@@ -171,7 +168,7 @@ impl Decisions {
                     literal_string, level, package, previous_decision
                 ))
                 .0
-                .message
+                .get_message()
             );
         }
 

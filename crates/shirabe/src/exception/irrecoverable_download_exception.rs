@@ -5,10 +5,14 @@ use shirabe_php_shim::RuntimeException;
 #[derive(Debug)]
 pub struct IrrecoverableDownloadException(pub RuntimeException);
 
-impl std::fmt::Display for IrrecoverableDownloadException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+impl IrrecoverableDownloadException {
+    pub fn new(message: String) -> Self {
+        Self(RuntimeException::new(message))
     }
 }
 
-impl std::error::Error for IrrecoverableDownloadException {}
+shirabe_php_shim::impl_php_exception!(
+    IrrecoverableDownloadException,
+    0,
+    r"Composer\Exception\IrrecoverableDownloadException"
+);

@@ -27,6 +27,7 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_external_packages::symfony::console::output::output_interface;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PHP_EOL, PhpMixed};
 
 fn tear_down() {
@@ -286,8 +287,7 @@ fn test_dispatcher_detect_infinite_recursion() {
     let result = dispatcher.dispatch(Some("root"), Some(&mut event));
     let err = result.expect_err("infinite recursion must raise a RuntimeException");
     assert!(
-        err.downcast_ref::<shirabe_php_shim::RuntimeException>()
-            .is_some(),
+        err.is_instanceof::<shirabe_php_shim::RuntimeException>(),
         "expected RuntimeException, got: {err:?}"
     );
 }
@@ -392,8 +392,7 @@ fn test_listener_exceptions_are_caught() {
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
-        e.downcast_ref::<shirabe_php_shim::RuntimeException>()
-            .is_some(),
+        e.is_instanceof::<shirabe_php_shim::RuntimeException>(),
         "got: {e:?}"
     );
 }

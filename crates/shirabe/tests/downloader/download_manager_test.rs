@@ -253,13 +253,7 @@ fn test_full_package_download_failover() {
         .expect_download()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
-        .returning(|_, _, _, _| {
-            Err(RuntimeException {
-                message: "Foo".to_string(),
-                code: 0,
-            }
-            .into())
-        });
+        .returning(|_, _, _, _| Err(RuntimeException::new("Foo".to_string()).into()));
 
     let mut downloader_success = downloader_mock("source");
     downloader_success

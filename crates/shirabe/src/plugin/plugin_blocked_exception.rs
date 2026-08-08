@@ -8,14 +8,12 @@ pub struct PluginBlockedException(pub UnexpectedValueException);
 
 impl PluginBlockedException {
     pub fn new(message: String) -> Self {
-        Self(UnexpectedValueException { message, code: 0 })
+        Self(UnexpectedValueException::new(message))
     }
 }
 
-impl std::fmt::Display for PluginBlockedException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl std::error::Error for PluginBlockedException {}
+shirabe_php_shim::impl_php_exception!(
+    PluginBlockedException,
+    0,
+    r"Composer\Plugin\PluginBlockedException"
+);

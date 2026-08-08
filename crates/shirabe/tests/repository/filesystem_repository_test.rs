@@ -13,6 +13,7 @@ use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, Roo
 use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 
@@ -50,7 +51,6 @@ fn test_repository_read() {
     assert_eq!(packages[0].get_type(), "vendor");
 }
 
-#[ignore = "InvalidRepositoryException message building calls shirabe_php_shim::var::get_class_err(), which is still todo!()"]
 #[test]
 fn test_corrupted_repository_file() {
     // PHP mocks read() to return the scalar string 'foo'; a real file containing the JSON string
@@ -63,7 +63,7 @@ fn test_corrupted_repository_file() {
     let result = repository.get_packages();
     let err = result.unwrap_err();
     assert!(
-        err.is::<shirabe::repository::InvalidRepositoryException>(),
+        err.is_instanceof::<shirabe::repository::InvalidRepositoryException>(),
         "expected InvalidRepositoryException, got: {err}"
     );
 }

@@ -145,13 +145,11 @@ pub trait BaseIO: IOInterface {
                 }
 
                 if !Preg::is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), &token_str) {
-                    return Err(anyhow::anyhow!(UnexpectedValueException {
-                        message: format!(
-                            "Your github oauth token for {} contains invalid characters: \"{}\"",
-                            domain, token_str
-                        ),
-                        code: 0,
-                    }));
+                    return Err(UnexpectedValueException::new(format!(
+                        "Your github oauth token for {} contains invalid characters: \"{}\"",
+                        domain, token_str
+                    ))
+                    .into());
                 }
                 self.check_and_set_authentication(
                     domain,

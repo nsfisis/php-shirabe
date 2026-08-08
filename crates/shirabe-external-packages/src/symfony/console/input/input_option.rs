@@ -34,13 +34,10 @@ impl InputOption {
         };
 
         if name.is_empty() {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: "An option name cannot be empty.".to_string(),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(
+                "An option name cannot be empty.".to_string(),
+            )
+            .into());
         }
 
         let shortcut = match shortcut {
@@ -69,13 +66,11 @@ impl InputOption {
         let mode = match mode {
             None => Self::VALUE_NONE,
             Some(m) if !(1..(Self::VALUE_NEGATABLE << 1)).contains(&m) => {
-                return Err(
-                    InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                        message: format!("Option mode \"{}\" is not valid.", m),
-                        code: 0,
-                    })
-                    .into(),
-                );
+                return Err(InvalidArgumentException::new(format!(
+                    "Option mode \"{}\" is not valid.",
+                    m
+                ))
+                .into());
             }
             Some(m) => m,
         };
@@ -89,17 +84,11 @@ impl InputOption {
         };
 
         if option.is_array() && !option.accept_value() {
-            return Err(InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                message: "Impossible to have an option mode VALUE_IS_ARRAY if the option does not accept a value.".to_string(),
-                code: 0,
-            })
+            return Err(InvalidArgumentException::new("Impossible to have an option mode VALUE_IS_ARRAY if the option does not accept a value.".to_string())
             .into());
         }
         if option.is_negatable() && option.accept_value() {
-            return Err(InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                message: "Impossible to have an option mode VALUE_NEGATABLE if the option also accepts a value.".to_string(),
-                code: 0,
-            })
+            return Err(InvalidArgumentException::new("Impossible to have an option mode VALUE_NEGATABLE if the option also accepts a value.".to_string())
             .into());
         }
 
@@ -115,13 +104,10 @@ impl InputOption {
             shirabe_php_shim::array_filter(&parts, |s: &String| !s.is_empty());
         let result = shirabe_php_shim::implode("|", &filtered);
         if result.is_empty() {
-            return Err(
-                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: "An option shortcut cannot be empty.".to_string(),
-                    code: 0,
-                })
-                .into(),
-            );
+            return Err(InvalidArgumentException::new(
+                "An option shortcut cannot be empty.".to_string(),
+            )
+            .into());
         }
         Ok(Some(result))
     }
@@ -157,11 +143,9 @@ impl InputOption {
     pub fn set_default(&mut self, default: PhpMixed) -> anyhow::Result<()> {
         if Self::VALUE_NONE == (Self::VALUE_NONE & self.mode) && !matches!(default, PhpMixed::Null)
         {
-            return Err(LogicException(shirabe_php_shim::LogicException {
-                message: "Cannot set a default value when using InputOption::VALUE_NONE mode."
-                    .to_string(),
-                code: 0,
-            })
+            return Err(LogicException::new(
+                "Cannot set a default value when using InputOption::VALUE_NONE mode.".to_string(),
+            )
             .into());
         }
 
@@ -171,11 +155,9 @@ impl InputOption {
                 // PHP `is_array()` accepts both list-style and associative arrays.
                 PhpMixed::List(_) | PhpMixed::Array(_) => default,
                 _ => {
-                    return Err(LogicException(shirabe_php_shim::LogicException {
-                        message: "A default value for an array option must be an array."
-                            .to_string(),
-                        code: 0,
-                    })
+                    return Err(LogicException::new(
+                        "A default value for an array option must be an array.".to_string(),
+                    )
                     .into());
                 }
             }

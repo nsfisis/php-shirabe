@@ -138,7 +138,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
             let mut borrowed = output.borrow_mut();
             if let Some(style) = (*borrowed).as_any_mut().downcast_mut::<SymfonyStyle>() {
                 style.new_line(1);
-                style.error(PhpMixed::String(error.message.clone()));
+                style.error(PhpMixed::String(error.get_message().to_string()));
 
                 return;
             }

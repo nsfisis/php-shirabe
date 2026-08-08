@@ -59,11 +59,7 @@ impl RuleSet {
     ) -> anyhow::Result<()> {
         let types = Self::types();
         if !types.contains_key(&r#type) {
-            return Err(OutOfBoundsException {
-                message: format!("Unknown rule type: {}", r#type),
-                code: 0,
-            }
-            .into());
+            return Err(OutOfBoundsException::new(format!("Unknown rule type: {}", r#type)).into());
         }
 
         let hash = rule.borrow().get_hash()?.to_string();

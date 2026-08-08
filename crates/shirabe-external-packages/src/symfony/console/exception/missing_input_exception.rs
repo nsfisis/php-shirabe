@@ -6,12 +6,16 @@ use super::runtime_exception::RuntimeException;
 #[derive(Debug)]
 pub struct MissingInputException(pub RuntimeException);
 
-impl std::fmt::Display for MissingInputException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl MissingInputException {
+    pub fn new(message: String) -> Self {
+        Self(RuntimeException::new(message))
     }
 }
 
-impl std::error::Error for MissingInputException {}
+shirabe_php_shim::impl_php_exception!(
+    MissingInputException,
+    0,
+    r"Symfony\Component\Console\Exception\MissingInputException"
+);
 
 impl ExceptionInterface for MissingInputException {}

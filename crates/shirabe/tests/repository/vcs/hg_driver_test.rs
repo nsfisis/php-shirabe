@@ -11,6 +11,7 @@ use shirabe::repository::vcs::HgDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::MockHandler;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 use tempfile::TempDir;
 
@@ -141,7 +142,7 @@ fn test_file_get_content_invalid_identifier() {
     assert_eq!(None, driver.get_file_content("file.txt", "h").unwrap());
 
     let err = driver.get_file_content("file.txt", "-h").unwrap_err();
-    assert!(err.downcast_ref::<RuntimeException>().is_some());
+    assert!(err.is_instanceof::<RuntimeException>());
 }
 
 #[test]
@@ -168,5 +169,5 @@ fn test_get_change_date_invalid_identifier() {
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
 
     let err = driver.get_change_date("-r foo").unwrap_err();
-    assert!(err.downcast_ref::<RuntimeException>().is_some());
+    assert!(err.is_instanceof::<RuntimeException>());
 }

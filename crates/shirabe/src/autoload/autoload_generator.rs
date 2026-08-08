@@ -815,19 +815,13 @@ return array(
         {
             let name = package.get_name();
             let _ = package.get_target_dir();
-            return Err(InvalidArgumentException {
-                message: format!("PSR-4 autoloading is incompatible with the target-dir property, remove the target-dir in package '{}'.", name),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new(format!("PSR-4 autoloading is incompatible with the target-dir property, remove the target-dir in package '{}'.", name))
             .into());
         }
         if let Some(psr4) = autoload.get("psr-4").and_then(|v| v.as_array()) {
             for (namespace, _dirs) in psr4 {
                 if !namespace.is_empty() && !namespace.ends_with('\\') {
-                    return Err(InvalidArgumentException {
-                        message: format!("psr-4 namespaces must end with a namespace separator, '{}' does not, use '{}\\'.", namespace, namespace),
-                        code: 0,
-                    }
+                    return Err(InvalidArgumentException::new(format!("psr-4 namespaces must end with a namespace separator, '{}' does not, use '{}\\'.", namespace, namespace))
                     .into());
                 }
             }

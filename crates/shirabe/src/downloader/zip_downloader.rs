@@ -10,6 +10,7 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException,
     UnexpectedValueException, ZipArchive, bin2hex, class_exists, file_exists, file_get_contents,
@@ -146,13 +147,10 @@ impl ZipDownloader {
                         .borrow()
                         .contains_key(&package.get_name())
                     {
-                        return Err(RuntimeException {
-                            message: format!(
-                                "Failed to extract {} as the installation was aborted by another package operation.",
-                                package.get_name()
-                            ),
-                            code: 0,
-                        }
+                        return Err(RuntimeException::new(format!(
+                            "Failed to extract {} as the installation was aborted by another package operation.",
+                            package.get_name()
+                        ))
                         .into());
                     }
 
@@ -162,19 +160,16 @@ impl ZipDownloader {
 
                     return self
                         .try_fallback(
-                            RuntimeException {
-                                message: format!(
-                                    "Failed to extract {}: ({}) {}\n\n{}",
-                                    package.get_name(),
-                                    process
-                                        .get_exit_code()
-                                        .map(|c| c.to_string())
-                                        .unwrap_or_default(),
-                                    command.join(" "),
-                                    output
-                                ),
-                                code: 0,
-                            }
+                            RuntimeException::new(format!(
+                                "Failed to extract {}: ({}) {}\n\n{}",
+                                package.get_name(),
+                                process
+                                    .get_exit_code()
+                                    .map(|c| c.to_string())
+                                    .unwrap_or_default(),
+                                command.join(" "),
+                                output
+                            ))
                             .into(),
                             is_last_chance,
                             file,
@@ -337,13 +332,10 @@ impl ZipDownloader {
                             && total_size > archive_sz * 100
                             && total_size > 50 * 1024 * 1024
                         {
-                            return Err(RuntimeException {
-                                message: format!(
-                                    "Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)",
-                                    package.get_name(),
-                                ),
-                                code: 0,
-                            }.into());
+                            return Err(RuntimeException::new(format!(
+                                "Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)",
+                                package.get_name(),
+                            )).into());
                         }
                     }
 
@@ -354,32 +346,26 @@ impl ZipDownloader {
                         return Ok(None);
                     }
 
-                    Err(RuntimeException {
-                        message: format!(
-                            "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
-                            package.get_name(),
-                        ),
-                        code: 0,
-                    }.into())
+                    Err(RuntimeException::new(format!(
+                        "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
+                        package.get_name(),
+                    )).into())
                 }
-                Err(code) => Err(UnexpectedValueException {
-                    message: self.get_error_message(code, file).trim_end().to_string(),
+                Err(code) => Err(UnexpectedValueException::with_code(
+                    self.get_error_message(code, file).trim_end().to_string(),
                     code,
-                }
+                )
                 .into()),
             }
         })();
 
         result.map_err(|e| {
-            if let Some(err) = e.downcast_ref::<ErrorException>() {
-                RuntimeException {
-                    message: format!(
-                        "The archive for \"{}\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): {}",
-                        package.get_name(),
-                        err.message,
-                    ),
-                    code: 0,
-                }.into()
+            if let Some(err) = e.catch::<ErrorException>() {
+                RuntimeException::new(format!(
+                    "The archive for \"{}\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): {}",
+                    package.get_name(),
+                    err.get_message(),
+                )).into()
             } else {
                 e
             }
@@ -578,11 +564,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                     ini_message
                 )
             };
-            return Err(RuntimeException {
-                message: error,
-                code: 0,
-            }
-            .into());
+            return Err(RuntimeException::new(error).into());
         }
 
         {

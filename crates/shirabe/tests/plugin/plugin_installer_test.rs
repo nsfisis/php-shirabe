@@ -31,6 +31,7 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
@@ -859,8 +860,7 @@ fn test_querying_with_invalid_capability_class_name_throws() {
                 ),
             };
         assert!(
-            err.downcast_ref::<shirabe_php_shim::UnexpectedValueException>()
-                .is_some(),
+            err.is_instanceof::<shirabe_php_shim::UnexpectedValueException>(),
             "expected UnexpectedValueException for {invalid_implementation_class_name:?}, got: {err}"
         );
         // PHP: ->expects($this->once())->method('getCapabilities').

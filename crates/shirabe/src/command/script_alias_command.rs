@@ -36,12 +36,10 @@ impl ScriptAliasCommand {
 
         for alias in &aliases {
             if !is_string(&PhpMixed::String(alias.clone())) {
-                return Err(InvalidArgumentException {
-                    message:
-                        r#""scripts-aliases" element array values should contain only strings"#
-                            .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    r#""scripts-aliases" element array values should contain only strings"#
+                        .to_string(),
+                )
                 .into());
             }
         }
@@ -123,10 +121,9 @@ impl Command for ScriptAliasCommand {
         // TODO(phase-c): InputInterface has_to_string/get_class_name not modeled in Rust
         // TODO remove for Symfony 6+ as it is then in the interface
         if false {
-            return Err(LogicException {
-                message: "Expected an Input instance that is stringable".to_string(),
-                code: 0,
-            }
+            return Err(LogicException::new(
+                "Expected an Input instance that is stringable".to_string(),
+            )
             .into());
         }
 

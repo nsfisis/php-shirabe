@@ -64,10 +64,9 @@ impl VcsDownloader for HgDownloader {
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if HgUtils::get_version(&self.inner.process).is_none() {
-            return Err(RuntimeException {
-                message: "hg was not found in your PATH, skipping source download".to_string(),
-                code: 0,
-            }
+            return Err(RuntimeException::new(
+                "hg was not found in your PATH, skipping source download".to_string(),
+            )
             .into());
         }
 
@@ -111,14 +110,11 @@ impl VcsDownloader for HgDownloader {
             shirabe_php_shim::realpath(path).as_deref(),
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    command.join(" "),
-                    self.inner.process.borrow().get_error_output()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Failed to execute {}\n\n{}",
+                command.join(" "),
+                self.inner.process.borrow().get_error_output()
+            ))
             .into());
         }
 
@@ -145,13 +141,10 @@ impl VcsDownloader for HgDownloader {
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException {
-                message: format!(
-                    "The .hg directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                    path
-                ),
-                code: 0,
-            }.into());
+            return Err(RuntimeException::new(format!(
+                "The .hg directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
+                path
+            )).into());
         }
 
         let pull_command = |url: String| -> Vec<String> {
@@ -195,14 +188,11 @@ impl VcsDownloader for HgDownloader {
             shirabe_php_shim::realpath(path).as_deref(),
         ) != 0
         {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    command.join(" "),
-                    self.inner.process.borrow().get_error_output()
-                ),
-                code: 0,
-            }
+            return Err(RuntimeException::new(format!(
+                "Failed to execute {}\n\n{}",
+                command.join(" "),
+                self.inner.process.borrow().get_error_output()
+            ))
             .into());
         }
 

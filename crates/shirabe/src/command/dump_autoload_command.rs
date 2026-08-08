@@ -149,10 +149,7 @@ impl Command for DumpAutoloadCommand {
             && !optimize
             && !authoritative
         {
-            return Err(InvalidArgumentException {
-                message: "--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new("--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string())
             .into());
         }
         if input
@@ -163,10 +160,7 @@ impl Command for DumpAutoloadCommand {
             && !optimize
             && !authoritative
         {
-            return Err(InvalidArgumentException {
-                message: "--strict-ambiguous mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string(),
-                code: 0,
-            }
+            return Err(InvalidArgumentException::new("--strict-ambiguous mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string())
             .into());
         }
 
@@ -208,12 +202,10 @@ impl Command for DumpAutoloadCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException {
-                    message:
-                        "You can not use both --no-dev and --dev as they conflict with each other."
-                            .to_string(),
-                    code: 0,
-                }
+                return Err(InvalidArgumentException::new(
+                    "You can not use both --no-dev and --dev as they conflict with each other."
+                        .to_string(),
+                )
                 .into());
             }
             composer
