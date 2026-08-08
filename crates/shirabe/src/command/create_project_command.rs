@@ -44,9 +44,9 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, RuntimeException,
-    UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd,
-    impl_php_class, implode, is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
+    InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException, array_pop,
+    chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir, is_file,
+    mkdir, realpath, rtrim, strtolower, unlink,
 };
 use std::path::PathBuf;
 
@@ -461,7 +461,7 @@ impl CreateProjectCommand {
                 format!(
                     "{}{}{}",
                     Platform::get_cwd(false)?,
-                    DIRECTORY_SEPARATOR,
+                    std::path::MAIN_SEPARATOR,
                     array_pop(&mut parts).unwrap_or_default()
                 )
             }
@@ -477,7 +477,7 @@ impl CreateProjectCommand {
             directory = format!(
                 "{}{}{}",
                 Platform::get_cwd(false)?,
-                DIRECTORY_SEPARATOR,
+                std::path::MAIN_SEPARATOR,
                 directory
             );
         }

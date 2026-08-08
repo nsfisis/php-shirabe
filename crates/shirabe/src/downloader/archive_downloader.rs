@@ -11,8 +11,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes,
-    realpath,
+    PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
 };
 use std::path::{Path, PathBuf};
 
@@ -92,13 +91,11 @@ pub trait ArchiveDownloader {
             .filesystem
             .borrow()
             .normalize_path(&vendor_dir)
-            .contains(
-                &self
-                    .inner()
-                    .filesystem
-                    .borrow()
-                    .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR)),
-            )
+            .contains(&self.inner().filesystem.borrow().normalize_path(&format!(
+                "{}{}",
+                path,
+                std::path::MAIN_SEPARATOR
+            )))
         {
             self.inner()
                 .filesystem

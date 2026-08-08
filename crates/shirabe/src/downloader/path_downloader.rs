@@ -23,8 +23,8 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::filesystem::Filesystem as SymfonyFilesystem;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed,
-    RuntimeException, file_exists, function_exists, impl_php_class, is_dir, realpath,
+    PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed, RuntimeException, file_exists,
+    function_exists, impl_php_class, is_dir, realpath,
 };
 
 #[derive(Debug)]
@@ -261,9 +261,9 @@ impl DownloaderInterface for PathDownloader {
         if format!(
             "{}{}",
             realpath(&path).unwrap_or_default(),
-            DIRECTORY_SEPARATOR
+            std::path::MAIN_SEPARATOR
         )
-        .starts_with(&format!("{}{}", real_url, DIRECTORY_SEPARATOR))
+        .starts_with(&format!("{}{}", real_url, std::path::MAIN_SEPARATOR))
         {
             // IMPORTANT NOTICE: If you wish to change this, don't. You are wasting your time and ours.
             //
@@ -383,7 +383,7 @@ impl DownloaderInterface for PathDownloader {
                                     format!(
                                         "{}{}{}",
                                         Platform::get_cwd(false)?,
-                                        DIRECTORY_SEPARATOR,
+                                        std::path::MAIN_SEPARATOR,
                                         path
                                     )
                                 } else {

@@ -2,9 +2,8 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, defined, file_exists, include_file,
-    spl_autoload_register, spl_autoload_unregister, stream_resolve_include_path, strlen, strpos,
-    strrpos, strtr, substr,
+    InvalidArgumentException, PhpMixed, defined, file_exists, include_file, spl_autoload_register,
+    spl_autoload_unregister, stream_resolve_include_path, strlen, strpos, strrpos, strtr, substr,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -366,7 +365,11 @@ impl ClassLoader {
 
     fn find_file_with_extension(&self, class: &str, ext: &str) -> Option<String> {
         // PSR-4 lookup
-        let logical_path_psr4 = format!("{}{}", strtr(class, "\\", DIRECTORY_SEPARATOR), ext);
+        let logical_path_psr4 = format!(
+            "{}{}",
+            strtr(class, "\\", std::path::MAIN_SEPARATOR_STR),
+            ext
+        );
 
         let first = class.chars().next().unwrap_or('\0').to_string();
         if self.prefix_lengths_psr4.contains_key(&first) {
@@ -382,7 +385,7 @@ impl ClassLoader {
                 if let Some(dirs) = self.prefix_dirs_psr4.get(&search) {
                     let path_end = format!(
                         "{}{}",
-                        DIRECTORY_SEPARATOR,
+                        std::path::MAIN_SEPARATOR,
                         substr(&logical_path_psr4, (last_pos + 1) as i64, None)
                     );
                     for dir in dirs {
@@ -397,7 +400,7 @@ impl ClassLoader {
 
         // PSR-4 fallback dirs
         for dir in &self.fallback_dirs_psr4 {
-            let file = format!("{}{}{}", dir, DIRECTORY_SEPARATOR, logical_path_psr4);
+            let file = format!("{}{}{}", dir, std::path::MAIN_SEPARATOR, logical_path_psr4);
             if file_exists(&file) {
                 return Some(file);
             }
@@ -413,19 +416,24 @@ impl ClassLoader {
                 strtr(
                     &substr(&logical_path_psr4, (pos + 1) as i64, None),
                     "_",
-                    DIRECTORY_SEPARATOR
+                    std::path::MAIN_SEPARATOR_STR,
                 )
             );
         } else {
             // PEAR-like class name
-            logical_path_psr0 = format!("{}{}", strtr(class, "_", DIRECTORY_SEPARATOR), ext);
+            logical_path_psr0 = format!(
+                "{}{}",
+                strtr(class, "_", std::path::MAIN_SEPARATOR_STR),
+                ext
+            );
         }
 
         if let Some(prefixes) = self.prefixes_psr0.get(&first) {
             for (prefix, dirs) in prefixes {
                 if Some(0) == strpos(class, prefix) {
                     for dir in dirs {
-                        let file = format!("{}{}{}", dir, DIRECTORY_SEPARATOR, logical_path_psr0);
+                        let file =
+                            format!("{}{}{}", dir, std::path::MAIN_SEPARATOR, logical_path_psr0);
                         if file_exists(&file) {
                             return Some(file);
                         }
@@ -436,7 +444,7 @@ impl ClassLoader {
 
         // PSR-0 fallback dirs
         for dir in &self.fallback_dirs_psr0 {
-            let file = format!("{}{}{}", dir, DIRECTORY_SEPARATOR, logical_path_psr0);
+            let file = format!("{}{}{}", dir, std::path::MAIN_SEPARATOR, logical_path_psr0);
             if file_exists(&file) {
                 return Some(file);
             }

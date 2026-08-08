@@ -12,10 +12,10 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    CmpOp, DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException,
-    UnexpectedValueException, ZipArchive, bin2hex, class_exists, file_exists, file_get_contents,
-    filesize, function_exists, hash_file, impl_php_class, is_file, json_encode, php_regex,
-    random_int, str_contains, str_replace, strlen, substr, version_compare,
+    CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
+    bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
+    impl_php_class, is_file, json_encode, php_regex, random_int, str_contains, str_replace, strlen,
+    substr, version_compare,
 };
 use std::sync::Mutex;
 
@@ -84,8 +84,8 @@ impl ZipDownloader {
         let map: IndexMap<&str, String> = [
             // normalize separators to backslashes to avoid problems with 7-zip on windows
             // see https://github.com/composer/composer/issues/10058
-            ("%file%", file.replace('/', DIRECTORY_SEPARATOR)),
-            ("%path%", path.replace('/', DIRECTORY_SEPARATOR)),
+            ("%file%", file.replace('/', std::path::MAIN_SEPARATOR_STR)),
+            ("%path%", path.replace('/', std::path::MAIN_SEPARATOR_STR)),
         ]
         .into_iter()
         .collect();

@@ -7,10 +7,9 @@ use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
-    RuntimeException, explode, getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote,
-    realpath, str_replace, str_starts_with, stream_get_wrappers, strlen, strpos, strrpos, strtr,
-    substr,
+    InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX, RuntimeException,
+    explode, getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath,
+    str_replace, str_starts_with, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
 };
 use std::path::PathBuf;
 
@@ -264,10 +263,10 @@ impl ClassMapGenerator {
                 if let Some(ns_len) = namespace_length {
                     let namespace = substr(&class, 0, Some((ns_len + 1) as i64));
                     let class_name = substr(&class, (ns_len + 1) as i64, None);
-                    sub_path = str_replace("\\", DIRECTORY_SEPARATOR, &namespace)
-                        + &str_replace("_", DIRECTORY_SEPARATOR, &class_name);
+                    sub_path = str_replace("\\", std::path::MAIN_SEPARATOR_STR, &namespace)
+                        + &str_replace("_", std::path::MAIN_SEPARATOR_STR, &class_name);
                 } else {
-                    sub_path = str_replace("_", DIRECTORY_SEPARATOR, &class);
+                    sub_path = str_replace("_", std::path::MAIN_SEPARATOR_STR, &class);
                 }
             } else if namespace_type == "psr-4" {
                 let sub_namespace = if !base_namespace.is_empty() {
@@ -275,7 +274,7 @@ impl ClassMapGenerator {
                 } else {
                     class.clone()
                 };
-                sub_path = str_replace("\\", DIRECTORY_SEPARATOR, &sub_namespace);
+                sub_path = str_replace("\\", std::path::MAIN_SEPARATOR_STR, &sub_namespace);
             } else {
                 return Err(InvalidArgumentException::new(
                     "$namespaceType must be \"psr-0\" or \"psr-4\"".to_string(),

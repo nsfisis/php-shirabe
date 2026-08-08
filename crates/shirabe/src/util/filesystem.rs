@@ -7,13 +7,13 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::filesystem::exception::IOException;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, ErrorException, LogicException, PhpMixed, RuntimeException, array_pop,
-    basename, chdir, clearstatcache, clearstatcache2, copy, dirname, error_get_last, explode,
-    fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime, filemtime,
-    filesize, fopen, fread, function_exists, fwrite, implode, is_dir, is_file, is_link,
-    is_readable, lstat, mkdir, php_regex, rename, rmdir, rtrim, str_contains, str_repeat,
-    str_replace, str_starts_with, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink,
-    touch, unlink, usleep, var_export,
+    ErrorException, LogicException, PhpMixed, RuntimeException, array_pop, basename, chdir,
+    clearstatcache, clearstatcache2, copy, dirname, error_get_last, explode, fclose, feof,
+    file_exists, file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen,
+    fread, function_exists, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
+    php_regex, rename, rmdir, rtrim, str_contains, str_repeat, str_replace, str_starts_with,
+    strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep,
+    var_export,
 };
 use std::path::Path;
 
@@ -488,7 +488,12 @@ impl Filesystem {
 
         let mut result = true;
         for file in &ri {
-            let target_path = format!("{}{}{}", target, DIRECTORY_SEPARATOR, ri.get_sub_pathname());
+            let target_path = format!(
+                "{}{}{}",
+                target,
+                std::path::MAIN_SEPARATOR,
+                ri.get_sub_pathname()
+            );
             if file.is_dir() {
                 self.ensure_directory_exists(&target_path)?;
             } else {
@@ -1003,7 +1008,7 @@ impl Filesystem {
         let cmd = vec![
             "mklink".to_string(),
             "/J".to_string(),
-            str_replace("/", DIRECTORY_SEPARATOR, junction),
+            str_replace("/", std::path::MAIN_SEPARATOR_STR, junction),
             Platform::realpath(target),
         ];
         let mut output = String::new();
@@ -1066,8 +1071,8 @@ impl Filesystem {
             return Ok(false);
         }
         let junction = rtrim(
-            &str_replace("/", DIRECTORY_SEPARATOR, junction),
-            Some(DIRECTORY_SEPARATOR),
+            &str_replace("/", std::path::MAIN_SEPARATOR_STR, junction),
+            Some(std::path::MAIN_SEPARATOR_STR),
         );
         if !self.is_junction(&junction) {
             return Err(IOException::new(

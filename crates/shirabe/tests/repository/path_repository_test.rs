@@ -9,9 +9,7 @@ use shirabe::repository::PathRepository;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, PhpMixed, file_get_contents, hash, realpath, serialize,
-};
+use shirabe_php_shim::{PhpMixed, file_get_contents, hash, realpath, serialize};
 
 fn fixtures_dir() -> String {
     format!(
@@ -51,8 +49,8 @@ fn coordinates(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
 
 #[test]
 fn test_load_package_from_file_system_with_incorrect_path() {
-    let repository_url =
-        [fixtures_dir(), "path".to_string(), "missing".to_string()].join(DIRECTORY_SEPARATOR);
+    let repository_url = [fixtures_dir(), "path".to_string(), "missing".to_string()]
+        .join(std::path::MAIN_SEPARATOR_STR);
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     assert!(repository.__get_packages().is_err());
@@ -65,7 +63,7 @@ fn test_load_package_from_file_system_with_version() {
         "path".to_string(),
         "with-version".to_string(),
     ]
-    .join(DIRECTORY_SEPARATOR);
+    .join(std::path::MAIN_SEPARATOR_STR);
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     repository.__get_packages().unwrap();
@@ -85,7 +83,7 @@ fn test_load_package_from_file_system_without_version() {
         "path".to_string(),
         "without-version".to_string(),
     ]
-    .join(DIRECTORY_SEPARATOR);
+    .join(std::path::MAIN_SEPARATOR_STR);
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     let packages = repository.__get_packages().unwrap();
@@ -102,7 +100,7 @@ fn test_load_package_from_file_system_without_version() {
 #[test]
 fn test_load_package_from_file_system_with_wildcard() {
     let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(DIRECTORY_SEPARATOR);
+        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
     let packages = repository.__get_packages().unwrap();
@@ -140,7 +138,7 @@ fn test_load_package_with_explicit_versions() {
     let options = coordinates(vec![("versions", PhpMixed::Array(versions))]);
 
     let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(DIRECTORY_SEPARATOR);
+        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
     let mut repository = create_path_repo(coordinates(vec![
         ("url", PhpMixed::String(repository_url)),
         ("options", PhpMixed::Array(options)),
@@ -207,13 +205,13 @@ fn test_url_remains_relative() {
         "path".to_string(),
         "with-version".to_string(),
     ]
-    .join(DIRECTORY_SEPARATOR);
+    .join(std::path::MAIN_SEPARATOR_STR);
     // getcwd() not necessarily match __DIR__
     // PHP Bug https://bugs.php.net/bug.php?id=73797
     let cwd = realpath(realpath(Platform::get_cwd(false).unwrap()).unwrap_or_default())
         .unwrap_or_default();
     let relative_url = repository_url[cwd.len().min(repository_url.len())..]
-        .trim_start_matches(DIRECTORY_SEPARATOR)
+        .trim_start_matches(std::path::MAIN_SEPARATOR)
         .to_string();
 
     let mut repository = create_path_repo(coordinates(vec![(
@@ -228,7 +226,7 @@ fn test_url_remains_relative() {
     assert_eq!("test/path-versioned", package.get_name());
 
     // Convert platform specific separators back to generic URL slashes
-    let relative_url = relative_url.replace(DIRECTORY_SEPARATOR, "/");
+    let relative_url = relative_url.replace(std::path::MAIN_SEPARATOR, "/");
     assert_eq!(Some(relative_url), package.get_dist_url());
 }
 
@@ -236,7 +234,7 @@ fn test_url_remains_relative() {
 fn test_reference_none() {
     let options = coordinates(vec![("reference", PhpMixed::String("none".to_string()))]);
     let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(DIRECTORY_SEPARATOR);
+        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
     let mut repository = create_path_repo(coordinates(vec![
         ("url", PhpMixed::String(repository_url)),
         ("options", PhpMixed::Array(options)),
@@ -257,7 +255,7 @@ fn test_reference_config() {
         ("relative", PhpMixed::Bool(true)),
     ]);
     let repository_url =
-        [fixtures_dir(), "path".to_string(), "*".to_string()].join(DIRECTORY_SEPARATOR);
+        [fixtures_dir(), "path".to_string(), "*".to_string()].join(std::path::MAIN_SEPARATOR_STR);
     let mut repository = create_path_repo(coordinates(vec![
         ("url", PhpMixed::String(repository_url)),
         ("options", PhpMixed::Array(options.clone())),

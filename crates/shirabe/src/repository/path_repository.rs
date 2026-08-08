@@ -25,8 +25,8 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined,
-    file_exists, file_get_contents, glob_with_flags, hash, php_regex, realpath, serialize,
+    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, file_exists,
+    file_get_contents, glob_with_flags, hash, php_regex, realpath, serialize,
 };
 
 #[derive(Debug)]
@@ -378,7 +378,7 @@ impl PathRepository {
         Ok(glob_with_flags(&self.url, flags)
             .into_iter()
             .map(|val| {
-                val.replace(DIRECTORY_SEPARATOR, "/")
+                val.replace(std::path::MAIN_SEPARATOR, "/")
                     .trim_end_matches('/')
                     .to_string()
             })

@@ -27,10 +27,10 @@ use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
-    PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, file_exists,
-    filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable, parse_url,
-    pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+    InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PHP_URL_PATH, PhpMixed,
+    RuntimeException, UnexpectedValueException, array_search, file_exists, filesize, get_class,
+    hash, hash_file, impl_php_class, is_dir, is_executable, parse_url, pathinfo, realpath, rtrim,
+    spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -744,10 +744,11 @@ impl DownloaderInterface for FileDownloader {
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
         if !{
             let normalized_vendor = self.filesystem.borrow_mut().normalize_path(&vendor_dir);
-            let normalized_path = self
-                .filesystem
-                .borrow()
-                .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR));
+            let normalized_path = self.filesystem.borrow().normalize_path(&format!(
+                "{}{}",
+                path,
+                std::path::MAIN_SEPARATOR
+            ));
             strpos(&normalized_vendor, &normalized_path).is_some()
         } {
             self.filesystem.borrow_mut().empty_directory(path, true)?;

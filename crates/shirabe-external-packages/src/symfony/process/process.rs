@@ -245,7 +245,7 @@ impl Process {
 
         this.set_input(input)?;
         this.set_timeout(timeout)?;
-        this.use_file_handles = shirabe_php_shim::DIRECTORY_SEPARATOR == "\\";
+        this.use_file_handles = std::path::MAIN_SEPARATOR == '\\';
 
         Ok(this)
     }
@@ -309,7 +309,7 @@ impl Process {
                     .collect::<Vec<_>>()
                     .join(" ");
 
-                if shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" {
+                if std::path::MAIN_SEPARATOR != '\\' {
                     // exec is mandatory to deal with sending a signal to the process
                     cmd = format!("exec {}", cmd);
                 }
@@ -318,7 +318,7 @@ impl Process {
             CommandLine::String(s) => self.replace_placeholders(s, &env)?,
         };
 
-        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
+        if std::path::MAIN_SEPARATOR == '\\' {
             commandline = self.prepare_windows_command_line(&commandline, &mut env)?;
         } else if !self.use_file_handles && self.is_sigchild_enabled() {
             // last exit code is output on the fourth pipe and caught to work around --enable-sigchild
@@ -414,12 +414,9 @@ impl Process {
         loop {
             self.check_timeout()?;
             let running = self.is_running()
-                && (shirabe_php_shim::DIRECTORY_SEPARATOR == "\\"
+                && (std::path::MAIN_SEPARATOR == '\\'
                     || self.process_pipes.as_ref().unwrap().are_open());
-            self.read_pipes(
-                running,
-                shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" || !running,
-            );
+            self.read_pipes(running, std::path::MAIN_SEPARATOR != '\\' || !running);
             if !running {
                 break;
             }
@@ -644,7 +641,7 @@ impl Process {
 
     /// Enables or disables the TTY mode.
     pub fn set_tty(&mut self, tty: bool) -> anyhow::Result<&mut Self> {
-        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" && tty {
+        if std::path::MAIN_SEPARATOR == '\\' && tty {
             return Err(RuntimeException::new(
                 "TTY mode is not supported on Windows platform.".to_string(),
             )
@@ -743,7 +740,7 @@ impl Process {
     /// Creates the descriptors needed by the proc_open.
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
         // TODO(plugin): $this->input instanceof \Iterator -> rewind() is not modeled.
-        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
+        if std::path::MAIN_SEPARATOR == '\\' {
             self.process_pipes = Some(Box::new(WindowsPipes::new(self.input.clone())));
         } else {
             self.process_pipes = Some(Box::new(UnixPipes::new(
@@ -818,7 +815,7 @@ impl Process {
 
         self.read_pipes(
             running && blocking,
-            shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" || !running,
+            std::path::MAIN_SEPARATOR != '\\' || !running,
         );
 
         if !self.fallback_status.is_empty() && self.is_sigchild_enabled() {
@@ -999,7 +996,7 @@ impl Process {
             Some(pid) => pid,
         };
 
-        if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
+        if std::path::MAIN_SEPARATOR == '\\' {
             let mut output: Vec<String> = Vec::new();
             let mut exit_code: i64 = 0;
             shirabe_php_shim::exec(
@@ -1192,7 +1189,7 @@ impl Process {
             None | Some("") => return "\"\"".to_string(),
             Some(a) => a,
         };
-        if shirabe_php_shim::DIRECTORY_SEPARATOR != "\\" {
+        if std::path::MAIN_SEPARATOR != '\\' {
             return format!("'{}'", argument.replace('\'', "'\\''"));
         }
         let mut argument = argument.to_string();
