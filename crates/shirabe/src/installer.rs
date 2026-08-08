@@ -36,8 +36,8 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, array_unique, defined, gc_collect_cycles, gc_disable,
-    gc_enable, implode, intval, is_dir, is_numeric, strcmp, strpos, strtolower, touch, usort,
+    PhpMixed, RuntimeException, array_map, array_unique, implode, intval, is_dir, is_numeric,
+    strcmp, strpos, strtolower, touch, usort,
 };
 use shirabe_semver;
 
@@ -219,12 +219,8 @@ impl Installer {
     /// Run installation (or update)
     #[tracing::instrument(skip_all)]
     pub fn run(&mut self) -> anyhow::Result<i64> {
-        // Disable GC to save CPU cycles, as the dependency solver can create hundreds of thousands
-        // of PHP objects, the GC can spend quite some time walking the tree of references looking
-        // for stuff to collect while there is nothing to collect. This slows things down dramatically
-        // and turning it off results in much better performance. Do not try this at home however.
-        gc_collect_cycles();
-        gc_disable();
+        // Composer disables GC to save CPU cycles, but Shirabe does not as Rust has no GC.
+        // It is possible to disable GC in PHP via RPC, but it might not be effective.
 
         if self.update_allow_list.is_some() && self.update_mirrors {
             return Err(RuntimeException::new(
@@ -476,11 +472,6 @@ impl Installer {
                 vec![],
                 IndexMap::new(),
             );
-        }
-
-        // re-enable GC except on HHVM which triggers a warning here
-        if !defined("HHVM_VERSION") {
-            gc_enable();
         }
 
         let audit_config = self.get_audit_config()?.clone();

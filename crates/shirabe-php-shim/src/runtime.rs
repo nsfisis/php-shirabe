@@ -394,19 +394,6 @@ pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
     todo!()
 }
 
-pub fn gc_collect_cycles() -> i64 {
-    // Rust has no cycle collector; nothing is collected.
-    0
-}
-
-pub fn gc_disable() {
-    // Rust has no cycle collector to disable.
-}
-
-pub fn gc_enable() {
-    // Rust has no cycle collector to enable.
-}
-
 pub fn phpinfo(_what: i64) {
     // TODO(php-runtime): phpinfo() dumps the full PHP runtime configuration, which the shim does not
     // model.
