@@ -4,9 +4,10 @@ use crate::package::archiver::ArchivableFilesFilter;
 use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::archiver::ArchiverInterface;
 use indexmap::IndexMap;
+use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    AnyThrowable, FilesystemIterator, Phar, PharData, RuntimeException, bzcompress, file_exists,
-    file_put_contents, function_exists, gzcompress, str_repeat, strrpos, unlink,
+    FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException, bzcompress,
+    file_exists, file_put_contents, function_exists, gzcompress, str_repeat, strrpos, unlink,
 };
 
 fn formats() -> IndexMap<&'static str, i64> {
@@ -143,11 +144,16 @@ impl ArchiverInterface for PharArchiver {
         })();
 
         inner.map_err(|e| {
+            let Some(caught) = e.catch::<UnexpectedValueException>() else {
+                return e;
+            };
             let message = format!(
                 "Could not create archive '{}' from '{}': {}",
-                target_outer, sources, e
+                target_outer,
+                sources,
+                caught.get_message()
             );
-            let code = AnyThrowable::of(e.as_ref()).map_or(0, AnyThrowable::get_code);
+            let code = caught.get_code();
             RuntimeException::with_code_and_previous(message, code, Some(std::sync::Arc::new(e)))
                 .into()
         })
