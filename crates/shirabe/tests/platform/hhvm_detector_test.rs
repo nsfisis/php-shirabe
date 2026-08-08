@@ -5,7 +5,7 @@ use shirabe::platform::hhvm_detector::HhvmDetectorInterface;
 use shirabe::util::Platform;
 use shirabe::util::ProcessExecutor;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
-use shirabe_php_shim::{PhpMixed, constant, defined};
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 
 fn set_up() -> HhvmDetector {
@@ -16,22 +16,12 @@ fn set_up() -> HhvmDetector {
 
 #[test]
 fn test_hhvm_version_when_executing_in_hhvm() {
-    let mut hhvm_detector = set_up();
-    if !defined("HHVM_VERSION_ID") {
-        // markTestSkipped('Not running with HHVM')
-        return;
-    }
-    let version = hhvm_detector.get_version();
-    assert_eq!(version_id_to_version(), version);
+    // Always succeeds: shirabe never runs on HHVM.
 }
 
 #[test]
 fn test_hhvm_version_when_executing_in_php() {
     let mut hhvm_detector = set_up();
-    if defined("HHVM_VERSION_ID") {
-        // markTestSkipped('Running with HHVM')
-        return;
-    }
     if Platform::is_windows() {
         // markTestSkipped('Test does not run on Windows')
         return;
@@ -67,18 +57,4 @@ fn test_hhvm_version_when_executing_in_php() {
         VersionParser.normalize(&version, None).unwrap(),
         VersionParser.normalize(&detected_version, None).unwrap()
     );
-}
-
-fn version_id_to_version() -> Option<String> {
-    if !defined("HHVM_VERSION_ID") {
-        return None;
-    }
-
-    let hhvm_version_id = constant("HHVM_VERSION_ID").as_int().unwrap();
-    Some(format!(
-        "{}.{}.{}",
-        hhvm_version_id / 10000,
-        (hhvm_version_id / 100) % 100,
-        hhvm_version_id % 100,
-    ))
 }

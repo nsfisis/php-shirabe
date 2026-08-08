@@ -43,12 +43,6 @@ pub const PHP_OS: &str = match std::env::consts::OS.as_bytes() {
     _ => std::env::consts::OS,
 };
 
-pub fn constant(_name: &str) -> PhpMixed {
-    // TODO(php-runtime): resolving a constant by name needs a runtime constant registry, which the shim
-    // does not provide (constants are ported as Rust `const`s, not looked up by string).
-    todo!()
-}
-
 // Models the constants defined in a standard modern PHP CLI environment on a
 // non-Windows platform with the common extensions loaded (curl, openssl, json).
 // Windows-only, HHVM and Composer-bootstrap constants are reported undefined.
