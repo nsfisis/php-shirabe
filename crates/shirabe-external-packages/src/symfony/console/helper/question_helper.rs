@@ -685,7 +685,7 @@ impl QuestionHelper {
         input_stream: &shirabe_php_shim::PhpResource,
         trimmable: bool,
     ) -> anyhow::Result<Result<String, RuntimeException>> {
-        if std::path::MAIN_SEPARATOR == '\\' {
+        if cfg!(windows) {
             let mut exe = format!(
                 "{}/../Resources/bin/hiddeninput.exe",
                 shirabe_php_shim::dir()

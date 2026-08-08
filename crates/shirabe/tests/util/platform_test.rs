@@ -31,6 +31,6 @@ fn test_expand_path() {
 #[test]
 fn test_is_windows() {
     // Compare 2 common tests for Windows to the built-in Windows test
-    assert_eq!(std::path::MAIN_SEPARATOR == '\\', Platform::is_windows());
+    assert_eq!(cfg!(windows), Platform::is_windows());
     assert_eq!(defined("PHP_WINDOWS_VERSION_MAJOR"), Platform::is_windows());
 }

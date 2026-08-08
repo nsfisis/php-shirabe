@@ -98,8 +98,7 @@ impl StreamOutput {
             return false;
         }
 
-        if std::path::MAIN_SEPARATOR == '\\' && shirabe_php_shim::sapi_windows_vt100_support(stream)
-        {
+        if cfg!(windows) && shirabe_php_shim::sapi_windows_vt100_support(stream) {
             return true;
         }
 

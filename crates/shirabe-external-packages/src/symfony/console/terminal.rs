@@ -69,11 +69,7 @@ impl Terminal {
 
         let result = shirabe_php_shim::shell_exec(&format!(
             "stty 2> {}",
-            if std::path::MAIN_SEPARATOR == '\\' {
-                "NUL"
-            } else {
-                "/dev/null"
-            }
+            if cfg!(windows) { "NUL" } else { "/dev/null" }
         ))
         .is_some();
         STTY.with(|s| s.set(Some(result)));
@@ -81,7 +77,7 @@ impl Terminal {
     }
 
     fn init_dimensions() {
-        if std::path::MAIN_SEPARATOR == '\\' {
+        if cfg!(windows) {
             let ansicon = shirabe_php_shim::getenv("ANSICON");
             let mut matches: Vec<Option<String>> = Vec::new();
             if let Some(ansicon) = &ansicon

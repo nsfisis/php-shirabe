@@ -56,11 +56,7 @@ impl SymfonyStyle {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Self {
         let buffered_output = TrimmedBufferOutput::new(
-            if std::path::MAIN_SEPARATOR == '\\' {
-                4
-            } else {
-                2
-            },
+            if cfg!(windows) { 4 } else { 2 },
             Some(output.borrow().get_verbosity()),
             false,
             // TODO(plugin): clone of the formatter; PHP `clone $output->getFormatter()`.
@@ -72,10 +68,7 @@ impl SymfonyStyle {
             let w = Terminal::new().get_width();
             if w != 0 { w } else { MAX_LINE_LENGTH }
         };
-        let line_length = std::cmp::min(
-            width - (std::path::MAIN_SEPARATOR == '\\') as i64,
-            MAX_LINE_LENGTH,
-        );
+        let line_length = std::cmp::min(width - cfg!(windows) as i64, MAX_LINE_LENGTH);
 
         let inner = OutputStyle::new(output.clone());
 
@@ -279,7 +272,7 @@ impl SymfonyStyle {
     pub fn create_progress_bar(&self, max: i64) -> ProgressBar {
         let mut progress_bar = self.inner.create_progress_bar(max);
 
-        if std::path::MAIN_SEPARATOR != '\\'
+        if !cfg!(windows)
             || shirabe_php_shim::getenv("TERM_PROGRAM").as_deref()
                 == Some(std::ffi::OsStr::new("Hyper"))
         {

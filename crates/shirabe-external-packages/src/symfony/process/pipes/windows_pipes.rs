@@ -17,7 +17,7 @@ pub struct WindowsPipes {
 
 impl WindowsPipes {
     pub fn new(_input: PhpMixed) -> Self {
-        // Windows-only path: never constructed on POSIX (MAIN_SEPARATOR is '/').
+        // Windows-only path: never constructed on non-Windows targets.
         todo!()
     }
 }

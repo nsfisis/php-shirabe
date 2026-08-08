@@ -201,7 +201,7 @@ impl Filesystem {
             if shirabe_php_shim::is_link(&file) {
                 // See https://bugs.php.net/52176
                 if !(shirabe_php_shim::unlink(&file)
-                    || std::path::MAIN_SEPARATOR != '\\'
+                    || !cfg!(windows)
                     || shirabe_php_shim::rmdir(&file))
                     && shirabe_php_shim::file_exists(&file)
                 {
@@ -272,7 +272,7 @@ impl Filesystem {
         let mut origin_dir = origin_dir.to_string();
         let mut target_dir = target_dir.to_string();
 
-        if std::path::MAIN_SEPARATOR == '\\' {
+        if cfg!(windows) {
             origin_dir = shirabe_php_shim::strtr(&origin_dir, "/", "\\");
             target_dir = shirabe_php_shim::strtr(&target_dir, "/", "\\");
 

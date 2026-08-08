@@ -25,9 +25,7 @@ impl ExecutableFinder {
 
     pub fn find(&self, name: &str, default: Option<&str>, extra_dirs: &[String]) -> Option<String> {
         // windows built-in commands that are present in cmd.exe should not be resolved using PATH as they do not exist as exes
-        if std::path::MAIN_SEPARATOR == '\\'
-            && CMD_BUILTINS.contains(&shirabe_php_shim::strtolower(name).as_str())
-        {
+        if cfg!(windows) && CMD_BUILTINS.contains(&shirabe_php_shim::strtolower(name).as_str()) {
             return Some(name.to_string());
         }
 
@@ -39,7 +37,7 @@ impl ExecutableFinder {
         dirs.extend_from_slice(extra_dirs);
 
         let mut suffixes: Vec<String> = vec![];
-        if std::path::MAIN_SEPARATOR == '\\' {
+        if cfg!(windows) {
             let path_ext =
                 shirabe_php_shim::getenv("PATHEXT").map(|v| v.to_string_lossy().into_owned());
             suffixes = self.suffixes.clone();
@@ -70,7 +68,7 @@ impl ExecutableFinder {
                 let dir = if dir.is_empty() { "." } else { dir.as_str() };
                 let file = format!("{dir}{}{name}{suffix}", std::path::MAIN_SEPARATOR);
                 if shirabe_php_shim::is_file(&file)
-                    && (std::path::MAIN_SEPARATOR == '\\' || shirabe_php_shim::is_executable(&file))
+                    && (cfg!(windows) || shirabe_php_shim::is_executable(&file))
                 {
                     return Some(file);
                 }
@@ -84,7 +82,7 @@ impl ExecutableFinder {
             }
         }
 
-        if std::path::MAIN_SEPARATOR == '\\'
+        if cfg!(windows)
             || name.len()
                 != shirabe_php_shim::strcspn(name, &format!("/{}", std::path::MAIN_SEPARATOR))
         {
