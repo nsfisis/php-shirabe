@@ -171,8 +171,6 @@ impl JsonFile {
         })() {
             Ok(j) => j,
             Err(e) => {
-                // TransportException keeps its message verbatim; any other exception is wrapped
-                // with the "Could not read" prefix.
                 if let Some(te) = e.catch::<TransportException>() {
                     let message = te.get_message().to_string();
                     return Err(RuntimeException::with_code_and_previous(
@@ -181,6 +179,10 @@ impl JsonFile {
                         Some(std::sync::Arc::new(e)),
                     )
                     .into());
+                }
+                // `catch (\Exception)` leaves an \Error to propagate.
+                if e.is_instanceof::<shirabe_php_shim::Error>() {
+                    return Err(e);
                 }
                 return Err(RuntimeException::new(format!(
                     "Could not read {}\n\n{}",
