@@ -7,12 +7,25 @@ use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::psr::log::LogLevel;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, in_array_loose, in_array_strict, json_encode_ex,
-    php_regex,
+    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, php_regex,
 };
+
+/// ref: composer/vendor/psr/log/Psr/Log/LogLevel.php
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogLevel;
+
+impl LogLevel {
+    pub const EMERGENCY: &'static str = "emergency";
+    pub const ALERT: &'static str = "alert";
+    pub const CRITICAL: &'static str = "critical";
+    pub const ERROR: &'static str = "error";
+    pub const WARNING: &'static str = "warning";
+    pub const NOTICE: &'static str = "notice";
+    pub const INFO: &'static str = "info";
+    pub const DEBUG: &'static str = "debug";
+}
 
 fn log_context(context: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
     context
@@ -387,70 +400,38 @@ pub trait BaseIO: IOInterface {
     }
 
     fn emergency(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::EMERGENCY.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::EMERGENCY, message, context);
     }
 
     fn alert(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::ALERT.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::ALERT, message, context);
     }
 
     fn critical(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::CRITICAL.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::CRITICAL, message, context);
     }
 
     fn error(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::ERROR.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::ERROR, message, context);
     }
 
     fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::WARNING.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::WARNING, message, context);
     }
 
     fn notice(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::NOTICE.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::NOTICE, message, context);
     }
 
     fn info(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::INFO.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::INFO, message, context);
     }
 
     fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        self.log(
-            PhpMixed::String(LogLevel::DEBUG.to_string()),
-            message,
-            context,
-        );
+        self.log(LogLevel::DEBUG, message, context);
     }
 
-    fn log(&self, level: PhpMixed, message: &str, context: &[(&str, &str)]) {
+    fn log(&self, level: &str, message: &str, context: &[(&str, &str)]) {
         let mut message_str = message.to_string();
 
         if !context.is_empty() {
@@ -467,34 +448,28 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        let level_str = level.as_string().unwrap_or("");
-        if in_array_loose(
-            level.clone(),
-            &[
-                PhpMixed::String(LogLevel::EMERGENCY.to_string()),
-                PhpMixed::String(LogLevel::ALERT.to_string()),
-                PhpMixed::String(LogLevel::CRITICAL.to_string()),
-                PhpMixed::String(LogLevel::ERROR.to_string()),
-            ],
+        if matches!(
+            level,
+            LogLevel::EMERGENCY | LogLevel::ALERT | LogLevel::CRITICAL | LogLevel::ERROR
         ) {
             self.write_error3(
                 &format!("<error>{}</error>", message_str),
                 true,
                 io_interface::NORMAL,
             );
-        } else if level_str == LogLevel::WARNING {
+        } else if level == LogLevel::WARNING {
             self.write_error3(
                 &format!("<warning>{}</warning>", message_str),
                 true,
                 io_interface::NORMAL,
             );
-        } else if level_str == LogLevel::NOTICE {
+        } else if level == LogLevel::NOTICE {
             self.write_error3(
                 &format!("<info>{}</info>", message_str),
                 true,
                 io_interface::VERBOSE,
             );
-        } else if level_str == LogLevel::INFO {
+        } else if level == LogLevel::INFO {
             self.write_error3(
                 &format!("<info>{}</info>", message_str),
                 true,
