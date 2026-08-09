@@ -6,7 +6,7 @@
 //! `RecursiveDirectoryIterator` attaches to each `SplFileInfo` is carried on the
 //! private `Entry` struct so the path/exclude filters keep their exact behavior.
 
-use crate::symfony::finder::glob::Glob;
+use crate::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_pcre::{CaptureKey, Preg};

@@ -4,9 +4,9 @@ use crate::package::archiver::BaseExcludeFilter;
 use crate::package::archiver::ComposerExcludeFilter;
 use crate::package::archiver::GitExcludeFilter;
 use crate::util::Filesystem;
-use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{RuntimeException, preg_quote, realpath};
+use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
 pub struct ArchivableFilesFinder {

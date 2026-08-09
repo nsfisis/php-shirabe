@@ -18,6 +18,7 @@ shirabe-php-src = { path = "crates/shirabe-php-src" }
 shirabe-semver = { path = "crates/shirabe-semver" }
 shirabe-spdx-licenses = { path = "crates/shirabe-spdx-licenses" }
 shirabe-symfony-filesystem = { path = "crates/shirabe-symfony-filesystem" }
+shirabe-symfony-finder = { path = "crates/shirabe-symfony-finder" }
 shirabe-symfony-process = { path = "crates/shirabe-symfony-process" }
 shirabe-symfony-string = { path = "crates/shirabe-symfony-string" }
 anyhow = "1.0.102"

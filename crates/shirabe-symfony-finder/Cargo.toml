@@ -1,15 +1,14 @@
 [package]
-name = "shirabe-class-map-generator"
+name = "shirabe-symfony-finder"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-shirabe-external-packages.workspace = true
 shirabe-pcre.workspace = true
 shirabe-php-shim.workspace = true
-shirabe-symfony-finder.workspace = true
-anyhow.workspace = true
+chrono.workspace = true
 indexmap.workspace = true
+regex.workspace = true
 
 [lints]
 workspace = true

@@ -40,7 +40,6 @@ use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -48,6 +47,7 @@ use shirabe_php_shim::{
     chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir, is_file,
     mkdir, realpath, rtrim, strtolower, unlink,
 };
+use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
 
 /// Install a package as new project into new directory.

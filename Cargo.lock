@@ -2105,6 +2105,7 @@ dependencies = [
  "shirabe-semver",
  "shirabe-spdx-licenses",
  "shirabe-symfony-filesystem",
+ "shirabe-symfony-finder",
  "shirabe-symfony-process",
  "tempfile",
  "tokio",
@@ -2122,6 +2123,7 @@ dependencies = [
  "shirabe-external-packages",
  "shirabe-pcre",
  "shirabe-php-shim",
+ "shirabe-symfony-finder",
 ]
 
 [[package]]
@@ -2224,6 +2226,17 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "indexmap",
+ "shirabe-php-shim",
+]
+
+[[package]]
+name = "shirabe-symfony-finder"
+version = "0.0.1"
+dependencies = [
+ "chrono",
+ "indexmap",
+ "regex",
+ "shirabe-pcre",
  "shirabe-php-shim",
 ]
 

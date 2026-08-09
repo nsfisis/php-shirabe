@@ -8,11 +8,11 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
 };
+use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
 pub trait ArchiveDownloader {

@@ -13,6 +13,7 @@ shirabe-php-shim.workspace = true
 shirabe-semver.workspace = true
 shirabe-spdx-licenses.workspace = true
 shirabe-symfony-filesystem.workspace = true
+shirabe-symfony-finder.workspace = true
 shirabe-symfony-process.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
