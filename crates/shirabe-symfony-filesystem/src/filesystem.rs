@@ -280,7 +280,12 @@ impl Filesystem {
         Ok(())
     }
 
-    pub fn mirror(&self, origin_dir: &str, target_dir: &str) -> anyhow::Result<()> {
+    pub fn mirror(
+        &self,
+        origin_dir: &str,
+        target_dir: &str,
+        iterator: Vec<String>,
+    ) -> anyhow::Result<()> {
         let target_dir = shirabe_php_shim::rtrim(target_dir, Some("/\\"));
         let origin_dir = shirabe_php_shim::rtrim(origin_dir, Some("/\\"));
         let origin_dir_len = origin_dir.len();
@@ -298,21 +303,12 @@ impl Filesystem {
             .into());
         }
 
-        let iterator = shirabe_php_shim::recursive_iterator_iterator(
-            shirabe_php_shim::recursive_directory_iterator(
-                &origin_dir,
-                shirabe_php_shim::SKIP_DOTS,
-            )?,
-            shirabe_php_shim::RecursiveIteratorIterator::SELF_FIRST,
-        );
-
         self.mkdir(&target_dir, 0o777)?;
 
         let mut files_created_while_mirroring: indexmap::IndexMap<String, bool> =
             indexmap::IndexMap::new();
 
-        for file in &iterator {
-            let pathname = file.get_pathname();
+        for pathname in iterator {
             // SplFileInfo::getRealPath(), which returns false for a path that cannot be resolved.
             let real_path = shirabe_php_shim::realpath(&pathname);
             if pathname == target_dir
@@ -327,12 +323,15 @@ impl Filesystem {
             let target = format!("{}{}", target_dir, &pathname[origin_dir_len..]);
             files_created_while_mirroring.insert(target.clone(), true);
 
-            if file.is_link() {
+            if shirabe_php_shim::is_link(&pathname) {
                 // PHP coerces the false getLinkTarget() returns on failure to the empty string.
-                self.symlink(&file.get_link_target().unwrap_or_default(), &target)?;
-            } else if file.is_dir() {
+                self.symlink(
+                    &shirabe_php_shim::readlink(&pathname).unwrap_or_default(),
+                    &target,
+                )?;
+            } else if shirabe_php_shim::is_dir(&pathname) {
                 self.mkdir(&target, 0o777)?;
-            } else if file.is_file() {
+            } else if shirabe_php_shim::is_file(&pathname) {
                 self.copy(&pathname, &target)?;
             } else {
                 return Err(IOException::new(

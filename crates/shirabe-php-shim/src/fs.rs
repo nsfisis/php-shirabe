@@ -190,11 +190,6 @@ impl RecursiveIteratorFileInfo {
         self.path.to_string_lossy().into_owned()
     }
 
-    // SplFileInfo::getLinkTarget(): readlink() on the entry. None is PHP's false-on-failure.
-    pub fn get_link_target(&self) -> Option<String> {
-        readlink(&self.path)
-    }
-
     pub fn get_size(&self) -> i64 {
         std::fs::metadata(&self.path)
             .map(|m| m.len() as i64)

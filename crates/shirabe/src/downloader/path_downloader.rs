@@ -443,13 +443,14 @@ impl DownloaderInterface for PathDownloader {
                     io_interface::NORMAL,
                 );
             }
-            let _iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
-            // PHP: $symfonyFilesystem->mirror($realUrl, $path, $iterator);
-            // TODO(phase-c): Symfony Filesystem::mirror takes a Traversable iterator as its third
-            // argument, but the external-package Filesystem stub does not model the iterator type
-            // that ArchivableFilesFinder (an IteratorAggregate) would be wrapped into, so None is
-            // passed and the mirrored file list is not restricted.
-            symfony_filesystem.mirror(&real_url, &path)?;
+            let iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
+            symfony_filesystem.mirror(
+                &real_url,
+                &path,
+                iterator
+                    .map(|entry| entry.to_string_lossy().into_owned())
+                    .collect(),
+            )?;
         }
 
         if output {
