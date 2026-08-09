@@ -16,6 +16,7 @@ shirabe-php-rpc = { path = "crates/shirabe-php-rpc" }
 shirabe-php-shim = { path = "crates/shirabe-php-shim" }
 shirabe-php-src = { path = "crates/shirabe-php-src" }
 shirabe-seld-json-lint = { path = "crates/shirabe-seld-json-lint" }
+shirabe-seld-signal = { path = "crates/shirabe-seld-signal" }
 shirabe-semver = { path = "crates/shirabe-semver" }
 shirabe-spdx-licenses = { path = "crates/shirabe-spdx-licenses" }
 shirabe-symfony-console = { path = "crates/shirabe-symfony-console" }

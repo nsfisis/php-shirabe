@@ -21,11 +21,11 @@ use crate::util::Platform;
 use crate::util::r#loop::Loop;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
     str_contains, str_replace, strpos, strtolower,
 };
+use shirabe_seld_signal::SignalHandler;
 
 /// Package operation manager.
 #[derive(Debug)]

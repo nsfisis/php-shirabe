@@ -36,7 +36,6 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -44,6 +43,7 @@ use shirabe_php_shim::{
     chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir, is_file,
     mkdir, realpath, rtrim, strtolower, unlink,
 };
+use shirabe_seld_signal::SignalHandler;
 use shirabe_symfony_console::command::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;

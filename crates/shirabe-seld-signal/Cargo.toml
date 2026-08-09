@@ -1,0 +1,7 @@
+[package]
+name = "shirabe-seld-signal"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true

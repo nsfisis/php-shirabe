@@ -32,12 +32,12 @@ use crate::util::Filesystem;
 use crate::util::PackageSorter;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
     array_merge, array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
     impl_php_class, implode, is_writable, strtolower, unlink,
 };
+use shirabe_seld_signal::SignalHandler;
 use shirabe_symfony_console::command::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
