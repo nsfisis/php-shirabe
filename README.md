@@ -17,10 +17,21 @@ Shirabe runs Composer plugins using the system-provided real PHP. The plugin API
 * [phpstan/extension-installer](https://github.com/phpstan/extension-installer)
 
 
+## Requirements
+
+Building Shirabe requires:
+
+* Rust toolchain
+* Git
+* PHP
+* Composer
+
+
 ## Build
 
 ```
 $ git submodule update --init
+$ composer install --no-dev --working-dir=composer
 $ cargo build --release
 ```
 
