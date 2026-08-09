@@ -1,8 +1,5 @@
 //! ref: composer/vendor/symfony/console/Helper/TableStyle.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::exception::logic_exception::LogicException;
-
 /// Defines the styles for a Table.
 #[derive(Debug, Clone)]
 pub struct TableStyle {
@@ -23,8 +20,6 @@ pub struct TableStyle {
     crossing_top_left_bottom_char: String,
     crossing_top_mid_bottom_char: String,
     crossing_top_right_bottom_char: String,
-    header_title_format: String,
-    footer_title_format: String,
     cell_header_format: String,
     cell_row_format: String,
     cell_row_content_format: String,
@@ -52,8 +47,6 @@ impl Default for TableStyle {
             crossing_top_left_bottom_char: "+".to_string(),
             crossing_top_mid_bottom_char: "+".to_string(),
             crossing_top_right_bottom_char: "+".to_string(),
-            header_title_format: "<fg=black;bg=white;options=bold> %s </>".to_string(),
-            footer_title_format: "<fg=black;bg=white;options=bold> %s </>".to_string(),
             cell_header_format: "<info>%s</info>".to_string(),
             cell_row_format: "%s".to_string(),
             cell_row_content_format: " %s ".to_string(),
@@ -64,22 +57,6 @@ impl Default for TableStyle {
 }
 
 impl TableStyle {
-    /// Sets padding character, used for cell padding.
-    pub fn set_padding_char(
-        &mut self,
-        padding_char: String,
-    ) -> anyhow::Result<Result<&mut Self, LogicException>> {
-        if padding_char.is_empty() {
-            return Ok(Err(LogicException::new(
-                "The padding char must not be empty.".to_string(),
-            )));
-        }
-
-        self.padding_char = padding_char;
-
-        Ok(Ok(self))
-    }
-
     /// Gets padding character, used for cell padding.
     pub fn get_padding_char(&self) -> String {
         self.padding_char.clone()
@@ -205,13 +182,6 @@ impl TableStyle {
         self.cell_header_format.clone()
     }
 
-    /// Sets row cell format.
-    pub fn set_cell_row_format(&mut self, cell_row_format: String) -> &mut Self {
-        self.cell_row_format = cell_row_format;
-
-        self
-    }
-
     /// Gets row cell format.
     pub fn get_cell_row_format(&self) -> String {
         self.cell_row_format.clone()
@@ -229,61 +199,13 @@ impl TableStyle {
         self.cell_row_content_format.clone()
     }
 
-    /// Sets table border format.
-    pub fn set_border_format(&mut self, border_format: String) -> &mut Self {
-        self.border_format = border_format;
-
-        self
-    }
-
     /// Gets table border format.
     pub fn get_border_format(&self) -> String {
         self.border_format.clone()
     }
 
-    /// Sets cell padding type.
-    pub fn set_pad_type(
-        &mut self,
-        pad_type: i64,
-    ) -> anyhow::Result<Result<&mut Self, InvalidArgumentException>> {
-        if ![
-            shirabe_php_shim::STR_PAD_LEFT,
-            shirabe_php_shim::STR_PAD_RIGHT,
-            shirabe_php_shim::STR_PAD_BOTH,
-        ]
-        .contains(&pad_type)
-        {
-            return Ok(Err(InvalidArgumentException::new("Invalid padding type. Expected one of (STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH)."
-                .to_string())));
-        }
-
-        self.pad_type = pad_type;
-
-        Ok(Ok(self))
-    }
-
     /// Gets cell padding type.
     pub fn get_pad_type(&self) -> i64 {
         self.pad_type
-    }
-
-    pub fn get_header_title_format(&self) -> String {
-        self.header_title_format.clone()
-    }
-
-    pub fn set_header_title_format(&mut self, format: String) -> &mut Self {
-        self.header_title_format = format;
-
-        self
-    }
-
-    pub fn get_footer_title_format(&self) -> String {
-        self.footer_title_format.clone()
-    }
-
-    pub fn set_footer_title_format(&mut self, format: String) -> &mut Self {
-        self.footer_title_format = format;
-
-        self
     }
 }

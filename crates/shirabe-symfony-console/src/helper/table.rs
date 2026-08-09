@@ -1,16 +1,11 @@
 //! ref: composer/vendor/symfony/console/Helper/Table.php
 
 use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::exception::runtime_exception::RuntimeException;
 use crate::formatter::output_formatter::OutputFormatter;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
-use crate::helper::helper::Helper;
-use crate::helper::table_cell::{TableCell, TableCellOption};
-use crate::helper::table_cell_style::TableCellStyle;
-use crate::helper::table_rows::TableRows;
-use crate::helper::table_separator::TableSeparator;
-use crate::helper::table_style::TableStyle;
-use crate::output::console_section_output::ConsoleSectionOutput;
+use crate::helper::{
+    Helper, TableCell, TableCellOption, TableCellStyle, TableRows, TableSeparator, TableStyle,
+};
 use crate::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_pcre::preg::Preg;
@@ -228,9 +223,6 @@ fn set_cell(row: &mut Vec<Cell>, index: i64, value: Cell) {
 /// Provides helpers to display a table.
 #[derive(Debug)]
 pub struct Table {
-    header_title: Option<String>,
-    footer_title: Option<String>,
-
     /// Table headers.
     headers: Vec<Row>,
 
@@ -248,13 +240,9 @@ pub struct Table {
 
     style: TableStyle,
 
-    column_styles: IndexMap<i64, TableStyle>,
-
     /// User set column widths.
     column_widths: IndexMap<i64, i64>,
     column_max_widths: IndexMap<i64, i64>,
-
-    rendered: bool,
 }
 
 const SEPARATOR_TOP: i64 = 0;
@@ -282,8 +270,6 @@ impl Table {
         drop(styles_guard);
 
         let mut this = Self {
-            header_title: None,
-            footer_title: None,
             headers: Vec::new(),
             rows: Vec::new(),
             horizontal: false,
@@ -291,10 +277,8 @@ impl Table {
             number_of_columns: None,
             output,
             style: TableStyle::default(),
-            column_styles: IndexMap::new(),
             column_widths: IndexMap::new(),
             column_max_widths: IndexMap::new(),
-            rendered: false,
         };
 
         this.set_style(StyleName::from("default"));
@@ -302,18 +286,8 @@ impl Table {
         this
     }
 
-    /// Sets a style definition.
-    pub fn set_style_definition(name: String, style: TableStyle) {
-        let mut styles_guard = styles().lock().unwrap();
-        if styles_guard.is_none() {
-            *styles_guard = Some(Self::init_styles());
-        }
-
-        styles_guard.as_mut().unwrap().insert(name, style);
-    }
-
     /// Gets a style definition by name.
-    pub fn get_style_definition(
+    pub(crate) fn get_style_definition(
         name: String,
     ) -> anyhow::Result<Result<TableStyle, InvalidArgumentException>> {
         let mut styles_guard = styles().lock().unwrap();
@@ -348,49 +322,13 @@ impl Table {
     }
 
     /// Gets the current table style.
-    pub fn get_style(&self) -> &TableStyle {
+    fn get_style(&self) -> &TableStyle {
         &self.style
-    }
-
-    /// Sets table column style.
-    ///
-    /// `$name` is the style name or a TableStyle instance.
-    pub fn set_column_style(
-        &mut self,
-        column_index: i64,
-        name: StyleName,
-    ) -> anyhow::Result<Result<&mut Self, InvalidArgumentException>> {
-        match self.resolve_style(name)? {
-            Ok(style) => {
-                self.column_styles.insert(column_index, style);
-                Ok(Ok(self))
-            }
-            Err(e) => Ok(Err(e)),
-        }
-    }
-
-    /// Gets the current style for a column.
-    ///
-    /// If style was not set, it returns the global table style.
-    pub fn get_column_style(&self, column_index: i64) -> &TableStyle {
-        self.column_styles
-            .get(&column_index)
-            .unwrap_or_else(|| self.get_style())
     }
 
     /// Sets the minimum width of a column.
     pub fn set_column_width(&mut self, column_index: i64, width: i64) -> &mut Self {
         self.column_widths.insert(column_index, width);
-
-        self
-    }
-
-    /// Sets the minimum width of all columns.
-    pub fn set_column_widths(&mut self, widths: Vec<i64>) -> &mut Self {
-        self.column_widths = IndexMap::new();
-        for (index, width) in widths.into_iter().enumerate() {
-            self.set_column_width(index as i64, width);
-        }
 
         self
     }
@@ -433,7 +371,7 @@ impl Table {
         self.add_rows(rows)
     }
 
-    pub fn add_rows(&mut self, rows: Vec<Row>) -> &mut Self {
+    fn add_rows(&mut self, rows: Vec<Row>) -> &mut Self {
         for row in rows {
             self.add_row(row);
         }
@@ -445,50 +383,6 @@ impl Table {
         // PHP `array_values($row)` reindexing is the identity on a positional cell vector, and the
         // "row must be an array or a TableSeparator" check is now guaranteed by the type.
         self.rows.push(row);
-
-        self
-    }
-
-    /// Adds a row to the table, and re-renders the table.
-    pub fn append_row(&mut self, row: Row) -> anyhow::Result<Result<&mut Self, RuntimeException>> {
-        if !Self::output_is_console_section(&self.output) {
-            return Ok(Err(RuntimeException::new(format!(
-                "Output should be an instance of \"{}\" when calling \"{}\".",
-                "Symfony\\Component\\Console\\Output\\ConsoleSectionOutput",
-                "Symfony\\Component\\Console\\Helper\\Table::appendRow",
-            ))));
-        }
-
-        if self.rendered {
-            // TODO(phase-c): downcast output to ConsoleSectionOutput to call clear().
-            let _ = ConsoleSectionOutput::clear;
-            let row_count = self.calculate_row_count();
-            let _ = row_count;
-            todo!()
-        }
-
-        self.add_row(row);
-        self.render();
-
-        Ok(Ok(self))
-    }
-
-    pub fn set_row(&mut self, column: i64, row: Vec<Cell>) -> &mut Self {
-        // PHP indexes $this->rows by arbitrary key; sparse assignment over a positional Vec is not
-        // modeled and has no callers.
-        let _ = (column, row);
-        // TODO(phase-c): sparse `$this->rows[$column] = $row` over a positional row vector.
-        todo!()
-    }
-
-    pub fn set_header_title(&mut self, title: Option<String>) -> &mut Self {
-        self.header_title = title;
-
-        self
-    }
-
-    pub fn set_footer_title(&mut self, title: Option<String>) -> &mut Self {
-        self.footer_title = title;
 
         self
     }
@@ -544,8 +438,6 @@ impl Table {
 
         let mut is_header = !self.horizontal;
         let mut is_first_row = self.horizontal;
-        let mut has_title =
-            self.header_title.is_some() && !self.header_title.as_deref().unwrap_or("").is_empty();
 
         for row_group in &row_groups {
             let mut is_header_separator_rendered = false;
@@ -559,7 +451,7 @@ impl Table {
                 }
 
                 if row.is_table_separator() {
-                    self.render_row_separator(SEPARATOR_MID, None, None);
+                    self.render_row_separator(SEPARATOR_MID);
 
                     continue;
                 }
@@ -569,47 +461,21 @@ impl Table {
                 }
 
                 if is_header && !is_header_separator_rendered {
-                    self.render_row_separator(
-                        if is_header {
-                            SEPARATOR_TOP
-                        } else {
-                            SEPARATOR_TOP_BOTTOM
-                        },
-                        if has_title {
-                            self.header_title.clone()
-                        } else {
-                            None
-                        },
-                        if has_title {
-                            Some(self.style.get_header_title_format())
-                        } else {
-                            None
-                        },
-                    );
-                    has_title = false;
+                    self.render_row_separator(if is_header {
+                        SEPARATOR_TOP
+                    } else {
+                        SEPARATOR_TOP_BOTTOM
+                    });
                     is_header_separator_rendered = true;
                 }
 
                 if is_first_row {
-                    self.render_row_separator(
-                        if is_header {
-                            SEPARATOR_TOP
-                        } else {
-                            SEPARATOR_TOP_BOTTOM
-                        },
-                        if has_title {
-                            self.header_title.clone()
-                        } else {
-                            None
-                        },
-                        if has_title {
-                            Some(self.style.get_header_title_format())
-                        } else {
-                            None
-                        },
-                    );
+                    self.render_row_separator(if is_header {
+                        SEPARATOR_TOP
+                    } else {
+                        SEPARATOR_TOP_BOTTOM
+                    });
                     is_first_row = false;
-                    has_title = false;
                 }
 
                 if self.horizontal {
@@ -631,23 +497,13 @@ impl Table {
                 }
             }
         }
-        self.render_row_separator(
-            SEPARATOR_BOTTOM,
-            self.footer_title.clone(),
-            Some(self.style.get_footer_title_format()),
-        );
+        self.render_row_separator(SEPARATOR_BOTTOM);
 
         self.cleanup();
-        self.rendered = true;
     }
 
     /// Renders horizontal header separator.
-    fn render_row_separator(
-        &self,
-        r#type: i64,
-        title: Option<String>,
-        title_format: Option<String>,
-    ) {
+    fn render_row_separator(&self, r#type: i64) {
         let count = match self.number_of_columns {
             Some(0) | None => return,
             Some(c) => c,
@@ -705,46 +561,6 @@ impl Table {
                 &mid_char
             });
             column += 1;
-        }
-
-        if let Some(title) = title {
-            let title_format = title_format.unwrap();
-            let formatted_title =
-                shirabe_php_shim::sprintf(&title_format, &[PhpMixed::from(title.clone())]);
-            let mut formatted_title = formatted_title;
-            let mut title_length = Helper::width(&self.remove_decoration(&formatted_title));
-            let markup_length = Helper::width(&markup);
-            let limit = markup_length - 4;
-            if title_length > limit {
-                title_length = limit;
-                let format_length = Helper::width(&self.remove_decoration(
-                    &shirabe_php_shim::sprintf(&title_format, &[PhpMixed::from("")]),
-                ));
-                formatted_title = shirabe_php_shim::sprintf(
-                    &title_format,
-                    &[PhpMixed::from(format!(
-                        "{}...",
-                        Helper::substr(&title, 0, Some(limit - format_length - 3))
-                    ))],
-                );
-            }
-
-            let title_start = (markup_length - title_length) / 2;
-            if shirabe_php_shim::mb_detect_encoding(&markup, None, true).is_none() {
-                markup = shirabe_php_shim::substr_replace(
-                    &markup,
-                    &formatted_title,
-                    title_start as usize,
-                    title_length as usize,
-                );
-            } else {
-                markup = format!(
-                    "{}{}{}",
-                    shirabe_php_shim::mb_substr(&markup, 0, Some(title_start), None),
-                    formatted_title,
-                    shirabe_php_shim::mb_substr(&markup, title_start + title_length, None, None),
-                );
-            }
         }
 
         self.output.borrow().writeln(
@@ -820,7 +636,7 @@ impl Table {
                 - shirabe_php_shim::mb_strwidth(&cell_str, Some(&encoding));
         }
 
-        let style = self.get_column_style(column);
+        let style = self.get_style();
 
         if cell.is_table_separator() {
             return shirabe_php_shim::sprintf(
@@ -1014,23 +830,6 @@ impl Table {
         }
 
         TableRows::from_row_groups(row_groups)
-    }
-
-    fn calculate_row_count(&mut self) -> i64 {
-        let mut merged = self.headers.clone();
-        merged.push(Row::Separator(TableSeparator::new()));
-        merged.extend(self.rows.clone());
-        let mut number_of_rows = self.build_table_rows(merged).into_row_groups().len() as i64;
-
-        if !self.headers.is_empty() {
-            number_of_rows += 1; // Add row for header separator
-        }
-
-        if !self.rows.is_empty() {
-            number_of_rows += 1; // Add row for footer separator
-        }
-
-        number_of_rows
     }
 
     /// fill rows that contains rowspan > 1.
@@ -1404,17 +1203,6 @@ impl Table {
         let formatter = self.output.borrow().get_formatter();
         let mut formatter = formatter.borrow_mut();
         Helper::remove_decoration(&mut *formatter, string)
-    }
-
-    fn output_is_console_section(
-        output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> bool {
-        // PHP: $this->output instanceof ConsoleSectionOutput
-        let borrowed = output.borrow();
-        (*borrowed)
-            .as_any()
-            .downcast_ref::<ConsoleSectionOutput>()
-            .is_some()
     }
 
     fn table_cell_options_colspan(colspan: i64) -> IndexMap<String, TableCellOption> {

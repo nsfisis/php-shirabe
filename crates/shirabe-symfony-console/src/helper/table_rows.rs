@@ -16,14 +16,6 @@ impl TableRows {
     pub fn from_row_groups(row_groups: Vec<Vec<Row>>) -> Self {
         Self { row_groups }
     }
-
-    pub fn get_iterator(&self) -> std::slice::Iter<'_, Vec<Row>> {
-        self.row_groups.iter()
-    }
-
-    pub fn into_row_groups(self) -> Vec<Vec<Row>> {
-        self.row_groups
-    }
 }
 
 impl<'a> IntoIterator for &'a TableRows {
@@ -32,14 +24,5 @@ impl<'a> IntoIterator for &'a TableRows {
 
     fn into_iter(self) -> Self::IntoIter {
         self.row_groups.iter()
-    }
-}
-
-impl IntoIterator for TableRows {
-    type Item = Vec<Row>;
-    type IntoIter = std::vec::IntoIter<Vec<Row>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.row_groups.into_iter()
     }
 }

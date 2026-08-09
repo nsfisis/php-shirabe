@@ -15,9 +15,7 @@ impl TableSeparator {
         Self::new1(IndexMap::new()).expect("TableSeparator default options are always valid")
     }
 
-    pub fn new1(
-        options: IndexMap<String, TableCellOption>,
-    ) -> Result<Self, InvalidArgumentException> {
+    fn new1(options: IndexMap<String, TableCellOption>) -> Result<Self, InvalidArgumentException> {
         Ok(Self {
             inner: TableCell::new("", options)?,
         })
