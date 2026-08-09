@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/FilesystemRepository.php
 
 use crate::config::is_php_integer_key;
-use crate::installed_versions::InstalledVersions;
 use crate::installer::InstallationManagerInterface;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
@@ -338,30 +337,20 @@ impl FilesystemRepository {
             );
 
             // make sure the in memory state is up to date with on disk
-            // The upstream in-process reload/selfDir/installedIsLocalDir tail is mirrored
-            // twice: into the Rust-side statics below, and into the PHP worker where the real
-            // observers (plugins) live. The push is skipped when no worker is running — with no
-            // child there is nothing that could observe the state; the glue skips it only when
-            // the class is not even autoloadable there (no Composer PHP runtime = no observer
-            // code either).
+            // The upstream in-process reload/selfDir/installedIsLocalDir tail is pushed to the
+            // PHP worker, where the real observers (plugins) live. The push is skipped when no
+            // worker is running — with no child there is nothing that could observe the state;
+            // the glue skips it only when the class is not even autoloadable there (no Composer
+            // PHP runtime = no observer code either).
             if shirabe_php_rpc::worker_is_running() {
                 crate::event_dispatcher::unwrap_php_result(shirabe_php_rpc::call_function(
                     "__shirabe_installed_versions_reload",
                     vec![
-                        shirabe_php_rpc::PluginValue::from_php_mixed(&PhpMixed::Array(
-                            versions.clone(),
-                        )),
+                        shirabe_php_rpc::PluginValue::from_php_mixed(&PhpMixed::Array(versions)),
                         shirabe_php_rpc::PluginValue::string(repo_dir.clone()),
                     ],
                 ))?;
             }
-            InstalledVersions::reload(versions);
-
-            // make sure the selfDir matches the expected data at runtime if the class was loaded from the vendor dir, as it may have been
-            // loaded from the Composer sources, causing packages to appear twice in that case if the installed.php is loaded in addition to the
-            // in memory loaded data from above
-            InstalledVersions::set_self_dir(repo_dir.replace('\\', "/"));
-            InstalledVersions::set_installed_is_local_dir(true);
         }
 
         Ok(())

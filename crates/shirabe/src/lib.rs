@@ -11,7 +11,6 @@ pub mod event_dispatcher;
 pub mod exception;
 pub mod factory;
 pub mod filter;
-pub mod installed_versions;
 pub mod installer;
 pub mod io;
 pub mod json;
@@ -24,6 +23,10 @@ pub mod repository;
 pub mod script;
 pub mod self_update;
 pub mod util;
+
+// InstalledVersions is intentionally unported to Rust. It is a runtime API for plugins and project
+// code, never read by Composer itself. Its real state is stored in PHP's InstalledVersions class.
+// See also `__shirabe_installed_versions_reload` in crates/shirabe-php-rpc/php/worker.php.
 
 /// ref: composer/bin/composer
 pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {

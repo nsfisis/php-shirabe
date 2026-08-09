@@ -66,18 +66,6 @@ pub fn defined(name: &str) -> bool {
     )
 }
 
-// Models methods available on Composer's own runtime classes when given a class name string.
-// Shirabe is a native binary that does not run under a Composer-dumped autoloader, so the dumped
-// `Composer\Autoload\ClassLoader` (and its `getRegisteredLoaders`) is absent from the running
-// process; the class-name form therefore reports no such method. The object form needs runtime
-// reflection that PhpMixed::Object does not carry.
-pub fn method_exists(object_or_class: &PhpMixed, _method_name: &str) -> bool {
-    match object_or_class {
-        PhpMixed::String(_) => false,
-        _ => todo!(),
-    }
-}
-
 // Models the classes available in a standard PHP CLI environment running Composer:
 // the common bundled extensions (zip, Phar) plus Composer's own runtime classes.
 pub fn class_exists(name: &str) -> bool {
@@ -351,20 +339,9 @@ pub fn usleep(_microseconds: u64) {
 }
 
 /// Equivalent to PHP's __DIR__ magic constant
-pub fn php_dir() -> String {
+pub fn dir() -> String {
     // TODO(php-runtime): __DIR__ is the directory of the source file at compile time; it must be supplied
     // per call site (e.g. via a macro), not from a runtime shim function.
-    todo!()
-}
-
-pub fn dir() -> String {
-    // TODO(php-runtime): see php_dir; __DIR__ is a per-source-file compile-time value.
-    todo!()
-}
-
-/// Equivalent to PHP's `require <file>` returning the file's return value
-pub fn require_php_file(_filename: &str) -> PhpMixed {
-    // TODO(php-runtime): `require` evaluates a PHP source file at runtime; there is no PHP interpreter.
     todo!()
 }
 
