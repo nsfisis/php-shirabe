@@ -11,7 +11,8 @@ domain socket. There is exactly one child process per Shirabe process, shared by
 
 The existing `PhpExecutableFinder` class resolves the PHP binary. The child is started with
 `-d serialize_precision=-1` so the wire codec's float formatting is pinned to the default PHP
-behavior.
+behavior, and with `-d xdebug.mode=off` unless `COMPOSER_ALLOW_XDEBUG` asks for Xdebug to stay
+(see `xdebug.md`).
 
 ## Transport
 

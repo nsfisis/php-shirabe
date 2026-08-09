@@ -31,6 +31,7 @@ license of the package it is ported from:
 | [`shirabe-class-map-generator`](crates/shirabe-class-map-generator/LICENSE) | composer/class-map-generator                |
 | [`shirabe-metadata-minifier`](crates/shirabe-metadata-minifier/LICENSE)     | composer/metadata-minifier                  |
 | [`shirabe-pcre`](crates/shirabe-pcre/LICENSE)                               | composer/pcre                               |
+| [`shirabe-php-rpc`](crates/shirabe-php-rpc/LICENSE)                         | composer/xdebug-handler                     |
 | [`shirabe-seld-json-lint`](crates/shirabe-seld-json-lint/LICENSE)           | seld/jsonlint                               |
 | [`shirabe-seld-signal`](crates/shirabe-seld-signal/LICENSE)                 | seld/signal-handler                         |
 | [`shirabe-semver`](crates/shirabe-semver/LICENSE)                           | composer/semver                             |
@@ -40,7 +41,6 @@ license of the package it is ported from:
 | [`shirabe-symfony-finder`](crates/shirabe-symfony-finder/LICENSE)           | symfony/finder                              |
 | [`shirabe-symfony-process`](crates/shirabe-symfony-process/LICENSE)         | symfony/process                             |
 | [`shirabe-symfony-string`](crates/shirabe-symfony-string/LICENSE)           | symfony/string                              |
-| [`shirabe-xdebug-handler`](crates/shirabe-xdebug-handler/LICENSE)           | composer/xdebug-handler                     |
 
 ## PHP
 

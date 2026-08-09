@@ -4,10 +4,12 @@ pub struct IniHelper;
 
 impl IniHelper {
     /// Returns an array of php.ini locations with at least one entry.
+    ///
+    /// PHP asks `XdebugHandler::getAllIniFiles()`, which answers from `COMPOSER_ORIGINAL_INIS`
+    /// when it is set, because a restarted process runs on a generated ini file and has to name
+    /// the ones it replaced. Nothing here restarts PHP, so the worker always runs on the machine's
+    /// own ini files and the variable is not consulted.
     pub fn get_all() -> Vec<String> {
-        // PHP: XdebugHandler::getAllIniFiles(). shirabe_xdebug_handler::XdebugHandler's port
-        // of that method is a stub that returns the PHP default, so query the real PHP
-        // runtime's loaded/scanned ini files here instead.
         shirabe_php_rpc::get_all_ini_files()
     }
 

@@ -20,11 +20,10 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
-    array_slice_strs, explode, get_class, implode, in_array_strict, is_string, php_regex,
-    str_replace, str_starts_with, strpos, strtolower, var_export,
+    array_slice_strs, explode, get_class, implode, is_string, php_regex, str_replace,
+    str_starts_with, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
-use shirabe_xdebug_handler::XdebugHandler;
 use std::sync::{LazyLock, Mutex};
 
 static LAST_SEEN_PLATFORM_PHP: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
@@ -303,17 +302,10 @@ impl PlatformRepository {
         }
 
         // Check for Xdebug in a restarted process
-        if !in_array_strict(
-            "xdebug".to_string(),
-            &loaded_extensions
-                .iter()
-                .map(|s| PhpMixed::String(s.clone()))
-                .collect::<Vec<_>>(),
-        ) && let Some(xdebug_pretty_version) = XdebugHandler::get_skipped_version()
-            && !xdebug_pretty_version.is_empty()
-        {
-            self.add_extension("xdebug", &xdebug_pretty_version)?;
-        }
+        // PHP re-adds the extension `XdebugHandler::getSkippedVersion()` names, since its restart
+        // runs on an ini file with Xdebug commented out. The worker is instead started with
+        // `xdebug.mode=off` (see docs/dev/xdebug.md), which leaves the extension loaded, so it is
+        // already among $loadedExtensions.
 
         // Another quick loop, just for possible libraries
         // Doing it this way to know that functions or constants exist before

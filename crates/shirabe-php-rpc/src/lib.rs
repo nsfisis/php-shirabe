@@ -3,6 +3,7 @@
 pub mod frame;
 pub mod session;
 pub mod value;
+pub mod xdebug;
 
 pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
 
@@ -536,12 +537,21 @@ pub fn phpversion(extension: &str) -> Option<String> {
     }
 }
 
-/// `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` (minus the `self::$name` branch,
-/// which is unreachable since this port never constructs an XdebugHandler): `[(string)
+/// What `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` measures: `[(string)
 /// php_ini_loaded_file()]` merged with the trimmed, comma-split `php_ini_scanned_files()` list
-/// when scanning is active.
+/// when scanning is active. The worker runs on the ini files of the machine, so these are the
+/// user's own.
 pub fn get_all_ini_files() -> Vec<String> {
     string_list(call("get_all_ini_files", ""), "get_all_ini_files")
+}
+
+/// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
+/// the process Xdebug is loaded into.
+pub(crate) fn xdebug_active() -> bool {
+    match call("xdebug_active", "") {
+        PhpMixed::Bool(b) => b,
+        other => panic!("PHP RPC: `xdebug_active` did not return a bool: {other:?}"),
+    }
 }
 
 fn string_list(value: PhpMixed, name: &str) -> Vec<String> {
@@ -1070,7 +1080,16 @@ fn spawn_worker() -> anyhow::Result<Worker> {
         // supported) serialize_precision; pin the child to it in case a distro php.ini overrides
         // the default.
         .arg("-d")
-        .arg("serialize_precision=-1")
+        .arg("serialize_precision=-1");
+    if xdebug::switches_xdebug_off() {
+        // The environment variable takes precedence over every ini setting, so switching the
+        // mode off takes both. See `docs/dev/xdebug.md`.
+        command
+            .arg("-d")
+            .arg("xdebug.mode=off")
+            .env("XDEBUG_MODE", "off");
+    }
+    command
         .arg(&script_path)
         .arg(WORKER_SOCKET_FD.to_string())
         .arg(&stubs_dir);
@@ -1144,6 +1163,41 @@ mod tests {
             state.contains("PHP worker process already exited"),
             "unexpected worker state: {state}"
         );
+    }
+
+    #[test]
+    fn worker_starts_with_xdebug_switched_off() {
+        if PhpExecutableFinder::new().find(false).is_none() {
+            // No PHP in this environment; the worker cannot start.
+            return;
+        }
+
+        let mut worker = spawn_worker().expect("failed to spawn PHP worker");
+
+        // The `-d xdebug.mode=off` half is invisible from PHP while the extension is not loaded
+        // (an unregistered ini entry is not readable), so only the environment half — the one
+        // that overrides every ini setting — can be asserted here.
+        frame::write_frame(
+            &mut worker.stream,
+            &Frame::CallFunction {
+                corr_id: 1,
+                function_name: "getenv".to_string(),
+                args: vec![PluginValue::string("XDEBUG_MODE")],
+                out_param_positions: Vec::new(),
+            },
+        )
+        .expect("failed to ask the worker for its Xdebug mode");
+        let reply = frame::read_frame(&mut worker.stream).expect("failed to read the worker reply");
+        match reply {
+            Frame::Return { value, .. } => assert_eq!(
+                value.to_php_mixed().expect("unusable reply"),
+                PhpMixed::String("off".to_string())
+            ),
+            other => panic!("unexpected reply: {other:?}"),
+        }
+
+        worker.child.kill().expect("failed to kill PHP worker");
+        worker.child.wait().expect("failed to reap PHP worker");
     }
 
     #[test]

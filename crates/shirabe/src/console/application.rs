@@ -98,7 +98,6 @@ use shirabe_symfony_console::style::style_interface::StyleInterface;
 use shirabe_symfony_console::style::symfony_style::SymfonyStyle;
 use shirabe_symfony_console::terminal::Terminal;
 use shirabe_symfony_process::exception::ProcessTimedOutException;
-use shirabe_xdebug_handler::XdebugHandler;
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
 /// flattened into a single struct. Methods that are overridden by subclass and called via
@@ -2275,7 +2274,7 @@ impl ApplicationHandle {
                 io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", PHP_VERSION));
             }
 
-            if XdebugHandler::is_xdebug_active()
+            if shirabe_php_rpc::xdebug::is_xdebug_active()
                 && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
             {
                 io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");

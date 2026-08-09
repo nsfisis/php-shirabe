@@ -526,8 +526,8 @@ final class ShirabePlatformRuntime
     }
 }
 
-// Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the diagnose payload
-// reports as `xdebug_active`.
+// Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the `xdebug_active`
+// query and the diagnose payload both report.
 $xdebug_active = static function (): bool {
     if (!extension_loaded('xdebug')) {
         return false;
@@ -562,6 +562,7 @@ $xdebug_active = static function (): bool {
 
 ShirabeRpcRuntime::$dispatch = [
     'constant' => static fn($args) => defined($args[0]) ? constant($args[0]) : null,
+    'xdebug_active' => static fn($args) => $xdebug_active(),
     'get_all_ini_files' => static function ($args) {
         $paths = [(string) php_ini_loaded_file()];
         $scanned = php_ini_scanned_files();

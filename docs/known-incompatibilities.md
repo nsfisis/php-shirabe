@@ -32,6 +32,13 @@ The following are intentionally left unchanged for ecosystem compatibility:
 TODO: a CLI flag or an environment variable to force Shirabe to use compatible paths.
 
 
+## Xdebug
+
+Composer disables Xdebug on startup. Shirabe emulates it, but the exact
+behavior is slightly different. See [docs/dev/xdebug.md](./dev/xdebug.md)
+for details.
+
+
 ## Plugins
 
 ### Reflection

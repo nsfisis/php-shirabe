@@ -22,7 +22,6 @@ shirabe-symfony-console.workspace = true
 shirabe-symfony-filesystem.workspace = true
 shirabe-symfony-finder.workspace = true
 shirabe-symfony-process.workspace = true
-shirabe-xdebug-handler.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 base64.workspace = true
