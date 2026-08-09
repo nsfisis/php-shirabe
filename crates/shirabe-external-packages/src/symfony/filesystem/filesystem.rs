@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/filesystem/Filesystem.php
 
-// TODO(phase-c): PHP's box()/self::$lastError mechanism (captures the underlying OS error message
-// from a failed native call via set_error_handler) is not modeled anywhere in this file. Every
-// IOException message constructed below therefore omits the trailing low-level error string that
-// PHP would append (e.g. "Failed to touch \"%s\": ".self::$lastError).
+// TODO(phase-c): PHP's box()/self::$lastError mechanism captures the warning text emitted by the
+// failed native call. The low-level error appended to the IOException messages below is instead the
+// Rust io::Error text, which words the same errno differently (e.g. "Permission denied (os error
+// 13)").
 
 use crate::symfony::filesystem::exception::io_exception::IOException;
 use shirabe_php_shim::PhpMixed;
@@ -146,9 +146,11 @@ impl Filesystem {
                 continue;
             }
 
-            if !shirabe_php_shim::mkdir(&dir, mode, true) && !shirabe_php_shim::is_dir(&dir) {
+            if let Err(last_error) = shirabe_php_shim::mkdir_result(&dir, mode, true)
+                && !shirabe_php_shim::is_dir(&dir)
+            {
                 return Err(IOException::new(
-                    format!("Failed to create \"{}\": ", dir),
+                    format!("Failed to create \"{}\": {}", dir, last_error),
                     0,
                     None,
                     Some(dir),
@@ -200,13 +202,25 @@ impl Filesystem {
         for file in files {
             if shirabe_php_shim::is_link(&file) {
                 // See https://bugs.php.net/52176
-                if !(shirabe_php_shim::unlink(&file)
-                    || !cfg!(windows)
-                    || shirabe_php_shim::rmdir(&file))
-                    && shirabe_php_shim::file_exists(&file)
-                {
+                let unlinked = shirabe_php_shim::unlink_result(&file);
+                let mut last_error = unlinked.as_ref().err().map(ToString::to_string);
+                let mut removed = unlinked.is_ok() || !cfg!(windows);
+                if !removed {
+                    match shirabe_php_shim::rmdir_result(&file) {
+                        Ok(()) => {
+                            last_error = None;
+                            removed = true;
+                        }
+                        Err(e) => last_error = Some(e.to_string()),
+                    }
+                }
+                if !removed && shirabe_php_shim::file_exists(&file) {
                     return Err(IOException::new(
-                        format!("Failed to remove symlink \"{}\": ", file),
+                        format!(
+                            "Failed to remove symlink \"{}\": {}",
+                            file,
+                            last_error.unwrap_or_default()
+                        ),
                         0,
                         None,
                         None,
@@ -237,27 +251,29 @@ impl Filesystem {
                     (&entries).into_iter().map(|e| e.get_pathname()).collect();
                 Self::do_remove(child_paths, true)?;
 
-                if !shirabe_php_shim::rmdir(&file) && shirabe_php_shim::file_exists(&file) {
+                if let Err(last_error) = shirabe_php_shim::rmdir_result(&file)
+                    && shirabe_php_shim::file_exists(&file)
+                {
                     return Err(IOException::new(
-                        format!("Failed to remove directory \"{}\": ", file),
+                        format!("Failed to remove directory \"{}\": {}", file, last_error),
                         0,
                         None,
                         None,
                     )
                     .into());
                 }
-            } else if !shirabe_php_shim::unlink(&file) && shirabe_php_shim::file_exists(&file) {
-                // TODO(phase-c): PHP also throws when self::$lastError contains "Permission
-                // denied", even if file_exists() is now false (e.g. the file vanished between the
-                // failed unlink and this check). That OR-branch is dropped along with the general
-                // $lastError omission noted at the top of this file.
-                return Err(IOException::new(
-                    format!("Failed to remove file \"{}\": ", file),
-                    0,
-                    None,
-                    None,
-                )
-                .into());
+            } else if let Err(last_error) = shirabe_php_shim::unlink_result(&file) {
+                let last_error = last_error.to_string();
+                if last_error.contains("Permission denied") || shirabe_php_shim::file_exists(&file)
+                {
+                    return Err(IOException::new(
+                        format!("Failed to remove file \"{}\": {}", file, last_error),
+                        0,
+                        None,
+                        None,
+                    )
+                    .into());
+                }
             }
         }
         Ok(())
@@ -293,21 +309,41 @@ impl Filesystem {
             self.remove(PhpMixed::String(target_dir.clone()))?;
         }
 
-        if !shirabe_php_shim::symlink(&origin_dir, &target_dir) {
-            return Self::link_exception(&origin_dir, &target_dir, "symbolic");
+        if let Err(last_error) = shirabe_php_shim::symlink_result(&origin_dir, &target_dir) {
+            return Self::link_exception(
+                &origin_dir,
+                &target_dir,
+                "symbolic",
+                &last_error.to_string(),
+            );
         }
         Ok(())
     }
 
-    // TODO(phase-c): PHP special-cases a Windows error containing "error code(1314)" with a
-    // distinct "Do you have the required Administrator-rights?" message; that check (and the
-    // self::$lastError inspection it depends on) is not ported, so this always throws the generic
-    // message below.
-    fn link_exception(origin: &str, target: &str, link_type: &str) -> anyhow::Result<()> {
+    fn link_exception(
+        origin: &str,
+        target: &str,
+        link_type: &str,
+        last_error: &str,
+    ) -> anyhow::Result<()> {
+        // TODO(phase-c): the Windows io::Error text renders the error number as "(os error 1314)",
+        // so this substring never matches and the generic message below is thrown instead.
+        if !last_error.is_empty() && cfg!(windows) && last_error.contains("error code(1314)") {
+            return Err(IOException::new(
+                format!(
+                    "Unable to create \"{}\" link due to error code 1314: 'A required privilege is not held by the client'. Do you have the required Administrator-rights?",
+                    link_type
+                ),
+                0,
+                None,
+                Some(target.to_string()),
+            )
+            .into());
+        }
         Err(IOException::new(
             format!(
-                "Failed to create \"{}\" link from \"{}\" to \"{}\": ",
-                link_type, origin, target
+                "Failed to create \"{}\" link from \"{}\" to \"{}\": {}",
+                link_type, origin, target, last_error
             ),
             0,
             None,

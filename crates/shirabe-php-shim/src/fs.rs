@@ -835,7 +835,11 @@ pub fn filemtime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
 }
 
 pub fn unlink(path: impl AsRef<std::path::Path>) -> bool {
-    std::fs::remove_file(path).is_ok()
+    unlink_result(path).is_ok()
+}
+
+pub fn unlink_result(path: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
+    std::fs::remove_file(path)
 }
 
 pub fn unlink_silent(_path: impl AsRef<std::path::Path>) -> bool {
@@ -965,15 +969,27 @@ pub fn umask() -> u32 {
 }
 
 pub fn mkdir(_pathname: impl AsRef<std::path::Path>, _mode: u32, _recursive: bool) -> bool {
+    mkdir_result(_pathname, _mode, _recursive).is_ok()
+}
+
+pub fn mkdir_result(
+    pathname: impl AsRef<std::path::Path>,
+    mode: u32,
+    recursive: bool,
+) -> Result<(), std::io::Error> {
     use std::os::unix::fs::DirBuilderExt;
     // DirBuilder::mode passes the mode to mkdir(2), which applies the process umask, matching PHP.
     let mut builder = std::fs::DirBuilder::new();
-    builder.mode(_mode).recursive(_recursive);
-    builder.create(_pathname.as_ref()).is_ok()
+    builder.mode(mode).recursive(recursive);
+    builder.create(pathname.as_ref())
 }
 
 pub fn rmdir(dir: impl AsRef<std::path::Path>) -> bool {
-    std::fs::remove_dir(dir).is_ok()
+    rmdir_result(dir).is_ok()
+}
+
+pub fn rmdir_result(dir: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
+    std::fs::remove_dir(dir)
 }
 
 pub fn rename(
@@ -1014,7 +1030,14 @@ pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
 }
 
 pub fn symlink(_target: impl AsRef<std::path::Path>, _link: impl AsRef<std::path::Path>) -> bool {
-    std::os::unix::fs::symlink(_target.as_ref(), _link.as_ref()).is_ok()
+    symlink_result(_target, _link).is_ok()
+}
+
+pub fn symlink_result(
+    target: impl AsRef<std::path::Path>,
+    link: impl AsRef<std::path::Path>,
+) -> Result<(), std::io::Error> {
+    std::os::unix::fs::symlink(target.as_ref(), link.as_ref())
 }
 
 pub fn sys_get_temp_dir() -> String {
