@@ -10,7 +10,6 @@ use crate::input::InputDefinition;
 use crate::input::InputInterface;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
-use crate::output::output_interface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex};
 use std::cell::{Cell, Ref};
@@ -30,7 +29,6 @@ use std::cell::{Cell, Ref};
 pub struct CommandData {
     application: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn Application>>>>,
     name: std::cell::RefCell<Option<String>>,
-    process_title: std::cell::RefCell<Option<String>>,
     aliases: std::cell::RefCell<Vec<String>>,
     definition: std::cell::RefCell<Option<InputDefinition>>,
     hidden: Cell<bool>,
@@ -63,7 +61,6 @@ impl CommandData {
         let this = CommandData {
             application: std::cell::RefCell::new(None),
             name: std::cell::RefCell::new(None),
-            process_title: std::cell::RefCell::new(None),
             aliases: std::cell::RefCell::new(Vec::new()),
             definition: std::cell::RefCell::new(Some(
                 InputDefinition::new(Vec::new()).expect("an empty InputDefinition cannot fail"),
@@ -279,8 +276,6 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn get_native_definition(&self) -> std::cell::Ref<'_, $crate::input::InputDefinition>);
         $crate::delegate_to_inner!($field, fn set_name(&self, name: &str) -> anyhow::Result<()>);
         $crate::delegate_to_inner!($field, fn get_name(&self) -> Option<String>);
-        $crate::delegate_to_inner!($field, fn set_process_title(&self, title: &str));
-        $crate::delegate_to_inner!($field, fn get_process_title(&self) -> Option<String>);
         $crate::delegate_to_inner!($field, fn set_hidden(&self, hidden: bool));
         $crate::delegate_to_inner!($field, fn is_hidden(&self) -> bool);
         $crate::delegate_to_inner!($field, fn set_description(&self, description: &str));
@@ -402,29 +397,6 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
 
         self.initialize(input.clone(), output.clone())?;
 
-        if let Some(process_title) = self.get_process_title() {
-            // TODO(phase-c): PHP probes for cli_set_process_title / setproctitle availability.
-            if shirabe_php_shim::function_exists("cli_set_process_title") {
-                if !shirabe_php_shim::cli_set_process_title(&process_title) {
-                    if shirabe_php_shim::PHP_OS == "Darwin" {
-                        output.borrow_mut().writeln(
-                            &["<comment>Running \"cli_set_process_title\" as an unprivileged user is not supported on MacOS.</comment>".to_string()],
-                            output_interface::VERBOSITY_VERY_VERBOSE,
-                        );
-                    } else {
-                        shirabe_php_shim::cli_set_process_title(&process_title);
-                    }
-                }
-            } else if shirabe_php_shim::function_exists("setproctitle") {
-                shirabe_php_shim::setproctitle(&process_title);
-            } else if output.borrow().get_verbosity() == output_interface::VERBOSITY_VERY_VERBOSE {
-                output.borrow_mut().writeln(
-                    &["<comment>Install the proctitle PECL to be able to change the process title.</comment>".to_string()],
-                    output_interface::OUTPUT_NORMAL,
-                );
-            }
-        }
-
         if input.borrow().is_interactive() {
             self.interact(input.clone(), output.clone());
         }
@@ -482,10 +454,6 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
     fn set_name(&self, name: &str) -> anyhow::Result<()>;
 
     fn get_name(&self) -> Option<String>;
-
-    fn set_process_title(&self, title: &str);
-
-    fn get_process_title(&self) -> Option<String>;
 
     fn set_hidden(&self, hidden: bool);
 
@@ -682,14 +650,6 @@ impl Command for CommandData {
 
     fn get_name(&self) -> Option<String> {
         self.name.borrow().clone()
-    }
-
-    fn set_process_title(&self, title: &str) {
-        *self.process_title.borrow_mut() = Some(title.to_string());
-    }
-
-    fn get_process_title(&self) -> Option<String> {
-        self.process_title.borrow().clone()
     }
 
     fn set_hidden(&self, hidden: bool) {

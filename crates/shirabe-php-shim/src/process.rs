@@ -401,18 +401,6 @@ pub fn getmypid() -> i64 {
     std::process::id() as i64
 }
 
-pub fn cli_set_process_title(_title: &str) -> bool {
-    // TODO(phase-c): PHP rewrites the argv area so the new title shows up in ps(1)'s full command
-    // line. Rust hands out argv as owned copies, so the original block is not reachable; prctl's
-    // PR_SET_NAME only replaces the 16-byte comm field and would report a different title.
-    todo!()
-}
-
-pub fn setproctitle(_title: &str) {
-    // TODO(phase-c): see cli_set_process_title; requires access to the process's own argv block.
-    todo!()
-}
-
 // No-op until real signal handling is wired up; signal registration itself is
 // deferred (see the TODO(plugin) notes in SignalRegistry::register).
 pub fn pcntl_async_signals(_enable: bool) {}
