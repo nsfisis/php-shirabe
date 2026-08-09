@@ -14,10 +14,10 @@ use shirabe::console::application::ApplicationHandle;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{PHP_EOL, PHP_SERVER, PhpMixed, time};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::array_input::ArrayInput;
-use shirabe_symfony_console::input::input_interface::InputInterface;
-use shirabe_symfony_console::output::buffered_output::BufferedOutput;
-use shirabe_symfony_console::output::output_interface::OutputInterface;
+use shirabe_symfony_console::input::ArrayInput;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::BufferedOutput;
+use shirabe_symfony_console::output::OutputInterface;
 
 fn set_up() {
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");

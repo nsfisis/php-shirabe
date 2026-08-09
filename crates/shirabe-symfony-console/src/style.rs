@@ -1,6 +1,6 @@
-pub mod output_style;
-pub mod style_interface;
-pub mod symfony_style;
+mod output_style;
+mod style_interface;
+mod symfony_style;
 
 pub use output_style::*;
 pub use style_interface::*;

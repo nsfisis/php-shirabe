@@ -1,11 +1,11 @@
-pub mod command_not_found_exception;
-pub mod exception_interface;
-pub mod invalid_argument_exception;
-pub mod invalid_option_exception;
-pub mod logic_exception;
-pub mod missing_input_exception;
-pub mod namespace_not_found_exception;
-pub mod runtime_exception;
+mod command_not_found_exception;
+mod exception_interface;
+mod invalid_argument_exception;
+mod invalid_option_exception;
+mod logic_exception;
+mod missing_input_exception;
+mod namespace_not_found_exception;
+mod runtime_exception;
 
 pub use command_not_found_exception::*;
 pub use exception_interface::*;

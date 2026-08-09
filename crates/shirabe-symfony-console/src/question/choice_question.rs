@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Question/ChoiceQuestion.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::exception::logic_exception::LogicException;
+use crate::exception::InvalidArgumentException;
+use crate::exception::LogicException;
 use crate::question::Question;
 use crate::question::QuestionInterface;
 use indexmap::IndexMap;

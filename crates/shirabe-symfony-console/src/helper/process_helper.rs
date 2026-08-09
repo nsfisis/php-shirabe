@@ -1,12 +1,12 @@
 //! ref: composer/vendor/symfony/console/Helper/ProcessHelper.php
 
-use crate::helper::debug_formatter_helper::DebugFormatterHelper;
-use crate::helper::helper::Helper;
-use crate::helper::helper_interface::HelperInterface;
-use crate::helper::helper_set::HelperSet;
+use crate::helper::DebugFormatterHelper;
+use crate::helper::Helper;
+use crate::helper::HelperInterface;
+use crate::helper::HelperSet;
 use crate::output::ConsoleOutputInterface;
-use crate::output::output_interface::{self, OutputInterface};
-use shirabe_symfony_process::exception::process_failed_exception::ProcessFailedException;
+use crate::output::{OutputInterface, output_interface};
+use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
 
 /// The ProcessHelper class provides helpers to run external processes.
@@ -54,7 +54,7 @@ impl ProcessHelper {
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
-                .downcast_ref::<crate::output::console_output::ConsoleOutput>()
+                .downcast_ref::<crate::output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };
@@ -228,7 +228,7 @@ impl ProcessHelper {
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
-                .downcast_ref::<crate::output::console_output::ConsoleOutput>()
+                .downcast_ref::<crate::output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };

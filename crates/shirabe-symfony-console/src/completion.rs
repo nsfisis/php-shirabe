@@ -1,7 +1,7 @@
-pub mod completion_input;
-pub mod completion_suggestions;
-pub mod output;
-pub mod suggestion;
+mod completion_input;
+mod completion_suggestions;
+mod output;
+mod suggestion;
 
 pub use completion_input::*;
 pub use completion_suggestions::*;

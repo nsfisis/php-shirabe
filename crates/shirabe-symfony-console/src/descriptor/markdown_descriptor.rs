@@ -1,15 +1,15 @@
 //! ref: composer/vendor/symfony/console/Descriptor/MarkdownDescriptor.php
 
 use crate::application::Application;
-use crate::command::command::Command;
-use crate::descriptor::application_description::ApplicationDescription;
-use crate::descriptor::descriptor::Descriptor;
-use crate::descriptor::descriptor_interface::{DescribableObject, DescriptorInterface};
-use crate::helper::helper::Helper;
-use crate::input::input_argument::InputArgument;
-use crate::input::input_definition::InputDefinition;
-use crate::input::input_option::InputOption;
-use crate::output::output_interface::OutputInterface;
+use crate::command::Command;
+use crate::descriptor::ApplicationDescription;
+use crate::descriptor::Descriptor;
+use crate::descriptor::{DescribableObject, DescriptorInterface};
+use crate::helper::Helper;
+use crate::input::InputArgument;
+use crate::input::InputDefinition;
+use crate::input::InputOption;
+use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::PhpMixed;
@@ -329,9 +329,9 @@ impl Descriptor for MarkdownDescriptor {
             &[content.to_string()],
             false,
             if decorated {
-                crate::output::output_interface::OUTPUT_NORMAL
+                crate::output::OUTPUT_NORMAL
             } else {
-                crate::output::output_interface::OUTPUT_RAW
+                crate::output::OUTPUT_RAW
             },
         );
     }

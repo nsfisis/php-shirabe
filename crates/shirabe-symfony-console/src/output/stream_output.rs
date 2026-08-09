@@ -3,8 +3,8 @@
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::OutputInterface;
-use crate::output::output::{DoWrite, Output};
-use crate::output::output_interface::VERBOSITY_NORMAL;
+use crate::output::VERBOSITY_NORMAL;
+use crate::output::{DoWrite, Output};
 use shirabe_php_shim::php_regex;
 
 /// StreamOutput writes the output to a given stream.

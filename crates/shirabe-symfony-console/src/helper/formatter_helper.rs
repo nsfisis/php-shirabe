@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Helper/FormatterHelper.php
 
-use crate::formatter::output_formatter::OutputFormatter;
-use crate::helper::helper::Helper;
-use crate::helper::helper_interface::HelperInterface;
-use crate::helper::helper_set::HelperSet;
+use crate::formatter::OutputFormatter;
+use crate::helper::Helper;
+use crate::helper::HelperInterface;
+use crate::helper::HelperSet;
 
 /// The Formatter class provides helpers to format messages.
 #[derive(Debug, Default)]

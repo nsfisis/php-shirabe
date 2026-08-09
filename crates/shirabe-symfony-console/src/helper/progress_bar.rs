@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/console/Helper/ProgressBar.php
 
 use crate::cursor::Cursor;
-use crate::exception::logic_exception::LogicException;
-use crate::helper::helper::Helper;
+use crate::exception::LogicException;
+use crate::helper::Helper;
 use crate::output::ConsoleOutputInterface;
 use crate::output::ConsoleSectionOutput;
 use crate::output::OutputInterface;
@@ -73,7 +73,7 @@ impl ProgressBar {
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
-                .downcast_ref::<crate::output::console_output::ConsoleOutput>()
+                .downcast_ref::<crate::output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };

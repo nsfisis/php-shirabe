@@ -26,7 +26,7 @@ use shirabe_php_shim::{
     php_regex, str_replace, strpos, strtolower, system, touch, var_export,
 };
 use shirabe_semver::VersionParser;
-use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -1578,8 +1578,8 @@ impl Command for ConfigCommand {
 
     fn complete(
         &self,
-        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }

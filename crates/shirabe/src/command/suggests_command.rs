@@ -13,7 +13,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, empty, impl_php_class, in_array_loose};
-use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -228,8 +228,8 @@ impl Command for SuggestsCommand {
 
     fn complete(
         &self,
-        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }

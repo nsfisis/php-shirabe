@@ -14,9 +14,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{InvalidArgumentException, RuntimeException};
 use shirabe_php_shim::{PhpMixed, impl_php_class};
-use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::CommandNotFoundException;
-use shirabe_symfony_console::exception::namespace_not_found_exception::NamespaceNotFoundException;
+use shirabe_symfony_console::exception::NamespaceNotFoundException;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -347,8 +347,8 @@ impl Command for RunScriptCommand {
 
     fn complete(
         &self,
-        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }

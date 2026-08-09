@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionSuggestions.php
 
-use crate::completion::suggestion::Suggestion;
-use crate::input::input_option::InputOption;
+use crate::completion::Suggestion;
+use crate::input::InputOption;
 
 /// PHP union type `string|Suggestion` used by `suggestValue`/`suggestValues`.
 #[derive(Debug)]

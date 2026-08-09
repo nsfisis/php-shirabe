@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/process/Exception/ProcessTimedOutException.php
 
-use crate::exception::runtime_exception::RuntimeException;
+use crate::exception::RuntimeException;
 use crate::process::Process;
 
 #[derive(Debug)]

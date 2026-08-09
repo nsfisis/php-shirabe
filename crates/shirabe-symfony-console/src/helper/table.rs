@@ -1,12 +1,12 @@
 //! ref: composer/vendor/symfony/console/Helper/Table.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::formatter::output_formatter::OutputFormatter;
-use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
+use crate::exception::InvalidArgumentException;
+use crate::formatter::OutputFormatter;
+use crate::formatter::WrappableOutputFormatterInterface;
 use crate::helper::{
     Helper, TableCell, TableCellOption, TableCellStyle, TableRows, TableSeparator, TableStyle,
 };
-use crate::output::output_interface::OutputInterface;
+use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::{PhpMixed, php_regex};
@@ -568,7 +568,7 @@ impl Table {
                 &self.style.get_border_format(),
                 &[PhpMixed::from(markup)],
             )],
-            crate::output::output_interface::OUTPUT_NORMAL,
+            crate::output::OUTPUT_NORMAL,
         );
     }
 
@@ -608,10 +608,9 @@ impl Table {
                 BORDER_INSIDE
             }));
         }
-        self.output.borrow().writeln(
-            &[row_content],
-            crate::output::output_interface::OUTPUT_NORMAL,
-        );
+        self.output
+            .borrow()
+            .writeln(&[row_content], crate::output::OUTPUT_NORMAL);
     }
 
     /// Renders table cell with padding.

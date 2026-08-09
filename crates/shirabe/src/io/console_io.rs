@@ -21,7 +21,7 @@ use shirabe_symfony_console::helper::Table;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::ConsoleOutput;
 use shirabe_symfony_console::output::ConsoleOutputInterface;
-use shirabe_symfony_console::output::output_interface::{self, OutputInterface};
+use shirabe_symfony_console::output::{OutputInterface, output_interface};
 use shirabe_symfony_console::question::ChoiceQuestion;
 use shirabe_symfony_console::question::Question;
 use shirabe_symfony_console::question::QuestionInterface;

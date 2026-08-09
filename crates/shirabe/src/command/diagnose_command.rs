@@ -41,7 +41,7 @@ use shirabe_php_shim::{
     is_string, php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos, strstr,
     strstr3, strtolower, trim, version_compare,
 };
-use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_process::ExecutableFinder;
@@ -637,7 +637,7 @@ impl DiagnoseCommand {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(BufferIO::new(
                 String::new(),
-                shirabe_symfony_console::output::output_interface::VERBOSITY_NORMAL,
+                shirabe_symfony_console::output::VERBOSITY_NORMAL,
                 None,
             )?));
         let result = match auditor.audit(
@@ -1499,8 +1499,8 @@ impl Command for DiagnoseCommand {
 
     fn complete(
         &self,
-        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }

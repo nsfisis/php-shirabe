@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/TableSeparator.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::helper::table_cell::{TableCell, TableCellOption};
+use crate::exception::InvalidArgumentException;
+use crate::helper::{TableCell, TableCellOption};
 use indexmap::IndexMap;
 
 /// Marks a row as being a separator.
@@ -30,9 +30,7 @@ impl TableSeparator {
         self.inner.get_rowspan()
     }
 
-    pub fn get_style(
-        &self,
-    ) -> Option<std::rc::Rc<crate::helper::table_cell_style::TableCellStyle>> {
+    pub fn get_style(&self) -> Option<std::rc::Rc<crate::helper::TableCellStyle>> {
         self.inner.get_style()
     }
 }

@@ -1,10 +1,10 @@
 //! ref: composer/vendor/symfony/console/Input/StringInput.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::input::argv_input::ArgvInput;
-use crate::input::input_definition::InputDefinition;
-use crate::input::input_interface::InputInterface;
-use crate::input::streamable_input_interface::StreamableInputInterface;
+use crate::exception::InvalidArgumentException;
+use crate::input::ArgvInput;
+use crate::input::InputDefinition;
+use crate::input::InputInterface;
+use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex};
 

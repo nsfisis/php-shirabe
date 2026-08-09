@@ -18,13 +18,13 @@ use shirabe::io::IOInterfaceMutable;
 use shirabe::io::io_interface::NORMAL;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::input::array_input::ArrayInput;
-use shirabe_symfony_console::input::input_interface::InputInterface;
-use shirabe_symfony_console::input::streamable_input_interface::StreamableInputInterface;
-use shirabe_symfony_console::output::buffered_output::BufferedOutput;
-use shirabe_symfony_console::output::console_output::ConsoleOutput;
-use shirabe_symfony_console::output::console_output_interface::ConsoleOutputInterface;
-use shirabe_symfony_console::output::output_interface::OutputInterface;
+use shirabe_symfony_console::input::ArrayInput;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::StreamableInputInterface;
+use shirabe_symfony_console::output::BufferedOutput;
+use shirabe_symfony_console::output::ConsoleOutput;
+use shirabe_symfony_console::output::ConsoleOutputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 /// Builds a ConsoleIO backed by real, side-effect-free Input/Output/QuestionHelper. PHP uses
 /// PHPUnit mocks here, but for tests that exercise only the authentication map they carry no

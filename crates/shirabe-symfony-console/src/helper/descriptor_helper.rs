@@ -1,15 +1,15 @@
 //! ref: composer/vendor/symfony/console/Helper/DescriptorHelper.php
 
-use crate::descriptor::descriptor_interface::{DescribableObject, DescriptorInterface};
-use crate::descriptor::json_descriptor::JsonDescriptor;
-use crate::descriptor::markdown_descriptor::MarkdownDescriptor;
-use crate::descriptor::text_descriptor::TextDescriptor;
-use crate::descriptor::xml_descriptor::XmlDescriptor;
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::helper::helper::Helper;
-use crate::helper::helper_interface::HelperInterface;
-use crate::helper::helper_set::HelperSet;
-use crate::output::output_interface::OutputInterface;
+use crate::descriptor::JsonDescriptor;
+use crate::descriptor::MarkdownDescriptor;
+use crate::descriptor::TextDescriptor;
+use crate::descriptor::XmlDescriptor;
+use crate::descriptor::{DescribableObject, DescriptorInterface};
+use crate::exception::InvalidArgumentException;
+use crate::helper::Helper;
+use crate::helper::HelperInterface;
+use crate::helper::HelperSet;
+use crate::output::OutputInterface;
 use indexmap::IndexMap;
 
 /// This class adds helper method to describe objects in various formats.

@@ -29,7 +29,7 @@ use shirabe_php_shim::{
     ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
-use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::helper::FormatBlockMessages;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
@@ -1250,8 +1250,8 @@ impl Command for InitCommand {
 
     fn complete(
         &self,
-        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }

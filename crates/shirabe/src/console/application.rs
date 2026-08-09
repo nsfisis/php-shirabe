@@ -67,35 +67,35 @@ use shirabe_php_shim::{
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
 use shirabe_symfony_console::command::Command as SymfonyCommand;
-use shirabe_symfony_console::command::help_command::HelpCommand;
-use shirabe_symfony_console::command::signalable_command_interface::SignalableCommandInterface;
-use shirabe_symfony_console::command_loader::command_loader_interface::CommandLoaderInterface;
-use shirabe_symfony_console::completion::completion_input::CompletionInput;
-use shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions;
+use shirabe_symfony_console::command::HelpCommand;
+use shirabe_symfony_console::command::SignalableCommandInterface;
+use shirabe_symfony_console::command_loader::CommandLoaderInterface;
+use shirabe_symfony_console::completion::CompletionInput;
+use shirabe_symfony_console::completion::CompletionSuggestions;
 use shirabe_symfony_console::exception::CommandNotFoundException;
-use shirabe_symfony_console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
-use shirabe_symfony_console::exception::invalid_option_exception::InvalidOptionException;
-use shirabe_symfony_console::exception::logic_exception::LogicException as ConsoleLogicException;
-use shirabe_symfony_console::exception::missing_input_exception::MissingInputException;
-use shirabe_symfony_console::exception::namespace_not_found_exception::NamespaceNotFoundException;
-use shirabe_symfony_console::exception::runtime_exception::RuntimeException as ConsoleRuntimeException;
-use shirabe_symfony_console::formatter::output_formatter::OutputFormatter;
+use shirabe_symfony_console::exception::InvalidArgumentException as ConsoleInvalidArgumentException;
+use shirabe_symfony_console::exception::InvalidOptionException;
+use shirabe_symfony_console::exception::LogicException as ConsoleLogicException;
+use shirabe_symfony_console::exception::MissingInputException;
+use shirabe_symfony_console::exception::NamespaceNotFoundException;
+use shirabe_symfony_console::exception::RuntimeException as ConsoleRuntimeException;
+use shirabe_symfony_console::formatter::OutputFormatter;
+use shirabe_symfony_console::helper::Helper;
 use shirabe_symfony_console::helper::HelperSet;
 use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::helper::formatter_helper::{FormatBlockMessages, FormatterHelper};
-use shirabe_symfony_console::helper::helper::Helper;
+use shirabe_symfony_console::helper::{FormatBlockMessages, FormatterHelper};
+use shirabe_symfony_console::input::ArgvInput;
+use shirabe_symfony_console::input::ArrayInput;
+use shirabe_symfony_console::input::InputArgument;
 use shirabe_symfony_console::input::InputDefinition;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::input::InputOption;
-use shirabe_symfony_console::input::argv_input::ArgvInput;
-use shirabe_symfony_console::input::array_input::ArrayInput;
-use shirabe_symfony_console::input::input_argument::InputArgument;
+use shirabe_symfony_console::output::ConsoleOutput;
 use shirabe_symfony_console::output::ConsoleOutputInterface;
-use shirabe_symfony_console::output::console_output::ConsoleOutput;
-use shirabe_symfony_console::output::output_interface::{self, OutputInterface};
-use shirabe_symfony_console::signal_registry::signal_registry::SignalRegistry;
-use shirabe_symfony_console::style::style_interface::StyleInterface;
-use shirabe_symfony_console::style::symfony_style::SymfonyStyle;
+use shirabe_symfony_console::output::{OutputInterface, output_interface};
+use shirabe_symfony_console::signal_registry::SignalRegistry;
+use shirabe_symfony_console::style::StyleInterface;
+use shirabe_symfony_console::style::SymfonyStyle;
 use shirabe_symfony_console::terminal::Terminal;
 use shirabe_symfony_process::exception::ProcessTimedOutException;
 
@@ -777,12 +777,12 @@ impl Application {
                 }
             }
             // array_filter($commandNames)
-            let filtered: Vec<shirabe_symfony_console::completion::completion_suggestions::StringOrSuggestion> =
+            let filtered: Vec<shirabe_symfony_console::completion::StringOrSuggestion> =
                 command_names
                     .into_iter()
                     .filter(shirabe_php_shim::php_truthy)
                     .map(|n| {
-                        shirabe_symfony_console::completion::completion_suggestions::StringOrSuggestion::String(
+                        shirabe_symfony_console::completion::StringOrSuggestion::String(
                             shirabe_php_shim::php_to_string(&n),
                         )
                     })
@@ -1563,7 +1563,7 @@ impl Application {
 
     /// Gets the default input definition (Symfony base; `parent::getDefaultInputDefinition`).
     pub fn base_get_default_input_definition(&self) -> InputDefinition {
-        use shirabe_symfony_console::input::input_definition::DefinitionItem;
+        use shirabe_symfony_console::input::DefinitionItem;
         InputDefinition::new(vec![
             DefinitionItem::InputArgument(
                 InputArgument::new(
@@ -1646,10 +1646,10 @@ impl Application {
     pub fn base_get_default_commands(
         &self,
     ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        use shirabe_symfony_console::command::complete_command::CompleteCommand;
-        use shirabe_symfony_console::command::dump_completion_command::DumpCompletionCommand;
-        use shirabe_symfony_console::command::help_command::HelpCommand;
-        use shirabe_symfony_console::command::list_command::ListCommand;
+        use shirabe_symfony_console::command::CompleteCommand;
+        use shirabe_symfony_console::command::DumpCompletionCommand;
+        use shirabe_symfony_console::command::HelpCommand;
+        use shirabe_symfony_console::command::ListCommand;
 
         vec![
             std::rc::Rc::new(std::cell::RefCell::new(HelpCommand::new()))
@@ -3067,10 +3067,9 @@ pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow
     } else {
         format!("{name} {trimmed}")
     };
-    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(
-            shirabe_symfony_console::input::string_input::StringInput::new(&line)?,
-        ));
+    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(shirabe_symfony_console::input::StringInput::new(&line)?),
+    );
     let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(ConsoleOutput::new(None, None, None)?),
     );

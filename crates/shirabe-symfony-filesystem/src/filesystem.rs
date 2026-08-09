@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/filesystem/Filesystem.php
 
-use crate::exception::io_exception::IOException;
+use crate::exception::IOException;
 use shirabe_php_shim::Catch as _;
 
 #[derive(Debug, Clone)]

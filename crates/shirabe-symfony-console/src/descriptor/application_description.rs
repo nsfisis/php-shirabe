@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/console/Descriptor/ApplicationDescription.php
 
 use crate::application::Application;
-use crate::command::command::Command;
-use crate::exception::command_not_found_exception::CommandNotFoundException;
+use crate::command::Command;
+use crate::exception::CommandNotFoundException;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

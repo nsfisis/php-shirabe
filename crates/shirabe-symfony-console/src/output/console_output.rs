@@ -2,10 +2,10 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::output::ConsoleOutputInterface;
+use crate::output::ConsoleSectionOutput;
 use crate::output::OutputInterface;
-use crate::output::console_section_output::ConsoleSectionOutput;
-use crate::output::output_interface::VERBOSITY_NORMAL;
-use crate::output::stream_output::StreamOutput;
+use crate::output::StreamOutput;
+use crate::output::VERBOSITY_NORMAL;
 
 /// ConsoleOutput is the default class for all CLI output. It uses STDOUT and STDERR.
 ///

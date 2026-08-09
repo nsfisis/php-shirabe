@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Helper/TableRows.php
 
-use crate::helper::table::Row;
+use crate::helper::Row;
 
 /// @internal
 ///

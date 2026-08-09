@@ -35,7 +35,7 @@ use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
-use shirabe_symfony_console::output::output_interface::VERBOSITY_NORMAL;
+use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 use shirabe_symfony_process::PhpExecutableFinder;
 use tempfile::TempDir;
 

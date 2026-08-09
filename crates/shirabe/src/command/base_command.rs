@@ -23,7 +23,7 @@ use shirabe_php_shim::{
     UnexpectedValueException, count, explode, in_array_strict, is_string,
 };
 use shirabe_symfony_console::Terminal;
-use shirabe_symfony_console::command::command::{Command, CommandData, SetDefinitionArg};
+use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
 use shirabe_symfony_console::helper::Table;
 use shirabe_symfony_console::helper::TableSeparator;
 use shirabe_symfony_console::input::InputInterface;
@@ -741,10 +741,10 @@ fn apply_application_defaults(
 /// each command's `Command::complete` forwards here.
 pub fn base_command_complete(
     cmd: &dyn BaseCommand,
-    input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
-    suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
+    input: &shirabe_symfony_console::completion::CompletionInput,
+    suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
 ) -> anyhow::Result<()> {
-    use shirabe_symfony_console::completion::completion_input::CompletionInput;
+    use shirabe_symfony_console::completion::CompletionInput;
 
     // PHP: (string) $input->getCompletionName()
     let name = input.get_completion_name().unwrap_or_default();

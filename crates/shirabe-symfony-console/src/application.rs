@@ -1,10 +1,10 @@
 //! ref: composer/vendor/symfony/console/Application.php
 
-use crate::command::command::Command;
-use crate::completion::completion_input::CompletionInput;
-use crate::completion::completion_suggestions::CompletionSuggestions;
-use crate::helper::helper_set::HelperSet;
-use crate::input::input_definition::InputDefinition;
+use crate::command::Command;
+use crate::completion::CompletionInput;
+use crate::completion::CompletionSuggestions;
+use crate::helper::HelperSet;
+use crate::input::InputDefinition;
 use indexmap::IndexMap;
 
 /// `Symfony\Component\Console\Application` is a concrete class in PHP, but it is ported here as a

@@ -2,9 +2,9 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
+use crate::output::DoWrite;
 use crate::output::OutputInterface;
-use crate::output::output::DoWrite;
-use crate::output::stream_output::StreamOutput;
+use crate::output::StreamOutput;
 use crate::terminal::Terminal;
 
 type Sections =
@@ -79,7 +79,7 @@ impl ConsoleSectionOutput {
     /// Overwrites the previous output with a new message.
     pub fn overwrite(&self, message: &[String]) {
         self.clear(None);
-        self.writeln(message, crate::output::output_interface::OUTPUT_NORMAL);
+        self.writeln(message, crate::output::OUTPUT_NORMAL);
     }
 
     pub fn get_content(&self) -> String {

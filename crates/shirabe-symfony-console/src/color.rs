@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Color.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::InvalidArgumentException;
 use indexmap::IndexMap;
 
 const COLORS: [(&str, i64); 9] = [

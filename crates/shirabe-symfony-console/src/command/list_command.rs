@@ -1,16 +1,16 @@
 //! ref: composer/vendor/symfony/console/Command/ListCommand.php
 
-use crate::command::command::{Command, CommandData, SetDefinitionArg};
-use crate::completion::completion_input::CompletionInput;
-use crate::completion::completion_suggestions::{CompletionSuggestions, StringOrSuggestion};
-use crate::descriptor::application_description::ApplicationDescription;
-use crate::descriptor::descriptor_interface::DescribableObject;
-use crate::helper::descriptor_helper::DescriptorHelper;
-use crate::input::input_argument::InputArgument;
-use crate::input::input_definition::DefinitionItem;
-use crate::input::input_interface::InputInterface;
-use crate::input::input_option::InputOption;
-use crate::output::output_interface::OutputInterface;
+use crate::command::{Command, CommandData, SetDefinitionArg};
+use crate::completion::CompletionInput;
+use crate::completion::{CompletionSuggestions, StringOrSuggestion};
+use crate::descriptor::ApplicationDescription;
+use crate::descriptor::DescribableObject;
+use crate::helper::DescriptorHelper;
+use crate::input::DefinitionItem;
+use crate::input::InputArgument;
+use crate::input::InputInterface;
+use crate::input::InputOption;
+use crate::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, impl_php_class};
 use std::ops::{Deref, DerefMut};
 

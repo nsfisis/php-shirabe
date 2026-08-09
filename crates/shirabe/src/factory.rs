@@ -402,7 +402,7 @@ impl Factory {
         let formatter = OutputFormatter::new(false, styles);
 
         ConsoleOutput::new(
-            Some(shirabe_symfony_console::output::output_interface::VERBOSITY_NORMAL),
+            Some(shirabe_symfony_console::output::VERBOSITY_NORMAL),
             None,
             Some(std::rc::Rc::new(std::cell::RefCell::new(formatter))),
         )

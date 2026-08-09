@@ -2,8 +2,8 @@
 
 use crate::console::input::SuggestedValues;
 use shirabe_php_shim::PhpMixed;
-use shirabe_symfony_console::completion::completion_input::CompletionInput;
-use shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions;
+use shirabe_symfony_console::completion::CompletionInput;
+use shirabe_symfony_console::completion::CompletionSuggestions;
 use shirabe_symfony_console::input::InputArgument as BaseInputArgument;
 
 #[derive(Debug)]

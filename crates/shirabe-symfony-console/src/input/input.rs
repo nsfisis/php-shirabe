@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/console/Input/Input.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::exception::runtime_exception::RuntimeException;
-use crate::input::input_definition::InputDefinition;
+use crate::exception::InvalidArgumentException;
+use crate::exception::RuntimeException;
+use crate::input::InputDefinition;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, PhpResource, php_regex};
 

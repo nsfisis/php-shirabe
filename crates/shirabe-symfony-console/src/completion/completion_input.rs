@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
 
-use crate::input::argv_input::ArgvInput;
-use crate::input::input_definition::InputDefinition;
-use crate::input::input_option::InputOption;
+use crate::input::ArgvInput;
+use crate::input::InputDefinition;
+use crate::input::InputOption;
 use shirabe_php_shim::{PhpMixed, php_regex};
 
 /// An input specialized for shell completion.
@@ -281,10 +281,8 @@ impl CompletionInput {
 /// PHP: `CompletionInput extends ArgvInput` — the inherited `InputInterface` surface,
 /// forwarded to the embedded `ArgvInput`. `bind` dispatches to the specialized
 /// `CompletionInput::bind` above, matching PHP's virtual dispatch.
-impl crate::input::input_interface::InputInterface for CompletionInput {
-    fn dup(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::input::input_interface::InputInterface>> {
+impl crate::input::InputInterface for CompletionInput {
+    fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn crate::input::InputInterface>> {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
     }
 
@@ -297,11 +295,7 @@ impl crate::input::input_interface::InputInterface for CompletionInput {
     }
 
     fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
-        crate::input::input_interface::InputInterface::has_parameter_option(
-            &self.inner,
-            values,
-            only_params,
-        )
+        crate::input::InputInterface::has_parameter_option(&self.inner, values, only_params)
     }
 
     fn get_parameter_option(
@@ -310,7 +304,7 @@ impl crate::input::input_interface::InputInterface for CompletionInput {
         default: PhpMixed,
         only_params: bool,
     ) -> PhpMixed {
-        crate::input::input_interface::InputInterface::get_parameter_option(
+        crate::input::InputInterface::get_parameter_option(
             &self.inner,
             values,
             default,
@@ -323,59 +317,55 @@ impl crate::input::input_interface::InputInterface for CompletionInput {
     }
 
     fn validate(&mut self) -> anyhow::Result<()> {
-        crate::input::input_interface::InputInterface::validate(&mut self.inner)
+        crate::input::InputInterface::validate(&mut self.inner)
     }
 
     fn get_arguments(&self) -> indexmap::IndexMap<String, PhpMixed> {
-        crate::input::input_interface::InputInterface::get_arguments(&self.inner)
+        crate::input::InputInterface::get_arguments(&self.inner)
     }
 
     fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed> {
-        crate::input::input_interface::InputInterface::get_argument(&self.inner, name)
+        crate::input::InputInterface::get_argument(&self.inner, name)
     }
 
     fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
-        crate::input::input_interface::InputInterface::set_argument(&mut self.inner, name, value)
+        crate::input::InputInterface::set_argument(&mut self.inner, name, value)
     }
 
     fn has_argument(&self, name: &str) -> bool {
-        crate::input::input_interface::InputInterface::has_argument(&self.inner, name)
+        crate::input::InputInterface::has_argument(&self.inner, name)
     }
 
     fn get_options(&self) -> indexmap::IndexMap<String, PhpMixed> {
-        crate::input::input_interface::InputInterface::get_options(&self.inner)
+        crate::input::InputInterface::get_options(&self.inner)
     }
 
     fn get_option(&self, name: &str) -> anyhow::Result<PhpMixed> {
-        crate::input::input_interface::InputInterface::get_option(&self.inner, name)
+        crate::input::InputInterface::get_option(&self.inner, name)
     }
 
     fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
-        crate::input::input_interface::InputInterface::set_option(&mut self.inner, name, value)
+        crate::input::InputInterface::set_option(&mut self.inner, name, value)
     }
 
     fn has_option(&self, name: &str) -> bool {
-        crate::input::input_interface::InputInterface::has_option(&self.inner, name)
+        crate::input::InputInterface::has_option(&self.inner, name)
     }
 
     fn is_interactive(&self) -> bool {
-        crate::input::input_interface::InputInterface::is_interactive(&self.inner)
+        crate::input::InputInterface::is_interactive(&self.inner)
     }
 
     fn set_interactive(&mut self, interactive: bool) {
-        crate::input::input_interface::InputInterface::set_interactive(&mut self.inner, interactive)
+        crate::input::InputInterface::set_interactive(&mut self.inner, interactive)
     }
 
-    fn as_streamable(
-        &self,
-    ) -> Option<&dyn crate::input::streamable_input_interface::StreamableInputInterface> {
-        crate::input::input_interface::InputInterface::as_streamable(&self.inner)
+    fn as_streamable(&self) -> Option<&dyn crate::input::StreamableInputInterface> {
+        crate::input::InputInterface::as_streamable(&self.inner)
     }
 
-    fn as_streamable_mut(
-        &mut self,
-    ) -> Option<&mut dyn crate::input::streamable_input_interface::StreamableInputInterface> {
-        crate::input::input_interface::InputInterface::as_streamable_mut(&mut self.inner)
+    fn as_streamable_mut(&mut self) -> Option<&mut dyn crate::input::StreamableInputInterface> {
+        crate::input::InputInterface::as_streamable_mut(&mut self.inner)
     }
 }
 

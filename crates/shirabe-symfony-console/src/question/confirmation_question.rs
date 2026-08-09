@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Question/ConfirmationQuestion.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::InvalidArgumentException;
 use crate::question::Question;
 use crate::question::QuestionInterface;
 use shirabe_php_shim::PhpMixed;

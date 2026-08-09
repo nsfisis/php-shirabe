@@ -56,9 +56,7 @@ pub trait OutputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     /// Downcast hook standing in for PHP's `$output instanceof ConsoleOutputInterface`
     /// (cf. `InputInterface::as_streamable`). Only `ConsoleOutput` returns `Some`.
-    fn as_console_output(
-        &self,
-    ) -> Option<&dyn crate::output::console_output_interface::ConsoleOutputInterface> {
+    fn as_console_output(&self) -> Option<&dyn crate::output::ConsoleOutputInterface> {
         None
     }
 }

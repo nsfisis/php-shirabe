@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/Helper.php
 
-use crate::formatter::output_formatter_interface::OutputFormatterInterface;
-use crate::helper::helper_set::HelperSet;
+use crate::formatter::OutputFormatterInterface;
+use crate::helper::HelperSet;
 use shirabe_php_shim::php_regex;
 use shirabe_symfony_string::unicode_string::UnicodeString;
 

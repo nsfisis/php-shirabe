@@ -10,11 +10,9 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir, impl_php_class, php_regex};
-use shirabe_symfony_console::command::command::Command;
-use shirabe_symfony_console::completion::completion_input::CompletionInput;
-use shirabe_symfony_console::completion::completion_suggestions::{
-    CompletionSuggestions, StringOrSuggestion,
-};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::completion::CompletionInput;
+use shirabe_symfony_console::completion::{CompletionSuggestions, StringOrSuggestion};
 use shirabe_symfony_console::input::ArgvInput;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;

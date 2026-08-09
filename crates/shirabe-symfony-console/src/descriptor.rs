@@ -1,10 +1,10 @@
-pub mod application_description;
-pub mod descriptor;
-pub mod descriptor_interface;
-pub mod json_descriptor;
-pub mod markdown_descriptor;
-pub mod text_descriptor;
-pub mod xml_descriptor;
+mod application_description;
+mod descriptor;
+mod descriptor_interface;
+mod json_descriptor;
+mod markdown_descriptor;
+mod text_descriptor;
+mod xml_descriptor;
 
 pub use application_description::*;
 pub use descriptor::*;

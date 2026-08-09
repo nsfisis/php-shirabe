@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Question/Question.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::exception::logic_exception::LogicException;
+use crate::exception::InvalidArgumentException;
+use crate::exception::LogicException;
 use crate::question::choice_question::ChoiceQuestion;
 use crate::question::confirmation_question::ConfirmationQuestion;
 use shirabe_php_shim::PhpMixed;

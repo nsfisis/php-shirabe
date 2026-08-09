@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/console/Completion/Output/BashCompletionOutput.php
 
-use crate::completion::completion_suggestions::CompletionSuggestions;
-use crate::completion::output::completion_output_interface::CompletionOutputInterface;
-use crate::output::output_interface::OutputInterface;
+use crate::completion::CompletionOutputInterface;
+use crate::completion::CompletionSuggestions;
+use crate::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct BashCompletionOutput;

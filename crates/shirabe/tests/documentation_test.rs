@@ -2,7 +2,7 @@
 
 use shirabe::console::application::ApplicationHandle;
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::descriptor::application_description::ApplicationDescription;
+use shirabe_symfony_console::descriptor::ApplicationDescription;
 
 fn get_command_name(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
     let mut name = command.borrow().get_name().unwrap_or_default();

@@ -33,7 +33,7 @@ use shirabe_php_rpc::{
     call_function_with_dispatcher, call_php_method, release_php_handle,
 };
 use shirabe_php_shim::PhpMixed;
-use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -2977,9 +2977,9 @@ impl PhpCommandProxy {
         handle: &PhpObjHandle,
         data: &crate::command::BaseCommandData,
     ) -> anyhow::Result<()> {
-        use shirabe_symfony_console::input::input_argument::InputArgument;
-        use shirabe_symfony_console::input::input_definition::{DefinitionItem, InputDefinition};
-        use shirabe_symfony_console::input::input_option::InputOption;
+        use shirabe_symfony_console::input::InputArgument;
+        use shirabe_symfony_console::input::InputOption;
+        use shirabe_symfony_console::input::{DefinitionItem, InputDefinition};
 
         let value = unwrap_php_result(call_function_with_dispatcher(
             "__shirabe_read_command_definition",
@@ -3084,9 +3084,9 @@ impl PhpCommandProxy {
             )?));
         }
         data.command_data().set_definition(
-            shirabe_symfony_console::command::command::SetDefinitionArg::Definition(
-                InputDefinition::new(items)?,
-            ),
+            shirabe_symfony_console::command::SetDefinitionArg::Definition(InputDefinition::new(
+                items,
+            )?),
         );
 
         match field(&mut map, "help") {

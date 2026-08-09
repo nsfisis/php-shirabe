@@ -1,11 +1,11 @@
 //! ref: composer/vendor/symfony/console/Descriptor/DescriptorInterface.php
 
 use crate::application::Application;
-use crate::command::command::Command;
-use crate::input::input_argument::InputArgument;
-use crate::input::input_definition::InputDefinition;
-use crate::input::input_option::InputOption;
-use crate::output::output_interface::OutputInterface;
+use crate::command::Command;
+use crate::input::InputArgument;
+use crate::input::InputDefinition;
+use crate::input::InputOption;
+use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

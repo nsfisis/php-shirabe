@@ -4,10 +4,8 @@ pub mod input_option;
 pub use input_argument::*;
 pub use input_option::*;
 
-use shirabe_symfony_console::completion::completion_input::CompletionInput;
-use shirabe_symfony_console::completion::completion_suggestions::{
-    CompletionSuggestions, StringOrSuggestion,
-};
+use shirabe_symfony_console::completion::CompletionInput;
+use shirabe_symfony_console::completion::{CompletionSuggestions, StringOrSuggestion};
 
 /// PHP: `\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion>`.
 ///
@@ -88,10 +86,8 @@ pub enum InputDefinitionItem {
 
 impl InputDefinitionItem {
     /// Converts to the Symfony-typed definition item accepted by `CommandData::set_definition`.
-    pub(crate) fn to_definition_item(
-        &self,
-    ) -> shirabe_symfony_console::input::input_definition::DefinitionItem {
-        use shirabe_symfony_console::input::input_definition::DefinitionItem;
+    pub(crate) fn to_definition_item(&self) -> shirabe_symfony_console::input::DefinitionItem {
+        use shirabe_symfony_console::input::DefinitionItem;
         match self {
             InputDefinitionItem::Argument(argument) => {
                 DefinitionItem::InputArgument(argument.to_base())

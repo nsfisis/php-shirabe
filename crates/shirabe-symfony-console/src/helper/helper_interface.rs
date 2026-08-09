@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Helper/HelperInterface.php
 
-use crate::helper::helper_set::HelperSet;
+use crate::helper::HelperSet;
 
 /// HelperInterface is the interface all helpers must implement.
 pub trait HelperInterface: std::fmt::Debug + shirabe_php_shim::AsAny {

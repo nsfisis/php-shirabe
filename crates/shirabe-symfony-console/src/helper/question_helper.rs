@@ -1,20 +1,20 @@
 //! ref: composer/vendor/symfony/console/Helper/QuestionHelper.php
 
 use crate::cursor::Cursor;
-use crate::exception::missing_input_exception::MissingInputException;
-use crate::exception::runtime_exception::RuntimeException;
-use crate::formatter::output_formatter::OutputFormatter;
-use crate::formatter::output_formatter_style::OutputFormatterStyle;
-use crate::helper::formatter_helper::FormatBlockMessages;
-use crate::helper::helper::Helper;
-use crate::helper::helper_interface::HelperInterface;
-use crate::helper::helper_set::HelperSet;
-use crate::input::input_interface::InputInterface;
-use crate::output::console_output::ConsoleOutput;
-use crate::output::console_output_interface::ConsoleOutputInterface;
-use crate::output::console_section_output::ConsoleSectionOutput;
+use crate::exception::MissingInputException;
+use crate::exception::RuntimeException;
+use crate::formatter::OutputFormatter;
+use crate::formatter::OutputFormatterStyle;
+use crate::helper::FormatBlockMessages;
+use crate::helper::Helper;
+use crate::helper::HelperInterface;
+use crate::helper::HelperSet;
+use crate::input::InputInterface;
+use crate::output::ConsoleOutput;
+use crate::output::ConsoleOutputInterface;
+use crate::output::ConsoleSectionOutput;
+use crate::output::OutputInterface;
 use crate::output::output_interface;
-use crate::output::output_interface::OutputInterface;
 use crate::question::ChoiceQuestion;
 use crate::question::QuestionInterface;
 use crate::terminal::Terminal;

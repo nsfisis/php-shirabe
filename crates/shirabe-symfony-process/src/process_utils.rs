@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/process/ProcessUtils.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::InvalidArgumentException;
 use shirabe_php_shim::PhpMixed;
 
 /// ProcessUtils is a bunch of utility methods.

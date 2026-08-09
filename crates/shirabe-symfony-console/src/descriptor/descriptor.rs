@@ -1,12 +1,12 @@
 //! ref: composer/vendor/symfony/console/Descriptor/Descriptor.php
 
 use crate::application::Application;
-use crate::command::command::Command;
-use crate::descriptor::descriptor_interface::{DescribableObject, DescriptorInterface};
-use crate::input::input_argument::InputArgument;
-use crate::input::input_definition::InputDefinition;
-use crate::input::input_option::InputOption;
-use crate::output::output_interface::OutputInterface;
+use crate::command::Command;
+use crate::descriptor::{DescribableObject, DescriptorInterface};
+use crate::input::InputArgument;
+use crate::input::InputDefinition;
+use crate::input::InputOption;
+use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -53,9 +53,9 @@ pub trait Descriptor: DescriptorInterface {
             &[content.to_string()],
             false,
             if decorated {
-                crate::output::output_interface::OUTPUT_NORMAL
+                crate::output::OUTPUT_NORMAL
             } else {
-                crate::output::output_interface::OUTPUT_RAW
+                crate::output::OUTPUT_RAW
             },
         );
     }

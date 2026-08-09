@@ -1,9 +1,9 @@
-pub mod command;
-pub mod complete_command;
-pub mod dump_completion_command;
-pub mod help_command;
-pub mod list_command;
-pub mod signalable_command_interface;
+mod command;
+mod complete_command;
+mod dump_completion_command;
+mod help_command;
+mod list_command;
+mod signalable_command_interface;
 
 pub use command::*;
 pub use complete_command::*;

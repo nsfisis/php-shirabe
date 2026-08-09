@@ -1,13 +1,13 @@
-pub mod argv_input;
-pub mod array_input;
-pub mod input;
-pub mod input_argument;
-pub mod input_aware_interface;
-pub mod input_definition;
-pub mod input_interface;
-pub mod input_option;
-pub mod streamable_input_interface;
-pub mod string_input;
+mod argv_input;
+mod array_input;
+mod input;
+mod input_argument;
+mod input_aware_interface;
+mod input_definition;
+mod input_interface;
+mod input_option;
+mod streamable_input_interface;
+mod string_input;
 
 pub use argv_input::*;
 pub use array_input::*;

@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/TableCell.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::helper::table_cell_style::TableCellStyle;
+use crate::exception::InvalidArgumentException;
+use crate::helper::TableCellStyle;
 use indexmap::IndexMap;
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.

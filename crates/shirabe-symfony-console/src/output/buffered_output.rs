@@ -2,7 +2,7 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::output::OutputInterface;
-use crate::output::output::{DoWrite, Output};
+use crate::output::{DoWrite, Output};
 
 #[derive(Debug)]
 pub struct BufferedOutput {

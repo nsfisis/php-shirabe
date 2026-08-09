@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php
 
-use crate::input::input_definition::InputDefinition;
-use crate::input::streamable_input_interface::StreamableInputInterface;
+use crate::input::InputDefinition;
+use crate::input::StreamableInputInterface;
 use shirabe_php_shim::PhpMixed;
 
 pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {

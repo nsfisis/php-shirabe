@@ -14,7 +14,7 @@ mod bootstrap;
 
 use serial_test::serial;
 use shirabe::console::application::{Application, ApplicationHandle};
-use shirabe_symfony_console::tester::command_completion_tester::CommandCompletionTester;
+use shirabe_symfony_console::tester::CommandCompletionTester;
 
 struct RestoreCwd(std::path::PathBuf);
 

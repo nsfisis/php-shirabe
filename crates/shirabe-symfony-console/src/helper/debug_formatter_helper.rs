@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/console/Helper/DebugFormatterHelper.php
 
-use crate::helper::helper::Helper;
-use crate::helper::helper_interface::HelperInterface;
-use crate::helper::helper_set::HelperSet;
+use crate::helper::Helper;
+use crate::helper::HelperInterface;
+use crate::helper::HelperSet;
 use indexmap::IndexMap;
 
 const COLORS: [&str; 9] = [

@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Formatter/OutputFormatter.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::InvalidArgumentException;
 use crate::formatter::output_formatter_interface::OutputFormatterInterface;
 use crate::formatter::output_formatter_style::OutputFormatterStyle;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;

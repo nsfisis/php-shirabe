@@ -1,22 +1,22 @@
 //! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatter;
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
 use crate::helper::ProgressBar;
+use crate::helper::QuestionHelperInterface;
 use crate::helper::SymfonyQuestionHelper;
 use crate::helper::Table;
 use crate::helper::TableCell;
 use crate::helper::TableSeparator;
-use crate::helper::question_helper::QuestionHelperInterface;
-use crate::helper::table::{Cell, Row};
+use crate::helper::{Cell, Row};
 use crate::input::InputInterface;
+use crate::output::ConsoleOutput;
 use crate::output::ConsoleOutputInterface;
+use crate::output::OUTPUT_NORMAL;
 use crate::output::OutputInterface;
 use crate::output::TrimmedBufferOutput;
-use crate::output::console_output::ConsoleOutput;
-use crate::output::output_interface::OUTPUT_NORMAL;
 use crate::question::ChoiceQuestion;
 use crate::question::ConfirmationQuestion;
 use crate::question::Question;
@@ -161,7 +161,7 @@ impl SymfonyStyle {
                             let mut options = indexmap::IndexMap::new();
                             options.insert(
                                 "colspan".to_string(),
-                                crate::helper::table_cell::TableCellOption::Int(2),
+                                crate::helper::TableCellOption::Int(2),
                             );
                             options
                         })
@@ -261,7 +261,7 @@ impl SymfonyStyle {
         style.set_cell_header_format("<info>%s</info>".to_string());
 
         let mut table = Table::new(output);
-        let _ = table.set_style(crate::helper::table::StyleName::Style(style));
+        let _ = table.set_style(crate::helper::StyleName::Style(style));
         table
     }
 

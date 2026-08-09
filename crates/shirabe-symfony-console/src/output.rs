@@ -1,11 +1,11 @@
-pub mod buffered_output;
-pub mod console_output;
-pub mod console_output_interface;
-pub mod console_section_output;
-pub mod output;
+mod buffered_output;
+mod console_output;
+mod console_output_interface;
+mod console_section_output;
+mod output;
 pub mod output_interface;
-pub mod stream_output;
-pub mod trimmed_buffer_output;
+mod stream_output;
+mod trimmed_buffer_output;
 
 pub use buffered_output::*;
 pub use console_output::*;

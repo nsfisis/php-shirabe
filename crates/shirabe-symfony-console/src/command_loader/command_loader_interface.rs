@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/CommandLoader/CommandLoaderInterface.php
 
-use crate::command::command::Command;
+use crate::command::Command;
 
 pub trait CommandLoaderInterface: std::fmt::Debug {
     /// Loads a command.

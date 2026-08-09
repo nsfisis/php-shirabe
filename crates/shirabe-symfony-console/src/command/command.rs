@@ -1,15 +1,16 @@
 //! ref: composer/vendor/symfony/console/Command/Command.php
 
 use crate::application::Application;
-use crate::completion::completion_input::CompletionInput;
-use crate::completion::completion_suggestions::CompletionSuggestions;
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::helper::helper_set::HelperSet;
-use crate::input::input_argument::InputArgument;
-use crate::input::input_definition::InputDefinition;
-use crate::input::input_interface::InputInterface;
-use crate::input::input_option::InputOption;
-use crate::output::output_interface::{self, OutputInterface};
+use crate::completion::CompletionInput;
+use crate::completion::CompletionSuggestions;
+use crate::exception::InvalidArgumentException;
+use crate::helper::HelperSet;
+use crate::input::InputArgument;
+use crate::input::InputDefinition;
+use crate::input::InputInterface;
+use crate::input::InputOption;
+use crate::output::OutputInterface;
+use crate::output::output_interface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex};
 use std::cell::{Cell, Ref};
@@ -241,7 +242,7 @@ impl CommandData {
 /// argument/option instances or an InputDefinition.
 #[derive(Debug)]
 pub enum SetDefinitionArg {
-    Array(Vec<crate::input::input_definition::DefinitionItem>),
+    Array(Vec<crate::input::DefinitionItem>),
     Definition(InputDefinition),
 }
 
@@ -296,11 +297,11 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn is_enabled(&self) -> bool);
         $crate::delegate_to_inner!($field, fn set_application(&self, application: Option<std::rc::Rc<std::cell::RefCell<dyn $crate::application::Application>>>));
         $crate::delegate_to_inner!($field, fn get_application(&self) -> Option<std::rc::Rc<std::cell::RefCell<dyn $crate::application::Application>>>);
-        $crate::delegate_to_inner!($field, fn set_helper_set(&self, helper_set: std::rc::Rc<std::cell::RefCell<$crate::helper::helper_set::HelperSet>>));
-        $crate::delegate_to_inner!($field, fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<$crate::helper::helper_set::HelperSet>>>);
+        $crate::delegate_to_inner!($field, fn set_helper_set(&self, helper_set: std::rc::Rc<std::cell::RefCell<$crate::helper::HelperSet>>));
+        $crate::delegate_to_inner!($field, fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<$crate::helper::HelperSet>>>);
         $crate::delegate_to_inner!($field, fn merge_application_definition(&self, merge_args: bool));
-        $crate::delegate_to_inner!($field, fn get_definition(&self) -> std::cell::Ref<'_, $crate::input::input_definition::InputDefinition>);
-        $crate::delegate_to_inner!($field, fn get_native_definition(&self) -> std::cell::Ref<'_, $crate::input::input_definition::InputDefinition>);
+        $crate::delegate_to_inner!($field, fn get_definition(&self) -> std::cell::Ref<'_, $crate::input::InputDefinition>);
+        $crate::delegate_to_inner!($field, fn get_native_definition(&self) -> std::cell::Ref<'_, $crate::input::InputDefinition>);
         $crate::delegate_to_inner!($field, fn set_name(&self, name: &str) -> anyhow::Result<()>);
         $crate::delegate_to_inner!($field, fn get_name(&self) -> Option<String>);
         $crate::delegate_to_inner!($field, fn set_process_title(&self, title: &str));
@@ -317,7 +318,7 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> String);
         $crate::delegate_to_inner!($field, fn add_usage(&self, usage: &str));
         $crate::delegate_to_inner!($field, fn get_usages(&self) -> Vec<String>);
-        $crate::delegate_to_inner!($field, fn get_helper(&self, name: &str) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, $crate::exception::logic_exception::LogicException>>);
+        $crate::delegate_to_inner!($field, fn get_helper(&self, name: &str) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, $crate::exception::LogicException>>);
         $crate::delegate_to_inner!($field, fn set_code(&self, code: Box<dyn Fn(&mut dyn $crate::input::InputInterface, &mut dyn $crate::output::OutputInterface) -> shirabe_php_shim::PhpMixed>));
         $crate::delegate_to_inner!($field, fn get_code(&self) -> std::cell::Ref<'_, Option<Box<dyn Fn(&mut dyn $crate::input::InputInterface, &mut dyn $crate::output::OutputInterface) -> shirabe_php_shim::PhpMixed>>>);
         $crate::delegate_to_inner!($field, fn ignore_validation_errors(&self));
@@ -538,7 +539,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
     fn get_helper(
         &self,
         name: &str,
-    ) -> anyhow::Result<Result<PhpMixed, crate::exception::logic_exception::LogicException>>;
+    ) -> anyhow::Result<Result<PhpMixed, crate::exception::LogicException>>;
 
     fn set_code(
         &self,
@@ -836,16 +837,14 @@ impl Command for CommandData {
     fn get_helper(
         &self,
         name: &str,
-    ) -> anyhow::Result<Result<PhpMixed, crate::exception::logic_exception::LogicException>> {
+    ) -> anyhow::Result<Result<PhpMixed, crate::exception::LogicException>> {
         let helper_set_ref = self.helper_set.borrow();
         let helper_set = match &*helper_set_ref {
             None => {
-                return Ok(Err(crate::exception::logic_exception::LogicException::new(
-                    format!(
-                        "Cannot retrieve helper \"{}\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.",
-                        name
-                    ),
-                )));
+                return Ok(Err(crate::exception::LogicException::new(format!(
+                    "Cannot retrieve helper \"{}\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.",
+                    name
+                ))));
             }
             Some(helper_set) => helper_set,
         };

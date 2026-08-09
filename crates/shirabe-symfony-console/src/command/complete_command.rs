@@ -1,13 +1,13 @@
 //! ref: composer/vendor/symfony/console/Command/CompleteCommand.php
 
-use crate::command::command::{Command, CommandData};
-use crate::completion::completion_input::CompletionInput;
-use crate::completion::completion_suggestions::{CompletionSuggestions, StringOrSuggestion};
-use crate::completion::output::bash_completion_output::BashCompletionOutput;
-use crate::completion::output::completion_output_interface::CompletionOutputInterface;
-use crate::input::input_interface::InputInterface;
-use crate::input::input_option::InputOption;
-use crate::output::output_interface::OutputInterface;
+use crate::command::{Command, CommandData};
+use crate::completion::BashCompletionOutput;
+use crate::completion::CompletionInput;
+use crate::completion::CompletionOutputInterface;
+use crate::completion::{CompletionSuggestions, StringOrSuggestion};
+use crate::input::InputInterface;
+use crate::input::InputOption;
+use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class};
 use std::ops::{Deref, DerefMut};

@@ -1,12 +1,12 @@
 //! ref: composer/vendor/symfony/console/Helper/SymfonyQuestionHelper.php
 
-use crate::formatter::output_formatter::OutputFormatter;
-use crate::helper::question_helper::{QuestionHelper, QuestionHelperInterface};
+use crate::formatter::OutputFormatter;
+use crate::helper::{QuestionHelper, QuestionHelperInterface};
+use crate::output::OutputInterface;
 use crate::output::output_interface;
-use crate::output::output_interface::OutputInterface;
 use crate::question::QuestionInterface;
-use crate::style::style_interface::StyleInterface;
-use crate::style::symfony_style::SymfonyStyle;
+use crate::style::StyleInterface;
+use crate::style::SymfonyStyle;
 use shirabe_php_shim::PhpMixed;
 use std::ops::{Deref, DerefMut};
 

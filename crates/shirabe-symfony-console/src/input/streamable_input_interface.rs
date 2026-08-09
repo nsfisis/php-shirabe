@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Input/StreamableInputInterface.php
 
-use crate::input::input_interface::InputInterface;
+use crate::input::InputInterface;
 use shirabe_php_shim::PhpResource;
 
 pub trait StreamableInputInterface: InputInterface {

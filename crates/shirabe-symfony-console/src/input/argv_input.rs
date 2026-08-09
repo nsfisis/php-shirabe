@@ -1,10 +1,10 @@
 //! ref: composer/vendor/symfony/console/Input/ArgvInput.php
 
-use crate::exception::runtime_exception::RuntimeException;
-use crate::input::input::Input;
-use crate::input::input_definition::InputDefinition;
-use crate::input::input_interface::InputInterface;
-use crate::input::streamable_input_interface::StreamableInputInterface;
+use crate::exception::RuntimeException;
+use crate::input::Input;
+use crate::input::InputDefinition;
+use crate::input::InputInterface;
+use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex};
 

@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Input/InputDefinition.php
 
-use crate::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::exception::logic_exception::LogicException;
-use crate::input::input_argument::InputArgument;
-use crate::input::input_option::InputOption;
+use crate::exception::InvalidArgumentException;
+use crate::exception::LogicException;
+use crate::input::InputArgument;
+use crate::input::InputOption;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

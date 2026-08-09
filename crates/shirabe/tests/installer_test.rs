@@ -46,14 +46,14 @@ use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, PhpMixed, php_regex};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
-use shirabe_symfony_console::command::command::Command as SymfonyCommand;
-use shirabe_symfony_console::command::command::CommandData;
-use shirabe_symfony_console::input::input_argument::InputArgument;
-use shirabe_symfony_console::input::input_interface::InputInterface;
-use shirabe_symfony_console::input::input_option::InputOption;
-use shirabe_symfony_console::input::string_input::StringInput;
-use shirabe_symfony_console::output::output_interface::{OutputInterface, VERBOSITY_NORMAL};
-use shirabe_symfony_console::output::stream_output::StreamOutput;
+use shirabe_symfony_console::command::Command as SymfonyCommand;
+use shirabe_symfony_console::command::CommandData;
+use shirabe_symfony_console::input::InputArgument;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputOption;
+use shirabe_symfony_console::input::StringInput;
+use shirabe_symfony_console::output::StreamOutput;
+use shirabe_symfony_console::output::{OutputInterface, VERBOSITY_NORMAL};
 
 // removeDirectory of tempComposerHome (a path produced by the unported install pipeline) is not
 // ported; the cwd management (setUp's chdir(__DIR__) / tearDown's chdir($this->prevCwd)) and the
