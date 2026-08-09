@@ -30,3 +30,15 @@ The following are intentionally left unchanged for ecosystem compatibility:
 * `vendor/composer/` directory
 
 TODO: a CLI flag or an environment variable to force Shirabe to use compatible paths.
+
+
+## Plugins
+
+### Reflection
+
+Reflection on Composer's own objects (`$composer`, `$io`, and everything reachable from them) is
+not supported. Their properties are invisible to `ReflectionClass::getProperties()` and cannot be
+read or written through `ReflectionProperty`; only the public methods reach the real values.
+`ReflectionClass::getFileName()` and the method bodies do not describe Composer's sources either.
+
+Reflection on objects a plugin creates itself works as usual.
