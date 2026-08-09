@@ -55,9 +55,9 @@ impl Filesystem {
             // on the target instead, so the mode fopen would have left is captured here and put
             // back below.
             let target_perms = if shirabe_php_shim::is_file(target_file) {
-                shirabe_php_shim::fileperms(target_file)
+                shirabe_php_shim::fileperms(target_file)?
             } else {
-                0o666 & !(shirabe_php_shim::umask() as i64)
+                0o666 & !shirabe_php_shim::umask()
             };
 
             if !shirabe_php_shim::copy(origin_file, target_file) {
@@ -85,7 +85,7 @@ impl Filesystem {
                 // Like `cp`, preserve executable permission bits.
                 shirabe_php_shim::chmod(
                     target_file,
-                    (target_perms | (shirabe_php_shim::fileperms(origin_file) & 0o111)) as u32,
+                    (target_perms | (shirabe_php_shim::fileperms(origin_file)? & 0o111)) as u32,
                 );
 
                 // Like `cp`, preserve the file modification time.

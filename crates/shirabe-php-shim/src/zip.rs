@@ -218,7 +218,7 @@ impl ZipArchive {
         )))
     }
 
-    pub fn add_empty_dir(&self, local_name: &str, opsys: i64, attr: i64) -> bool {
+    pub fn add_empty_dir(&self, local_name: &str, opsys: i64, attr: u32) -> bool {
         let mut state = self.state.borrow_mut();
         let ZipState::Writer { writer, .. } = &mut *state else {
             return false;
@@ -233,7 +233,7 @@ impl ZipArchive {
         filepath: impl AsRef<std::path::Path>,
         local_name: &str,
         opsys: i64,
-        attr: i64,
+        attr: u32,
     ) -> bool {
         let contents = match std::fs::read(filepath.as_ref()) {
             Ok(c) => c,
@@ -257,14 +257,14 @@ impl ZipArchive {
     /// keeps only the low 9 mode bits, on top of which the crate restores `S_IFREG` for
     /// files and `S_IFDIR` for directories; libzip stores `attr` verbatim, so
     /// setuid/setgid/sticky bits and the remaining file types do not survive.
-    fn entry_options(opsys: i64, attr: i64) -> SimpleFileOptions {
+    fn entry_options(opsys: i64, attr: u32) -> SimpleFileOptions {
         let system = match opsys {
             Self::OPSYS_UNIX => zip::System::Unix,
             _ => todo!(),
         };
         SimpleFileOptions::default()
             .system(system)
-            .unix_permissions((attr >> 16) as u32)
+            .unix_permissions(attr >> 16)
     }
 
     pub fn get_status_string(&self) -> String {

@@ -791,13 +791,10 @@ pub fn chmod(path: impl AsRef<std::path::Path>, mode: u32) -> bool {
     std::fs::set_permissions(path.as_ref(), std::fs::Permissions::from_mode(mode)).is_ok()
 }
 
-pub fn fileperms(path: impl AsRef<std::path::Path>) -> i64 {
+pub fn fileperms(path: impl AsRef<std::path::Path>) -> Result<u32, std::io::Error> {
     use std::os::unix::fs::MetadataExt;
-    // PHP returns the full st_mode (file type bits included).
-    // TODO(phase-c): PHP returns false on error; this i64 signature reports 0 instead.
-    std::fs::metadata(path.as_ref())
-        .map(|m| m.mode() as i64)
-        .unwrap_or(0)
+    // TODO(phase-e): PHP returns the full st_mode (file type bits included).
+    std::fs::metadata(path.as_ref()).map(|m| m.mode())
 }
 
 pub fn filesize(path: impl AsRef<std::path::Path>) -> Option<i64> {

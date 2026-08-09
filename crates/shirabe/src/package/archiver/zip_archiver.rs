@@ -70,7 +70,7 @@ impl ArchiverInterface for ZipArchiver {
                 }
 
                 // Ensure to preserve the permission umasks for the filepath in the archive.
-                let perms = fileperms(&filepath);
+                let perms = fileperms(&filepath)?;
 
                 if filepath.is_dir() {
                     zip.add_empty_dir(
