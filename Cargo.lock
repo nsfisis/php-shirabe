@@ -2098,7 +2098,6 @@ dependencies = [
  "sha1",
  "shirabe-ca-bundle",
  "shirabe-class-map-generator",
- "shirabe-external-packages",
  "shirabe-metadata-minifier",
  "shirabe-pcre",
  "shirabe-php-rpc",
@@ -2129,25 +2128,9 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "indexmap",
- "shirabe-external-packages",
  "shirabe-pcre",
  "shirabe-php-shim",
  "shirabe-symfony-finder",
-]
-
-[[package]]
-name = "shirabe-external-packages"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "chrono",
- "indexmap",
- "regex",
- "shirabe-pcre",
- "shirabe-php-shim",
- "shirabe-semver",
- "shirabe-symfony-process",
- "shirabe-symfony-string",
 ]
 
 [[package]]
@@ -2174,7 +2157,6 @@ dependencies = [
  "anyhow",
  "indexmap",
  "nix",
- "shirabe-external-packages",
  "shirabe-php-shim",
  "shirabe-php-src",
  "shirabe-symfony-process",

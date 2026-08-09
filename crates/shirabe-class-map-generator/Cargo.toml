@@ -4,7 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-shirabe-external-packages.workspace = true
 shirabe-pcre.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-symfony-finder.workspace = true

@@ -6,7 +6,6 @@ edition.workspace = true
 [dependencies]
 shirabe-ca-bundle.workspace = true
 shirabe-class-map-generator.workspace = true
-shirabe-external-packages.workspace = true
 shirabe-metadata-minifier.workspace = true
 shirabe-pcre.workspace = true
 shirabe-php-rpc.workspace = true

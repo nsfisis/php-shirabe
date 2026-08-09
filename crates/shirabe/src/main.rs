@@ -33,7 +33,7 @@ fn main() {
     // (restart the process without Xdebug loaded, for performance) is not ported. Since no
     // XdebugHandler is ever constructed, `self::$name` never gets set, so the
     // COMPOSER_ORIGINAL_INIS-env-var branch of XdebugHandler::getAllIniFiles() (see
-    // shirabe-external-packages' xdebug_handler.rs and shirabe/src/util/ini_helper.rs) is
+    // shirabe-xdebug-handler's xdebug_handler.rs and shirabe/src/util/ini_helper.rs) is
     // unreachable in this port, not merely unexercised by current tests.
 
     // Take the $_ENV / $_SERVER snapshots before any putenv() mutates the real environment.
