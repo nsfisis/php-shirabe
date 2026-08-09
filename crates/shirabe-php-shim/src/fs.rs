@@ -205,28 +205,25 @@ impl RecursiveIteratorFileInfo {
 }
 
 pub fn recursive_directory_iterator(
-    _path: impl AsRef<std::path::Path>,
-    _flags: i64,
+    path: impl AsRef<std::path::Path>,
+    flags: i64,
 ) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
-    let root = _path.as_ref().to_path_buf();
+    let root = path.as_ref().to_path_buf();
     if !root.is_dir() {
         return Err(UnexpectedValueException::new(format!(
             "RecursiveDirectoryIterator::__construct({}): Failed to open directory",
             root.display()
         )));
     }
-    Ok(RecursiveDirectoryIterator {
-        root,
-        flags: _flags,
-    })
+    Ok(RecursiveDirectoryIterator { root, flags })
 }
 
 pub fn recursive_iterator_iterator(
-    _iter: RecursiveDirectoryIterator,
-    _mode: i64,
+    iter: RecursiveDirectoryIterator,
+    mode: i64,
 ) -> RecursiveIteratorIterator {
     let mut entries = Vec::new();
-    rii_walk(&_iter.root, &_iter.root, _iter.flags, _mode, &mut entries);
+    rii_walk(&iter.root, &iter.root, iter.flags, mode, &mut entries);
     RecursiveIteratorIterator {
         entries,
         cursor: std::cell::Cell::new(0),
@@ -712,9 +709,9 @@ pub fn fflush(stream: &PhpResource) -> bool {
     }
 }
 
-pub fn lstat(_filename: impl AsRef<std::path::Path>) -> Option<IndexMap<String, PhpMixed>> {
+pub fn lstat(filename: impl AsRef<std::path::Path>) -> Option<IndexMap<String, PhpMixed>> {
     use std::os::unix::fs::MetadataExt;
-    let m = std::fs::symlink_metadata(_filename).ok()?;
+    let m = std::fs::symlink_metadata(filename).ok()?;
     Some(stat_fields_map([
         ("dev", m.dev() as i64),
         ("ino", m.ino() as i64),
@@ -789,16 +786,16 @@ pub fn touch3(path: impl AsRef<std::path::Path>, mtime: i64, atime: i64) -> bool
     touch_impl(path.as_ref(), mtime, atime)
 }
 
-pub fn chmod(_path: impl AsRef<std::path::Path>, _mode: u32) -> bool {
+pub fn chmod(path: impl AsRef<std::path::Path>, mode: u32) -> bool {
     use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(_path.as_ref(), std::fs::Permissions::from_mode(_mode)).is_ok()
+    std::fs::set_permissions(path.as_ref(), std::fs::Permissions::from_mode(mode)).is_ok()
 }
 
-pub fn fileperms(_path: impl AsRef<std::path::Path>) -> i64 {
+pub fn fileperms(path: impl AsRef<std::path::Path>) -> i64 {
     use std::os::unix::fs::MetadataExt;
     // PHP returns the full st_mode (file type bits included).
     // TODO(phase-c): PHP returns false on error; this i64 signature reports 0 instead.
-    std::fs::metadata(_path.as_ref())
+    std::fs::metadata(path.as_ref())
         .map(|m| m.mode() as i64)
         .unwrap_or(0)
 }
@@ -811,12 +808,12 @@ pub fn file_exists(path: impl AsRef<std::path::Path>) -> bool {
     path.as_ref().exists()
 }
 
-pub fn is_writable(_path: impl AsRef<std::path::Path>) -> bool {
-    nix::unistd::access(_path.as_ref(), nix::unistd::AccessFlags::W_OK).is_ok()
+pub fn is_writable(path: impl AsRef<std::path::Path>) -> bool {
+    nix::unistd::access(path.as_ref(), nix::unistd::AccessFlags::W_OK).is_ok()
 }
 
-pub fn is_readable(_path: impl AsRef<std::path::Path>) -> bool {
-    let path = _path.as_ref();
+pub fn is_readable(path: impl AsRef<std::path::Path>) -> bool {
+    let path = path.as_ref();
     match std::fs::metadata(path) {
         Ok(meta) => {
             if meta.is_dir() {
@@ -829,8 +826,8 @@ pub fn is_readable(_path: impl AsRef<std::path::Path>) -> bool {
     }
 }
 
-pub fn is_executable(_path: impl AsRef<std::path::Path>) -> bool {
-    nix::unistd::access(_path.as_ref(), nix::unistd::AccessFlags::X_OK).is_ok()
+pub fn is_executable(path: impl AsRef<std::path::Path>) -> bool {
+    nix::unistd::access(path.as_ref(), nix::unistd::AccessFlags::X_OK).is_ok()
 }
 
 pub fn is_file(path: impl AsRef<std::path::Path>) -> bool {
@@ -856,16 +853,16 @@ pub fn readlink(path: impl AsRef<std::path::Path>) -> Option<String> {
         .map(|target| target.to_string_lossy().into_owned())
 }
 
-pub fn fileatime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
-    std::fs::metadata(_filename.as_ref())
+pub fn fileatime(filename: impl AsRef<std::path::Path>) -> Option<i64> {
+    std::fs::metadata(filename.as_ref())
         .ok()
         .and_then(|m| m.accessed().ok())
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
 }
 
-pub fn filemtime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
-    std::fs::metadata(_filename.as_ref())
+pub fn filemtime(filename: impl AsRef<std::path::Path>) -> Option<i64> {
+    std::fs::metadata(filename.as_ref())
         .ok()
         .and_then(|m| m.modified().ok())
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
@@ -876,21 +873,19 @@ pub fn unlink(path: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
     std::fs::remove_file(path)
 }
 
-pub fn unlink_silent(_path: impl AsRef<std::path::Path>) -> bool {
+pub fn unlink_silent(path: impl AsRef<std::path::Path>) -> bool {
     // PHP's `@unlink`: delete the file, suppressing any warning.
-    std::fs::remove_file(_path.as_ref()).is_ok()
+    std::fs::remove_file(path.as_ref()).is_ok()
 }
 
-pub fn file_put_contents(_path: &str, _data: &[u8]) -> Option<i64> {
-    std::fs::write(_path, _data)
-        .ok()
-        .map(|_| _data.len() as i64)
+pub fn file_put_contents(path: &str, data: &[u8]) -> Option<i64> {
+    std::fs::write(path, data).ok().map(|_| data.len() as i64)
 }
 
-pub fn file_put_contents3(_filename: &str, _data: &str, _flags: i64) -> Option<i64> {
+pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64> {
     // TODO(phase-c): the LOCK_EX and FILE_USE_INCLUDE_PATH flags are ignored; only FILE_APPEND is
     // honored.
-    let append = _flags & FILE_APPEND != 0;
+    let append = flags & FILE_APPEND != 0;
     let mut opts = std::fs::OpenOptions::new();
     opts.write(true).create(true);
     if append {
@@ -898,9 +893,9 @@ pub fn file_put_contents3(_filename: &str, _data: &str, _flags: i64) -> Option<i
     } else {
         opts.truncate(true);
     }
-    let mut file = opts.open(_filename).ok()?;
-    file.write_all(_data.as_bytes()).ok()?;
-    Some(_data.len() as i64)
+    let mut file = opts.open(filename).ok()?;
+    file.write_all(data.as_bytes()).ok()?;
+    Some(data.len() as i64)
 }
 
 pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> Option<String> {
@@ -916,25 +911,25 @@ pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> Option<String> {
 }
 
 pub fn file_get_contents5(
-    _path: &str,
+    path: &str,
     _use_include_path: bool,
     _context: PhpMixed,
-    _offset: i64,
-    _length: Option<i64>,
+    offset: i64,
+    length: Option<i64>,
 ) -> Option<String> {
     // TODO(phase-c): the stream $context and FILE_USE_INCLUDE_PATH are ignored; only $offset and
     // $length are applied (to the file read from the local filesystem).
     // PHP supports the file:// stream wrapper; strip it to read the local file.
-    let path = _path.strip_prefix("file://").unwrap_or(_path);
+    let path = path.strip_prefix("file://").unwrap_or(path);
     let bytes = std::fs::read(path).ok()?;
     let len = bytes.len() as i64;
-    let start = if _offset < 0 {
-        (len + _offset).max(0)
+    let start = if offset < 0 {
+        (len + offset).max(0)
     } else {
-        _offset.min(len)
+        offset.min(len)
     } as usize;
     let slice = &bytes[start..];
-    let slice = match _length {
+    let slice = match length {
         Some(l) if l >= 0 => &slice[..(l as usize).min(slice.len())],
         _ => slice,
     };
@@ -947,21 +942,21 @@ pub fn getcwd() -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
-pub fn chdir(_path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
-    Ok(std::env::set_current_dir(_path.as_ref())?)
+pub fn chdir(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
+    Ok(std::env::set_current_dir(path.as_ref())?)
 }
 
-pub fn glob(_pattern: &str) -> Vec<String> {
-    glob_with_flags(_pattern, 0)
+pub fn glob(pattern: &str) -> Vec<String> {
+    glob_with_flags(pattern, 0)
 }
 
 pub const FILE_SKIP_EMPTY_LINES: i64 = 4;
 
-pub fn file(_filename: &str, _flags: i64) -> Option<Vec<String>> {
-    let content = std::fs::read(_filename).ok()?;
+pub fn file(filename: &str, flags: i64) -> Option<Vec<String>> {
+    let content = std::fs::read(filename).ok()?;
     let s = String::from_utf8_lossy(&content);
-    let ignore_newlines = _flags & FILE_IGNORE_NEW_LINES != 0;
-    let skip_empty = _flags & FILE_SKIP_EMPTY_LINES != 0;
+    let ignore_newlines = flags & FILE_IGNORE_NEW_LINES != 0;
+    let skip_empty = flags & FILE_SKIP_EMPTY_LINES != 0;
     let mut lines = Vec::new();
     // PHP keeps the trailing newline on each element unless FILE_IGNORE_NEW_LINES is set.
     for line in s.split_inclusive('\n') {
@@ -1025,8 +1020,8 @@ pub fn rename(
     std::fs::rename(old_name, new_name).is_ok()
 }
 
-pub fn copy(_source: impl AsRef<std::path::Path>, _dest: impl AsRef<std::path::Path>) -> bool {
-    std::fs::copy(_source.as_ref(), _dest.as_ref()).is_ok()
+pub fn copy(source: impl AsRef<std::path::Path>, dest: impl AsRef<std::path::Path>) -> bool {
+    std::fs::copy(source.as_ref(), dest.as_ref()).is_ok()
 }
 
 pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
@@ -1167,15 +1162,15 @@ pub const GLOB_MARK: i64 = 8;
 pub const GLOB_ONLYDIR: i64 = 1024;
 pub const GLOB_BRACE: i64 = 4096;
 
-pub fn glob_with_flags(_pattern: &str, _flags: i64) -> Vec<String> {
-    let patterns = if _flags & GLOB_BRACE != 0 {
-        glob_expand_braces(_pattern)
+pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
+    let patterns = if flags & GLOB_BRACE != 0 {
+        glob_expand_braces(pattern)
     } else {
-        vec![_pattern.to_string()]
+        vec![pattern.to_string()]
     };
     let mut results: Vec<String> = Vec::new();
     for pattern in patterns {
-        glob_collect(&pattern, _flags, &mut results);
+        glob_collect(&pattern, flags, &mut results);
     }
     // PHP sorts the result set by default (GLOB_NOSORT is not modeled here).
     results.sort();

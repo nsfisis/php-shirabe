@@ -93,21 +93,21 @@ pub fn canonical_int_key(key: &str) -> Option<i64> {
     key.parse::<i64>().ok()
 }
 
-pub fn is_bool(_value: &PhpMixed) -> bool {
-    matches!(_value, PhpMixed::Bool(_))
+pub fn is_bool(value: &PhpMixed) -> bool {
+    matches!(value, PhpMixed::Bool(_))
 }
 
-pub fn is_string(_value: &PhpMixed) -> bool {
-    matches!(_value, PhpMixed::String(_))
+pub fn is_string(value: &PhpMixed) -> bool {
+    matches!(value, PhpMixed::String(_))
 }
 
-pub fn is_int(_value: &PhpMixed) -> bool {
-    matches!(_value, PhpMixed::Int(_))
+pub fn is_int(value: &PhpMixed) -> bool {
+    matches!(value, PhpMixed::Int(_))
 }
 
-pub fn is_scalar(_value: &PhpMixed) -> bool {
+pub fn is_scalar(value: &PhpMixed) -> bool {
     matches!(
-        _value,
+        value,
         PhpMixed::Bool(_) | PhpMixed::Int(_) | PhpMixed::Float(_) | PhpMixed::String(_)
     )
 }
@@ -131,8 +131,8 @@ pub fn is_callable(value: &PhpMixed) -> bool {
     }
 }
 
-pub fn is_object(_value: &PhpMixed) -> bool {
-    matches!(_value, PhpMixed::Object(_))
+pub fn is_object(value: &PhpMixed) -> bool {
+    matches!(value, PhpMixed::Object(_))
 }
 
 pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> bool {
@@ -141,12 +141,12 @@ pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> b
     todo!()
 }
 
-pub fn is_array(_value: &PhpMixed) -> bool {
-    matches!(_value, PhpMixed::List(_) | PhpMixed::Array(_))
+pub fn is_array(value: &PhpMixed) -> bool {
+    matches!(value, PhpMixed::List(_) | PhpMixed::Array(_))
 }
 
-pub fn is_null(_value: &PhpMixed) -> bool {
-    matches!(_value, PhpMixed::Null)
+pub fn is_null(value: &PhpMixed) -> bool {
+    matches!(value, PhpMixed::Null)
 }
 
 pub fn is_iterable(value: &PhpMixed) -> bool {
@@ -255,9 +255,9 @@ pub fn strval(value: &PhpMixed) -> String {
     php_to_string(value)
 }
 
-pub fn intval(_value: &PhpMixed) -> i64 {
+pub fn intval(value: &PhpMixed) -> i64 {
     // Single-argument PHP intval(), i.e. base 10.
-    match _value {
+    match value {
         PhpMixed::Null => 0,
         PhpMixed::Bool(b) => *b as i64,
         PhpMixed::Int(i) => *i,

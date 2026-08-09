@@ -334,8 +334,8 @@ pub fn trigger_deprecation(_package: &str, _version: &str, _message: &str, _arg:
     todo!()
 }
 
-pub fn usleep(_microseconds: u64) {
-    std::thread::sleep(std::time::Duration::from_micros(_microseconds));
+pub fn usleep(microseconds: u64) {
+    std::thread::sleep(std::time::Duration::from_micros(microseconds));
 }
 
 /// Equivalent to PHP's __DIR__ magic constant

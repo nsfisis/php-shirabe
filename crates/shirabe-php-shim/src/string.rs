@@ -14,16 +14,16 @@ pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
     subject.replace(search, replace)
 }
 
-pub fn str_contains(_haystack: &str, _needle: &str) -> bool {
-    _haystack.contains(_needle)
+pub fn str_contains(haystack: &str, needle: &str) -> bool {
+    haystack.contains(needle)
 }
 
-pub fn str_starts_with(_haystack: &str, _needle: &str) -> bool {
-    _haystack.starts_with(_needle)
+pub fn str_starts_with(haystack: &str, needle: &str) -> bool {
+    haystack.starts_with(needle)
 }
 
-pub fn str_ends_with(_haystack: &str, _needle: &str) -> bool {
-    _haystack.ends_with(_needle)
+pub fn str_ends_with(haystack: &str, needle: &str) -> bool {
+    haystack.ends_with(needle)
 }
 
 pub fn substr_count(haystack: &str, needle: &str) -> i64 {
@@ -48,8 +48,8 @@ pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) 
     String::from_utf8_lossy(&out).into_owned()
 }
 
-pub fn str_repeat(_s: &str, _count: usize) -> String {
-    _s.repeat(_count)
+pub fn str_repeat(s: &str, count: usize) -> String {
+    s.repeat(count)
 }
 
 pub fn str_replace_array(search: &[String], replace: &[String], subject: &str) -> String {
@@ -63,29 +63,29 @@ pub fn str_replace_array(search: &[String], replace: &[String], subject: &str) -
     result
 }
 
-pub fn str_pad(_input: &str, _length: usize, _pad_string: &str, _pad_type: i64) -> String {
+pub fn str_pad(input: &str, length: usize, pad_string: &str, pad_type: i64) -> String {
     // PHP str_pad() works on bytes: it pads up to `length` bytes by repeating `pad_string`.
-    let input_len = _input.len();
-    if _length <= input_len || _pad_string.is_empty() {
-        return _input.to_string();
+    let input_len = input.len();
+    if length <= input_len || pad_string.is_empty() {
+        return input.to_string();
     }
-    let pad = _pad_string.as_bytes();
+    let pad = pad_string.as_bytes();
     let make = |n: usize| -> Vec<u8> { (0..n).map(|i| pad[i % pad.len()]).collect() };
-    let total = _length - input_len;
-    let mut out: Vec<u8> = Vec::with_capacity(_length);
-    match _pad_type {
+    let total = length - input_len;
+    let mut out: Vec<u8> = Vec::with_capacity(length);
+    match pad_type {
         STR_PAD_LEFT => {
             out.extend(make(total));
-            out.extend_from_slice(_input.as_bytes());
+            out.extend_from_slice(input.as_bytes());
         }
         STR_PAD_BOTH => {
             let left = total / 2;
             out.extend(make(left));
-            out.extend_from_slice(_input.as_bytes());
+            out.extend_from_slice(input.as_bytes());
             out.extend(make(total - left));
         }
         _ => {
-            out.extend_from_slice(_input.as_bytes());
+            out.extend_from_slice(input.as_bytes());
             out.extend(make(total));
         }
     }
@@ -96,10 +96,10 @@ pub const STR_PAD_LEFT: i64 = 0;
 pub const STR_PAD_RIGHT: i64 = 1;
 pub const STR_PAD_BOTH: i64 = 2;
 
-pub fn str_split(_s: &str, _length: i64) -> Vec<String> {
+pub fn str_split(s: &str, length: i64) -> Vec<String> {
     // PHP str_split() chunks the string by bytes into pieces of `length` bytes.
-    let length = _length.max(1) as usize;
-    let bytes = _s.as_bytes();
+    let length = length.max(1) as usize;
+    let bytes = s.as_bytes();
     if bytes.is_empty() {
         return vec![String::new()];
     }
@@ -109,10 +109,10 @@ pub fn str_split(_s: &str, _length: i64) -> Vec<String> {
         .collect()
 }
 
-pub fn str_bitand(_a: &str, _b: &str) -> String {
+pub fn str_bitand(a: &str, b: &str) -> String {
     // PHP's string `&` operator: byte-wise AND, the result truncated to the shorter operand.
-    let a = _a.as_bytes();
-    let b = _b.as_bytes();
+    let a = a.as_bytes();
+    let b = b.as_bytes();
     let n = a.len().min(b.len());
     let out: Vec<u8> = (0..n).map(|i| a[i] & b[i]).collect();
     String::from_utf8_lossy(&out).into_owned()
@@ -132,20 +132,20 @@ pub fn str_replace_arr(search: &[&str], replace: &str, subject: &str) -> String 
     result
 }
 
-pub fn strcasecmp(_s1: &str, _s2: &str) -> i64 {
-    _s1.to_ascii_lowercase().cmp(&_s2.to_ascii_lowercase()) as i64
+pub fn strcasecmp(s1: &str, s2: &str) -> i64 {
+    s1.to_ascii_lowercase().cmp(&s2.to_ascii_lowercase()) as i64
 }
 
-pub fn strpos(_haystack: &str, _needle: &str) -> Option<usize> {
-    _haystack.find(_needle)
+pub fn strpos(haystack: &str, needle: &str) -> Option<usize> {
+    haystack.find(needle)
 }
 
-pub fn strtoupper(_s: &str) -> String {
-    _s.to_ascii_uppercase()
+pub fn strtoupper(s: &str) -> String {
+    s.to_ascii_uppercase()
 }
 
-pub fn strlen(_s: &str) -> i64 {
-    _s.len() as i64
+pub fn strlen(s: &str) -> i64 {
+    s.len() as i64
 }
 
 pub fn strtr(str: &str, from: &str, to: &str) -> String {
@@ -175,8 +175,8 @@ pub fn strnatcasecmp(s1: &str, s2: &str) -> i64 {
     strnatcmp_ex(s1.as_bytes(), s2.as_bytes(), true)
 }
 
-pub fn strrpos(_haystack: &str, _needle: &str) -> Option<usize> {
-    _haystack.rfind(_needle)
+pub fn strrpos(haystack: &str, needle: &str) -> Option<usize> {
+    haystack.rfind(needle)
 }
 
 // Byte-based, matching PHP: strrev() reverses the bytes, not the characters.
@@ -186,14 +186,14 @@ pub fn strrev(s: &str) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
-pub fn strtolower(_s: &str) -> String {
-    _s.to_ascii_lowercase()
+pub fn strtolower(s: &str) -> String {
+    s.to_ascii_lowercase()
 }
 
-pub fn stripos(_haystack: &str, _needle: &str) -> Option<usize> {
-    _haystack
+pub fn stripos(haystack: &str, needle: &str) -> Option<usize> {
+    haystack
         .to_ascii_lowercase()
-        .find(_needle.to_ascii_lowercase().as_str())
+        .find(needle.to_ascii_lowercase().as_str())
 }
 
 // Byte-based, matching PHP's array form of strtr: at each position the longest
@@ -225,8 +225,8 @@ pub fn strtr_array(s: &str, pairs: &IndexMap<String, String>) -> String {
     String::from_utf8_lossy(&result).into_owned()
 }
 
-pub fn strcmp(_s1: &str, _s2: &str) -> i64 {
-    _s1.cmp(_s2) as i64
+pub fn strcmp(s1: &str, s2: &str) -> i64 {
+    s1.cmp(s2) as i64
 }
 
 pub fn strnatcmp(s1: &str, s2: &str) -> i64 {
@@ -311,8 +311,8 @@ pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
     String::from_utf8_lossy(&bytes[start as usize..end as usize]).into_owned()
 }
 
-pub fn implode(_glue: &str, _pieces: &[String]) -> String {
-    _pieces.join(_glue)
+pub fn implode(glue: &str, pieces: &[String]) -> String {
+    pieces.join(glue)
 }
 
 pub fn explode(delimiter: &str, string: &str) -> Vec<String> {
@@ -356,13 +356,13 @@ fn canonical_encoding(name: &str) -> String {
     }
 }
 
-pub fn mb_convert_encoding(_string: Vec<u8>, _to_encoding: &str, _from_encoding: &str) -> String {
-    let to = canonical_encoding(_to_encoding);
-    let from = canonical_encoding(_from_encoding);
+pub fn mb_convert_encoding(string: Vec<u8>, to_encoding: &str, from_encoding: &str) -> String {
+    let to = canonical_encoding(to_encoding);
+    let from = canonical_encoding(from_encoding);
     // ASCII is a subset of UTF-8, so converting among ASCII/UTF-8 is a byte-level no-op. Other
     // encodings need conversion tables that have not been ported yet.
     if matches!(to.as_str(), "UTF-8" | "ASCII") && matches!(from.as_str(), "UTF-8" | "ASCII") {
-        return String::from_utf8_lossy(&_string).into_owned();
+        return String::from_utf8_lossy(&string).into_owned();
     }
     todo!("mb_convert_encoding {} -> {}", from, to)
 }
@@ -372,27 +372,27 @@ pub fn mb_strlen(s: &str, _encoding: &str) -> i64 {
     s.chars().count() as i64
 }
 
-pub fn mb_check_encoding(_value: &str, _encoding: &str) -> bool {
-    match _encoding.to_ascii_uppercase().replace('-', "").as_str() {
+pub fn mb_check_encoding(value: &str, encoding: &str) -> bool {
+    match encoding.to_ascii_uppercase().replace('-', "").as_str() {
         // A Rust &str is, by construction, valid UTF-8.
         "UTF8" => true,
-        "ASCII" | "USASCII" => _value.is_ascii(),
+        "ASCII" | "USASCII" => value.is_ascii(),
         // Other encodings need the mbstring validation tables, which have not been ported.
         _ => todo!(),
     }
 }
 
 pub fn mb_detect_encoding(
-    _s: &str,
-    _encodings: Option<Vec<String>>,
+    s: &str,
+    encodings: Option<Vec<String>>,
     _strict: bool,
 ) -> Option<String> {
-    // PHP's default detection order is ASCII then UTF-8. `_s` is already valid UTF-8, so detection
+    // PHP's default detection order is ASCII then UTF-8. `s` is already valid UTF-8, so detection
     // reduces to: pure-ASCII content matches "ASCII", anything else matches "UTF-8".
-    let order = _encodings.unwrap_or_else(|| vec!["ASCII".to_string(), "UTF-8".to_string()]);
+    let order = encodings.unwrap_or_else(|| vec!["ASCII".to_string(), "UTF-8".to_string()]);
     for enc in order {
         match canonical_encoding(&enc).as_str() {
-            "ASCII" if _s.is_ascii() => return Some(enc),
+            "ASCII" if s.is_ascii() => return Some(enc),
             "UTF-8" => return Some(enc),
             _ => {}
         }
@@ -421,13 +421,13 @@ pub fn mb_str_split(s: &str, length: i64) -> Vec<String> {
         .collect()
 }
 
-pub fn mb_convert_variables(_to: &str, _from: &str, _vars: &mut Vec<String>) -> Option<String> {
-    // Converts each variable in place from `_from` to `_to`, returning the source encoding (PHP
-    // returns the detected source encoding; here `_from` is a single named encoding).
-    for v in _vars.iter_mut() {
-        *v = mb_convert_encoding(std::mem::take(v).into_bytes(), _to, _from);
+pub fn mb_convert_variables(to: &str, from: &str, vars: &mut [String]) -> Option<String> {
+    // Converts each variable in place from `from` to `to`, returning the source encoding (PHP
+    // returns the detected source encoding; here `from` is a single named encoding).
+    for v in vars.iter_mut() {
+        *v = mb_convert_encoding(std::mem::take(v).into_bytes(), to, from);
     }
-    Some(_from.to_string())
+    Some(from.to_string())
 }
 
 /// Resolve PHP array_slice/substr-style (offset, length) into a `[start, end)`
@@ -492,9 +492,9 @@ pub fn urlencode(s: &str) -> String {
     out
 }
 
-pub fn base64_encode(_data: impl AsRef<[u8]>) -> String {
+pub fn base64_encode(data: impl AsRef<[u8]>) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let bytes = _data.as_ref();
+    let bytes = data.as_ref();
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let b1 = chunk.get(1).copied();
@@ -516,11 +516,11 @@ pub fn base64_encode(_data: impl AsRef<[u8]>) -> String {
     out
 }
 
-pub fn base64_decode(_data: &str) -> Option<Vec<u8>> {
+pub fn base64_decode(data: &str) -> Option<Vec<u8>> {
     // Non-strict mode (PHP's default $strict = false): characters outside the base64 alphabet are
     // silently skipped, and padding terminates the input.
-    let mut sextets: Vec<u8> = Vec::with_capacity(_data.len());
-    for &b in _data.as_bytes() {
+    let mut sextets: Vec<u8> = Vec::with_capacity(data.len());
+    for &b in data.as_bytes() {
         let v = match b {
             b'A'..=b'Z' => b - b'A',
             b'a'..=b'z' => b - b'a' + 26,
@@ -552,16 +552,16 @@ pub fn base64_decode(_data: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-pub fn ctype_alnum(_s: &str) -> bool {
-    !_s.is_empty() && _s.bytes().all(|b| b.is_ascii_alphanumeric())
+pub fn ctype_alnum(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric())
 }
 
 pub fn ctype_digit(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
 }
 
-pub fn ord(_c: &str) -> i64 {
-    _c.as_bytes().first().copied().unwrap_or(0) as i64
+pub fn ord(c: &str) -> i64 {
+    c.as_bytes().first().copied().unwrap_or(0) as i64
 }
 
 pub fn ucwords(s: &str) -> String {
@@ -589,8 +589,8 @@ fn hex_digit_value(b: u8) -> Option<u8> {
     }
 }
 
-pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
-    let fb = _format.as_bytes();
+pub fn sprintf(format: &str, args: &[PhpMixed]) -> String {
+    let fb = format.as_bytes();
     let mut out = String::new();
     let mut i = 0;
     let mut next_arg = 0usize;
@@ -601,7 +601,7 @@ pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
             while i < fb.len() && fb[i] != b'%' {
                 i += 1;
             }
-            out.push_str(&_format[start..i]);
+            out.push_str(&format[start..i]);
             continue;
         }
         i += 1;
@@ -623,7 +623,7 @@ pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
                 k += 1;
             }
             if k > i && k < fb.len() && fb[k] == b'$' {
-                explicit_arg = _format[i..k].parse::<usize>().ok();
+                explicit_arg = format[i..k].parse::<usize>().ok();
                 i = k + 1;
             }
         }
@@ -661,7 +661,7 @@ pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
                 i += 1;
             }
             if i > start {
-                width = _format[start..i].parse().unwrap_or(0);
+                width = format[start..i].parse().unwrap_or(0);
             }
         }
 
@@ -673,7 +673,7 @@ pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
             while i < fb.len() && fb[i].is_ascii_digit() {
                 i += 1;
             }
-            precision = Some(_format[start..i].parse().unwrap_or(0));
+            precision = Some(format[start..i].parse().unwrap_or(0));
         }
 
         if i >= fb.len() {
@@ -683,9 +683,9 @@ pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
         i += 1;
 
         let arg = match explicit_arg {
-            Some(n) => _args.get(n.wrapping_sub(1)),
+            Some(n) => args.get(n.wrapping_sub(1)),
             None => {
-                let a = _args.get(next_arg);
+                let a = args.get(next_arg);
                 next_arg += 1;
                 a
             }
@@ -841,8 +841,8 @@ fn php_to_float(v: &PhpMixed) -> f64 {
     }
 }
 
-pub fn bin2hex(_data: &[u8]) -> String {
-    _data.iter().map(|b| format!("{:02x}", b)).collect()
+pub fn bin2hex(data: &[u8]) -> String {
+    data.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 pub fn ucfirst(s: &str) -> String {
@@ -989,11 +989,11 @@ pub fn php_strip_whitespace(path: impl AsRef<std::path::Path>) -> Result<String,
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-pub fn hexdec(_s: &str) -> i64 {
+pub fn hexdec(s: &str) -> i64 {
     // PHP hexdec() ignores characters outside [0-9A-Fa-f].
     // TODO(phase-c): PHP promotes the result to float on overflow; this i64 return wraps instead.
     let mut acc: u64 = 0;
-    for &b in _s.as_bytes() {
+    for &b in s.as_bytes() {
         let d = match b {
             b'0'..=b'9' => b - b'0',
             b'a'..=b'f' => b - b'a' + 10,
@@ -1009,17 +1009,17 @@ pub fn byte_at(s: &str, i: usize) -> u8 {
     s.as_bytes().get(i).copied().unwrap_or(0)
 }
 
-pub fn wordwrap(_s: &str, _width: i64, _break_str: &str, _cut: bool) -> String {
+pub fn wordwrap(s: &str, width: i64, break_str: &str, cut: bool) -> String {
     // PHP throws a ValueError for either argument combination before reaching the wrapping loop.
     assert!(
-        !_break_str.is_empty(),
+        !break_str.is_empty(),
         "wordwrap(): Argument #3 ($break) must not be empty"
     );
     assert!(
-        !(_width == 0 && _cut),
+        !(width == 0 && cut),
         "wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0"
     );
-    php_wordwrap(_s, _width, _break_str, _cut)
+    php_wordwrap(s, width, break_str, cut)
 }
 
 pub fn levenshtein(string1: &str, string2: &str) -> i64 {
@@ -1041,14 +1041,14 @@ pub fn levenshtein(string1: &str, string2: &str) -> i64 {
 }
 
 pub fn number_format(
-    _number: f64,
-    _decimals: i64,
-    _decimal_separator: &str,
-    _thousands_separator: &str,
+    number: f64,
+    decimals: i64,
+    decimal_separator: &str,
+    thousands_separator: &str,
 ) -> String {
-    let decimals = _decimals.max(0) as usize;
-    let negative = _number < 0.0;
-    let magnitude = _number.abs();
+    let decimals = decimals.max(0) as usize;
+    let negative = number < 0.0;
+    let magnitude = number.abs();
     // PHP rounds half away from zero; Rust's f64::round() does the same, so round the scaled value
     // to a whole number before formatting to avoid the round-half-to-even of `{:.*}`.
     let factor = 10f64.powi(decimals as i32);
@@ -1066,12 +1066,12 @@ pub fn number_format(
     let len = int_bytes.len();
     for (idx, &b) in int_bytes.iter().enumerate() {
         if idx > 0 && (len - idx) % 3 == 0 {
-            result.push_str(_thousands_separator);
+            result.push_str(thousands_separator);
         }
         result.push(b as char);
     }
     if decimals > 0 {
-        result.push_str(_decimal_separator);
+        result.push_str(decimal_separator);
         result.push_str(frac_part);
     }
     // PHP drops the sign when the rounded value is zero.
@@ -1081,19 +1081,14 @@ pub fn number_format(
     result
 }
 
-pub fn uniqid(_prefix: &str, _more_entropy: bool) -> String {
+pub fn uniqid(prefix: &str, more_entropy: bool) -> String {
     // PHP builds the id from the current time: 8 hex digits of seconds followed by 5 hex digits of
     // microseconds. With $more_entropy a '.' and a random fraction (PHP's "%08.8F") are appended.
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
-    let base = format!(
-        "{}{:08x}{:05x}",
-        _prefix,
-        now.as_secs(),
-        now.subsec_micros()
-    );
-    if _more_entropy {
+    let base = format!("{}{:08x}{:05x}", prefix, now.as_secs(), now.subsec_micros());
+    if more_entropy {
         // TODO(phase-c): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
         // not reproducible against PHP (it is non-deterministic in PHP too).
         format!("{}.{:.8}", base, fastrand::f64() * 10.0)

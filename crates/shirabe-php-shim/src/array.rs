@@ -2,21 +2,21 @@ use crate::PhpMixed;
 use crate::php_to_string;
 use indexmap::IndexMap;
 
-pub fn array_values<V: Clone>(_array: &IndexMap<String, V>) -> Vec<V> {
-    _array.values().cloned().collect()
+pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
+    array.values().cloned().collect()
 }
 
-pub fn array_keys<V>(_array: &IndexMap<String, V>) -> Vec<String> {
-    _array.keys().cloned().collect()
+pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
+    array.keys().cloned().collect()
 }
 
-pub fn array_push(_array: &mut Vec<String>, _value: String) -> i64 {
-    _array.push(_value);
-    _array.len() as i64
+pub fn array_push(array: &mut Vec<String>, value: String) -> i64 {
+    array.push(value);
+    array.len() as i64
 }
 
-pub fn array_search_in_vec(_needle: &str, _haystack: &[String]) -> Option<usize> {
-    _haystack.iter().position(|s| s.as_str() == _needle)
+pub fn array_search_in_vec(needle: &str, haystack: &[String]) -> Option<usize> {
+    haystack.iter().position(|s| s.as_str() == needle)
 }
 
 pub fn array_map_str_fn<F: Fn(&str) -> String>(_callback: F, _array: &[String]) -> Vec<String> {
@@ -136,10 +136,10 @@ pub fn array_merge_map<V>(
     result
 }
 
-pub fn array_diff(_array1: &[String], _array2: &[String]) -> Vec<String> {
-    _array1
+pub fn array_diff(array1: &[String], array2: &[String]) -> Vec<String> {
+    array1
         .iter()
-        .filter(|&x| !_array2.contains(x))
+        .filter(|&x| !array2.contains(x))
         .cloned()
         .collect()
 }
@@ -158,12 +158,12 @@ pub fn array_unique<T: Clone + PartialEq>(array: &[T]) -> Vec<T> {
 }
 
 pub fn array_intersect_key(
-    _array1: &IndexMap<String, PhpMixed>,
-    _array2: &IndexMap<String, PhpMixed>,
+    array1: &IndexMap<String, PhpMixed>,
+    array2: &IndexMap<String, PhpMixed>,
 ) -> IndexMap<String, PhpMixed> {
-    _array1
+    array1
         .iter()
-        .filter(|(k, _)| _array2.contains_key(k.as_str()))
+        .filter(|(k, _)| array2.contains_key(k.as_str()))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect()
 }
@@ -260,72 +260,72 @@ pub fn array_search(needle: &str, haystack: &IndexMap<String, String>) -> Option
         .map(|(key, _)| key.clone())
 }
 
-pub fn array_shift<T>(_array: &mut Vec<T>) -> Option<T> {
-    if _array.is_empty() {
+pub fn array_shift<T>(array: &mut Vec<T>) -> Option<T> {
+    if array.is_empty() {
         None
     } else {
-        Some(_array.remove(0))
+        Some(array.remove(0))
     }
 }
 
-pub fn array_pop<T>(_array: &mut Vec<T>) -> Option<T> {
-    _array.pop()
+pub fn array_pop<T>(array: &mut Vec<T>) -> Option<T> {
+    array.pop()
 }
 
-pub fn array_unshift<T>(_array: &mut Vec<T>, _value: T) {
-    _array.insert(0, _value);
+pub fn array_unshift<T>(array: &mut Vec<T>, value: T) {
+    array.insert(0, value);
 }
 
-pub fn array_reverse<T: Clone>(_array: &[T], _preserve_keys: bool) -> Vec<T> {
-    _array.iter().rev().cloned().collect()
+pub fn array_reverse<T: Clone>(array: &[T], _preserve_keys: bool) -> Vec<T> {
+    array.iter().rev().cloned().collect()
 }
 
-pub fn array_filter<T: Clone, F>(_array: &[T], _callback: F) -> Vec<T>
+pub fn array_filter<T: Clone, F>(array: &[T], callback: F) -> Vec<T>
 where
     F: Fn(&T) -> bool,
 {
-    _array.iter().filter(|&x| _callback(x)).cloned().collect()
+    array.iter().filter(|&x| callback(x)).cloned().collect()
 }
 
 pub fn array_filter_map<F>(
-    _array: &IndexMap<String, PhpMixed>,
-    _callback: F,
+    array: &IndexMap<String, PhpMixed>,
+    callback: F,
 ) -> IndexMap<String, PhpMixed>
 where
     F: Fn(&PhpMixed) -> bool,
 {
-    _array
+    array
         .iter()
-        .filter(|&(_, v)| _callback(v))
+        .filter(|&(_, v)| callback(v))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect()
 }
 
-pub fn array_all<T, F>(_array: &[T], _callback: F) -> bool
+pub fn array_all<T, F>(array: &[T], callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
-    _array.iter().all(_callback)
+    array.iter().all(callback)
 }
 
-pub fn array_any<T, F>(_array: &[T], _callback: F) -> bool
+pub fn array_any<T, F>(array: &[T], callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
-    _array.iter().any(_callback)
+    array.iter().any(callback)
 }
 
-pub fn array_reduce<T, U, F>(_array: &[T], _callback: F, _initial: U) -> U
+pub fn array_reduce<T, U, F>(array: &[T], callback: F, initial: U) -> U
 where
     F: Fn(U, &T) -> U,
 {
-    _array.iter().fold(_initial, _callback)
+    array.iter().fold(initial, callback)
 }
 
-pub fn array_intersect<T: Clone + PartialEq>(_array1: &[T], _array2: &[T]) -> Vec<T> {
-    _array1
+pub fn array_intersect<T: Clone + PartialEq>(array1: &[T], array2: &[T]) -> Vec<T> {
+    array1
         .iter()
-        .filter(|&x| _array2.contains(x))
+        .filter(|&x| array2.contains(x))
         .cloned()
         .collect()
 }
@@ -365,16 +365,16 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
     PhpMixed::Array(result)
 }
 
-pub fn array_flip_strings(_array: &[String]) -> IndexMap<String, PhpMixed> {
-    _array
+pub fn array_flip_strings(array: &[String]) -> IndexMap<String, PhpMixed> {
+    array
         .iter()
         .enumerate()
         .map(|(i, s)| (s.clone(), PhpMixed::Int(i as i64)))
         .collect()
 }
 
-pub fn array_key_exists<V>(_key: &str, _array: &IndexMap<String, V>) -> bool {
-    _array.contains_key(_key)
+pub fn array_key_exists<V>(key: &str, array: &IndexMap<String, V>) -> bool {
+    array.contains_key(key)
 }
 
 pub fn array_is_list(array: &PhpMixed) -> bool {
@@ -518,24 +518,24 @@ pub fn array_slice<V: Clone>(
         .collect()
 }
 
-pub fn array_map<T, U, F>(_callback: F, _array: &[T]) -> Vec<U>
+pub fn array_map<T, U, F>(callback: F, array: &[T]) -> Vec<U>
 where
     F: Fn(&T) -> U,
 {
-    _array.iter().map(_callback).collect()
+    array.iter().map(callback).collect()
 }
 
-pub fn array_chunk<T: Clone>(_array: &[T], _size: i64, _preserve_keys: bool) -> Vec<Vec<T>> {
-    _array.chunks(_size as usize).map(|c| c.to_vec()).collect()
+pub fn array_chunk<T: Clone>(array: &[T], size: i64, _preserve_keys: bool) -> Vec<Vec<T>> {
+    array.chunks(size as usize).map(|c| c.to_vec()).collect()
 }
 
 pub fn array_diff_key(
-    _array1: IndexMap<String, PhpMixed>,
-    _array2: &IndexMap<String, PhpMixed>,
+    array1: IndexMap<String, PhpMixed>,
+    array2: &IndexMap<String, PhpMixed>,
 ) -> IndexMap<String, PhpMixed> {
-    _array1
+    array1
         .into_iter()
-        .filter(|(k, _)| !_array2.contains_key(k.as_str()))
+        .filter(|(k, _)| !array2.contains_key(k.as_str()))
         .collect()
 }
 
@@ -663,8 +663,8 @@ where
     array.sort_by(|_, v1, _, v2| compare(v1, v2).cmp(&0));
 }
 
-pub fn sort<T: Ord>(_array: &mut Vec<T>) {
-    _array.sort();
+pub fn sort<T: Ord>(array: &mut [T]) {
+    array.sort();
 }
 
 pub const SORT_REGULAR: i64 = 0;
@@ -673,12 +673,12 @@ pub const SORT_STRING: i64 = 2;
 pub const SORT_NATURAL: i64 = 6;
 pub const SORT_FLAG_CASE: i64 = 8;
 
-pub fn usort<T, F>(_array: &mut Vec<T>, _compare: F)
+pub fn usort<T, F>(array: &mut [T], compare: F)
 where
     F: FnMut(&T, &T) -> i64,
 {
-    let mut compare = _compare;
-    _array.sort_by(|a, b| compare(a, b).cmp(&0));
+    let mut compare = compare;
+    array.sort_by(|a, b| compare(a, b).cmp(&0));
 }
 
 pub fn ksort<V>(array: &mut IndexMap<String, V>) {
