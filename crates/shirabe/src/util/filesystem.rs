@@ -8,9 +8,9 @@ use shirabe_external_packages::symfony::filesystem::exception::IOException;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     ErrorException, LogicException, PhpMixed, RuntimeException, array_pop, basename, chdir,
-    clearstatcache, clearstatcache2, copy, dirname, error_get_last, explode, fclose, feof,
-    file_exists, file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen,
-    fread, function_exists, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
+    clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof, file_exists,
+    file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread,
+    function_exists, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
     php_regex, rename, rmdir, rtrim, str_contains, str_repeat, str_replace, str_starts_with,
     strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep,
     var_export,
@@ -315,28 +315,20 @@ impl Filesystem {
                 .into());
             }
 
-            if is_link(directory) && !self.unlink_implementation(Path::new(directory)) {
+            if is_link(directory)
+                && let Err(last_error) = self.unlink_implementation(Path::new(directory))
+            {
                 return Err(RuntimeException::new(format!(
                     "Could not delete symbolic link {}: {}",
-                    directory,
-                    error_get_last()
-                        .as_ref()
-                        .and_then(|m| m.get("message"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                    directory, last_error
                 ))
                 .into());
             }
 
-            if mkdir(directory, 0o777, true).is_err() {
+            if let Err(last_error) = mkdir(directory, 0o777, true) {
                 let e = RuntimeException::new(format!(
                     "{} does not exist and could not be created: {}",
-                    directory,
-                    error_get_last()
-                        .as_ref()
-                        .and_then(|m| m.get("message"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                    directory, last_error
                 ));
 
                 // in pathological cases with paths like path/to/broken-symlink/../foo is_dir will fail to detect path/to/foo
@@ -361,24 +353,15 @@ impl Filesystem {
     pub fn unlink(&self, path: impl AsRef<Path>) -> anyhow::Result<bool> {
         let path = path.as_ref();
         let mut unlinked = self.unlink_implementation(path);
-        if !unlinked {
+        if unlinked.is_err() {
             // retry after a bit on windows since it tends to be touchy with mass removals
             if Platform::is_windows() {
                 usleep(350000);
                 unlinked = self.unlink_implementation(path);
             }
 
-            if !unlinked {
-                let error = error_get_last();
-                let mut message = format!(
-                    "Could not delete {}: {}",
-                    path.display(),
-                    error
-                        .as_ref()
-                        .and_then(|m| m.get("message"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                );
+            if let Err(last_error) = unlinked {
+                let mut message = format!("Could not delete {}: {}", path.display(), last_error);
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
@@ -393,25 +376,16 @@ impl Filesystem {
     /// Attempts to rmdir a file and in case of failure retries after 350ms on windows
     pub fn rmdir(&self, path: impl AsRef<Path>) -> anyhow::Result<bool> {
         let path = path.as_ref();
-        let mut deleted = rmdir(path).is_ok();
-        if !deleted {
+        let mut deleted = rmdir(path);
+        if deleted.is_err() {
             // retry after a bit on windows since it tends to be touchy with mass removals
             if Platform::is_windows() {
                 usleep(350000);
-                deleted = rmdir(path).is_ok();
+                deleted = rmdir(path);
             }
 
-            if !deleted {
-                let error = error_get_last();
-                let mut message = format!(
-                    "Could not delete {}: {}",
-                    path.display(),
-                    error
-                        .as_ref()
-                        .and_then(|m| m.get("message"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                );
+            if let Err(last_error) = deleted {
+                let mut message = format!("Could not delete {}: {}", path.display(), last_error);
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
@@ -920,12 +894,12 @@ impl Filesystem {
     /// delete symbolic link implementation (commonly known as "unlink()")
     ///
     /// symbolic links on windows which link to directories need rmdir instead of unlink
-    fn unlink_implementation(&self, path: &Path) -> bool {
+    fn unlink_implementation(&self, path: &Path) -> Result<(), std::io::Error> {
         if Platform::is_windows() && is_dir(path) && is_link(path) {
-            return rmdir(path).is_ok();
+            return rmdir(path);
         }
 
-        unlink(path).is_ok()
+        unlink(path)
     }
 
     /// Creates a relative symlink from $link to $target

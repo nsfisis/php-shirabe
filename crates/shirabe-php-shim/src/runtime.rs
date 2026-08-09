@@ -360,11 +360,6 @@ pub fn call_php_callable(_callback: &PhpMixed, _args: &[PhpMixed]) -> PhpMixed {
     todo!()
 }
 
-// The shim does not raise PHP-level errors, so there is never a last error.
-pub fn error_get_last() -> Option<IndexMap<String, PhpMixed>> {
-    None
-}
-
 pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
     // TODO(php-runtime): ini_set must return the previous value and have its override observed by a
     // subsequent ini_get; ini_get is currently a static lookup, so overrides cannot be wired up yet.

@@ -4,9 +4,9 @@ use crate::php_file_cleaner::PhpFileCleaner;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    CmpOp, HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, error_get_last, file_exists,
-    file_get_contents, function_exists, is_file, is_readable, ltrim, php_strip_whitespace,
-    str_replace_array, strrpos, substr, trim, version_compare,
+    CmpOp, HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, file_exists, file_get_contents,
+    function_exists, is_file, is_readable, ltrim, php_strip_whitespace, str_replace_array, strrpos,
+    substr, trim, version_compare,
 };
 use std::sync::OnceLock;
 
@@ -21,46 +21,42 @@ impl PhpFileParser {
         }
 
         // Use @ here instead of Silencer to actively suppress 'unhelpful' output
-        let contents = php_strip_whitespace(path);
-        if contents.is_empty() {
-            let message: String;
-            if !file_exists(path) {
-                message = format!(
-                    "File at \"{}\" does not exist, check your classmap definitions",
-                    path
-                );
-            } else if !Self::is_readable(path) {
-                message = format!(
-                    "File at \"{}\" is not readable, check its permissions",
-                    path
-                );
-            } else if trim(file_get_contents(path).unwrap_or_default().as_str(), None).is_empty() {
-                // The input file was really empty and thus contains no classes
-                return Ok(vec![]);
-            } else {
-                message = format!(
-                    "File at \"{}\" could not be parsed as PHP, it may be binary or corrupted",
-                    path
-                );
-            }
+        let contents = match php_strip_whitespace(path) {
+            Ok(contents) if !contents.is_empty() => contents,
+            stripped => {
+                let mut message: String;
+                if !file_exists(path) {
+                    message = format!(
+                        "File at \"{}\" does not exist, check your classmap definitions",
+                        path
+                    );
+                } else if !Self::is_readable(path) {
+                    message = format!(
+                        "File at \"{}\" is not readable, check its permissions",
+                        path
+                    );
+                } else if trim(file_get_contents(path).unwrap_or_default().as_str(), None)
+                    .is_empty()
+                {
+                    // The input file was really empty and thus contains no classes
+                    return Ok(vec![]);
+                } else {
+                    message = format!(
+                        "File at \"{}\" could not be parsed as PHP, it may be binary or corrupted",
+                        path
+                    );
+                }
 
-            let error = error_get_last();
-            let mut message = message;
-            if let Some(error) = error
-                && let Some(err_msg) = error.get("message")
-            {
-                message = format!(
-                    "{}{}{}{}{}",
-                    message,
-                    PHP_EOL,
-                    "The following message may be helpful:",
-                    PHP_EOL,
-                    err_msg.as_string().unwrap_or("")
-                );
-            }
+                if let Err(error) = stripped {
+                    message = format!(
+                        "{}{}{}{}{}",
+                        message, PHP_EOL, "The following message may be helpful:", PHP_EOL, error
+                    );
+                }
 
-            return Err(RuntimeException::new(message).into());
-        }
+                return Err(RuntimeException::new(message).into());
+            }
+        };
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);

@@ -846,17 +846,15 @@ pub fn ucfirst(s: &str) -> String {
     }
 }
 
-pub fn php_strip_whitespace(path: impl AsRef<std::path::Path>) -> String {
+pub fn php_strip_whitespace(path: impl AsRef<std::path::Path>) -> Result<String, std::io::Error> {
     // PHP `php_strip_whitespace()` tokenizes the source and re-emits it with comments removed and
     // each run of whitespace collapsed to a single space. There is no PHP tokenizer in the shim, so
     // this is a hand-written lexer that reproduces the observable effect for the cases the class-map
     // generator depends on: it preserves single-quoted, double-quoted, backtick and heredoc/nowdoc
     // string contents verbatim while dropping `//`, `#` and `/* */` comments and squeezing
-    // whitespace. On any read failure it returns an empty string, mirroring `@php_strip_whitespace`.
-    let contents = match std::fs::read(path.as_ref()) {
-        Ok(bytes) => bytes,
-        Err(_) => return String::new(),
-    };
+    // whitespace. PHP returns an empty string on a read failure and leaves the reason in the warning
+    // text; this returns the io::Error instead so callers can report it.
+    let contents = std::fs::read(path.as_ref())?;
 
     let b = contents;
     let n = b.len();
@@ -981,7 +979,7 @@ pub fn php_strip_whitespace(path: impl AsRef<std::path::Path>) -> String {
         i += 1;
     }
 
-    String::from_utf8_lossy(&out).into_owned()
+    Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
 pub fn hexdec(_s: &str) -> i64 {
