@@ -2,6 +2,10 @@
 name = "shirabe-seld-json-lint"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+description = "A Rust port of seld/jsonlint"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 shirabe-php-shim.workspace = true

@@ -2,6 +2,10 @@
 name = "shirabe"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+description = "A Rust port of Composer, the dependency manager for PHP"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 shirabe-ca-bundle.workspace = true

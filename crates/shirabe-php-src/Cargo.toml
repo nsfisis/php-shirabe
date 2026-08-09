@@ -2,6 +2,9 @@
 name = "shirabe-php-src"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+description = "A Rust port from the original C implementation in php-src"
+repository.workspace = true
 license = "BSD-3-Clause AND Zlib"
 # The module tree mirrors php-src's own tree, so `src/main.rs` is the `main/` directory of
 # php-src, not a binary entry point.

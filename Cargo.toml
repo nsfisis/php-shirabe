@@ -5,6 +5,9 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.0.1"
 edition = "2024"
+rust-version = "1.94"
+repository = "https://github.com/nsfisis/php-shirabe"
+license = "MIT"
 
 [workspace.dependencies]
 shirabe = { path = "crates/shirabe" }

@@ -2,6 +2,10 @@
 name = "shirabe-xdebug-handler"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+description = "A Rust port of composer/xdebug-handler"
+repository.workspace = true
+license.workspace = true
 
 [lints]
 workspace = true

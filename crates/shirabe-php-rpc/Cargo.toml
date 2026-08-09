@@ -2,6 +2,10 @@
 name = "shirabe-php-rpc"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+description = "Rust-to-PHP RPC over a Unix domain socket"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 shirabe-php-shim.workspace = true

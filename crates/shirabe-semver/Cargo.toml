@@ -2,6 +2,10 @@
 name = "shirabe-semver"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+description = "A Rust port of composer/semver"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 shirabe-php-shim.workspace = true
