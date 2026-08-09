@@ -691,21 +691,16 @@ return array(
             ),
         )?;
 
-        // PHP: __DIR__ refers to the directory of AutoloadGenerator.php, an absolute path
-        // independent of the cwd. The ClassLoader.php and LICENSE templates are bundled from the
-        // upstream composer source tree, resolved at build time relative to this crate's manifest
-        // (mirroring the InstalledVersions.php include in FilesystemRepository).
-        let autoload_dir = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../composer/src/Composer/Autoload"
-        );
-        filesystem.safe_copy(
-            &format!("{}/ClassLoader.php", autoload_dir),
+        // PHP copies these out of the Composer source tree at __DIR__. The binary has no such
+        // tree at run time, so they are embedded at build time, as InstalledVersions.php is in
+        // FilesystemRepository.
+        filesystem.file_put_contents_if_modified(
             &format!("{}/ClassLoader.php", target_dir),
+            include_str!("../../../../composer/src/Composer/Autoload/ClassLoader.php"),
         )?;
-        filesystem.safe_copy(
-            &format!("{}/../../../LICENSE", autoload_dir),
+        filesystem.file_put_contents_if_modified(
             &format!("{}/LICENSE", target_dir),
+            include_str!("../../../../composer/LICENSE"),
         )?;
 
         if self.run_scripts.get() {
