@@ -43,6 +43,35 @@ pub struct FilesystemIterator;
 impl FilesystemIterator {
     pub const KEY_AS_PATHNAME: i64 = 256;
     pub const CURRENT_AS_FILEINFO: i64 = 0;
+    pub const CURRENT_AS_PATHNAME: i64 = 32;
+    pub const SKIP_DOTS: i64 = 4096;
+}
+
+/// PHP `new \FilesystemIterator($path, $flags)` flattened to the entries it yields: the direct
+/// children of `path`, in readdir order, without descending into subdirectories.
+pub fn filesystem_iterator(
+    path: impl AsRef<std::path::Path>,
+    flags: i64,
+) -> Result<Vec<String>, UnexpectedValueException> {
+    assert!(
+        flags & FilesystemIterator::CURRENT_AS_PATHNAME != 0,
+        "filesystem_iterator yields pathnames, so CURRENT_AS_PATHNAME must be set"
+    );
+    assert!(
+        flags & FilesystemIterator::SKIP_DOTS != 0,
+        "filesystem_iterator does not model the \".\" and \"..\" entries, so SKIP_DOTS must be set"
+    );
+    let base = path.as_ref();
+    let rd = std::fs::read_dir(base).map_err(|_| {
+        UnexpectedValueException::new(format!(
+            "FilesystemIterator::__construct({}): Failed to open directory",
+            base.display()
+        ))
+    })?;
+    Ok(rd
+        .flatten()
+        .map(|entry| entry.path().to_string_lossy().into_owned())
+        .collect())
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +188,11 @@ impl RecursiveIteratorFileInfo {
 
     pub fn get_pathname(&self) -> String {
         self.path.to_string_lossy().into_owned()
+    }
+
+    // SplFileInfo::getLinkTarget(): readlink() on the entry. None is PHP's false-on-failure.
+    pub fn get_link_target(&self) -> Option<String> {
+        readlink(&self.path)
     }
 
     pub fn get_size(&self) -> i64 {
@@ -816,6 +850,15 @@ pub fn is_link(path: impl AsRef<std::path::Path>) -> bool {
 
 pub fn is_dir(path: impl AsRef<std::path::Path>) -> bool {
     path.as_ref().is_dir()
+}
+
+/// PHP `readlink()`: the target the link points at, without resolving it further.
+/// `None` is PHP's `false`-on-failure.
+/// TODO(phase-e): byte-string semantics -- PHP returns the raw bytes of the link target.
+pub fn readlink(path: impl AsRef<std::path::Path>) -> Option<String> {
+    std::fs::read_link(path)
+        .ok()
+        .map(|target| target.to_string_lossy().into_owned())
 }
 
 pub fn fileatime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {

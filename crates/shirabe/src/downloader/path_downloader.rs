@@ -348,61 +348,57 @@ impl DownloaderInterface for PathDownloader {
 
         let mut is_fallback = false;
         if Self::STRATEGY_SYMLINK == current_strategy {
-            let symlink_result: anyhow::Result<anyhow::Result<()>> =
-                (|| {
-                    if Platform::is_windows() {
-                        // Implement symlinks as NTFS junctions on Windows
-                        if output {
-                            self.inner.io.borrow().write_error3(
-                                &format!("Junctioning from {}", url),
-                                false,
-                                io_interface::NORMAL,
-                            );
-                        }
-                        Ok(self
-                            .inner
-                            .filesystem
-                            .borrow_mut()
-                            .junction(&real_url, &path))
-                    } else {
-                        let path = path.trim_end_matches('/').to_string();
-                        if output {
-                            self.inner.io.borrow().write_error3(
-                                &format!("Symlinking from {}", url),
-                                false,
-                                io_interface::NORMAL,
-                            );
-                        }
-                        if transport_options
-                            .get("relative")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false)
-                        {
-                            let absolute_path =
-                                if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
-                                    std::path::Path::new(&Platform::get_cwd(false)?)
-                                        .join(&path)
-                                        .into_os_string()
-                                        .into_string()
-                                        .unwrap()
-                                } else {
-                                    path.clone()
-                                };
-                            let shortest_path = self
-                                .inner
-                                .filesystem
-                                .borrow_mut()
-                                .find_shortest_path(&absolute_path, &real_url, false, true);
-                            Ok(symfony_filesystem.symlink(
-                                &format!("{}/", shortest_path),
-                                &path,
-                                false,
-                            ))
-                        } else {
-                            Ok(symfony_filesystem.symlink(&format!("{}/", real_url), &path, false))
-                        }
+            let symlink_result: anyhow::Result<anyhow::Result<()>> = (|| {
+                if Platform::is_windows() {
+                    // Implement symlinks as NTFS junctions on Windows
+                    if output {
+                        self.inner.io.borrow().write_error3(
+                            &format!("Junctioning from {}", url),
+                            false,
+                            io_interface::NORMAL,
+                        );
                     }
-                })();
+                    Ok(self
+                        .inner
+                        .filesystem
+                        .borrow_mut()
+                        .junction(&real_url, &path))
+                } else {
+                    let path = path.trim_end_matches('/').to_string();
+                    if output {
+                        self.inner.io.borrow().write_error3(
+                            &format!("Symlinking from {}", url),
+                            false,
+                            io_interface::NORMAL,
+                        );
+                    }
+                    if transport_options
+                        .get("relative")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false)
+                    {
+                        let absolute_path =
+                            if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
+                                std::path::Path::new(&Platform::get_cwd(false)?)
+                                    .join(&path)
+                                    .into_os_string()
+                                    .into_string()
+                                    .unwrap()
+                            } else {
+                                path.clone()
+                            };
+                        let shortest_path = self.inner.filesystem.borrow_mut().find_shortest_path(
+                            &absolute_path,
+                            &real_url,
+                            false,
+                            true,
+                        );
+                        Ok(symfony_filesystem.symlink(&format!("{}/", shortest_path), &path))
+                    } else {
+                        Ok(symfony_filesystem.symlink(&format!("{}/", real_url), &path))
+                    }
+                }
+            })();
 
             match symlink_result? {
                 Ok(()) => {}
@@ -453,7 +449,7 @@ impl DownloaderInterface for PathDownloader {
             // argument, but the external-package Filesystem stub does not model the iterator type
             // that ArchivableFilesFinder (an IteratorAggregate) would be wrapped into, so None is
             // passed and the mirrored file list is not restricted.
-            symfony_filesystem.mirror(&real_url, &path, None, &IndexMap::new())?;
+            symfony_filesystem.mirror(&real_url, &path)?;
         }
 
         if output {

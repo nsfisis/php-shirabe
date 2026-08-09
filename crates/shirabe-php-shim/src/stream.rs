@@ -85,6 +85,18 @@ pub fn stream_isatty(stream: PhpResource) -> bool {
     stream_isatty_resource(&stream)
 }
 
+/// PHP `stream_is_local()`: true for plain paths and the `file://` wrapper, false for remote
+/// wrappers (`http://`, `ftp://`, ...).
+/// TODO(phase-c): PHP asks the wrapper registered for the path's scheme whether it is flagged
+/// `STREAM_IS_URL`; this classifies by the scheme itself, so a registered custom wrapper claiming to
+/// be local (or vice versa) comes out differently than in PHP.
+pub fn stream_is_local(path: &str) -> bool {
+    match crate::parse_url(path, crate::PHP_URL_SCHEME) {
+        PhpMixed::String(scheme) => scheme.eq_ignore_ascii_case("file"),
+        _ => true,
+    }
+}
+
 pub fn stream_get_wrappers() -> Vec<String> {
     // The full registered set depends on compiled-in extensions and runtime
     // `stream_wrapper_register` calls, which are not modeled. We return the wrappers always

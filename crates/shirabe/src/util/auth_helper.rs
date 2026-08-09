@@ -593,7 +593,7 @@ impl AuthHelper {
                 );
                 authentication_display_message = Some("Using SSL client certificate".to_string());
             } else {
-                let auth_str = base64_encode(&format!("{}:{}", username, password));
+                let auth_str = base64_encode(format!("{}:{}", username, password));
                 headers.push(PhpMixed::String(format!(
                     "Authorization: Basic {}",
                     auth_str,

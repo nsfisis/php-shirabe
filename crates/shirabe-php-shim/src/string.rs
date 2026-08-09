@@ -179,6 +179,13 @@ pub fn strrpos(_haystack: &str, _needle: &str) -> Option<usize> {
     _haystack.rfind(_needle)
 }
 
+// Byte-based, matching PHP: strrev() reverses the bytes, not the characters.
+pub fn strrev(s: &str) -> String {
+    let mut bytes = s.as_bytes().to_vec();
+    bytes.reverse();
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
 pub fn strtolower(_s: &str) -> String {
     _s.to_ascii_lowercase()
 }
@@ -485,9 +492,9 @@ pub fn urlencode(s: &str) -> String {
     out
 }
 
-pub fn base64_encode(_data: &str) -> String {
+pub fn base64_encode(_data: impl AsRef<[u8]>) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let bytes = _data.as_bytes();
+    let bytes = _data.as_ref();
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let b1 = chunk.get(1).copied();

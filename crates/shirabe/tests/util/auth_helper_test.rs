@@ -340,7 +340,7 @@ fn add_authentication_header_with_basic_http_authentication(
 
     let expected = format!(
         "Authorization: Basic {}",
-        base64_encode(&format!("{}:{}", username, password))
+        base64_encode(format!("{}:{}", username, password))
     );
 
     let options = f

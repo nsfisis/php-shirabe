@@ -1,12 +1,7 @@
 //! ref: composer/vendor/symfony/filesystem/Filesystem.php
 
-// TODO(phase-c): PHP's box()/self::$lastError mechanism captures the warning text emitted by the
-// failed native call. The low-level error appended to the IOException messages below is instead the
-// Rust io::Error text, which words the same errno differently (e.g. "Permission denied (os error
-// 13)").
-
 use crate::exception::io_exception::IOException;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::Catch as _;
 
 #[derive(Debug, Clone)]
 pub struct Filesystem;
@@ -22,31 +17,9 @@ impl Filesystem {
         Filesystem
     }
 
-    // Symfony's toIterable(): a single string yields one element, an array/iterable yields each
-    // element as a string.
-    fn to_iterable(files: &PhpMixed) -> Vec<String> {
-        match files {
-            PhpMixed::String(s) => vec![s.clone()],
-            PhpMixed::List(items) => items
-                .iter()
-                .map(|item| item.as_string().unwrap_or("").to_string())
-                .collect(),
-            PhpMixed::Array(entries) => entries
-                .values()
-                .map(|item| item.as_string().unwrap_or("").to_string())
-                .collect(),
-            _ => vec![files.as_string().unwrap_or("").to_string()],
-        }
-    }
-
-    fn copy(
-        &self,
-        origin_file: &str,
-        target_file: &str,
-        override_file: bool,
-    ) -> anyhow::Result<()> {
+    fn copy(&self, origin_file: &str, target_file: &str) -> anyhow::Result<()> {
         // PHP: stream_is_local($originFile) || 0 === stripos($originFile, 'file://')
-        let origin_is_local = Self::stream_is_local(origin_file)
+        let origin_is_local = shirabe_php_shim::stream_is_local(origin_file)
             || shirabe_php_shim::stripos(origin_file, "file://") == Some(0);
 
         if origin_is_local && !shirabe_php_shim::is_file(origin_file) {
@@ -62,39 +35,41 @@ impl Filesystem {
             .into());
         }
 
-        self.mkdir(
-            PhpMixed::String(shirabe_php_shim::dirname(target_file)),
-            0o777,
-        )?;
+        self.mkdir(&shirabe_php_shim::dirname(target_file), 0o777)?;
 
         let mut do_copy = true;
         // PHP: !$overwriteNewerFiles && !parse_url($originFile, PHP_URL_HOST) && is_file($targetFile)
         let origin_host = shirabe_php_shim::parse_url(origin_file, shirabe_php_shim::PHP_URL_HOST);
-        if !override_file
-            && matches!(origin_host, PhpMixed::Null | PhpMixed::Bool(false))
-            && shirabe_php_shim::is_file(target_file)
+        if matches!(
+            origin_host,
+            shirabe_php_shim::PhpMixed::Null | shirabe_php_shim::PhpMixed::Bool(false)
+        ) && shirabe_php_shim::is_file(target_file)
         {
             do_copy = shirabe_php_shim::filemtime(origin_file).unwrap_or(0)
                 > shirabe_php_shim::filemtime(target_file).unwrap_or(0);
         }
 
         if do_copy {
-            let bytes_copied = match shirabe_php_shim::copy(origin_file, target_file) {
-                true => shirabe_php_shim::filesize(target_file).unwrap_or(0),
-                false => {
-                    // TODO(phase-c): PHP distinguishes fopen($originFile) failure ("source file
-                    // could not be opened for reading") from fopen($targetFile) failure ("target
-                    // file could not be opened for writing"); the shim's copy() collapses both
-                    // (and the actual copy failure) into this single generic message.
-                    return Err(IOException::new(
-                        format!("Failed to copy \"{}\" to \"{}\".", origin_file, target_file),
-                        0,
-                        None,
-                        Some(origin_file.to_string()),
-                    )
-                    .into());
-                }
+            // PHP writes the target through fopen($targetFile, 'w'), which leaves an existing
+            // file's mode alone and gives a new one 0666 & ~umask. copy() stamps the origin's mode
+            // on the target instead, so the mode fopen would have left is captured here and put
+            // back below.
+            let target_perms = if shirabe_php_shim::is_file(target_file) {
+                shirabe_php_shim::fileperms(target_file)
+            } else {
+                0o666 & !(shirabe_php_shim::umask() as i64)
             };
+
+            if !shirabe_php_shim::copy(origin_file, target_file) {
+                return Err(IOException::new(
+                    format!("Failed to copy \"{}\" to \"{}\".", origin_file, target_file),
+                    0,
+                    None,
+                    Some(origin_file.to_string()),
+                )
+                .into());
+            }
+            let bytes_copied = shirabe_php_shim::filesize(target_file);
 
             if !shirabe_php_shim::is_file(target_file) {
                 return Err(IOException::new(
@@ -110,9 +85,7 @@ impl Filesystem {
                 // Like `cp`, preserve executable permission bits.
                 shirabe_php_shim::chmod(
                     target_file,
-                    (shirabe_php_shim::fileperms(target_file)
-                        | (shirabe_php_shim::fileperms(origin_file) & 0o111))
-                        as u32,
+                    (target_perms | (shirabe_php_shim::fileperms(origin_file) & 0o111)) as u32,
                 );
 
                 // Like `cp`, preserve the file modification time.
@@ -121,12 +94,15 @@ impl Filesystem {
                     shirabe_php_shim::filemtime(origin_file).unwrap_or(0),
                 );
 
-                let bytes_origin = shirabe_php_shim::filesize(origin_file).unwrap_or(0);
+                let bytes_origin = shirabe_php_shim::filesize(origin_file);
                 if bytes_copied != bytes_origin {
                     return Err(IOException::new(
                         format!(
                             "Failed to copy the whole content of \"{}\" to \"{}\" ({} of {} bytes copied).",
-                            origin_file, target_file, bytes_copied, bytes_origin
+                            origin_file,
+                            target_file,
+                            bytes_copied.unwrap_or(0),
+                            bytes_origin.unwrap_or(0)
                         ),
                         0,
                         None,
@@ -140,87 +116,59 @@ impl Filesystem {
         Ok(())
     }
 
-    fn mkdir(&self, dirs: PhpMixed, mode: u32) -> anyhow::Result<()> {
-        for dir in Self::to_iterable(&dirs) {
-            if shirabe_php_shim::is_dir(&dir) {
-                continue;
-            }
+    fn mkdir(&self, dir: &str, mode: u32) -> anyhow::Result<()> {
+        if shirabe_php_shim::is_dir(dir) {
+            return Ok(());
+        }
 
-            if let Err(last_error) = shirabe_php_shim::mkdir(&dir, mode, true)
-                && !shirabe_php_shim::is_dir(&dir)
-            {
-                return Err(IOException::new(
-                    format!("Failed to create \"{}\": {}", dir, last_error),
-                    0,
-                    None,
-                    Some(dir),
-                )
-                .into());
-            }
+        if shirabe_php_shim::mkdir(dir, mode, true).is_err() && !shirabe_php_shim::is_dir(dir) {
+            return Err(IOException::new(
+                format!("Failed to create \"{}\".", dir),
+                0,
+                None,
+                Some(dir.to_string()),
+            )
+            .into());
         }
         Ok(())
     }
 
-    fn exists(&self, files: PhpMixed) -> anyhow::Result<bool> {
+    fn exists(&self, file: &str) -> anyhow::Result<bool> {
         let max_path_length = shirabe_php_shim::PHP_MAXPATHLEN - 2;
 
-        for file in Self::to_iterable(&files) {
-            if file.len() as i64 > max_path_length {
-                return Err(IOException::new(
-                    format!(
-                        "Could not check if file exist because path length exceeds {} characters.",
-                        max_path_length
-                    ),
-                    0,
-                    None,
-                    Some(file),
-                )
-                .into());
-            }
-
-            if !shirabe_php_shim::file_exists(&file) {
-                return Ok(false);
-            }
+        if file.len() as i64 > max_path_length {
+            return Err(IOException::new(
+                format!(
+                    "Could not check if file exist because path length exceeds {} characters.",
+                    max_path_length
+                ),
+                0,
+                None,
+                Some(file.to_string()),
+            )
+            .into());
         }
-        Ok(true)
+
+        Ok(shirabe_php_shim::file_exists(file))
     }
 
-    fn remove(&self, files: PhpMixed) -> anyhow::Result<()> {
-        let files = Self::to_iterable(&files);
-        Self::do_remove(files, false)
+    fn remove(&self, file: &str) -> anyhow::Result<()> {
+        Self::do_remove(vec![file.to_string()], false)
     }
 
-    // TODO(phase-c): `is_recursive` is unused. In PHP, doRemove() uses it as a top-level-call guard:
-    // on the first (non-recursive) call for a directory, it renames the directory to a random
-    // hidden name before recursing into it (and renames it back if rmdir subsequently fails), to
-    // avoid a race where another process recreates the path mid-removal. That rename/rollback
-    // trick is entirely unported here; this version always operates on the original path.
     fn do_remove(files: Vec<String>, is_recursive: bool) -> anyhow::Result<()> {
         // PHP reverses the list so that directory contents are removed before the directory itself.
         let mut files = files;
         files.reverse();
-        for file in files {
+        for mut file in files {
             if shirabe_php_shim::is_link(&file) {
                 // See https://bugs.php.net/52176
-                let unlinked = shirabe_php_shim::unlink(&file);
-                let mut last_error = unlinked.as_ref().err().map(ToString::to_string);
-                let mut removed = unlinked.is_ok() || !cfg!(windows);
-                if !removed {
-                    match shirabe_php_shim::rmdir(&file) {
-                        Ok(()) => {
-                            last_error = None;
-                            removed = true;
-                        }
-                        Err(e) => last_error = Some(e.to_string()),
-                    }
-                }
+                let removed = shirabe_php_shim::unlink(&file).is_ok()
+                    || !cfg!(windows)
+                    || shirabe_php_shim::rmdir(&file).is_ok();
                 if !removed && shirabe_php_shim::file_exists(&file) {
                     return Err(IOException::new(
-                        format!(
-                            "Failed to remove symlink \"{}\": {}",
-                            file,
-                            last_error.unwrap_or_default()
-                        ),
+                        format!("Failed to remove symlink \"{}\".", file),
                         0,
                         None,
                         None,
@@ -228,32 +176,52 @@ impl Filesystem {
                     .into());
                 }
             } else if shirabe_php_shim::is_dir(&file) {
-                let entries = match shirabe_php_shim::recursive_directory_iterator(
-                    &file,
-                    shirabe_php_shim::FilesystemIterator::KEY_AS_PATHNAME
-                        | shirabe_php_shim::SKIP_DOTS,
-                ) {
-                    Ok(dir) => shirabe_php_shim::recursive_iterator_iterator(
-                        dir,
-                        shirabe_php_shim::RecursiveIteratorIterator::CHILD_FIRST,
-                    ),
-                    Err(_) => {
-                        return Err(IOException::new(
-                            format!("Failed to remove directory \"{}\": ", file),
-                            0,
-                            None,
-                            None,
-                        )
-                        .into());
+                // Removing the directory under a random hidden name keeps another process from
+                // recreating the path while its contents are being removed. The rename is undone
+                // if the final rmdir fails, so a failure leaves the path where the caller left it.
+                let mut orig_file = None;
+                if !is_recursive {
+                    let tmp_name = format!(
+                        "{}/.!{}",
+                        shirabe_php_shim::dirname(
+                            &shirabe_php_shim::realpath(&file).unwrap_or_default()
+                        ),
+                        shirabe_php_shim::strrev(&shirabe_php_shim::strtr(
+                            &shirabe_php_shim::base64_encode(shirabe_php_shim::random_bytes(2)),
+                            "/=",
+                            "-!",
+                        ))
+                    );
+
+                    if shirabe_php_shim::file_exists(&tmp_name)
+                        && let Err(error) = Self::do_remove(vec![tmp_name.clone()], true)
+                        && error.catch::<IOException>().is_none()
+                    {
+                        return Err(error);
                     }
-                };
-                let child_paths: Vec<String> =
-                    (&entries).into_iter().map(|e| e.get_pathname()).collect();
-                Self::do_remove(child_paths, true)?;
+
+                    if !shirabe_php_shim::file_exists(&tmp_name)
+                        && shirabe_php_shim::rename(&file, &tmp_name)
+                    {
+                        orig_file = Some(file);
+                        file = tmp_name;
+                    }
+                }
+
+                let entries = shirabe_php_shim::filesystem_iterator(
+                    &file,
+                    shirabe_php_shim::FilesystemIterator::CURRENT_AS_PATHNAME
+                        | shirabe_php_shim::FilesystemIterator::SKIP_DOTS,
+                )?;
+                Self::do_remove(entries, true)?;
 
                 if let Err(last_error) = shirabe_php_shim::rmdir(&file)
                     && shirabe_php_shim::file_exists(&file)
+                    && !is_recursive
                 {
+                    if let Some(orig_file) = orig_file {
+                        shirabe_php_shim::rename(&file, &orig_file);
+                    }
                     return Err(IOException::new(
                         format!("Failed to remove directory \"{}\": {}", file, last_error),
                         0,
@@ -279,133 +247,45 @@ impl Filesystem {
         Ok(())
     }
 
-    pub fn symlink(
-        &self,
-        origin_dir: &str,
-        target_dir: &str,
-        copy_on_windows: bool,
-    ) -> anyhow::Result<()> {
+    pub fn symlink(&self, origin_dir: &str, target_dir: &str) -> anyhow::Result<()> {
         let mut origin_dir = origin_dir.to_string();
         let mut target_dir = target_dir.to_string();
 
         if cfg!(windows) {
             origin_dir = shirabe_php_shim::strtr(&origin_dir, "/", "\\");
             target_dir = shirabe_php_shim::strtr(&target_dir, "/", "\\");
-
-            if copy_on_windows {
-                return self.mirror(&origin_dir, &target_dir, None, &indexmap::IndexMap::new());
-            }
         }
 
-        self.mkdir(
-            PhpMixed::String(shirabe_php_shim::dirname(&target_dir)),
-            0o777,
-        )?;
+        self.mkdir(&shirabe_php_shim::dirname(&target_dir), 0o777)?;
 
         if shirabe_php_shim::is_link(&target_dir) {
-            if self.read_link(&target_dir) == origin_dir {
+            if shirabe_php_shim::readlink(&target_dir).as_deref() == Some(origin_dir.as_str()) {
                 return Ok(());
             }
-            self.remove(PhpMixed::String(target_dir.clone()))?;
+            self.remove(&target_dir)?;
         }
 
         if let Err(last_error) = shirabe_php_shim::symlink(&origin_dir, &target_dir) {
-            return Self::link_exception(
-                &origin_dir,
-                &target_dir,
-                "symbolic",
-                &last_error.to_string(),
-            );
+            return Err(IOException::new(
+                format!(
+                    "Failed to create \"symbolic\" link from \"{}\" to \"{}\": {}",
+                    origin_dir, target_dir, last_error
+                ),
+                0,
+                None,
+                Some(target_dir.clone()),
+            )
+            .into());
         }
         Ok(())
     }
 
-    fn link_exception(
-        origin: &str,
-        target: &str,
-        link_type: &str,
-        last_error: &str,
-    ) -> anyhow::Result<()> {
-        // TODO(phase-c): the Windows io::Error text renders the error number as "(os error 1314)",
-        // so this substring never matches and the generic message below is thrown instead.
-        if !last_error.is_empty() && cfg!(windows) && last_error.contains("error code(1314)") {
-            return Err(IOException::new(
-                format!(
-                    "Unable to create \"{}\" link due to error code 1314: 'A required privilege is not held by the client'. Do you have the required Administrator-rights?",
-                    link_type
-                ),
-                0,
-                None,
-                Some(target.to_string()),
-            )
-            .into());
-        }
-        Err(IOException::new(
-            format!(
-                "Failed to create \"{}\" link from \"{}\" to \"{}\": {}",
-                link_type, origin, target, last_error
-            ),
-            0,
-            None,
-            Some(target.to_string()),
-        )
-        .into())
-    }
-
-    // TODO(phase-c): this only ports Symfony's readlink($path, $canonicalize = false) overload;
-    // the $canonicalize = true branch (realpath()-based resolution, returning null if the path
-    // does not exist at all) is entirely unported. Following the numbered-suffix convention
-    // for PHP default arguments, it should become a `read_link2` overload if ever needed.
-    fn read_link(&self, path: &str) -> String {
-        // Symfony's readlink() with $canonicalize = false: returns null if the path is not a link.
-        // TODO(phase-c): the Rust signature is non-Option, so the non-link case yields the path's
-        // readlink result (empty string on failure) instead of PHP's null, to keep the symlink()
-        // caller working. Every current caller checks is_link() first, so this never triggers on
-        // the live code paths, but the collapsed Option<String> -> String signature is a real
-        // divergence from upstream.
-        // TODO(phase-c): PHP also has `if ('\\' === DIRECTORY_SEPARATOR && PHP_VERSION_ID < 70400)
-        // return realpath($path);` ahead of the plain readlink() call below, working around a
-        // pre-7.4 Windows bug. Not ported here; on old Windows PHP this would resolve differently.
-        std::fs::read_link(path)
-            .ok()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_default()
-    }
-
-    // PHP stream_is_local(): true for plain paths and the file:// wrapper, false for remote
-    // wrappers (http://, ftp://, ...).
-    // TODO(phase-c): this is PHP's built-in stream_is_local(), which queries the registered stream
-    // wrapper for STREAM_IS_URL rather than just parsing the scheme. It is approximated here via
-    // parse_url()'s scheme instead of being added to shirabe-php-shim, so a registered custom
-    // stream wrapper claiming to be local (or vice versa) would be classified differently than PHP.
-    fn stream_is_local(path: &str) -> bool {
-        let scheme = shirabe_php_shim::parse_url(path, shirabe_php_shim::PHP_URL_SCHEME);
-        match scheme {
-            PhpMixed::Null | PhpMixed::Bool(false) => true,
-            PhpMixed::String(s) => s.eq_ignore_ascii_case("file"),
-            _ => true,
-        }
-    }
-
-    pub fn mirror(
-        &self,
-        origin_dir: &str,
-        target_dir: &str,
-        iterator: Option<PhpMixed>,
-        options: &indexmap::IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<()> {
-        if iterator.is_some() {
-            // TODO(phase-c): Symfony's mirror() accepts a \Traversable filter iterator. The
-            // external-package Filesystem does not model that iterator type, and every caller passes
-            // None, so the filtered case is left unimplemented.
-            todo!()
-        }
-
+    pub fn mirror(&self, origin_dir: &str, target_dir: &str) -> anyhow::Result<()> {
         let target_dir = shirabe_php_shim::rtrim(target_dir, Some("/\\"));
         let origin_dir = shirabe_php_shim::rtrim(origin_dir, Some("/\\"));
         let origin_dir_len = origin_dir.len();
 
-        if !self.exists(PhpMixed::String(origin_dir.clone()))? {
+        if !self.exists(&origin_dir)? {
             return Err(IOException::new(
                 format!(
                     "The origin directory specified \"{}\" was not found.",
@@ -413,61 +293,20 @@ impl Filesystem {
                 ),
                 0,
                 None,
-                Some(origin_dir),
+                Some(origin_dir.clone()),
             )
             .into());
         }
 
-        let delete = options
-            .get("delete")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        // Iterate in destination folder to remove obsolete entries.
-        if self.exists(PhpMixed::String(target_dir.clone()))? && delete {
-            let target_dir_len = target_dir.len();
-            if let Ok(dir) = shirabe_php_shim::recursive_directory_iterator(
-                &target_dir,
-                shirabe_php_shim::SKIP_DOTS,
-            ) {
-                let delete_iterator = shirabe_php_shim::recursive_iterator_iterator(
-                    dir,
-                    shirabe_php_shim::RecursiveIteratorIterator::CHILD_FIRST,
-                );
-                for file in &delete_iterator {
-                    let pathname = file.get_pathname();
-                    let origin = format!("{}{}", origin_dir, &pathname[target_dir_len..]);
-                    if !self.exists(PhpMixed::String(origin))? {
-                        self.remove(PhpMixed::String(pathname))?;
-                    }
-                }
-            }
-        }
-
-        let copy_on_windows = options
-            .get("copy_on_windows")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        let flags = if copy_on_windows {
-            shirabe_php_shim::SKIP_DOTS
-                | shirabe_php_shim::RecursiveDirectoryIterator::FOLLOW_SYMLINKS
-        } else {
-            shirabe_php_shim::SKIP_DOTS
-        };
-        let dir = shirabe_php_shim::recursive_directory_iterator(&origin_dir, flags)
-            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
         let iterator = shirabe_php_shim::recursive_iterator_iterator(
-            dir,
+            shirabe_php_shim::recursive_directory_iterator(
+                &origin_dir,
+                shirabe_php_shim::SKIP_DOTS,
+            )?,
             shirabe_php_shim::RecursiveIteratorIterator::SELF_FIRST,
         );
 
-        self.mkdir(PhpMixed::String(target_dir.clone()), 0o777)?;
-
-        let override_file = options
-            .get("override")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        self.mkdir(&target_dir, 0o777)?;
 
         let mut files_created_while_mirroring: indexmap::IndexMap<String, bool> =
             indexmap::IndexMap::new();
@@ -488,12 +327,13 @@ impl Filesystem {
             let target = format!("{}{}", target_dir, &pathname[origin_dir_len..]);
             files_created_while_mirroring.insert(target.clone(), true);
 
-            if !copy_on_windows && file.is_link() {
-                self.symlink(&self.read_link(&pathname), &target, false)?;
+            if file.is_link() {
+                // PHP coerces the false getLinkTarget() returns on failure to the empty string.
+                self.symlink(&file.get_link_target().unwrap_or_default(), &target)?;
             } else if file.is_dir() {
-                self.mkdir(PhpMixed::String(target), 0o777)?;
+                self.mkdir(&target, 0o777)?;
             } else if file.is_file() {
-                self.copy(&pathname, &target, override_file)?;
+                self.copy(&pathname, &target)?;
             } else {
                 return Err(IOException::new(
                     format!("Unable to guess \"{}\" file type.", pathname),
