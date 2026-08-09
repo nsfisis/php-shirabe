@@ -36,7 +36,6 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -45,6 +44,7 @@ use shirabe_php_shim::{
     is_string, php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos, strstr,
     strstr3, strtolower, trim, version_compare,
 };
+use shirabe_symfony_process::ExecutableFinder;
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {

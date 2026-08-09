@@ -8,7 +8,6 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -17,6 +16,7 @@ use shirabe_php_shim::{
     impl_php_class, is_file, json_encode, php_regex, random_int, str_contains, str_replace, strlen,
     substr, version_compare,
 };
+use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
 static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<String>>>> = Mutex::new(None);

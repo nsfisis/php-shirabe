@@ -12,11 +12,11 @@ use shirabe::util::Filesystem;
 use shirabe::util::ProcessExecutor;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, file_exists, file_put_contents, realpath, sys_get_temp_dir, unlink,
 };
+use shirabe_symfony_process::Process;
 use tempfile::TempDir;
 
 // ref: ArchiverTestCase::setUp + ArchiveManagerTest::setUp.

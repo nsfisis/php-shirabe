@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/process/Exception/ProcessFailedException.php
 
-use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::symfony::process::exception::runtime_exception::RuntimeException;
-use crate::symfony::process::process::Process;
+use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::runtime_exception::RuntimeException;
+use crate::process::Process;
 
 #[derive(Debug)]
 pub struct ProcessFailedException {

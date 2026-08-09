@@ -92,7 +92,6 @@ use shirabe_external_packages::symfony::console::signal_registry::signal_registr
 use shirabe_external_packages::symfony::console::style::style_interface::StyleInterface;
 use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_external_packages::symfony::console::terminal::Terminal;
-use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
@@ -103,6 +102,7 @@ use shirabe_php_shim::{
     php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains,
     str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
+use shirabe_symfony_process::exception::ProcessTimedOutException;
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
 /// flattened into a single struct. Methods that are overridden by subclass and called via

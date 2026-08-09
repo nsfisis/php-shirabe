@@ -1,15 +1,15 @@
 //! ref: composer/vendor/symfony/process/Process.php
 
-use crate::symfony::process::exception::invalid_argument_exception::InvalidArgumentException;
-use crate::symfony::process::exception::logic_exception::LogicException;
-use crate::symfony::process::exception::process_signaled_exception::ProcessSignaledException;
-use crate::symfony::process::exception::process_timed_out_exception::ProcessTimedOutException;
-use crate::symfony::process::exception::runtime_exception::RuntimeException;
-use crate::symfony::process::executable_finder::ExecutableFinder;
-use crate::symfony::process::pipes::pipes_interface::PipesInterface;
-use crate::symfony::process::pipes::unix_pipes::UnixPipes;
-use crate::symfony::process::pipes::windows_pipes::WindowsPipes;
-use crate::symfony::process::process_utils::ProcessUtils;
+use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::logic_exception::LogicException;
+use crate::exception::process_signaled_exception::ProcessSignaledException;
+use crate::exception::process_timed_out_exception::ProcessTimedOutException;
+use crate::exception::runtime_exception::RuntimeException;
+use crate::executable_finder::ExecutableFinder;
+use crate::pipes::pipes_interface::PipesInterface;
+use crate::pipes::unix_pipes::UnixPipes;
+use crate::pipes::windows_pipes::WindowsPipes;
+use crate::process_utils::ProcessUtils;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, php_regex};
 use std::sync::OnceLock;

@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/process/Pipes/UnixPipes.php
 
-use crate::symfony::process::pipes::abstract_pipes::AbstractPipes;
-use crate::symfony::process::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
-use crate::symfony::process::process::Process;
+use crate::pipes::abstract_pipes::AbstractPipes;
+use crate::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
+use crate::process::Process;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
 

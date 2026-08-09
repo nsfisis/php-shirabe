@@ -6,7 +6,7 @@
 //! report; when any of those is missing the test returns early, following the non-mock test
 //! convention of this crate.
 
-use shirabe_external_packages::symfony::process::PhpExecutableFinder;
+use shirabe_symfony_process::PhpExecutableFinder;
 use std::path::Path;
 
 #[test]

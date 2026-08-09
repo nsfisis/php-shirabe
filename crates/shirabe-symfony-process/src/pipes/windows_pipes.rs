@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/process/Pipes/WindowsPipes.php
 
-use crate::symfony::process::pipes::abstract_pipes::AbstractPipes;
-use crate::symfony::process::pipes::pipes_interface::PipesInterface;
+use crate::pipes::abstract_pipes::AbstractPipes;
+use crate::pipes::pipes_interface::PipesInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
 

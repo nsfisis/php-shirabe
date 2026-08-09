@@ -6,8 +6,8 @@ use crate::symfony::console::helper::helper_interface::HelperInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
 use crate::symfony::console::output::ConsoleOutputInterface;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
-use crate::symfony::process::exception::process_failed_exception::ProcessFailedException;
-use crate::symfony::process::process::Process;
+use shirabe_symfony_process::exception::process_failed_exception::ProcessFailedException;
+use shirabe_symfony_process::process::Process;
 
 /// The ProcessHelper class provides helpers to run external processes.
 ///

@@ -1,0 +1,12 @@
+[package]
+name = "shirabe-symfony-process"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shirabe-php-shim.workspace = true
+anyhow.workspace = true
+indexmap.workspace = true
+
+[lints]
+workspace = true

@@ -8,8 +8,8 @@ pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHan
 
 use frame::Frame;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex, OnceLock};

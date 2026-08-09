@@ -2,8 +2,8 @@
 
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{HHVM_VERSION, defined};
+use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
 // None = null (uninitialized), Some(None) = false (not found), Some(Some(v)) = version

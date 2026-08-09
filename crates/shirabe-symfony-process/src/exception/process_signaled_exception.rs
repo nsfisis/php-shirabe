@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/process/Exception/ProcessSignaledException.php
 
-use crate::symfony::process::exception::runtime_exception::RuntimeException;
-use crate::symfony::process::process::Process;
+use crate::exception::runtime_exception::RuntimeException;
+use crate::process::Process;
 
 #[derive(Debug)]
 pub struct ProcessSignaledException {

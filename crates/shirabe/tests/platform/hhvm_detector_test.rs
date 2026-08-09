@@ -4,9 +4,9 @@ use shirabe::platform::hhvm_detector::HhvmDetector;
 use shirabe::platform::hhvm_detector::HhvmDetectorInterface;
 use shirabe::util::Platform;
 use shirabe::util::ProcessExecutor;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
+use shirabe_symfony_process::ExecutableFinder;
 
 fn set_up() -> HhvmDetector {
     let hhvm_detector = HhvmDetector::new(None, None);

@@ -7,9 +7,9 @@
 //! focus areas.
 
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_rpc::value::{serialize, unserialize};
 use shirabe_php_rpc::{PhpObject, PluginValue, call_function};
+use shirabe_symfony_process::PhpExecutableFinder;
 
 fn php_available() -> bool {
     PhpExecutableFinder::new().find(false).is_some()

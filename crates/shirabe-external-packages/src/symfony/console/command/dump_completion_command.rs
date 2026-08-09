@@ -9,8 +9,8 @@ use crate::symfony::console::input::input_argument::InputArgument;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::{self, OutputInterface};
-use crate::symfony::process::process::Process;
 use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_symfony_process::process::Process;
 use std::ops::{Deref, DerefMut};
 
 /// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a

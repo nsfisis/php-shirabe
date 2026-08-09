@@ -6,14 +6,14 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
-use shirabe_external_packages::symfony::process::Process;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode, php_regex, str_replace_array,
     strcmp, strlen, strpos, strrpos, substr, time, trim,
 };
+use shirabe_symfony_process::ExecutableFinder;
+use shirabe_symfony_process::Process;
 
 /// @phpstan-type RepoConfig array{unique_perforce_client_name?: string, depot?: string, branch?: string, p4user?: string, p4password?: string}
 #[derive(Debug)]

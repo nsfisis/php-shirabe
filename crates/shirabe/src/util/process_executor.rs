@@ -7,11 +7,6 @@ use crate::util::GitHub;
 use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_external_packages::seld::signal::SignalHandler;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
-use shirabe_external_packages::symfony::process::Process;
-use shirabe_external_packages::symfony::process::ProcessMock;
-use shirabe_external_packages::symfony::process::exception::ProcessSignaledException;
-use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -20,6 +15,11 @@ use shirabe_php_shim::{
     php_regex, rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
     substr_replace, trim,
 };
+use shirabe_symfony_process::ExecutableFinder;
+use shirabe_symfony_process::Process;
+use shirabe_symfony_process::ProcessMock;
+use shirabe_symfony_process::exception::ProcessSignaledException;
+use shirabe_symfony_process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use std::sync::{LazyLock, Mutex};
 
 static EXECUTABLES: LazyLock<Mutex<IndexMap<String, String>>> =

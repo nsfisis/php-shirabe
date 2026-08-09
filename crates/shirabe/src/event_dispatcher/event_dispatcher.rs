@@ -22,8 +22,6 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::output::output_interface;
-use shirabe_external_packages::symfony::process::ExecutableFinder;
-use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
@@ -38,6 +36,8 @@ use shirabe_php_shim::{
     str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper, substr,
     trim,
 };
+use shirabe_symfony_process::ExecutableFinder;
+use shirabe_symfony_process::PhpExecutableFinder;
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
 /// "Class::method"), a `[object|string, method]` pair, or a `\Closure`.
