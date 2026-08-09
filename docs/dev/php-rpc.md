@@ -196,6 +196,12 @@ by `scripts/plugin-stub-generator/generate-stubs` and must not be edited by hand
   surface (`getIO()`/`getComposer()`/...) answers from the Rust handoff.
 - `Shirabe\RustCommandStub` — the reverse stub for built-in commands registered into that
   application.
+- `Shirabe\RustPluginStub` and `Shirabe\RustCapablePluginStub` — proxy stubs for a plugin
+  implemented on the Rust side, which has no class of its own here. A plugin is normally PHP
+  code running in the worker; these stand in where Rust hands such a plugin to PHP code, as
+  `PluginManager::getPluginCapability` does when it passes the plugin to a capability
+  constructor. The Capable flavour exists because `$plugin instanceof Capable` decides whether
+  Composer asks a plugin for capabilities.
 - `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: the closed list of
   classes `unserialize()` may revive, and the hook that hands such an instance to `serialize()`
   in place of a handle descriptor.

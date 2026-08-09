@@ -11,4 +11,10 @@ pub trait Capability {
     fn as_command_provider(&self) -> Option<&dyn CommandProvider> {
         None
     }
+
+    /// For testing only: recovers the PHP-backed proxy so tests can read capability properties
+    /// the way PHPUnit asserts `$capability->args`.
+    fn __as_php_capability_proxy(&self) -> Option<&crate::plugin::PhpCapabilityProxy> {
+        None
+    }
 }

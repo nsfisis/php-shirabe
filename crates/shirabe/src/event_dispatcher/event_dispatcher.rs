@@ -1586,6 +1586,13 @@ try {{
         Ok(())
     }
 
+    /// For testing only: a test that never registers a plugin package still needs the Composer
+    /// PHP runtime in the worker before a class of its own can implement a Composer interface
+    /// there.
+    pub fn __ensure_composer_php_runtime() -> anyhow::Result<()> {
+        Self::ensure_composer_php_runtime()
+    }
+
     fn composer_php_runtime_autoload() -> Option<String> {
         if let Some(dir) = Platform::get_env("SHIRABE_COMPOSER_PHP_DIR") {
             let path = std::path::Path::new(&dir)

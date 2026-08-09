@@ -969,6 +969,14 @@ const RUNTIME_FILES: &[(&str, &str)] = &[
         "Shirabe/RustCommandStub.php",
         include_str!("../php/runtime/Shirabe/RustCommandStub.php"),
     ),
+    (
+        "Shirabe/RustPluginStub.php",
+        include_str!("../php/runtime/Shirabe/RustPluginStub.php"),
+    ),
+    (
+        "Shirabe/RustCapablePluginStub.php",
+        include_str!("../php/runtime/Shirabe/RustCapablePluginStub.php"),
+    ),
 ];
 
 struct Worker {

@@ -16,6 +16,7 @@ use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
 use crate::plugin::php_plugin_proxy::{
     PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, PluginRpcDispatcher, php_is_a,
+    plugin_handle_value,
 };
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::InstalledRepository;
@@ -1031,15 +1032,16 @@ impl PluginManager {
 
     pub fn get_plugin_capability(
         &self,
-        plugin: &dyn PluginInterface,
+        plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
         capability_class_name: &str,
         ctor_args: IndexMap<String, PluginValue>,
     ) -> anyhow::Result<Option<Box<dyn Capability>>> {
-        let capability_class =
-            match self.get_capability_implementation_class_name(plugin, capability_class_name)? {
-                Some(c) => c,
-                None => return Ok(None),
-            };
+        let capability_class = match self
+            .get_capability_implementation_class_name(&*plugin.borrow(), capability_class_name)?
+        {
+            Some(c) => c,
+            None => return Ok(None),
+        };
 
         // PHP: if (!class_exists($capabilityClass))
         let exists = unwrap_php_result(call_function_with_dispatcher(
@@ -1051,23 +1053,21 @@ impl PluginManager {
             return Err(RuntimeException::new(format!(
                 "Cannot instantiate Capability, as class {} from plugin {} does not exist.",
                 capability_class,
-                plugin.get_class_name()
+                plugin.borrow().get_class_name()
             ))
             .into());
         }
 
         // PHP: $ctorArgs['plugin'] = $plugin; the capability constructor receives the plugin
-        // instance itself, so a plugin with no PHP-side entity cannot be represented.
-        let plugin_value = match plugin.__as_php_plugin_proxy() {
+        // instance itself. A PHP-implemented plugin already has an entity in the child's P
+        // table; a Rust-implemented one crosses as a handle to its R-table entity.
+        let plugin_value = match plugin.borrow().__as_php_plugin_proxy() {
             Some(proxy) => PluginValue::PhpHandle(shirabe_php_rpc::PhpObjHandle {
                 phandle: proxy.phandle,
                 class: proxy.class.clone(),
                 implements: proxy.implements.clone(),
             }),
-            None => anyhow::bail!(
-                "cannot instantiate capability {capability_class}: plugin {} has no PHP-side entity to pass as $ctorArgs['plugin']",
-                plugin.get_class_name()
-            ),
+            None => plugin_handle_value(plugin),
         };
         let mut ctor_args = ctor_args;
         ctor_args.insert("plugin".to_string(), plugin_value);
@@ -1121,11 +1121,9 @@ impl PluginManager {
     ) -> anyhow::Result<Vec<Box<dyn Capability>>> {
         let mut capabilities: Vec<Box<dyn Capability>> = vec![];
         for plugin in self.get_plugins() {
-            if let Some(capability) = self.get_plugin_capability(
-                &*plugin.borrow(),
-                capability_class_name,
-                ctor_args.clone(),
-            )? {
+            if let Some(capability) =
+                self.get_plugin_capability(plugin, capability_class_name, ctor_args.clone())?
+            {
                 capabilities.push(capability);
             }
         }

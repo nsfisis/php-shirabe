@@ -54,6 +54,7 @@ enum RustEntity {
         std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>,
     ),
     Operation(std::rc::Rc<AnyOperation>),
+    Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -74,6 +75,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
             std::rc::Rc::as_ptr(dispatcher) as *const () as usize
         }
         RustEntity::Operation(operation) => std::rc::Rc::as_ptr(operation) as *const () as usize,
+        RustEntity::Plugin(plugin) => std::rc::Rc::as_ptr(plugin) as *const () as usize,
     }
 }
 
@@ -193,6 +195,22 @@ pub(crate) fn package_handle_value(
 ) -> PluginValue {
     let class = package_stub_class(package);
     let rhandle = register_entity(RustEntity::Package(package.clone()));
+    rust_handle_value(rhandle, class)
+}
+
+/// Registers a Rust-implemented plugin and returns its wire descriptor. A PHP-implemented
+/// plugin never takes this route: its entity lives in the child's P table already.
+pub fn plugin_handle_value(
+    plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+) -> PluginValue {
+    // TODO(plugin): a Rust-implemented plugin that is also an EventSubscriberInterface crosses
+    // as one of these two classes, so `instanceof EventSubscriberInterface` is false in the
+    // child; Composer's own subscriber dispatch runs on the Rust side and never asks.
+    let class = match plugin.borrow().as_capable() {
+        Some(_) => "Shirabe\\RustCapablePluginStub",
+        None => "Shirabe\\RustPluginStub",
+    };
+    let rhandle = register_entity(RustEntity::Plugin(plugin.clone()));
     rust_handle_value(rhandle, class)
 }
 
@@ -363,6 +381,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             Some(RustEntity::Operation(operation)) => {
                 dispatch_operation_method(&operation, method_name, &args)
             }
+            Some(RustEntity::Plugin(plugin)) => dispatch_plugin_method(&plugin, method_name),
             None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
         }
     }
@@ -539,7 +558,8 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::RepositoryManager(_)
         | RustEntity::Repository(_)
         | RustEntity::EventDispatcher(_)
-        | RustEntity::Operation(_) => {
+        | RustEntity::Operation(_)
+        | RustEntity::Plugin(_) => {
             return Err(runtime_throw(
                 "cloning this Rust-side entity over RPC is not supported".to_string(),
             ));
@@ -590,6 +610,33 @@ fn dispatch_property_access(
     Err(runtime_throw(format!(
         "the property `{property}` is not available over RPC yet"
     )))
+}
+
+fn dispatch_plugin_method(
+    plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+    method_name: &str,
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getCapabilities" => {
+            let plugin = plugin.borrow();
+            let capable = plugin.as_capable().ok_or_else(|| {
+                runtime_throw(format!(
+                    "plugin {} does not implement Capable",
+                    plugin.get_class_name()
+                ))
+            })?;
+            let capabilities = capable
+                .get_capabilities()
+                .map_err(|error| runtime_throw(format!("getCapabilities failed: {error:#}")))?;
+            Ok(PluginValue::from_php_mixed(&PhpMixed::Array(capabilities)))
+        }
+        // TODO(plugin): the lifecycle methods would have to turn the `$composer`/`$io` stubs the
+        // child passes back into the Rust handles they stand for; nothing calls them, because
+        // Composer activates a Rust-implemented plugin on the Rust side.
+        other => Err(runtime_throw(format!(
+            "the plugin method `{other}` is not available over RPC yet"
+        ))),
+    }
 }
 
 fn dispatch_composer_method(
@@ -2582,9 +2629,38 @@ impl PhpCapabilityProxy {
     pub(crate) fn new(handle: PhpObjHandle) -> Self {
         Self { handle }
     }
+
+    /// For testing only: the entity descriptor, whose class and interface list answer the
+    /// `assertInstanceOf` checks PHPUnit makes on a capability.
+    pub fn __handle(&self) -> &PhpObjHandle {
+        &self.handle
+    }
+
+    /// For testing only: reads a public property of the capability entity in the child. Unlike
+    /// `PhpPluginProxy::__get_property` the value keeps its wire form, so a test can assert the
+    /// object identity behind a handle instead of only the plain data around it.
+    pub fn __get_property(&self, name: &str) -> anyhow::Result<PluginValue> {
+        let outcome = shirabe_php_rpc::call_function(
+            "__shirabe_get_property",
+            vec![
+                PluginValue::PhpHandle(self.handle.clone()),
+                PluginValue::string(name),
+            ],
+        )?;
+        match outcome {
+            Ok(value) => Ok(value),
+            Err(throw) => {
+                Err(shirabe_php_shim::RuntimeException::with_code(throw.message, throw.code).into())
+            }
+        }
+    }
 }
 
-impl Capability for PhpCapabilityProxy {}
+impl Capability for PhpCapabilityProxy {
+    fn __as_php_capability_proxy(&self) -> Option<&PhpCapabilityProxy> {
+        Some(self)
+    }
+}
 
 impl Drop for PhpCapabilityProxy {
     fn drop(&mut self) {
