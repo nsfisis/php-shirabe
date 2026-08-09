@@ -1,5 +1,5 @@
 //! Rust port from the original C implementation in php-src.
-//! See `LICENSE.md` at the repository root.
+//! See the `LICENSE` file in this crate.
 #![allow(special_module_name)]
 //!
 //! Rules for this crate:
