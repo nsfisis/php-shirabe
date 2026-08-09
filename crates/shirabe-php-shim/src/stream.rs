@@ -13,13 +13,6 @@ pub fn stream_get_contents(stream: &PhpResource) -> Option<String> {
     stream_read_remaining(stream, None)
 }
 
-pub fn stream_resolve_include_path(filename: impl AsRef<std::path::Path>) -> Option<String> {
-    // TODO(phase-c): resolution searches the `include_path` ini setting, which the shim does not
-    // model; checking only the current directory would silently miss configured include paths.
-    let _ = filename.as_ref();
-    todo!()
-}
-
 // Reads from the stream's current position: all remaining bytes, or up to `max_length` when given
 // (a negative max means "until end").
 fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Option<String> {

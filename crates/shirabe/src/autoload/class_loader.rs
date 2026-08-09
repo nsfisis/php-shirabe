@@ -1,9 +1,10 @@
 //! ref: composer/src/Composer/Autoload/ClassLoader.php
 
 use indexmap::IndexMap;
+use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, defined, file_exists, include_file, spl_autoload_register,
-    spl_autoload_unregister, stream_resolve_include_path, strlen, strpos, strrpos, strtr, substr,
+    spl_autoload_unregister, strlen, strpos, strrpos, strtr, substr,
 };
 use std::sync::{LazyLock, Mutex};
 

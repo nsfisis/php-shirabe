@@ -537,6 +537,19 @@ pub fn phpversion(extension: &str) -> Option<String> {
     }
 }
 
+/// PHP `stream_resolve_include_path($filename)`. It is answered by the worker because the
+/// `include_path` it searches is the worker's own, including whatever a required `autoload_real.php`
+/// put there with `set_include_path()`.
+pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
+    match call("stream_resolve_include_path", filename) {
+        PhpMixed::String(s) => Some(s),
+        PhpMixed::Bool(false) => None,
+        other => {
+            panic!("PHP RPC: `stream_resolve_include_path` returned an unexpected value: {other:?}")
+        }
+    }
+}
+
 /// What `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` measures: `[(string)
 /// php_ini_loaded_file()]` merged with the trimmed, comma-split `php_ini_scanned_files()` list
 /// when scanning is active. The worker runs on the ini files of the machine, so these are the
