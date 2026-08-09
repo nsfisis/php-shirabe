@@ -2,8 +2,8 @@
 
 use crate::symfony::console::formatter::output_formatter_interface::OutputFormatterInterface;
 use crate::symfony::console::helper::helper_set::HelperSet;
-use crate::symfony::string::unicode_string::UnicodeString;
 use shirabe_php_shim::php_regex;
+use shirabe_symfony_string::unicode_string::UnicodeString;
 
 /// Helper is the base class for all helper classes.
 #[derive(Debug, Default)]

@@ -18,8 +18,8 @@ use crate::symfony::console::output::output_interface::OutputInterface;
 use crate::symfony::console::question::ChoiceQuestion;
 use crate::symfony::console::question::QuestionInterface;
 use crate::symfony::console::terminal::Terminal;
-use crate::symfony::string::s;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_string::s;
 
 /// The QuestionHelper class provides helpers to interact with the user.
 #[derive(Debug, Default)]

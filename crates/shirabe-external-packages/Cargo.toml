@@ -7,6 +7,7 @@ edition.workspace = true
 shirabe-pcre.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-semver.workspace = true
+shirabe-symfony-string.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 indexmap.workspace = true

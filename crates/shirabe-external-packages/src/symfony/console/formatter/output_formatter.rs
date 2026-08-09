@@ -6,8 +6,8 @@ use crate::symfony::console::formatter::output_formatter_style::OutputFormatterS
 use crate::symfony::console::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 use crate::symfony::console::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::symfony::console::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
-use crate::symfony::string::b;
 use shirabe_php_shim::php_regex;
+use shirabe_symfony_string::b;
 
 /// Formatter class for console output.
 #[derive(Debug)]
