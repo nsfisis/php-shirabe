@@ -8,6 +8,7 @@ edition = "2024"
 
 [workspace.dependencies]
 shirabe = { path = "crates/shirabe" }
+shirabe-ca-bundle = { path = "crates/shirabe-ca-bundle" }
 shirabe-class-map-generator = { path = "crates/shirabe-class-map-generator" }
 shirabe-external-packages = { path = "crates/shirabe-external-packages" }
 shirabe-metadata-minifier = { path = "crates/shirabe-metadata-minifier" }

@@ -2096,6 +2096,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "sha1",
+ "shirabe-ca-bundle",
  "shirabe-class-map-generator",
  "shirabe-external-packages",
  "shirabe-metadata-minifier",
@@ -2116,6 +2117,10 @@ dependencies = [
  "tracing-subscriber",
  "url",
 ]
+
+[[package]]
+name = "shirabe-ca-bundle"
+version = "0.0.1"
 
 [[package]]
 name = "shirabe-class-map-generator"

@@ -7,7 +7,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::http::ProxyManager;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::ca_bundle::CaBundle;
+use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
     HHVM_VERSION, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, PhpMixed,
     array_replace_recursive, extension_loaded, function_exists, php_uname, stream_context_create,
