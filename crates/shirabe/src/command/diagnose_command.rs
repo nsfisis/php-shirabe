@@ -888,8 +888,8 @@ impl DiagnoseCommand {
             warnings.insert("xdebug_profile".to_string(), PhpMixed::Bool(true));
         } else if diagnostics.xdebug_active {
             // PHP: XdebugHandler::isXdebugActive(). As with IniHelper::get_all, the port of that
-            // method in shirabe_external_packages cannot reach the PHP RPC bridge (the dependency
-            // would cycle), so the real runtime is queried through the diagnose payload instead.
+            // method in shirabe_xdebug_handler is a stub, so the real runtime is queried through
+            // the diagnose payload instead.
             warnings.insert("xdebug_loaded".to_string(), PhpMixed::Bool(true));
         }
 

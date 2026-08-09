@@ -16,7 +16,6 @@ use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
@@ -25,6 +24,7 @@ use shirabe_php_shim::{
     str_replace, str_starts_with, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_xdebug_handler::XdebugHandler;
 use std::sync::{LazyLock, Mutex};
 
 static LAST_SEEN_PLATFORM_PHP: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));

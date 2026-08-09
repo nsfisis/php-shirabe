@@ -25,6 +25,7 @@ shirabe-symfony-filesystem = { path = "crates/shirabe-symfony-filesystem" }
 shirabe-symfony-finder = { path = "crates/shirabe-symfony-finder" }
 shirabe-symfony-process = { path = "crates/shirabe-symfony-process" }
 shirabe-symfony-string = { path = "crates/shirabe-symfony-string" }
+shirabe-xdebug-handler = { path = "crates/shirabe-xdebug-handler" }
 anyhow = "1.0.102"
 async-trait = "0.1.89"
 base64 = "0.22.1"

@@ -54,7 +54,6 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
@@ -99,6 +98,7 @@ use shirabe_symfony_console::style::style_interface::StyleInterface;
 use shirabe_symfony_console::style::symfony_style::SymfonyStyle;
 use shirabe_symfony_console::terminal::Terminal;
 use shirabe_symfony_process::exception::ProcessTimedOutException;
+use shirabe_xdebug_handler::XdebugHandler;
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
 /// flattened into a single struct. Methods that are overridden by subclass and called via

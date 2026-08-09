@@ -24,11 +24,9 @@ impl XdebugHandler {
         // ported (see the TODO(phase-c) at the top of shirabe's main.rs), so the
         // COMPOSER_ORIGINAL_INIS env-var branch is unreachable here.
         //
-        // shirabe-external-packages cannot depend on shirabe-php-rpc (the reverse dependency
-        // would cycle, since shirabe-php-rpc already depends on shirabe-external-packages), so
-        // callers that need the real PHP runtime's ini files (php_ini_loaded_file() /
+        // Callers that need the real PHP runtime's ini files (php_ini_loaded_file() /
         // php_ini_scanned_files()) query shirabe_php_rpc directly instead of going through this
-        // stub; see crate::util::ini_helper::IniHelper::get_all.
+        // stub; see IniHelper::get_all in the shirabe crate.
         vec![String::new()]
     }
 }

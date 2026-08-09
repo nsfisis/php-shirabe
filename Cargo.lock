@@ -2111,6 +2111,7 @@ dependencies = [
  "shirabe-symfony-filesystem",
  "shirabe-symfony-finder",
  "shirabe-symfony-process",
+ "shirabe-xdebug-handler",
  "tempfile",
  "tokio",
  "tracing",
@@ -2288,6 +2289,10 @@ version = "0.0.1"
 dependencies = [
  "shirabe-php-shim",
 ]
+
+[[package]]
+name = "shirabe-xdebug-handler"
+version = "0.0.1"
 
 [[package]]
 name = "shlex"

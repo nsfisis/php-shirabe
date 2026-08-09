@@ -5,10 +5,9 @@ pub struct IniHelper;
 impl IniHelper {
     /// Returns an array of php.ini locations with at least one entry.
     pub fn get_all() -> Vec<String> {
-        // PHP: XdebugHandler::getAllIniFiles(). shirabe_external_packages::XdebugHandler's port
-        // of that method can't reach the PHP RPC bridge (shirabe-php-rpc already depends on
-        // shirabe-external-packages, so the reverse dependency would cycle), so query the real
-        // PHP runtime's loaded/scanned ini files here instead.
+        // PHP: XdebugHandler::getAllIniFiles(). shirabe_xdebug_handler::XdebugHandler's port
+        // of that method is a stub that returns the PHP default, so query the real PHP
+        // runtime's loaded/scanned ini files here instead.
         shirabe_php_rpc::get_all_ini_files()
     }
 
