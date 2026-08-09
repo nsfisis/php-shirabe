@@ -1,3 +1,5 @@
+//! `composerRequire()` is ported to `__shirabe_composer_require()` in shirabe-php-rpc, not here.
+//!
 //! ref: composer/src/Composer/Autoload/AutoloadGenerator.php
 
 use crate::autoload::ClassLoader;
@@ -2528,13 +2530,6 @@ fn find_top_level_arrow(entry: &str) -> Option<usize> {
         i += 1;
     }
     None
-}
-
-pub fn composer_require(_file_identifier: &str, _file: &str) {
-    // TODO(phase-c): unportable — depends on the $GLOBALS superglobal
-    // ($GLOBALS['__composer_autoload_files']) and PHP's `require $file` include
-    // mechanism (see also ClassLoader's include closure), neither of which is modeled.
-    todo!()
 }
 
 // Helper used by parse_autoloads_type for chained string substitutions.
