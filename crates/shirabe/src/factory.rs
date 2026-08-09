@@ -299,7 +299,7 @@ impl Factory {
                     if !is_dir(dir) {
                         let dir_owned = dir.clone();
                         let _ = Silencer::call(|| {
-                            Ok::<bool, anyhow::Error>(mkdir(&dir_owned, 0o777, true))
+                            Ok::<bool, anyhow::Error>(mkdir(&dir_owned, 0o777, true).is_ok())
                         });
                     }
                     let path = format!("{}/.htaccess", dir);

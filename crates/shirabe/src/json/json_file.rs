@@ -237,7 +237,7 @@ impl JsonFile {
                 .into());
             }
             // PHP: @mkdir($dir, 0777, true)
-            if !Silencer::call(|| Ok(mkdir(&dir, 0o777, true))).unwrap_or(false) {
+            if !Silencer::call(|| Ok(mkdir(&dir, 0o777, true).is_ok())).unwrap_or(false) {
                 return Err(UnexpectedValueException::new(format!(
                     "{} does not exist and could not be created.",
                     dir

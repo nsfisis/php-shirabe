@@ -834,11 +834,7 @@ pub fn filemtime(_filename: impl AsRef<std::path::Path>) -> Option<i64> {
         .map(|d| d.as_secs() as i64)
 }
 
-pub fn unlink(path: impl AsRef<std::path::Path>) -> bool {
-    unlink_result(path).is_ok()
-}
-
-pub fn unlink_result(path: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
+pub fn unlink(path: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
     std::fs::remove_file(path)
 }
 
@@ -968,11 +964,7 @@ pub fn umask() -> u32 {
     previous.bits() as u32
 }
 
-pub fn mkdir(_pathname: impl AsRef<std::path::Path>, _mode: u32, _recursive: bool) -> bool {
-    mkdir_result(_pathname, _mode, _recursive).is_ok()
-}
-
-pub fn mkdir_result(
+pub fn mkdir(
     pathname: impl AsRef<std::path::Path>,
     mode: u32,
     recursive: bool,
@@ -984,11 +976,7 @@ pub fn mkdir_result(
     builder.create(pathname.as_ref())
 }
 
-pub fn rmdir(dir: impl AsRef<std::path::Path>) -> bool {
-    rmdir_result(dir).is_ok()
-}
-
-pub fn rmdir_result(dir: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
+pub fn rmdir(dir: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
     std::fs::remove_dir(dir)
 }
 
@@ -1029,11 +1017,7 @@ pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {
     }
 }
 
-pub fn symlink(_target: impl AsRef<std::path::Path>, _link: impl AsRef<std::path::Path>) -> bool {
-    symlink_result(_target, _link).is_ok()
-}
-
-pub fn symlink_result(
+pub fn symlink(
     target: impl AsRef<std::path::Path>,
     link: impl AsRef<std::path::Path>,
 ) -> Result<(), std::io::Error> {

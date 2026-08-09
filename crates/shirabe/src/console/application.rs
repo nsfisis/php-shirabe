@@ -2335,7 +2335,7 @@ impl ApplicationHandle {
                 );
                 if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
                     && file_get_contents(&tempfile).as_deref() == Some(file!())
-                    && unlink(&tempfile)
+                    && unlink(&tempfile).is_ok()
                     && !file_exists(&tempfile))
                 {
                     return Ok(Some(format!("<error>PHP temp directory ({}) does not exist or is not writable to Composer. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir())));

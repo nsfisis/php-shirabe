@@ -240,7 +240,7 @@ impl Filesystem {
         }
 
         if is_link(directory) {
-            return Ok(Some(unlink(directory)));
+            return Ok(Some(unlink(directory).is_ok()));
         }
 
         if !is_dir(directory) || !file_exists(directory) {
@@ -328,7 +328,7 @@ impl Filesystem {
                 .into());
             }
 
-            if !mkdir(directory, 0o777, true) {
+            if mkdir(directory, 0o777, true).is_err() {
                 let e = RuntimeException::new(format!(
                     "{} does not exist and could not be created: {}",
                     directory,
@@ -393,12 +393,12 @@ impl Filesystem {
     /// Attempts to rmdir a file and in case of failure retries after 350ms on windows
     pub fn rmdir(&self, path: impl AsRef<Path>) -> anyhow::Result<bool> {
         let path = path.as_ref();
-        let mut deleted = rmdir(path);
+        let mut deleted = rmdir(path).is_ok();
         if !deleted {
             // retry after a bit on windows since it tends to be touchy with mass removals
             if Platform::is_windows() {
                 usleep(350000);
-                deleted = rmdir(path);
+                deleted = rmdir(path).is_ok();
             }
 
             if !deleted {
@@ -922,10 +922,10 @@ impl Filesystem {
     /// symbolic links on windows which link to directories need rmdir instead of unlink
     fn unlink_implementation(&self, path: &Path) -> bool {
         if Platform::is_windows() && is_dir(path) && is_link(path) {
-            return rmdir(path);
+            return rmdir(path).is_ok();
         }
 
-        unlink(path)
+        unlink(path).is_ok()
     }
 
     /// Creates a relative symlink from $link to $target
@@ -938,7 +938,7 @@ impl Filesystem {
 
         let relative_path = self.find_shortest_path(link, target, false, false);
         chdir(dirname(link));
-        let result = symlink(&relative_path, link);
+        let result = symlink(&relative_path, link).is_ok();
 
         chdir(&cwd);
 

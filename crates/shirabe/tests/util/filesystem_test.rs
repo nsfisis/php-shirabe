@@ -512,7 +512,7 @@ fn test_unlink_symlinked_directory() {
     mkdir(format!("{basepath}/real"), 0o777, true);
     touch(format!("{basepath}/real/FILE"));
 
-    let result = symlink(format!("{basepath}/real"), &symlinked);
+    let result = symlink(format!("{basepath}/real"), &symlinked).is_ok();
 
     if !result {
         // Symbolic links for directories not supported on this platform.
@@ -539,7 +539,7 @@ fn test_remove_symlinked_directory_with_trailing_slash() {
     let symlinked = format!("{working_dir}/linked");
     let symlinked_trailing_slash = format!("{symlinked}/");
 
-    let result = symlink(format!("{working_dir}/real"), &symlinked);
+    let result = symlink(format!("{working_dir}/real"), &symlinked).is_ok();
 
     if !result {
         // Symbolic links for directories not supported on this platform.

@@ -106,7 +106,8 @@ impl Cache {
 
             if !self.read_only
                 && ((!is_dir(&self.root)
-                    && !Silencer::call(|| Ok(mkdir(&self.root, 0o777, true))).unwrap_or(false))
+                    && !Silencer::call(|| Ok(mkdir(&self.root, 0o777, true).is_ok()))
+                        .unwrap_or(false))
                     || !is_writable(&self.root))
             {
                 self.io.write_error(&format!(

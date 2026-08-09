@@ -2535,7 +2535,7 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
     // Create an absolute symlink
     let target = format!("{}/tools-real", s.working_dir);
     let r#link = format!("{}/tools", s.working_dir);
-    assert!(shirabe_php_shim::symlink(&target, &r#link));
+    assert!(shirabe_php_shim::symlink(&target, &r#link).is_ok());
 
     package.set_autoload(autoload(vec![
         ("psr-4", str_map(&[("MyTools\\", pstr("tools/"))])),
@@ -2577,7 +2577,7 @@ fn test_absolute_symlink_with_classmap_exclude_from_classmap() {
     // Create an absolute symlink
     let target = format!("{}/tools-real", s.working_dir);
     let r#link = format!("{}/tools", s.working_dir);
-    assert!(shirabe_php_shim::symlink(&target, &r#link));
+    assert!(shirabe_php_shim::symlink(&target, &r#link).is_ok());
 
     package.set_autoload(autoload(vec![
         ("classmap", str_list(&["tools/"])),

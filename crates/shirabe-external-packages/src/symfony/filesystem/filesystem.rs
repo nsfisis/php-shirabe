@@ -146,7 +146,7 @@ impl Filesystem {
                 continue;
             }
 
-            if let Err(last_error) = shirabe_php_shim::mkdir_result(&dir, mode, true)
+            if let Err(last_error) = shirabe_php_shim::mkdir(&dir, mode, true)
                 && !shirabe_php_shim::is_dir(&dir)
             {
                 return Err(IOException::new(
@@ -202,11 +202,11 @@ impl Filesystem {
         for file in files {
             if shirabe_php_shim::is_link(&file) {
                 // See https://bugs.php.net/52176
-                let unlinked = shirabe_php_shim::unlink_result(&file);
+                let unlinked = shirabe_php_shim::unlink(&file);
                 let mut last_error = unlinked.as_ref().err().map(ToString::to_string);
                 let mut removed = unlinked.is_ok() || !cfg!(windows);
                 if !removed {
-                    match shirabe_php_shim::rmdir_result(&file) {
+                    match shirabe_php_shim::rmdir(&file) {
                         Ok(()) => {
                             last_error = None;
                             removed = true;
@@ -251,7 +251,7 @@ impl Filesystem {
                     (&entries).into_iter().map(|e| e.get_pathname()).collect();
                 Self::do_remove(child_paths, true)?;
 
-                if let Err(last_error) = shirabe_php_shim::rmdir_result(&file)
+                if let Err(last_error) = shirabe_php_shim::rmdir(&file)
                     && shirabe_php_shim::file_exists(&file)
                 {
                     return Err(IOException::new(
@@ -262,7 +262,7 @@ impl Filesystem {
                     )
                     .into());
                 }
-            } else if let Err(last_error) = shirabe_php_shim::unlink_result(&file) {
+            } else if let Err(last_error) = shirabe_php_shim::unlink(&file) {
                 let last_error = last_error.to_string();
                 if last_error.contains("Permission denied") || shirabe_php_shim::file_exists(&file)
                 {
@@ -309,7 +309,7 @@ impl Filesystem {
             self.remove(PhpMixed::String(target_dir.clone()))?;
         }
 
-        if let Err(last_error) = shirabe_php_shim::symlink_result(&origin_dir, &target_dir) {
+        if let Err(last_error) = shirabe_php_shim::symlink(&origin_dir, &target_dir) {
             return Self::link_exception(
                 &origin_dir,
                 &target_dir,
