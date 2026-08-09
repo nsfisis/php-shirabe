@@ -2102,6 +2102,7 @@ dependencies = [
  "shirabe-pcre",
  "shirabe-php-rpc",
  "shirabe-php-shim",
+ "shirabe-seld-json-lint",
  "shirabe-semver",
  "shirabe-spdx-licenses",
  "shirabe-symfony-console",
@@ -2203,6 +2204,14 @@ dependencies = [
 [[package]]
 name = "shirabe-php-src"
 version = "0.0.1"
+
+[[package]]
+name = "shirabe-seld-json-lint"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "shirabe-php-shim",
+]
 
 [[package]]
 name = "shirabe-semver"

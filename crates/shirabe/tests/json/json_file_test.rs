@@ -2,9 +2,9 @@
 
 use indexmap::IndexMap;
 use shirabe::json::{JsonEncodeOptions, JsonFile, JsonValidationException};
-use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
+use shirabe_seld_json_lint::ParsingException;
 
 /// ref: JsonFileTest::expectParseException
 fn expect_parse_exception(text: &str, json: &str) {

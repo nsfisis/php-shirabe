@@ -55,7 +55,6 @@ use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
-use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
@@ -66,6 +65,7 @@ use shirabe_php_shim::{
     php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains,
     str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
+use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
 use shirabe_symfony_console::command::Command as SymfonyCommand;
 use shirabe_symfony_console::command::help_command::HelpCommand;

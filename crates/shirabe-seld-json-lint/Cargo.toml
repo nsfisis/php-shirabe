@@ -1,0 +1,11 @@
+[package]
+name = "shirabe-seld-json-lint"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shirabe-php-shim.workspace = true
+anyhow.workspace = true
+
+[lints]
+workspace = true

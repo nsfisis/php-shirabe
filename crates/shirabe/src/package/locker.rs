@@ -24,7 +24,6 @@ use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -32,6 +31,7 @@ use shirabe_php_shim::{
     array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array_loose,
     is_int, ksort, php_regex, realpath, strcmp, strtolower, touch2, trim, usort,
 };
+use shirabe_seld_json_lint::ParsingException;
 
 /// Reads/writes project lockfile (composer.lock).
 #[derive(Debug)]

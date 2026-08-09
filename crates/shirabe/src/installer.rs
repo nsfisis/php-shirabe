@@ -34,11 +34,11 @@ pub use suggested_packages_reporter::*;
 use crate::io::io_interface;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_map, array_unique, implode, intval, is_dir, is_numeric,
     strcmp, strpos, strtolower, touch, usort,
 };
+use shirabe_seld_json_lint::ParsingException;
 use shirabe_semver;
 
 use crate::advisory::AuditConfig;

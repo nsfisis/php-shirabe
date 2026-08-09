@@ -9,7 +9,6 @@ use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::seld::json_lint::{ParsingException, ParsingExceptionDetails};
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -18,6 +17,7 @@ use shirabe_php_shim::{
     file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, php_regex, realpath,
     str_contains, str_ends_with, str_repeat, strlen, strpos, usleep,
 };
+use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 
 #[derive(Debug, Clone)]
 pub struct JsonEncodeOptions {
