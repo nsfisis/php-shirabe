@@ -53,27 +53,6 @@ impl CommandData {
     pub const FAILURE: i64 = 1;
     pub const INVALID: i64 = 2;
 
-    /// The default command name.
-    // NOTE: PHP `protected static $defaultName`; static late-binding property.
-    pub const DEFAULT_NAME: Option<&'static str> = None;
-
-    /// The default command description.
-    // NOTE: PHP `protected static $defaultDescription`; static late-binding property.
-    pub const DEFAULT_DESCRIPTION: Option<&'static str> = None;
-
-    pub fn get_default_name() -> Option<String> {
-        // TODO(phase-c): PHP uses ReflectionClass to read the #[AsCommand] attribute
-        // and ReflectionProperty to check that `$defaultName` is declared on the late-static
-        // class itself (not inherited). Reflection-based late static binding has no direct
-        // Rust equivalent; human review needed for the porting strategy.
-        todo!()
-    }
-
-    pub fn get_default_description() -> Option<String> {
-        // TODO(phase-c): same Reflection/late-static-binding concern as get_default_name().
-        todo!()
-    }
-
     /// Builds the base-class state. `name` is the name of the command; passing None
     /// means it must be set in the subclass `configure()`.
     ///
@@ -100,10 +79,6 @@ impl CommandData {
             helper_set: std::cell::RefCell::new(None),
         };
 
-        // PHP's __construct also derives the name from getDefaultName() when null and
-        // sets the default description; both rely on Reflection late-static-binding
-        // (get_default_name/get_default_description are todo!()), and concrete commands
-        // always set their name in configure(), so only an explicit name is honored here.
         if let Some(name) = name {
             *this.name.borrow_mut() = Some(name);
         }
