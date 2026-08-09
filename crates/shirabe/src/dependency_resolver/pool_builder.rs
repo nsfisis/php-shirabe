@@ -19,7 +19,7 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
     number_format, round, strpos,

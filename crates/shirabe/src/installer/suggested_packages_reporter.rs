@@ -6,8 +6,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::php_regex;
 
 #[derive(Debug)]

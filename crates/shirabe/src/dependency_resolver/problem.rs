@@ -10,8 +10,8 @@ use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare,
     php_regex, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos, strtolower,

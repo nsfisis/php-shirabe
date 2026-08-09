@@ -36,8 +36,8 @@ use crate::util::sync_executor;
 use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_metadata_minifier::MetadataMinifier;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,

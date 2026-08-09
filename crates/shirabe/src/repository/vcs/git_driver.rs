@@ -14,7 +14,7 @@ use crate::util::Url;
 use chrono::TimeZone;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,

@@ -4,8 +4,8 @@ use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
 use indexmap::indexmap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX, RuntimeException,
     explode, getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath,

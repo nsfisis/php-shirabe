@@ -10,7 +10,7 @@ use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::util::ComposerMirror;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, LogicException, PhpMixed, php_regex, strpos, trigger_error,
 };
@@ -433,13 +433,9 @@ impl Package {
             // dist URL never carries more than one SHA reference.
             self.set_dist_url(Some(Preg::replace_callback(
                 php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                |m: &indexmap::IndexMap<
-                    shirabe_external_packages::composer::pcre::CaptureKey,
-                    String,
-                >|
-                 -> String {
+                |m: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
                     let get = |i: usize| -> String {
-                        m.get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(i))
+                        m.get(&shirabe_pcre::CaptureKey::ByIndex(i))
                             .cloned()
                             .unwrap_or_default()
                     };

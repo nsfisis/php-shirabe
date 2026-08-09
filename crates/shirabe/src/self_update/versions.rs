@@ -5,7 +5,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
     UnexpectedValueException, php_regex,

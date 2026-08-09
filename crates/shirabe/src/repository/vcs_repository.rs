@@ -27,7 +27,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpClass, PhpMixed, php_regex, str_replace, strpos,

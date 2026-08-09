@@ -11,7 +11,7 @@ use crate::util::Hg as HgUtils;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex};
 

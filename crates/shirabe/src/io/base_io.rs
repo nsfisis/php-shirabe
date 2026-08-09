@@ -6,7 +6,7 @@ use crate::io::io_interface;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
     UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, php_regex,

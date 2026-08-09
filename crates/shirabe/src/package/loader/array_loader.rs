@@ -17,7 +17,7 @@ use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
 use chrono::Utc;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string,
     json_encode, ltrim, php_regex, stripos, strpos, strtolower, strval, substr, trigger_error,

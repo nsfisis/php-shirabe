@@ -11,7 +11,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex,

@@ -6,7 +6,7 @@ use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::php_regex;
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;

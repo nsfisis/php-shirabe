@@ -6,9 +6,9 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::Process;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode, php_regex, str_replace_array,

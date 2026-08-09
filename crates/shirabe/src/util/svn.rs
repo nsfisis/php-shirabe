@@ -7,7 +7,7 @@ use crate::io::io_interface;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     LogicException, PHP_URL_HOST, PhpMixed, RuntimeException, empty, implode, parse_url,
     parse_url_all, php_regex, stripos, strpos, trim,

@@ -6,10 +6,10 @@ use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::util::Platform;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, impl_php_class, is_string, php_regex,
 };

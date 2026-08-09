@@ -12,7 +12,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, php_regex};
 
 #[derive(Debug)]

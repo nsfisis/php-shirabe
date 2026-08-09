@@ -1,14 +1,10 @@
 [package]
-name = "shirabe-external-packages"
+name = "shirabe-pcre"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-shirabe-pcre.workspace = true
 shirabe-php-shim.workspace = true
-shirabe-semver.workspace = true
-anyhow.workspace = true
-chrono.workspace = true
 indexmap.workspace = true
 regex.workspace = true
 

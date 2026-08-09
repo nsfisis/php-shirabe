@@ -8,7 +8,7 @@ pub use json_config_source::*;
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
     array_merge, array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,

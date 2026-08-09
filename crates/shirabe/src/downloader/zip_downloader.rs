@@ -8,8 +8,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,

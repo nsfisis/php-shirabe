@@ -11,7 +11,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use crate::repository::repository_interface::{SEARCH_NAME, SEARCH_VENDOR, SearchResult};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_quote};
 
 /// Adds completion to arguments and options.

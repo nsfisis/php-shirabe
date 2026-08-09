@@ -13,7 +13,7 @@ use crate::util::Url;
 use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed, RuntimeException,

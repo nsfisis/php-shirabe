@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/NoProxyPattern.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
     empty, explode, filter_var_int_with_range, filter_var_ip, inet_pton, ltrim, parse_url,

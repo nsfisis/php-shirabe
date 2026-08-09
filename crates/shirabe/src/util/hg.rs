@@ -5,7 +5,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{php_regex, rawurlencode};
 use std::sync::OnceLock;
 

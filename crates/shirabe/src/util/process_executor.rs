@@ -6,13 +6,13 @@ use crate::io::io_interface;
 use crate::util::GitHub;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::Process;
 use shirabe_external_packages::symfony::process::ProcessMock;
 use shirabe_external_packages::symfony::process::exception::ProcessSignaledException;
 use shirabe_external_packages::symfony::process::exception::RuntimeException as SymfonyProcessRuntimeException;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,

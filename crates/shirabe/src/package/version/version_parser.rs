@@ -2,7 +2,7 @@
 
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::php_regex;
 use shirabe_semver::Semver;
 use shirabe_semver::VersionParser as SemverVersionParser;

@@ -9,7 +9,7 @@ use crate::repository::{
     RepositoryInterfaceHandle, SearchResult,
 };
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 use shirabe_semver::constraint::AnyConstraint;
 

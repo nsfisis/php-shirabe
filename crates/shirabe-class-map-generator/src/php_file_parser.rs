@@ -2,7 +2,7 @@
 
 use crate::php_file_cleaner::PhpFileCleaner;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, file_exists, file_get_contents,
     function_exists, is_file, is_readable, ltrim, php_strip_whitespace, str_replace_array, strrpos,

@@ -9,7 +9,7 @@ use crate::util::PerforceInterface;
 use crate::util::ProcessExecutor;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{BadMethodCallException, PhpMixed, RuntimeException, php_regex};
 
 #[derive(Debug)]

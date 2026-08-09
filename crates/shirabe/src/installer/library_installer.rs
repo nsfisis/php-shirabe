@@ -12,7 +12,7 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
     realpath, rmdir, rtrim, strpos,

@@ -6,8 +6,8 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
 use chrono::Utc;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
     file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,

@@ -21,10 +21,10 @@ use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,

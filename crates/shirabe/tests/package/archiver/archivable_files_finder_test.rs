@@ -3,8 +3,8 @@
 use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
 use shirabe::util::Filesystem;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::process::Process;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{PhpMixed, ZipArchive, dirname, file_put_contents, preg_quote};
 use tempfile::TempDir;
 

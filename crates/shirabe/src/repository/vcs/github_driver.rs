@@ -14,7 +14,7 @@ use crate::util::GitHub;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_key_exists, array_map,

@@ -9,7 +9,7 @@ use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
 use serde::de::Error as _;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, php_regex};
 use shirabe_spdx_licenses::SpdxLicenses;

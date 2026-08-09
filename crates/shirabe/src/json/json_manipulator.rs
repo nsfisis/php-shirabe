@@ -4,7 +4,7 @@ use crate::json::JsonFile;
 use crate::json::json_grammar::{self, ValueKind};
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,

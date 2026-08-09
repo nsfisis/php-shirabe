@@ -11,7 +11,7 @@ use crate::package::{LockerInterface, RootPackageInterfaceHandle};
 use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::php_regex;
 
 // TODO(phase-c): change this information to Shirabe version.

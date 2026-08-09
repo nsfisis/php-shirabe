@@ -24,8 +24,8 @@ use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::ParsingException;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,

@@ -12,7 +12,7 @@ use crate::repository::{
     RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{implode, php_regex, preg_quote, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;

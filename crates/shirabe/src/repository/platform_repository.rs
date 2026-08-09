@@ -16,8 +16,8 @@ use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,

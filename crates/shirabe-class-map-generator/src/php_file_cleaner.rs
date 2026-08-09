@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]

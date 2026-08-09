@@ -17,7 +17,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
     in_array_strict, is_dir, php_regex, preg_quote, realpath, rtrim, strlen, strpos, substr, trim,

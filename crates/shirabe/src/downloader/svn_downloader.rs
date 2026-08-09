@@ -15,7 +15,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, version_compare,
 };

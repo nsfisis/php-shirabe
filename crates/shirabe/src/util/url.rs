@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::util::GitHub;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array_strict, parse_url, php_regex,
 };

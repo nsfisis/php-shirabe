@@ -36,12 +36,12 @@ use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date, date_format_to_strftime, extension_loaded, impl_php_class, in_array_loose,

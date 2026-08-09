@@ -14,7 +14,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Url;
 use crate::util::{AuthHelper, StoreAuth};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
     clearstatcache, explode, implode, in_array_loose, in_array_strict, is_dir, php_regex,

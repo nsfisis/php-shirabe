@@ -36,12 +36,12 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException, array_pop,

@@ -1,6 +1,5 @@
 //! ref: composer/vendor/symfony/console/Descriptor/JsonDescriptor.php
 
-use crate::composer::pcre::preg::Preg;
 use crate::symfony::console::application::Application;
 use crate::symfony::console::command::command::Command;
 use crate::symfony::console::descriptor::application_description::ApplicationDescription;
@@ -13,6 +12,7 @@ use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_option::InputOption;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
+use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::{PhpMixed, php_regex};
 
 /// JSON descriptor.

@@ -5,7 +5,7 @@ use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Transaction;
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::php_regex;
 
 #[derive(Debug)]
@@ -176,17 +176,11 @@ impl LockTransaction {
                 let dist_reference = present_package.get_dist_reference().unwrap();
                 let new_dist_url = Preg::replace_callback(
                     php_regex!(r"{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                    |m: &indexmap::IndexMap<
-                        shirabe_external_packages::composer::pcre::CaptureKey,
-                        String,
-                    >|
-                     -> String {
+                    |m: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
                         let get = |i: usize| -> String {
-                            m.get(
-                                &shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(i),
-                            )
-                            .cloned()
-                            .unwrap_or_default()
+                            m.get(&shirabe_pcre::CaptureKey::ByIndex(i))
+                                .cloned()
+                                .unwrap_or_default()
                         };
                         format!("{}{}{}", get(1), dist_reference, get(2))
                     },

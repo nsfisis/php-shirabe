@@ -8,7 +8,7 @@
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::{CaptureKey, PREG_SPLIT_DELIM_CAPTURE, PhpMixed, intval, php_regex};
 use std::path::{Path, PathBuf};
 

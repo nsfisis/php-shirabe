@@ -15,7 +15,7 @@ use crate::repository::{
     RepositoryInterface, SearchResult, SecurityAdvisoryResult,
 };
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, var_export};
 use shirabe_semver::constraint::AnyConstraint;
 

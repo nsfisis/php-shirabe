@@ -8,7 +8,6 @@ use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::util::Filesystem;
 use crate::util::Platform;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::completion::completion_suggestions::{
@@ -19,6 +18,7 @@ use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir, impl_php_class, php_regex};
 use std::path::Path;
 

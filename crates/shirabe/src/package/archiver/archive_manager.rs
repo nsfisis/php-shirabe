@@ -10,7 +10,7 @@ use crate::util::Filesystem;
 use crate::util::SyncHelper;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, bin2hex, file_exists, php_regex, random_bytes,
     realpath, sys_get_temp_dir,

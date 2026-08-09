@@ -9,7 +9,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, php_regex, realpath,

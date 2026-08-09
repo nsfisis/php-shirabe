@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/TlsHelper.php
 
 use shirabe_external_packages::composer::ca_bundle::ca_bundle::CaBundle;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, ltrim, php_regex, preg_quote, str_replace, strtolower, substr, substr_count,
 };

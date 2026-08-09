@@ -15,10 +15,10 @@ use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{InvalidArgumentException, impl_php_class};
 
 #[derive(Debug)]

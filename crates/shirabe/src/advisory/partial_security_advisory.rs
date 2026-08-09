@@ -5,7 +5,7 @@ use crate::advisory::SecurityAdvisory;
 use crate::package::version::VersionParser;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{PhpMixed, php_regex};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;

@@ -12,7 +12,7 @@ use crate::util::ProcessExecutor;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded, php_regex};
 

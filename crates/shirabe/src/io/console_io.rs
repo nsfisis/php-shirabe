@@ -9,7 +9,6 @@ use crate::io::io_interface;
 use crate::question::StrictConfirmationQuestion;
 use indexmap::IndexMap;
 use indexmap::indexmap;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::helper::ProgressBar;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::helper::QuestionHelperInterface;
@@ -23,6 +22,7 @@ use shirabe_external_packages::symfony::console::output::output_interface::{
 use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
 use shirabe_external_packages::symfony::console::question::Question;
 use shirabe_external_packages::symfony::console::question::QuestionInterface;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, array_search, implode, in_array_strict, is_array, is_string, microtime, str_repeat,
     strip_tags, strlen,

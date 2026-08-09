@@ -3,9 +3,9 @@
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::filesystem::exception::IOException;
 use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     ErrorException, LogicException, PhpMixed, RuntimeException, array_pop, basename, chdir,
     clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof, file_exists,
@@ -736,17 +736,15 @@ impl Filesystem {
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        let mut prefix_match: indexmap::IndexMap<
-            shirabe_external_packages::composer::pcre::CaptureKey,
-            String,
-        > = indexmap::IndexMap::new();
+        let mut prefix_match: indexmap::IndexMap<shirabe_pcre::CaptureKey, String> =
+            indexmap::IndexMap::new();
         if Preg::is_match3(
             php_regex!("{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
             Some(&mut prefix_match),
         ) {
             prefix = prefix_match
-                .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
+                .get(&shirabe_pcre::CaptureKey::ByIndex(1))
                 .cloned()
                 .unwrap_or_default();
             path = substr(&path, strlen(&prefix), None);
@@ -771,13 +769,9 @@ impl Filesystem {
         // ensure c: is normalized to C:
         prefix = Preg::replace_callback(
             php_regex!("{(^|://)[a-z]:$}i"),
-            |m: &indexmap::IndexMap<
-                shirabe_external_packages::composer::pcre::CaptureKey,
-                String,
-            >|
-             -> String {
+            |m: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
                 let s = m
-                    .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(0))
+                    .get(&shirabe_pcre::CaptureKey::ByIndex(0))
                     .cloned()
                     .unwrap_or_default();
                 strtoupper(&s)

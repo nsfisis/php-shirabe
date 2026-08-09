@@ -12,7 +12,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
     function_exists, implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen,

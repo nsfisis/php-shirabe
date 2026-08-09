@@ -33,11 +33,11 @@ use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpClass as _, PhpMixed,

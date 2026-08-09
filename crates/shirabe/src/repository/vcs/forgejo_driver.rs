@@ -15,7 +15,7 @@ use crate::util::ForgejoRepositoryData;
 use crate::util::ForgejoUrl;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, php_regex, urlencode,

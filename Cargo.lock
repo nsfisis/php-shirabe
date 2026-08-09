@@ -2099,6 +2099,7 @@ dependencies = [
  "shirabe-class-map-generator",
  "shirabe-external-packages",
  "shirabe-metadata-minifier",
+ "shirabe-pcre",
  "shirabe-php-rpc",
  "shirabe-php-shim",
  "shirabe-semver",
@@ -2117,6 +2118,7 @@ dependencies = [
  "anyhow",
  "indexmap",
  "shirabe-external-packages",
+ "shirabe-pcre",
  "shirabe-php-shim",
 ]
 
@@ -2128,6 +2130,7 @@ dependencies = [
  "chrono",
  "indexmap",
  "regex",
+ "shirabe-pcre",
  "shirabe-php-shim",
  "shirabe-semver",
 ]
@@ -2137,6 +2140,15 @@ name = "shirabe-metadata-minifier"
 version = "0.0.1"
 dependencies = [
  "indexmap",
+ "shirabe-php-shim",
+]
+
+[[package]]
+name = "shirabe-pcre"
+version = "0.0.1"
+dependencies = [
+ "indexmap",
+ "regex",
  "shirabe-php-shim",
 ]
 

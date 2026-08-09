@@ -9,7 +9,7 @@ use crate::util::Bitbucket;
 use crate::util::GitHub;
 use crate::util::GitLab;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, base64_encode, explode,
     in_array_loose, in_array_strict, is_array, is_string, json_decode, parse_url, php_regex,

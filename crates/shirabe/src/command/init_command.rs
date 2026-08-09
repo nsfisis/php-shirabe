@@ -19,12 +19,12 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::helper::FormatBlockMessages;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,

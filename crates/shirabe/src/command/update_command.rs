@@ -27,11 +27,11 @@ use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
     array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, strtolower,

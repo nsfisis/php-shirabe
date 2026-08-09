@@ -26,10 +26,10 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{LogicException, get_debug_type, impl_php_class, php_regex};
 
 #[derive(Debug)]

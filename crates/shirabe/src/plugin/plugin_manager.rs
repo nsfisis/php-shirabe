@@ -24,7 +24,7 @@ use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageSorter;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,

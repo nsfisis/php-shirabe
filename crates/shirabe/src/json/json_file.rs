@@ -9,8 +9,8 @@ use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::{ParsingException, ParsingExceptionDetails};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
@@ -451,13 +451,9 @@ impl JsonFile {
             let indent_owned = options.indent;
             return Ok(Preg::replace_callback(
                 php_regex!(r"#^ {4,}#m"),
-                move |m: &indexmap::IndexMap<
-                    shirabe_external_packages::composer::pcre::CaptureKey,
-                    String,
-                >|
-                      -> String {
+                move |m: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
                     let whole = m
-                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(0))
+                        .get(&shirabe_pcre::CaptureKey::ByIndex(0))
                         .map(|s| s.as_str())
                         .unwrap_or("");
                     str_repeat(&indent_owned, (strlen(whole) / 4) as usize)

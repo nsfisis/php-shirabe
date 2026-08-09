@@ -2,7 +2,7 @@
 
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
     file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_array, is_readable,
@@ -83,7 +83,7 @@ impl Platform {
 
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
-        use shirabe_external_packages::composer::pcre::CaptureKey;
+        use shirabe_pcre::CaptureKey;
         if Preg::is_match(php_regex!(r"#^~[\\/]#"), path) {
             return format!(
                 "{}{}",

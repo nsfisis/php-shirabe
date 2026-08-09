@@ -31,7 +31,7 @@ use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, in_array_loose, in_array_strict, parse_url, php_regex, preg_quote, rename, strpos,
     substr, unlink_silent,

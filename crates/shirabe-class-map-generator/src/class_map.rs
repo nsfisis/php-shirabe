@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/ClassMap.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{OutOfBoundsException, rtrim, strpos, strtr};
 
 #[derive(Debug, Clone)]

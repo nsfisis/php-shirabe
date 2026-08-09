@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/IO/BufferIO.php
 
 use crate::io::ConsoleIO;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::output::StreamOutput;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, php_regex,
     rewind, stream_get_contents, strip_tags,
@@ -76,20 +76,16 @@ impl BufferIO {
         loop {
             let next = Preg::replace_callback(
                 php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
-                |matches: &indexmap::IndexMap<
-                    shirabe_external_packages::composer::pcre::CaptureKey,
-                    String,
-                >|
-                 -> String {
+                |matches: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
                     let empty = String::new();
                     let g1 = matches
-                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
+                        .get(&shirabe_pcre::CaptureKey::ByIndex(1))
                         .unwrap_or(&empty);
                     let g2 = matches
-                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(2))
+                        .get(&shirabe_pcre::CaptureKey::ByIndex(2))
                         .unwrap_or(&empty);
                     let g3 = matches
-                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(3))
+                        .get(&shirabe_pcre::CaptureKey::ByIndex(3))
                         .unwrap_or(&empty);
                     let pre = strip_tags(g2);
 

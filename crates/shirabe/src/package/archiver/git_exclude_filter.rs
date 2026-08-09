@@ -2,7 +2,7 @@
 
 use crate::package::archiver::BaseExcludeFilter;
 use crate::package::archiver::BaseExcludeFilterBase;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::php_regex;
 use std::path::Path;
 

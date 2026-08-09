@@ -11,7 +11,7 @@ use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::handle::LockArrayRepositoryHandle;
 use shirabe::repository::lock_array_repository::LockArrayRepository;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, php_regex};
 use std::path::PathBuf;

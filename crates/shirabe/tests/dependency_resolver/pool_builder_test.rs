@@ -19,7 +19,7 @@ use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterface
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_factory::RepositoryFactory;
 use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, php_regex};
 use std::path::PathBuf;

@@ -16,7 +16,7 @@ use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySetInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, php_regex, strtolower,
     version_compare,

@@ -12,7 +12,7 @@ use crate::repository::RepositoryManagerInterface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
     php_regex, php_to_string,

@@ -3,7 +3,7 @@
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::base_package::{self};
 use crate::repository::PlatformRepository;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_semver::Interval;
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;

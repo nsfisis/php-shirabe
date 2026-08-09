@@ -19,9 +19,9 @@ use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,

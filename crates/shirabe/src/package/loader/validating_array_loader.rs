@@ -7,7 +7,7 @@ use crate::package::version::VersionParser;
 use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values,
     filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,

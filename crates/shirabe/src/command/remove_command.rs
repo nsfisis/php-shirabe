@@ -17,11 +17,11 @@ use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, strtolower};
 
 #[derive(Debug)]

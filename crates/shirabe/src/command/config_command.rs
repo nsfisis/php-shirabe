@@ -18,10 +18,10 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array_loose,

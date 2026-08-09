@@ -16,7 +16,7 @@ use crate::util::http::CurlDownloader;
 use crate::util::http::Response;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,

@@ -9,7 +9,7 @@ use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode, php_regex, time,

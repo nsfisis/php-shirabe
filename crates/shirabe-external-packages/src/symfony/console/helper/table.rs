@@ -1,6 +1,5 @@
 //! ref: composer/vendor/symfony/console/Helper/Table.php
 
-use crate::composer::pcre::preg::Preg;
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::runtime_exception::RuntimeException;
 use crate::symfony::console::formatter::output_formatter::OutputFormatter;
@@ -14,6 +13,7 @@ use crate::symfony::console::helper::table_style::TableStyle;
 use crate::symfony::console::output::console_section_output::ConsoleSectionOutput;
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
+use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::{PhpMixed, php_regex};
 
 /// A single cell within a table row.
