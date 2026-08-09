@@ -29,10 +29,10 @@ use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
+use shirabe_symfony_console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_symfony_process::PhpExecutableFinder;
 use tempfile::TempDir;
 

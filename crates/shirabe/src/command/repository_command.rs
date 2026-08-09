@@ -10,14 +10,14 @@ use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, impl_php_class, parse_url,
     php_regex, strtolower,
 };
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct RepositoryCommand {
@@ -160,9 +160,7 @@ impl RepositoryCommand {
             // PHP passes the CompletionInput itself; the accessors only read from it, so a
             // clone behind a fresh handle is equivalent.
             let input_handle: std::rc::Rc<
-                std::cell::RefCell<
-                    dyn shirabe_external_packages::symfony::console::input::InputInterface,
-                >,
+                std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>,
             > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
             let config = crate::factory::Factory::create_config(None, None)?;
             let config_file = JsonFile::new(
@@ -580,13 +578,13 @@ impl Command for RepositoryCommand {
 
     fn complete(
         &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RepositoryCommand {

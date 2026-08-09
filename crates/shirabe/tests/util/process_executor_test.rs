@@ -8,14 +8,14 @@ use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_external_packages::symfony::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
-use shirabe_external_packages::symfony::console::output::output_interface::{
+use shirabe_php_shim::{PHP_EOL, ob_get_clean, ob_start, trim};
+use shirabe_symfony_console::helper::QuestionHelper;
+use shirabe_symfony_console::input::array_input::ArrayInput;
+use shirabe_symfony_console::input::input_interface::InputInterface;
+use shirabe_symfony_console::output::buffered_output::BufferedOutput;
+use shirabe_symfony_console::output::output_interface::{
     OutputInterface, VERBOSITY_DEBUG, VERBOSITY_NORMAL,
 };
-use shirabe_php_shim::{PHP_EOL, ob_get_clean, ob_start, trim};
 
 #[test]
 fn test_execute_captures_output() {

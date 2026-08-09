@@ -56,42 +56,6 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::seld::json_lint::ParsingException;
-use shirabe_external_packages::symfony::console::application::Application as BaseApplication;
-use shirabe_external_packages::symfony::console::command::Command as SymfonyCommand;
-use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
-use shirabe_external_packages::symfony::console::command::signalable_command_interface::SignalableCommandInterface;
-use shirabe_external_packages::symfony::console::command_loader::command_loader_interface::CommandLoaderInterface;
-use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
-use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
-use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
-use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
-use shirabe_external_packages::symfony::console::exception::invalid_option_exception::InvalidOptionException;
-use shirabe_external_packages::symfony::console::exception::logic_exception::LogicException as ConsoleLogicException;
-use shirabe_external_packages::symfony::console::exception::missing_input_exception::MissingInputException;
-use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
-use shirabe_external_packages::symfony::console::exception::runtime_exception::RuntimeException as ConsoleRuntimeException;
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::helper::HelperSet;
-use shirabe_external_packages::symfony::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::helper::formatter_helper::{
-    FormatBlockMessages, FormatterHelper,
-};
-use shirabe_external_packages::symfony::console::helper::helper::Helper;
-use shirabe_external_packages::symfony::console::input::InputDefinition;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::input::InputOption;
-use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
-use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
-use shirabe_external_packages::symfony::console::output::output_interface::{
-    self, OutputInterface,
-};
-use shirabe_external_packages::symfony::console::signal_registry::signal_registry::SignalRegistry;
-use shirabe_external_packages::symfony::console::style::style_interface::StyleInterface;
-use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
-use shirabe_external_packages::symfony::console::terminal::Terminal;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
@@ -102,6 +66,38 @@ use shirabe_php_shim::{
     php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains,
     str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
+use shirabe_symfony_console::application::Application as BaseApplication;
+use shirabe_symfony_console::command::Command as SymfonyCommand;
+use shirabe_symfony_console::command::help_command::HelpCommand;
+use shirabe_symfony_console::command::signalable_command_interface::SignalableCommandInterface;
+use shirabe_symfony_console::command_loader::command_loader_interface::CommandLoaderInterface;
+use shirabe_symfony_console::completion::completion_input::CompletionInput;
+use shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions;
+use shirabe_symfony_console::exception::CommandNotFoundException;
+use shirabe_symfony_console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
+use shirabe_symfony_console::exception::invalid_option_exception::InvalidOptionException;
+use shirabe_symfony_console::exception::logic_exception::LogicException as ConsoleLogicException;
+use shirabe_symfony_console::exception::missing_input_exception::MissingInputException;
+use shirabe_symfony_console::exception::namespace_not_found_exception::NamespaceNotFoundException;
+use shirabe_symfony_console::exception::runtime_exception::RuntimeException as ConsoleRuntimeException;
+use shirabe_symfony_console::formatter::output_formatter::OutputFormatter;
+use shirabe_symfony_console::helper::HelperSet;
+use shirabe_symfony_console::helper::QuestionHelper;
+use shirabe_symfony_console::helper::formatter_helper::{FormatBlockMessages, FormatterHelper};
+use shirabe_symfony_console::helper::helper::Helper;
+use shirabe_symfony_console::input::InputDefinition;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputOption;
+use shirabe_symfony_console::input::argv_input::ArgvInput;
+use shirabe_symfony_console::input::array_input::ArrayInput;
+use shirabe_symfony_console::input::input_argument::InputArgument;
+use shirabe_symfony_console::output::ConsoleOutputInterface;
+use shirabe_symfony_console::output::console_output::ConsoleOutput;
+use shirabe_symfony_console::output::output_interface::{self, OutputInterface};
+use shirabe_symfony_console::signal_registry::signal_registry::SignalRegistry;
+use shirabe_symfony_console::style::style_interface::StyleInterface;
+use shirabe_symfony_console::style::symfony_style::SymfonyStyle;
+use shirabe_symfony_console::terminal::Terminal;
 use shirabe_symfony_process::exception::ProcessTimedOutException;
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
@@ -782,12 +778,12 @@ impl Application {
                 }
             }
             // array_filter($commandNames)
-            let filtered: Vec<shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion> =
+            let filtered: Vec<shirabe_symfony_console::completion::completion_suggestions::StringOrSuggestion> =
                 command_names
                     .into_iter()
                     .filter(shirabe_php_shim::php_truthy)
                     .map(|n| {
-                        shirabe_external_packages::symfony::console::completion::completion_suggestions::StringOrSuggestion::String(
+                        shirabe_symfony_console::completion::completion_suggestions::StringOrSuggestion::String(
                             shirabe_php_shim::php_to_string(&n),
                         )
                     })
@@ -1568,7 +1564,7 @@ impl Application {
 
     /// Gets the default input definition (Symfony base; `parent::getDefaultInputDefinition`).
     pub fn base_get_default_input_definition(&self) -> InputDefinition {
-        use shirabe_external_packages::symfony::console::input::input_definition::DefinitionItem;
+        use shirabe_symfony_console::input::input_definition::DefinitionItem;
         InputDefinition::new(vec![
             DefinitionItem::InputArgument(
                 InputArgument::new(
@@ -1651,10 +1647,10 @@ impl Application {
     pub fn base_get_default_commands(
         &self,
     ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        use shirabe_external_packages::symfony::console::command::complete_command::CompleteCommand;
-        use shirabe_external_packages::symfony::console::command::dump_completion_command::DumpCompletionCommand;
-        use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
-        use shirabe_external_packages::symfony::console::command::list_command::ListCommand;
+        use shirabe_symfony_console::command::complete_command::CompleteCommand;
+        use shirabe_symfony_console::command::dump_completion_command::DumpCompletionCommand;
+        use shirabe_symfony_console::command::help_command::HelpCommand;
+        use shirabe_symfony_console::command::list_command::ListCommand;
 
         vec![
             std::rc::Rc::new(std::cell::RefCell::new(HelpCommand::new()))
@@ -3074,9 +3070,7 @@ pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow
     };
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            shirabe_external_packages::symfony::console::input::string_input::StringInput::new(
-                &line,
-            )?,
+            shirabe_symfony_console::input::string_input::StringInput::new(&line)?,
         ));
     let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(ConsoleOutput::new(None, None, None)?),

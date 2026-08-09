@@ -18,10 +18,10 @@ use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterface
 use shirabe::script::ScriptEvents;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::{PhpMixed, dirname, preg_quote, realpath, strtr};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
+use shirabe_symfony_console::output::output_interface;
 use tempfile::TempDir;
 
 /// The mock `InstallationManager::getInstallPath` used throughout the test: metapackages return

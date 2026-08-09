@@ -12,12 +12,12 @@ use shirabe::command::about_command::AboutCommand;
 use shirabe::command::self_update_command::SelfUpdateCommand;
 use shirabe::console::application::ApplicationHandle;
 use shirabe::util::platform::Platform;
-use shirabe_external_packages::symfony::console::command::Command;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PHP_EOL, PHP_SERVER, PhpMixed, time};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::array_input::ArrayInput;
+use shirabe_symfony_console::input::input_interface::InputInterface;
+use shirabe_symfony_console::output::buffered_output::BufferedOutput;
+use shirabe_symfony_console::output::output_interface::OutputInterface;
 
 fn set_up() {
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");

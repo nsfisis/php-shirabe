@@ -2,8 +2,8 @@
 
 use shirabe::io::IOInterfaceImmutable;
 use shirabe::io::buffer_io::BufferIO;
-use shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::output::output_interface::VERBOSITY_NORMAL;
 
 #[test]
 fn test_set_user_inputs() {

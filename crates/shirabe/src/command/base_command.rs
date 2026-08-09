@@ -18,18 +18,16 @@ use crate::plugin::PluginEvents;
 use crate::plugin::PreCommandRunEvent;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::Terminal;
-use shirabe_external_packages::symfony::console::command::command::{
-    Command, CommandData, SetDefinitionArg,
-};
-use shirabe_external_packages::symfony::console::helper::Table;
-use shirabe_external_packages::symfony::console::helper::TableSeparator;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
     UnexpectedValueException, count, explode, in_array_strict, is_string,
 };
+use shirabe_symfony_console::Terminal;
+use shirabe_symfony_console::command::command::{Command, CommandData, SetDefinitionArg};
+use shirabe_symfony_console::helper::Table;
+use shirabe_symfony_console::helper::TableSeparator;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 pub const SUCCESS: i64 = 0;
 pub const FAILURE: i64 = 1;
@@ -251,26 +249,26 @@ pub trait BaseCommand: Command {
 #[macro_export]
 macro_rules! delegate_base_command_trait_impls_to_inner {
     ($field:ident) => {
-        shirabe_external_packages::delegate_to_inner!($field, fn require_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
-        shirabe_external_packages::delegate_to_inner!($field, fn try_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> Option<$crate::composer::PartialComposerHandle>);
-        shirabe_external_packages::delegate_to_inner!($field, fn set_composer(&self, composer: $crate::composer::PartialComposerHandle));
-        shirabe_external_packages::delegate_to_inner!($field, fn reset_composer(&self) -> anyhow::Result<()>);
-        shirabe_external_packages::delegate_to_inner!($field, fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>);
-        shirabe_external_packages::delegate_to_inner!($field, fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>));
-        shirabe_external_packages::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
-        shirabe_external_packages::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
-        shirabe_external_packages::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
-        shirabe_external_packages::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<String>) -> anyhow::Result<indexmap::IndexMap<String, String>>);
-        shirabe_external_packages::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<String>) -> anyhow::Result<Vec<indexmap::IndexMap<String, String>>>);
-        shirabe_external_packages::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::output::OutputInterface>>));
-        shirabe_external_packages::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
-        shirabe_external_packages::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, opt_name: &str) -> anyhow::Result<String>);
-        shirabe_external_packages::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn require_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn try_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> Option<$crate::composer::PartialComposerHandle>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn set_composer(&self, composer: $crate::composer::PartialComposerHandle));
+        shirabe_symfony_console::delegate_to_inner!($field, fn reset_composer(&self) -> anyhow::Result<()>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>));
+        shirabe_symfony_console::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<String>) -> anyhow::Result<indexmap::IndexMap<String, String>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<String>) -> anyhow::Result<Vec<indexmap::IndexMap<String, String>>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>));
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &str) -> anyhow::Result<String>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
     };
 }
 
 impl Command for BaseCommandData {
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(inner);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(inner);
 }
 
 impl PhpClass for BaseCommandData {
@@ -299,7 +297,8 @@ impl BaseCommand for BaseCommandData {
             };
             let composer = {
                 let mut app_ref = application.borrow_mut();
-                let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
+                let app_dyn: &mut dyn shirabe_symfony_console::application::Application =
+                    &mut *app_ref;
                 let app = app_dyn
                     .as_any_mut()
                     .downcast_mut::<Application>()
@@ -326,7 +325,8 @@ impl BaseCommand for BaseCommandData {
         {
             let result = {
                 let mut app_ref = application.borrow_mut();
-                let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
+                let app_dyn: &mut dyn shirabe_symfony_console::application::Application =
+                    &mut *app_ref;
                 let app = app_dyn
                     .as_any_mut()
                     .downcast_mut::<Application>()
@@ -349,7 +349,7 @@ impl BaseCommand for BaseCommandData {
         *self.composer.borrow_mut() = None;
         if let Some(application) = self.get_application() {
             let mut app_ref = application.borrow_mut();
-            let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
+            let app_dyn: &mut dyn shirabe_symfony_console::application::Application = &mut *app_ref;
             let app = app_dyn
                 .as_any_mut()
                 .downcast_mut::<Application>()
@@ -365,7 +365,8 @@ impl BaseCommand for BaseCommandData {
                 Some(application) => {
                     let io = {
                         let app_ref = application.borrow();
-                        let app_dyn: &dyn shirabe_external_packages::symfony::console::application::Application = &*app_ref;
+                        let app_dyn: &dyn shirabe_symfony_console::application::Application =
+                            &*app_ref;
                         let app = app_dyn
                             .as_any()
                             .downcast_ref::<Application>()
@@ -717,19 +718,14 @@ impl BaseCommand for BaseCommandData {
 /// (same for `getDisableScriptsByDefault()`), ORed into the caller's flags.
 fn apply_application_defaults(
     application: Option<
-        std::rc::Rc<
-            std::cell::RefCell<
-                dyn shirabe_external_packages::symfony::console::application::Application,
-            >,
-        >,
+        std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::application::Application>>,
     >,
     mut disable_plugins: bool,
     mut disable_scripts: bool,
 ) -> (bool, bool) {
     if let Some(application) = application {
         let app_ref = application.borrow();
-        let app_dyn: &dyn shirabe_external_packages::symfony::console::application::Application =
-            &*app_ref;
+        let app_dyn: &dyn shirabe_symfony_console::application::Application = &*app_ref;
         let app = app_dyn
             .as_any()
             .downcast_ref::<Application>()
@@ -745,10 +741,10 @@ fn apply_application_defaults(
 /// each command's `Command::complete` forwards here.
 pub fn base_command_complete(
     cmd: &dyn BaseCommand,
-    input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-    suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+    input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
+    suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
 ) -> anyhow::Result<()> {
-    use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
+    use shirabe_symfony_console::completion::completion_input::CompletionInput;
 
     // PHP: (string) $input->getCompletionName()
     let name = input.get_completion_name().unwrap_or_default();

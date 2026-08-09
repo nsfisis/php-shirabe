@@ -51,10 +51,6 @@ use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyleInterface;
-use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
@@ -62,6 +58,10 @@ use shirabe_php_shim::{
     file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode,
     mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr, substr, trim,
 };
+use shirabe_symfony_console::formatter::OutputFormatter;
+use shirabe_symfony_console::formatter::OutputFormatterStyle;
+use shirabe_symfony_console::formatter::OutputFormatterStyleInterface;
+use shirabe_symfony_console::output::ConsoleOutput;
 
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.
 pub enum LocalConfigInput {
@@ -402,7 +402,7 @@ impl Factory {
         let formatter = OutputFormatter::new(false, styles);
 
         ConsoleOutput::new(
-            Some(shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL),
+            Some(shirabe_symfony_console::output::output_interface::VERBOSITY_NORMAL),
             None,
             Some(std::rc::Rc::new(std::cell::RefCell::new(formatter))),
         )

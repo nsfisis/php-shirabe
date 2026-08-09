@@ -9,24 +9,22 @@ use crate::io::io_interface;
 use crate::question::StrictConfirmationQuestion;
 use indexmap::IndexMap;
 use indexmap::indexmap;
-use shirabe_external_packages::symfony::console::helper::ProgressBar;
-use shirabe_external_packages::symfony::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::helper::QuestionHelperInterface;
-use shirabe_external_packages::symfony::console::helper::Table;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::ConsoleOutput;
-use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::{
-    self, OutputInterface,
-};
-use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
-use shirabe_external_packages::symfony::console::question::Question;
-use shirabe_external_packages::symfony::console::question::QuestionInterface;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, array_search, implode, in_array_strict, is_array, is_string, microtime, str_repeat,
     strip_tags, strlen,
 };
+use shirabe_symfony_console::helper::ProgressBar;
+use shirabe_symfony_console::helper::QuestionHelper;
+use shirabe_symfony_console::helper::QuestionHelperInterface;
+use shirabe_symfony_console::helper::Table;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::ConsoleOutput;
+use shirabe_symfony_console::output::ConsoleOutputInterface;
+use shirabe_symfony_console::output::output_interface::{self, OutputInterface};
+use shirabe_symfony_console::question::ChoiceQuestion;
+use shirabe_symfony_console::question::Question;
+use shirabe_symfony_console::question::QuestionInterface;
 
 /// The Input/Output helper.
 #[derive(Debug)]
@@ -486,13 +484,11 @@ impl IOInterfaceImmutable for ConsoleIO {
                 Option<PhpMixed>,
             ) -> Result<
                 PhpMixed,
-                shirabe_external_packages::symfony::console::exception::InvalidArgumentException,
+                shirabe_symfony_console::exception::InvalidArgumentException,
             >,
         > = Box::new(move |answer: Option<PhpMixed>| {
             validator(answer.unwrap_or(PhpMixed::Null)).map_err(|e| {
-                shirabe_external_packages::symfony::console::exception::InvalidArgumentException::new(
-                    e.to_string(),
-                )
+                shirabe_symfony_console::exception::InvalidArgumentException::new(e.to_string())
             })
         });
         question.set_validator(Some(adapted));

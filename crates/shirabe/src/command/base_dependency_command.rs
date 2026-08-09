@@ -14,13 +14,13 @@ use crate::repository::{DependentsEntry, InstalledRepository, NeedleInput};
 use crate::repository::{FindPackageConstraint, RepositoryInterface};
 use crate::util::PackageInfo;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
+use shirabe_symfony_console::formatter::OutputFormatter;
+use shirabe_symfony_console::formatter::OutputFormatterStyle;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 pub const ARGUMENT_PACKAGE: &str = "package";
 pub const ARGUMENT_CONSTRAINT: &str = "version";
@@ -90,7 +90,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             {
                 output.borrow().writeln(
                     &["<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>".to_string()],
-                    shirabe_external_packages::symfony::console::output::OUTPUT_NORMAL,
+                    shirabe_symfony_console::output::OUTPUT_NORMAL,
                 );
 
                 return Ok(1);

@@ -8,10 +8,10 @@ use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterfaceImmutable;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{impl_php_class, realpath};
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {
@@ -188,13 +188,13 @@ impl Command for ClearCacheCommand {
 
     fn complete(
         &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ClearCacheCommand {

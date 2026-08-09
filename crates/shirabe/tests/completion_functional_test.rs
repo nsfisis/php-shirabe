@@ -14,7 +14,7 @@ mod bootstrap;
 
 use serial_test::serial;
 use shirabe::console::application::{Application, ApplicationHandle};
-use shirabe_external_packages::symfony::console::tester::command_completion_tester::CommandCompletionTester;
+use shirabe_symfony_console::tester::command_completion_tester::CommandCompletionTester;
 
 struct RestoreCwd(std::path::PathBuf);
 
@@ -48,8 +48,7 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
     let base = application.__base_application();
     let command = {
         let mut app_ref = base.borrow_mut();
-        let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application =
-            &mut *app_ref;
+        let app_dyn: &mut dyn shirabe_symfony_console::application::Application = &mut *app_ref;
         let app = app_dyn
             .as_any_mut()
             .downcast_mut::<Application>()

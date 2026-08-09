@@ -21,16 +21,16 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::input::streamable_input_interface::StreamableInputInterface;
-use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
-use shirabe_external_packages::symfony::console::output::console_output_interface::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
 use shirabe_php_shim::{PhpMixed, PhpResource};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
+use shirabe_symfony_console::input::array_input::ArrayInput;
+use shirabe_symfony_console::input::input_interface::InputInterface;
+use shirabe_symfony_console::input::streamable_input_interface::StreamableInputInterface;
+use shirabe_symfony_console::output::console_output::ConsoleOutput;
+use shirabe_symfony_console::output::console_output_interface::ConsoleOutputInterface;
+use shirabe_symfony_console::output::output_interface::OutputInterface;
+use shirabe_symfony_console::output::stream_output::StreamOutput;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -309,8 +309,8 @@ pub fn get_application_tester() -> ApplicationTester {
 
 /// ref: Symfony\Component\Console\Tester\ApplicationTester::run options.
 ///
-/// Lives in the test harness (not `shirabe_external_packages`) because the tester drives shirabe's
-/// own `ApplicationHandle`, which the external-packages crate cannot depend on.
+/// Lives in the test harness (not `shirabe_symfony_console`) because the tester drives shirabe's
+/// own `ApplicationHandle`, which the console crate cannot depend on.
 #[derive(Debug, Default)]
 pub struct RunOptions {
     pub interactive: Option<bool>,

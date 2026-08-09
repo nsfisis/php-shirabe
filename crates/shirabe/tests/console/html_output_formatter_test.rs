@@ -2,9 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe::console::html_output_formatter::HtmlOutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::{
-    OutputFormatterStyle, OutputFormatterStyleInterface,
-};
+use shirabe_symfony_console::formatter::{OutputFormatterStyle, OutputFormatterStyleInterface};
 
 #[test]
 fn test_formatting() {

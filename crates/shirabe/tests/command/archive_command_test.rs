@@ -15,13 +15,13 @@ use shirabe::repository::{
     InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use shirabe::util::Platform;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::array_input::ArrayInput;
+use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::output::buffered_output::BufferedOutput;
 
 // PHP mocks `Composer\Package\Archiver\ArchiveManager` with
 // getMockBuilder(...)->disableOriginalConstructor().

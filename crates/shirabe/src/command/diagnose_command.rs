@@ -33,9 +33,6 @@ use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -44,6 +41,9 @@ use shirabe_php_shim::{
     is_string, php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos, strstr,
     strstr3, strtolower, trim, version_compare,
 };
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_process::ExecutableFinder;
 
 #[derive(Debug)]
@@ -634,13 +634,12 @@ impl DiagnoseCommand {
             )?);
         repo_set.add_repository(composer_repo_as_repo)?;
 
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-            std::cell::RefCell::new(BufferIO::new(
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(BufferIO::new(
                 String::new(),
-                shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL,
+                shirabe_symfony_console::output::output_interface::VERBOSITY_NORMAL,
                 None,
-            )?),
-        );
+            )?));
         let result = match auditor.audit(
             &io,
             &repo_set,
@@ -1503,13 +1502,13 @@ impl Command for DiagnoseCommand {
 
     fn complete(
         &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for DiagnoseCommand {

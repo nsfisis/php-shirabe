@@ -1,0 +1,286 @@
+//! ref: composer/vendor/symfony/console/Question/ChoiceQuestion.php
+
+use crate::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::exception::logic_exception::LogicException;
+use crate::question::Question;
+use crate::question::QuestionInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::{PhpMixed, php_regex};
+
+/// Represents a choice question.
+#[derive(Debug)]
+pub struct ChoiceQuestion {
+    inner: Question,
+    choices: IndexMap<String, PhpMixed>,
+    multiselect: bool,
+    prompt: String,
+    error_message: String,
+}
+
+impl ChoiceQuestion {
+    /// `$question` The question to ask to the user.
+    /// `$choices` The list of available choices.
+    /// `$default` The default answer to return.
+    pub fn new(
+        question: String,
+        choices: IndexMap<String, PhpMixed>,
+        default: Option<PhpMixed>,
+    ) -> Result<Self, LogicException> {
+        if choices.is_empty() {
+            return Err(LogicException::new(
+                "Choice question must have at least 1 choice available.".to_string(),
+            ));
+        }
+
+        let mut this = Self {
+            inner: Question::new(question, default),
+            choices: choices.clone(),
+            multiselect: false,
+            prompt: " > ".to_string(),
+            error_message: "Value \"%s\" is invalid".to_string(),
+        };
+
+        let validator = this.get_default_validator();
+        this.inner.set_validator(Some(validator));
+        // setAutocompleterValues never throws for an array argument.
+        this.inner
+            .set_autocompleter_values(Some(PhpMixed::Array(choices)))
+            .expect("autocompleter cannot be set on a hidden question during construction");
+
+        Ok(this)
+    }
+
+    /// Returns available choices.
+    pub fn get_choices(&self) -> &IndexMap<String, PhpMixed> {
+        &self.choices
+    }
+
+    /// Sets multiselect option.
+    ///
+    /// When multiselect is set to true, multiple choices can be answered.
+    pub fn set_multiselect(&mut self, multiselect: bool) -> &mut Self {
+        self.multiselect = multiselect;
+        let validator = self.get_default_validator();
+        self.inner.set_validator(Some(validator));
+
+        self
+    }
+
+    /// Returns whether the choices are multiselect.
+    pub fn is_multiselect(&self) -> bool {
+        self.multiselect
+    }
+
+    /// Gets the prompt for choices.
+    pub fn get_prompt(&self) -> &str {
+        &self.prompt
+    }
+
+    /// Sets the prompt for choices.
+    pub fn set_prompt(&mut self, prompt: String) -> &mut Self {
+        self.prompt = prompt;
+
+        self
+    }
+
+    /// Inherited from Question. Sets the maximum number of attempts.
+    pub fn set_max_attempts(
+        &mut self,
+        attempts: Option<i64>,
+    ) -> Result<&mut Self, InvalidArgumentException> {
+        self.inner.set_max_attempts(attempts)?;
+
+        Ok(self)
+    }
+
+    /// Sets the error message for invalid values.
+    ///
+    /// The error message has a string placeholder (%s) for the invalid value.
+    pub fn set_error_message(&mut self, error_message: String) -> &mut Self {
+        self.error_message = error_message;
+        let validator = self.get_default_validator();
+        self.inner.set_validator(Some(validator));
+
+        self
+    }
+
+    fn get_default_validator(
+        &self,
+    ) -> Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+        let choices = self.choices.clone();
+        let error_message = self.error_message.clone();
+        let multiselect = self.multiselect;
+        let is_assoc = Question::is_assoc(&PhpMixed::Array(self.choices.clone()));
+        // PHP reads `$this->isTrimmable()` live inside the closure. A 'static boxed
+        // closure cannot borrow `$this`, so the value is snapshotted at validator
+        // creation time. setValidator is re-run on multiselect/errorMessage changes,
+        // but a later setTrimmable would not be reflected. See review notes.
+        let trimmable = self.inner.is_trimmable();
+
+        Box::new(move |selected: Option<PhpMixed>| {
+            let selected = selected.unwrap_or(PhpMixed::Null);
+
+            let selected_choices: Vec<PhpMixed> = if multiselect {
+                // Check for a separated comma values
+                let mut matches: Vec<Option<String>> = Vec::new();
+                if !shirabe_php_shim::preg_match(
+                    php_regex!("/^[^,]+(?:,[^,]+)*$/"),
+                    &shirabe_php_shim::strval(&selected),
+                    &mut matches,
+                ) {
+                    return Err(InvalidArgumentException::new(shirabe_php_shim::sprintf(
+                        &error_message,
+                        std::slice::from_ref(&selected),
+                    )));
+                }
+
+                shirabe_php_shim::explode(",", &shirabe_php_shim::strval(&selected))
+                    .into_iter()
+                    .map(PhpMixed::String)
+                    .collect()
+            } else {
+                vec![selected]
+            };
+
+            let mut selected_choices = selected_choices;
+            if trimmable {
+                for v in selected_choices.iter_mut() {
+                    *v = PhpMixed::String(shirabe_php_shim::trim(
+                        &shirabe_php_shim::strval(v),
+                        None,
+                    ));
+                }
+            }
+
+            let mut multiselect_choices: Vec<PhpMixed> = Vec::new();
+            for value in &selected_choices {
+                let mut results: Vec<String> = Vec::new();
+                for (key, choice) in &choices {
+                    if (*choice) == *value {
+                        results.push(key.clone());
+                    }
+                }
+
+                if results.len() > 1 {
+                    return Err(InvalidArgumentException::new(format!(
+                        "The provided answer is ambiguous. Value should be one of \"{}\".",
+                        shirabe_php_shim::implode("\" or \"", &results),
+                    )));
+                }
+
+                // array_search($value, $choices)
+                let result_key = shirabe_php_shim::array_search(
+                    &shirabe_php_shim::strval(value),
+                    &choices_as_str(&choices),
+                );
+
+                let mut result: PhpMixed;
+                if !is_assoc {
+                    if let Some(found_key) = &result_key {
+                        // $result = $choices[$result];
+                        result = choices[found_key].clone();
+                    } else if let Some(found) = choices.get(&shirabe_php_shim::strval(value)) {
+                        // isset($choices[$value])
+                        result = found.clone();
+                    } else {
+                        result = PhpMixed::Bool(false);
+                    }
+                } else if result_key.is_none() {
+                    if let Some(_found) = choices.get(&shirabe_php_shim::strval(value)) {
+                        // false === $result && isset($choices[$value])
+                        result = value.clone();
+                    } else {
+                        result = PhpMixed::Bool(false);
+                    }
+                } else {
+                    // associative, found: keep the matched key
+                    result = PhpMixed::String(result_key.clone().unwrap());
+                }
+
+                // false === $result
+                if matches!(result, PhpMixed::Bool(false)) {
+                    return Err(InvalidArgumentException::new(shirabe_php_shim::sprintf(
+                        &error_message,
+                        std::slice::from_ref(value),
+                    )));
+                }
+
+                // For associative choices, consistently return the key as string:
+                if is_assoc {
+                    result = PhpMixed::String(shirabe_php_shim::strval(&result));
+                }
+                multiselect_choices.push(result);
+            }
+
+            if multiselect {
+                return Ok(PhpMixed::List(multiselect_choices));
+            }
+
+            Ok(multiselect_choices
+                .into_iter()
+                .next()
+                .unwrap_or(PhpMixed::Bool(false)))
+        })
+    }
+}
+
+impl QuestionInterface for ChoiceQuestion {
+    fn get_question(&self) -> &str {
+        self.inner.get_question()
+    }
+
+    fn get_default(&self) -> PhpMixed {
+        self.inner.get_default()
+    }
+
+    fn is_multiline(&self) -> bool {
+        self.inner.is_multiline()
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.inner.is_hidden()
+    }
+
+    fn is_hidden_fallback(&self) -> bool {
+        self.inner.is_hidden_fallback()
+    }
+
+    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+        self.inner.get_autocompleter_values()
+    }
+
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+        self.inner.get_autocompleter_callback()
+    }
+
+    fn get_validator(
+        &self,
+    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+        self.inner.get_validator()
+    }
+
+    fn get_max_attempts(&self) -> Option<i64> {
+        self.inner.get_max_attempts()
+    }
+
+    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
+        self.inner.get_normalizer()
+    }
+
+    fn is_trimmable(&self) -> bool {
+        self.inner.is_trimmable()
+    }
+
+    fn as_choice(&self) -> Option<&ChoiceQuestion> {
+        Some(self)
+    }
+}
+
+/// array_search operates over the choice values as strings; this projects the
+/// choices map's values into the string-keyed form the shim expects.
+fn choices_as_str(choices: &IndexMap<String, PhpMixed>) -> IndexMap<String, String> {
+    choices
+        .iter()
+        .map(|(k, v)| (k.clone(), shirabe_php_shim::strval(v)))
+        .collect()
+}

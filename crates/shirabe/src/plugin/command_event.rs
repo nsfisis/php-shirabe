@@ -3,9 +3,9 @@
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct CommandEvent {

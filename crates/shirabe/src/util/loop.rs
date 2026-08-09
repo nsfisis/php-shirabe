@@ -4,7 +4,7 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
-use shirabe_external_packages::symfony::console::helper::ProgressBar;
+use shirabe_symfony_console::helper::ProgressBar;
 
 #[derive(Debug)]
 pub struct Loop {

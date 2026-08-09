@@ -28,14 +28,14 @@ use crate::repository::{
     RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
     call_function_with_dispatcher, call_php_method, release_php_handle,
 };
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 /// A Rust-side entity a PHP proxy stub points back to.
 #[derive(Debug, Clone)]
@@ -2901,11 +2901,9 @@ impl PhpCommandProxy {
         handle: &PhpObjHandle,
         data: &crate::command::BaseCommandData,
     ) -> anyhow::Result<()> {
-        use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
-        use shirabe_external_packages::symfony::console::input::input_definition::{
-            DefinitionItem, InputDefinition,
-        };
-        use shirabe_external_packages::symfony::console::input::input_option::InputOption;
+        use shirabe_symfony_console::input::input_argument::InputArgument;
+        use shirabe_symfony_console::input::input_definition::{DefinitionItem, InputDefinition};
+        use shirabe_symfony_console::input::input_option::InputOption;
 
         let value = unwrap_php_result(call_function_with_dispatcher(
             "__shirabe_read_command_definition",
@@ -3010,7 +3008,7 @@ impl PhpCommandProxy {
             )?));
         }
         data.command_data().set_definition(
-            shirabe_external_packages::symfony::console::command::command::SetDefinitionArg::Definition(
+            shirabe_symfony_console::command::command::SetDefinitionArg::Definition(
                 InputDefinition::new(items)?,
             ),
         );
@@ -3105,7 +3103,7 @@ impl Command for PhpCommandProxy {
         self.proxy_command
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for PhpCommandProxy {

@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Console/Input/InputOption.php
 
 use crate::console::input::SuggestedValues;
-use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
-use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
-use shirabe_external_packages::symfony::console::input::InputOption as BaseInputOption;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::completion::completion_input::CompletionInput;
+use shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions;
+use shirabe_symfony_console::input::InputOption as BaseInputOption;
 
 #[derive(Debug)]
 pub struct InputOption {

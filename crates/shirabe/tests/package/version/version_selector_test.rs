@@ -15,10 +15,10 @@ use shirabe::package::version::VersionSelector;
 use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::PlatformRepository;
 use shirabe::repository::RepositorySetInterface;
-use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION};
 use shirabe_semver::constraint::AnyConstraint;
+use shirabe_symfony_console::output::output_interface;
 
 mockall::mock! {
     RepositorySet {}

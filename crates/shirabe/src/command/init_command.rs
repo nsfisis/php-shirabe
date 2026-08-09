@@ -19,11 +19,6 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::helper::FormatBlockMessages;
-use shirabe_external_packages::symfony::console::input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -34,6 +29,11 @@ use shirabe_php_shim::{
     ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::helper::FormatBlockMessages;
+use shirabe_symfony_console::input::ArrayInput;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct InitCommand {
@@ -1250,13 +1250,13 @@ impl Command for InitCommand {
 
     fn complete(
         &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for InitCommand {

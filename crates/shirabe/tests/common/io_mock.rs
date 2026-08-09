@@ -5,9 +5,9 @@ use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::io_interface;
 use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use shirabe::util::platform::Platform;
-use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{PHP_EOL, PhpMixed, php_regex, preg_quote};
+use shirabe_symfony_console::output::output_interface;
 use std::collections::VecDeque;
 
 // A single entry of the IO expectation list. PHP models these as associative

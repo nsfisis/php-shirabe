@@ -21,7 +21,6 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
@@ -31,6 +30,7 @@ use shirabe_php_shim::{
     substr, substr_count, trim, unlink, var_export,
 };
 use shirabe_semver::constraint::Bound;
+use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {

@@ -1,17 +1,17 @@
 //! ref: composer/src/Composer/IO/BufferIO.php
 
 use crate::io::ConsoleIO;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
-use shirabe_external_packages::symfony::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::input::StringInput;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_external_packages::symfony::console::output::StreamOutput;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, php_regex,
     rewind, stream_get_contents, strip_tags,
 };
+use shirabe_symfony_console::formatter::OutputFormatterInterface;
+use shirabe_symfony_console::helper::QuestionHelper;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::StringInput;
+use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::output::StreamOutput;
 
 #[derive(Debug)]
 pub struct BufferIO {

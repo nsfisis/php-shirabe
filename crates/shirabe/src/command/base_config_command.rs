@@ -9,9 +9,9 @@ use crate::json::JsonFile;
 use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, chmod, touch};
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 pub trait BaseConfigCommand: BaseCommand {
     fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>>;

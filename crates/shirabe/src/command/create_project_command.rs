@@ -37,9 +37,6 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_external_packages::seld::signal::SignalHandler;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -47,6 +44,9 @@ use shirabe_php_shim::{
     chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir, is_file,
     mkdir, realpath, rtrim, strtolower, unlink,
 };
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
 
@@ -1021,13 +1021,13 @@ impl Command for CreateProjectCommand {
 
     fn complete(
         &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for CreateProjectCommand {

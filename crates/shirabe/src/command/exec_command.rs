@@ -7,10 +7,10 @@ use crate::console::Application;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
-use shirabe_external_packages::symfony::console::command::command::Command;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class};
+use shirabe_symfony_console::command::command::Command;
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ExecCommand {
@@ -208,8 +208,7 @@ impl Command for ExecCommand {
 
         let initial_working_directory = self.get_application().and_then(|application| {
             let application = application.borrow();
-            let app_dyn: &dyn shirabe_external_packages::symfony::console::application::Application =
-                &*application;
+            let app_dyn: &dyn shirabe_symfony_console::application::Application = &*application;
             app_dyn
                 .as_any()
                 .downcast_ref::<Application>()
@@ -257,13 +256,13 @@ impl Command for ExecCommand {
 
     fn complete(
         &self,
-        input: &shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput,
-        suggestions: &mut shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions,
+        input: &shirabe_symfony_console::completion::completion_input::CompletionInput,
+        suggestions: &mut shirabe_symfony_console::completion::completion_suggestions::CompletionSuggestions,
     ) -> anyhow::Result<()> {
         crate::command::base_command::base_command_complete(self, input, suggestions)
     }
 
-    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+    shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ExecCommand {

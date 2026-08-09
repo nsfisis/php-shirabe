@@ -1,14 +1,12 @@
 //! ref: composer/tests/Composer/Test/Question/StrictConfirmationQuestionTest.php
 
 use shirabe::question::StrictConfirmationQuestion;
-use shirabe_external_packages::symfony::console::helper::question_helper::{
-    QuestionHelper, QuestionHelperInterface,
-};
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::streamable_input_interface::StreamableInputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::helper::question_helper::{QuestionHelper, QuestionHelperInterface};
+use shirabe_symfony_console::input::array_input::ArrayInput;
+use shirabe_symfony_console::input::streamable_input_interface::StreamableInputInterface;
+use shirabe_symfony_console::output::output_interface::OutputInterface;
+use shirabe_symfony_console::output::stream_output::StreamOutput;
 
 const TRUE_ANSWER_REGEX: &str = "/^y(?:es)?$/i";
 const FALSE_ANSWER_REGEX: &str = "/^no?$/i";

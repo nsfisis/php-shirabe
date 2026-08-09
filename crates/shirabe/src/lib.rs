@@ -32,7 +32,7 @@ pub mod util;
 pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
     use crate::console::ApplicationHandle;
     use crate::util::Platform;
-    use shirabe_external_packages::symfony::console::input::argv_input::ArgvInput;
+    use shirabe_symfony_console::input::argv_input::ArgvInput;
 
     // TODO(php-runtime): the full initialization process in composer/bin/composer should be ported
     // somewhere else that communicates with the real PHP runtime.

@@ -26,9 +26,9 @@ use shirabe::script::ScriptEvents;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PHP_EOL, PhpMixed};
+use shirabe_symfony_console::output::output_interface;
 
 fn tear_down() {
     Platform::clear_env("COMPOSER_SKIP_SCRIPTS");

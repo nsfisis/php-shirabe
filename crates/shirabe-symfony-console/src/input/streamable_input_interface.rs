@@ -1,0 +1,10 @@
+//! ref: composer/vendor/symfony/console/Input/StreamableInputInterface.php
+
+use crate::input::input_interface::InputInterface;
+use shirabe_php_shim::PhpResource;
+
+pub trait StreamableInputInterface: InputInterface {
+    fn set_stream(&mut self, stream: PhpResource);
+
+    fn get_stream(&self) -> Option<PhpResource>;
+}

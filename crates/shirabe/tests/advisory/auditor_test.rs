@@ -24,11 +24,11 @@ use shirabe::repository::RepositoryInterfaceHandle;
 use shirabe::repository::RepositorySet;
 use shirabe::repository::SearchResult;
 use shirabe::repository::SecurityAdvisoryResult;
-use shirabe_external_packages::symfony::console::output::output_interface;
 use shirabe_php_shim::date_create;
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_symfony_console::output::output_interface;
 
 fn constraint(operator: &str, version: &str) -> shirabe_semver::constraint::AnyConstraint {
     SimpleConstraint::new(operator.to_string(), version.to_string(), None).into()

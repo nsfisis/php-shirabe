@@ -19,8 +19,6 @@ use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -28,6 +26,8 @@ use shirabe_php_shim::{
     array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
     is_numeric, json_decode, levenshtein, php_regex, strlen, strpos, trim,
 };
+use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::output::OutputInterface;
 
 /// @internal
 pub trait PackageDiscoveryTrait: BaseCommand {

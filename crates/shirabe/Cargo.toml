@@ -12,6 +12,7 @@ shirabe-php-rpc.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-semver.workspace = true
 shirabe-spdx-licenses.workspace = true
+shirabe-symfony-console.workspace = true
 shirabe-symfony-filesystem.workspace = true
 shirabe-symfony-finder.workspace = true
 shirabe-symfony-process.workspace = true

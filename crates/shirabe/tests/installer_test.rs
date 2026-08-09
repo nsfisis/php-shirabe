@@ -42,20 +42,18 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_external_packages::symfony::console::command::command::Command as SymfonyCommand;
-use shirabe_external_packages::symfony::console::command::command::CommandData;
-use shirabe_external_packages::symfony::console::input::input_argument::InputArgument;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::input::input_option::InputOption;
-use shirabe_external_packages::symfony::console::input::string_input::StringInput;
-use shirabe_external_packages::symfony::console::output::output_interface::{
-    OutputInterface, VERBOSITY_NORMAL,
-};
-use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
 use shirabe_pcre::preg::Preg;
 use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, PhpMixed, php_regex};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
+use shirabe_symfony_console::command::command::Command as SymfonyCommand;
+use shirabe_symfony_console::command::command::CommandData;
+use shirabe_symfony_console::input::input_argument::InputArgument;
+use shirabe_symfony_console::input::input_interface::InputInterface;
+use shirabe_symfony_console::input::input_option::InputOption;
+use shirabe_symfony_console::input::string_input::StringInput;
+use shirabe_symfony_console::output::output_interface::{OutputInterface, VERBOSITY_NORMAL};
+use shirabe_symfony_console::output::stream_output::StreamOutput;
 
 // removeDirectory of tempComposerHome (a path produced by the unported install pipeline) is not
 // ported; the cwd management (setUp's chdir(__DIR__) / tearDown's chdir($this->prevCwd)) and the

@@ -10,7 +10,6 @@ use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare,
@@ -20,6 +19,7 @@ use shirabe_php_shim::{
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_symfony_console::formatter::OutputFormatter;
 
 /// Represents a problem detected while solving dependencies
 #[derive(Debug)]

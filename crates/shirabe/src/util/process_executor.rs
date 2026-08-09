@@ -707,7 +707,7 @@ impl ProcessExecutor {
     // the spawn request to the PHP child over that channel instead of calling `Process::start()`
     // here. Release the permit on the child's completion notification, not by polling a
     // Rust-owned process handle. The return type below is provisional: the real deliverable is a
-    // handle to the live PHP-side Process object, not a `shirabe_external_packages` `Process`
+    // handle to the live PHP-side Process object, not a `shirabe_symfony_process` `Process`
     // value, so this signature will need to change once the RPC plumbing exists.
     pub fn execute_async_php<C>(
         &mut self,

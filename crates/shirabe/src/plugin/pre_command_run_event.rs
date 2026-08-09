@@ -4,8 +4,8 @@
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputInterface;
 
 #[derive(Debug)]
 pub struct PreCommandRunEvent {

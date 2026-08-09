@@ -16,15 +16,15 @@ use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterfaceImmutable;
 use shirabe::io::IOInterfaceMutable;
 use shirabe::io::io_interface::NORMAL;
-use shirabe_external_packages::symfony::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::input::streamable_input_interface::StreamableInputInterface;
-use shirabe_external_packages::symfony::console::output::buffered_output::BufferedOutput;
-use shirabe_external_packages::symfony::console::output::console_output::ConsoleOutput;
-use shirabe_external_packages::symfony::console::output::console_output_interface::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::helper::QuestionHelper;
+use shirabe_symfony_console::input::array_input::ArrayInput;
+use shirabe_symfony_console::input::input_interface::InputInterface;
+use shirabe_symfony_console::input::streamable_input_interface::StreamableInputInterface;
+use shirabe_symfony_console::output::buffered_output::BufferedOutput;
+use shirabe_symfony_console::output::console_output::ConsoleOutput;
+use shirabe_symfony_console::output::console_output_interface::ConsoleOutputInterface;
+use shirabe_symfony_console::output::output_interface::OutputInterface;
 
 /// Builds a ConsoleIO backed by real, side-effect-free Input/Output/QuestionHelper. PHP uses
 /// PHPUnit mocks here, but for tests that exercise only the authentication map they carry no

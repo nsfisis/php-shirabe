@@ -1,0 +1,415 @@
+//! ref: composer/vendor/symfony/console/Command/CompleteCommand.php
+
+use crate::command::command::{Command, CommandData};
+use crate::completion::completion_input::CompletionInput;
+use crate::completion::completion_suggestions::{CompletionSuggestions, StringOrSuggestion};
+use crate::completion::output::bash_completion_output::BashCompletionOutput;
+use crate::completion::output::completion_output_interface::CompletionOutputInterface;
+use crate::input::input_interface::InputInterface;
+use crate::input::input_option::InputOption;
+use crate::output::output_interface::OutputInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::{PhpMixed, impl_php_class};
+use std::ops::{Deref, DerefMut};
+
+/// Responsible for providing the values to the shell completion.
+#[derive(Debug)]
+pub struct CompleteCommand {
+    inner: CommandData,
+    completion_outputs: IndexMap<String, PhpMixed>,
+    is_debug: std::cell::Cell<bool>,
+}
+
+impl_php_class!(
+    CompleteCommand,
+    r"Symfony\Component\Console\Command\CompleteCommand"
+);
+
+impl Deref for CompleteCommand {
+    type Target = CommandData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for CompleteCommand {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl CompleteCommand {
+    pub const DEFAULT_NAME: &'static str = "|_complete";
+    pub const DEFAULT_DESCRIPTION: &'static str =
+        "Internal command to provide shell completion suggestions";
+
+    /// @param completion_outputs A list of additional completion outputs, with shell name as
+    /// key and FQCN as value
+    pub fn new(completion_outputs: IndexMap<String, PhpMixed>) -> anyhow::Result<Self> {
+        // must be set before the parent constructor, as the property value is used in configure()
+        let mut completion_outputs = completion_outputs;
+        // $completionOutputs + ['bash' => BashCompletionOutput::class]
+        completion_outputs
+            .entry("bash".to_string())
+            .or_insert_with(|| {
+                PhpMixed::from(
+                    "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput"
+                        .to_string(),
+                )
+            });
+
+        let this = Self {
+            inner: CommandData::new(None),
+            completion_outputs,
+            is_debug: std::cell::Cell::new(false),
+        };
+        // PHP: static $defaultName = '|_complete' / $defaultDescription, applied by the parent
+        // constructor before configure().
+        this.inner.apply_default_name(Self::DEFAULT_NAME)?;
+        this.inner.set_description(Self::DEFAULT_DESCRIPTION);
+        this.configure()?;
+
+        Ok(this)
+    }
+
+    fn create_completion_input(
+        &self,
+        input: &dyn InputInterface,
+    ) -> anyhow::Result<CompletionInput> {
+        let current_index = input.get_option("current")?;
+        if !current_index.to_bool() || !shirabe_php_shim::ctype_digit(&current_index.to_string()) {
+            anyhow::bail!(shirabe_php_shim::RuntimeException::new(
+                "The \"--current\" option must be set and it must be an integer.".to_string()
+            ));
+        }
+
+        let tokens: Vec<String> = match input.get_option("input")?.as_list() {
+            Some(list) => list.iter().map(|v| v.to_string()).collect(),
+            None => Vec::new(),
+        };
+        let mut completion_input = CompletionInput::from_tokens(
+            tokens,
+            current_index.to_string().parse::<i64>().unwrap_or(0),
+        )?;
+
+        // try { $completionInput->bind(...); } catch (ExceptionInterface $e) {}
+        let application = self.get_application().unwrap();
+        let definition = application.borrow_mut().get_definition();
+        let _ = completion_input.bind(&definition.borrow());
+
+        Ok(completion_input)
+    }
+
+    fn find_command(
+        &self,
+        completion_input: &CompletionInput,
+        _output: &dyn OutputInterface,
+    ) -> Option<std::rc::Rc<std::cell::RefCell<dyn Command>>> {
+        // try { ... } catch (CommandNotFoundException $e) {}
+        let input_name = completion_input.get_first_argument()?;
+
+        let application = self.get_application().unwrap();
+        // CommandNotFoundException is caught and swallowed by returning None.
+        application.borrow_mut().find(&input_name).ok()
+    }
+
+    fn log(&self, messages: &str) {
+        self.log_many(vec![messages.to_string()]);
+    }
+
+    fn log_many(&self, messages: Vec<String>) {
+        if !self.is_debug.get() {
+            return;
+        }
+
+        let command_name = shirabe_php_shim::basename(
+            &shirabe_php_shim::PHP_SERVER
+                .lock()
+                .unwrap()
+                .argv()
+                .next()
+                .unwrap_or_default()
+                .to_string_lossy(),
+        );
+        shirabe_php_shim::file_put_contents3(
+            &format!(
+                "{}/sf_{}.log",
+                shirabe_php_shim::sys_get_temp_dir(),
+                command_name
+            ),
+            &(messages.join(shirabe_php_shim::PHP_EOL) + shirabe_php_shim::PHP_EOL),
+            shirabe_php_shim::FILE_APPEND,
+        );
+    }
+}
+
+fn get_class_of_command(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
+    // LazyCommand is intentionally not ported.
+    command.borrow().php_class_name()
+}
+
+fn get_definition_options(
+    command: &std::rc::Rc<std::cell::RefCell<dyn Command>>,
+) -> Vec<std::rc::Rc<InputOption>> {
+    command
+        .borrow()
+        .get_definition()
+        .get_options()
+        .values()
+        .cloned()
+        .collect()
+}
+
+/// new $completionOutput();
+fn instantiate_completion_output(class: &PhpMixed) -> Box<dyn CompletionOutputInterface> {
+    match class.to_string().as_str() {
+        "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput" => {
+            Box::new(BashCompletionOutput)
+        }
+        // completion_outputs only ever registers the bash output (Composer registers no extra
+        // ones), so any other FQCN is a programming error.
+        other => panic!("unknown completion output class: {}", other),
+    }
+}
+
+impl Command for CompleteCommand {
+    fn configure(&self) -> anyhow::Result<()> {
+        let shells = self
+            .completion_outputs
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\", \"");
+        self.inner
+            .add_option(
+                "shell",
+                PhpMixed::from("s".to_string()),
+                Some(InputOption::VALUE_REQUIRED),
+                &format!("The shell type (\"{}\")", shells),
+                PhpMixed::Null,
+            )?
+            .add_option(
+                "input",
+                PhpMixed::from("i".to_string()),
+                Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
+                "An array of input tokens (e.g. COMP_WORDS or argv)",
+                PhpMixed::Null,
+            )?
+            .add_option(
+                "current",
+                PhpMixed::from("c".to_string()),
+                Some(InputOption::VALUE_REQUIRED),
+                "The index of the \"input\" array that the cursor is in (e.g. COMP_CWORD)",
+                PhpMixed::Null,
+            )?
+            .add_option(
+                "symfony",
+                PhpMixed::from("S".to_string()),
+                Some(InputOption::VALUE_REQUIRED),
+                "The version of the completion script",
+                PhpMixed::Null,
+            )?;
+
+        Ok(())
+    }
+
+    fn initialize(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        let _ = (input, output);
+        self.is_debug.set(shirabe_php_shim::filter_var_boolean(
+            &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG")
+                .unwrap_or_default()
+                .to_string_lossy(),
+        ));
+
+        Ok(())
+    }
+
+    fn execute(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        // try { ... } catch (\Throwable $e) { ...; if ($output->isDebug()) { throw $e; } return 2; }
+        let result: anyhow::Result<i64> = (|| {
+            // uncomment when a bugfix or BC break has been introduced in the shell completion scripts
+            // $version = $input->getOption('symfony');
+            // if ($version && version_compare($version, 'x.y', '>=')) {
+            //    $message = sprintf('Completion script version is not supported ("%s" given, ">=x.y" required).', $version);
+            //    $this->log($message);
+            //    $output->writeln($message.' Install the Symfony completion script again by using the "completion" command.');
+            //    return 126;
+            // }
+
+            let shell = input.borrow().get_option("shell")?;
+            if !shell.to_bool() {
+                anyhow::bail!(shirabe_php_shim::RuntimeException::new(
+                    "The \"--shell\" option must be set.".to_string()
+                ));
+            }
+
+            let completion_output = self
+                .completion_outputs
+                .get(&shell.to_string())
+                .cloned()
+                .unwrap_or(PhpMixed::Bool(false));
+            if !completion_output.to_bool() {
+                anyhow::bail!(shirabe_php_shim::RuntimeException::new(format!(
+                    "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
+                    shell,
+                    self.completion_outputs
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("\", \"")
+                )));
+            }
+
+            let mut completion_input = self.create_completion_input(&*input.borrow())?;
+            let mut suggestions = CompletionSuggestions::new();
+
+            self.log_many(vec![
+                String::new(),
+                format!(
+                    "<comment>{}</>",
+                    shirabe_php_shim::date("Y-m-d H:i:s", None)
+                ),
+                "<info>Input:</> <comment>(\"|\" indicates the cursor position)</>".to_string(),
+                format!("  {}", completion_input.to_string()),
+                "<info>Command:</>".to_string(),
+                format!(
+                    "  {}",
+                    shirabe_php_shim::PHP_SERVER
+                        .lock()
+                        .unwrap()
+                        .argv()
+                        .map(|a| a.to_string_lossy().into_owned())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                ),
+                "<info>Messages:</>".to_string(),
+            ]);
+
+            let command = self.find_command(&completion_input, &*output.borrow());
+            match command {
+                None => {
+                    self.log("  No command found, completing using the Application class.");
+
+                    let application = self.get_application().unwrap();
+                    application
+                        .borrow_mut()
+                        .complete(&completion_input, &mut suggestions)?;
+                }
+                Some(command)
+                    if completion_input.must_suggest_argument_values_for("command")
+                        && command.borrow().get_name().as_deref()
+                            != Some(&completion_input.get_completion_value())
+                        && !command
+                            .borrow()
+                            .get_aliases()
+                            .iter()
+                            .any(|a| a == &completion_input.get_completion_value()) =>
+                {
+                    self.log("  No command found, completing using the Application class.");
+
+                    // expand shortcut names ("cache:cl<TAB>") into their full name ("cache:clear")
+                    let mut values = vec![command.borrow().get_name()];
+                    values.extend(command.borrow().get_aliases().into_iter().map(Some));
+                    suggestions.suggest_values(
+                        values
+                            .into_iter()
+                            .flatten()
+                            .filter(|v| !v.is_empty())
+                            .map(StringOrSuggestion::String)
+                            .collect(),
+                    );
+                }
+                Some(command) => {
+                    // PHP: $command->mergeApplicationDefinition() — $mergeArgs defaults to true.
+                    command.borrow().merge_application_definition(true);
+                    completion_input.bind(&command.borrow().get_definition())?;
+
+                    if CompletionInput::TYPE_OPTION_NAME == completion_input.get_completion_type() {
+                        self.log(&format!(
+                            "  Completing option names for the <comment>{}</> command.",
+                            get_class_of_command(&command)
+                        ));
+
+                        suggestions.suggest_options(get_definition_options(&command));
+                    } else {
+                        self.log_many(vec![
+                            format!(
+                                "  Completing using the <comment>{}</> class.",
+                                get_class_of_command(&command)
+                            ),
+                            format!(
+                                "  Completing <comment>{}</> for <comment>{}</>",
+                                completion_input.get_completion_type(),
+                                completion_input.get_completion_name().unwrap_or_default()
+                            ),
+                        ]);
+                        let compval = completion_input.get_completion_value();
+                        if !compval.is_empty() {
+                            self.log(&format!("  Current value: <comment>{}</>", compval));
+                        }
+
+                        command
+                            .borrow()
+                            .complete(&completion_input, &mut suggestions)?;
+                    }
+                }
+            }
+
+            // $completionOutput = new $completionOutput();
+            let completion_output: Box<dyn CompletionOutputInterface> =
+                instantiate_completion_output(&completion_output);
+
+            self.log("<info>Suggestions:</>");
+            let option_suggestions = suggestions.get_option_suggestions();
+            if !option_suggestions.is_empty() {
+                self.log(&format!(
+                    "  --{}",
+                    option_suggestions
+                        .iter()
+                        .map(|o| o.get_name())
+                        .collect::<Vec<_>>()
+                        .join(" --")
+                ));
+            } else {
+                let value_suggestions: Vec<String> = suggestions
+                    .get_value_suggestions()
+                    .iter()
+                    .map(|s| s.get_value())
+                    .collect();
+                if !value_suggestions.is_empty() {
+                    self.log(&format!("  {}", value_suggestions.join(" ")));
+                } else {
+                    self.log("  <comment>No suggestions were provided</>");
+                }
+            }
+
+            completion_output.write(&suggestions, &*output.borrow_mut());
+
+            Ok(0)
+        })();
+
+        match result {
+            Ok(code) => Ok(code),
+            Err(e) => {
+                self.log_many(vec!["<error>Error!</error>".to_string(), format!("{}", e)]);
+
+                if output.borrow().is_debug() {
+                    return Err(e);
+                }
+
+                Ok(2)
+            }
+        }
+    }
+
+    crate::delegate_command_trait_impls_to_inner!(inner);
+}
