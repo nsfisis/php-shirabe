@@ -3,7 +3,6 @@
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use shirabe_external_packages::symfony::filesystem::exception::IOException;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
@@ -15,6 +14,7 @@ use shirabe_php_shim::{
     strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep,
     var_export,
 };
+use shirabe_symfony_filesystem::exception::IOException;
 use std::path::Path;
 
 #[derive(Debug)]

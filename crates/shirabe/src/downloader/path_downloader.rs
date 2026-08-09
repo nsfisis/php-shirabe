@@ -21,11 +21,11 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::filesystem::Filesystem as SymfonyFilesystem;
 use shirabe_php_shim::{
     PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed, RuntimeException, file_exists,
     function_exists, impl_php_class, is_dir, realpath,
 };
+use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 
 #[derive(Debug)]
 pub struct PathDownloader {

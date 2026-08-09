@@ -5,7 +5,7 @@
 // Rust io::Error text, which words the same errno differently (e.g. "Permission denied (os error
 // 13)").
 
-use crate::symfony::filesystem::exception::io_exception::IOException;
+use crate::exception::io_exception::IOException;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug, Clone)]
