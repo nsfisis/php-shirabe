@@ -51,7 +51,6 @@ pub struct Process {
     starttime: Option<f64>,
     timeout: Option<f64>,
     exitcode: Option<i64>,
-    fallback_status: IndexMap<String, PhpMixed>,
     process_information: Option<IndexMap<String, PhpMixed>>,
     stdout: Option<PhpResource>,
     stderr: Option<PhpResource>,
@@ -61,7 +60,6 @@ pub struct Process {
     incremental_error_output_offset: i64,
     tty: bool,
     options: IndexMap<String, PhpMixed>,
-    use_file_handles: bool,
     process_pipes: Option<Box<dyn PipesInterface>>,
     latest_signal: Option<i64>,
     cached_exit_code: Option<i64>,
@@ -180,7 +178,6 @@ impl Process {
             starttime: None,
             timeout: None,
             exitcode: None,
-            fallback_status: IndexMap::new(),
             process_information: None,
             stdout: None,
             stderr: None,
@@ -190,7 +187,6 @@ impl Process {
             incremental_error_output_offset: 0,
             tty: false,
             options,
-            use_file_handles: false,
             process_pipes: None,
             latest_signal: None,
             cached_exit_code: None,
@@ -245,7 +241,6 @@ impl Process {
 
         this.set_input(input)?;
         this.set_timeout(timeout)?;
-        this.use_file_handles = cfg!(windows);
 
         Ok(this)
     }
@@ -288,7 +283,7 @@ impl Process {
         self.reset_process_data();
         self.starttime = Some(shirabe_php_shim::microtime());
         self.callback = Some(self.build_callback(callback));
-        let mut descriptors = self.get_descriptors();
+        let descriptors = self.get_descriptors();
 
         if !self.env.is_empty() {
             // non-Windows: $env += $this->env;
@@ -320,17 +315,6 @@ impl Process {
 
         if cfg!(windows) {
             commandline = self.prepare_windows_command_line(&commandline, &mut env)?;
-        } else if !self.use_file_handles && self.is_sigchild_enabled() {
-            // last exit code is output on the fourth pipe and caught to work around --enable-sigchild
-            descriptors.push(descriptor(&["pipe", "w"]));
-
-            commandline = format!("{{ ({}) <&3 3<&- 3>/dev/null & }} 3<&0;", commandline);
-            commandline.push_str(
-                "pid=$!; echo $pid >&3; wait $pid 2>/dev/null; code=$?; echo $code >&3; exit $code",
-            );
-
-            // Workaround for the bug, when PTS functionality is enabled.
-            let _pts_workaround = shirabe_php_shim::fopen("Process.php", "r");
         }
 
         let mut env_pairs: Vec<String> = Vec::new();
@@ -375,22 +359,6 @@ impl Process {
             );
         }
         self.status = Self::STATUS_STARTED.to_string();
-
-        if descriptors.len() > 3 {
-            let pipe3 = self
-                .process_pipes
-                .as_ref()
-                .unwrap()
-                .pipes()
-                .get(&3)
-                .cloned();
-            let pid = pipe3
-                .and_then(|p| shirabe_php_shim::fgets(&p, None))
-                .map(|s| s.trim().parse::<i64>().unwrap_or(0))
-                .unwrap_or(0);
-            self.fallback_status
-                .insert("pid".to_string(), PhpMixed::Int(pid));
-        }
 
         if self.tty {
             return Ok(());
@@ -515,19 +483,12 @@ impl Process {
     pub fn get_term_signal(&mut self) -> anyhow::Result<i64> {
         self.require_process_is_terminated("getTermSignal")?;
 
-        let termsig = self
+        Ok(self
             .process_information
             .as_ref()
             .and_then(|i| i.get("termsig"))
-            .and_then(|v| v.as_int());
-        if self.is_sigchild_enabled() && termsig == Some(-1) {
-            return Err(RuntimeException::new(
-                "This PHP has been compiled with --enable-sigchild. Term signal cannot be retrieved.".to_string(),
-            )
-            .into());
-        }
-
-        Ok(termsig.unwrap_or(0))
+            .and_then(|v| v.as_int())
+            .unwrap_or(0))
     }
 
     /// Checks if the process is currently running.
@@ -579,11 +540,6 @@ impl Process {
         }
 
         if self.is_running() {
-            if self.fallback_status.contains_key("pid") {
-                self.fallback_status.shift_remove("pid");
-
-                return self.stop(0.0, signal);
-            }
             self.close();
         }
 
@@ -814,41 +770,9 @@ impl Process {
 
         self.read_pipes(running && blocking, !cfg!(windows) || !running);
 
-        if !self.fallback_status.is_empty() && self.is_sigchild_enabled() {
-            // processInformation = fallbackStatus + processInformation (fallback keys win)
-            let mut merged = self.fallback_status.clone();
-            for (k, v) in self.process_information.take().unwrap() {
-                merged.entry(k).or_insert(v);
-            }
-            self.process_information = Some(merged);
-        }
-
         if !running {
             self.close();
         }
-    }
-
-    /// Returns whether PHP has been compiled with the '--enable-sigchild' option or not.
-    fn is_sigchild_enabled(&self) -> bool {
-        static SIGCHILD: OnceLock<bool> = OnceLock::new();
-
-        if let Some(v) = SIGCHILD.get() {
-            return *v;
-        }
-
-        if !shirabe_php_shim::function_exists("phpinfo") {
-            return *SIGCHILD.get_or_init(|| false);
-        }
-
-        shirabe_php_shim::ob_start();
-        shirabe_php_shim::phpinfo(shirabe_php_shim::INFO_GENERAL);
-
-        *SIGCHILD.get_or_init(|| {
-            shirabe_php_shim::str_contains(
-                &shirabe_php_shim::ob_get_clean().unwrap_or_default(),
-                "--enable-sigchild",
-            )
-        })
     }
 
     /// Reads pipes for the freshest output.
@@ -885,22 +809,15 @@ impl Process {
 
         let mut callback = self.callback.take();
         for (r#type, data) in result {
-            if r#type != 3 {
-                if let Some(cb) = callback.as_mut() {
-                    cb(
-                        self,
-                        if Self::STDOUT == r#type {
-                            Self::OUT
-                        } else {
-                            Self::ERR
-                        },
-                        &data,
-                    );
-                }
-            } else if !self.fallback_status.contains_key("signaled") {
-                self.fallback_status.insert(
-                    "exitcode".to_string(),
-                    PhpMixed::Int(data.trim().parse().unwrap_or(0)),
+            if let Some(cb) = callback.as_mut() {
+                cb(
+                    self,
+                    if Self::STDOUT == r#type {
+                        Self::OUT
+                    } else {
+                        Self::ERR
+                    },
+                    &data,
                 );
             }
         }
@@ -939,11 +856,6 @@ impl Process {
             if signaled && termsig > 0 {
                 // if process has been signaled, no exitcode but a valid termsig, apply Unix convention
                 self.exitcode = Some(128 + termsig);
-            } else if self.is_sigchild_enabled()
-                && let Some(i) = self.process_information.as_mut()
-            {
-                i.insert("signaled".to_string(), PhpMixed::Bool(true));
-                i.insert("termsig".to_string(), PhpMixed::Int(-1));
             }
         }
 
@@ -958,7 +870,6 @@ impl Process {
         self.starttime = None;
         self.callback = None;
         self.exitcode = None;
-        self.fallback_status = IndexMap::new();
         self.process_information = None;
         // php://temp is an in-memory stream; fopen never fails for it.
         self.stdout = Some(
@@ -1012,33 +923,7 @@ impl Process {
                 return Ok(false);
             }
         } else {
-            let ok;
-            if !self.is_sigchild_enabled() {
-                ok = shirabe_php_shim::proc_terminate(self.process.as_ref().unwrap(), signal);
-            } else if shirabe_php_shim::function_exists("posix_kill") {
-                ok = shirabe_php_shim::posix_kill(pid, signal);
-            } else {
-                let mut pipes = IndexMap::new();
-                let opened = shirabe_php_shim::proc_open(
-                    &format!("kill -{} {}", signal, pid),
-                    &[
-                        Descriptor::Inherit,
-                        Descriptor::Inherit,
-                        descriptor(&["pipe", "w"]),
-                    ],
-                    &mut pipes,
-                    None,
-                    None,
-                    None,
-                );
-                ok = match opened {
-                    Ok(_) => pipes
-                        .get(&2)
-                        .and_then(|p| shirabe_php_shim::fgets(p, None))
-                        .is_none(),
-                    Err(_) => false,
-                };
-            }
+            let ok = shirabe_php_shim::proc_terminate(self.process.as_ref().unwrap(), signal);
             if !ok {
                 if throw_exception {
                     return Err(RuntimeException::new(format!(
@@ -1053,14 +938,6 @@ impl Process {
         }
 
         self.latest_signal = Some(signal);
-        self.fallback_status
-            .insert("signaled".to_string(), PhpMixed::Bool(true));
-        self.fallback_status
-            .insert("exitcode".to_string(), PhpMixed::Int(-1));
-        self.fallback_status.insert(
-            "termsig".to_string(),
-            PhpMixed::Int(self.latest_signal.unwrap()),
-        );
 
         Ok(true)
     }

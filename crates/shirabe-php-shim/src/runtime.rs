@@ -27,7 +27,6 @@ pub const E_USER_NOTICE: i64 = 1024;
 pub const E_DEPRECATED: i64 = 8192;
 pub const E_USER_DEPRECATED: i64 = 16384;
 
-pub const INFO_GENERAL: i64 = 1;
 pub const PHP_BINARY: &str = "";
 
 // NOTE: &str matching in const expression does not compile for now.
@@ -363,12 +362,6 @@ pub fn call_php_callable(_callback: &PhpMixed, _args: &[PhpMixed]) -> PhpMixed {
 pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
     // TODO(php-runtime): ini_set must return the previous value and have its override observed by a
     // subsequent ini_get; ini_get is currently a static lookup, so overrides cannot be wired up yet.
-    todo!()
-}
-
-pub fn phpinfo(_what: i64) {
-    // TODO(php-runtime): phpinfo() dumps the full PHP runtime configuration, which the shim does not
-    // model.
     todo!()
 }
 

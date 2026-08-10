@@ -380,12 +380,7 @@ pub fn proc_terminate(process: &PhpResource, signal: i64) -> bool {
     let Some(child) = state.child.as_ref() else {
         return false;
     };
-    send_signal(child.id() as i32, signal)
-}
-
-/// Shared body of `proc_terminate` and `posix_kill`. Signal 0 is PHP's existence probe and is
-/// forwarded to `kill(2)` as such.
-fn send_signal(pid: i32, signal: i64) -> bool {
+    // Signal 0 is PHP's existence probe and is forwarded to `kill(2)` as such.
     let signal = if signal == 0 {
         None
     } else {
@@ -394,7 +389,7 @@ fn send_signal(pid: i32, signal: i64) -> bool {
             Err(_) => return false,
         }
     };
-    nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), signal).is_ok()
+    nix::sys::signal::kill(nix::unistd::Pid::from_raw(child.id() as i32), signal).is_ok()
 }
 
 pub fn getmypid() -> i64 {
@@ -464,10 +459,6 @@ pub fn posix_isatty(stream: PhpResource) -> bool {
         // A regular file, in-memory stream or process handle is never a tty.
         PhpResource::Stream(_) | PhpResource::Process(_) => false,
     }
-}
-
-pub fn posix_kill(pid: i64, signal: i64) -> bool {
-    send_signal(pid as i32, signal)
 }
 
 /// PHP `get_current_user()`: the name of the owner of the running script file. The Shirabe
