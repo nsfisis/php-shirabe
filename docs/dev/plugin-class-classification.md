@@ -87,7 +87,7 @@ the boundary.
 #### php-native
 
 Composer-plugin-api's pure type definitions, the stateless utility classes
-(`TlsHelper`, `Platform\Version`, `ClassMapGenerator`, …), exception
+(`Platform\Version`, `ClassMapGenerator`, …), exception
 classes, constants-only classes, the state-decoupled vendor packages
 (composer/pcre, composer/semver, seld/jsonlint, justinrainbow/json-schema,
 …) — and *reachable* classes that are stateless and pure (`VersionParser`,

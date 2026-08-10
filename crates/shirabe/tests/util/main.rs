@@ -33,6 +33,5 @@ mod silencer_test;
 mod stream_context_factory_test;
 mod svn_test;
 mod tar_test;
-mod tls_helper_test;
 mod url_test;
 mod zip_test;
