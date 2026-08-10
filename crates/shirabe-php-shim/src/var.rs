@@ -206,11 +206,6 @@ pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
-pub fn is_subclass_of(_object_or_class: &PhpMixed, _class_name: &str, _allow_string: bool) -> bool {
-    // TODO(php-runtime): requires runtime class ancestry, which PhpMixed::Object does not carry.
-    todo!()
-}
-
 pub fn get_class(_object: &PhpMixed) -> String {
     // TODO(php-runtime): PhpMixed::Object carries no class name; there is no runtime class to report.
     todo!()

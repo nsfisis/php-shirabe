@@ -1,0 +1,23 @@
+{
+    "name": "shirabe/e2e-script-command",
+    "description": "E2E fixture project: composer.json scripts naming Command classes, run against upstream Composer and Shirabe.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\ScriptCommand\\": "src/"
+        }
+    },
+    "scripts": {
+        "greet": "ShirabeTest\\ScriptCommand\\GreetCommand",
+        "renamed": "ShirabeTest\\ScriptCommand\\MismatchedNameCommand",
+        "single": "ShirabeTest\\ScriptCommand\\SingleAppCommand",
+        "plain": "echo plain-script"
+    },
+    "scripts-descriptions": {
+        "renamed": "Description taken from composer.json"
+    },
+    "repositories": [
+        {
+            "packagist.org": false
+        }
+    ]
+}

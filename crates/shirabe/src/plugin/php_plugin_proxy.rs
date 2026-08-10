@@ -30,7 +30,7 @@ use crate::repository::{
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
-    call_function_with_dispatcher, call_php_method, release_php_handle,
+    call_function_with_dispatcher, call_php_method, new_object, release_php_handle,
 };
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::command::Command;
@@ -2362,6 +2362,58 @@ pub fn io_handle_value(
     Ok(rust_handle_value(register_io_entity(io), class))
 }
 
+/// Runs a boolean class query (`class_exists`, `is_subclass_of`, ...) in the worker with the
+/// script autoloader active, so a class named by `composer.json` resolves through the Rust-side
+/// [`ClassLoader`]s.
+pub(crate) fn php_class_query(function: &str, args: Vec<PluginValue>) -> anyhow::Result<bool> {
+    crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
+    let value = unwrap_php_result(call_function_with_dispatcher(
+        function,
+        args,
+        Some(&mut PluginRpcDispatcher::default()),
+    ))?;
+    match value {
+        PluginValue::Bool(value) => Ok(value),
+        other => Err(anyhow::anyhow!(
+            "PHP class query `{function}` did not return a bool: {other:?}"
+        )),
+    }
+}
+
+/// Instantiates `new $class(...$ctor_args)` in the worker, with the script autoloader active.
+pub(crate) fn new_php_object(
+    class: &str,
+    ctor_args: Vec<PluginValue>,
+) -> anyhow::Result<PhpObjHandle> {
+    crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
+    let value = unwrap_php_result(new_object(
+        class,
+        ctor_args,
+        Some(&mut PluginRpcDispatcher::default()),
+    ))?;
+    match value {
+        PluginValue::PhpHandle(handle) => Ok(handle),
+        other => Err(shirabe_php_shim::RuntimeException::new(format!(
+            "`new {class}` returned an unsupported shape over RPC: {other:?}"
+        ))
+        .into()),
+    }
+}
+
+/// Calls `$obj->$method(...$args)` on a worker-side entity.
+pub(crate) fn call_php_entity_method(
+    handle: &PhpObjHandle,
+    method: &str,
+    args: Vec<PluginValue>,
+) -> anyhow::Result<PluginValue> {
+    unwrap_php_result(call_php_method(
+        handle.phandle,
+        method,
+        args,
+        Some(&mut PluginRpcDispatcher::default()),
+    ))
+}
+
 /// `is_a($obj, $class)` evaluated in the worker: the child's own class table answers, so
 /// parent classes are covered (a `PhpObjHandle`'s `implements` lists interfaces only).
 pub(crate) fn php_is_a(handle: &PhpObjHandle, class: &str) -> anyhow::Result<bool> {
@@ -2742,7 +2794,7 @@ impl Drop for PhpCommandProviderProxy {
 }
 
 /// Metadata row for one Rust-implemented command, mirrored into the worker as a
-/// `\Shirabe\RustCommandStub` so a plugin-provided command can `find()` and invoke built-in
+/// `\Shirabe\RustCommandStub` so a worker-hosted command can `find()` and invoke built-in
 /// commands (their execution crosses back into this process).
 #[derive(Debug)]
 pub(crate) struct RustCommandMetadata {
@@ -2776,25 +2828,25 @@ impl RustCommandMetadata {
 
 /// Handoff state for the worker-side console application (the `Composer\Console\Application`
 /// defined under the RPC crate's `php/runtime/`): assembled by
-/// `Application::get_plugin_commands` once the full command set is known, booted in the worker
-/// the first time a plugin-provided command actually runs.
+/// `Application::register_worker_console_commands` as worker-hosted commands are registered,
+/// booted in the worker the first time one of them actually runs.
 #[derive(Debug)]
 pub(crate) struct PhpConsoleApplicationContext {
-    composer: ComposerHandle,
+    composer: Option<ComposerHandle>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     initial_working_directory: Option<String>,
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
     rust_commands: Vec<RustCommandMetadata>,
-    /// Clones of the plugin command handles; ownership (and release) stays with the
+    /// Clones of the worker-hosted command handles; ownership (and release) stays with the
     /// `PhpCommandProxy` instances holding the originals.
-    plugin_commands: Vec<PhpObjHandle>,
+    plugin_commands: std::cell::RefCell<Vec<PhpObjHandle>>,
     app: std::cell::RefCell<Option<PhpObjHandle>>,
 }
 
 thread_local! {
-    /// Handles of the `PhpCommandProxy` instances built while `Application::get_plugin_commands`
-    /// collects providers; drained into the context it publishes.
+    /// Handles of the `PhpCommandProxy` instances built since the last drain; drained into the
+    /// console application context by `Application::register_worker_console_commands`.
     static PENDING_COMMAND_HANDLES: std::cell::RefCell<Vec<PhpObjHandle>> =
         const { std::cell::RefCell::new(Vec::new()) };
 
@@ -2813,7 +2865,7 @@ pub(crate) fn take_pending_plugin_command_handles() -> Vec<PhpObjHandle> {
 }
 
 pub(crate) fn publish_console_application_context(
-    composer: &ComposerHandle,
+    composer: Option<&ComposerHandle>,
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     initial_working_directory: Option<String>,
     disable_plugins_by_default: bool,
@@ -2822,16 +2874,34 @@ pub(crate) fn publish_console_application_context(
     plugin_commands: Vec<PhpObjHandle>,
 ) {
     let context = std::rc::Rc::new(PhpConsoleApplicationContext {
-        composer: composer.clone(),
+        composer: composer.cloned(),
         io: io.clone(),
         initial_working_directory,
         disable_plugins_by_default,
         disable_scripts_by_default,
         rust_commands,
-        plugin_commands,
+        plugin_commands: std::cell::RefCell::new(plugin_commands),
         app: std::cell::RefCell::new(None),
     });
     CONSOLE_APP_CONTEXT.with(|slot| *slot.borrow_mut() = Some(context));
+}
+
+/// Adds command entities to the published handoff, for commands registered after it was
+/// published. A worker-side application that already booted gets them right away, so the two
+/// sides keep the same command set.
+pub(crate) fn extend_console_application_commands(
+    handles: Vec<PhpObjHandle>,
+) -> anyhow::Result<()> {
+    let context = CONSOLE_APP_CONTEXT
+        .with(|slot| slot.borrow().clone())
+        .expect("only an application that published the handoff extends it");
+    for handle in handles {
+        if let Some(app) = context.app.borrow().as_ref() {
+            call_php_entity_method(app, "add", vec![PluginValue::PhpHandle(handle.clone())])?;
+        }
+        context.plugin_commands.borrow_mut().push(handle);
+    }
+    Ok(())
 }
 
 impl PhpConsoleApplicationContext {
@@ -2841,7 +2911,13 @@ impl PhpConsoleApplicationContext {
             return Ok(app.clone());
         }
         let mut config: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-        config.insert(b"composer".to_vec(), composer_handle_value(&self.composer));
+        config.insert(
+            b"composer".to_vec(),
+            match &self.composer {
+                Some(composer) => composer_handle_value(composer),
+                None => PluginValue::Null,
+            },
+        );
         config.insert(b"io".to_vec(), io_handle_value(&self.io)?);
         config.insert(
             b"initialWorkingDirectory".to_vec(),
@@ -2871,6 +2947,7 @@ impl PhpConsoleApplicationContext {
             b"pluginCommands".to_vec(),
             PluginValue::List(
                 self.plugin_commands
+                    .borrow()
                     .iter()
                     .cloned()
                     .map(PluginValue::PhpHandle)
@@ -2919,6 +2996,28 @@ pub struct PhpCommandProxy {
 
 impl PhpCommandProxy {
     pub(crate) fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
+        let proxy_command = match Self::call_metadata_getter(&handle, "isProxyCommand")? {
+            PluginValue::Bool(proxy_command) => proxy_command,
+            other => return Err(Self::unsupported_shape(&handle, "isProxyCommand", &other)),
+        };
+        Self::build(handle, proxy_command)
+    }
+
+    /// A command class named by a `composer.json` script only has to extend Symfony's `Command`,
+    /// so `isProxyCommand()` is asked for only when it also extends Composer's `BaseCommand`.
+    pub(crate) fn new_script_command(handle: PhpObjHandle) -> anyhow::Result<Self> {
+        let proxy_command = if php_is_a(&handle, "Composer\\Command\\BaseCommand")? {
+            match Self::call_metadata_getter(&handle, "isProxyCommand")? {
+                PluginValue::Bool(proxy_command) => proxy_command,
+                other => return Err(Self::unsupported_shape(&handle, "isProxyCommand", &other)),
+            }
+        } else {
+            false
+        };
+        Self::build(handle, proxy_command)
+    }
+
+    fn build(handle: PhpObjHandle, proxy_command: bool) -> anyhow::Result<Self> {
         let data = crate::command::BaseCommandData::new(None);
         let name = Self::call_metadata_getter(&handle, "getName")?;
         match name {
@@ -2958,10 +3057,6 @@ impl PhpCommandProxy {
             }
             other => return Err(Self::unsupported_shape(&handle, "isHidden", &other)),
         }
-        let proxy_command = match Self::call_metadata_getter(&handle, "isProxyCommand")? {
-            PluginValue::Bool(proxy_command) => proxy_command,
-            other => return Err(Self::unsupported_shape(&handle, "isProxyCommand", &other)),
-        };
         Self::read_back_definition(&handle, &data)?;
         PENDING_COMMAND_HANDLES.with(|handles| handles.borrow_mut().push(handle.clone()));
         Ok(Self {

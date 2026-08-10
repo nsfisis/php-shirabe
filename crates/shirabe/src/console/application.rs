@@ -38,6 +38,7 @@ use crate::composer;
 use crate::composer::PartialComposerHandle;
 use crate::console::GithubActionError;
 use crate::downloader::TransportException;
+use crate::event_dispatcher::EventDispatcher;
 use crate::event_dispatcher::ScriptExecutionException;
 use crate::exception::NoSslException;
 use crate::factory::Factory;
@@ -60,9 +61,9 @@ use shirabe_php_shim::{
     bin2hex, chdir, date_default_timezone_get, date_default_timezone_set, defined, dirname,
     disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
-    is_subclass_of, json_decode, memory_get_peak_usage, memory_get_usage, microtime, php_regex,
-    php_uname, posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains,
-    str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
+    json_decode, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
+    posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains, str_replace,
+    strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
@@ -122,6 +123,10 @@ pub struct Application {
     pub(crate) composer: Option<PartialComposerHandle>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     has_plugin_commands: bool,
+    /// Whether this application published the worker-side console application handoff. The
+    /// handoff is process-wide, so a second application in the same process must replace it
+    /// rather than extend the one its predecessor left behind.
+    published_worker_console_context: bool,
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
     /// Store the initial working directory at startup time
@@ -188,6 +193,7 @@ impl Application {
             composer: None,
             io,
             has_plugin_commands: false,
+            published_worker_console_context: false,
             disable_plugins_by_default: false,
             disable_scripts_by_default: false,
             initial_working_directory,
@@ -631,43 +637,68 @@ impl Application {
             }
 
             if !commands.is_empty() {
-                // Publish the handoff the worker-side console application boots from when one
-                // of these commands actually runs: the shared object graph, plus metadata
-                // mirrors of the built-in commands (plugin commands are not registered yet, so
-                // this snapshot is exactly the Rust-implemented set).
-                let mut seen: Vec<*const ()> = Vec::new();
-                let mut rust_commands: Vec<crate::plugin::RustCommandMetadata> = Vec::new();
-                for command in self.commands.values() {
-                    let ptr = std::rc::Rc::as_ptr(command) as *const ();
-                    if seen.contains(&ptr) {
-                        continue;
-                    }
-                    seen.push(ptr);
-                    let command = command.borrow();
-                    let Some(name) = command.get_name() else {
-                        continue;
-                    };
-                    rust_commands.push(crate::plugin::RustCommandMetadata {
-                        name,
-                        description: command.get_description(),
-                        aliases: command.get_aliases(),
-                        hidden: command.is_hidden(),
-                    });
-                }
-                crate::plugin::publish_console_application_context(
-                    &composer,
-                    &self.io,
-                    self.get_initial_working_directory(),
-                    self.disable_plugins_by_default,
-                    self.disable_scripts_by_default,
-                    rust_commands,
+                self.register_worker_console_commands(
+                    Some(&composer),
                     crate::plugin::take_pending_plugin_command_handles(),
-                );
-                register_worker_reverse_application(self.me.clone());
+                )?;
             }
         }
 
         Ok(commands)
+    }
+
+    /// Makes worker-hosted commands runnable through the worker-side console application: they
+    /// join the handoff it boots from when one of them actually runs. This application's first
+    /// call publishes that handoff, carrying the shared object graph plus metadata mirrors of
+    /// the commands registered so far — all Rust-implemented at that point, since a worker-hosted
+    /// command is only registered after being handed to this method.
+    ///
+    /// TODO(plugin): a Rust-implemented command registered *after* this first call is missing
+    /// from that mirror, so the worker cannot `find()` it. `Application::do_run` hits this when
+    /// one `scripts` entry names a Command class and a later entry falls back to
+    /// `ScriptAliasCommand`: the alias command is registered after the class command published
+    /// the handoff. Fixing it needs a metadata half of `extend_console_application_commands`
+    /// that also builds a `\Shirabe\RustCommandStub` in an already-booted worker application.
+    fn register_worker_console_commands(
+        &mut self,
+        composer: Option<&crate::composer::ComposerHandle>,
+        handles: Vec<shirabe_php_rpc::PhpObjHandle>,
+    ) -> anyhow::Result<()> {
+        if self.published_worker_console_context {
+            return crate::plugin::extend_console_application_commands(handles);
+        }
+        self.published_worker_console_context = true;
+
+        let mut seen: Vec<*const ()> = Vec::new();
+        let mut rust_commands: Vec<crate::plugin::RustCommandMetadata> = Vec::new();
+        for command in self.commands.values() {
+            let ptr = std::rc::Rc::as_ptr(command) as *const ();
+            if seen.contains(&ptr) {
+                continue;
+            }
+            seen.push(ptr);
+            let command = command.borrow();
+            let Some(name) = command.get_name() else {
+                continue;
+            };
+            rust_commands.push(crate::plugin::RustCommandMetadata {
+                name,
+                description: command.get_description(),
+                aliases: command.get_aliases(),
+                hidden: command.is_hidden(),
+            });
+        }
+        crate::plugin::publish_console_application_context(
+            composer,
+            &self.io,
+            self.get_initial_working_directory(),
+            self.disable_plugins_by_default,
+            self.disable_scripts_by_default,
+            rust_commands,
+            handles,
+        );
+        register_worker_reverse_application(self.me.clone());
+        Ok(())
     }
 
     /// Get the working directory at startup time
@@ -2389,8 +2420,8 @@ impl ApplicationHandle {
 
                                 let composer_opt =
                                     application.borrow_mut().get_composer(false, None, None)?;
-                                if let Some(composer) = composer_opt {
-                                    let composer = crate::composer::composer_full(&composer);
+                                if let Some(ref composer_handle) = composer_opt {
+                                    let composer = crate::composer::composer_full(composer_handle);
                                     let root_package = composer.get_package();
                                     let generator = composer.get_autoload_generator().clone();
                                     let generator = generator.borrow();
@@ -2421,34 +2452,118 @@ impl ApplicationHandle {
 
                                 // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly
                                 let dummy_str = dummy.as_string().unwrap_or("").to_string();
+                                // The class lives in the PHP worker, which cannot even declare
+                                // a subclass of Symfony's Command before the Composer PHP
+                                // runtime is loaded there. That load is skipped for a class the
+                                // Rust-side ClassLoaders cannot resolve to a file, which is
+                                // every plain shell-command script.
+                                //
+                                // TODO(php-runtime): the file lookup is narrower than PHP's
+                                // `class_exists`, which is also true for a class already
+                                // declared in the process. A script naming one of those (say
+                                // `Composer\Command\AboutCommand`) is imported as a command by
+                                // PHP but falls through to ScriptAliasCommand here.
+                                let is_command_class = is_string(dummy)
+                                    && crate::plugin::find_file_in_registered_loaders(&dummy_str)
+                                        .is_some()
+                                    && {
+                                        EventDispatcher::ensure_composer_php_runtime()?;
+                                        crate::plugin::php_class_query(
+                                            "class_exists",
+                                            vec![shirabe_php_rpc::PluginValue::string(
+                                                dummy_str.clone(),
+                                            )],
+                                        )? && crate::plugin::php_class_query(
+                                            "is_subclass_of",
+                                            vec![
+                                                shirabe_php_rpc::PluginValue::string(
+                                                    dummy_str.clone(),
+                                                ),
+                                                shirabe_php_rpc::PluginValue::string(
+                                                    "Symfony\\Component\\Console\\Command\\Command",
+                                                ),
+                                                shirabe_php_rpc::PluginValue::Bool(true),
+                                            ],
+                                        )?
+                                    };
                                 let cmd: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> =
-                                    if is_string(dummy)
-                                        && shirabe_php_shim::class_exists(&dummy_str)
-                                        && is_subclass_of(
-                                            &PhpMixed::String(dummy_str.clone()),
-                                            "Symfony\\Component\\Console\\Command\\Command",
-                                            true,
-                                        )
-                                    {
-                                        if is_subclass_of(
-                                            &PhpMixed::String(dummy_str.clone()),
-                                            "Symfony\\Component\\Console\\SingleCommandApplication",
-                                            true,
-                                        ) {
+                                    if is_command_class {
+                                        if crate::plugin::php_class_query(
+                                            "is_subclass_of",
+                                            vec![
+                                                shirabe_php_rpc::PluginValue::string(
+                                                    dummy_str.clone(),
+                                                ),
+                                                shirabe_php_rpc::PluginValue::string(
+                                                    "Symfony\\Component\\Console\\SingleCommandApplication",
+                                                ),
+                                                shirabe_php_rpc::PluginValue::Bool(true),
+                                            ],
+                                        )? {
                                             io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
                                         }
-                                        // TODO(plugin): `new $dummy($script)` instantiates the
-                                        // user's PHP command class in-process and registers the
-                                        // live object on this Application. The worker-side
-                                        // console application and PhpCommandProxy exist now,
-                                        // but this arm is not wired to them: the class checks
-                                        // above use the shim class_exists, which never
-                                        // recognizes user classes, so the arm stays
-                                        // unreachable until the checks and the instantiation
-                                        // go through the worker.
-                                        todo!(
-                                            "plugin: import a user Command class as a live application command"
-                                        );
+
+                                        let handle = crate::plugin::new_php_object(
+                                            &dummy_str,
+                                            vec![shirabe_php_rpc::PluginValue::string(
+                                                script.clone(),
+                                            )],
+                                        )?;
+
+                                        // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
+                                        let cmd_name = crate::plugin::call_php_entity_method(
+                                            &handle,
+                                            "getName",
+                                            vec![],
+                                        )?;
+                                        if let shirabe_php_rpc::PluginValue::String(ref bytes) =
+                                            cmd_name
+                                            && !bytes.is_empty()
+                                            && bytes.as_slice() != script.as_bytes()
+                                        {
+                                            io.write_error(&format!("<warning>The script named {} in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>", script));
+                                            // override it with the defined script name
+                                            crate::plugin::call_php_entity_method(
+                                                &handle,
+                                                "setName",
+                                                vec![shirabe_php_rpc::PluginValue::string(
+                                                    script.clone(),
+                                                )],
+                                            )?;
+                                        }
+
+                                        let cmd_description =
+                                            crate::plugin::call_php_entity_method(
+                                                &handle,
+                                                "getDescription",
+                                                vec![],
+                                            )?;
+                                        if matches!(
+                                            cmd_description,
+                                            shirabe_php_rpc::PluginValue::String(ref bytes)
+                                                if bytes.is_empty()
+                                        ) {
+                                            crate::plugin::call_php_entity_method(
+                                                &handle,
+                                                "setDescription",
+                                                vec![shirabe_php_rpc::PluginValue::string(
+                                                    description,
+                                                )],
+                                            )?;
+                                        }
+
+                                        let cmd =
+                                            crate::plugin::PhpCommandProxy::new_script_command(
+                                                handle,
+                                            )?;
+                                        application.borrow_mut().register_worker_console_commands(
+                                            composer_opt
+                                                .as_ref()
+                                                .and_then(|c| c.as_full())
+                                                .as_ref(),
+                                            crate::plugin::take_pending_plugin_command_handles(),
+                                        )?;
+                                        std::rc::Rc::new(std::cell::RefCell::new(cmd))
                                     } else {
                                         // fallback to usual aliasing behavior
                                         std::rc::Rc::new(std::cell::RefCell::new(

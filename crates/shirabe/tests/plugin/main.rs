@@ -10,6 +10,7 @@ mod e2e_installer_test;
 mod e2e_installers_test;
 mod e2e_normalize_test;
 mod e2e_package_event_test;
+mod e2e_script_command_test;
 mod plugin_installer_test;
 mod subscriber_test;
 mod value_round_trip_test;
