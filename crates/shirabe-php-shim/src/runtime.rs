@@ -13,8 +13,6 @@ pub const PHP_WINDOWS_VERSION_MAJOR: i64 = 0;
 pub const PHP_WINDOWS_VERSION_MINOR: i64 = 0;
 pub const PHP_WINDOWS_VERSION_BUILD: i64 = 0;
 
-pub const HHVM_VERSION: Option<&str> = None;
-
 pub const E_ALL: i64 = 32767;
 pub const E_WARNING: i64 = 2;
 pub const E_NOTICE: i64 = 8;
@@ -40,7 +38,7 @@ pub const PHP_OS: &str = match std::env::consts::OS.as_bytes() {
 
 // Models the constants defined in a standard modern PHP CLI environment on a
 // non-Windows platform with the common extensions loaded (curl, openssl, json).
-// Windows-only, HHVM and Composer-bootstrap constants are reported undefined.
+// Windows-only and Composer-bootstrap constants are reported undefined.
 pub fn defined(name: &str) -> bool {
     matches!(
         name,

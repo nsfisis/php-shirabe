@@ -12,9 +12,9 @@ use crate::repository::RepositorySet;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare,
-    php_regex, spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower, substr,
-    substr_count, version_compare,
+    CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
+    spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower, substr, substr_count,
+    version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -398,10 +398,7 @@ impl Problem {
                     Self::constraint_to_text(constraint)
                 );
 
-                if defined("HHVM_VERSION")
-                    || (package_name == "hhvm"
-                        && !pool.what_provides(package_name, None).is_empty())
-                {
+                if package_name == "hhvm" && !pool.what_provides(package_name, None).is_empty() {
                     return Ok((
                         msg,
                         "your HHVM version does not satisfy that requirement.".to_string(),

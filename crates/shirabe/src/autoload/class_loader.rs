@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, defined, file_exists, include_file, spl_autoload_register,
+    InvalidArgumentException, PhpMixed, file_exists, include_file, spl_autoload_register,
     spl_autoload_unregister, strlen, strpos, strrpos, strtr, substr,
 };
 use std::sync::{LazyLock, Mutex};
@@ -340,12 +340,10 @@ impl ClassLoader {
             // No-op; APCu is not available in Rust.
         }
 
-        let mut file = self.find_file_with_extension(class, ".php");
-
-        // Search for Hack files if we are running on HHVM
-        if file.is_none() && defined("HHVM_VERSION") {
-            file = self.find_file_with_extension(class, ".hh");
-        }
+        // TODO(php-runtime): PHP also looks for a Hack file (`.hh`) when it runs on HHVM. Only the
+        // worker, which is the runtime that includes the file, can answer whether it is HHVM, and
+        // asking boots it, while this lookup is what decides whether it is needed at all.
+        let file = self.find_file_with_extension(class, ".php");
 
         if let Some(apcu_prefix) = &self.apcu_prefix {
             // No-op; APCu is not available in Rust.

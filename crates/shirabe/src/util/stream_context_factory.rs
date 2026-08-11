@@ -9,9 +9,8 @@ use crate::util::http::ProxyManager;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    HHVM_VERSION, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, PhpMixed,
-    array_replace_recursive, extension_loaded, function_exists, php_uname, stream_context_create,
-    stripos, uasort,
+    PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, PhpMixed, array_replace_recursive,
+    extension_loaded, function_exists, php_uname, stream_context_create, stripos, uasort,
 };
 
 pub struct StreamContextFactory;
@@ -148,14 +147,10 @@ impl StreamContextFactory {
             }
         }
 
-        let php_version = if HHVM_VERSION.is_some() {
-            format!("HHVM {}", HHVM_VERSION.unwrap())
-        } else {
-            format!(
-                "PHP {}.{}.{}",
-                PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION
-            )
-        };
+        let php_version = format!(
+            "PHP {}.{}.{}",
+            PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION
+        );
 
         let http_version = if for_curl {
             // PHP reports `cURL <version>` here. Shirabe's "curl" transport is backed by reqwest,

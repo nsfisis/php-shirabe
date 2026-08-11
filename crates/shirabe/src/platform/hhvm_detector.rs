@@ -2,7 +2,6 @@
 
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use shirabe_php_shim::{HHVM_VERSION, defined};
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
@@ -47,13 +46,8 @@ impl HhvmDetectorInterface for HhvmDetector {
         }
 
         let mut cache = HHVM_VERSION_CACHE.lock().unwrap();
-        *cache = Some(if defined("HHVM_VERSION") {
-            HHVM_VERSION.map(|s| s.to_string())
-        } else {
-            None
-        });
 
-        if cache.as_ref().unwrap().is_none() && !Platform::is_windows() {
+        if !Platform::is_windows() {
             *cache = Some(None);
             let finder = self
                 .executable_finder

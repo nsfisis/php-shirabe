@@ -2259,14 +2259,10 @@ impl ApplicationHandle {
         if !is_proxy_command {
             io.write_error3(
                 &format!(
-                    "Running {} ({}) with {} on {}",
+                    "Running {} ({}) with PHP {} on {}",
                     composer::get_version(),
                     composer::RELEASE_DATE,
-                    (if defined("HHVM_VERSION") {
-                        format!("HHVM {}", shirabe_php_shim::HHVM_VERSION.unwrap_or(""))
-                    } else {
-                        format!("PHP {}", PHP_VERSION)
-                    }),
+                    PHP_VERSION,
                     (if function_exists("php_uname") {
                         format!("{} / {}", php_uname("s"), php_uname("r"))
                     } else {
