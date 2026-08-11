@@ -14,9 +14,9 @@ use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
-    function_exists, implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen,
-    strnatcasecmp, strpos, substr, trim, usort,
+    PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, function_exists,
+    implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen, strnatcasecmp,
+    strpos, substr, trim, usort,
 };
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
@@ -507,7 +507,7 @@ impl VersionGuesser {
         if !has_branch_alias || has_self_version {
             let branch =
                 Preg::replace(php_regex!(r"{^dev-}"), "", version.as_deref().unwrap_or(""));
-            let mut length: i64 = PHP_INT_MAX;
+            let mut length = i64::MAX;
 
             // return directly, if branch is configured to be non-feature branch
             if !self.is_feature_branch(package_config, Some(&branch)) {

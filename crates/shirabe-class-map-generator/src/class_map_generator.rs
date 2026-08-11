@@ -6,9 +6,9 @@ use crate::php_file_parser::PhpFileParser;
 use indexmap::indexmap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX, RuntimeException,
-    explode, getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath,
-    str_replace, str_starts_with, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
+    InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
+    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath, str_replace,
+    str_starts_with, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
@@ -247,7 +247,7 @@ impl ClassMapGenerator {
         let real_sub_path = substr(
             &real_sub_path_str,
             0,
-            Some(dot_position.map(|p| p as i64).unwrap_or(PHP_INT_MAX)),
+            Some(dot_position.map(|p| p as i64).unwrap_or(i64::MAX)),
         );
 
         for class in classes {

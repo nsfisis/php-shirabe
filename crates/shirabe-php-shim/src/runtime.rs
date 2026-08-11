@@ -13,10 +13,6 @@ pub const PHP_WINDOWS_VERSION_MAJOR: i64 = 0;
 pub const PHP_WINDOWS_VERSION_MINOR: i64 = 0;
 pub const PHP_WINDOWS_VERSION_BUILD: i64 = 0;
 
-pub const PHP_INT_MAX: i64 = i64::MAX;
-pub const PHP_INT_MIN: i64 = i64::MIN;
-pub const PHP_INT_SIZE: i64 = 8;
-
 pub const HHVM_VERSION: Option<&str> = None;
 
 pub const E_ALL: i64 = 32767;
