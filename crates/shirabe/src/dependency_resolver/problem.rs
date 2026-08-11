@@ -13,8 +13,8 @@ use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, defined, extension_loaded, implode, loosely_compare,
-    php_regex, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos, strtolower,
-    substr, substr_count, version_compare,
+    php_regex, spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower, substr,
+    substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -806,7 +806,7 @@ impl Problem {
                                 );
                             }
 
-                            if str_starts_with(advisory_id, "PKSA-") {
+                            if advisory_id.starts_with("PKSA-") {
                                 return format!(
                                     "<href={}>{}</>",
                                     OutputFormatter::escape(&format!(
@@ -828,7 +828,7 @@ impl Problem {
                         )
                         .into_iter()
                         .map(|advisory_id: String| {
-                            if str_starts_with(&advisory_id, "PKSA-") {
+                            if advisory_id.starts_with("PKSA-") {
                                 return format!(
                                     "<href={}>{}</>",
                                     OutputFormatter::escape(&format!(
@@ -1384,7 +1384,7 @@ impl Problem {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
-            && !str_starts_with(c.get_version(), "dev-")
+            && !c.get_version().starts_with("dev-")
         {
             if !Preg::is_match3(
                 php_regex!(r"{^\d+(?:\.\d+)*$}"),

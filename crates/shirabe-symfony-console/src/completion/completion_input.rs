@@ -84,7 +84,7 @@ impl CompletionInput {
                 self.completion_name = Some(option.get_name().to_string());
                 self.completion_value = if !option_value.is_empty() {
                     option_value
-                } else if !shirabe_php_shim::str_starts_with(&option_token, "--") {
+                } else if !option_token.starts_with("--") {
                     shirabe_php_shim::substr(&option_token, 2, None)
                 } else {
                     String::new()

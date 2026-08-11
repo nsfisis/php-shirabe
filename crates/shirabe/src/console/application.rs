@@ -62,8 +62,8 @@ use shirabe_php_shim::{
     disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
     json_decode, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
-    posix_getuid, random_bytes, realpath, restore_error_handler, round, str_contains, str_replace,
-    strpos, strtoupper, sys_get_temp_dir, time, unlink,
+    posix_getuid, random_bytes, realpath, restore_error_handler, round, str_replace, strpos,
+    strtoupper, sys_get_temp_dir, time, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
@@ -300,7 +300,7 @@ impl Application {
 
         let message = exception.to_string();
         if exception.is_instanceof::<TransportException>()
-            && str_contains(&message, "Unable to use a proxy")
+            && message.contains("Unable to use a proxy")
         {
             io.write_error3(
                 "<error>The following exception indicates your proxy is misconfigured</error>",
@@ -312,7 +312,7 @@ impl Application {
 
         if Platform::is_windows()
             && exception.is_instanceof::<TransportException>()
-            && str_contains(&message, "unable to get local issuer certificate")
+            && message.contains("unable to get local issuer certificate")
         {
             let avast_detect = glob("C:\\Program Files\\Avast*");
             let avast_detect_pm = PhpMixed::List(

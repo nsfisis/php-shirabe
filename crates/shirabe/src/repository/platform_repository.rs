@@ -20,8 +20,8 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
-    array_slice_strs, explode, get_class, implode, is_string, php_regex, str_replace,
-    str_starts_with, strpos, strtolower, var_export,
+    array_slice_strs, explode, get_class, implode, is_string, php_regex, str_replace, strpos,
+    strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -427,7 +427,7 @@ impl PlatformRepository {
                             )?;
                         } else {
                             let (shortlib, ssl_lib);
-                            if str_starts_with(&library, "(securetransport)") {
+                            if library.starts_with("(securetransport)") {
                                 let mut securetransport_matches: IndexMap<CaptureKey, String> =
                                     IndexMap::new();
                                 if Preg::is_match3(

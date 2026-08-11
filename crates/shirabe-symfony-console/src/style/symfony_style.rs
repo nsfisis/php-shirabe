@@ -312,7 +312,7 @@ impl SymfonyStyle {
     fn auto_prepend_text(&mut self) {
         let fetched = self.buffered_output.fetch();
         // Prepend new line if last char isn't EOL:
-        if !shirabe_php_shim::str_ends_with(&fetched, "\n") {
+        if !fetched.ends_with('\n') {
             self.new_line(1);
         }
     }

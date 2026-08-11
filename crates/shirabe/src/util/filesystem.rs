@@ -9,9 +9,8 @@ use shirabe_php_shim::{
     clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof, file_exists,
     file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread,
     function_exists, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
-    php_regex, rename, rmdir, rtrim, str_contains, str_repeat, str_replace, str_starts_with,
-    strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep,
-    var_export,
+    php_regex, rename, rmdir, rtrim, str_repeat, str_replace, strlen, strpos, strtoupper, strtr,
+    substr, substr_count, symlink, touch, unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -431,7 +430,7 @@ impl Filesystem {
 
                     // if copy fails we attempt to copy it manually as this can help bypass issues with VirtualBox shared folders
                     // see https://github.com/composer/composer/issues/12057
-                    if str_contains(e.get_message(), "Bad address") {
+                    if e.get_message().contains("Bad address") {
                         let (source_handle, target_handle) =
                             match (fopen(source, "r"), fopen(&target, "w")) {
                                 (Ok(source_handle), Ok(target_handle)) => {
@@ -648,7 +647,7 @@ impl Filesystem {
         }
 
         common_path = format!("{}/", rtrim(&common_path, Some("/")));
-        if str_starts_with(&to, &format!("{}/", from)) {
+        if to.starts_with(&format!("{}/", from)) {
             return format!(
                 "__DIR__ . {}",
                 var_export(&PhpMixed::String(substr(&to, strlen(&from), None)), true)

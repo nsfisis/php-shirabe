@@ -24,7 +24,7 @@ use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
-    str_contains, str_replace, strpos, strtolower,
+    str_replace, strpos, strtolower,
 };
 
 /// Package operation manager.
@@ -844,7 +844,7 @@ impl InstallationManager {
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             for (repo_url, packages) in self.notifiable_packages.borrow().iter() {
                 // non-batch API, deprecated
-                if str_contains(repo_url, "%package%") {
+                if repo_url.contains("%package%") {
                     for package in packages {
                         let url = str_replace("%package%", &package.get_pretty_name(), repo_url);
 

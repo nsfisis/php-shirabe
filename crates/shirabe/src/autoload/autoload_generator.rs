@@ -28,8 +28,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
     array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
     file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex, preg_quote,
-    random_bytes, realpath, str_contains, str_replace, str_starts_with, strlen, strpos, strtr,
-    substr, substr_count, trim, unlink, var_export,
+    random_bytes, realpath, str_replace, strlen, strpos, strtr, substr, substr_count, trim, unlink,
+    var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -456,14 +456,13 @@ return array(
                         }
 
                         // if the vendor dir is contained within a psr-0/psr-4 dir being scanned we exclude it
-                        let exclusion_regex =
-                            if str_contains(&vendor_path, &format!("{}/", dir_str)) {
-                                let mut combined = excluded.clone();
-                                combined.push(format!("{}/", vendor_path));
-                                self.build_exclusion_regex(&dir_str, combined)
-                            } else {
-                                self.build_exclusion_regex(&dir_str, excluded.clone())
-                            };
+                        let exclusion_regex = if vendor_path.contains(&format!("{}/", dir_str)) {
+                            let mut combined = excluded.clone();
+                            combined.push(format!("{}/", vendor_path));
+                            self.build_exclusion_regex(&dir_str, combined)
+                        } else {
+                            self.build_exclusion_regex(&dir_str, excluded.clone())
+                        };
 
                         class_map_generator.scan_paths(
                             &dir_str,
@@ -757,11 +756,11 @@ return array(
                     pattern,
                 );
                 // if the pattern is not a subset or superset of $dir, it is unrelated and we skip it
-                let unrelated = (!str_starts_with(&pattern_processed, &dir_match)
-                    && !str_starts_with(&dir_match, &pattern_processed))
+                let unrelated = (!pattern_processed.starts_with(&dir_match)
+                    && !dir_match.starts_with(&pattern_processed))
                     && (!is_symlink
-                        || (!str_starts_with(&pattern_processed, &dir_match_normalized)
-                            && !str_starts_with(&dir_match_normalized, &pattern_processed)));
+                        || (!pattern_processed.starts_with(&dir_match_normalized)
+                            && !dir_match_normalized.starts_with(&pattern_processed)));
                 if !unrelated {
                     new_excluded.push(pattern.clone());
                 }
@@ -1763,7 +1762,7 @@ class ComposerStaticInit{}
         for (prop, value) in loader.as_array_iter() {
             if !is_array(&value)
                 || value.as_array().map_or(0, |a| a.len()) == 0
-                || !str_starts_with(&prop, prefix)
+                || !prop.starts_with(prefix)
             {
                 continue;
             }

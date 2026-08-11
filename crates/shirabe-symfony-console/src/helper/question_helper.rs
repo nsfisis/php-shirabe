@@ -557,10 +557,7 @@ impl QuestionHelper {
                             .into_iter()
                             .filter(|m| {
                                 ret_for_filter.is_empty()
-                                    || shirabe_php_shim::str_starts_with(
-                                        &m.to_string(),
-                                        &ret_for_filter,
-                                    )
+                                    || m.to_string().starts_with(&ret_for_filter)
                             })
                             .collect();
                         ofs = -1;
@@ -616,7 +613,7 @@ impl QuestionHelper {
 
                 for value in autocomplete(&ret) {
                     // If typed characters match the beginning chunk of value (e.g. [AcmeDe]moBundle)
-                    if shirabe_php_shim::str_starts_with(&value.to_string(), &temp_ret) {
+                    if value.to_string().starts_with(&temp_ret) {
                         if (num_matches as usize) < matches.len() {
                             matches[num_matches as usize] = value;
                         } else {
@@ -660,7 +657,7 @@ impl QuestionHelper {
 
     fn most_recently_entered_value(&self, entered: &str) -> String {
         // Determine the most recent value that the user entered
-        if !shirabe_php_shim::str_contains(entered, ",") {
+        if !entered.contains(',') {
             return entered.to_string();
         }
 

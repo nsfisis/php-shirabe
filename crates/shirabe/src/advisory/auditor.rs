@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, get_class, str_starts_with,
+    array_keys, array_reduce, get_class,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 
@@ -266,7 +266,7 @@ impl Auditor {
 
         let ignored_ids = array_keys(ignore_list);
 
-        array_any(&ignored_ids, |id: &String| !str_starts_with(id, "PKSA-"))
+        array_any(&ignored_ids, |id: &String| !id.starts_with("PKSA-"))
     }
 
     pub fn filter_abandoned_packages(
@@ -656,7 +656,7 @@ impl Auditor {
 
     fn get_advisory_id(&self, advisory: &SecurityAdvisory) -> String {
         let advisory_id = advisory.advisory_id();
-        if str_starts_with(advisory_id, "PKSA-") {
+        if advisory_id.starts_with("PKSA-") {
             return format!(
                 "<href=https://packagist.org/security-advisories/{}>{}</>",
                 advisory_id, advisory_id

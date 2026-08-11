@@ -14,18 +14,6 @@ pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
     subject.replace(search, replace)
 }
 
-pub fn str_contains(haystack: &str, needle: &str) -> bool {
-    haystack.contains(needle)
-}
-
-pub fn str_starts_with(haystack: &str, needle: &str) -> bool {
-    haystack.starts_with(needle)
-}
-
-pub fn str_ends_with(haystack: &str, needle: &str) -> bool {
-    haystack.ends_with(needle)
-}
-
 pub fn substr_count(haystack: &str, needle: &str) -> i64 {
     if needle.is_empty() {
         panic!("substr_count(): Argument #2 ($needle) cannot be empty");

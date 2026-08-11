@@ -8,8 +8,8 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
-    json_decode, php_regex, php_truthy, preg_quote, rtrim, str_contains, str_repeat, str_replace,
-    strlen, strnatcmp, strpos, substr, trim, uksort,
+    json_decode, php_regex, php_truthy, preg_quote, rtrim, str_repeat, str_replace, strlen,
+    strnatcmp, strpos, substr, trim, uksort,
 };
 
 #[derive(Debug)]
@@ -1061,7 +1061,7 @@ impl JsonManipulator {
             let mut item_depth: i64 = 1;
 
             // keep oneline lists as one line
-            if !str_contains(&whitespace, &self.newline) {
+            if !whitespace.contains(&self.newline) {
                 leading_item_whitespace = leading_whitespace.clone();
                 trailing_item_whitespace = leading_whitespace.clone();
                 item_depth = 0;

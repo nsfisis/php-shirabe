@@ -18,8 +18,8 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
     clearstatcache, explode, implode, in_array_loose, in_array_strict, is_dir, php_regex,
-    preg_quote, rawurldecode, rawurlencode, str_contains, str_ends_with, str_replace_array, strlen,
-    strpos, substr, trim, version_compare,
+    preg_quote, rawurldecode, rawurlencode, str_replace_array, strlen, strpos, substr, trim,
+    version_compare,
 };
 use std::sync::Mutex;
 
@@ -57,7 +57,7 @@ impl Git {
         path: &str,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<()> {
-        if str_contains(output, "fatal: detected dubious ownership") {
+        if output.contains("fatal: detected dubious ownership") {
             let msg = format!(
                 "The repository at \"{}\" does not have the correct ownership and git refuses to use it:{}{}{}",
                 path, PHP_EOL, PHP_EOL, output
@@ -431,7 +431,7 @@ impl Git {
                 let domain = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let mut repo_with_git_part =
                     m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
-                if !str_ends_with(&repo_with_git_part, ".git") {
+                if !repo_with_git_part.ends_with(".git") {
                     repo_with_git_part.push_str(".git");
                 }
                 if !self.io.has_authentication(&domain) {
@@ -651,7 +651,7 @@ impl Git {
                 let mut m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 let mut auth_parts: Option<String> = None;
-                if str_contains(&m2, "@") {
+                if m2.contains("@") {
                     let parts = explode("@", &m2);
                     auth_parts = parts.first().cloned();
                     m2 = parts.get(1).cloned().unwrap_or_default();
@@ -665,7 +665,7 @@ impl Git {
                     if let Some(ref parts) = auth_parts
                         && !parts.is_empty()
                     {
-                        if str_contains(parts, ":") {
+                        if parts.contains(":") {
                             let split = explode(":", parts);
                             default_username = split.first().cloned();
                         } else {

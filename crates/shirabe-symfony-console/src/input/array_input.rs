@@ -139,9 +139,9 @@ impl ArrayInput {
             if key == "--" {
                 return Ok(());
             }
-            if shirabe_php_shim::str_starts_with(&key, "--") {
+            if key.starts_with("--") {
                 self.add_long_option(&shirabe_php_shim::substr(&key, 2, None), value)?;
-            } else if shirabe_php_shim::str_starts_with(&key, "-") {
+            } else if key.starts_with("-") {
                 self.add_short_option(&shirabe_php_shim::substr(&key, 1, None), value)?;
             } else {
                 self.add_argument(&PhpMixed::String(key), value)?;

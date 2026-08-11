@@ -15,7 +15,7 @@ use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
     file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, php_regex, realpath,
-    str_contains, str_ends_with, str_repeat, strlen, strpos, usleep,
+    str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 
@@ -484,8 +484,8 @@ impl JsonFile {
         if matches!(data, PhpMixed::Null) && json != "null" {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
             if let Some(file) = file
-                && str_ends_with(file, ".lock")
-                && str_contains(json, "\"content-hash\"")
+                && file.ends_with(".lock")
+                && json.contains("\"content-hash\"")
             {
                 let mut count: usize = 0;
                 let replaced = Preg::replace5(

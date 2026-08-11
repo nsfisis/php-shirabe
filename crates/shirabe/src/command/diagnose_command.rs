@@ -38,8 +38,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpClass as _, PhpMixed,
     disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class, implode, is_array,
-    is_string, php_regex, rtrim, str_contains, str_replace, str_starts_with, strpos, strstr,
-    strstr3, strtolower, trim, version_compare,
+    is_string, php_regex, rtrim, str_replace, strpos, strstr, strstr3, strtolower, trim,
+    version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -234,8 +234,7 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<PhpMixed> = vec![];
         let mut tls_warning: Option<String> = None;
-        if str_starts_with(url, "https://")
-            && config.borrow().get("disable-tls").as_bool() == Some(true)
+        if url.starts_with("https://") && config.borrow().get("disable-tls").as_bool() == Some(true)
         {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
@@ -875,11 +874,11 @@ impl DiagnoseCommand {
                 .unwrap_or_default();
             let configure = configure.as_str();
 
-            if str_contains(configure, "--enable-sigchild") {
+            if configure.contains("--enable-sigchild") {
                 warnings.insert("sigchild".to_string(), PhpMixed::Bool(true));
             }
 
-            if str_contains(configure, "--with-curlwrappers") {
+            if configure.contains("--with-curlwrappers") {
                 warnings.insert("curlwrappers".to_string(), PhpMixed::Bool(true));
             }
         }
@@ -1228,7 +1227,10 @@ impl Command for DiagnoseCommand {
         .unwrap();
         let mut php_version = php_pkg.get_pretty_version();
         if let Some(cp) = php_pkg.as_complete()
-            && str_contains(&cp.get_description().unwrap_or_default(), "overridden")
+            && cp
+                .get_description()
+                .unwrap_or_default()
+                .contains("overridden")
         {
             php_version = format!(
                 "{} - {}",
@@ -1361,10 +1363,10 @@ impl Command for DiagnoseCommand {
                 // We surface the same internal call by directly invoking the equivalent method.
                 // TODO(plugin): support reflection-based access if plugin code requires it.
                 let url = composer_repo.get_packages_json_url();
-                if !str_starts_with(&url, "http") {
+                if !url.starts_with("http") {
                     continue;
                 }
-                if str_starts_with(&url, "https://repo.packagist.org") {
+                if url.starts_with("https://repo.packagist.org") {
                     continue;
                 }
                 io.write_no_newline(&format!(

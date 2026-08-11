@@ -32,8 +32,7 @@ use shirabe_php_shim::{
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
     is_callable, is_object, is_string, krsort, php_regex, preg_quote, realpath,
     spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
-    str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper, substr,
-    trim,
+    str_replace, strlen, strpos, strtoupper, substr, trim,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::ExecutableFinder;
@@ -371,7 +370,7 @@ impl EventDispatcher {
             let mut additional_args = event.get_arguments().clone();
             let mut callable = callable;
             if let Callable::String(ref s) = callable
-                && str_contains(s, "@no_additional_args")
+                && s.contains("@no_additional_args")
             {
                 let replaced = Preg::replace(php_regex!("{ ?@no_additional_args}"), "", s);
                 callable = Callable::String(replaced);
@@ -880,7 +879,7 @@ try {{
                         // @putenv does not receive arguments
                         let mut exec = if strpos(&callable_str, "@putenv ") == Some(0) {
                             callable_str.clone()
-                        } else if str_contains(&callable_str, "@additional_args") {
+                        } else if callable_str.contains("@additional_args") {
                             str_replace("@additional_args", &args, &callable_str)
                         } else {
                             format!(
@@ -1358,16 +1357,14 @@ try {{
 
     /// Checks if string given references a command class
     fn is_command_class(&self, callable: &str) -> bool {
-        str_contains(callable, "\\")
-            && !str_contains(callable, " ")
-            && str_ends_with(callable, "Command")
+        callable.contains("\\") && !callable.contains(" ") && callable.ends_with("Command")
     }
 
     /// Checks if string given references a composer run-script
     fn is_composer_script(&self, callable: &str) -> bool {
-        str_starts_with(callable, "@")
-            && !str_starts_with(callable, "@php ")
-            && !str_starts_with(callable, "@putenv ")
+        callable.starts_with("@")
+            && !callable.starts_with("@php ")
+            && !callable.starts_with("@putenv ")
     }
 
     /// Push an event to the stack of active event

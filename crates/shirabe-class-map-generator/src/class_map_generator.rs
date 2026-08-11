@@ -8,7 +8,7 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
     getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath, str_replace,
-    str_starts_with, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
+    stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
@@ -254,7 +254,7 @@ impl ClassMapGenerator {
             let sub_path: String;
 
             if namespace_type == "psr-0" {
-                if !base_namespace.is_empty() && !str_starts_with(&class, base_namespace) {
+                if !base_namespace.is_empty() && !class.starts_with(base_namespace) {
                     rejected_classes.push(class);
                     continue;
                 }

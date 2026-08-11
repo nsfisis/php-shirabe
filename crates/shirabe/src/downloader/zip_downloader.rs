@@ -13,8 +13,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
     bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
-    impl_php_class, is_file, json_encode, php_regex, random_int, str_contains, str_replace, strlen,
-    substr, version_compare,
+    impl_php_class, is_file, json_encode, php_regex, random_int, str_replace, strlen, substr,
+    version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -202,7 +202,7 @@ impl ZipDownloader {
             return Err(process_error);
         }
 
-        if str_contains(&process_error.to_string(), "zip bomb") {
+        if process_error.to_string().contains("zip bomb") {
             return Err(process_error);
         }
 

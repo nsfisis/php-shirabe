@@ -237,9 +237,7 @@ impl Platform {
                 None => continue,
             };
             // detect default mount points created by Docker/containerd
-            if shirabe_php_shim::str_contains(&data, "/var/lib/docker/")
-                || shirabe_php_shim::str_contains(&data, "/io.containerd.snapshotter")
-            {
+            if data.contains("/var/lib/docker/") || data.contains("/io.containerd.snapshotter") {
                 *cached = Some(true);
                 return true;
             }
@@ -357,7 +355,7 @@ impl Platform {
                 let mut output = String::new();
                 let result: anyhow::Result<()> = (|| {
                     if process.execute_args(&["lsmod".to_string()], &mut output, None) == 0
-                        && shirabe_php_shim::str_contains(&output, "vboxguest")
+                        && output.contains("vboxguest")
                     {
                         *cached = Some(true);
                         return Ok(());

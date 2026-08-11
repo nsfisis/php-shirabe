@@ -34,7 +34,7 @@ impl OutputFormatter {
     /// Escapes trailing "\" in given text.
     pub fn escape_trailing_backslash(text: &str) -> String {
         let mut text = text.to_string();
-        if shirabe_php_shim::str_ends_with(&text, "\\") {
+        if text.ends_with('\\') {
             let len = shirabe_php_shim::strlen(&text);
             text = shirabe_php_shim::rtrim(&text, Some("\\"));
             text = shirabe_php_shim::str_replace("\0", "", &text);

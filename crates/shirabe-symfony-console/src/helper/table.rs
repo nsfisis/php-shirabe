@@ -745,7 +745,7 @@ impl Table {
                 if shirabe_php_shim::strstr(&cell_str, "\n").is_none() {
                     continue;
                 }
-                let eol = if shirabe_php_shim::str_contains(&cell_str, "\r\n") {
+                let eol = if cell_str.contains("\r\n") {
                     "\r\n"
                 } else {
                     "\n"
@@ -846,7 +846,7 @@ impl Table {
                 let cell_str = cell.to_php_string();
                 let mut lines = vec![cell.clone()];
                 if shirabe_php_shim::strstr(&cell_str, "\n").is_some() {
-                    let eol = if shirabe_php_shim::str_contains(&cell_str, "\r\n") {
+                    let eol = if cell_str.contains("\r\n") {
                         "\r\n"
                     } else {
                         "\n"

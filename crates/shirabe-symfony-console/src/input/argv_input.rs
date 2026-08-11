@@ -116,7 +116,7 @@ impl ArgvInput {
             self.parse_argument(token)?;
         } else if parse_options && token == "--" {
             return Ok(false);
-        } else if parse_options && shirabe_php_shim::str_starts_with(token, "--") {
+        } else if parse_options && token.starts_with("--") {
             self.parse_long_option(token)?;
         } else if parse_options && token.as_bytes().first() == Some(&b'-') && token != "-" {
             self.parse_short_option(token)?;
@@ -405,7 +405,7 @@ impl ArgvInput {
         let mut is_option = false;
         for (i, token) in self.tokens.iter().enumerate() {
             if !token.is_empty() && token.as_bytes()[0] == b'-' {
-                if shirabe_php_shim::str_contains(token, "=") || self.tokens.get(i + 1).is_none() {
+                if token.contains('=') || self.tokens.get(i + 1).is_none() {
                     continue;
                 }
 
@@ -458,14 +458,12 @@ impl ArgvInput {
                 // Options with values:
                 //   For long options, test for '--option=' at beginning
                 //   For short options, test for '-o' at beginning
-                let leading = if shirabe_php_shim::str_starts_with(value, "--") {
+                let leading = if value.starts_with("--") {
                     format!("{}=", value)
                 } else {
                     value.clone()
                 };
-                if token == value
-                    || (!leading.is_empty() && shirabe_php_shim::str_starts_with(token, &leading))
-                {
+                if token == value || (!leading.is_empty() && token.starts_with(&leading)) {
                     return true;
                 }
             }
@@ -499,12 +497,12 @@ impl ArgvInput {
                 // Options with values:
                 //   For long options, test for '--option=' at beginning
                 //   For short options, test for '-o' at beginning
-                let leading = if shirabe_php_shim::str_starts_with(value, "--") {
+                let leading = if value.starts_with("--") {
                     format!("{}=", value)
                 } else {
                     value.clone()
                 };
-                if !leading.is_empty() && shirabe_php_shim::str_starts_with(&token, &leading) {
+                if !leading.is_empty() && token.starts_with(&leading) {
                     return PhpMixed::String(shirabe_php_shim::substr(
                         &token,
                         shirabe_php_shim::strlen(&leading),
