@@ -935,7 +935,6 @@ fn test_non_dev_autoload_replaces_nested_requirements() {
 
 #[test]
 #[serial]
-#[ignore = "autoload_static.php getInitializer() fixture has a trailing blank line the current AutoloadGenerator template omits; needs production template alignment"]
 fn test_phar_autoload() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
@@ -1381,7 +1380,6 @@ fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
 
 #[test]
 #[serial]
-#[ignore = "autoload_real.php/autoload_static.php fixtures track a newer Composer template (single blank lines + $filesToLoad/$requireFile block) than the current AutoloadGenerator port emits; needs production template alignment"]
 fn test_files_autoload_generation() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
@@ -1651,7 +1649,6 @@ fn test_empty_paths() {
 
 #[test]
 #[serial]
-#[ignore = "fixture assumes the symlinked composersrc/foo/bar tree (created via `ln -s` in PHP) and exercises exclude-from-classmap pattern matching that the port does not yet apply; symlink setup not replicated"]
 fn test_exclude_from_classmap() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
@@ -2106,7 +2103,6 @@ fn test_vendor_dir_excluded_from_working_dir() {
 
 #[test]
 #[serial]
-#[ignore = "classmap generation does not apply exclude-from-classmap rules that use up-level (../) relative paths or wildcards, so excluded classes (Boo/Boo2/Boo3/Boo4) still appear"]
 fn test_up_level_relative_paths() {
     let mut s = set_up();
     let working_dir = format!("{}/working-dir", s.working_dir);
@@ -2514,7 +2510,6 @@ fn test_generates_platform_check() {
 
 #[test]
 #[serial]
-#[ignore = "psr-4 compliance warning is emitted for files reached through an absolute symlink; Composer does not warn here"]
 fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
     let mut s = set_up();
     let package = new_root_pkg("test/package");
@@ -2552,7 +2547,6 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
 
 #[test]
 #[serial]
-#[ignore = "exclude-from-classmap '**/vendor/' is not applied to paths reached through an absolute symlink, so PHPUnit\\Framework\\Exception is not excluded"]
 fn test_absolute_symlink_with_classmap_exclude_from_classmap() {
     let mut s = set_up();
     let package = new_root_pkg("test/package");

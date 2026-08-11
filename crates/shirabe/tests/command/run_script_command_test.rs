@@ -124,7 +124,11 @@ fn test_can_define_aliases() {
 /// ref: RunScriptCommandTest::testExecutionOfSimpleSymfonyCommand
 #[test]
 #[serial]
-#[ignore = "invoking the script name as a top-level composer command needs Application::do_run to import the user's PHP Command class as a live application command, which is a todo!() in application.rs, and the worker writes to inherited stdio the in-process application tester cannot capture"]
+#[ignore = "PhpCommandProxy::run hands the whole run to the worker-side console application, so the \
+            user's Command writes to the stdio the worker inherited and the in-process application \
+            tester's buffer stays empty. The worker is also a per-process singleton that keeps the \
+            working directory it was spawned in, so the relative psr-4 path this test's autoload \
+            config produces ('./MyCommand.php') only resolves when the test runs first in the binary"]
 fn test_execution_of_simple_symfony_command() {
     let description = "Sample description for test command";
     let tear_down = init_temp_composer(
@@ -245,7 +249,11 @@ class MyCommand extends Command
 /// ref: RunScriptCommandTest::testExecutionOfSymfonyCommandWithConfiguration
 #[test]
 #[serial]
-#[ignore = "invoking the script name as a top-level composer command needs Application::do_run to import the user's PHP Command class as a live application command, which is a todo!() in application.rs, and the worker writes to inherited stdio the in-process application tester cannot capture"]
+#[ignore = "PhpCommandProxy::run hands the whole run to the worker-side console application, so the \
+            user's Command writes to the stdio the worker inherited and the in-process application \
+            tester's buffer stays empty. The worker is also a per-process singleton that keeps the \
+            working directory it was spawned in, so the relative psr-4 path this test's autoload \
+            config produces ('./MyCommand.php') only resolves when the test runs first in the binary"]
 fn test_execution_of_symfony_command_with_configuration() {
     let cmd_name = "custom-cmd-123";
     let cmd_alias = format!("{}-alias", cmd_name);

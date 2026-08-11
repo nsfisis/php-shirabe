@@ -145,9 +145,6 @@ fn test_process_isolation_works_multiple_times() {
     assert_eq!(0, application.do_run(input2, output2).unwrap());
 }
 
-#[ignore = "Application::do_run registers the composer.json script as a command, a path that ends at a todo!() \
-            (application.rs:2461, 'plugin: register reflection-instantiated command on Application::add'). With a \
-            'scripts' key present, do_run panics there before getComposer is reached"]
 #[test]
 #[serial]
 fn test_no_plugins_disables_plugins_when_script_commands_exist() {
@@ -213,9 +210,6 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
     );
 }
 
-#[ignore = "Application::do_run registers composer.json scripts as commands; that path ends at a todo!() \
-            (application.rs:2461, 'plugin: register reflection-instantiated command on Application::add'). With a \
-            'scripts' key present, do_run panics there before the script command executes"]
 #[test]
 #[serial]
 fn test_script_command_takes_priority_over_abbreviated_builtin_command() {

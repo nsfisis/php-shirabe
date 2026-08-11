@@ -31,7 +31,6 @@ fn chdir_unique_tmp_directory() -> TempDir {
 
 #[test]
 #[serial]
-#[ignore = "runs a composer.json script, which Application::do_run registers as a reflection-instantiated command; that registration path is todo!() at crates/shirabe/src/console/application.rs:2461 (plugin: register reflection-instantiated command on Application::add)"]
 fn test_global() {
     let _env_guard = EnvGuard;
 

@@ -259,11 +259,6 @@ fn test_integration_create_project_command() {
 
 #[test]
 #[serial]
-#[ignore = "needs live network (real git clone from github.com). The two former in-process \
-            blockers are fixed: the scheme-less packages.json read via RemoteFilesystem::\
-            get_remote_contents, and the exit-101 panic during CreateProjectCommand's keep-vcs \
-            cleanup, whose Symfony Finder name patterns go through Glob::to_regex (now \
-            regex-crate-compatible); a full green run is unverified because it requires network"]
 fn test_integration_create_project_shows_full_hash_for_dev_packages() {
     run_integration("create-project-shows-full-hash-for-dev-packages.test");
 }
@@ -284,7 +279,6 @@ fn test_integration_installed_versions2() {
 
 #[test]
 #[serial]
-#[ignore = "requires the Plugin API (PHP plugins emitting !! markers), which is not yet implemented"]
 fn test_integration_plugin_autoloading_only_loads_dependencies() {
     run_integration("plugin-autoloading-only-loads-dependencies.test");
 }

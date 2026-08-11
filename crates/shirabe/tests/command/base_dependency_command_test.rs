@@ -445,7 +445,6 @@ fn test_why_command_outputs() {
 /// ref: BaseDependencyCommandTest::testWhyNotCommandOutputs (caseWhyNotProvider rolled in).
 #[test]
 #[serial]
-#[ignore = "panics in shirabe_php_shim::runtime::trigger_error (crates/shirabe-php-shim/src/runtime.rs:435 todo!()): emitting a PHP error obeys error_reporting and the installed error handler (runtime state not modeled), reached on the `why-not` command execution path"]
 fn test_why_not_command_outputs() {
     // caseWhyNotProvider: (package, version, expected_output, expected_status_code)
     let cases: Vec<(&str, &str, &str, i32)> = vec![

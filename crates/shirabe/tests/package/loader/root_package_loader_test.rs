@@ -89,7 +89,6 @@ mockall::mock! {
 }
 
 #[test]
-#[ignore = "process_executor.enable_async() drives the async stream path, which calls stream_set_blocking (fcntl(2) todo!() in shirabe-php-shim::stream)"]
 fn test_stability_flags_parsing() {
     let io = null_io();
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
