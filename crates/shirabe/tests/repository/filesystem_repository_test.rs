@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/FilesystemRepositoryTest.php
 
+use crate::php_worker::{load_composer_php_runtime, php_call_static, php_runtime_available};
 use crate::test_case::{get_alias_package, get_package};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -12,6 +13,7 @@ use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, Roo
 use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
+use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
@@ -325,10 +327,104 @@ fn test_repository_writes_installed_php() {
     assert_eq!(expected, actual);
 }
 
-#[ignore = "safely_load_installed_versions's pattern uses a PCRE (?(DEFINE)...) recursive grammar the regex crate cannot compile, and InstalledVersions::getAllRawData has no Rust counterpart"]
+/// The Rust `FilesystemRepository::safely_load_installed_versions` is a no-op stub, and
+/// `InstalledVersions` has no Rust port at all; both live in the PHP worker, which is where the
+/// upstream assertions are checked. See `crates/shirabe/tests/installed_versions_test.rs`.
 #[test]
+// Serialized because test_repository_writes_installed_php pushes InstalledVersions::reload into
+// the same worker, which would replace the state asserted here.
+#[serial]
 fn test_safely_load_installed_versions() {
-    // TODO(pcre): needs a regex-crate expression equivalent to the PCRE recursive grammar, and
-    // InstalledVersions::get_all_raw_data.
-    todo!()
+    if !php_runtime_available() {
+        return;
+    }
+    load_composer_php_runtime();
+
+    let fixtures_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Repository/Fixtures")
+        .canonicalize()
+        .expect("the Composer checkout must provide the repository fixtures")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let result = php_call_static(
+        "Composer\\Repository\\FilesystemRepository",
+        "safelyLoadInstalledVersions",
+        vec![PluginValue::string(format!(
+            "{}/installed_complex.php",
+            fixtures_dir
+        ))],
+    );
+    assert_eq!(
+        PluginValue::Bool(true),
+        result,
+        "The file should be considered valid"
+    );
+
+    let raw_data = php_call_static("Composer\\InstalledVersions", "getAllRawData", vec![]);
+    let PluginValue::List(datasets) = raw_data else {
+        panic!("getAllRawData must return a list, got {raw_data:?}")
+    };
+    let raw_data = datasets.last().cloned().unwrap();
+
+    let root = PhpMixed::Array(IndexMap::from([
+        (
+            "install_path".to_string(),
+            PhpMixed::String(format!("{}/./", fixtures_dir)),
+        ),
+        (
+            "aliases".to_string(),
+            PhpMixed::List(vec![
+                PhpMixed::String("1.10.x-dev".to_string()),
+                PhpMixed::String("2.10.x-dev".to_string()),
+            ]),
+        ),
+        ("name".to_string(), PhpMixed::String("__root__".to_string())),
+        ("true".to_string(), PhpMixed::Bool(true)),
+        ("false".to_string(), PhpMixed::Bool(false)),
+        ("null".to_string(), PhpMixed::Null),
+    ]));
+
+    let a_provider = PhpMixed::Array(IndexMap::from([
+        (
+            "foo".to_string(),
+            PhpMixed::String("simple string/no backslash".to_string()),
+        ),
+        (
+            "install_path".to_string(),
+            PhpMixed::String(format!(
+                "{}/vendor/{{${{passthru('bash -i')}}}}",
+                fixtures_dir
+            )),
+        ),
+        ("empty array".to_string(), PhpMixed::List(vec![])),
+    ]));
+
+    let c_c = PhpMixed::Array(IndexMap::from([
+        (
+            "install_path".to_string(),
+            PhpMixed::String("/foo/bar/ven/do{}r/c/c${}".to_string()),
+        ),
+        ("aliases".to_string(), PhpMixed::List(vec![])),
+        (
+            "reference".to_string(),
+            PhpMixed::String(
+                "{${passthru('bash -i')}} Foo\\Bar\n\ttab\u{0b}verticaltab\0".to_string(),
+            ),
+        ),
+    ]));
+
+    let expected = PhpMixed::Array(IndexMap::from([
+        ("root".to_string(), root),
+        (
+            "versions".to_string(),
+            PhpMixed::Array(IndexMap::from([
+                ("a/provider".to_string(), a_provider),
+                ("c/c".to_string(), c_c),
+            ])),
+        ),
+    ]));
+
+    assert_eq!(PluginValue::from_php_mixed(&expected), raw_data);
 }

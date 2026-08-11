@@ -6,6 +6,8 @@ mod config_stub;
 mod http_downloader_mock;
 #[path = "../common/io_stub.rs"]
 mod io_stub;
+#[path = "../common/php_worker.rs"]
+mod php_worker;
 #[path = "../common/process_executor_mock.rs"]
 mod process_executor_mock;
 #[path = "../common/test_case.rs"]
