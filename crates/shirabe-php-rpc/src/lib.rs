@@ -71,7 +71,7 @@ pub struct Diagnostics {
     pub ioncube_loader_iversion: i64,
     /// Empty when the ionCube loader is not loaded.
     pub ioncube_loader_version: String,
-    /// `phpinfo(INFO_GENERAL)` output, captured via `ob_start()`/`ob_get_clean()`.
+    /// `phpinfo(INFO_GENERAL)` output.
     pub phpinfo_general: String,
     /// `None` when the curl extension is not loaded.
     pub curl: Option<Curl>,

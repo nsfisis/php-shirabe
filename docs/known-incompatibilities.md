@@ -59,3 +59,8 @@ read or written through `ReflectionProperty`; only the public methods reach the 
 `ReflectionClass::getFileName()` and the method bodies do not describe Composer's sources either.
 
 Reflection on objects a plugin creates itself works as usual.
+
+### Output buffering functions
+
+`ob_*()` functions work as usual in PHP, but cannot capture any output from
+Rust side.

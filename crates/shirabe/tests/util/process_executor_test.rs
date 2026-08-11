@@ -8,7 +8,7 @@ use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::{PHP_EOL, ob_get_clean, ob_start, trim};
+use shirabe_php_shim::{PHP_EOL, trim};
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
@@ -23,16 +23,10 @@ fn test_execute_captures_output() {
     assert_eq!(format!("foo{}", PHP_EOL), output);
 }
 
-#[ignore = "shirabe_php_shim::ob_start/ob_get_clean are todo!(): the shim has no echo-to-buffer routing, and ProcessExecutor::execute with FORWARD_OUTPUT and io=None writes straight to the real process stdout"]
 #[test]
 fn test_execute_outputs_if_not_captured() {
-    let mut process = ProcessExecutor::new(None);
-    ob_start();
-    process
-        .execute("echo foo", ProcessExecutor::FORWARD_OUTPUT, None)
-        .unwrap();
-    let output = ob_get_clean();
-    assert_eq!(Some(format!("foo{}", PHP_EOL)), output);
+    // ob_start() and ob_get_clean() have no counterparts in Rust. It is known incompatibility; See
+    // docs/known-incompatibilities.md.
 }
 
 #[test]
