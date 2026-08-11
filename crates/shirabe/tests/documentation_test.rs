@@ -14,7 +14,7 @@ fn get_command_name(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> S
 }
 
 fn provide_command_cases() -> Vec<std::rc::Rc<std::cell::RefCell<dyn Command>>> {
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
 
     let mut description =

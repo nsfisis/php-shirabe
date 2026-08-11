@@ -40,7 +40,7 @@ fn test_dev_warning() {
     let _tear_down = TearDown;
     set_up();
 
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
 
     application.__set_dev_warning_time(Some(time() - 1));
 
@@ -59,7 +59,7 @@ fn test_dev_warning() {
     application.do_run(input, output_trait).unwrap();
 
     let expected_output = format!(
-        "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>{}",
+        "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>{}",
         PHP_SERVER
             .lock()
             .unwrap()
@@ -82,7 +82,7 @@ fn test_dev_warning_suppressed_for_self_update() {
         return;
     }
 
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
         std::rc::Rc::new(std::cell::RefCell::new(SelfUpdateCommand::new()));
     application.add(command).unwrap();
@@ -113,7 +113,7 @@ fn test_process_isolation_works_multiple_times() {
     let _tear_down = TearDown;
     set_up();
 
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
         std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new()));
     application.add(command).unwrap();
@@ -166,7 +166,7 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
         true,
     );
 
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
 
     // Run list command with --no-plugins, this triggers script command registration which previously
@@ -231,7 +231,7 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
         true,
     );
 
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
 
     let app_output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(

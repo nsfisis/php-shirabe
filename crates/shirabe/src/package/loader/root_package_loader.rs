@@ -112,7 +112,7 @@ impl RootPackageLoader {
                     let package_type = config.get("type").and_then(|v| v.as_string()).unwrap_or("");
                     if name != "__root__" && package_type != "project" {
                         io.warning(&format!(
-                            "Composer could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
+                            "Shirabe could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
                             name
                         ), &[]);
                     }

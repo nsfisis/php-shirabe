@@ -153,7 +153,7 @@ impl PathDownloader {
             && !self.safe_junctions()
         {
             if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException::new("You are on an old Windows / old PHP combo which does not allow Composer to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
+                return Err(RuntimeException::new("You are on an old Windows / old PHP combo which does not allow Shirabe to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
                 .into());
             }
             current_strategy = Self::STRATEGY_MIRROR;
@@ -166,7 +166,7 @@ impl PathDownloader {
             && !function_exists("symlink")
         {
             if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException::new("Your PHP has the symlink() function disabled which does not allow Composer to use symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
+                return Err(RuntimeException::new("Your PHP has the symlink() function disabled which does not allow Shirabe to use symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
                 .into());
             }
             current_strategy = Self::STRATEGY_MIRROR;

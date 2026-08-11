@@ -250,7 +250,7 @@ impl PluginManager {
             if requires_composer.get_pretty_string() == self.get_plugin_api_version() {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin requires composer-plugin-api {}, this *WILL* break in the future and it should be fixed ASAP (require ^{} instead for example).</warning>", package.get_name(), self.get_plugin_api_version(), self.get_plugin_api_version()));
             } else if !requires_composer.matches(&current_plugin_api_constraint.into()) {
-                self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it requires a Plugin API version (\"{}\") that does not match your Composer installation (\"{}\"). You may need to run composer update with the \"--no-plugins\" option.</warning>",
+                self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it requires a Plugin API version (\"{}\") that does not match your Shirabe installation (\"{}\"). You may need to run shirabe update with the \"--no-plugins\" option.</warning>",
                     package.get_name(),
                     if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" },
                     requires_composer.get_pretty_string(),
@@ -1347,7 +1347,7 @@ impl PluginManager {
         }
 
         Err(PluginBlockedException::new(format!(
-            "{}{} contains a Composer plugin which is blocked by your allow-plugins config. You may add it to the list if you consider it safe.\nYou can run \"composer {}config --no-plugins allow-plugins.{} [true|false]\" to enable it (true) or disable it explicitly and suppress this exception (false)\nSee https://getcomposer.org/allow-plugins",
+            "{}{} contains a Composer plugin which is blocked by your allow-plugins config. You may add it to the list if you consider it safe.\nYou can run \"shirabe {}config --no-plugins allow-plugins.{} [true|false]\" to enable it (true) or disable it explicitly and suppress this exception (false)\nSee https://getcomposer.org/allow-plugins",
             package,
             if is_global_plugin || self.running_in_global_dir { " (installed globally)" } else { "" },
             if is_global_plugin || self.running_in_global_dir { "global " } else { "" },

@@ -43,7 +43,7 @@ pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
             .unwrap_or_default(),
     );
 
-    let application = ApplicationHandle::new("Composer".to_string(), String::new())?;
+    let application = ApplicationHandle::new("Shirabe".to_string(), String::new())?;
     let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?));
     application.run(Some(input), None)
 }

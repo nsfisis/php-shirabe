@@ -939,7 +939,7 @@ impl JsonManipulator {
             children_clean = Some(children.clone());
         }
 
-        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/composer/composer/issues/new.".to_string()))?;
+        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()))?;
 
         // no child data left, $name was the only key in
         let mut empty_match: IndexMap<String, String> = IndexMap::new();

@@ -829,7 +829,7 @@ impl PoolBuilder {
             }
             if matched_platform_package {
                 self.io.write_error(&format!(
-                    "<warning>Pattern \"{}\" listed for update matches platform packages, but these cannot be updated by Composer.</warning>",
+                    "<warning>Pattern \"{}\" listed for update matches platform packages, but these cannot be updated by Shirabe.</warning>",
                     pattern
                 ));
             } else if strpos(pattern, "*").is_some() {

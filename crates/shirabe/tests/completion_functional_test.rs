@@ -44,7 +44,7 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
     let mut input: Vec<&str> = input.split(' ').collect();
     let command_name = input.remove(0);
     // PHP: $this->getApplication()->get($commandName)
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     let base = application.__base_application();
     let command = {
         let mut app_ref = base.borrow_mut();

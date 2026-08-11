@@ -2915,7 +2915,7 @@ impl ComposerRepository {
 
         match data {
             Some(d) => Ok(d),
-            None => Err(LogicException::new("ComposerRepository: Undefined $data. Please report at https://github.com/composer/composer/issues/new.".to_string()).into()),
+            None => Err(LogicException::new("ComposerRepository: Undefined $data. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()).into()),
         }
     }
 

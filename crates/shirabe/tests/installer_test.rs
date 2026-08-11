@@ -960,7 +960,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     )));
 
     // Application with inline install/update commands (setCode closures).
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
 
     let run_result: std::rc::Rc<std::cell::RefCell<Option<anyhow::Result<i64>>>> =

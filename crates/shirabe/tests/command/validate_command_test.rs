@@ -69,7 +69,7 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
             name: "validation passing",
             composer_json: minimal_valid_configuration(),
             command: vec![],
-            expected: "<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid",
+            expected: "<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid",
         },
         ValidateCase {
             // WORDING NOTE: upstream asserts justinrainbow's property-prefixed strings
@@ -142,7 +142,7 @@ fn test_with_composer_lock() {
         .run(validate_input(vec![]), RunOptions::default())
         .unwrap();
 
-    let expected = "<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Composer could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid but your composer.lock has some errors\n# Lock file errors\n- Required package \"root/req\" is not present in the lock file.\nThis usually happens when composer files are incorrectly merged or the composer.json file is manually edited.\nRead more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md\nand prefer using the \"require\" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r";
+    let expected = "<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid but your composer.lock has some errors\n# Lock file errors\n- Required package \"root/req\" is not present in the lock file.\nThis usually happens when composer files are incorrectly merged or the composer.json file is manually edited.\nRead more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md\nand prefer using the \"require\" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r";
 
     assert_eq!(expected.trim(), app_tester.get_display().trim());
 

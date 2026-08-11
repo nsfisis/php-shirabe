@@ -14,12 +14,20 @@ use crate::util::r#loop::Loop;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::php_regex;
 
-// TODO(distribution): change this information to Shirabe version.
+/// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
+/// platform package and the HTTP User-Agent keep reporting a value plugins and servers can
+/// interpret. What Shirabe calls itself is `SHIRABE_VERSION`.
 pub const VERSION: &str = "2.9.7";
 pub const BRANCH_ALIAS_VERSION: &str = "";
 pub const RELEASE_DATE: &str = "2026-04-14 13:31:52";
 pub const SOURCE_VERSION: &str = "";
 pub const RUNTIME_API_VERSION: &str = "2.2.2";
+
+pub const SHIRABE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The UTC date of the commit this build was made from. Baked in by `build.rs`, the way Composer's
+/// Compiler stamps `RELEASE_DATE` when it builds the phar.
+pub const SHIRABE_RELEASE_DATE: &str = include!(concat!(env!("OUT_DIR"), "/release_date.rs"));
 
 /// The deadline after which a development build reports itself as outdated, or `None` for a build
 /// made from a tagged revision. Baked in by `build.rs`.

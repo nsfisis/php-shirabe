@@ -42,6 +42,15 @@ fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) 
     }
 }
 
+/// `list` opens with the application banner (logo and version line), which Shirabe owns and
+/// upstream Composer cannot match. Everything from the `Usage:` section down still has to.
+fn list_body(text: &str) -> &str {
+    let usage = text
+        .find("\nUsage:")
+        .expect("list output has a Usage section");
+    &text[usage + 1..]
+}
+
 fn lines_starting_with<'a>(text: &'a str, prefix: &str) -> Vec<&'a str> {
     text.lines()
         .map(str::trim_end)
@@ -149,7 +158,11 @@ fn test_script_command_class_import_matches_upstream_composer() {
     // them, next to the plain shell script that stays a ScriptAliasCommand.
     assert_eq!(0, u_list.exit_code);
     assert_eq!(u_list.exit_code, s_list.exit_code);
-    assert_eq!(u_list.stdout, s_list.stdout, "list output differs");
+    assert_eq!(
+        list_body(&u_list.stdout),
+        list_body(&s_list.stdout),
+        "list output differs"
+    );
     assert_eq!(
         vec!["  greet                Greets someone from a script-provided command."],
         lines_starting_with(&s_list.stdout, "greet")

@@ -345,7 +345,7 @@ impl Command for UpdateCommand {
 
         if !HttpDownloader::is_curl_enabled() {
             io.write_error3(
-                "<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>",
+                "<warning>Shirabe is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>",
                 true,
                 io_interface::NORMAL,
             );

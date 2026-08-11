@@ -9,7 +9,7 @@ impl SolverBugException {
     pub fn new(message: String) -> Self {
         let full_message = format!(
             "{}\nThis exception was most likely caused by a bug in Composer.\n\
-            Please report the command you ran, the exact error you received, and your composer.json on https://github.com/composer/composer/issues - thank you!\n",
+            Please report the command you ran, the exact error you received, and your composer.json on https://github.com/nsfisis/php-shirabe/issues - thank you!\n",
             message
         );
         SolverBugException(RuntimeException::new(full_message))

@@ -141,17 +141,16 @@ pub struct Application {
 }
 
 impl Application {
-    const LOGO: &'static str = r#"   ______
-  / ____/___  ____ ___  ____  ____  ________  _____
- / /   / __ \/ __ `__ \/ __ \/ __ \/ ___/ _ \/ ___/
-/ /___/ /_/ / / / / / / /_/ / /_/ (__  )  __/ /
-\____/\____/_/ /_/ /_/ .___/\____/____/\___/_/
-                    /_/
+    const LOGO: &'static str = r#"   _____ __    _            __
+  / ___// /_  (_)________ _/ /_  ___
+  \__ \/ __ \/ / ___/ __ `/ __ \/ _ \
+ ___/ / / / / / /  / /_/ / /_/ /  __/
+/____/_/ /_/_/_/   \__,_/_.___/\___/
 "#;
 
     pub fn new(name: String, mut version: String) -> Self {
         if version.is_empty() {
-            version = composer::get_version();
+            version = composer::SHIRABE_VERSION.to_string();
         }
         if function_exists("ini_set") && extension_loaded("xdebug") {
             ini_set("xdebug.show_exception_trace", "0");
@@ -525,11 +524,12 @@ impl Application {
         }
 
         format!(
-            "<info>{}</info> version <comment>{}{}</comment> {}",
+            "<info>{}</info> version <comment>{}{}</comment> (based on Composer {}) {}",
             self.get_name(),
             self.get_version(),
             branch_alias_string,
-            composer::RELEASE_DATE,
+            composer::VERSION,
+            composer::SHIRABE_RELEASE_DATE,
         )
     }
 
@@ -2176,7 +2176,7 @@ impl ApplicationHandle {
             // at this point plugins are needed, so if we are running as root and it is not allowed we need to prompt
             // if interactive, and abort otherwise
             if is_non_allowed_root {
-                io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
+                io.write_error("<warning>Do not run Shirabe as root/super user! See https://getcomposer.org/root for details</warning>");
 
                 if io.is_interactive()
                     && io.ask_confirmation(
@@ -2200,7 +2200,7 @@ impl ApplicationHandle {
                     let cmd_name = command.borrow().get_name().unwrap_or_default();
                     if application.borrow_mut().has(&cmd_name) {
                         let cls = command.borrow().php_class_name();
-                        io.write_error(&format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
+                        io.write_error(&format!("<warning>Plugin command {} ({}) would override a Shirabe command and has been skipped</warning>", cmd_name, cls));
                     } else {
                         self.add(command)?;
                     }
@@ -2259,9 +2259,10 @@ impl ApplicationHandle {
         if !is_proxy_command {
             io.write_error3(
                 &format!(
-                    "Running {} ({}) with PHP {} on {}",
-                    composer::get_version(),
-                    composer::RELEASE_DATE,
+                    "Running Shirabe {} ({}, based on Composer {}) with PHP {} on {}",
+                    composer::SHIRABE_VERSION,
+                    composer::SHIRABE_RELEASE_DATE,
+                    composer::VERSION,
                     shirabe_php_rpc::get_php_version().version,
                     (if function_exists("php_uname") {
                         format!("{} / {}", php_uname("s"), php_uname("r"))
@@ -2274,13 +2275,13 @@ impl ApplicationHandle {
             );
 
             if shirabe_php_rpc::get_php_version().version_id < 70205 {
-                io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version));
+                io.write_error(&format!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version));
             }
 
             if shirabe_php_rpc::xdebug::is_xdebug_active()
                 && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
             {
-                io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
+                io.write_error("<warning>Shirabe is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 
             let dev_warning_time = application.borrow().dev_warning_time;
@@ -2290,7 +2291,7 @@ impl ApplicationHandle {
                 && time() > dev_warning_time
             {
                 io.write_error(&format!(
-                    "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
+                    "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
                     shirabe_php_shim::PHP_SERVER
                         .lock()
                         .unwrap()
@@ -2305,7 +2306,7 @@ impl ApplicationHandle {
                 && command_name.as_deref() != Some("selfupdate")
                 && command_name.as_deref() != Some("_complete")
             {
-                io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
+                io.write_error("<warning>Do not run Shirabe as root/super user! See https://getcomposer.org/root for details</warning>");
 
                 if io.is_interactive()
                     && !io.ask_confirmation(
@@ -2336,7 +2337,7 @@ impl ApplicationHandle {
                     && unlink(&tempfile).is_ok()
                     && !file_exists(&tempfile))
                 {
-                    return Ok(Some(format!("<error>PHP temp directory ({}) does not exist or is not writable to Composer. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir())));
+                    return Ok(Some(format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir())));
                 }
                 Ok(None)
             })
@@ -2362,7 +2363,7 @@ impl ApplicationHandle {
                         );
                         if !defined(&script_event_const) {
                             if application.borrow_mut().has(script) {
-                                io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
+                                io.write_error(&format!("<warning>A script named {} would override a Shirabe command and has been skipped</warning>", script));
                             } else {
                                 let mut description = format!(
                                     "Runs the {} script as defined in composer.json",

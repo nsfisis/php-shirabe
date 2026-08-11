@@ -134,7 +134,7 @@ impl Command for InstallCommand {
         let composer = crate::composer::composer_full(&composer_handle);
 
         if !composer.get_locker().borrow_mut().is_locked() && !HttpDownloader::is_curl_enabled() {
-            io.write_error("<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>");
+            io.write_error("<warning>Shirabe is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>");
         }
 
         // TODO(plugin): dispatch CommandEvent

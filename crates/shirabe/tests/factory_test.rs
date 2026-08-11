@@ -38,7 +38,7 @@ fn test_default_values_are_as_expected() {
         .borrow_mut()
         .expects(
             vec![Expectation::text(
-                "<warning>You are running Composer with SSL/TLS protection disabled.</warning>",
+                "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
             )],
             false,
         )

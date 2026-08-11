@@ -47,12 +47,13 @@ impl Command for AboutCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let composer_version = composer::get_version();
+        let shirabe_version = composer::SHIRABE_VERSION;
+        let composer_version = composer::VERSION;
         let _ = (input, output);
 
         self.get_io().borrow().write(&format!(
-            "<info>Composer - Dependency Manager for PHP - version {composer_version}</info>\n\
-            <comment>Composer is a dependency manager tracking local dependencies of your projects and libraries.\n\
+            "<info>Shirabe - Dependency Manager for PHP - version {shirabe_version} (based on Composer {composer_version})</info>\n\
+            <comment>Shirabe is a dependency manager tracking local dependencies of your projects and libraries.\n\
             See https://getcomposer.org/ for more information.</comment>"
         ));
 

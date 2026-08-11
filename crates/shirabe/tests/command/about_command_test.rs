@@ -8,7 +8,8 @@ use shirabe_php_shim::PhpMixed;
 #[test]
 #[serial]
 fn test_about() {
-    let composer_version = composer::get_version();
+    let shirabe_version = composer::SHIRABE_VERSION;
+    let composer_version = composer::VERSION;
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
@@ -19,11 +20,11 @@ fn test_about() {
     assert_eq!(0, status_code);
 
     assert!(app_tester.get_display().contains(&format!(
-        "Composer - Dependency Manager for PHP - version {composer_version}"
+        "Shirabe - Dependency Manager for PHP - version {shirabe_version} (based on Composer {composer_version})"
     )));
 
     assert!(app_tester.get_display().contains(
-        "Composer is a dependency manager tracking local dependencies of your projects and libraries."
+        "Shirabe is a dependency manager tracking local dependencies of your projects and libraries."
     ));
     assert!(
         app_tester

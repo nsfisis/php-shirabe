@@ -177,7 +177,7 @@ impl DiagnoseCommand {
         let mut result_list: Vec<PhpMixed> = vec![];
         let mut tls_warning: Option<String> = None;
         if proto == "https" && config.borrow().get("disable-tls").as_bool() == Some(true) {
-            tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
+            tls_warning = Some("<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
         match self
@@ -236,7 +236,7 @@ impl DiagnoseCommand {
         let mut tls_warning: Option<String> = None;
         if url.starts_with("https://") && config.borrow().get("disable-tls").as_bool() == Some(true)
         {
-            tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
+            tls_warning = Some("<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
         match self
@@ -964,7 +964,7 @@ impl DiagnoseCommand {
                     ),
                     other => {
                         return Err(InvalidArgumentException::new(format!(
-                            "DiagnoseCommand: Unknown error type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
+                            "DiagnoseCommand: Unknown error type \"{}\". Please report at https://github.com/nsfisis/php-shirabe/issues/new.",
                             other,
                         ))
                         .into());
@@ -989,7 +989,7 @@ impl DiagnoseCommand {
                     "zlib" => {
                         display_ini_message = true;
                         format!(
-                            "The zlib extension is not loaded, this can slow down Composer a lot.{}If possible, enable it or recompile php with --with-zlib{}",
+                            "The zlib extension is not loaded, this can slow down Shirabe a lot.{}If possible, enable it or recompile php with --with-zlib{}",
                             PHP_EOL, PHP_EOL
                         )
                     }
@@ -1021,29 +1021,29 @@ impl DiagnoseCommand {
                         )
                     }
                     "xdebug_loaded" => format!(
-                        "The xdebug extension is loaded, this can slow down Composer a little.{} Disabling it when using Composer is recommended.",
+                        "The xdebug extension is loaded, this can slow down Shirabe a little.{} Disabling it when using Shirabe is recommended.",
                         PHP_EOL
                     ),
                     "xdebug_profile" => {
                         display_ini_message = true;
                         format!(
-                            "The xdebug.profiler_enabled setting is enabled, this can slow down Composer a lot.{}Add the following to the end of your `php.ini` to disable it:{}  xdebug.profiler_enabled = 0",
+                            "The xdebug.profiler_enabled setting is enabled, this can slow down Shirabe a lot.{}Add the following to the end of your `php.ini` to disable it:{}  xdebug.profiler_enabled = 0",
                             PHP_EOL, PHP_EOL
                         )
                     }
                     "onedrive" => format!(
-                        "The Windows OneDrive folder is not supported on PHP versions below 7.2.23 and 7.3.10.{}Upgrade your PHP ({}) to use this location with Composer.{}",
+                        "The Windows OneDrive folder is not supported on PHP versions below 7.2.23 and 7.3.10.{}Upgrade your PHP ({}) to use this location with Shirabe.{}",
                         PHP_EOL,
                         current.as_string().unwrap_or(""),
                         PHP_EOL
                     ),
                     "uopz" => format!(
-                        "The uopz extension ignores exit calls and may not work with all Composer commands.{}Disabling it when using Composer is recommended.",
+                        "The uopz extension ignores exit calls and may not work with all Shirabe commands.{}Disabling it when using Shirabe is recommended.",
                         PHP_EOL
                     ),
                     other => {
                         return Err(InvalidArgumentException::new(format!(
-                            "DiagnoseCommand: Unknown warning type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
+                            "DiagnoseCommand: Unknown warning type \"{}\". Please report at https://github.com/nsfisis/php-shirabe/issues/new.",
                             other,
                         ))
                         .into());
@@ -1197,17 +1197,18 @@ impl Command for DiagnoseCommand {
             let r = self.check_pub_keys(&config.borrow())?;
             self.output_result(r);
 
-            io.write_no_newline("Checking Composer version: ");
+            io.write_no_newline("Checking Shirabe version: ");
             let r = self.check_version(&config)?;
             self.output_result(r);
         }
 
         io.write(&format!(
-            "Composer version: <comment>{}</comment>",
-            composer::get_version()
+            "Shirabe version: <comment>{}</comment> (based on Composer <comment>{}</comment>)",
+            composer::SHIRABE_VERSION,
+            composer::VERSION
         ));
 
-        io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
+        io.write_no_newline("Checking Shirabe and its dependencies for vulnerabilities: ");
         let r = self.check_composer_audit(&config)?;
         self.output_result(r);
 

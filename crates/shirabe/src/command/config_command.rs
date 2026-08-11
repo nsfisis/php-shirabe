@@ -120,7 +120,7 @@ impl ConfigCommand {
                     .unwrap_or(false)
             {
                 self.get_io().write_error(
-                    "<info>You are now running Composer with SSL/TLS protection enabled.</info>",
+                    "<info>You are now running Shirabe with SSL/TLS protection enabled.</info>",
                 );
             } else if normalized_value.as_bool().unwrap_or(false)
                 && !config
@@ -129,7 +129,7 @@ impl ConfigCommand {
                     .as_bool()
                     .unwrap_or(false)
             {
-                self.get_io().write_error("<warning>You are now running Composer with SSL/TLS protection disabled.</warning>");
+                self.get_io().write_error("<warning>You are now running Shirabe with SSL/TLS protection disabled.</warning>");
             }
         }
 
@@ -907,7 +907,7 @@ impl Command for ConfigCommand {
                     .unwrap_or(false)
             {
                 self.get_io().write_error(
-                    "<info>You are now running Composer with SSL/TLS protection enabled.</info>",
+                    "<info>You are now running Shirabe with SSL/TLS protection enabled.</info>",
                 );
             }
 

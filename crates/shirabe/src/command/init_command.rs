@@ -878,7 +878,7 @@ impl Command for InitCommand {
                     "\n{}\n",
                     formatter.borrow().format_block(
                         FormatBlockMessages::String(
-                            "Welcome to the Composer config generator".to_string(),
+                            "Welcome to the Shirabe config generator".to_string(),
                         ),
                         "bg=blue;fg=white",
                         true,

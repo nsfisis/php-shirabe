@@ -46,7 +46,7 @@ fn test_from_bool_throws_exception_if_type_is_unknown() {
     let result = PlatformRequirementFilterFactory::from_bool_or_list(PhpMixed::Null);
     let err = result.unwrap_err();
     assert_eq!(
-        "PlatformRequirementFilter: Unknown $boolOrList parameter null. Please report at https://github.com/composer/composer/issues/new.",
+        "PlatformRequirementFilter: Unknown $boolOrList parameter null. Please report at https://github.com/nsfisis/php-shirabe/issues/new.",
         err.to_string()
     );
 }

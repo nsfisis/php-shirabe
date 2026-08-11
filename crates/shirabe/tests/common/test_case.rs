@@ -302,7 +302,7 @@ pub fn create_composer_lock(
 pub fn get_application_tester() -> ApplicationTester {
     crate::bootstrap::bootstrap();
 
-    let application = ApplicationHandle::new("Composer".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
     application.set_catch_exceptions(false);
     ApplicationTester::new(application)
 }

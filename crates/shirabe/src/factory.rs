@@ -450,9 +450,9 @@ impl Factory {
 
             if !file.exists() {
                 let message = if path == "./composer.json" || path == "composer.json" {
-                    format!("Composer could not find a composer.json file in {}", cwd)
+                    format!("Shirabe could not find a composer.json file in {}", cwd)
                 } else {
-                    format!("Composer could not find the config file: {}", path)
+                    format!("Shirabe could not find the config file: {}", path)
                 };
                 let instructions = if full_load {
                     "To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage"
@@ -1445,7 +1445,7 @@ impl Factory {
         {
             if !unsafe { WARNED } {
                 io.write_error3(
-                    "<warning>You are running Composer with SSL/TLS protection disabled.</warning>",
+                    "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
                     true,
                     crate::io::NORMAL,
                 );

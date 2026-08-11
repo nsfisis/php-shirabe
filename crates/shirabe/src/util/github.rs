@@ -88,7 +88,7 @@ impl GitHub {
             self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let mut note = "Composer".to_string();
+        let mut note = "Shirabe".to_string();
         let expose_hostname = self
             .config
             .borrow_mut()

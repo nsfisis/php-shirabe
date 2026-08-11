@@ -1,11 +1,13 @@
 //! ref: composer/src/Composer/Compiler.php
 //!
-//! Generates a constant value of `composer::COMPOSER_DEV_WARNING_TIME`.
+//! Generates the constant values of `composer::SHIRABE_RELEASE_DATE` and
+//! `composer::COMPOSER_DEV_WARNING_TIME` from the HEAD commit.
 
 fn git(repo_root: &std::path::Path, args: &[&str]) -> Option<String> {
     let output = std::process::Command::new("git")
         .args(args)
         .current_dir(repo_root)
+        .env("TZ", "UTC")
         .output()
         .ok()?;
     if !output.status.success() {
@@ -26,26 +28,49 @@ fn main() {
 
     if let Some(git_dir) = git(repo_root, &["rev-parse", "--git-dir"]) {
         let git_dir = repo_root.join(git_dir);
-        for path in ["HEAD", "packed-refs", "refs/tags"] {
-            let path = git_dir.join(path);
+        // Committing on the current branch moves the branch ref, not HEAD.
+        let branch_ref = git(repo_root, &["symbolic-ref", "-q", "HEAD"]);
+        for path in ["HEAD", "packed-refs", "refs/tags"]
+            .iter()
+            .map(|name| git_dir.join(name))
+            .chain(branch_ref.map(|name| git_dir.join(name)))
+        {
             if path.exists() {
                 println!("cargo::rerun-if-changed={}", path.display());
             }
         }
     }
 
+    // Both constants describe the HEAD commit, so a checkout git cannot read leaves the build
+    // unable to date itself. Falling back would ship a build that claims a release date it does
+    // not have and that never reports itself as outdated.
+    let expect_git = "the release date comes from the HEAD commit: build from a git checkout";
+    let release_date = git(
+        repo_root,
+        &[
+            "log",
+            "-n1",
+            "--date=format-local:%Y-%m-%d %H:%M:%S",
+            "--pretty=%cd",
+            "HEAD",
+        ],
+    )
+    .expect(expect_git);
+    let commit_time = git(repo_root, &["log", "-n1", "--pretty=%ct", "HEAD"])
+        .and_then(|date| date.parse::<i64>().ok())
+        .expect(expect_git);
+
     let dev_warning_time =
         if git(repo_root, &["describe", "--tags", "--exact-match", "HEAD"]).is_some() {
             None
         } else {
-            git(repo_root, &["log", "-n1", "--pretty=%ct", "HEAD"])
-                .and_then(|date| date.parse::<i64>().ok())
-                .map(|date| date + 60 * 86400)
+            Some(commit_time + 60 * 86400)
         };
 
-    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    std::fs::write(out_dir.join("release_date.rs"), format!("{release_date:?}")).unwrap();
     std::fs::write(
-        std::path::Path::new(&out_dir).join("dev_warning_time.rs"),
+        out_dir.join("dev_warning_time.rs"),
         match dev_warning_time {
             Some(time) => format!("Some({time})"),
             None => "None".to_string(),
