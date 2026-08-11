@@ -4,8 +4,8 @@ use crate::php_file_cleaner::PhpFileCleaner;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PHP_EOL, PHP_VERSION_ID, RuntimeException, file_exists, file_get_contents, function_exists,
-    is_file, is_readable, ltrim, php_strip_whitespace, str_replace_array, strrpos, substr, trim,
+    PHP_EOL, RuntimeException, file_exists, file_get_contents, function_exists, is_file,
+    is_readable, ltrim, php_strip_whitespace, str_replace_array, strrpos, substr, trim,
 };
 use std::sync::OnceLock;
 
@@ -176,10 +176,9 @@ impl PhpFileParser {
         EXTRA_TYPES.get_or_init(|| {
             let mut extra_types = String::new();
             let mut extra_types_array: Vec<String> = vec![];
-            // TODO(php-runtime): whether `enum` is scanned for belongs to the runtime that loads
-            // the generated class map, i.e. the worker, while PHP_VERSION_ID is the version this
-            // build models. PHP also scans for enums on HHVM 3.3 and above.
-            if PHP_VERSION_ID >= 80100 {
+            // TODO(port): PHP also scans for enums on HHVM 3.3 and above
+            // (`defined('HHVM_VERSION') && version_compare(HHVM_VERSION, '3.3', '>=')`).
+            if shirabe_php_rpc::get_php_version().version_id >= 80100 {
                 extra_types += "|enum";
                 extra_types_array = vec!["enum".to_string()];
             }

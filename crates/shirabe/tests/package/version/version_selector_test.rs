@@ -16,7 +16,6 @@ use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::PlatformRepository;
 use shirabe::repository::RepositorySetInterface;
 use shirabe_php_shim::PhpMixed;
-use shirabe_php_shim::{PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::output::output_interface;
 
@@ -535,10 +534,8 @@ fn test_false_returned_on_no_packages() {
 
 #[test]
 fn test_find_recommended_require_version() {
-    let php_version = format!(
-        "{}.{}.{}",
-        PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION
-    );
+    let php = shirabe_php_rpc::get_php_version();
+    let php_version = format!("{}.{}.{}", php.major, php.minor, php.release);
     // real version, expected recommendation, [branch-alias], [pkg name]
     let cases: Vec<(String, &str, Option<&str>, &str)> = vec![
         ("1.2.1".to_string(), "^1.2", None, "foo/bar"),

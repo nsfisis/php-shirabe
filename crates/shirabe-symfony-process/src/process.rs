@@ -62,7 +62,6 @@ pub struct Process {
     options: IndexMap<String, PhpMixed>,
     process_pipes: Option<Box<dyn PipesInterface>>,
     latest_signal: Option<i64>,
-    cached_exit_code: Option<i64>,
     /// Test-only mock state. `None` in production; set via [`Process::__mock`] in tests.
     mock: Option<ProcessMock>,
 }
@@ -189,7 +188,6 @@ impl Process {
             options,
             process_pipes: None,
             latest_signal: None,
-            cached_exit_code: None,
             mock: None,
         }
     }
@@ -744,29 +742,6 @@ impl Process {
             .get("running")
             .map(shirabe_php_shim::php_truthy)
             .unwrap_or(false);
-
-        // In PHP < 8.3, "proc_get_status" only returns the correct exit status on the first call.
-        if shirabe_php_shim::PHP_VERSION_ID < 80300 {
-            let exitcode = self
-                .process_information
-                .as_ref()
-                .unwrap()
-                .get("exitcode")
-                .and_then(|v| v.as_int());
-            if self.cached_exit_code.is_none() && !running && exitcode != Some(-1) {
-                self.cached_exit_code = exitcode;
-            }
-
-            if let Some(cached) = self.cached_exit_code
-                && !running
-                && exitcode == Some(-1)
-            {
-                self.process_information
-                    .as_mut()
-                    .unwrap()
-                    .insert("exitcode".to_string(), PhpMixed::Int(cached));
-            }
-        }
 
         self.read_pipes(running && blocking, !cfg!(windows) || !running);
 

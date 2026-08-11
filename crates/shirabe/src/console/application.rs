@@ -57,13 +57,13 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    LogicException as ShimLogicException, PHP_VERSION, PHP_VERSION_ID, PhpMixed, RuntimeException,
-    bin2hex, chdir, date_default_timezone_get, date_default_timezone_set, defined, dirname,
-    disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
-    json_decode, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
-    posix_getuid, random_bytes, realpath, restore_error_handler, round, str_replace, strpos,
-    strtoupper, sys_get_temp_dir, time, unlink,
+    LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir,
+    date_default_timezone_get, date_default_timezone_set, defined, dirname, disk_free_space,
+    extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists, getcwd,
+    getmypid, glob, ini_set, is_array, is_dir, is_file, is_string, json_decode,
+    memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname, posix_getuid,
+    random_bytes, realpath, restore_error_handler, round, str_replace, strpos, strtoupper,
+    sys_get_temp_dir, time, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
@@ -2262,7 +2262,7 @@ impl ApplicationHandle {
                     "Running {} ({}) with PHP {} on {}",
                     composer::get_version(),
                     composer::RELEASE_DATE,
-                    PHP_VERSION,
+                    shirabe_php_rpc::get_php_version().version,
                     (if function_exists("php_uname") {
                         format!("{} / {}", php_uname("s"), php_uname("r"))
                     } else {
@@ -2273,8 +2273,8 @@ impl ApplicationHandle {
                 io_interface::DEBUG,
             );
 
-            if PHP_VERSION_ID < 70205 {
-                io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", PHP_VERSION));
+            if shirabe_php_rpc::get_php_version().version_id < 70205 {
+                io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version));
             }
 
             if shirabe_php_rpc::xdebug::is_xdebug_active()
@@ -2588,7 +2588,7 @@ impl ApplicationHandle {
             {
                 io.write_error(&format!(
                     "<info>PHP</info> version <comment>{}</comment> ({})",
-                    shirabe_php_rpc::get_php_version(),
+                    shirabe_php_rpc::get_php_version().version,
                     shirabe_php_rpc::get_php_binary(),
                 ));
                 io.write_error(

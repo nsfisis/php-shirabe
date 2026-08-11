@@ -7,8 +7,7 @@ use crate::util::HttpDownloader;
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
-    UnexpectedValueException, php_regex,
+    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, php_regex,
 };
 
 pub struct Versions {
@@ -133,7 +132,7 @@ impl Versions {
             for version in list {
                 if let PhpMixed::Array(ref v) = *version {
                     let min_php = v.get("min-php").and_then(|p| p.as_int()).unwrap_or(0);
-                    if min_php <= PHP_VERSION_ID {
+                    if min_php <= shirabe_php_rpc::get_php_version().version_id {
                         return Ok(Ok(v
                             .iter()
                             .map(|(k, val)| (k.clone(), val.clone()))
@@ -145,7 +144,7 @@ impl Versions {
 
         Ok(Err(UnexpectedValueException::new(format!(
             "There is no version of Composer available for your PHP version ({})",
-            PHP_VERSION
+            shirabe_php_rpc::get_php_version().version
         ))))
     }
 

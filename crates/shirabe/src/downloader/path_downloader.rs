@@ -22,8 +22,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed, RuntimeException, file_exists,
-    function_exists, impl_php_class, is_dir, realpath,
+    PhpMixed, RuntimeException, file_exists, function_exists, impl_php_class, is_dir, realpath,
 };
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 
@@ -188,9 +187,10 @@ impl PathDownloader {
     // The PHP bug was fixed in 7.2.16 and 7.3.3 (requires at least Windows 7).
     fn safe_junctions(&self) -> bool {
         // We need to call mklink, and rmdir on Windows 7 (version 6.1)
-        function_exists("proc_open")
-            && (PHP_WINDOWS_VERSION_MAJOR > 6
-                || (PHP_WINDOWS_VERSION_MAJOR == 6 && PHP_WINDOWS_VERSION_MINOR >= 1))
+        // TODO(windows): PHP reads the Windows version off PHP_WINDOWS_VERSION_MAJOR and
+        // PHP_WINDOWS_VERSION_MINOR, which describe the host rather than PHP; this port has to
+        // ask the OS for it.
+        todo!()
     }
 }
 

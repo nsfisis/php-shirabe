@@ -2,17 +2,6 @@ use crate::PhpMixed;
 use indexmap::IndexMap;
 use shirabe_php_src::standard::versioning::php_version_compare;
 
-pub const PHP_VERSION_ID: i64 = 80100;
-pub const PHP_VERSION: &str = "8.1.0";
-
-pub const PHP_MAJOR_VERSION: i64 = 8;
-pub const PHP_MINOR_VERSION: i64 = 1;
-pub const PHP_RELEASE_VERSION: i64 = 0;
-
-pub const PHP_WINDOWS_VERSION_MAJOR: i64 = 0;
-pub const PHP_WINDOWS_VERSION_MINOR: i64 = 0;
-pub const PHP_WINDOWS_VERSION_BUILD: i64 = 0;
-
 pub const E_ALL: i64 = 32767;
 pub const E_WARNING: i64 = 2;
 pub const E_NOTICE: i64 = 8;

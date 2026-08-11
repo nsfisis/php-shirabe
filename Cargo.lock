@@ -2128,6 +2128,7 @@ dependencies = [
  "anyhow",
  "indexmap",
  "shirabe-pcre",
+ "shirabe-php-rpc",
  "shirabe-php-shim",
  "shirabe-symfony-finder",
 ]

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/MultiConflictRule.php
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
-use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw};
+use shirabe_php_shim::{RuntimeException, hash_raw};
 
 #[derive(Debug)]
 pub struct MultiConflictRule {
@@ -50,12 +50,7 @@ impl MultiConflictRule {
             .map(|l| l.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        let algo = if PHP_VERSION_ID > 80100 {
-            "xxh3"
-        } else {
-            "sha1"
-        };
-        let binary = hash_raw(algo, &format!("c:{}", joined));
+        let binary = hash_raw("xxh3", &format!("c:{}", joined));
         match binary.get(..4) {
             Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
             None => Err(RuntimeException::new(format!("Failed unpacking: {}", joined)).into()),

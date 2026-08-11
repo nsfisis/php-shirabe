@@ -16,25 +16,57 @@ use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex, OnceLock};
 
-/// PHP `\PHP_VERSION`.
-pub fn get_php_version() -> String {
-    match get_constant("PHP_VERSION") {
-        PhpMixed::String(s) => s,
-        other => panic!("PHP RPC: PHP_VERSION constant did not resolve to a string: {other:?}"),
-    }
+/// The version constants of the PHP the worker runs.
+#[derive(Debug)]
+pub struct PhpVersion {
+    /// `\PHP_VERSION`.
+    pub version: String,
+    /// `\PHP_VERSION_ID`.
+    pub version_id: i64,
+    /// `\PHP_MAJOR_VERSION`.
+    pub major: i64,
+    /// `\PHP_MINOR_VERSION`.
+    pub minor: i64,
+    /// `\PHP_RELEASE_VERSION`.
+    pub release: i64,
+}
+
+static PHP_VERSION: OnceLock<PhpVersion> = OnceLock::new();
+
+/// The PHP version the worker runs. The worker is queried once per process; subsequent calls
+/// reuse the cached constants.
+pub fn get_php_version() -> &'static PhpVersion {
+    PHP_VERSION.get_or_init(|| PhpVersion {
+        version: string_constant("PHP_VERSION"),
+        version_id: int_constant("PHP_VERSION_ID"),
+        major: int_constant("PHP_MAJOR_VERSION"),
+        minor: int_constant("PHP_MINOR_VERSION"),
+        release: int_constant("PHP_RELEASE_VERSION"),
+    })
 }
 
 /// PHP `\PHP_BINARY`.
 pub fn get_php_binary() -> String {
-    match get_constant("PHP_BINARY") {
-        PhpMixed::String(s) => s,
-        other => panic!("PHP RPC: PHP_BINARY constant did not resolve to a string: {other:?}"),
-    }
+    string_constant("PHP_BINARY")
 }
 
 /// PHP `constant($name)`.
 fn get_constant(name: &str) -> PhpMixed {
     call("constant", name)
+}
+
+fn string_constant(name: &str) -> String {
+    match get_constant(name) {
+        PhpMixed::String(s) => s,
+        other => panic!("PHP RPC: {name} constant did not resolve to a string: {other:?}"),
+    }
+}
+
+fn int_constant(name: &str) -> i64 {
+    match get_constant(name) {
+        PhpMixed::Int(n) => n,
+        other => panic!("PHP RPC: {name} constant did not resolve to an int: {other:?}"),
+    }
 }
 
 /// `curl_version()`, together with the `CURL_*` constants the `diagnose` command consults. Every
@@ -1237,7 +1269,7 @@ mod tests {
         }
 
         let diagnostics = get_diagnostics();
-        assert_eq!(diagnostics.php_version, get_php_version());
+        assert_eq!(diagnostics.php_version, get_php_version().version);
         assert!(diagnostics.php_version_id >= 70205);
         let php_binary = get_php_binary();
         assert_eq!(diagnostics.php_binary.as_deref(), Some(php_binary.as_str()));
@@ -1257,15 +1289,20 @@ mod tests {
             return;
         }
 
-        let version = get_php_version();
-        assert!(!version.is_empty(), "expected a PHP version");
-        assert!(
-            version
+        let php = get_php_version();
+        assert!(!php.version.is_empty(), "expected a PHP version");
+        assert_eq!(
+            php.version
                 .split('.')
                 .next()
-                .and_then(|n| n.parse::<u32>().ok())
-                .is_some(),
-            "version should start with a number: {version}",
+                .and_then(|n| n.parse::<i64>().ok()),
+            Some(php.major),
+            "version should start with the major version: {}",
+            php.version,
+        );
+        assert_eq!(
+            php.version_id,
+            php.major * 10000 + php.minor * 100 + php.release
         );
 
         let binary = get_php_binary();
@@ -1292,7 +1329,7 @@ mod tests {
         );
         assert_eq!(
             platform_info.get_extension_version("Core"),
-            get_php_version()
+            get_php_version().version
         );
 
         assert!(platform_info.has_constant("PHP_VERSION", None));

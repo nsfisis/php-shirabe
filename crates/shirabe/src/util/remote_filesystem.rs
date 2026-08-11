@@ -16,12 +16,12 @@ use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed, RuntimeException,
-    STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
-    array_replace_recursive, base64_encode, explode, extension_loaded, file_get_contents,
-    file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
-    http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode,
-    parse_url, php_regex, preg_quote, strpos, strtolower, strtr, substr, trim, zlib_decode,
+    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE,
+    STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode,
+    explode, extension_loaded, file_get_contents, file_get_contents5, file_put_contents,
+    filter_var_boolean, gethostbyname, http_clear_last_response_headers,
+    http_get_last_response_headers, ini_get, json_decode, parse_url, php_regex, preg_quote, strpos,
+    strtolower, strtr, substr, trim, zlib_decode,
 };
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
@@ -723,9 +723,9 @@ impl RemoteFilesystem {
     ) -> anyhow::Result<Option<String>> {
         let mut result: Option<String> = None;
 
-        if PHP_VERSION_ID >= 80400 {
-            http_clear_last_response_headers();
-        }
+        // PHP reads the magic `$http_response_header` variable instead before 8.4, which is where
+        // http_get_last_response_headers() and its companion appeared.
+        http_clear_last_response_headers();
 
         let mut caught_e: Option<anyhow::Error> = None;
         // PHP has no scheme branch here: `file_get_contents` reads `file://` URLs and plain
@@ -760,14 +760,8 @@ impl RemoteFilesystem {
             .into());
         }
 
-        if PHP_VERSION_ID >= 80400 {
-            *response_headers = http_get_last_response_headers().unwrap_or_default();
-            http_clear_last_response_headers();
-        } else {
-            // TODO(http): read the magic `$http_response_header` PHP variable; depends on the
-            // unmodeled PHP stream layer that populates it.
-            *response_headers = Vec::new();
-        }
+        *response_headers = http_get_last_response_headers().unwrap_or_default();
+        http_clear_last_response_headers();
 
         if let Some(e) = caught_e {
             return Err(e);

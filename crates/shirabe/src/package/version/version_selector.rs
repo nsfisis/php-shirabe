@@ -17,10 +17,7 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySetInterface;
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
-use shirabe_php_shim::{
-    CmpOp, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, php_regex, strtolower,
-    version_compare,
-};
+use shirabe_php_shim::{CmpOp, php_regex, strtolower, version_compare};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -258,10 +255,8 @@ impl VersionSelector {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<String> {
         if package.get_name().starts_with("ext-") {
-            let php_version = format!(
-                "{}.{}.{}",
-                PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION
-            );
+            let php = shirabe_php_rpc::get_php_version();
+            let php_version = format!("{}.{}.{}", php.major, php.minor, php.release);
             let package_version = package.get_version();
             let ext_parts: Vec<&str> = package_version.splitn(4, '.').collect();
             let ext_version = ext_parts[..3.min(ext_parts.len())].join(".");

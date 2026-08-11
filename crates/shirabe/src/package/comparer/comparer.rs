@@ -140,12 +140,7 @@ impl Comparer {
                 } else if Path::new(&path).is_file() {
                     let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
                     if size > 0 {
-                        let algo = if shirabe_php_shim::PHP_VERSION_ID > 80100 {
-                            "xxh3"
-                        } else {
-                            "sha1"
-                        };
-                        let hash = shirabe_php_shim::hash_file(algo, &path);
+                        let hash = shirabe_php_shim::hash_file("xxh3", &path);
                         array.entry(dir.to_string()).or_default().insert(file, hash);
                     }
                 }
