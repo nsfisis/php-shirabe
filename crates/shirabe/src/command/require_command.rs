@@ -28,6 +28,7 @@ use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositorySet;
+use crate::signal::SignalSubscription;
 use crate::util::Filesystem;
 use crate::util::PackageSorter;
 use crate::util::Silencer;
@@ -37,7 +38,6 @@ use shirabe_php_shim::{
     array_merge, array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
     impl_php_class, implode, is_writable, strtolower, unlink,
 };
-use shirabe_seld_signal::SignalHandler;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -839,25 +839,16 @@ impl Command for RequireCommand {
             None
         };
 
-        // PHP: function ($signal, $handler) use ($io, $self) {
-        //   $io->writeError('Received '.$signal.', aborting', true, IOInterface::DEBUG);
-        //   $self->revertComposerFile(); $handler->exitWithLastSignal(); }
-        // TODO(phase-c): SignalHandler::create takes a `Box<dyn Fn> + 'static` handler that cannot
-        // borrow &self, but the body must call self.revert_composer_file() (which mutates the
-        // command's composer.json backup state) and self.get_io(). Faithfully wiring this needs the
-        // revert state + io shared into the closure (Rc<RefCell<...>>), i.e. the shared-ownership
-        // rework of the command — the same pattern as InstallationManager::execute's signal handler.
-        let signal_handler = SignalHandler::create(
-            vec![
-                SignalHandler::SIGINT.to_string(),
-                SignalHandler::SIGTERM.to_string(),
-                SignalHandler::SIGHUP.to_string(),
-            ],
-            Box::new(move |signal: String, handler: &SignalHandler| {
-                let _ = signal;
-                handler.exit_with_last_signal();
-            }),
-        );
+        let signals = SignalSubscription::new();
+        let abort_on_signal = |signals: &SignalSubscription| {
+            self.get_io().write_error3(
+                &format!("Received {}, aborting", signals.last_signal().as_str()),
+                true,
+                io_interface::DEBUG,
+            );
+            self.revert_composer_file();
+            signals.exit_with_last_signal();
+        };
 
         // check for writability by writing to the file as is_writable can not be trusted on network-mounts
         // see https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
@@ -970,6 +961,10 @@ impl Command for RequireCommand {
             no_update,
             fixed,
         );
+
+        if signals.is_triggered() {
+            abort_on_signal(&signals);
+        }
 
         let requirements = match requirements_result {
             Ok(r) => r,
@@ -1192,6 +1187,10 @@ impl Command for RequireCommand {
             self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
         }
 
+        if signals.is_triggered() {
+            abort_on_signal(&signals);
+        }
+
         let updated_msg = format!(
             "<info>{} has been {}</info>",
             file,
@@ -1227,6 +1226,9 @@ impl Command for RequireCommand {
             require_key,
             remove_key,
         );
+        if signals.is_triggered() {
+            abort_on_signal(&signals);
+        }
         let dry_run = input
             .borrow()
             .get_option("dry-run")?
@@ -1262,12 +1264,15 @@ impl Command for RequireCommand {
             }
         };
 
+        if signals.is_triggered() {
+            abort_on_signal(&signals);
+        }
+
         // finally
         if dry_run && self.newly_created.get() {
             // @unlink($this->json->getPath());
             unlink(json.borrow().get_path());
         }
-        signal_handler.unregister();
 
         result
     }

@@ -44,6 +44,9 @@ impl AbstractPipes {
     }
 
     /// Returns true if a system call has been interrupted.
+    // TODO(php-runtime): `last_error` is never set. PHP fills it from a `set_error_handler` wrapped
+    // around `stream_select`, so this always reports false and an EINTR-interrupted `select` resets
+    // the pipes instead of being retried.
     pub(crate) fn has_system_call_been_interrupted(&mut self) -> bool {
         let last_error = self.last_error.take();
 

@@ -32,6 +32,7 @@ use crate::repository::PlatformRepository;
 use crate::repository::RepositoryFactory;
 use crate::repository::RepositorySet;
 use crate::script::ScriptEvents;
+use crate::signal::SignalSubscription;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
@@ -43,7 +44,6 @@ use shirabe_php_shim::{
     chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir, is_file,
     mkdir, realpath, rtrim, strtolower, unlink,
 };
-use shirabe_seld_signal::SignalHandler;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -731,28 +731,23 @@ impl CreateProjectCommand {
 
         // handler Ctrl+C aborts gracefully
         let _ = mkdir(&directory, 0o777, true);
-        let mut signal_handler: Option<SignalHandler> = None;
-        if let Some(real_dir) = realpath(&directory) {
-            let real_dir_clone = real_dir;
-            let io_for_signal = io.clone();
-            signal_handler = Some(SignalHandler::create(
-                vec![
-                    SignalHandler::SIGINT.to_string(),
-                    SignalHandler::SIGTERM.to_string(),
-                    SignalHandler::SIGHUP.to_string(),
-                ],
-                Box::new(move |signal: String, handler: &SignalHandler| {
-                    io_for_signal.write_error3(
-                        &format!("Received {}, aborting", signal),
-                        true,
-                        crate::io::DEBUG,
-                    );
-                    let mut fs = Filesystem::new(None);
-                    fs.remove_directory(&real_dir_clone).ok();
-                    handler.exit_with_last_signal();
-                }),
-            ));
-        }
+        let real_dir = realpath(&directory);
+        let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
+        let abort_on_signal = |signals: &SignalSubscription| {
+            io.write_error3(
+                &format!("Received {}, aborting", signals.last_signal().as_str()),
+                true,
+                crate::io::DEBUG,
+            );
+            let mut fs = Filesystem::new(None);
+            fs.remove_directory(
+                real_dir
+                    .as_ref()
+                    .expect("subscribed only when realpath succeeded"),
+            )
+            .ok();
+            signals.exit_with_last_signal();
+        };
 
         // avoid displaying 9999999-dev as version if default-branch was selected
         if let Some(alias) = package.as_alias()
@@ -791,13 +786,19 @@ impl CreateProjectCommand {
         );
         // A shared borrow: plugin registration inside execute re-enters this manager handle
         // through the Composer graph.
-        installation_manager.borrow().execute(
+        let executed = installation_manager.borrow().execute(
             &installed_repo,
             vec![InstallOperation::new(package.clone()).into()],
             true,
             true,
             false,
-        )?;
+        );
+        if let Some(signals) = &signals
+            && signals.is_triggered()
+        {
+            abort_on_signal(signals);
+        }
+        executed?;
         installation_manager
             .borrow_mut()
             .notify_installs(io.clone());
@@ -826,10 +827,14 @@ impl CreateProjectCommand {
 
         Platform::put_env("COMPOSER_ROOT_VERSION", &package.get_pretty_version());
 
-        // once the root project is fully initialized, we do not need to wipe everything on user abort anymore even if it happens during deps install
-        if let Some(handler) = signal_handler {
-            handler.unregister();
+        if let Some(signals) = &signals
+            && signals.is_triggered()
+        {
+            abort_on_signal(signals);
         }
+
+        // once the root project is fully initialized, we do not need to wipe everything on user abort anymore even if it happens during deps install
+        drop(signals);
 
         Ok(installed_from_vcs)
     }

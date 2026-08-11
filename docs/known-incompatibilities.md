@@ -39,6 +39,16 @@ behavior is slightly different. See [docs/dev/xdebug.md](./dev/xdebug.md)
 for details.
 
 
+## Signals
+
+Composer runs its abort handler almost immediately after the signal arrives.
+Shirabe, however, runs it at the next checkpoint instead, so stopping `shirabe`
+command by `Ctrl+C` may take more time than Composer.
+
+Signal handling in plugins and scripts is undefined behavior: it may or may not
+work. See [docs/dev/signals.md](./dev/signals.md) for details.
+
+
 ## Plugins
 
 ### Reflection

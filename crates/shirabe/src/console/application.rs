@@ -69,7 +69,6 @@ use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
 use shirabe_symfony_console::command::Command as SymfonyCommand;
 use shirabe_symfony_console::command::HelpCommand;
-use shirabe_symfony_console::command::SignalableCommandInterface;
 use shirabe_symfony_console::command_loader::CommandLoaderInterface;
 use shirabe_symfony_console::completion::CompletionInput;
 use shirabe_symfony_console::completion::CompletionSuggestions;
@@ -94,7 +93,6 @@ use shirabe_symfony_console::input::InputOption;
 use shirabe_symfony_console::output::ConsoleOutput;
 use shirabe_symfony_console::output::ConsoleOutputInterface;
 use shirabe_symfony_console::output::{OutputInterface, output_interface};
-use shirabe_symfony_console::signal_registry::SignalRegistry;
 use shirabe_symfony_console::style::StyleInterface;
 use shirabe_symfony_console::style::SymfonyStyle;
 use shirabe_symfony_console::terminal::Terminal;
@@ -103,6 +101,10 @@ use shirabe_symfony_process::exception::ProcessTimedOutException;
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
 /// flattened into a single struct. Methods that are overridden by subclass and called via
 /// `parent::` are prefixed by `base_`.
+///
+/// Symfony's signal dispatch — `$signalRegistry`, `$signalsToDispatchEvent`, and the
+/// `SignalableCommandInterface` branch of `doRunCommand` — is unported. See
+/// `docs/dev/signals.md`.
 #[derive(Debug)]
 pub struct Application {
     commands: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>,
@@ -117,8 +119,6 @@ pub struct Application {
     terminal: Terminal,
     default_command: String,
     single_command: bool,
-    signal_registry: Option<SignalRegistry>,
-    signals_to_dispatch_event: Vec<i64>,
     // $initialized is omitted. See ApplicationHandle::init().
     pub(crate) composer: Option<PartialComposerHandle>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -175,7 +175,7 @@ impl Application {
 
         let initial_working_directory = getcwd();
 
-        let mut this = Self {
+        Self {
             commands: IndexMap::new(),
             want_helps: false,
             running_command: None,
@@ -188,8 +188,6 @@ impl Application {
             terminal: Terminal::new(),
             default_command: "list".to_string(),
             single_command: false,
-            signal_registry: None,
-            signals_to_dispatch_event: Vec::new(),
             composer: None,
             io,
             has_plugin_commands: false,
@@ -199,17 +197,7 @@ impl Application {
             initial_working_directory,
             dev_warning_time: composer::COMPOSER_DEV_WARNING_TIME,
             me: std::rc::Weak::new(),
-        };
-        if defined("SIGINT") && SignalRegistry::is_supported() {
-            this.signal_registry = Some(SignalRegistry::new());
-            this.signals_to_dispatch_event = vec![
-                shirabe_php_shim::SIGINT,
-                shirabe_php_shim::SIGTERM,
-                shirabe_php_shim::SIGUSR1,
-                shirabe_php_shim::SIGUSR2,
-            ];
         }
-        this
     }
 
     /// Returns the shared handle to this application set up by `ApplicationHandle::new`. Proxy
@@ -729,18 +717,6 @@ impl Application {
 
     pub fn set_command_loader(&mut self, command_loader: Box<dyn CommandLoaderInterface>) {
         self.command_loader = Some(command_loader);
-    }
-
-    pub fn get_signal_registry(&self) -> anyhow::Result<&SignalRegistry> {
-        match &self.signal_registry {
-            None => Err(ConsoleRuntimeException::new("Signals are not supported. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string())
-            .into()),
-            Some(signal_registry) => Ok(signal_registry),
-        }
-    }
-
-    pub fn set_signals_to_dispatch_event(&mut self, signals_to_dispatch_event: Vec<i64>) {
-        self.signals_to_dispatch_event = signals_to_dispatch_event;
     }
 
     pub fn set_helper_set(&mut self, helper_set: std::rc::Rc<std::cell::RefCell<HelperSet>>) {
@@ -2992,35 +2968,6 @@ impl ApplicationHandle {
         // InputAwareInterface, so this loop is a no-op. Plugin-registered InputAware helpers cannot
         // be reached until dynamic helper registration is restored (see HelperSet).
         let _ = command.borrow().get_helper_set();
-
-        if !application.borrow().signals_to_dispatch_event.is_empty() {
-            // $commandSignals = $command instanceof SignalableCommandInterface ? $command->getSubscribedSignals() : []
-            // TODO(phase-c): SymfonyCommand is not a SignalableCommandInterface here; downcast needed.
-            let command_signals: Vec<i64> = Vec::new();
-            let _ = std::marker::PhantomData::<dyn SignalableCommandInterface>;
-
-            if !command_signals.is_empty() {
-                if application.borrow().signal_registry.is_none() {
-                    return Err(ConsoleRuntimeException::new("Unable to subscribe to signal events. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string())
-                    .into());
-                }
-
-                if Terminal::has_stty_available() {
-                    // TODO(phase-c): registers SIGINT/SIGTERM handlers that restore the stty mode via
-                    // shell_exec('stty ...'). pcntl signal handlers have no faithful Rust
-                    // equivalent yet.
-                    let _stty_mode = shirabe_php_shim::shell_exec("stty -g");
-                    for _signal in [shirabe_php_shim::SIGINT, shirabe_php_shim::SIGTERM] {
-                        todo!("register signal handler to restore stty mode");
-                    }
-                }
-            }
-
-            for _signal in command_signals {
-                // $this->signalRegistry->register($signal, [$command, 'handleSignal']);
-                todo!("register command->handle_signal as signal handler");
-            }
-        }
 
         command
             .borrow()

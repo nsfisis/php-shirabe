@@ -396,22 +396,6 @@ pub fn getmypid() -> i64 {
     std::process::id() as i64
 }
 
-// No-op until real signal handling is wired up; signal registration itself is
-// deferred (see the TODO(plugin) notes in SignalRegistry::register).
-pub fn pcntl_async_signals(_enable: bool) {}
-
-pub fn pcntl_signal(_signal: i64, _handler: PhpMixed) -> bool {
-    // TODO(phase-c): registering a signal handler requires the signal-handling subsystem to be
-    // wired up (cf. SignalRegistry / the TODO(plugin) notes). sigaction(2) itself is reachable, but
-    // the handler is a PHP callable whose dispatch depends on the runtime callable mechanism.
-    todo!()
-}
-
-pub fn pcntl_signal_get_handler(_signal: i64) -> PhpMixed {
-    // TODO(phase-c): see pcntl_signal; needs the signal-handling subsystem.
-    todo!()
-}
-
 pub fn posix_getuid() -> i64 {
     nix::unistd::getuid().as_raw() as i64
 }

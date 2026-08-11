@@ -17,6 +17,7 @@ use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::repository::InstalledRepositoryInterfaceHandle;
+use crate::signal::SignalSubscription;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
 use crate::util::sync_executor;
@@ -25,7 +26,6 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
     str_contains, str_replace, strpos, strtolower,
 };
-use shirabe_seld_signal::SignalHandler;
 
 /// Package operation manager.
 #[derive(Debug)]
@@ -309,19 +309,7 @@ impl InstallationManager {
             >,
         > = IndexMap::new();
 
-        let signal_handler = SignalHandler::create(
-            vec![
-                SignalHandler::SIGINT.to_string(),
-                SignalHandler::SIGTERM.to_string(),
-                SignalHandler::SIGHUP.to_string(),
-            ],
-            // TODO(phase-c): closure captures &mut self via &mut cleanup_promises
-            Box::new(move |signal: String, handler: &SignalHandler| {
-                // TODO(phase-c): self.io.write_error(...); self.run_cleanup(&cleanup_promises);
-                let _ = signal;
-                handler.exit_with_last_signal();
-            }),
-        );
+        let signals = SignalSubscription::new();
 
         // Shared rather than owned so that one operation reaches a plugin as one object, both
         // through the whole batch pipeline and through its pre- and post-event.
@@ -367,6 +355,9 @@ impl InstallationManager {
             }
 
             for batch_to_execute in batches {
+                if signals.is_triggered() {
+                    sync_executor::block_on(self.abort_on_signal(&signals, &cleanup_promises));
+                }
                 sync_executor::block_on(self.download_and_execute_batch(
                     repo,
                     batch_to_execute,
@@ -375,22 +366,25 @@ impl InstallationManager {
                     run_scripts,
                     download_only,
                     all_operations.clone(),
+                    &signals,
                 ))?;
             }
 
             Ok(())
         })();
 
-        // finally
-        signal_handler.unregister();
-
         match result {
             Ok(()) => {}
             Err(e) => {
+                if signals.is_triggered() {
+                    sync_executor::block_on(self.abort_on_signal(&signals, &cleanup_promises));
+                }
                 sync_executor::block_on(self.run_cleanup(&cleanup_promises));
                 return Err(e);
             }
         }
+
+        drop(signals);
 
         if download_only {
             return Ok(());
@@ -421,12 +415,16 @@ impl InstallationManager {
         run_scripts: bool,
         download_only: bool,
         all_operations: Vec<std::rc::Rc<AnyOperation>>,
+        signals: &SignalSubscription,
     ) -> anyhow::Result<()> {
         let mut promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
         > = vec![];
 
         for (index, operation) in &operations {
+            if signals.is_triggered() {
+                self.abort_on_signal(signals, cleanup_promises).await;
+            }
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything at this stage
@@ -496,6 +494,10 @@ impl InstallationManager {
             self.wait_on_promises(promises).await?;
         }
 
+        if signals.is_triggered() {
+            self.abort_on_signal(signals, cleanup_promises).await;
+        }
+
         if download_only {
             self.run_cleanup(cleanup_promises).await;
 
@@ -533,6 +535,9 @@ impl InstallationManager {
         }
 
         for batch_to_execute in batches {
+            if signals.is_triggered() {
+                self.abort_on_signal(signals, cleanup_promises).await;
+            }
             self.execute_batch(
                 repo,
                 batch_to_execute,
@@ -540,6 +545,7 @@ impl InstallationManager {
                 dev_mode,
                 run_scripts,
                 &all_operations,
+                signals,
             )
             .await?;
         }
@@ -547,6 +553,7 @@ impl InstallationManager {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     async fn execute_batch(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
@@ -562,6 +569,7 @@ impl InstallationManager {
         dev_mode: bool,
         run_scripts: bool,
         all_operations: &[std::rc::Rc<AnyOperation>],
+        signals: &SignalSubscription,
     ) -> anyhow::Result<()> {
         let mut promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
@@ -570,6 +578,9 @@ impl InstallationManager {
         let mut post_exec_callbacks: Vec<Box<dyn Fn() -> anyhow::Result<()>>> = vec![];
 
         for (index, operation) in operations {
+            if signals.is_triggered() {
+                self.abort_on_signal(signals, cleanup_promises).await;
+            }
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything
@@ -702,6 +713,10 @@ impl InstallationManager {
 
         if !promises.is_empty() {
             self.wait_on_promises(promises).await?;
+        }
+
+        if signals.is_triggered() {
+            self.abort_on_signal(signals, cleanup_promises).await;
         }
 
         Platform::workaround_filesystem_issues();
@@ -1021,6 +1036,28 @@ impl InstallationManager {
         if (promises.len() as i64) > 0 {
             let _ = self.loop_.borrow_mut().wait(promises, None).await;
         }
+    }
+
+    /// Cleans up after the packages installed so far and terminates the process. Never returns.
+    async fn abort_on_signal(
+        &self,
+        signals: &SignalSubscription,
+        cleanup_promises: &IndexMap<
+            i64,
+            Box<
+                dyn Fn() -> Option<
+                    std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>,
+                >,
+            >,
+        >,
+    ) {
+        self.io.write_error3(
+            &format!("Received {}, aborting", signals.last_signal().as_str()),
+            true,
+            io_interface::DEBUG,
+        );
+        self.run_cleanup(cleanup_promises).await;
+        signals.exit_with_last_signal();
     }
 }
 

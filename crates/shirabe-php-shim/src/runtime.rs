@@ -354,11 +354,6 @@ pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
     0
 }
 
-pub fn call_php_callable(_callback: &PhpMixed, _args: &[PhpMixed]) -> PhpMixed {
-    // TODO(php-runtime): PhpMixed carries no callable variant; a runtime callable cannot be invoked.
-    todo!()
-}
-
 pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
     // TODO(php-runtime): ini_set must return the previous value and have its override observed by a
     // subsequent ini_get; ini_get is currently a static lookup, so overrides cannot be wired up yet.

@@ -3,6 +3,7 @@
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
+use crate::signal::SignalSubscription;
 use crate::util::GitHub;
 use crate::util::Platform;
 use indexmap::IndexMap;
@@ -14,7 +15,6 @@ use shirabe_php_shim::{
     php_regex, rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
     substr_replace, trim,
 };
-use shirabe_seld_signal::SignalHandler;
 use shirabe_symfony_process::ExecutableFinder;
 use shirabe_symfony_process::Process;
 use shirabe_symfony_process::ProcessMock;
@@ -267,22 +267,7 @@ impl ProcessExecutor {
             // ignore TTY enabling errors
         }
 
-        let io_for_signal = self.io.clone();
-        let signal_handler = SignalHandler::create(
-            vec![
-                SignalHandler::SIGINT.to_string(),
-                SignalHandler::SIGTERM.to_string(),
-                SignalHandler::SIGHUP.to_string(),
-            ],
-            Box::new(move |signal: String, _h: &SignalHandler| {
-                if let Some(io) = &io_for_signal {
-                    io.write_error(&format!(
-                        "Received {}, aborting when child process is done",
-                        signal
-                    ));
-                }
-            }),
-        );
+        let signals = SignalSubscription::new();
 
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             match output.to_callback() {
@@ -306,23 +291,33 @@ impl ProcessExecutor {
             self.error_output = process.get_error_output()?;
             Ok(())
         })();
+        if signals.is_triggered()
+            && let Some(io) = &self.io
+        {
+            io.write_error3(
+                &format!(
+                    "Received {}, aborting when child process is done",
+                    signals.last_signal().as_str()
+                ),
+                true,
+                io_interface::DEBUG,
+            );
+        }
         let final_result: anyhow::Result<()> = match result {
             Ok(()) => Ok(()),
             Err(e) => {
                 if let Some(pse) = e.catch::<ProcessSignaledException>() {
-                    if signal_handler.is_triggered() {
+                    if signals.is_triggered() {
                         // exiting as we were signaled and the child process exited too due to the signal
-                        signal_handler.exit_with_last_signal();
+                        signals.exit_with_last_signal();
                     }
                     let _ = pse;
                     Ok(())
                 } else {
-                    signal_handler.unregister();
                     return Err(e);
                 }
             }
         };
-        signal_handler.unregister();
         final_result?;
 
         Ok(process.get_exit_code())

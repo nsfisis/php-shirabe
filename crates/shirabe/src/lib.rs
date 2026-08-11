@@ -22,6 +22,7 @@ pub mod question;
 pub mod repository;
 pub mod script;
 pub mod self_update;
+pub mod signal;
 pub mod util;
 
 // InstalledVersions is intentionally unported to Rust. It is a runtime API for plugins and project
