@@ -1594,7 +1594,7 @@ impl PlatformRepository {
         ));
         let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
         extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
-        // NOTE(phase-c): neither PackageInterface nor CompletePackageInterface exposes
+        // TODO(type-model): neither PackageInterface nor CompletePackageInterface exposes
         // setExtra (PHP defines it on BasePackage), and the handle API does not surface
         // it. Disabled packages are always plain CompletePackage objects, so reach the
         // concrete Package through the shared Rc.

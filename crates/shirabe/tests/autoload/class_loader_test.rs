@@ -43,7 +43,7 @@ fn test_get_prefixes_with_no_psr0_configuration() {
 #[test]
 #[ignore = "the round trip is `unserialize(serialize($loader))`: shirabe_php_shim::serialize takes a PhpMixed (a ClassLoader cannot be turned into one) and there is no unserialize at all, so the ClassLoader under test cannot be round-tripped"]
 fn test_serializability() {
-    // TODO(phase-d): the round trip is `unserialize(serialize($loader))`. serialize() in the shim
+    // TODO(php-semantics): the round trip is `unserialize(serialize($loader))`. serialize() in the shim
     // takes a PhpMixed, which a ClassLoader cannot be converted into, and there is no unserialize
     // symbol to produce the second ClassLoader the assertions compare against.
     todo!()

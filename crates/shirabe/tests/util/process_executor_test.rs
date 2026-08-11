@@ -2,7 +2,7 @@
 
 // These run real subprocesses (capturing output/stderr/timeout) and assert ProcessExecutor's
 // password hiding, line splitting and argument escaping. A few data points remain unportable —
-// see the individual `// TODO(phase-d)` comments below.
+// see the individual `// TODO(async)` comments below.
 
 use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterface;
@@ -179,7 +179,7 @@ fn test_console_io_does_not_format_symfony_console_style() {
 #[ignore = "none of the three symbols this test drives exist: execute_async returns a plain future with no cancel(), and ProcessExecutor has no count_active_jobs or wait (PHP's $jobs/$maxJobs queue is a tokio semaphore here)"]
 #[test]
 fn test_execute_async_cancel() {
-    // TODO(phase-d): PHP's executeAsync returns a React\Promise\PromiseInterface with cancel(),
+    // TODO(async): PHP's executeAsync returns a React\Promise\PromiseInterface with cancel(),
     // and the test reads countActiveJobs() around it and then calls wait(). execute_async here
     // returns a plain future with no cancel(), and ProcessExecutor has neither count_active_jobs
     // nor wait: the PHP job queue those methods expose is a tokio semaphore in this port.

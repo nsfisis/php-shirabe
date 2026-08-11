@@ -42,7 +42,7 @@ fn main() {
     // here (rather than driving `run` via `.block_on`) just makes it ambiently available via
     // `Handle::try_current()` for `util::sync_executor::block_on`'s many scattered call sites,
     // which ride it through `tokio::task::block_in_place` instead of each spinning up (or
-    // busy-spin-polling without) their own. See sync_executor.rs for the TODO(phase-e) tracking
+    // busy-spin-polling without) their own. See sync_executor.rs for the TODO(async) tracking
     // the eventual goal of propagating `async fn` all the way up to here instead.
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()

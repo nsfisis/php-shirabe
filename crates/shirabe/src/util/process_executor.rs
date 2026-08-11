@@ -161,7 +161,7 @@ impl ProcessExecutor {
     /// Forwards to `execute`, returning the status code (1 on Err for compatibility) — this
     /// mirrors PHP call sites that check the `int` return of `execute()` without a surrounding
     /// `try`/`catch`, where an uncaught mock-mismatch exception would otherwise propagate.
-    // TODO(phase-d): under a strict `ProcessExecutorMock`, an incomplete expectation list now
+    // TODO(mock): under a strict `ProcessExecutorMock`, an incomplete expectation list now
     // surfaces here as a swallowed "exit code 1" instead of the old `panic!`, so a future test
     // ported through this call site could silently take a wrong branch instead of failing loudly.
     // `ProcessExecutorMockGuard::__assert_complete` still catches unconsumed expectations at

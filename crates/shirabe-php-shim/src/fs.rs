@@ -385,7 +385,7 @@ pub fn fwrite(stream: &PhpResource, data: impl AsRef<[u8]>, length: Option<i64>)
 }
 
 /// PHP `fread()`. Reads up to `length` bytes.
-/// TODO(phase-e): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
+/// TODO(bytes): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
 /// binary reads (filesAreEqual / binary copy).
 pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
     let cap = length.max(0) as usize;
@@ -449,7 +449,7 @@ pub fn fclose(stream: &PhpResource) -> bool {
 
 /// PHP `fgets()`. Reads one line, including the trailing newline, capped at `length-1` bytes
 /// when given (matching PHP's `length` parameter).
-/// TODO(phase-e): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
+/// TODO(bytes): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
 /// binary reads.
 pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
     let limit = match length {
@@ -507,7 +507,7 @@ fn fgets_read_line<R: std::io::Read + ?Sized>(
 }
 
 /// PHP `fgetc()`: reads a single byte, or `None` at end-of-stream.
-/// TODO(phase-e): byte-string semantics — should return Vec<u8>.
+/// TODO(bytes): byte-string semantics — should return Vec<u8>.
 pub fn fgetc(stream: &PhpResource) -> Option<String> {
     let mut byte = [0u8; 1];
     match stream {
@@ -793,7 +793,7 @@ pub fn chmod(path: impl AsRef<std::path::Path>, mode: u32) -> bool {
 
 pub fn fileperms(path: impl AsRef<std::path::Path>) -> Result<u32, std::io::Error> {
     use std::os::unix::fs::MetadataExt;
-    // TODO(phase-e): PHP returns the full st_mode (file type bits included).
+    // TODO(php-semantics): PHP returns the full st_mode (file type bits included).
     std::fs::metadata(path.as_ref()).map(|m| m.mode())
 }
 
@@ -843,7 +843,7 @@ pub fn is_dir(path: impl AsRef<std::path::Path>) -> bool {
 
 /// PHP `readlink()`: the target the link points at, without resolving it further.
 /// `None` is PHP's `false`-on-failure.
-/// TODO(phase-e): byte-string semantics -- PHP returns the raw bytes of the link target.
+/// TODO(bytes): byte-string semantics -- PHP returns the raw bytes of the link target.
 pub fn readlink(path: impl AsRef<std::path::Path>) -> Option<String> {
     std::fs::read_link(path)
         .ok()
@@ -880,7 +880,7 @@ pub fn file_put_contents(path: &str, data: &[u8]) -> Option<i64> {
 }
 
 pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64> {
-    // TODO(phase-c): the LOCK_EX and FILE_USE_INCLUDE_PATH flags are ignored; only FILE_APPEND is
+    // TODO(php-semantics): the LOCK_EX and FILE_USE_INCLUDE_PATH flags are ignored; only FILE_APPEND is
     // honored.
     let append = flags & FILE_APPEND != 0;
     let mut opts = std::fs::OpenOptions::new();
@@ -914,7 +914,7 @@ pub fn file_get_contents5(
     offset: i64,
     length: Option<i64>,
 ) -> Option<String> {
-    // TODO(phase-c): the stream $context and FILE_USE_INCLUDE_PATH are ignored; only $offset and
+    // TODO(php-semantics): the stream $context and FILE_USE_INCLUDE_PATH are ignored; only $offset and
     // $length are applied (to the file read from the local filesystem).
     // PHP supports the file:// stream wrapper; strip it to read the local file.
     let path = path.strip_prefix("file://").unwrap_or(path);
@@ -1060,7 +1060,7 @@ pub fn sys_get_temp_dir() -> String {
 
 // A directory-handle resource. This is a distinct resource kind from the byte streams modeled by
 // PhpResource; readdir/closedir have no callers yet, so it only records the opened path.
-// TODO(phase-c): give it real readdir/closedir behavior (cursor over the entries) when needed.
+// TODO(php-semantics): give it real readdir/closedir behavior (cursor over the entries) when needed.
 #[derive(Debug)]
 pub struct PhpDirHandle {
     pub path: std::path::PathBuf,
@@ -1097,7 +1097,7 @@ pub fn pathinfo(path: &str, option: i64) -> String {
     }
 }
 
-// TODO(phase-c): returns Option<PathBuf>
+// TODO(type-model): returns Option<PathBuf>
 pub fn realpath(path: impl AsRef<std::path::Path>) -> Option<String> {
     path.as_ref()
         .canonicalize()

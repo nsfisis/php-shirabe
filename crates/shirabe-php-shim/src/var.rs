@@ -59,7 +59,7 @@ fn serialize_into(out: &mut String, value: &PhpMixed) {
     }
 }
 
-// TODO(phase-c): PHP's serialize uses serialize_precision (-1 => shortest round-trip), which Rust's
+// TODO(php-semantics): PHP's serialize uses serialize_precision (-1 => shortest round-trip), which Rust's
 // default float formatting also produces, but the two differ on scientific-notation spelling (PHP
 // "1.0E+20" vs Rust "1e20") for very large/small magnitudes.
 fn serialize_float(f: f64) -> String {
@@ -188,7 +188,7 @@ pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
 /// Approximates PHP's `<=>` for two strings: if both are numeric strings, compare numerically
 /// (as PHP does), otherwise fall back to a byte-wise comparison.
 ///
-/// TODO(phase-c): this only covers the string/string case of PHP's loose comparison. PHP's `<=>` has many
+/// TODO(php-semantics): this only covers the string/string case of PHP's loose comparison. PHP's `<=>` has many
 /// more special-cased rules across other operand type combinations (bool, array, null, object,
 /// numeric-string-vs-non-numeric-string, ...). Extend this if a new caller needs those.
 pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {

@@ -118,7 +118,7 @@ impl Filesystem {
     /// Uses the process component if proc_open is enabled on the PHP
     /// installation.
     pub fn remove_directory(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
-        // TODO(phase-c):
+        // TODO(bytes):
         // This path is matched against a regex (remove_edge_cases) and passed to an
         // `rm -rf`/`rmdir` subprocess via the String-based ProcessExecutor, so it has to be
         // representable as UTF-8.
@@ -487,7 +487,7 @@ impl Filesystem {
             return Ok(());
         }
 
-        // TODO(phase-c):
+        // TODO(bytes):
         // The fallbacks below (copy_then_remove and the mv/xcopy subprocesses) operate on
         // path strings, so beyond this point the paths have to be representable as UTF-8.
         let source = source.to_str().ok_or_else(|| {

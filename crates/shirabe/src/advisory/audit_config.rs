@@ -83,7 +83,7 @@ impl AuditConfig {
         for (key, value) in entries {
             let (id, apply, reason) = match value {
                 PhpMixed::String(reason_str) => {
-                    // TODO(phase-e): PHP's `array` type must be modeled more precisely. This is
+                    // TODO(type-model): PHP's `array` type must be modeled more precisely. This is
                     // escape hatch.
                     if canonical_int_key(key).is_some() {
                         (reason_str.clone(), "all".to_string(), None)

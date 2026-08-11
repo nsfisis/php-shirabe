@@ -49,7 +49,7 @@ impl Loop {
         let mut pending: FuturesUnordered<_> = promises.into_iter().collect();
         let mut uncaught: Option<anyhow::Error> = None;
 
-        // TODO(phase-c): promises are now polled concurrently via FuturesUnordered, but
+        // TODO(async): promises are now polled concurrently via FuturesUnordered, but
         // each individual future (HttpDownloader::add/add_copy etc.) still resolves through a
         // blocking bridge (curl_runtime()/sync_executor::block_on), so real I/O overlap does not
         // happen yet — the bridged future fully blocks the thread until it settles before the next
@@ -67,7 +67,7 @@ impl Loop {
     }
 
     pub fn abort_jobs(&self) {
-        // TODO(phase-c): no-op until a cancellation mechanism is introduced. PHP cancels
+        // TODO(async): no-op until a cancellation mechanism is introduced. PHP cancels
         // every in-flight promise group it tracks in $currentPromises; reintroduce that tracking
         // once the asynchronous workers support cancellation on a multi-thread runtime.
     }

@@ -246,7 +246,7 @@ fn run_integration(test_filename: &str) {
 #[ignore = "Rust has no phar; the binary under test is built by cargo (CARGO_BIN_EXE_shirabe), so bin/compile (the phar build) has no equivalent"]
 fn test_build_phar() {
     let _guard = set_up();
-    // TODO(phase-d): no phar-build equivalent in Rust; the binary under test is produced by cargo
+    // TODO(distribution): no phar-build equivalent in Rust; the binary under test is produced by cargo
     // and located via CARGO_BIN_EXE_shirabe, so there is nothing analogous to bin/compile to test.
     todo!()
 }

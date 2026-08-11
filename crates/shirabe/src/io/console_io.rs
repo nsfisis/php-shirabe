@@ -310,7 +310,7 @@ impl ConsoleIO {
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'
-    // TODO(phase-c): PHP sanitizes invalid byte sequences here, but `&str` is always valid UTF-8
+    // TODO(bytes): PHP sanitizes invalid byte sequences here, but `&str` is always valid UTF-8
     // so this is a no-op for now. The codebase does not yet strictly distinguish `Vec<u8>` from
     // `String`; once it does, this should take `&[u8]` and lossily convert it to `String`.
     fn ensure_valid_utf8(string: &str) -> String {
@@ -438,7 +438,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.ask_question(&question)
     }
 
-    // TODO(phase-c): ask_confirmation and ask_and_hide_answer still collapse ask_question
+    // TODO(error-model): ask_confirmation and ask_and_hide_answer still collapse ask_question
     // errors with .expect() instead of propagating them; extending Result propagation to
     // them is a further IOInterface signature change that has not been decided yet.
     fn ask_confirmation(&self, question: String, default: bool) -> bool {

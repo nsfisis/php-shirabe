@@ -62,7 +62,7 @@ impl Default for SignalSubscription {
 }
 
 impl SignalSubscription {
-    // TODO(phase-c): Windows delivers console control events (CTRL_C_EVENT, CTRL_BREAK_EVENT)
+    // TODO(windows): Windows delivers console control events (CTRL_C_EVENT, CTRL_BREAK_EVENT)
     // rather than signals, and they are not subscribed to here.
     pub fn new() -> Self {
         let seq = SIGNAL_SEQ.load(std::sync::atomic::Ordering::SeqCst);

@@ -315,7 +315,7 @@ impl RemoteFilesystem {
         let mut error_message = String::new();
         let error_code = 0_i64;
         let mut result: Option<String> = None;
-        // TODO(phase-c): PHP captures file_get_contents warnings here via set_error_handler. Rust
+        // TODO(http): PHP captures file_get_contents warnings here via set_error_handler. Rust
         // reports I/O failures through return values rather than warnings, so error_message stays
         // empty until get_remote_contents surfaces a read reason.
         let mut http_response_header: Vec<String> = Vec::new();
@@ -617,7 +617,7 @@ impl RemoteFilesystem {
                 .into());
             }
 
-            // TODO(phase-c): PHP captures the file_put_contents warning here via set_error_handler
+            // TODO(php-semantics): PHP captures the file_put_contents warning here via set_error_handler
             // (see the get() reads above); Rust reports the failure through the return value, so
             // put_error_message stays empty until file_put_contents surfaces a write reason.
             let put_error_message = String::new();
@@ -738,7 +738,7 @@ impl RemoteFilesystem {
                     None => file_get_contents(file_url),
                 })
             } else {
-                // TODO(phase-c): wrap PHP's `file_get_contents` with stream context and error capture
+                // TODO(http): wrap PHP's `file_get_contents` with stream context and error capture
                 // for http(s) and other network schemes; depends on the unmodeled PHP stream-context
                 // layer.
                 Ok(None)
@@ -764,7 +764,7 @@ impl RemoteFilesystem {
             *response_headers = http_get_last_response_headers().unwrap_or_default();
             http_clear_last_response_headers();
         } else {
-            // TODO(phase-c): read the magic `$http_response_header` PHP variable; depends on the
+            // TODO(http): read the magic `$http_response_header` PHP variable; depends on the
             // unmodeled PHP stream layer that populates it.
             *response_headers = Vec::new();
         }
@@ -1040,7 +1040,7 @@ impl RemoteFilesystem {
                 let decoded = zlib_decode(result.as_deref().unwrap_or("").as_bytes());
 
                 result = match decoded {
-                    // TODO(phase-e): byte-string semantics — the response body travels through
+                    // TODO(bytes): byte-string semantics — the response body travels through
                     // RemoteFilesystem as a String; from_utf8_lossy can corrupt binary payloads
                     Some(d) => Some(String::from_utf8_lossy(&d).into_owned()),
                     None => {

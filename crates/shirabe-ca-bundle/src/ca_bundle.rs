@@ -5,7 +5,7 @@ pub struct CaBundle;
 
 impl CaBundle {
     // TODO(plugin): unused for now; kept for API parity.
-    // TODO(phase-c): The original inspects the linked OpenSSL version to decide
+    // TODO(http): The original inspects the linked OpenSSL version to decide
     // whether openssl_x509_parse can be called safely. Certificate handling is
     // slated to move to reqwest, so this dummy always reports safe.
     pub fn is_openssl_parse_safe() -> bool {
@@ -16,7 +16,7 @@ impl CaBundle {
     // `()` placeholder: CaBundle is expected to be subsumed by a Rust TLS
     // library and removed, so it does not need a real logger.
     //
-    // TODO(phase-c): Dummy stand-in until HTTP handling moves to reqwest, which
+    // TODO(http): Dummy stand-in until HTTP handling moves to reqwest, which
     // discovers the system CA bundle itself. This probes the SSL_CERT_FILE /
     // SSL_CERT_DIR environment variables and the common distribution CA
     // locations, returning the first that exists. Unlike the original it does
@@ -65,7 +65,7 @@ impl CaBundle {
         String::new()
     }
 
-    // TODO(phase-c): Dummy stand-in until reqwest validates certificates itself.
+    // TODO(http): Dummy stand-in until reqwest validates certificates itself.
     // The original parses the file with OpenSSL and rejects malformed or expired
     // bundles; here we only require the file to exist and be non-empty.
     pub fn validate_ca_file(ca_file: &str, _logger: ()) -> bool {

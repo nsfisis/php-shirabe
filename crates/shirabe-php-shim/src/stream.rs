@@ -7,7 +7,7 @@ pub const STREAM_NOTIFY_FILE_SIZE_IS: i64 = 5;
 pub const STREAM_NOTIFY_PROGRESS: i64 = 7;
 
 /// PHP `stream_get_contents()`: read the remaining bytes from the stream's current position.
-/// TODO(phase-e): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
+/// TODO(bytes): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
 /// binary reads.
 pub fn stream_get_contents(stream: &PhpResource) -> Option<String> {
     stream_read_remaining(stream, None)
@@ -80,7 +80,7 @@ pub fn stream_isatty(stream: PhpResource) -> bool {
 
 /// PHP `stream_is_local()`: true for plain paths and the `file://` wrapper, false for remote
 /// wrappers (`http://`, `ftp://`, ...).
-/// TODO(phase-c): PHP asks the wrapper registered for the path's scheme whether it is flagged
+/// TODO(php-semantics): PHP asks the wrapper registered for the path's scheme whether it is flagged
 /// `STREAM_IS_URL`; this classifies by the scheme itself, so a registered custom wrapper claiming to
 /// be local (or vice versa) comes out differently than in PHP.
 pub fn stream_is_local(path: &str) -> bool {

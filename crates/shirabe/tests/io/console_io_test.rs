@@ -138,7 +138,7 @@ fn test_write_error() {
 #[ignore = "ConsoleIO::write3 takes a single &str; the test feeds a 2-element array ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed messages array, which the &str signature cannot represent"]
 #[test]
 fn test_write_with_multiple_line_string_when_debugging() {
-    // TODO(phase-d): ConsoleIO::write3 takes a single &str; the test feeds a 2-element array
+    // TODO(type-model): ConsoleIO::write3 takes a single &str; the test feeds a 2-element array
     // ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed
     // messages array, which the &str signature cannot represent.
     todo!()
@@ -294,7 +294,7 @@ fn test_has_authentication() {
 #[ignore = "data provider includes malformed-UTF-8 inputs (e.g. \\xFF, \\xC3\\x28); sanitize() takes PhpMixed::String which is UTF-8-only and cannot carry invalid bytes, so those cases are unrepresentable"]
 #[test]
 fn test_sanitize() {
-    // TODO(phase-d): the data provider includes malformed-UTF-8 inputs (e.g. \xFF, \xC3\x28);
+    // TODO(bytes): the data provider includes malformed-UTF-8 inputs (e.g. \xFF, \xC3\x28);
     // sanitize() takes PhpMixed::String which is UTF-8-only and cannot carry invalid bytes, so
     // those cases are unrepresentable.
     todo!()

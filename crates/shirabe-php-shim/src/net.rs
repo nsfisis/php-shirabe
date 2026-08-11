@@ -45,7 +45,7 @@ thread_local! {
 
 // Engine-side hook with no PHP userland counterpart: the HTTP stream layer must call this
 // after each request, like PHP's http wrapper populating `$http_response_header`. No stream
-// layer performs HTTP requests yet (see the TODO(phase-c) in util/remote_filesystem.rs), so
+// layer performs HTTP requests yet (see the TODO(http) in util/remote_filesystem.rs), so
 // until then the store stays empty and the getter below returns None, which matches PHP
 // before any HTTP stream request was made.
 pub fn http_record_last_response_headers(headers: Vec<String>) {

@@ -94,7 +94,7 @@ impl AnyThrowable {
     }
 
     /// The exception a Rust error carries, or `None` if it carries none.
-    // TODO(phase-c): this matches only an error that *is* the exception, where [`Catch`]'s
+    // TODO(error-model): this matches only an error that *is* the exception, where [`Catch`]'s
     // `anyhow::Error` impl also sees one behind an `anyhow::Context` layer. Nothing in the port
     // adds context to an error yet, so an exception wrapped that way would go silently unseen.
     pub fn of<'e>(error: &'e (dyn std::error::Error + 'static)) -> Option<&'e Self> {

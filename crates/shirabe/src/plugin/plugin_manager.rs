@@ -430,7 +430,7 @@ impl PluginManager {
                 let path = class_loader.find_file(&class).unwrap_or_else(|| {
                     panic!("plugin class `{class}` is already defined but has no autoloadable file")
                 });
-                // TODO(phase-e): file_get_contents is lossy UTF-8; the eval'd plugin source
+                // TODO(bytes): file_get_contents is lossy UTF-8; the eval'd plugin source
                 // should be carried as bytes.
                 let code = file_get_contents(&path)
                     .unwrap_or_else(|| panic!("unable to read the plugin class file `{path}`"));

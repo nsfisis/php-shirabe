@@ -34,7 +34,7 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
-// TODO(phase-c): the driver registration should be refactored later.
+// TODO(port): the driver registration should be refactored later.
 #[derive(Debug)]
 pub struct VcsRepository {
     pub(crate) inner: ArrayRepository,

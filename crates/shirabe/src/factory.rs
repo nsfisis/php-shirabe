@@ -878,7 +878,7 @@ impl Factory {
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
             // PHP: $this->purgePackages($rm->getLocalRepository(), $im);
-            // TODO(phase-c): purge_packages' removal body (repo.removePackage for packages
+            // TODO(port): purge_packages' removal body (repo.removePackage for packages
             // deleted on the filesystem) is still a stub; wire this call once implemented.
             // self.purge_packages(&InstalledRepositoryInterfaceHandle::from_repository_handle(&rm.get_local_repository()), &mut im)?;
         }

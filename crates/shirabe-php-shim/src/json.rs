@@ -29,7 +29,7 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     // JSON_UNESCAPED_SLASHES and JSON_UNESCAPED_UNICODE set: forward slashes and non-ASCII
     // characters are emitted verbatim. The two flags below re-apply PHP's default escaping when
     // they are absent.
-    // TODO(phase-c): other flags (e.g. JSON_HEX_*, JSON_THROW_ON_ERROR) are not handled yet; add
+    // TODO(php-semantics): other flags (e.g. JSON_HEX_*, JSON_THROW_ON_ERROR) are not handled yet; add
     // them when a call site needs them.
     let mut s = if flags & JSON_PRETTY_PRINT != 0 {
         // PHP's JSON_PRETTY_PRINT uses a 4-space indent.

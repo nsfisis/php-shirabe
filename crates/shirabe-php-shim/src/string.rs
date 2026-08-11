@@ -23,7 +23,7 @@ pub fn substr_count(haystack: &str, needle: &str) -> i64 {
 }
 
 // Byte-based, matching PHP's substr_replace.
-// TODO(phase-c): PHP accepts negative $start/$length (counting from the end); this signature takes
+// TODO(php-semantics): PHP accepts negative $start/$length (counting from the end); this signature takes
 // usize and therefore cannot express those cases.
 pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) -> String {
     let bytes = string.as_bytes();
@@ -389,7 +389,7 @@ pub fn mb_detect_encoding(
 }
 
 pub fn mb_strwidth(s: &str, _encoding: Option<&str>) -> i64 {
-    // TODO(phase-c): calculate actual width
+    // TODO(unicode): calculate actual width
     s.len() as i64
 }
 
@@ -979,7 +979,7 @@ pub fn php_strip_whitespace(path: impl AsRef<std::path::Path>) -> Result<String,
 
 pub fn hexdec(s: &str) -> i64 {
     // PHP hexdec() ignores characters outside [0-9A-Fa-f].
-    // TODO(phase-c): PHP promotes the result to float on overflow; this i64 return wraps instead.
+    // TODO(php-semantics): PHP promotes the result to float on overflow; this i64 return wraps instead.
     let mut acc: u64 = 0;
     for &b in s.as_bytes() {
         let d = match b {
@@ -1077,7 +1077,7 @@ pub fn uniqid(prefix: &str, more_entropy: bool) -> String {
         .unwrap_or_default();
     let base = format!("{}{:08x}{:05x}", prefix, now.as_secs(), now.subsec_micros());
     if more_entropy {
-        // TODO(phase-c): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
+        // TODO(php-semantics): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
         // not reproducible against PHP (it is non-deterministic in PHP too).
         format!("{}.{:.8}", base, fastrand::f64() * 10.0)
     } else {

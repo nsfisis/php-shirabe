@@ -205,7 +205,7 @@ fn test_php_version() {
 #[test]
 fn test_inet_pton_regression() {
     // PHP: ->expects(self::once())->method('invoke')->with('inet_pton', ['::'])->willReturn(false).
-    // TODO(phase-d): the payload reports the result of `@inet_pton('::')` instead of answering a
+    // TODO(mock): the payload reports the result of `@inet_pton('::')` instead of answering a
     // call, so there is nothing left for the once() call-count check to observe.
     let functions = [(
         PhpMixed::String("inet_pton".to_string()),

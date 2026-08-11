@@ -1751,7 +1751,7 @@ fn test_exclude_from_classmap() {
 #[test]
 #[ignore = "require autoload.php + function_exists() assertions are unportable (composer_require todo!())"]
 fn test_files_autoload_order_by_dependencies() {
-    // TODO(phase-d): PHP `require autoload.php` + function_exists() assertions have no Rust
+    // TODO(php-runtime): PHP `require autoload.php` + function_exists() assertions have no Rust
     // equivalent (no runtime PHP file loading/class definition).
     todo!()
 }
@@ -1924,7 +1924,7 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
 #[test]
 #[ignore = "asserts PHP get_include_path() after require autoload.php"]
 fn test_include_paths_are_prepended_in_autoload_file() {
-    // TODO(phase-d): asserts PHP get_include_path() after `require autoload.php`; no Rust
+    // TODO(php-runtime): asserts PHP get_include_path() after `require autoload.php`; no Rust
     // equivalent for PHP's include path / runtime require.
     todo!()
 }
@@ -1932,7 +1932,7 @@ fn test_include_paths_are_prepended_in_autoload_file() {
 #[test]
 #[ignore = "asserts PHP get_include_path() after require autoload.php"]
 fn test_include_paths_in_root_package() {
-    // TODO(phase-d): asserts PHP get_include_path() after `require autoload.php`; no Rust
+    // TODO(php-runtime): asserts PHP get_include_path() after `require autoload.php`; no Rust
     // equivalent for PHP's include path / runtime require.
     todo!()
 }

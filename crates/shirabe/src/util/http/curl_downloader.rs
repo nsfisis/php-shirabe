@@ -11,7 +11,7 @@
 //! is preserved. Per-request TLS/proxy/IP-resolve settings that reqwest only exposes per-Client
 //! are simplified to a single default Client; see the TODOs below.
 //!
-//! TODO(phase-c): `abortRequest()` (PHP `CurlDownloader::abortRequest`, called from
+//! TODO(async): `abortRequest()` (PHP `CurlDownloader::abortRequest`, called from
 //! `HttpDownloader.php:275` when a React\Promise consumer cancels a download) has no equivalent
 //! here: shirabe has never ported the Promise/canceler machinery (`HttpDownloader::STATUS_ABORTED`
 //! is likewise unused), and there is no job table left to cancel now that `download()` runs to
@@ -76,9 +76,9 @@ impl CurlDownloader {
         //   - cookie_store(true)        ~ CURL_LOCK_DATA_COOKIE
         //   - redirect(none)            ~ CURLOPT_FOLLOWLOCATION = false (we follow manually)
         // The libcurl version-specific multiplexing / accept-encoding workarounds are not needed.
-        // TODO(phase-e): a brand-new reqwest client is created per CurlDownloader; that is acceptable here
+        // TODO(http): a brand-new reqwest client is created per CurlDownloader; that is acceptable here
         // (one HttpDownloader owns one CurlDownloader) but not pooled across them.
-        // TODO(phase-c): cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
+        // TODO(http): cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
         // (.cookie_store(true)); omitted as it is not required for package downloads.
         let client = reqwest::Client::builder()
             .pool_max_idle_per_host(8)
@@ -493,10 +493,10 @@ impl CurlDownloader {
             .and_then(|v| v.as_int())
             .map(|n| n as u64);
 
-        // TODO(phase-c): per-request ssl (cafile/verify_peer/local_cert) and proxy settings are reqwest
+        // TODO(http): per-request ssl (cafile/verify_peer/local_cert) and proxy settings are reqwest
         // Client-level, not request-level. They are not applied here yet; a ConnectionOptions-keyed
         // Client cache (as in the design sketch) is required to honor them.
-        // TODO(phase-c): CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
+        // TODO(http): CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
         let _ = attributes;
 
         let reqwest_method =

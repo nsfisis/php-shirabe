@@ -16,7 +16,7 @@
 //! case — and for any other call site reached before `main.rs`'s runtime exists — `block_on` falls
 //! back to a disposable single-threaded runtime scoped to just that one call.
 //!
-//! TODO(phase-e): this still leaves every one of `block_on`'s call sites synchronous rather than
+//! TODO(async): this still leaves every one of `block_on`'s call sites synchronous rather than
 //! genuinely `async fn` propagated up to `Command::execute`, which remains the end goal of the
 //! async re-architecture (see the design doc). Nested `block_on` call sites (a sync fn reached
 //! from inside another `block_on`'s async block) do not run concurrently with their siblings —

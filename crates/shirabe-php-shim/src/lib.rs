@@ -67,7 +67,7 @@ pub enum PhpMixed {
     String(String),
     List(Vec<PhpMixed>),
     Array(IndexMap<String, PhpMixed>),
-    // TODO(phase-e): consolidate Object to Array.
+    // TODO(type-model): consolidate Object to Array.
     Object(IndexMap<String, PhpMixed>),
     // Resources, arbitrary objects and callables are intentionally excluded. Do not add these
     // things to this type.
@@ -434,7 +434,7 @@ pub enum StreamBacking {
     /// A real file on disk (also `/dev/null`); the OS tracks the position.
     File(std::fs::File),
     /// `php://memory` and `php://temp` — an in-memory growable buffer.
-    /// TODO(phase-c): `php://temp/maxmemory:N` spills to a temp file past N bytes;
+    /// TODO(php-semantics): `php://temp/maxmemory:N` spills to a temp file past N bytes;
     /// the threshold is ignored here and everything stays in memory.
     Memory(std::io::Cursor<Vec<u8>>),
     /// A child process pipe created by `proc_open`. Half-duplex and not seekable.

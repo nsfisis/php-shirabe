@@ -46,7 +46,7 @@ impl ScriptAliasCommand {
 
         // PHP also calls parent::__construct() (Symfony Command base) and
         // $this->ignoreValidationErrors().
-        // TODO(phase-c): both are Symfony Command base-class operations — the constructor sets up
+        // TODO(symfony): both are Symfony Command base-class operations — the constructor sets up
         // the command's name/definition/application state and ignoreValidationErrors() flips a flag
         // on it. Composer's BaseCommand carries no such Symfony Command state yet (the Symfony
         // Command base is an intentional todo!() stub), so there is nothing to initialize here.
@@ -118,7 +118,7 @@ impl Command for ScriptAliasCommand {
 
         let args = input.borrow().get_arguments();
 
-        // TODO(phase-c): InputInterface has_to_string/get_class_name not modeled in Rust
+        // TODO(symfony): InputInterface has_to_string/get_class_name not modeled in Rust
         // TODO remove for Symfony 6+ as it is then in the interface
         if false {
             return Err(LogicException::new(
@@ -136,7 +136,7 @@ impl Command for ScriptAliasCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        // TODO(phase-c): InputInterface lacks to_string; use a placeholder until it is modeled.
+        // TODO(symfony): InputInterface lacks to_string; use a placeholder until it is modeled.
         let input_as_string = String::new();
         let _ = input;
         let script_alias_input = Preg::replace4(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1);

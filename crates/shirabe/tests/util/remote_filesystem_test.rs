@@ -274,10 +274,10 @@ fn test_copy() {
 #[test]
 #[ignore = "requires a MockObject subclass of RemoteFilesystem overriding private get_remote_contents; no subclass-mocking infrastructure exists"]
 fn test_copy_with_no_retry_on_failure() {
-    // TODO(phase-d): requires a MockObject subclass of RemoteFilesystem overriding the
+    // TODO(mock): requires a MockObject subclass of RemoteFilesystem overriding the
     // private get_remote_contents method. There is no subclass-mocking infrastructure in
     // Rust for this, and get_remote_contents's http(s) branch is itself still a
-    // TODO(phase-c) stub (always returns Ok(None)), so there is nothing yet to intercept
+    // TODO(http) stub (always returns Ok(None)), so there is nothing yet to intercept
     // even with a seam.
     todo!()
 }
@@ -285,10 +285,10 @@ fn test_copy_with_no_retry_on_failure() {
 #[test]
 #[ignore = "requires MockObject subclasses overriding RemoteFilesystem::get_remote_contents and AuthHelper::prompt_auth_if_needed; no subclass-mocking infrastructure exists"]
 fn test_copy_with_success_on_retry() {
-    // TODO(phase-d): requires MockObject subclasses overriding
+    // TODO(mock): requires MockObject subclasses overriding
     // RemoteFilesystem::get_remote_contents and AuthHelper::prompt_auth_if_needed to
     // simulate a first failure and a retried success; same missing-subclass-mocking-
-    // infrastructure and TODO(phase-c) http(s)-stub blockers as
+    // infrastructure and TODO(http) http(s)-stub blockers as
     // test_copy_with_no_retry_on_failure above.
     todo!()
 }
@@ -350,7 +350,7 @@ fn provide_bitbucket_public_download_urls() -> Vec<(&'static str, &'static str)>
 }
 
 #[test]
-#[ignore = "performs a real network download; get_remote_contents has no stream layer (TODO(phase-c)) and returns None, so getContents raises a TransportException"]
+#[ignore = "performs a real network download; get_remote_contents has no stream layer (TODO(http)) and returns None, so getContents raises a TransportException"]
 fn test_bit_bucket_public_download() {
     for (url, contents) in provide_bitbucket_public_download_urls() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =

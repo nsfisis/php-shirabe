@@ -17,7 +17,7 @@ use shirabe_php_shim::PhpMixed;
             harness is inexpressible; the event-side isDevMode downcast now exists \
             (EventInterface::as_any), but that alone does not unblock the test."]
 fn test_detect_and_pass_dev_mode_to_event_and_to_dispatching() {
-    // TODO(phase-d): PHP mocks RunScriptCommand itself (onlyMethods incl. requireComposer -> a
+    // TODO(mock): PHP mocks RunScriptCommand itself (onlyMethods incl. requireComposer -> a
     // composer whose EventDispatcher is a hasEventListeners/dispatchScript recording mock) and
     // drives run() with mocked Input/Output. The Rust RunScriptCommand has no requireComposer
     // override seam and Input/Output are concrete types, so the mocked harness is

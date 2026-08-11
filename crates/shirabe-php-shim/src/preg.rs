@@ -423,7 +423,7 @@ pub fn preg_grep2(pattern: impl PregPattern, array: &[&str], flags: i64) -> Vec<
 // modifiers are handled; PCRE-only constructs (possessive quantifiers,
 // lookaround, backreferences) are not supported by `regex` and must be avoided
 // in the caller's pattern.
-// TODO(phase-c): replace with a faithful PCRE engine to restore full semantics.
+// TODO(pcre): replace with a faithful PCRE engine to restore full semantics.
 // PCRE treats `\<` and `\>` as escaped literal `<`/`>`, but the `regex` crate
 // reads them as start/end-of-word boundary assertions. Rewrite those escapes to
 // the literal characters so PCRE-sourced patterns (e.g. anything run through
@@ -597,7 +597,7 @@ pub fn php_regex_anchored(pattern: &str) -> bool {
 /// compiles to a per-call-site cached `&'static regex::Regex`, instead of going through the
 /// runtime `PATTERN_CACHE` lookup by string key. Expands to a `(&'static regex::Regex, bool)`
 /// tuple, ready to pass straight into any `preg_*` function.
-// TODO(phase-e): `$php_pattern` is still translated from PHP delimiter/modifier syntax at runtime (on
+// TODO(pcre): `$php_pattern` is still translated from PHP delimiter/modifier syntax at runtime (on
 // first use at each call site). Once call sites pass native `regex`-crate syntax directly, drop
 // this wrapper and call `regex_macro::regex!` directly.
 #[macro_export]

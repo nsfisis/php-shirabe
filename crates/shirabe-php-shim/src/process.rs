@@ -63,7 +63,7 @@ pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
         *code = result.status.code().unwrap_or(-1) as i64;
     }
     // PHP system() passes the command output straight through to the script's output.
-    // TODO(phase-c): PHP flushes line by line as the command runs; here the whole output is captured
+    // TODO(php-semantics): PHP flushes line by line as the command runs; here the whole output is captured
     // and emitted once the command finishes, which changes interleaving/streaming timing.
     let _ = std::io::stdout().write_all(&result.stdout);
     let _ = std::io::stdout().flush();

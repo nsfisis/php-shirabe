@@ -86,7 +86,7 @@ post-package-install devMode=1 class=Composer\\DependencyResolver\\Operation\\In
 // previous one installed. Shirabe builds a lazy future per operation and only drives them in
 // wait_on_promises, so every pre-event of a batch sees the repository as it was before the
 // batch. Upstream: 1 / 1 / 2 / 3 / 3, Shirabe: 1 / 1 / 1 / 3 / 3.
-#[ignore = "operation chains run where they are built upstream but only in wait_on_promises here, so the repository state a package event observes differs (TODO(phase-c) promise cluster)"]
+#[ignore = "operation chains run where they are built upstream but only in wait_on_promises here, so the repository state a package event observes differs (TODO(async) promise cluster)"]
 #[test]
 fn test_local_repository_seen_by_package_events_matches_upstream_composer() {
     if !php_runtime_available() {

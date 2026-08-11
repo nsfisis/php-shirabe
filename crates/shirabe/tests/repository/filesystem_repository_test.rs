@@ -328,7 +328,7 @@ fn test_repository_writes_installed_php() {
 #[ignore = "safely_load_installed_versions's pattern uses a PCRE (?(DEFINE)...) recursive grammar the regex crate cannot compile, and InstalledVersions::getAllRawData has no Rust counterpart"]
 #[test]
 fn test_safely_load_installed_versions() {
-    // TODO(phase-d): needs a regex-crate expression equivalent to the PCRE recursive grammar, and
+    // TODO(pcre): needs a regex-crate expression equivalent to the PCRE recursive grammar, and
     // InstalledVersions::get_all_raw_data.
     todo!()
 }

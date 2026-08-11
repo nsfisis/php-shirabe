@@ -291,7 +291,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
                 let class = match args.first() {
-                    // TODO(phase-e): lossy UTF-8; class names are bytes in PHP.
+                    // TODO(bytes): lossy UTF-8; class names are bytes in PHP.
                     Some(PluginValue::String(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
                     other => {
                         return Err(runtime_throw(format!(
@@ -307,7 +307,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             if method_name == "__shirabe_run_rust_command" {
                 let (name, input_line) = match (args.first(), args.get(1)) {
                     (Some(PluginValue::String(name)), Some(PluginValue::String(line))) => (
-                        // TODO(phase-e): lossy UTF-8; command lines are bytes in PHP.
+                        // TODO(bytes): lossy UTF-8; command lines are bytes in PHP.
                         String::from_utf8_lossy(name).into_owned(),
                         String::from_utf8_lossy(line).into_owned(),
                     ),
@@ -393,7 +393,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
 /// ends up holding a second, unconnected instance of a Composer service.
 pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     let (class, ctor_args) = match (args.first(), args.get(1)) {
-        // TODO(phase-e): lossy UTF-8; class names are bytes in PHP.
+        // TODO(bytes): lossy UTF-8; class names are bytes in PHP.
         (Some(PluginValue::String(class)), Some(PluginValue::List(ctor_args))) => {
             (String::from_utf8_lossy(class).into_owned(), ctor_args)
         }
@@ -700,7 +700,7 @@ fn dispatch_config_method(
 ) -> Result<PluginValue, PhpThrow> {
     let key = |position: usize| -> Result<String, PhpThrow> {
         match args.get(position) {
-            // TODO(phase-e): lossy UTF-8; config keys are bytes in PHP.
+            // TODO(bytes): lossy UTF-8; config keys are bytes in PHP.
             Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
             other => Err(runtime_throw(format!(
                 "{method_name} expects a string key, got {other:?}"
@@ -790,7 +790,7 @@ fn dispatch_download_manager_method(
 ) -> Result<PluginValue, PhpThrow> {
     let string_arg = |position: usize| -> Result<String, PhpThrow> {
         match args.get(position) {
-            // TODO(phase-e): lossy UTF-8; paths and types are bytes in PHP.
+            // TODO(bytes): lossy UTF-8; paths and types are bytes in PHP.
             Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
             other => Err(runtime_throw(format!(
                 "{method_name} expects a string argument at position {position}, got {other:?}"
@@ -2013,7 +2013,7 @@ fn decode_write_args(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<(Vec<String>, bool, i64), PhpThrow> {
-    // TODO(phase-e): lossy UTF-8; IO messages are bytes in PHP.
+    // TODO(bytes): lossy UTF-8; IO messages are bytes in PHP.
     let messages = match args.first() {
         Some(PluginValue::String(bytes)) => vec![String::from_utf8_lossy(bytes).into_owned()],
         Some(PluginValue::List(items)) => {
@@ -2289,7 +2289,7 @@ fn decode_subscribed_events(
     };
     let mut events: IndexMap<String, SubscribedEventEntry> = IndexMap::new();
     for (event_name, params) in entries {
-        // TODO(phase-e): lossy UTF-8; event and method names are bytes in PHP.
+        // TODO(bytes): lossy UTF-8; event and method names are bytes in PHP.
         let event_name = String::from_utf8_lossy(&event_name).into_owned();
         let entry = match &params {
             PluginValue::String(method) => {

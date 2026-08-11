@@ -323,7 +323,7 @@ fn test_add_remove_installer() {
 #[ignore = "partial mock of InstallationManager (onlyMethods install/update/uninstall) with expects(once)->with(...) is not reproducible without method-overriding mocks; execute() also takes the batched download path"]
 #[test]
 fn test_execute() {
-    // TODO(phase-d): a partial mock of InstallationManager (onlyMethods install/update/uninstall)
+    // TODO(mock): a partial mock of InstallationManager (onlyMethods install/update/uninstall)
     // with expects(once)->with(...) is not reproducible without method-overriding mocks: the PHP
     // test runs the *real* execute() (batched download path included, via NoopInstaller) while
     // spying on the three per-operation methods it dispatches to. The existing

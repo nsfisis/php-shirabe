@@ -215,7 +215,7 @@ impl SymfonyStyle {
             self.question_helper = Some(SymfonyQuestionHelper::new());
         }
 
-        // TODO(phase-c): PHP passes `$this` as the OutputInterface, so SymfonyQuestionHelper's
+        // TODO(symfony): PHP passes `$this` as the OutputInterface, so SymfonyQuestionHelper's
         // write_error renders through SymfonyStyle::error; SymfonyStyle is not an OutputInterface
         // trait object here, so the raw output is passed instead.
         let answer = {

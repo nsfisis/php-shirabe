@@ -183,7 +183,7 @@ impl Finder {
             resolved_dirs.push(self.normalize_dir(&dir));
         } else {
             // GLOB_ONLYDIR is emulated by retaining directory matches only.
-            // TODO(phase-c): wildcard `in()` paths depend on `shirabe_php_shim::glob`, which is
+            // TODO(php-semantics): wildcard `in()` paths depend on `shirabe_php_shim::glob`, which is
             // still `todo!()`; only the real-directory branch above currently resolves.
             let mut globbed: Vec<String> =
                 glob(&dir).into_iter().filter(|path| is_dir(path)).collect();
@@ -451,7 +451,7 @@ impl Finder {
         out: &mut Vec<Entry>,
     ) {
         // `RecursiveDirectoryIterator::SKIP_DOTS` is implicit: read_dir omits "." and "..".
-        // TODO(phase-c): unreadable directories are skipped here; the SplFileInfo-less,
+        // TODO(symfony): unreadable directories are skipped here; the SplFileInfo-less,
         // non-fallible iterator signatures cannot surface the AccessDeniedException that PHP
         // throws when ignoreUnreadableDirs is false.
         let read = match std::fs::read_dir(dir) {
@@ -715,7 +715,7 @@ fn parse_date_comparator(test: &str) -> (String, i64) {
 
 /// `(new \DateTime($s))->format('U')`.
 ///
-/// TODO(phase-c): PHP's `\DateTime` accepts any strtotime() expression, but only the
+/// TODO(php-semantics): PHP's `\DateTime` accepts any strtotime() expression, but only the
 /// `Y-m-d H:i:s` / `Y-m-d` shapes produced by the callers are parsed here. The components are
 /// interpreted as UTC (not PHP's local timezone) so the timestamp round-trips with the
 /// `chrono::Utc`-derived thresholds the callers format from.

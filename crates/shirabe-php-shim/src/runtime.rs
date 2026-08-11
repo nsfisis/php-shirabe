@@ -289,7 +289,7 @@ pub fn spl_object_hash<T: HasAddress>(object: T) -> String {
     format!("{:032x}", object.address())
 }
 
-// TODO(phase-c): the Windows branch of php_uname is missing. There PHP reports "Windows NT" as the
+// TODO(windows): the Windows branch of php_uname is missing. There PHP reports "Windows NT" as the
 // sysname and derives release/version from the OS version APIs rather than uname(2).
 pub fn php_uname(mode: &str) -> String {
     let Ok(utsname) = nix::sys::utsname::uname() else {
@@ -339,12 +339,12 @@ pub fn dir() -> String {
 }
 
 pub fn memory_get_usage() -> i64 {
-    // TODO(phase-c): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
+    // TODO(php-semantics): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
     0
 }
 
 pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
-    // TODO(phase-c): return PHP's actual emalloc-tracked peak memory usage instead of a stub 0.
+    // TODO(php-semantics): return PHP's actual emalloc-tracked peak memory usage instead of a stub 0.
     0
 }
 
@@ -355,22 +355,22 @@ pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
 }
 
 pub fn sapi_windows_vt100_support(_resource: &crate::PhpResource) -> bool {
-    // TODO(phase-c): Windows-only SAPI function; not defined on the non-Windows target this build
+    // TODO(windows): Windows-only SAPI function; not defined on the non-Windows target this build
     // models (function_exists reports it absent).
     todo!()
 }
 
 pub fn sapi_windows_cp_get(_kind: Option<&str>) -> i64 {
-    // TODO(phase-c): Windows-only SAPI function; see sapi_windows_vt100_support.
+    // TODO(windows): Windows-only SAPI function; see sapi_windows_vt100_support.
     todo!()
 }
 
 pub fn sapi_windows_cp_set(_codepage: i64) -> bool {
-    // TODO(phase-c): Windows-only SAPI function; see sapi_windows_vt100_support.
+    // TODO(windows): Windows-only SAPI function; see sapi_windows_vt100_support.
     todo!()
 }
 
 pub fn sapi_windows_cp_conv(_in_codepage: i64, _out_codepage: i64, _subject: &str) -> String {
-    // TODO(phase-c): Windows-only SAPI function; see sapi_windows_vt100_support.
+    // TODO(windows): Windows-only SAPI function; see sapi_windows_vt100_support.
     todo!()
 }

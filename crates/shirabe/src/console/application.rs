@@ -1345,7 +1345,7 @@ impl Application {
             // PHP rewrites `@anonymous\0` markers via class_exists/get_parent_class/class_implements.
             // Rust error messages never carry PHP's anonymous-class marker and those reflection
             // primitives have no Rust equivalent, so the branch is unreachable here.
-            // TODO(phase-c): port the @anonymous rewrite if it ever becomes relevant.
+            // TODO(port): port the @anonymous rewrite if it ever becomes relevant.
 
             let width = if self.terminal.get_width() != 0 {
                 self.terminal.get_width() - 1
@@ -1371,7 +1371,7 @@ impl Application {
             if !throwable_is_exception_interface(e)
                 || output_interface::VERBOSITY_VERBOSE <= verbosity
             {
-                // TODO(phase-c): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
+                // TODO(error-model): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
                 // the 'n/a' fallback PHP itself uses when they are unavailable. The real source
                 // location cannot be reproduced (it would be a Rust path, not Composer's PHP path).
                 messages.push(format!(

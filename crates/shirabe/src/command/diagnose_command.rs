@@ -599,7 +599,7 @@ impl DiagnoseCommand {
             None,
         )?;
         if !installed_json.exists() {
-            // TODO(phase-c): the native binary never ships vendor/composer/installed.json, so
+            // TODO(distribution): the native binary never ships vendor/composer/installed.json, so
             // Composer's "non-standard Composer installation" warning would fire on every run.
             // A Composer source snapshot is planned to be embedded together with the plugin API
             // implementation, which will make this self-audit functional; until then report

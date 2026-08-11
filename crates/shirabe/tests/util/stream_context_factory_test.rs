@@ -100,7 +100,7 @@ impl Drop for TearDown {
     }
 }
 
-// TODO(phase-d): PHP's dataGetContext second data set passes a `notification` closure in both
+// TODO(type-model): PHP's dataGetContext second data set passes a `notification` closure in both
 // the default and expected params; PhpMixed has no closure variant, so that data set (and thus
 // the all-or-nothing testGetContext, which a data provider test cannot partially skip) cannot be
 // expressed.
@@ -110,7 +110,7 @@ impl Drop for TearDown {
 fn test_get_context() {
     let _tear_down = TearDown;
     set_up();
-    // TODO(phase-d): dataGetContext's second data set passes a `notification` closure in
+    // TODO(type-model): dataGetContext's second data set passes a `notification` closure in
     // params; PhpMixed cannot represent a PHP closure, so that data set (and thus the
     // all-or-nothing testGetContext, which a data provider test cannot partially skip) is
     // unportable.

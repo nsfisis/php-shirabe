@@ -11,7 +11,7 @@ fn fixture(name: &str) -> String {
     )
 }
 
-// TODO(phase-d): PHP runs this test only when the zip extension is NOT loaded (it is
+// TODO(php-runtime): PHP runs this test only when the zip extension is NOT loaded (it is
 // markTestSkipped otherwise). The Rust port links zip support unconditionally, so the
 // "extension not loaded" precondition cannot exist and the expected RuntimeException
 // ("The Zip Util requires PHP's zip extension") is unreachable by design.

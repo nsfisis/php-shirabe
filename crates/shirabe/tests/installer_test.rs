@@ -812,8 +812,8 @@ fn evaluate_condition(condition: &str) -> bool {
         }
         // HHVM is never defined under the Rust port.
         "!defined('HHVM_VERSION')" => true,
-        // TODO(phase-d): unported CONDITION expression (PHP eval has no Rust equivalent).
-        other => panic!("// TODO(phase-d): unported CONDITION: {}", other),
+        // TODO(php-runtime): unported CONDITION expression (PHP eval has no Rust equivalent).
+        other => panic!("// TODO(php-runtime): unported CONDITION: {}", other),
     }
 }
 
@@ -1305,7 +1305,7 @@ fn test_slow_integration() {
     let _tear_down = TearDown::new();
     for case in load_integration_tests("installer-slow/") {
         if case.file == "github-issues-7665.test" {
-            // TODO(phase-d): upstream Composer defect (composer/composer#12111), not a porting
+            // TODO(upstream): upstream Composer defect (composer/composer#12111), not a porting
             // bug. Problem::getPrettyString breaks RULE_LEARNED sort ties with
             // getSortableString() <=> getSortableString(), which compares numerically when both
             // sides are numeric strings and by byte otherwise, so it is not transitive. Those

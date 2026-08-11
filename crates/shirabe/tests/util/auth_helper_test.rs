@@ -806,7 +806,7 @@ fn test_add_authentication_header_with_custom_headers() {
 #[ignore = "exercises the deprecated addAuthenticationHeader wrapper (not ported) which relies on \
 trigger_error/E_USER_DEPRECATED; the PHP error-handler subsystem is not modeled"]
 fn test_add_authentication_header_is_working() {
-    // TODO(phase-d): see test_add_authentication_header_with_custom_headers above — same
+    // TODO(php-runtime): see test_add_authentication_header_with_custom_headers above — same
     // unported addAuthenticationHeader deprecated wrapper.
     todo!()
 }
@@ -815,7 +815,7 @@ fn test_add_authentication_header_is_working() {
 #[ignore = "exercises the deprecated addAuthenticationHeader wrapper (not ported) which relies on \
 trigger_error/E_USER_DEPRECATED converted to a RuntimeException via set_error_handler; not modeled"]
 fn test_add_authentication_header_deprecation() {
-    // TODO(phase-d): asserts that calling addAuthenticationHeader itself raises a
+    // TODO(php-runtime): asserts that calling addAuthenticationHeader itself raises a
     // RuntimeException via a custom set_error_handler converting E_USER_DEPRECATED; same
     // unported wrapper and unmodeled error-handler subsystem as the two tests above.
     todo!()

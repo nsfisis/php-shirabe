@@ -839,7 +839,7 @@ impl InstallationManager {
             return;
         }
 
-        // TODO(phase-c): PHP collects every http_downloader.add() promise and runs them via
+        // TODO(async): PHP collects every http_downloader.add() promise and runs them via
         // Loop::wait; the single-threaded sync bridge block_on's each notification serially instead.
         let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             for (repo_url, packages) in self.notifiable_packages.borrow().iter() {
@@ -966,7 +966,7 @@ impl InstallationManager {
 
     /// PHP: waitOnPromises() creates a ProgressBar up front and Loop::wait advances it while the
     /// concurrent promises resolve.
-    /// TODO(phase-c): Loop::wait has no active-job counter to feed the bar yet, so a
+    /// TODO(async): Loop::wait has no active-job counter to feed the bar yet, so a
     /// single 0% -> 100% jump is rendered after the wait instead of PHP's timing-driven
     /// intermediate snapshots.
     async fn wait_on_promises<'p>(

@@ -265,7 +265,7 @@ fn verify_phar_signature(path: &std::path::Path, bytes: &[u8]) -> anyhow::Result
         0x0002 => "sha1",
         0x0003 => "sha256",
         0x0004 => "sha512",
-        // TODO(phase-c): OPENSSL phar signatures need an RSA verification decision; they are
+        // TODO(php-semantics): OPENSSL phar signatures need an RSA verification decision; they are
         // accepted unverified for now.
         0x0010 => return Ok(()),
         _ => return Err(broken()),

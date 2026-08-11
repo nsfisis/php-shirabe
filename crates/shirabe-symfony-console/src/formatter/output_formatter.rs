@@ -287,7 +287,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         // `regex` crate:
         //   let open_tag_regex = "[a-z](?:[^\\\\<>]*+ | \\\\.)*";
         //   let close_tag_regex = "[a-z][^<>]*+";
-        // TODO(phase-c): restore the possessive quantifiers once a PCRE-compatible
+        // TODO(pcre): restore the possessive quantifiers once a PCRE-compatible
         // engine is available; greedy quantifiers match the same tags here but may
         // differ in pathological backtracking cases.
         let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";

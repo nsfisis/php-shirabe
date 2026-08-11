@@ -687,7 +687,7 @@ pub fn ksort<V>(array: &mut IndexMap<String, V>) {
 
 // PHP's default SORT_REGULAR comparison for array keys: two integer-like keys
 // compare numerically, otherwise byte-wise as strings.
-// TODO(phase-c): full SORT_REGULAR semantics for mixed integer/non-numeric-string
+// TODO(php-semantics): full SORT_REGULAR semantics for mixed integer/non-numeric-string
 // keys are not reproduced; every current caller uses homogeneous string keys.
 fn php_sort_regular_key(a: &str, b: &str) -> std::cmp::Ordering {
     if let (Ok(na), Ok(nb)) = (a.parse::<i64>(), b.parse::<i64>())

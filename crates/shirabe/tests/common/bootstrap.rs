@@ -8,7 +8,7 @@ use shirabe::util::platform::Platform;
 /// a tty (as it isn't under `cargo test`), so interactive `ApplicationTester` runs silently no-op
 /// instead of consuming `set_inputs`.
 ///
-/// TODO(phase-d): this is only wired into `get_application_tester()` (used by the `command` test
+/// TODO(port): this is only wired into `get_application_tester()` (used by the `command` test
 /// binary) rather than into every test binary's `main.rs`, unlike PHPUnit's bootstrap which
 /// covers the whole suite unconditionally. Rust's libtest has no per-binary setup hook, so a true
 /// equivalent needs either the `ctor` crate (new dependency, user decision) or wiring a call into
@@ -22,7 +22,7 @@ pub fn bootstrap() {
         shirabe_php_shim::date_default_timezone_set(&shirabe_php_shim::date_default_timezone_get());
 
         // PHP: require src/bootstrap.php and refresh vendor/composer/InstalledVersions.php.
-        // TODO(phase-d): port remaining bootstrap processes (the src/bootstrap.php include and
+        // TODO(php-runtime): port remaining bootstrap processes (the src/bootstrap.php include and
         // the InstalledVersions refresh are PHP autoload mechanics with no Rust counterpart yet).
 
         Platform::put_env("COMPOSER_TESTS_ARE_RUNNING", "1");

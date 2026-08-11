@@ -32,7 +32,7 @@ pub fn parse_url(url: &str, component: i64) -> PhpMixed {
 }
 
 pub fn parse_url_all(url: &str) -> PhpMixed {
-    // TODO(phase-c): PHP's parse_url uses php_url_parse_ex, which accepts relative
+    // TODO(php-semantics): PHP's parse_url uses php_url_parse_ex, which accepts relative
     // and partial URLs and leaves an absent component absent. reqwest::Url
     // (WHATWG/RFC 3986) requires an absolute URL, lowercases the host of special
     // schemes, and normalizes the path (e.g. "http://host" yields path "/"). This

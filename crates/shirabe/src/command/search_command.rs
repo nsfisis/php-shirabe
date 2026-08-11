@@ -260,7 +260,7 @@ impl Command for SearchCommand {
                 }
             }
         } else if format == "json" {
-            // TODO(phase-c): faithful JSON output requires SearchResult to retain the raw result
+            // TODO(type-model): faithful JSON output requires SearchResult to retain the raw result
             // array. PHP's fulltext search passes through arbitrary API fields (downloads, favers,
             // repository, ...) which the typed SearchResult (name/description/abandoned/url) drops,
             // so ComposerRepository-sourced results still diverge from Composer's raw JSON output.
