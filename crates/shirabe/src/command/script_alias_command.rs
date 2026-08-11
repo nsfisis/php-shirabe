@@ -44,18 +44,13 @@ impl ScriptAliasCommand {
             }
         }
 
-        // PHP also calls parent::__construct() (Symfony Command base) and
-        // $this->ignoreValidationErrors().
-        // TODO(symfony): both are Symfony Command base-class operations — the constructor sets up
-        // the command's name/definition/application state and ignoreValidationErrors() flips a flag
-        // on it. Composer's BaseCommand carries no such Symfony Command state yet (the Symfony
-        // Command base is an intentional todo!() stub), so there is nothing to initialize here.
         let command = Self {
             base_command_data: BaseCommandData::new(None),
             script,
             description,
             aliases,
         };
+        command.ignore_validation_errors();
         command
             .configure()
             .expect("ScriptAliasCommand::configure uses constructor-provided metadata");
