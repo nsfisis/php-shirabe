@@ -25,9 +25,14 @@ pub fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
 }
 
 /// Requires the Composer PHP runtime's `vendor/autoload.php` into the worker, which is what makes
-/// the real `Composer\` classes autoloadable there.
+/// the real `Composer\` classes autoloadable there. A worker whose PHP cannot read the runtime out
+/// of the test binary unpacks it under a cache directory of this test run, never the one the
+/// developer's own Composer uses.
 pub fn load_composer_php_runtime() {
-    shirabe::event_dispatcher::EventDispatcher::__ensure_composer_php_runtime().unwrap();
+    static CACHE: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    let cache = CACHE.get_or_init(|| tempfile::tempdir().expect("no cache directory for the test"));
+    shirabe::event_dispatcher::EventDispatcher::__ensure_composer_php_runtime(cache.path())
+        .unwrap();
 }
 
 /// Calls a static method in the worker, panicking on either failure lane.

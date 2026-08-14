@@ -699,7 +699,13 @@ impl EventDispatcher {
                         // The user's command class extends Symfony's Command, so the child
                         // process needs the real symfony/console classes before it can even
                         // autoload the user class.
-                        Self::ensure_composer_php_runtime()?;
+                        let cache_dir = self
+                            .composer()
+                            .borrow_partial()
+                            .get_config()
+                            .borrow()
+                            .get_str("cache-dir")?;
+                        Self::ensure_composer_php_runtime(std::path::Path::new(&cache_dir))?;
                         if !self.php_runtime_bool(
                             "class_exists",
                             vec![PluginValue::string(class_name.clone())],
@@ -1565,8 +1571,8 @@ try {{
 
     /// Loads the Composer PHP runtime (symfony/console and friends) into the worker, needed
     /// before a `scripts` Command class can be autoloaded and hosted.
-    pub(crate) fn ensure_composer_php_runtime() -> anyhow::Result<()> {
-        let autoload = Self::composer_php_runtime_autoload()?;
+    pub(crate) fn ensure_composer_php_runtime(cache_dir: &std::path::Path) -> anyhow::Result<()> {
+        let autoload = Self::composer_php_runtime_autoload(cache_dir)?;
         unwrap_php_result(call_function(
             "__shirabe_require",
             vec![PluginValue::string(autoload)],
@@ -1577,15 +1583,15 @@ try {{
     /// For testing only: a test that never registers a plugin package still needs the Composer
     /// PHP runtime in the worker before a class of its own can implement a Composer interface
     /// there.
-    pub fn __ensure_composer_php_runtime() -> anyhow::Result<()> {
-        Self::ensure_composer_php_runtime()
+    pub fn __ensure_composer_php_runtime(cache_dir: &std::path::Path) -> anyhow::Result<()> {
+        Self::ensure_composer_php_runtime(cache_dir)
     }
 
     /// The `vendor/autoload.php` of the Composer PHP runtime.
-    fn composer_php_runtime_autoload() -> anyhow::Result<String> {
+    fn composer_php_runtime_autoload(cache_dir: &std::path::Path) -> anyhow::Result<String> {
         Ok(format!(
             "{}/vendor/autoload.php",
-            shirabe_php_rpc::composer_runtime::base_path()?
+            shirabe_php_rpc::composer_runtime::base_path(cache_dir)?
         ))
     }
 

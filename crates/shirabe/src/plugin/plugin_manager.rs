@@ -405,7 +405,12 @@ impl PluginManager {
 
         // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like
         // PluginInterface) and the reverse-RPC autoloader before touching plugin classes there.
-        EventDispatcher::ensure_composer_php_runtime()?;
+        let cache_dir = composer
+            .borrow()
+            .get_config()
+            .borrow()
+            .get_str("cache-dir")?;
+        EventDispatcher::ensure_composer_php_runtime(std::path::Path::new(&cache_dir))?;
         EventDispatcher::ensure_script_autoloader()?;
 
         if let Some(files) = map.get("files").and_then(|v| v.as_array()) {

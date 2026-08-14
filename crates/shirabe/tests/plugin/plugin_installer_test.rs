@@ -58,6 +58,12 @@ pub(crate) fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+fn load_composer_php_runtime() {
+    static CACHE: std::sync::OnceLock<TempDir> = std::sync::OnceLock::new();
+    let cache = CACHE.get_or_init(|| tempfile::tempdir().expect("no cache directory for the test"));
+    EventDispatcher::__ensure_composer_php_runtime(cache.path()).unwrap();
+}
+
 /// `__DIR__ . '/Fixtures'` of the upstream test class.
 fn fixtures_dir() -> String {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -817,7 +823,7 @@ fn test_incapable_plugin_is_correctly_detected() {
 /// PHPUnit autoloads `Composer\Test\Plugin\Mock\Capability` from the Composer checkout; the
 /// worker resolves `Composer\` to `src/Composer` only, so the class file is loaded by path.
 fn load_mock_capability_class() {
-    EventDispatcher::__ensure_composer_php_runtime().unwrap();
+    load_composer_php_runtime();
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Plugin/Mock/Capability.php")
         .canonicalize()
@@ -1043,7 +1049,7 @@ fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
     let _worker = lock_php_worker();
     // `new \stdClass($ctorArgs)` receives the plugin, whose proxy stub implements the real
     // PluginInterface in the child.
-    EventDispatcher::__ensure_composer_php_runtime().unwrap();
+    load_composer_php_runtime();
     for wrong_implementation_class_type in non_existing_or_invalid_implementation_class_types() {
         assert_querying_with_invalid_capability_class_name_throws(
             &PhpMixed::String(wrong_implementation_class_type.to_string()),

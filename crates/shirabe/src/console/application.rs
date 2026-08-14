@@ -2439,7 +2439,19 @@ impl ApplicationHandle {
                                     && crate::plugin::find_file_in_registered_loaders(&dummy_str)
                                         .is_some()
                                     && {
-                                        EventDispatcher::ensure_composer_php_runtime()?;
+                                        let cache_dir = match composer_opt {
+                                            Some(ref composer_handle) => {
+                                                crate::composer::composer_full(composer_handle)
+                                                    .get_config()
+                                                    .borrow()
+                                                    .get_str("cache-dir")?
+                                            }
+                                            None => Factory::create_config(Some(io.clone()), None)?
+                                                .get_str("cache-dir")?,
+                                        };
+                                        EventDispatcher::ensure_composer_php_runtime(
+                                            std::path::Path::new(&cache_dir),
+                                        )?;
                                         crate::plugin::php_class_query(
                                             "class_exists",
                                             vec![shirabe_php_rpc::PluginValue::string(

@@ -22,22 +22,24 @@ const OVERRIDE_ENV: &str = "SHIRABE_COMPOSER_PHP_DIR";
 
 /// The path the Composer PHP runtime's files sit under in the worker: the checkout `OVERRIDE_ENV`
 /// names, or else the bundle, either inside this executable or in the directory it was extracted
-/// to.
-pub fn base_path() -> anyhow::Result<String> {
+/// to. A bundle the worker cannot read in place is unpacked under `cache_dir`, Composer's cache
+/// directory; the process answers with the path it resolved first, so a later call's `cache_dir`
+/// no longer moves the runtime.
+pub fn base_path(cache_dir: &std::path::Path) -> anyhow::Result<String> {
     static BASE: std::sync::OnceLock<Result<String, String>> = std::sync::OnceLock::new();
-    BASE.get_or_init(|| resolve().map_err(|e| format!("{e:#}")))
+    BASE.get_or_init(|| resolve(cache_dir).map_err(|e| format!("{e:#}")))
         .clone()
         .map_err(|e| anyhow::anyhow!(e))
 }
 
-fn resolve() -> anyhow::Result<String> {
+fn resolve(cache_dir: &std::path::Path) -> anyhow::Result<String> {
     if let Some(directory) = override_directory()? {
         return path_to_string(directory);
     }
     if worker_opens_bundle()? {
         return Ok(format!("phar://{ALIAS}"));
     }
-    path_to_string(extract()?)
+    path_to_string(extract_into(&cache_dir.join("runtime"))?)
 }
 
 fn path_to_string(directory: std::path::PathBuf) -> anyhow::Result<String> {
@@ -129,12 +131,8 @@ impl LocalFile {
     }
 }
 
-/// Unpacks the bundle into a content-addressed directory, so that a worker that cannot read the
-/// bundle in place gets the same files from the filesystem.
-fn extract() -> anyhow::Result<std::path::PathBuf> {
-    extract_into(&cache_directory()?.join("shirabe").join("runtime"))
-}
-
+/// Unpacks the bundle into a content-addressed directory under `root`, so that a worker that
+/// cannot read the bundle in place gets the same files from the filesystem.
 fn extract_into(root: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
     let destination = root.join(BUNDLE_ID);
     if destination.is_dir() {
@@ -157,17 +155,6 @@ fn extract_into(root: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
         }
     }
     Ok(destination)
-}
-
-fn cache_directory() -> anyhow::Result<std::path::PathBuf> {
-    if let Some(directory) = std::env::var_os("XDG_CACHE_HOME")
-        && !directory.is_empty()
-    {
-        return Ok(std::path::PathBuf::from(directory));
-    }
-    let home = std::env::var_os("HOME")
-        .ok_or_else(|| anyhow::anyhow!("neither XDG_CACHE_HOME nor HOME is set"))?;
-    Ok(std::path::Path::new(&home).join(".cache"))
 }
 
 #[cfg(test)]
@@ -212,7 +199,8 @@ mod tests {
             return;
         }
 
-        assert_eq!(base_path().unwrap(), format!("phar://{ALIAS}"));
+        let cache = tempfile::tempdir().unwrap();
+        assert_eq!(base_path(cache.path()).unwrap(), format!("phar://{ALIAS}"));
     }
 
     /// The other half of `base_path`: a worker whose PHP cannot open the bundle is handed the
