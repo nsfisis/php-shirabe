@@ -289,8 +289,8 @@ fn verify_phar_signature(path: &std::path::Path, bytes: &[u8]) -> anyhow::Result
 /// The special token to separate a phar stub and contents.
 ///
 /// The Shirabe executable embeds the Composer runtime bundle as a phar archive, so the token must
-/// not appear in the binary. See `docs/dev/composer-runtime-bundle.md`. We use `black_box()` to
-/// prevent the Rust compiler from inlining the function to a constant.
+/// not appear in the binary in any letter case. See `docs/dev/composer-runtime-bundle.md`. We use
+/// `black_box()` to prevent the Rust compiler from inlining the function to a constant.
 fn halt_compiler_token() -> [u8; 18] {
     let mut token = *std::hint::black_box(b"__UNYG_PBZCVYRE();");
     for byte in &mut token {
@@ -308,7 +308,7 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     let halt = halt_compiler_token();
     let halt_pos = bytes
         .windows(halt.len())
-        .position(|window| window == halt)
+        .position(|window| window.eq_ignore_ascii_case(&halt))
         .ok_or_else(|| {
             corruption_error(
                 path,
@@ -958,8 +958,8 @@ mod tests {
     }
 
     /// Builds a minimal native phar (one stored file, one deflated file, SHA-1
-    /// signature) following the php.net manual layout.
-    fn build_native_phar(tampered: bool) -> Vec<u8> {
+    /// signature) following the php.net manual layout, with `token` as the stub token.
+    fn build_native_phar(tampered: bool, token: [u8; 18]) -> Vec<u8> {
         let stored = (b"Hello World".to_vec(), "dir/hello.txt");
         let big = "abc".repeat(1000).into_bytes();
         let mut deflated = Vec::new();
@@ -1003,7 +1003,7 @@ mod tests {
         }
 
         let mut bytes = b"<?php ".to_vec();
-        bytes.extend_from_slice(&halt_compiler_token());
+        bytes.extend_from_slice(&token);
         bytes.extend_from_slice(b" ?>\r\n");
         bytes.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
         bytes.extend_from_slice(&manifest);
@@ -1024,7 +1024,7 @@ mod tests {
     fn phar_native_read_and_extract() {
         let dir = tempfile::tempdir().unwrap();
         let phar_path = dir.path().join("test.phar");
-        std::fs::write(&phar_path, build_native_phar(false)).unwrap();
+        std::fs::write(&phar_path, build_native_phar(false, halt_compiler_token())).unwrap();
 
         let phar = Phar::new(&phar_path).unwrap();
         let out = dir.path().join("extracted");
@@ -1040,10 +1040,30 @@ mod tests {
     }
 
     #[test]
+    fn phar_native_stub_token_is_read_in_any_letter_case() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut token = halt_compiler_token();
+        token.make_ascii_lowercase();
+        let phar_path = dir.path().join("lowercase.phar");
+        std::fs::write(&phar_path, build_native_phar(false, token)).unwrap();
+
+        let out = dir.path().join("extracted");
+        Phar::new(&phar_path)
+            .unwrap()
+            .extract_to(&out, None, true)
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read(out.join("dir/hello.txt")).unwrap(),
+            b"Hello World"
+        );
+    }
+
+    #[test]
     fn phar_native_broken_signature_is_rejected() {
         let dir = tempfile::tempdir().unwrap();
         let phar_path = dir.path().join("tampered.phar");
-        std::fs::write(&phar_path, build_native_phar(true)).unwrap();
+        std::fs::write(&phar_path, build_native_phar(true, halt_compiler_token())).unwrap();
 
         let error = Phar::new(&phar_path).unwrap_err();
         assert!(

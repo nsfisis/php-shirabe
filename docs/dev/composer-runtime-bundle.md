@@ -27,7 +27,8 @@ cached per file, and the bundle is never re-verified.
 A phar file consists of 3 or 4 sections: a stub, a manifest, the actual contents
 and an optional signature. The stub and the manifest are separated by
 `__HALT_COMPILER();` tokens, which means that Shirabe's executable binary
-must not contain the tokens except for phar's one.
+must not contain the tokens except for phar's one. Note that the token is
+case-insensitive.
 
 ## Accessing files at runtime
 

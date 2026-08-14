@@ -20,7 +20,7 @@ final class NoHaltCompilerLiteral implements Linter
 
     public function failureIntro(): string
     {
-        return "Found a literal `" . self::TOKEN . "`.\n"
+        return "Found a literal `" . self::TOKEN . "` (case-insensitive).\n"
             . "The executable carries the Composer runtime bundle as a phar that PHP finds by\n"
             . "scanning for the first occurrence of that token, and every literal here ends up in\n"
             . "the same binary, so an earlier one shadows the bundle. Build the token at run time\n"
@@ -39,7 +39,7 @@ final class NoHaltCompilerLiteral implements Linter
             }
 
             foreach (file($path) as $idx => $raw) {
-                if (!str_contains($raw, self::TOKEN)) {
+                if (stripos($raw, self::TOKEN) === false) {
                     continue;
                 }
 
