@@ -37,9 +37,9 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpClass as _, PhpMixed,
-    disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class, implode, is_array,
-    is_string, php_regex, rtrim, str_replace, strpos, strstr, strstr3, strtolower, trim,
-    version_compare,
+    RuntimeException, disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class,
+    implode, is_array, is_string, php_regex, rtrim, str_replace, strpos, strstr, strstr3,
+    strtolower, trim, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -592,19 +592,21 @@ impl DiagnoseCommand {
             IndexMap::new(),
             IndexMap::new(),
         );
-        // PHP: __DIR__ . '/../../../vendor/composer/installed.json'
-        let installed_json = JsonFile::new(
-            "composer/src/Composer/Command/../../../vendor/composer/installed.json".to_string(),
-            None,
-            None,
-        )?;
+        // PHP reads the installed.json of the Composer that runs; here that is the one in the
+        // Composer PHP runtime. The handle holds the file in place while the repository reads it.
+        let installed =
+            shirabe_php_rpc::composer_runtime::local_file("vendor/composer/installed.json")?;
+        // TODO(bytes): JsonFile holds its path as a string, since it takes http URLs too, so the
+        // path has to be representable as UTF-8.
+        let path = installed.path();
+        let path = path.to_str().ok_or_else(|| {
+            RuntimeException::new(format!("Path contains invalid UTF-8: {}", path.display()))
+        })?;
+        let installed_json = JsonFile::new(path.to_string(), None, None)?;
         if !installed_json.exists() {
-            // TODO(distribution): the native binary never ships vendor/composer/installed.json, so
-            // Composer's "non-standard Composer installation" warning would fire on every run.
-            // A Composer source snapshot is planned to be embedded together with the plugin API
-            // implementation, which will make this self-audit functional; until then report
-            // success instead of the warning.
-            return Ok(PhpMixed::Bool(true));
+            return Ok(PhpMixed::String(
+                "<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>".to_string(),
+            ));
         }
 
         let local_repo = FilesystemRepository::new(installed_json, false, None, None)?;

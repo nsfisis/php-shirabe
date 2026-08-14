@@ -147,6 +147,7 @@ fn extract_entries(
     archive_path: &std::path::Path,
     entries: &[PharEntry],
     directory: &std::path::Path,
+    files: Option<&[&str]>,
     overwrite: bool,
 ) -> anyhow::Result<()> {
     let extract_error = |detail: String| {
@@ -158,8 +159,21 @@ fn extract_entries(
         .into()
     };
 
+    if let Some(files) = files
+        && let Some(missing) = files
+            .iter()
+            .find(|file| !entries.iter().any(|entry| entry.localname == **file))
+    {
+        return Err(extract_error(format!("\"{}\" is not in the phar", missing)));
+    }
+
     std::fs::create_dir_all(directory).map_err(|e| extract_error(e.to_string()))?;
     for entry in entries {
+        if let Some(files) = files
+            && !files.contains(&entry.localname.as_str())
+        {
+            continue;
+        }
         let rel = std::path::Path::new(&entry.localname);
         if rel.is_absolute()
             || rel
@@ -448,10 +462,16 @@ impl Phar {
     pub fn extract_to(
         &self,
         directory: impl AsRef<std::path::Path>,
-        _files: Option<()>,
+        files: Option<&[&str]>,
         overwrite: bool,
     ) -> anyhow::Result<()> {
-        extract_entries(&self.path, &self.entries, directory.as_ref(), overwrite)
+        extract_entries(
+            &self.path,
+            &self.entries,
+            directory.as_ref(),
+            files,
+            overwrite,
+        )
     }
 }
 
@@ -623,13 +643,14 @@ impl PharData {
     pub fn extract_to(
         &self,
         directory: impl AsRef<std::path::Path>,
-        _files: Option<()>,
+        files: Option<&[&str]>,
         overwrite: bool,
     ) -> anyhow::Result<()> {
         extract_entries(
             &self.path,
             &self.entries.borrow(),
             directory.as_ref(),
+            files,
             overwrite,
         )
     }
@@ -1056,6 +1077,33 @@ mod tests {
         assert_eq!(
             std::fs::read(out.join("dir/hello.txt")).unwrap(),
             b"Hello World"
+        );
+    }
+
+    #[test]
+    fn phar_native_extract_takes_the_named_files_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let phar_path = dir.path().join("selected.phar");
+        std::fs::write(&phar_path, build_native_phar(false, halt_compiler_token())).unwrap();
+        let phar = Phar::new(&phar_path).unwrap();
+
+        let out = dir.path().join("extracted");
+        phar.extract_to(&out, Some(&["dir/hello.txt"]), true)
+            .unwrap();
+        assert_eq!(
+            std::fs::read(out.join("dir/hello.txt")).unwrap(),
+            b"Hello World"
+        );
+        assert!(!out.join("big.txt").exists());
+
+        let error = phar
+            .extract_to(&out, Some(&["dir/absent.txt"]), true)
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("\"dir/absent.txt\" is not in the phar"),
+            "unexpected error: {error}"
         );
     }
 

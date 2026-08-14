@@ -1581,23 +1581,8 @@ try {{
         Self::ensure_composer_php_runtime()
     }
 
-    /// The `vendor/autoload.php` of the Composer PHP runtime: the checkout `SHIRABE_COMPOSER_PHP_DIR`
-    /// points at, or else the runtime bundle the executable carries.
+    /// The `vendor/autoload.php` of the Composer PHP runtime.
     fn composer_php_runtime_autoload() -> anyhow::Result<String> {
-        if let Some(dir) = Platform::get_env("SHIRABE_COMPOSER_PHP_DIR") {
-            let path = std::path::Path::new(&dir)
-                .join("vendor")
-                .join("autoload.php");
-            if !path.is_file() {
-                return Err(RuntimeException::new(format!(
-                    "SHIRABE_COMPOSER_PHP_DIR points at {dir}, which has no \
-                     vendor/autoload.php; install the checkout's dependencies or unset it to use \
-                     the runtime the executable carries"
-                ))
-                .into());
-            }
-            return Ok(path.display().to_string());
-        }
         Ok(format!(
             "{}/vendor/autoload.php",
             shirabe_php_rpc::composer_runtime::base_path()?

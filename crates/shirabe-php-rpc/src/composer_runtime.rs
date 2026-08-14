@@ -17,8 +17,12 @@ const SENTINEL_PATH: &str = "shirabe/bundle-id";
 /// its own, so this name is the only one its stream paths answer to.
 const ALIAS: &str = "shirabe-composer-runtime.phar";
 
-/// The path the Composer PHP runtime's files sit under in the worker, either inside this
-/// executable or in the directory the bundle was extracted to.
+/// Names the Composer checkout that stands in for the bundle, for development.
+const OVERRIDE_ENV: &str = "SHIRABE_COMPOSER_PHP_DIR";
+
+/// The path the Composer PHP runtime's files sit under in the worker: the checkout `OVERRIDE_ENV`
+/// names, or else the bundle, either inside this executable or in the directory it was extracted
+/// to.
 pub fn base_path() -> anyhow::Result<String> {
     static BASE: std::sync::OnceLock<Result<String, String>> = std::sync::OnceLock::new();
     BASE.get_or_init(|| resolve().map_err(|e| format!("{e:#}")))
@@ -27,13 +31,37 @@ pub fn base_path() -> anyhow::Result<String> {
 }
 
 fn resolve() -> anyhow::Result<String> {
+    if let Some(directory) = override_directory()? {
+        return path_to_string(directory);
+    }
     if worker_opens_bundle()? {
         return Ok(format!("phar://{ALIAS}"));
     }
-    let directory = extract()?;
+    path_to_string(extract()?)
+}
+
+fn path_to_string(directory: std::path::PathBuf) -> anyhow::Result<String> {
     directory.into_os_string().into_string().map_err(|path| {
-        anyhow::anyhow!("the extracted Composer PHP runtime path {path:?} is not valid UTF-8")
+        anyhow::anyhow!("the Composer PHP runtime path {path:?} is not valid UTF-8")
     })
+}
+
+/// The checkout that stands in for the bundle, if `OVERRIDE_ENV` names one. Both the worker and
+/// the Rust side read the runtime from there instead.
+fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
+    let Some(directory) = std::env::var_os(OVERRIDE_ENV) else {
+        return Ok(None);
+    };
+    let directory = std::path::PathBuf::from(directory);
+    if !directory.join("vendor/autoload.php").is_file() {
+        return Err(shirabe_php_shim::RuntimeException::new(format!(
+            "{OVERRIDE_ENV} points at {}, which has no vendor/autoload.php; install the \
+             checkout's dependencies or unset it to use the runtime the executable carries",
+            directory.display()
+        ))
+        .into());
+    }
+    Ok(Some(directory))
 }
 
 /// Whether the worker can read the bundle straight out of this executable. It cannot when its
@@ -59,6 +87,45 @@ fn worker_opens_bundle() -> anyhow::Result<bool> {
         other => Err(anyhow::anyhow!(
             "opening the Composer PHP runtime bundle did not answer with a bool: {other:?}"
         )),
+    }
+}
+
+/// One of the runtime's files, at a path a reader in this process can open: the one in the
+/// checkout `OVERRIDE_ENV` names, or the file written out of the bundle on its own. `base_path()`
+/// answers for the worker and can name a path inside this executable that only its phar stream
+/// wrapper opens.
+pub fn local_file(path: &str) -> anyhow::Result<LocalFile> {
+    if let Some(directory) = override_directory()? {
+        return Ok(LocalFile {
+            path: directory.join(path),
+            _directory: None,
+        });
+    }
+
+    let directory = tempfile::tempdir()?;
+    let archive = directory.path().join("bundle.phar");
+    std::fs::write(&archive, BUNDLE)?;
+    let unpacked = directory.path().join("unpacked");
+    shirabe_php_shim::Phar::new(&archive)?.extract_to(&unpacked, Some(&[path]), true)?;
+    std::fs::remove_file(&archive)?;
+
+    Ok(LocalFile {
+        path: unpacked.join(path),
+        _directory: Some(directory),
+    })
+}
+
+/// A file of the Composer PHP runtime on the local filesystem. One written out of the bundle
+/// lives in a temporary directory that this handle removes again.
+#[derive(Debug)]
+pub struct LocalFile {
+    path: std::path::PathBuf,
+    _directory: Option<tempfile::TempDir>,
+}
+
+impl LocalFile {
+    pub fn path(&self) -> &std::path::Path {
+        &self.path
     }
 }
 
