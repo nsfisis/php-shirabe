@@ -1,5 +1,6 @@
 //! Rust-to-PHP RPC over a Unix domain socket. See `docs/dev/php-rpc.md`.
 
+pub mod composer_runtime;
 pub mod frame;
 pub mod session;
 pub mod value;
@@ -1093,7 +1094,10 @@ fn spawn_worker() -> anyhow::Result<Worker> {
         // supported) serialize_precision; pin the child to it in case a distro php.ini overrides
         // the default.
         .arg("-d")
-        .arg("serialize_precision=-1");
+        .arg("serialize_precision=-1")
+        // The Composer runtime bundle has no phar signature.
+        .arg("-d")
+        .arg("phar.require_hash=0");
     if xdebug::switches_xdebug_off() {
         // The environment variable takes precedence over every ini setting, so switching the
         // mode off takes both. See `docs/dev/xdebug.md`.

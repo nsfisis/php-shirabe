@@ -42,6 +42,10 @@ license of the package it is ported from:
 | [`shirabe-symfony-process`](crates/shirabe-symfony-process/LICENSE)         | symfony/process                             |
 | [`shirabe-symfony-string`](crates/shirabe-symfony-string/LICENSE)           | symfony/string                              |
 
+The Shirabe executable embeds these PHP sources into its own binary as the
+Composer runtime bundle ([docs/dev/composer-runtime-bundle.md](docs/dev/composer-runtime-bundle.md)).
+The bundle has the `LICENSE` file of every package.
+
 ## PHP
 
 The [`shirabe-php-src`](crates/shirabe-php-src/LICENSE) crate contains a Rust

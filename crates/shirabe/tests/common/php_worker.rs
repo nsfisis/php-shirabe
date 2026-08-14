@@ -24,8 +24,8 @@ pub fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Requires the Composer PHP runtime (`composer/vendor/autoload.php`) into the worker, which is
-/// what makes the real `Composer\` classes autoloadable there.
+/// Requires the Composer PHP runtime's `vendor/autoload.php` into the worker, which is what makes
+/// the real `Composer\` classes autoloadable there.
 pub fn load_composer_php_runtime() {
     shirabe::event_dispatcher::EventDispatcher::__ensure_composer_php_runtime().unwrap();
 }

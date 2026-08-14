@@ -7,12 +7,15 @@ runtime.
 The `shirabe-php-rpc` crate spawns the system PHP as a child process and talks to it over a Unix
 domain socket. There is exactly one child process per Shirabe process, shared by every caller.
 
-## Locating PHP
+## Locating and spawning PHP
 
-The existing `PhpExecutableFinder` class resolves the PHP binary. The child is started with
-`-d serialize_precision=-1` so the wire codec's float formatting is pinned to the default PHP
-behavior, and with `-d xdebug.mode=off` unless `COMPOSER_ALLOW_XDEBUG` asks for Xdebug to stay
-(see `xdebug.md`).
+The existing `PhpExecutableFinder` class resolves the PHP binary.
+
+The child is started with the following arguments:
+
+* `-d serialize_precision=-1` for stable float formatting of `serialize()`/`unserialize()`
+* `-d phar.require_hash=0` (see [docs/dev/composer-runtime-bundle.md](./composer-runtime-bundle.md))
+* `-d xdebug.mode=off` (see [docs/dev/xdebug.md](./xdebug.md))
 
 ## Transport
 

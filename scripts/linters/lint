@@ -11,6 +11,7 @@ use Shirabe\Lint\Linters\NoBannedUse;
 use Shirabe\Lint\Linters\NoDecorativeSectionComment;
 use Shirabe\Lint\Linters\NoExceptionDowncast;
 use Shirabe\Lint\Linters\NoFormatTrailingComma;
+use Shirabe\Lint\Linters\NoHaltCompilerLiteral;
 use Shirabe\Lint\Linters\NoModRs;
 use Shirabe\Lint\Linters\NoStdCollectionsMaps;
 use Shirabe\Lint\Linters\NoUseAsAlias;
@@ -38,6 +39,9 @@ $runner = new Runner($rootDir, [
     [new NoFormatTrailingComma(), [
         'crates/shirabe/src/package/loader/root_package_loader.rs',
         'crates/shirabe-spdx-licenses/src/spdx_licenses.rs',
+    ]],
+    [new NoHaltCompilerLiteral(), [
+        'crates/shirabe-php-rpc/build.rs',
     ]],
     [new NoModRs(), []],
     [new NoStdCollectionsMaps(), []],

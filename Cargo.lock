@@ -2154,8 +2154,10 @@ name = "shirabe-php-rpc"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "flate2",
  "indexmap",
  "nix",
+ "sha2 0.11.0",
  "shirabe-php-shim",
  "shirabe-php-src",
  "shirabe-symfony-process",

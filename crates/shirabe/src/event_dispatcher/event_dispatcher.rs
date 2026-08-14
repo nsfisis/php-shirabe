@@ -1566,16 +1566,7 @@ try {{
     /// Loads the Composer PHP runtime (symfony/console and friends) into the worker, needed
     /// before a `scripts` Command class can be autoloaded and hosted.
     pub(crate) fn ensure_composer_php_runtime() -> anyhow::Result<()> {
-        // TODO(plugin): the real PHP classes are taken from a Composer checkout for now; how
-        // they ship with a released Shirabe binary is part of the plugin distribution work.
-        let autoload = Self::composer_php_runtime_autoload().ok_or_else(|| -> anyhow::Error {
-            RuntimeException::new(
-                "unable to locate the Composer PHP runtime; set SHIRABE_COMPOSER_PHP_DIR \
-                          to a Composer checkout with its vendor directory installed"
-                    .to_string(),
-            )
-            .into()
-        })?;
+        let autoload = Self::composer_php_runtime_autoload()?;
         unwrap_php_result(call_function(
             "__shirabe_require",
             vec![PluginValue::string(autoload)],
@@ -1590,22 +1581,27 @@ try {{
         Self::ensure_composer_php_runtime()
     }
 
-    fn composer_php_runtime_autoload() -> Option<String> {
+    /// The `vendor/autoload.php` of the Composer PHP runtime: the checkout `SHIRABE_COMPOSER_PHP_DIR`
+    /// points at, or else the runtime bundle the executable carries.
+    fn composer_php_runtime_autoload() -> anyhow::Result<String> {
         if let Some(dir) = Platform::get_env("SHIRABE_COMPOSER_PHP_DIR") {
             let path = std::path::Path::new(&dir)
                 .join("vendor")
                 .join("autoload.php");
-            if path.is_file() {
-                return path.to_str().map(|s| s.to_string());
+            if !path.is_file() {
+                return Err(RuntimeException::new(format!(
+                    "SHIRABE_COMPOSER_PHP_DIR points at {dir}, which has no \
+                     vendor/autoload.php; install the checkout's dependencies or unset it to use \
+                     the runtime the executable carries"
+                ))
+                .into());
             }
+            return Ok(path.display().to_string());
         }
-        // Development fallback: the Composer checkout sitting next to this workspace.
-        let dev = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../composer/vendor/autoload.php");
-        if dev.is_file() {
-            return dev.canonicalize().ok()?.to_str().map(|s| s.to_string());
-        }
-        None
+        Ok(format!(
+            "{}/vendor/autoload.php",
+            shirabe_php_rpc::composer_runtime::base_path()?
+        ))
     }
 
     /// Runs a boolean runtime query (`class_exists`, `is_a`, ...) inside the PHP worker, with

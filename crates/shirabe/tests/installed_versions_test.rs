@@ -512,12 +512,19 @@ fn test_worker_loads_the_installed_versions_file_shirabe_dumps() {
     let _worker = lock_php_worker();
     load_composer_php_runtime();
 
+    // Read in the worker rather than from Rust: the file it autoloads lives inside the runtime
+    // bundle, which only the PHP side has a stream wrapper for.
     let loaded = string_of(&php_eval(
         r"return (new \ReflectionClass(\Composer\InstalledVersions::class))->getFileName();",
     ));
+    let contents = string_of(&php_eval(
+        r"return file_get_contents(
+            (new \ReflectionClass(\Composer\InstalledVersions::class))->getFileName()
+        );",
+    ));
     assert_eq!(
         include_str!("../../../composer/src/Composer/InstalledVersions.php"),
-        std::fs::read_to_string(&loaded).unwrap(),
+        contents,
         "the worker autoloads {loaded}, which must match the file Shirabe dumps",
     );
 }

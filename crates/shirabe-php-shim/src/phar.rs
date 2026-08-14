@@ -286,15 +286,35 @@ fn verify_phar_signature(path: &std::path::Path, bytes: &[u8]) -> anyhow::Result
     Ok(())
 }
 
+/// The special token to separate a phar stub and contents.
+///
+/// The Shirabe executable embeds the Composer runtime bundle as a phar archive, so the token must
+/// not appear in the binary. See `docs/dev/composer-runtime-bundle.md`. We use `black_box()` to
+/// prevent the Rust compiler from inlining the function to a constant.
+fn halt_compiler_token() -> [u8; 18] {
+    let mut token = *std::hint::black_box(b"__UNYG_PBZCVYRE();");
+    for byte in &mut token {
+        if byte.is_ascii_uppercase() {
+            *byte = b'A' + (*byte - b'A' + 13) % 26;
+        }
+    }
+    token
+}
+
 fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     let bytes = std::fs::read(path)
         .map_err(|e| corruption_error(path, &format!("unable to open phar: {}", e)))?;
 
-    let halt = b"__HALT_COMPILER();";
+    let halt = halt_compiler_token();
     let halt_pos = bytes
         .windows(halt.len())
         .position(|window| window == halt)
-        .ok_or_else(|| corruption_error(path, "__HALT_COMPILER(); not found in stub"))?;
+        .ok_or_else(|| {
+            corruption_error(
+                path,
+                &format!("{} not found in stub", String::from_utf8_lossy(&halt)),
+            )
+        })?;
     let mut offset = halt_pos + halt.len();
     for close_tag in [&b" ?>"[..], &b"\n?>"[..]] {
         if bytes[offset..].starts_with(close_tag) {
@@ -846,6 +866,17 @@ mod tests {
     use super::*;
     use crate::Catch as _;
 
+    #[test]
+    fn halt_compiler_token_decodes() {
+        assert_eq!(
+            halt_compiler_token(),
+            [
+                b'_', b'_', b'H', b'A', b'L', b'T', b'_', b'C', b'O', b'M', b'P', b'I', b'L', b'E',
+                b'R', b'(', b')', b';',
+            ],
+        );
+    }
+
     fn write_file(dir: &std::path::Path, name: &str, content: &[u8]) -> std::path::PathBuf {
         let path = dir.join(name);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -971,7 +1002,9 @@ mod tests {
             manifest.extend_from_slice(&0u32.to_le_bytes());
         }
 
-        let mut bytes = b"<?php __HALT_COMPILER(); ?>\r\n".to_vec();
+        let mut bytes = b"<?php ".to_vec();
+        bytes.extend_from_slice(&halt_compiler_token());
+        bytes.extend_from_slice(b" ?>\r\n");
         bytes.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
         bytes.extend_from_slice(&manifest);
         bytes.extend_from_slice(&stored.0);

@@ -716,6 +716,26 @@ ShirabeRpcRuntime::$dispatch = [
         ShirabeRpcRuntime::ensureStubAutoloaderPriority();
         return true;
     },
+    // Tries to open the embedded runtime bundle and maps the phar to $alias.
+    // Returns whether the extraction succeeds or not.
+    '__shirabe_open_runtime_bundle' => static function ($args) {
+        [$executable, $alias, $sentinel, $bundleId] = $args;
+        if (!extension_loaded('phar') || !in_array('phar', stream_get_wrappers(), true)) {
+            return false;
+        }
+        try {
+            Phar::loadPhar($executable, $alias);
+            $read = @file_get_contents("phar://{$alias}/{$sentinel}");
+        } catch (Throwable $e) {
+            $read = false;
+        }
+        // The phar bundle is unsigned, so the worker process is started with
+        // phar.require_hash=0. Verification result is saved and not verified
+        // again for the same phar file, so it is safe to restore the settings
+        // here.
+        ini_set('phar.require_hash', '1');
+        return $read === $bundleId;
+    },
     '__shirabe_enable_script_autoloader' => static function ($args) {
         ShirabeRpcRuntime::enableScriptAutoloader();
         return true;
