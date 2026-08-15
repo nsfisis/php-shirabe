@@ -878,9 +878,8 @@ pub fn file_put_contents(path: &str, data: &[u8]) -> Option<i64> {
     std::fs::write(path, data).ok().map(|_| data.len() as i64)
 }
 
+/// Only `FILE_APPEND` is honored; `LOCK_EX` and `FILE_USE_INCLUDE_PATH` have no effect.
 pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64> {
-    // TODO(php-semantics): the LOCK_EX and FILE_USE_INCLUDE_PATH flags are ignored; only FILE_APPEND is
-    // honored.
     let append = flags & FILE_APPEND != 0;
     let mut opts = std::fs::OpenOptions::new();
     opts.write(true).create(true);
@@ -906,6 +905,8 @@ pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> Option<String> {
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }
 
+/// `$use_include_path` and the stream `$context` have no effect; the read always goes to the
+/// local filesystem.
 pub fn file_get_contents5(
     path: &str,
     _use_include_path: bool,
@@ -913,8 +914,6 @@ pub fn file_get_contents5(
     offset: i64,
     length: Option<i64>,
 ) -> Option<String> {
-    // TODO(php-semantics): the stream $context and FILE_USE_INCLUDE_PATH are ignored; only $offset and
-    // $length are applied (to the file read from the local filesystem).
     // PHP supports the file:// stream wrapper; strip it to read the local file.
     let path = path.strip_prefix("file://").unwrap_or(path);
     let bytes = std::fs::read(path).ok()?;
