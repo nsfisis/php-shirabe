@@ -1,10 +1,13 @@
 //! ref: composer/tests/Composer/Test/EventDispatcher/EventDispatcherTest.php
 
 use crate::io_mock::{Expectation, get_io_mock};
+use crate::php_worker::{
+    load_composer_php_runtime, php_eval, php_runtime_available, php_single_quote,
+};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::autoload::{AutoloadGeneratorInterface, ClassLoader};
+use shirabe::autoload::{AutoloadGenerator, AutoloadGeneratorInterface, ClassLoader};
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::dependency_resolver::Transaction;
@@ -45,10 +48,8 @@ impl Drop for TearDown {
 
 /// ref: EventDispatcherTest::createComposerInstance.
 ///
-/// The PHP helper wires a RepositoryManager / AutoloadGenerator / InstallationManager so that the
-/// autoloader-rebuild path (only reached for PHP-script and array callables) works. The tests ported
-/// here drive only command-line / composer-script listeners, which never touch those collaborators,
-/// so a minimal full Composer carrying a Config and a RootPackage is sufficient.
+/// The RepositoryManager / AutoloadGenerator / InstallationManager are what the autoloader-rebuild
+/// path reaches for, which happens for PHP-script and array callables.
 fn create_composer_instance() -> ComposerHandle {
     let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
         PartialOrFullComposer::new_full(),
@@ -62,7 +63,63 @@ fn create_composer_instance() -> ComposerHandle {
     )
     .into();
     composer.borrow_mut().set_package(package);
+
+    let mut repository_manager = MockRepositoryManager::new();
+    repository_manager
+        .expect_get_local_repository()
+        .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
     composer
+        .borrow_mut()
+        .set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
+            repository_manager,
+        )));
+    composer
+        .borrow_mut()
+        .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
+            MockInstallationManager::new(),
+        )));
+    let generator = AutoloadGenerator::new(
+        std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+            composer.upcast().downgrade(),
+            null_io(),
+            None,
+        ))),
+        None,
+    );
+    composer
+        .borrow_mut()
+        .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
+
+    composer
+}
+
+fn composer_test_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test")
+        .canonicalize()
+        .unwrap()
+}
+
+/// Makes `Composer\Test\EventDispatcher\EventDispatcherTest` — the class whose static and object
+/// methods the listeners below name — loadable in the worker, by requiring the upstream file from
+/// the Composer checkout. Its base class chain ends at `PHPUnit\Framework\TestCase`, which the
+/// Composer PHP runtime bundle does not carry, so the stand-in under `fixtures/` declares that
+/// class first. In PHP the listeners resolve because the class is the running test class itself.
+fn load_php_listener_class() {
+    static LOADED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    LOADED.get_or_init(|| {
+        load_composer_php_runtime();
+        let stub = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/event_dispatcher/fixtures/phpunit_test_case.php");
+        for file in [
+            stub,
+            composer_test_dir().join("TestCase.php"),
+            composer_test_dir().join("EventDispatcher/EventDispatcherTest.php"),
+        ] {
+            let path = file.to_str().expect("the fixture paths are UTF-8");
+            php_eval(&format!("require {};", php_single_quote(path)));
+        }
+    });
 }
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -345,20 +402,14 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
     let _ = &mut event;
 }
 
-// The remaining ignored tests use, as their listeners, static methods of the PHPUnit test class
-// `Composer\Test\EventDispatcher\EventDispatcherTest` itself (or object-identity array
-// callables). The PHP-script invocation path is implemented (execute_event_php_script sends a
-// CallStaticMethod over the RPC channel), but the worker child process cannot load that test
-// class: it extends PHPUnit\Framework\TestCase and phpunit is not part of composer/vendor.
-// Making these pass needs a decision on how to provide the listener methods to the child (e.g. a
-// stand-in fixture class with the same FQCN and method bodies), which is not a call to make
-// unilaterally under the no-test-alteration rule.
-
 #[test]
 #[serial]
-#[ignore = "listener `EventDispatcherTest::call` is a static method of the PHPUnit test class itself; the PHP worker cannot load it (extends PHPUnit\\Framework\\TestCase, phpunit absent from composer/vendor) — see the note above the ignored block"]
 fn test_listener_exceptions_are_caught() {
     let _tear_down = TearDown;
+    if !php_runtime_available() {
+        return;
+    }
+    load_php_listener_class();
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
@@ -582,26 +633,14 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
 
 #[test]
 #[serial]
-#[ignore = "the object-method listeners are methods of the PHPUnit test class itself; invoking them sends a CallMethod for a phandle that has no counterpart in the worker, which cannot load that class (extends PHPUnit\\Framework\\TestCase, phpunit absent from composer/vendor) — see the note above the ignored block"]
 fn test_dispatcher_remove_listener() {
     let _tear_down = TearDown;
+    if !php_runtime_available() {
+        return;
+    }
+    load_php_listener_class();
 
     let composer = create_composer_instance();
-
-    let mut repository_manager = MockRepositoryManager::new();
-    repository_manager
-        .expect_get_local_repository()
-        .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
-    composer
-        .borrow_mut()
-        .set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            repository_manager,
-        )));
-    composer
-        .borrow_mut()
-        .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            MockInstallationManager::new(),
-        )));
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
@@ -612,11 +651,11 @@ fn test_dispatcher_remove_listener() {
     // PHP's `[$this, 'someMethod']` is an array callable whose object half is the test instance.
     // `Callable::PhpMethod` is the port's shape for an object-half callable: it carries the
     // cross-RPC identity `remove_listener` compares, and echoes `Class->method` like PHP does.
-    let this = shirabe_php_rpc::PhpObjHandle {
-        phandle: 1,
-        class: "Composer\\Test\\EventDispatcher\\EventDispatcherTest".to_string(),
-        implements: vec![],
-    };
+    let this =
+        match php_eval("return new \\Composer\\Test\\EventDispatcher\\EventDispatcherTest();") {
+            shirabe_php_rpc::PluginValue::PhpHandle(handle) => handle,
+            other => panic!("the worker returned no object handle for the listener: {other:?}"),
+        };
     let listener = Callable::PhpMethod(this.clone(), "someMethod".to_string());
     let listener2 = Callable::PhpMethod(this.clone(), "someMethod2".to_string());
     let listener3 = Callable::String(
@@ -657,9 +696,12 @@ fn test_dispatcher_remove_listener() {
 
 #[test]
 #[serial]
-#[ignore = "listener `EventDispatcherTest::someMethod` is a static method of the PHPUnit test class itself; the PHP worker cannot load it — see the note above the ignored block"]
 fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let _tear_down = TearDown;
+    if !ensure_php_binary() || !php_runtime_available() {
+        return;
+    }
+    load_php_listener_class();
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![cmd("echo -n foo"), cmd("echo -n bar")],
@@ -698,11 +740,18 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     assert_eq!(expected, io.borrow().get_output());
 }
 
+// TODO(php-runtime): `@putenv` writes the environment of the Shirabe process, while the listener
+// reads `getenv()` inside the PHP worker — a long-lived child that keeps the environment it
+// inherited when it was spawned. Nothing propagates the write across the boundary.
 #[test]
 #[serial]
-#[ignore = "listener `EventDispatcherTest::getTestEnv` is a static method of the PHPUnit test class itself; the PHP worker cannot load it — see the note above the ignored block"]
+#[ignore = "`@putenv ABC=123` does not reach the PHP worker the listener runs in"]
 fn test_dispatcher_can_put_env() {
     let _tear_down = TearDown;
+    if !php_runtime_available() {
+        return;
+    }
+    load_php_listener_class();
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
@@ -737,19 +786,23 @@ fn test_dispatcher_can_put_env() {
     assert_eq!(expected, io.borrow().get_output());
 }
 
+// TODO(php-runtime): the bin dir is appended to the PATH of the Shirabe process, while the
+// listeners read `getenv('PATH')` inside the PHP worker — a long-lived child that keeps the
+// environment it inherited when it was spawned. Nothing propagates the append across the boundary.
 #[test]
 #[serial]
-#[ignore = "listeners (createsVendorBinFolderChecksEnv*) are static methods of the PHPUnit test class itself; the PHP worker cannot load them — see the note above the ignored block"]
+#[ignore = "the bin dir the dispatcher appends to PATH does not reach the PHP worker the listeners run in"]
 fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let _tear_down = TearDown;
+    if !php_runtime_available() {
+        return;
+    }
+    load_php_listener_class();
 
     let current_directory_bkp = Platform::get_cwd(false).unwrap();
     let composer_bin_dir_bkp = Platform::get_env("COMPOSER_BIN_DIR");
     // ref: __DIR__ of EventDispatcherTest.php, where the listeners create `vendor/bin`.
-    let php_test_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../composer/tests/Composer/Test/EventDispatcher")
-        .canonicalize()
-        .unwrap();
+    let php_test_dir = composer_test_dir().join("EventDispatcher");
     std::env::set_current_dir(&php_test_dir).unwrap();
     Platform::put_env(
         "COMPOSER_BIN_DIR",
