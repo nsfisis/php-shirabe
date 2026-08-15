@@ -14,19 +14,19 @@ use std::fmt;
 #[derive(Debug)]
 pub struct Pool {
     /// @var BasePackage[]
-    pub(crate) packages: Vec<BasePackageHandle>,
+    packages: Vec<BasePackageHandle>,
     /// @var array<string, BasePackage[]>
-    pub(crate) package_by_name: IndexMap<String, Vec<BasePackageHandle>>,
+    package_by_name: IndexMap<String, Vec<BasePackageHandle>>,
     /// @var VersionParser
-    pub(crate) version_parser: VersionParser,
+    version_parser: VersionParser,
     /// @var array<string, array<string, BasePackage[]>>
-    pub(crate) provider_cache: IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
+    provider_cache: IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
     /// @var BasePackage[]
-    pub(crate) unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
+    unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
     /// @var array<string, array<string, string>> Map of package name => normalized version => pretty version
-    pub(crate) removed_versions: IndexMap<String, IndexMap<String, String>>,
+    removed_versions: IndexMap<String, IndexMap<String, String>>,
     /// @var array<string, array<string, string>> Map of package object hash => removed normalized versions => removed pretty version
-    pub(crate) removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
+    removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
     /// @var array<string, array<string, array<SecurityAdvisory|PartialSecurityAdvisory>>> Map of package name => normalized version => security advisories
     security_removed_versions:
         IndexMap<String, IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,

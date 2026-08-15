@@ -516,7 +516,7 @@ impl JsonFile {
     /// @throws \UnexpectedValueException
     /// @throws ParsingException
     /// @return bool                      true on success
-    pub(crate) fn validate_syntax(json: &str, file: Option<&str>) -> anyhow::Result<bool> {
+    fn validate_syntax(json: &str, file: Option<&str>) -> anyhow::Result<bool> {
         // TODO(php-semantics): make json_decode() returns an error object with details.
         let error = match serde_json::from_str::<serde_json::Value>(json) {
             Ok(_) => {

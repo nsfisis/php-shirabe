@@ -15,9 +15,9 @@ use shirabe_php_shim::{BadMethodCallException, PhpMixed, RuntimeException, php_r
 #[derive(Debug)]
 pub struct PerforceDriver {
     inner: VcsDriverBase,
-    pub(crate) depot: String,
-    pub(crate) branch: String,
-    pub(crate) perforce: Option<Box<dyn PerforceInterface>>,
+    depot: String,
+    branch: String,
+    perforce: Option<Box<dyn PerforceInterface>>,
 }
 
 impl PerforceDriver {

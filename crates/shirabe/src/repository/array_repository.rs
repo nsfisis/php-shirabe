@@ -79,7 +79,7 @@ impl ArrayRepository {
         Ok(None)
     }
 
-    pub(crate) fn find_packages_internal(
+    fn find_packages_internal(
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
@@ -157,7 +157,7 @@ impl ArrayRepository {
         Ok(())
     }
 
-    pub(crate) fn create_alias_package(
+    fn create_alias_package(
         &self,
         package: BasePackageHandle,
         alias: String,

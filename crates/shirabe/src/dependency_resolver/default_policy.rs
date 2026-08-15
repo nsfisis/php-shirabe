@@ -85,11 +85,7 @@ impl DefaultPolicy {
         if a.id() < b.id() { -1 } else { 1 }
     }
 
-    pub(crate) fn group_literals_by_name(
-        &self,
-        pool: &Pool,
-        literals: &[i64],
-    ) -> IndexMap<String, Vec<i64>> {
+    fn group_literals_by_name(&self, pool: &Pool, literals: &[i64]) -> IndexMap<String, Vec<i64>> {
         let mut packages: IndexMap<String, Vec<i64>> = IndexMap::new();
         for &literal in literals {
             let package_name = pool.literal_to_package(literal).get_name().to_string();
@@ -98,7 +94,7 @@ impl DefaultPolicy {
         packages
     }
 
-    pub(crate) fn prune_to_best_version(&self, pool: &Pool, literals: Vec<i64>) -> Vec<i64> {
+    fn prune_to_best_version(&self, pool: &Pool, literals: Vec<i64>) -> Vec<i64> {
         if let Some(ref preferred_versions) = self.preferred_versions {
             let name = pool.literal_to_package(literals[0]).get_name();
             if let Some(preferred_version) = preferred_versions.get(&name) {
@@ -133,7 +129,7 @@ impl DefaultPolicy {
         best_literals
     }
 
-    pub(crate) fn prune_remote_aliases(&self, pool: &Pool, literals: Vec<i64>) -> Vec<i64> {
+    fn prune_remote_aliases(&self, pool: &Pool, literals: Vec<i64>) -> Vec<i64> {
         let mut has_local_alias = false;
 
         for &literal in &literals {
@@ -162,7 +158,7 @@ impl DefaultPolicy {
         selected
     }
 
-    pub(crate) fn replaces(&self, source: BasePackageHandle, target: BasePackageHandle) -> bool {
+    fn replaces(&self, source: BasePackageHandle, target: BasePackageHandle) -> bool {
         for link in source.get_replaces().values() {
             if link.get_target() == target.get_name().as_str() {
                 return true;

@@ -13,11 +13,11 @@ pub struct LockTransaction {
     inner: Transaction,
     /// packages in current lock file, platform repo or otherwise present
     /// Indexed by spl_object_hash
-    pub(crate) present_map: IndexMap<String, PackageInterfaceHandle>,
+    present_map: IndexMap<String, PackageInterfaceHandle>,
     /// Packages which cannot be mapped, platform repo, root package, other fixed repos
     /// Indexed by package id
-    pub(crate) unlockable_map: IndexMap<i64, PackageInterfaceHandle>,
-    pub(crate) result_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    unlockable_map: IndexMap<i64, PackageInterfaceHandle>,
+    result_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
 }
 
 impl LockTransaction {

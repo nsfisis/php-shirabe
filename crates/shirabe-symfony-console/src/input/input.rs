@@ -16,10 +16,10 @@ use shirabe_php_shim::{PhpMixed, PhpResource, php_regex};
 #[derive(Debug, Clone)]
 pub struct Input {
     pub(crate) definition: InputDefinition,
-    pub(crate) stream: Option<PhpResource>,
+    stream: Option<PhpResource>,
     pub(crate) options: IndexMap<String, PhpMixed>,
     pub(crate) arguments: IndexMap<String, PhpMixed>,
-    pub(crate) interactive: bool,
+    interactive: bool,
 }
 
 impl Input {

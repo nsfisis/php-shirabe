@@ -8,7 +8,7 @@ use shirabe_symfony_string::unicode_string::UnicodeString;
 /// Helper is the base class for all helper classes.
 #[derive(Debug, Default)]
 pub struct Helper {
-    pub(crate) helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>,
+    helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>,
 }
 
 impl Helper {

@@ -17,11 +17,11 @@ use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable,
 
 #[derive(Debug)]
 pub struct HgDriver {
-    pub(crate) inner: VcsDriverBase,
-    pub(crate) tags: Option<IndexMap<String, String>>,
-    pub(crate) branches: Option<IndexMap<String, String>>,
-    pub(crate) root_identifier: Option<String>,
-    pub(crate) repo_dir: String,
+    inner: VcsDriverBase,
+    tags: Option<IndexMap<String, String>>,
+    branches: Option<IndexMap<String, String>>,
+    root_identifier: Option<String>,
+    repo_dir: String,
 }
 
 impl HgDriver {

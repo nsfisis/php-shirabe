@@ -38,16 +38,15 @@ pub struct ConfigCommand {
     config_file: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
     config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 
-    pub(crate) auth_config_file:
-        std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
-    pub(crate) auth_config_source: std::cell::RefCell<Option<JsonConfigSource>>,
+    auth_config_file: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
+    auth_config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 }
 
 impl_php_class!(ConfigCommand, r"Composer\Command\ConfigCommand");
 
 impl ConfigCommand {
     /// List of additional configurable package-properties
-    pub(crate) const CONFIGURABLE_PACKAGE_PROPERTIES: &'static [&'static str] = &[
+    const CONFIGURABLE_PACKAGE_PROPERTIES: &'static [&'static str] = &[
         "name",
         "type",
         "description",
@@ -77,7 +76,7 @@ impl ConfigCommand {
         command
     }
 
-    pub(crate) fn handle_single_value(
+    fn handle_single_value(
         &self,
         key: &str,
         callbacks: &(ValidatorFn, NormalizerFn),
@@ -143,7 +142,7 @@ impl ConfigCommand {
         Ok(())
     }
 
-    pub(crate) fn handle_multi_value(
+    fn handle_multi_value(
         &self,
         key: &str,
         callbacks: &(ValidatorFn, NormalizerFn),
@@ -181,7 +180,7 @@ impl ConfigCommand {
     }
 
     /// Display the contents of the file in a pretty formatted way
-    pub(crate) fn list_configuration(
+    fn list_configuration(
         &self,
         contents: PhpMixed,
         raw_contents: PhpMixed,

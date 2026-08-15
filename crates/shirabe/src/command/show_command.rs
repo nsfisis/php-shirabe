@@ -55,8 +55,8 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct ShowCommand {
     base_command_data: BaseCommandData,
 
-    pub(crate) version_parser: std::cell::RefCell<VersionParser>,
-    pub(crate) colors: std::cell::RefCell<Vec<String>>,
+    version_parser: std::cell::RefCell<VersionParser>,
+    colors: std::cell::RefCell<Vec<String>>,
     repository_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
 
@@ -83,7 +83,7 @@ impl ShowCommand {
     }
 
     /// PHP: protected function suggestPackageBasedOnMode(): \Closure
-    pub(crate) fn suggest_package_based_on_mode(&self) -> crate::console::input::SuggestedValues {
+    fn suggest_package_based_on_mode(&self) -> crate::console::input::SuggestedValues {
         crate::console::input::SuggestedValues::Closure(Box::new(|this, input, suggestions| {
             if input.get_option("available")?.to_bool() || input.get_option("all")?.to_bool() {
                 return this.suggest_available_package_incl_platform().call(
@@ -259,7 +259,7 @@ impl ShowCommand {
         }
     }
 
-    pub(crate) fn get_root_requires(&self) -> Vec<String> {
+    fn get_root_requires(&self) -> Vec<String> {
         let composer_rc = self.try_composer(None, None);
         let composer_rc = match composer_rc {
             None => return vec![],
@@ -279,7 +279,7 @@ impl ShowCommand {
         combined.keys().map(|k| strtolower(k)).collect()
     }
 
-    pub(crate) fn get_version_style(
+    fn get_version_style(
         &self,
         latest_package: PackageInterfaceHandle,
         package: PackageInterfaceHandle,
@@ -294,7 +294,7 @@ impl ShowCommand {
     }
 
     /// finds a package by name and version if provided
-    pub(crate) fn get_package(
+    fn get_package(
         &self,
         installed_repo: &RepositoryInterfaceHandle,
         repos: &RepositoryInterfaceHandle,
@@ -371,7 +371,7 @@ impl ShowCommand {
     }
 
     /// Prints package info.
-    pub(crate) fn print_package_info(
+    fn print_package_info(
         &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
@@ -401,7 +401,7 @@ impl ShowCommand {
     }
 
     /// Prints package metadata.
-    pub(crate) fn print_meta(
+    fn print_meta(
         &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
@@ -564,7 +564,7 @@ impl ShowCommand {
     }
 
     /// Prints all available versions of this package and highlights the installed one if any.
-    pub(crate) fn print_versions(
+    fn print_versions(
         &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
@@ -599,7 +599,7 @@ impl ShowCommand {
     }
 
     /// print link objects
-    pub(crate) fn print_links(
+    fn print_links(
         &self,
         package: CompletePackageInterfaceHandle,
         link_type: &str,
@@ -622,7 +622,7 @@ impl ShowCommand {
     }
 
     /// Prints the licenses of a package with metadata
-    pub(crate) fn print_licenses(&self, package: CompletePackageInterfaceHandle) {
+    fn print_licenses(&self, package: CompletePackageInterfaceHandle) {
         let spdx_licenses = SpdxLicenses::new();
 
         let licenses = package.get_license();
@@ -650,7 +650,7 @@ impl ShowCommand {
     }
 
     /// Prints package info in JSON format.
-    pub(crate) fn print_package_info_as_json(
+    fn print_package_info_as_json(
         &self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
@@ -971,7 +971,7 @@ impl ShowCommand {
     }
 
     /// Init styles for tree
-    pub(crate) fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
+    fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
         *self.colors.borrow_mut() = vec![
             "green".to_string(),
             "yellow".to_string(),
@@ -991,7 +991,7 @@ impl ShowCommand {
     }
 
     /// Display the tree
-    pub(crate) fn display_package_tree(&self, array_tree: Vec<IndexMap<String, PhpMixed>>) {
+    fn display_package_tree(&self, array_tree: Vec<IndexMap<String, PhpMixed>>) {
         for package in array_tree.iter() {
             let name = package
                 .get("name")
@@ -1070,7 +1070,7 @@ impl ShowCommand {
     }
 
     /// Generate the package tree
-    pub(crate) fn generate_package_tree(
+    fn generate_package_tree(
         &self,
         package: PackageInterfaceHandle,
         installed_repo: &RepositoryInterfaceHandle,
@@ -1147,7 +1147,7 @@ impl ShowCommand {
     }
 
     /// Display a package tree
-    pub(crate) fn display_tree(
+    fn display_tree(
         &self,
         package: &PhpMixed,
         packages_in_tree: &[PhpMixed],
@@ -1216,7 +1216,7 @@ impl ShowCommand {
     }
 
     /// Display a package tree
-    pub(crate) fn add_tree(
+    fn add_tree(
         &self,
         name: &str,
         link: &Link,

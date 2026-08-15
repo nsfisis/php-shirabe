@@ -125,10 +125,7 @@ impl InitCommand {
         .into())
     }
 
-    pub(crate) fn format_authors(
-        &self,
-        author: &str,
-    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
+    fn format_authors(&self, author: &str) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
         let parsed = self.parse_author_string(author)?;
         let mut author_map: IndexMap<String, PhpMixed> = IndexMap::new();
         let name = parsed.get("name").cloned().unwrap_or(None);
@@ -163,7 +160,7 @@ impl InitCommand {
         Some(implode("\\", &namespace))
     }
 
-    pub(crate) fn get_git_config(&self) -> IndexMap<String, String> {
+    fn get_git_config(&self) -> IndexMap<String, String> {
         if self.git_config.borrow().is_some() {
             return self.git_config.borrow().clone().unwrap_or_default();
         }
@@ -208,7 +205,7 @@ impl InitCommand {
     ///  "/$vendor/"
     ///  "/$vendor/*"
     ///  "$vendor/*"
-    pub(crate) fn has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
+    fn has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
         if !file_exists(ignore_file) {
             return false;
         }
@@ -225,7 +222,7 @@ impl InitCommand {
         false
     }
 
-    pub(crate) fn add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
+    fn add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
         let mut contents = String::new();
         if file_exists(ignore_file) {
             contents = file_get_contents(ignore_file).unwrap_or_default();
@@ -269,7 +266,7 @@ impl InitCommand {
         self.add_vendor_ignore(ignore_file, vendor)
     }
 
-    pub(crate) fn is_valid_email(&self, email: &str) -> bool {
+    fn is_valid_email(&self, email: &str) -> bool {
         shirabe_php_shim::filter_var_email(email)
     }
 

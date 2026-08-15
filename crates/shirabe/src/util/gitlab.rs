@@ -17,10 +17,10 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct GitLab {
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
-    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    pub(crate) http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 }
 
 impl GitLab {

@@ -50,11 +50,9 @@ use shirabe_symfony_process::ExecutableFinder;
 pub struct DiagnoseCommand {
     base_command_data: BaseCommandData,
 
-    pub(crate) http_downloader:
-        std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>>,
-    pub(crate) process:
-        std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>>,
-    pub(crate) exit_code: std::cell::Cell<i64>,
+    http_downloader: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>>,
+    process: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>>,
+    exit_code: std::cell::Cell<i64>,
 }
 
 impl_php_class!(DiagnoseCommand, r"Composer\Command\DiagnoseCommand");

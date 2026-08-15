@@ -17,11 +17,11 @@ use std::collections::VecDeque;
 
 #[derive(Debug)]
 pub struct RuleSetGenerator {
-    pub(crate) policy: std::rc::Rc<dyn PolicyInterface>,
-    pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
-    pub(crate) rules: RuleSet,
-    pub(crate) added_map: IndexMap<i64, PackageInterfaceHandle>,
-    pub(crate) added_packages_by_names: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    policy: std::rc::Rc<dyn PolicyInterface>,
+    pool: std::rc::Rc<std::cell::RefCell<Pool>>,
+    rules: RuleSet,
+    added_map: IndexMap<i64, PackageInterfaceHandle>,
+    added_packages_by_names: IndexMap<String, Vec<PackageInterfaceHandle>>,
 }
 
 impl RuleSetGenerator {
@@ -132,7 +132,7 @@ impl RuleSetGenerator {
         }
     }
 
-    pub(crate) fn add_rules_for_package(
+    fn add_rules_for_package(
         &mut self,
         package: PackageInterfaceHandle,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
@@ -221,7 +221,7 @@ impl RuleSetGenerator {
         }
     }
 
-    pub(crate) fn add_conflict_rules(
+    fn add_conflict_rules(
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
@@ -292,7 +292,7 @@ impl RuleSetGenerator {
         }
     }
 
-    pub(crate) fn add_rules_for_request(
+    fn add_rules_for_request(
         &mut self,
         request: &Request,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
@@ -369,7 +369,7 @@ impl RuleSetGenerator {
         Ok(())
     }
 
-    pub(crate) fn add_rules_for_root_aliases(
+    fn add_rules_for_root_aliases(
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {

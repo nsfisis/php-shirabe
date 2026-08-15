@@ -1546,7 +1546,7 @@ impl JsonManipulator {
         JsonFile::encode(&data)
     }
 
-    pub(crate) fn detect_indenting(&mut self) {
+    fn detect_indenting(&mut self) {
         self.indent = JsonFile::detect_indenting(Some(&self.contents));
     }
 }

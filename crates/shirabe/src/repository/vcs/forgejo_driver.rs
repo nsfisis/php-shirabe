@@ -23,12 +23,12 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct ForgejoDriver {
-    pub(crate) inner: VcsDriverBase,
-    pub(crate) forgejo_url: Option<ForgejoUrl>,
-    pub(crate) repository_data: Option<ForgejoRepositoryData>,
-    pub(crate) git_driver: Option<GitDriver>,
-    pub(crate) tags: Option<IndexMap<String, String>>,
-    pub(crate) branches: Option<IndexMap<String, String>>,
+    inner: VcsDriverBase,
+    forgejo_url: Option<ForgejoUrl>,
+    repository_data: Option<ForgejoRepositoryData>,
+    git_driver: Option<GitDriver>,
+    tags: Option<IndexMap<String, String>>,
+    branches: Option<IndexMap<String, String>>,
 }
 
 impl ForgejoDriver {
@@ -595,7 +595,7 @@ impl ForgejoDriver {
         None
     }
 
-    pub(crate) fn get_contents(
+    fn get_contents(
         &mut self,
         url: &str,
         fetching_repo_data: bool,

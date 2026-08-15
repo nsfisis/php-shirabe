@@ -24,7 +24,7 @@ use shirabe_symfony_string::s;
 /// The QuestionHelper class provides helpers to interact with the user.
 #[derive(Debug, Default)]
 pub struct QuestionHelper {
-    pub(crate) inner: Helper,
+    inner: Helper,
 
     /// @var resource|null
     input_stream: Option<shirabe_php_shim::PhpResource>,
@@ -352,7 +352,7 @@ impl QuestionHelper {
     }
 
     /// Outputs the question prompt.
-    pub(crate) fn write_prompt(
+    fn write_prompt(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
@@ -403,7 +403,7 @@ impl QuestionHelper {
     }
 
     /// Outputs an error message.
-    pub(crate) fn write_error(
+    fn write_error(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         error: &shirabe_php_shim::Exception,

@@ -26,7 +26,7 @@ pub struct ParsingExceptionDetails {
 #[derive(Debug)]
 pub struct ParsingException {
     inner: shirabe_php_shim::Exception,
-    pub(crate) details: Box<ParsingExceptionDetails>,
+    details: Box<ParsingExceptionDetails>,
 }
 
 impl ParsingException {

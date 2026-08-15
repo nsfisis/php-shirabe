@@ -10,7 +10,7 @@ use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
 pub struct ArchivableFilesFinder {
-    pub(crate) finder: Finder,
+    finder: Finder,
     inner_iter: Box<dyn Iterator<Item = PathBuf>>,
 }
 

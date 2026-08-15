@@ -5,7 +5,7 @@ use crate::package::PackageInterfaceHandle;
 
 #[derive(Debug, Clone)]
 pub struct UninstallOperation {
-    pub(crate) package: PackageInterfaceHandle,
+    package: PackageInterfaceHandle,
 }
 
 impl UninstallOperation {

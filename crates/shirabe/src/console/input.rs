@@ -42,12 +42,12 @@ impl std::fmt::Debug for SuggestedValues {
 
 impl SuggestedValues {
     /// Whether PHP's `[] !== $suggestedValues` is false, i.e. no suggestions were declared.
-    pub(crate) fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         matches!(self, SuggestedValues::List(values) if values.is_empty())
     }
 
     /// The shared body of the `InputArgument::complete` / `InputOption::complete` backport.
-    pub(crate) fn complete(
+    fn complete(
         &self,
         this: &dyn crate::command::BaseCommand,
         input: &CompletionInput,

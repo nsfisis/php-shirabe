@@ -249,7 +249,7 @@ impl GitDownloader {
     ///
     /// @throws \RuntimeException
     /// @return null|string       if a string is returned, it is the commit reference that was checked out if the original could not be found
-    pub(crate) fn update_to_commit(
+    fn update_to_commit(
         &self,
         package: PackageInterfaceHandle,
         path: &str,
@@ -486,7 +486,7 @@ impl GitDownloader {
         .into())
     }
 
-    pub(crate) fn update_origin_url(&self, path: &str, url: &str) {
+    fn update_origin_url(&self, path: &str, url: &str) {
         let mut output = String::new();
         self.inner.process.borrow_mut().execute_args(
             &[
@@ -503,7 +503,7 @@ impl GitDownloader {
         self.set_push_url(path, url);
     }
 
-    pub(crate) fn set_push_url(&self, path: &str, url: &str) {
+    fn set_push_url(&self, path: &str, url: &str) {
         // set push url for github projects
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3(
@@ -549,7 +549,7 @@ impl GitDownloader {
     }
 
     /// @throws \RuntimeException
-    pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+    async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -580,7 +580,7 @@ impl GitDownloader {
     }
 
     /// @throws \RuntimeException
-    pub(crate) async fn stash_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+    async fn stash_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -604,7 +604,7 @@ impl GitDownloader {
     }
 
     /// @throws \RuntimeException
-    pub(crate) fn view_diff(&self, path: &str) -> anyhow::Result<()> {
+    fn view_diff(&self, path: &str) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -625,7 +625,7 @@ impl GitDownloader {
         Ok(())
     }
 
-    pub(crate) fn normalize_path(&self, path: &str) -> String {
+    fn normalize_path(&self, path: &str) -> String {
         let mut path = path.to_string();
         if Platform::is_windows() && strlen(&path) > 0 {
             let mut base_path = path.clone();
@@ -655,7 +655,7 @@ impl GitDownloader {
         path
     }
 
-    pub(crate) fn get_short_hash(&self, reference: &str) -> String {
+    fn get_short_hash(&self, reference: &str) -> String {
         if !self.inner.io.is_verbose() && Preg::is_match(php_regex!(r"{^[0-9a-f]{40}$}"), reference)
         {
             return substr(reference, 0, Some(10));

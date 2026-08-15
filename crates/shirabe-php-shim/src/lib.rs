@@ -402,7 +402,7 @@ impl PhpResource {
     /// Returns the underlying OS file descriptor backing this resource, when it has one.
     /// Used by `stream_set_blocking`/`stream_select` to drive `fcntl(2)`/`select(2)`. In-memory
     /// streams (`php://memory`/`php://temp`) and process handles have no fd and return `None`.
-    pub(crate) fn raw_fd(&self) -> Option<std::os::unix::io::RawFd> {
+    fn raw_fd(&self) -> Option<std::os::unix::io::RawFd> {
         use std::os::unix::io::AsRawFd;
         match self {
             PhpResource::Stdin => Some(std::io::stdin().as_raw_fd()),
@@ -442,7 +442,7 @@ pub enum StreamBacking {
 }
 
 impl StreamBacking {
-    pub(crate) fn as_rws(&mut self) -> &mut dyn ReadWriteSeek {
+    fn as_rws(&mut self) -> &mut dyn ReadWriteSeek {
         match self {
             StreamBacking::File(f) => f,
             StreamBacking::Memory(c) => c,
@@ -515,23 +515,23 @@ impl std::os::unix::io::AsRawFd for ChildPipe {
 
 #[derive(Debug)]
 pub struct StreamState {
-    pub(crate) backing: StreamBacking,
+    backing: StreamBacking,
     /// Whether the mode opened the stream for reading.
-    pub(crate) readable: bool,
+    readable: bool,
     /// Whether the mode opened the stream for writing.
-    pub(crate) writable: bool,
+    writable: bool,
     /// Set once a read attempt sees end-of-stream, mirroring PHP's `feof()` which
     /// only reports true after a read has hit the end; cleared by a seek.
-    pub(crate) eof: bool,
-    pub(crate) closed: bool,
+    eof: bool,
+    closed: bool,
     /// The mode string passed to `fopen`, reported back by `stream_get_meta_data`.
-    pub(crate) mode: String,
+    mode: String,
     /// The path/URI the stream was opened from, reported back by `stream_get_meta_data`.
-    pub(crate) uri: String,
+    uri: String,
 }
 
 impl StreamState {
-    pub(crate) fn new(
+    fn new(
         backing: StreamBacking,
         readable: bool,
         writable: bool,

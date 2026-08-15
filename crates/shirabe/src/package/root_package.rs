@@ -15,12 +15,12 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug, Clone)]
 pub struct RootPackage {
     pub(crate) inner: CompletePackage,
-    pub(crate) minimum_stability: String,
-    pub(crate) prefer_stable: bool,
-    pub(crate) stability_flags: IndexMap<String, i64>,
-    pub(crate) config: IndexMap<String, PhpMixed>,
-    pub(crate) references: IndexMap<String, String>,
-    pub(crate) aliases: Vec<IndexMap<String, String>>,
+    minimum_stability: String,
+    prefer_stable: bool,
+    stability_flags: IndexMap<String, i64>,
+    config: IndexMap<String, PhpMixed>,
+    references: IndexMap<String, String>,
+    aliases: Vec<IndexMap<String, String>>,
 }
 
 impl RootPackage {

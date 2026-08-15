@@ -21,25 +21,25 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct SvnDriver {
-    pub(crate) inner: VcsDriverBase,
+    inner: VcsDriverBase,
     /// @var string
-    pub(crate) base_url: String,
+    base_url: String,
     /// @var array<int|string, string> Map of tag name to identifier
-    pub(crate) tags: Option<IndexMap<String, String>>,
+    tags: Option<IndexMap<String, String>>,
     /// @var array<int|string, string> Map of branch name to identifier
-    pub(crate) branches: Option<IndexMap<String, String>>,
+    branches: Option<IndexMap<String, String>>,
     /// @var ?string
-    pub(crate) root_identifier: Option<String>,
+    root_identifier: Option<String>,
 
-    pub(crate) trunk_path: Option<String>,
+    trunk_path: Option<String>,
     /// @var string
-    pub(crate) branches_path: String,
+    branches_path: String,
     /// @var string
-    pub(crate) tags_path: String,
+    tags_path: String,
     /// @var string
-    pub(crate) package_path: String,
+    package_path: String,
     /// @var bool
-    pub(crate) cache_credentials: bool,
+    cache_credentials: bool,
 
     /// @var SvnUtil
     util: Option<SvnUtil>,
@@ -152,7 +152,7 @@ impl SvnDriver {
         None
     }
 
-    pub(crate) fn should_cache(&self, identifier: &str) -> bool {
+    fn should_cache(&self, identifier: &str) -> bool {
         self.inner.cache.is_some() && Preg::is_match(php_regex!(r"{@\d+$}"), identifier)
     }
 
@@ -530,7 +530,7 @@ impl SvnDriver {
     }
 
     /// An absolute path (leading '/') is converted to a file:// url.
-    pub(crate) fn normalize_url(url: &str) -> String {
+    fn normalize_url(url: &str) -> String {
         let fs = Filesystem::new(None);
         if fs.is_absolute_path(url) {
             return format!("file://{}", strtr(url, "\\", "/"));
@@ -545,7 +545,7 @@ impl SvnDriver {
     /// @param  non-empty-list<string> $command The svn command to run.
     /// @param  string            $url     The SVN URL.
     /// @throws \RuntimeException
-    pub(crate) fn execute(&mut self, command: Vec<String>, url: &str) -> anyhow::Result<String> {
+    fn execute(&mut self, command: Vec<String>, url: &str) -> anyhow::Result<String> {
         if self.util.is_none() {
             self.util = Some(SvnUtil::new(
                 self.base_url.clone(),
@@ -589,7 +589,7 @@ impl SvnDriver {
     ///
     /// @param string $baseDir  The path to trunk/branch/tag
     /// @param int $revision The revision mark to add to identifier
-    pub(crate) fn build_identifier(&self, base_dir: &str, revision: i64) -> String {
+    fn build_identifier(&self, base_dir: &str, revision: i64) -> String {
         format!(
             "{}{}/@{}",
             base_dir.trim_end_matches('/'),

@@ -5,9 +5,9 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Event {
-    pub(crate) name: String,
-    pub(crate) args: Vec<String>,
-    pub(crate) flags: IndexMap<String, PhpMixed>,
+    name: String,
+    args: Vec<String>,
+    flags: IndexMap<String, PhpMixed>,
     propagation_stopped: bool,
 }
 

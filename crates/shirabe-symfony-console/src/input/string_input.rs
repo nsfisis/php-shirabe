@@ -17,7 +17,7 @@ use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex};
 /// ```
 #[derive(Debug, Clone)]
 pub struct StringInput {
-    pub(crate) inner: ArgvInput,
+    inner: ArgvInput,
 }
 
 impl StringInput {

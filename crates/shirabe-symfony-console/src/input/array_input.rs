@@ -21,7 +21,7 @@ use shirabe_php_shim::PhpMixed;
 /// key type (`PhpMixed::Int` / `PhpMixed::String`) and the insertion order.
 #[derive(Debug, Clone)]
 pub struct ArrayInput {
-    pub(crate) inner: Input,
+    inner: Input,
     parameters: Vec<(PhpMixed, PhpMixed)>,
 }
 

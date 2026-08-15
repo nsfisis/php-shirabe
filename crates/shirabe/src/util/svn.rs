@@ -23,21 +23,21 @@ pub struct SvnCredentials {
 #[derive(Debug)]
 pub struct Svn {
     /// @var ?array{username: string, password: string}
-    pub(crate) credentials: Option<SvnCredentials>,
+    credentials: Option<SvnCredentials>,
     /// @var bool
-    pub(crate) has_auth: Option<bool>,
+    has_auth: Option<bool>,
     /// @var IOInterface
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var string
-    pub(crate) url: String,
+    url: String,
     /// @var bool
-    pub(crate) cache_credentials: bool,
+    cache_credentials: bool,
     /// @var ProcessExecutor
-    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var int
-    pub(crate) qty_auth_tries: i64,
+    qty_auth_tries: i64,
     /// @var Config
-    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
 }
 
 /// @var string|null
@@ -202,7 +202,7 @@ impl Svn {
     /// Repositories requests credentials, let's put them in.
     ///
     /// @throws \RuntimeException
-    pub(crate) fn do_auth_dance(&mut self) -> anyhow::Result<&mut Self> {
+    fn do_auth_dance(&mut self) -> anyhow::Result<&mut Self> {
         // cannot ask for credentials in non interactive mode
         if !self.io.is_interactive() {
             return Err(RuntimeException::new(
@@ -247,12 +247,7 @@ impl Svn {
     /// @param non-empty-list<string> $cmd  Usually 'svn ls' or something like that.
     /// @param string $url  Repo URL.
     /// @param string $path Target for a checkout
-    pub(crate) fn get_command(
-        &mut self,
-        mut cmd: Vec<String>,
-        url: &str,
-        path: Option<&str>,
-    ) -> Vec<String> {
+    fn get_command(&mut self, mut cmd: Vec<String>, url: &str, path: Option<&str>) -> Vec<String> {
         cmd.push("--non-interactive".to_string());
         cmd.extend(self.get_credential_args());
         cmd.push("--".to_string());
@@ -268,7 +263,7 @@ impl Svn {
     /// Return the credential string for the svn command.
     ///
     /// Adds --no-auth-cache when credentials are present.
-    pub(crate) fn get_credential_args(&mut self) -> Vec<String> {
+    fn get_credential_args(&mut self) -> Vec<String> {
         if !self.has_auth() {
             return vec![];
         }
@@ -299,7 +294,7 @@ impl Svn {
     /// Get the password for the svn command. Can be empty.
     ///
     /// @throws \LogicException
-    pub(crate) fn get_password(&self) -> anyhow::Result<String> {
+    fn get_password(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
             return Err(LogicException::new("No svn auth detected.".to_string()).into());
         }
@@ -310,7 +305,7 @@ impl Svn {
     /// Get the username for the svn command.
     ///
     /// @throws \LogicException
-    pub(crate) fn get_username(&self) -> anyhow::Result<String> {
+    fn get_username(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
             return Err(LogicException::new("No svn auth detected.".to_string()).into());
         }
@@ -319,7 +314,7 @@ impl Svn {
     }
 
     /// Detect Svn Auth.
-    pub(crate) fn has_auth(&mut self) -> bool {
+    fn has_auth(&mut self) -> bool {
         if let Some(has_auth) = self.has_auth {
             return has_auth;
         }
@@ -332,7 +327,7 @@ impl Svn {
     }
 
     /// Return the no-auth-cache switch.
-    pub(crate) fn get_auth_cache_args(&self) -> Vec<String> {
+    fn get_auth_cache_args(&self) -> Vec<String> {
         if self.cache_credentials {
             vec![]
         } else {

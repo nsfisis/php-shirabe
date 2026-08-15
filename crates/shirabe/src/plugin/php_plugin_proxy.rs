@@ -190,9 +190,7 @@ fn operation_stub_class(operation: &AnyOperation) -> &'static str {
 }
 
 /// Registers a package and returns its wire descriptor.
-pub(crate) fn package_handle_value(
-    package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
-) -> PluginValue {
+fn package_handle_value(package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>) -> PluginValue {
     let class = package_stub_class(package);
     let rhandle = register_entity(RustEntity::Package(package.clone()));
     rust_handle_value(rhandle, class)
@@ -2442,11 +2440,11 @@ pub(crate) fn repository_handle_value(
 /// `composer-installer` package names. Every call is forwarded as a `CallPhpMethod` RPC.
 #[derive(Debug)]
 pub struct PhpInstallerProxy {
-    pub(crate) handle: PhpObjHandle,
+    handle: PhpObjHandle,
 }
 
 impl PhpInstallerProxy {
-    pub(crate) fn new(handle: PhpObjHandle) -> Self {
+    fn new(handle: PhpObjHandle) -> Self {
         Self { handle }
     }
 
@@ -2674,7 +2672,7 @@ fn forget_php_installer_proxy(phandle: u64) {
 /// `Composer\Plugin\Capability\Capability` marker).
 #[derive(Debug)]
 pub struct PhpCapabilityProxy {
-    pub(crate) handle: PhpObjHandle,
+    handle: PhpObjHandle,
 }
 
 impl PhpCapabilityProxy {
@@ -2831,7 +2829,7 @@ impl RustCommandMetadata {
 /// `Application::register_worker_console_commands` as worker-hosted commands are registered,
 /// booted in the worker the first time one of them actually runs.
 #[derive(Debug)]
-pub(crate) struct PhpConsoleApplicationContext {
+struct PhpConsoleApplicationContext {
     composer: Option<ComposerHandle>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     initial_working_directory: Option<String>,
@@ -2995,7 +2993,7 @@ pub struct PhpCommandProxy {
 }
 
 impl PhpCommandProxy {
-    pub(crate) fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
+    fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
         let proxy_command = match Self::call_metadata_getter(&handle, "isProxyCommand")? {
             PluginValue::Bool(proxy_command) => proxy_command,
             other => return Err(Self::unsupported_shape(&handle, "isProxyCommand", &other)),

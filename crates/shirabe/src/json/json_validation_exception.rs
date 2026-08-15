@@ -5,7 +5,7 @@ use shirabe_php_shim::Exception;
 #[derive(Debug)]
 pub struct JsonValidationException {
     inner: Exception,
-    pub(crate) errors: Vec<String>,
+    errors: Vec<String>,
 }
 
 impl JsonValidationException {

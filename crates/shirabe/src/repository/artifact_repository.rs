@@ -26,9 +26,9 @@ use std::path::Path;
 
 pub struct ArtifactRepository {
     inner: ArrayRepository,
-    pub(crate) loader: Box<dyn LoaderInterface>,
-    pub(crate) lookup: String,
-    pub(crate) repo_config: IndexMap<String, PhpMixed>,
+    loader: Box<dyn LoaderInterface>,
+    lookup: String,
+    repo_config: IndexMap<String, PhpMixed>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 

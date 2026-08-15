@@ -30,11 +30,11 @@ static TIMEOUT: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(300));
 #[derive(Debug)]
 pub struct ProcessExecutor {
     /// @var bool
-    pub(crate) capture_output: bool,
+    capture_output: bool,
     /// @var string
-    pub(crate) error_output: String,
+    error_output: String,
     /// @var ?IOInterface
-    pub(crate) io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @var int
     max_jobs: i64,
     /// PHP throttles async jobs through the $jobs queue and $maxJobs; here concurrent

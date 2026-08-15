@@ -6,7 +6,7 @@ use crate::dependency_resolver::Rule;
 pub struct RuleWatchNode {
     pub watch1: i64,
     pub watch2: i64,
-    pub(crate) rule: std::rc::Rc<std::cell::RefCell<Rule>>,
+    rule: std::rc::Rc<std::cell::RefCell<Rule>>,
 }
 
 impl std::fmt::Debug for RuleWatchNode {

@@ -2,7 +2,7 @@
 
 #[derive(Debug, Clone)]
 pub struct UnicodeString {
-    pub(crate) string: String,
+    string: String,
 }
 
 impl UnicodeString {

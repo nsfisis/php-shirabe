@@ -18,8 +18,8 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct AuthHelper {
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var array<string, string> Map of origins to message displayed
     displayed_origin_authentications: IndexMap<String, String>,
     /// @var array<string, bool> Map of URLs and whether they already retried with authentication from Bitbucket

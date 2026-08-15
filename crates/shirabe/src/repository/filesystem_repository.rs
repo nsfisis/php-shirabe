@@ -95,7 +95,7 @@ impl FilesystemRepository {
     }
 
     /// Initializes repository (reads file, or remote address).
-    pub(crate) fn initialize(&self) -> anyhow::Result<()> {
+    fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
 
         if !self.file.exists() {

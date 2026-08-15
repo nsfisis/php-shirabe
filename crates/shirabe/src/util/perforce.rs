@@ -18,22 +18,22 @@ use shirabe_symfony_process::Process;
 /// @phpstan-type RepoConfig array{unique_perforce_client_name?: string, depot?: string, branch?: string, p4user?: string, p4password?: string}
 #[derive(Debug)]
 pub struct Perforce {
-    pub(crate) path: String,
-    pub(crate) p4_depot: Option<String>,
-    pub(crate) p4_client: Option<String>,
-    pub(crate) p4_user: Option<String>,
-    pub(crate) p4_password: Option<String>,
-    pub(crate) p4_port: String,
-    pub(crate) p4_stream: Option<String>,
-    pub(crate) p4_client_spec: String,
-    pub(crate) p4_depot_type: Option<String>,
-    pub(crate) p4_branch: Option<String>,
-    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    pub(crate) unique_perforce_client_name: String,
-    pub(crate) windows_flag: bool,
-    pub(crate) command_result: String,
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
+    path: String,
+    p4_depot: Option<String>,
+    p4_client: Option<String>,
+    p4_user: Option<String>,
+    p4_password: Option<String>,
+    p4_port: String,
+    p4_stream: Option<String>,
+    p4_client_spec: String,
+    p4_depot_type: Option<String>,
+    p4_branch: Option<String>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    unique_perforce_client_name: String,
+    windows_flag: bool,
+    command_result: String,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 }
 
 impl Perforce {
@@ -147,7 +147,7 @@ impl Perforce {
         file_system.borrow_mut().remove(&client_spec);
     }
 
-    pub(crate) fn execute_command(&mut self, command: PhpMixed) -> i64 {
+    fn execute_command(&mut self, command: PhpMixed) -> i64 {
         self.command_result = String::new();
 
         let cmd_vec: Vec<String> = match &command {
@@ -180,7 +180,7 @@ impl Perforce {
         self.p4_client.clone().unwrap_or_default()
     }
 
-    pub(crate) fn get_path(&self) -> &str {
+    fn get_path(&self) -> &str {
         &self.path
     }
 
@@ -190,7 +190,7 @@ impl Perforce {
         fs.borrow_mut().ensure_directory_exists(path);
     }
 
-    pub(crate) fn get_port(&self) -> &str {
+    fn get_port(&self) -> &str {
         &self.p4_port
     }
 
@@ -278,7 +278,7 @@ impl Perforce {
         Ok(())
     }
 
-    pub(crate) fn get_p4_variable(&mut self, name: &str) -> Option<String> {
+    fn get_p4_variable(&mut self, name: &str) -> Option<String> {
         if self.windows_flag {
             let command = format!("{} set", Self::get_p4_executable());
             self.execute_command(PhpMixed::String(command));
@@ -507,7 +507,7 @@ impl Perforce {
         Ok(())
     }
 
-    pub(crate) fn read(&self, pipe: &PhpResource, _name: PhpMixed) {
+    fn read(&self, pipe: &PhpResource, _name: PhpMixed) {
         if feof(pipe) {
             return;
         }
@@ -743,7 +743,7 @@ impl Perforce {
         false
     }
 
-    pub(crate) fn get_change_list(&mut self, reference: &str) -> Option<String> {
+    fn get_change_list(&mut self, reference: &str) -> Option<String> {
         let index = strpos(reference, "@")?;
         let label = substr(reference, index as i64, None);
         let command =

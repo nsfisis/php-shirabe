@@ -36,15 +36,15 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct PluginManager {
-    pub(crate) composer: ComposerWeakHandle,
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) global_composer: Option<PartialComposerHandle>,
-    pub(crate) version_parser: VersionParser,
-    pub(crate) disable_plugins: DisablePlugins,
+    composer: ComposerWeakHandle,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    global_composer: Option<PartialComposerHandle>,
+    version_parser: VersionParser,
+    disable_plugins: DisablePlugins,
     // PHP stores the same plugin instance in both $plugins and $registeredPlugins (reference
     // semantics); shared handles preserve the identity comparisons that relies on.
-    pub(crate) plugins: Vec<std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>>,
-    pub(crate) registered_plugins: IndexMap<String, Vec<PluginOrInstaller>>,
+    plugins: Vec<std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>>,
+    registered_plugins: IndexMap<String, Vec<PluginOrInstaller>>,
     allow_plugin_rules: Option<IndexMap<String, bool>>,
     allow_global_plugin_rules: Option<IndexMap<String, bool>>,
     running_in_global_dir: bool,
@@ -696,7 +696,7 @@ impl PluginManager {
     }
 
     /// Returns the version of the internal composer-plugin-api package.
-    pub(crate) fn get_plugin_api_version(&self) -> String {
+    fn get_plugin_api_version(&self) -> String {
         match &self.plugin_api_version_override {
             Some(version) => version.clone(),
             None => plugin_interface::PLUGIN_API_VERSION.to_string(),
@@ -996,7 +996,7 @@ impl PluginManager {
             .get_install_path(package)
     }
 
-    pub(crate) fn get_capability_implementation_class_name(
+    fn get_capability_implementation_class_name(
         &self,
         plugin: &dyn PluginInterface,
         capability: &str,

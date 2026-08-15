@@ -37,36 +37,36 @@ use shirabe_semver::constraint::SimpleConstraint;
 // TODO(port): the driver registration should be refactored later.
 #[derive(Debug)]
 pub struct VcsRepository {
-    pub(crate) inner: ArrayRepository,
+    inner: ArrayRepository,
     /// @var string
-    pub(crate) url: String,
+    url: String,
     /// @var ?string
     ///
     /// Interior mutability: set lazily by the (now `&self`) `initialize`, mirroring how PHP's
     /// inherited ArrayRepository methods drive the overridden `initialize()` on first access.
-    pub(crate) package_name: std::cell::RefCell<Option<String>>,
+    package_name: std::cell::RefCell<Option<String>>,
     /// @var bool
-    pub(crate) is_verbose: bool,
+    is_verbose: bool,
     /// @var bool
-    pub(crate) is_very_verbose: bool,
+    is_very_verbose: bool,
     /// @var IOInterface
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var Config
-    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var VersionParser
-    pub(crate) version_parser: std::cell::RefCell<Option<VersionParser>>,
+    version_parser: std::cell::RefCell<Option<VersionParser>>,
     /// @var string
-    pub(crate) r#type: String,
+    r#type: String,
     /// @var ?LoaderInterface
-    pub(crate) loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
+    loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
     /// @var array<string, mixed>
-    pub(crate) repo_config: IndexMap<String, PhpMixed>,
+    repo_config: IndexMap<String, PhpMixed>,
     /// @var HttpDownloader
-    pub(crate) http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     /// @var ProcessExecutor
-    pub(crate) process_executor: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    process_executor: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var bool
-    pub(crate) branch_error_occurred: std::cell::Cell<bool>,
+    branch_error_occurred: std::cell::Cell<bool>,
     /// @var array<string, class-string<VcsDriverInterface>>
     drivers: IndexMap<String, VcsDriverKind>,
     /// @var ?VcsDriverInterface

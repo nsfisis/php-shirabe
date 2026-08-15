@@ -6,11 +6,11 @@ use indexmap::IndexMap;
 /// Implements PHP \Iterator over a grouped rule set.
 #[derive(Debug)]
 pub struct RuleSetIterator {
-    pub(crate) rules: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
-    pub(crate) types: Vec<i64>,
-    pub(crate) current_offset: i64,
-    pub(crate) current_type: i64,
-    pub(crate) current_type_offset: i64,
+    rules: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
+    types: Vec<i64>,
+    current_offset: i64,
+    current_type: i64,
+    current_type_offset: i64,
 }
 
 impl RuleSetIterator {

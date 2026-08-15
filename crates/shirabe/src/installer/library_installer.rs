@@ -24,13 +24,12 @@ pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
     /// Behind a RefCell so initialize_vendor_dir can canonicalize it through `&self` (the
     /// installer instance is shared between concurrent package operations).
-    pub(crate) vendor_dir: std::cell::RefCell<String>,
-    pub(crate) download_manager:
-        Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
+    vendor_dir: std::cell::RefCell<String>,
+    download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) r#type: Option<String>,
-    pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    pub(crate) binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>,
+    r#type: Option<String>,
+    filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>,
 }
 
 impl LibraryInstaller {
@@ -121,7 +120,7 @@ impl LibraryInstaller {
     ///
     /// It is used for BC as getInstallPath tends to be overridden by
     /// installer plugins but not getPackageBasePath
-    pub(crate) fn get_package_base_path(&self, package: PackageInterfaceHandle) -> String {
+    fn get_package_base_path(&self, package: PackageInterfaceHandle) -> String {
         let install_path = self.get_install_path(package.clone()).unwrap();
         let target_dir = package.get_target_dir();
 
@@ -142,7 +141,7 @@ impl LibraryInstaller {
         install_path
     }
 
-    pub(crate) async fn install_code(
+    async fn install_code(
         &self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -154,7 +153,7 @@ impl LibraryInstaller {
             .await
     }
 
-    pub(crate) async fn update_code(
+    async fn update_code(
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
@@ -183,7 +182,7 @@ impl LibraryInstaller {
             .await
     }
 
-    pub(crate) async fn remove_code(
+    async fn remove_code(
         &self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -195,7 +194,7 @@ impl LibraryInstaller {
             .await
     }
 
-    pub(crate) fn initialize_vendor_dir(&self) {
+    fn initialize_vendor_dir(&self) {
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&self.vendor_dir.borrow());
@@ -203,7 +202,7 @@ impl LibraryInstaller {
         *self.vendor_dir.borrow_mut() = realpath;
     }
 
-    pub(crate) fn get_download_manager(
+    fn get_download_manager(
         &self,
     ) -> &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
         // PHP: assert($this->downloadManager instanceof DownloadManager, new \LogicException(...))

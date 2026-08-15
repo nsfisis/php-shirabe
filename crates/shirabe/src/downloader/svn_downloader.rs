@@ -23,7 +23,7 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct SvnDownloader {
     inner: VcsDownloaderBase,
-    pub(crate) cache_credentials: std::cell::Cell<bool>,
+    cache_credentials: std::cell::Cell<bool>,
 }
 
 impl_php_class!(SvnDownloader, r"Composer\Downloader\SvnDownloader");
@@ -41,7 +41,7 @@ impl SvnDownloader {
         }
     }
 
-    pub(crate) fn execute(
+    fn execute(
         &self,
         package: PackageInterfaceHandle,
         base_url: &str,
@@ -67,7 +67,7 @@ impl SvnDownloader {
             })
     }
 
-    pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+    async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
             ["svn", "revert", "-R", "."].map(|s| s.to_string()).as_ref(),

@@ -11,8 +11,8 @@ use shirabe_php_shim::RuntimeException;
 #[derive(Debug)]
 pub struct SolverProblemsException {
     inner: RuntimeException,
-    pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
+    problems: Vec<Problem>,
+    learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
 }
 
 impl SolverProblemsException {

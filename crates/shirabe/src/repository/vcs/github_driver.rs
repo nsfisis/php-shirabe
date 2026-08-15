@@ -24,24 +24,24 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct GitHubDriver {
-    pub(crate) inner: VcsDriverBase,
-    pub(crate) owner: String,
-    pub(crate) repository: String,
+    inner: VcsDriverBase,
+    owner: String,
+    repository: String,
     /// @var array<int|string, string> Map of tag name to identifier
-    pub(crate) tags: Option<IndexMap<String, String>>,
+    tags: Option<IndexMap<String, String>>,
     /// @var array<int|string, string> Map of branch name to identifier
-    pub(crate) branches: Option<IndexMap<String, String>>,
-    pub(crate) root_identifier: String,
+    branches: Option<IndexMap<String, String>>,
+    root_identifier: String,
     /// @var mixed[]
-    pub(crate) repo_data: Option<IndexMap<String, PhpMixed>>,
-    pub(crate) has_issues: bool,
-    pub(crate) is_private: bool,
+    repo_data: Option<IndexMap<String, PhpMixed>>,
+    has_issues: bool,
+    is_private: bool,
     is_archived: bool,
     /// @var array<int, array{type: string, url: string}>|false|null
     funding_info: Option<PhpMixed>,
     allow_git_fallback: bool,
     /// Git Driver
-    pub(crate) git_driver: Option<GitDriver>,
+    git_driver: Option<GitDriver>,
 }
 
 impl GitHubDriver {
@@ -194,7 +194,7 @@ impl GitHubDriver {
         )
     }
 
-    pub(crate) fn get_api_url(&self) -> String {
+    fn get_api_url(&self) -> String {
         let api_url = if self.inner.origin_url == "github.com" {
             "api.github.com".to_string()
         } else {
@@ -995,7 +995,7 @@ impl GitHubDriver {
     }
 
     /// Generate an SSH URL
-    pub(crate) fn generate_ssh_url(&self) -> String {
+    fn generate_ssh_url(&self) -> String {
         if strpos(&self.inner.origin_url, ":").is_some() {
             return format!(
                 "ssh://git@{}/{}/{}.git",
@@ -1009,7 +1009,7 @@ impl GitHubDriver {
         )
     }
 
-    pub(crate) fn get_contents(
+    fn get_contents(
         &mut self,
         url: &str,
         fetching_repo_data: bool,
@@ -1154,7 +1154,7 @@ impl GitHubDriver {
     /// Fetch root identifier from GitHub
     ///
     /// @throws TransportException
-    pub(crate) fn fetch_root_identifier(&mut self) -> anyhow::Result<()> {
+    fn fetch_root_identifier(&mut self) -> anyhow::Result<()> {
         if self.repo_data.is_some() {
             return Ok(());
         }
@@ -1225,7 +1225,7 @@ impl GitHubDriver {
     /// @phpstan-impure
     ///
     /// @throws \RuntimeException
-    pub(crate) fn attempt_clone_fallback(
+    fn attempt_clone_fallback(
         &mut self,
         e: Option<std::sync::Arc<anyhow::Error>>,
     ) -> anyhow::Result<bool> {
@@ -1263,7 +1263,7 @@ impl GitHubDriver {
         }
     }
 
-    pub(crate) fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
+    fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
         if !self.allow_git_fallback {
             return Err(
                 RuntimeException::new("Fallback to git driver disabled".to_string()).into(),
@@ -1283,7 +1283,7 @@ impl GitHubDriver {
         Ok(())
     }
 
-    pub(crate) fn get_next_page(&self, response: &Response) -> Option<String> {
+    fn get_next_page(&self, response: &Response) -> Option<String> {
         let header = response.get_header("link")?;
         if header.is_empty() {
             return None;

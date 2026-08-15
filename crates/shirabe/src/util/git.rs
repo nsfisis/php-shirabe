@@ -25,11 +25,11 @@ use std::sync::Mutex;
 
 #[derive(Debug)]
 pub struct Git {
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
-    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    pub(crate) http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
 }
 
 /// @var string|false|null

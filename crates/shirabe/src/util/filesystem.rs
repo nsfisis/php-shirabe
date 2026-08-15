@@ -848,7 +848,7 @@ impl Filesystem {
         false
     }
 
-    pub(crate) fn directory_size(&self, directory: &Path) -> anyhow::Result<i64> {
+    fn directory_size(&self, directory: &Path) -> anyhow::Result<i64> {
         let it =
             shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS)?;
         let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::CHILD_FIRST);
@@ -863,7 +863,7 @@ impl Filesystem {
         Ok(size)
     }
 
-    pub(crate) fn get_process(&mut self) -> std::cell::RefMut<'_, ProcessExecutor> {
+    fn get_process(&mut self) -> std::cell::RefMut<'_, ProcessExecutor> {
         self.get_process_handle();
 
         self.process_executor.as_ref().unwrap().borrow_mut()
@@ -871,9 +871,7 @@ impl Filesystem {
 
     /// Hands out the executor handle itself so async callers can hold only a shared borrow
     /// across their awaits (a RefMut held across an await panics once calls overlap).
-    pub(crate) fn get_process_handle(
-        &mut self,
-    ) -> std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
+    fn get_process_handle(&mut self) -> std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
         if self.process_executor.is_none() {
             self.process_executor = Some(std::rc::Rc::new(std::cell::RefCell::new(
                 ProcessExecutor::new(None),

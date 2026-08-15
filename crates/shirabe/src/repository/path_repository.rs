@@ -153,7 +153,7 @@ impl PathRepository {
         Ok(())
     }
 
-    pub(crate) fn initialize(&self) -> anyhow::Result<()> {
+    fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
 
         let url_matches = self.get_url_matches()?;

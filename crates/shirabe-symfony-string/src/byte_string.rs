@@ -4,7 +4,7 @@ use crate::code_point_string::CodePointString;
 
 #[derive(Debug, Clone)]
 pub struct ByteString {
-    pub(crate) string: String,
+    string: String,
 }
 
 impl ByteString {

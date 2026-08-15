@@ -47,10 +47,10 @@ impl BinaryInstallerInterface for BinaryInstaller {
 /// Utility to handle installation of package "bin"/binaries
 #[derive(Debug)]
 pub struct BinaryInstaller {
-    pub(crate) bin_dir: String,
-    pub(crate) bin_compat: String,
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    bin_dir: String,
+    bin_compat: String,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     vendor_dir: Option<String>,
 }
 
@@ -219,11 +219,11 @@ impl BinaryInstaller {
         "php".to_string()
     }
 
-    pub(crate) fn get_binaries(&self, package: PackageInterfaceHandle) -> Vec<String> {
+    fn get_binaries(&self, package: PackageInterfaceHandle) -> Vec<String> {
         package.get_binaries()
     }
 
-    pub(crate) fn install_full_binaries(
+    fn install_full_binaries(
         &mut self,
         bin_path: &str,
         link: &str,
@@ -258,7 +258,7 @@ impl BinaryInstaller {
         }
     }
 
-    pub(crate) fn install_unixy_proxy_binaries(&self, bin_path: &str, link: &str) {
+    fn install_unixy_proxy_binaries(&self, bin_path: &str, link: &str) {
         let code = self.generate_unixy_proxy_code(bin_path, link);
         file_put_contents(link, code.as_bytes());
         let link_owned = link.to_string();
@@ -268,14 +268,14 @@ impl BinaryInstaller {
         });
     }
 
-    pub(crate) fn initialize_bin_dir(&mut self) {
+    fn initialize_bin_dir(&mut self) {
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&self.bin_dir);
         self.bin_dir = realpath(&self.bin_dir).unwrap_or_default();
     }
 
-    pub(crate) fn generate_windows_proxy_code(&self, bin: &str, link: &str) -> String {
+    fn generate_windows_proxy_code(&self, bin: &str, link: &str) -> String {
         let bin_path = self
             .filesystem
             .borrow_mut()
@@ -311,7 +311,7 @@ impl BinaryInstaller {
         )
     }
 
-    pub(crate) fn generate_unixy_proxy_code(&self, bin: &str, link: &str) -> String {
+    fn generate_unixy_proxy_code(&self, bin: &str, link: &str) -> String {
         let bin_path = self
             .filesystem
             .borrow_mut()

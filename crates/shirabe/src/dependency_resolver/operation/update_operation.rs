@@ -6,8 +6,8 @@ use crate::package::version::VersionParser;
 
 #[derive(Debug, Clone)]
 pub struct UpdateOperation {
-    pub(crate) initial_package: PackageInterfaceHandle,
-    pub(crate) target_package: PackageInterfaceHandle,
+    initial_package: PackageInterfaceHandle,
+    target_package: PackageInterfaceHandle,
 }
 
 impl UpdateOperation {

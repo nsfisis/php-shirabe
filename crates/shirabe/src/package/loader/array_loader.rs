@@ -29,7 +29,7 @@ pub struct ArrayLoader {
     /// @var VersionParser
     pub(crate) version_parser: VersionParser,
     /// @var bool
-    pub(crate) load_options: bool,
+    load_options: bool,
 }
 
 impl ArrayLoader {

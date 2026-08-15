@@ -26,7 +26,7 @@ use shirabe_php_shim::{
 /// Driver for GitLab API, use the Git driver for local checkouts.
 #[derive(Debug)]
 pub struct GitLabDriver {
-    pub(crate) inner: VcsDriverBase,
+    inner: VcsDriverBase,
     /// @phpstan-var 'https'|'http'
     scheme: String,
     namespace: String,
@@ -40,10 +40,10 @@ pub struct GitLabDriver {
     /// @var array<int|string, string> Map of branch name to identifier
     branches: Option<IndexMap<String, String>>,
     /// Git Driver
-    pub(crate) git_driver: Option<GitDriver>,
+    git_driver: Option<GitDriver>,
     /// Protocol to force use of for repository URLs.
     /// @var string One of ssh, http
-    pub(crate) protocol: String,
+    protocol: String,
     /// Defaults to true unless we can make sure it is public
     /// @var bool defines whether the repo is private or not
     is_private: bool,
@@ -595,10 +595,7 @@ impl GitLabDriver {
     }
 
     /// @return string[] where keys are named references like tags or branches and the value a sha
-    pub(crate) fn get_references(
-        &mut self,
-        r#type: &str,
-    ) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_references(&mut self, r#type: &str) -> anyhow::Result<IndexMap<String, String>> {
         let per_page = 100;
         let mut resource: Option<String> = Some(format!(
             "{}/repository/{}?per_page={}",
@@ -661,7 +658,7 @@ impl GitLabDriver {
         Ok(references)
     }
 
-    pub(crate) fn fetch_project(&mut self) -> anyhow::Result<()> {
+    fn fetch_project(&mut self) -> anyhow::Result<()> {
         if self.project.is_some() {
             return Ok(());
         }
@@ -694,7 +691,7 @@ impl GitLabDriver {
     /// @phpstan-impure
     ///
     /// @throws \RuntimeException
-    pub(crate) fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
+    fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         let url = if !self.is_private {
             self.generate_public_url()
         } else {
@@ -723,7 +720,7 @@ impl GitLabDriver {
     }
 
     /// Generate an SSH URL
-    pub(crate) fn generate_ssh_url(&self) -> String {
+    fn generate_ssh_url(&self) -> String {
         if self.has_nonstandard_origin {
             return format!(
                 "ssh://git@{}/{}/{}.git",
@@ -737,14 +734,14 @@ impl GitLabDriver {
         )
     }
 
-    pub(crate) fn generate_public_url(&self) -> String {
+    fn generate_public_url(&self) -> String {
         format!(
             "{}://{}/{}/{}.git",
             self.scheme, self.inner.origin_url, self.namespace, self.repository
         )
     }
 
-    pub(crate) fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
+    fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
         let mut git_driver = GitDriver::new(
@@ -759,7 +756,7 @@ impl GitLabDriver {
         Ok(())
     }
 
-    pub(crate) fn get_contents(
+    fn get_contents(
         &mut self,
         url: &str,
         fetching_repo_data: bool,
@@ -1009,7 +1006,7 @@ impl GitLabDriver {
         Ok(self.project.clone())
     }
 
-    pub(crate) fn get_next_page(&self, response: &Response) -> Option<String> {
+    fn get_next_page(&self, response: &Response) -> Option<String> {
         let header = response.get_header("link").unwrap_or_default();
 
         let links = explode(",", &header);

@@ -94,19 +94,19 @@ pub struct ComposerRepository {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
-    pub(crate) cache: std::cell::RefCell<Cache>,
-    pub(crate) notify_url: Option<String>,
-    pub(crate) search_url: Option<String>,
-    pub(crate) providers_api_url: Option<String>,
-    pub(crate) has_providers: bool,
-    pub(crate) providers_url: Option<String>,
-    pub(crate) list_url: Option<String>,
-    pub(crate) has_available_package_list: bool,
-    pub(crate) available_packages: Option<IndexMap<String, String>>,
-    pub(crate) available_package_patterns: Option<Vec<String>>,
-    pub(crate) lazy_providers_url: Option<String>,
-    pub(crate) provider_listing: Option<IndexMap<String, ProviderListingEntry>>,
-    pub(crate) loader: ArrayLoader,
+    cache: std::cell::RefCell<Cache>,
+    notify_url: Option<String>,
+    search_url: Option<String>,
+    providers_api_url: Option<String>,
+    has_providers: bool,
+    providers_url: Option<String>,
+    list_url: Option<String>,
+    has_available_package_list: bool,
+    available_packages: Option<IndexMap<String, String>>,
+    available_package_patterns: Option<Vec<String>>,
+    lazy_providers_url: Option<String>,
+    provider_listing: Option<IndexMap<String, ProviderListingEntry>>,
+    loader: ArrayLoader,
     allow_ssl_downgrade: bool,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     source_mirrors: Option<IndexMap<String, Vec<SourceMirror>>>,
@@ -3324,7 +3324,7 @@ impl ComposerRepository {
     /// Checks if the package name is present in this lazy providers repo
     ///
     /// @return true if the package name is present in availablePackages or matched by availablePackagePatterns
-    pub(crate) fn lazy_providers_repo_contains(&self, name: &str) -> anyhow::Result<bool> {
+    fn lazy_providers_repo_contains(&self, name: &str) -> anyhow::Result<bool> {
         if !self.has_available_package_list {
             return Err(LogicException::new("lazyProvidersRepoContains should not be called unless hasAvailablePackageList is true".to_string()).into());
         }

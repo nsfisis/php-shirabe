@@ -76,7 +76,7 @@ fn fixtures_dir() -> String {
 }
 
 /// Shirabe-owned fixtures with no upstream counterpart (see `subscriber_test.rs`).
-pub(crate) fn shirabe_fixtures_dir() -> String {
+fn shirabe_fixtures_dir() -> String {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures");
     dir.canonicalize()
         .expect("the Shirabe plugin fixtures directory must exist")
@@ -248,7 +248,7 @@ fn locker_installation_manager(
 #[derive(Debug)]
 pub(crate) struct SetUp {
     pub(crate) io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
-    pub(crate) io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) pm: std::rc::Rc<std::cell::RefCell<PluginManager>>,
     autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     packages: Vec<PackageInterfaceHandle>,

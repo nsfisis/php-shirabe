@@ -28,7 +28,7 @@ use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 
 #[derive(Debug)]
 pub struct PathDownloader {
-    pub(crate) inner: FileDownloader,
+    inner: FileDownloader,
 }
 
 impl_php_class!(PathDownloader, r"Composer\Downloader\PathDownloader");
@@ -79,7 +79,7 @@ impl PathDownloader {
         None
     }
 
-    pub(crate) fn get_install_operation_appendix(
+    fn get_install_operation_appendix(
         &self,
         package: PackageInterfaceHandle,
         path: &str,

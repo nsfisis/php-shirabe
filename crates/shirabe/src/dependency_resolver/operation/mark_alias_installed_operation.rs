@@ -5,7 +5,7 @@ use crate::package::AliasPackageHandle;
 
 #[derive(Debug, Clone)]
 pub struct MarkAliasInstalledOperation {
-    pub(crate) package: AliasPackageHandle,
+    package: AliasPackageHandle,
 }
 
 impl MarkAliasInstalledOperation {

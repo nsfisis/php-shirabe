@@ -56,7 +56,7 @@ pub struct CreateProjectCommand {
     base_command_data: BaseCommandData,
 
     /// @var SuggestedPackagesReporter
-    pub(crate) suggested_packages_reporter:
+    suggested_packages_reporter:
         std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>>>,
 }
 

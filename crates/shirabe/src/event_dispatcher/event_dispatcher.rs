@@ -87,12 +87,12 @@ impl std::fmt::Debug for Callable {
 ///     `$dispatcher->dispatch(ScriptEvents::POST_INSTALL_CMD);`
 #[derive(Debug)]
 pub struct EventDispatcher {
-    pub(crate) composer: PartialComposerWeakHandle,
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) loader: Option<ClassLoader>,
-    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    pub(crate) listeners: IndexMap<String, IndexMap<i64, Vec<Callable>>>,
-    pub(crate) run_scripts: bool,
+    composer: PartialComposerWeakHandle,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    loader: Option<ClassLoader>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    listeners: IndexMap<String, IndexMap<i64, Vec<Callable>>>,
+    run_scripts: bool,
     event_stack: Vec<String>,
     skip_scripts: Vec<String>,
     previous_hash: Option<String>,

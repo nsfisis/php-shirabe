@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 
 #[derive(Debug)]
 pub struct RuleWatchGraph {
-    pub(crate) watch_chains: IndexMap<i64, RuleWatchChain>,
+    watch_chains: IndexMap<i64, RuleWatchChain>,
 }
 
 impl Default for RuleWatchGraph {
@@ -121,7 +121,7 @@ impl RuleWatchGraph {
         None
     }
 
-    pub(crate) fn move_watch(
+    fn move_watch(
         &mut self,
         from_literal: i64,
         to_literal: i64,

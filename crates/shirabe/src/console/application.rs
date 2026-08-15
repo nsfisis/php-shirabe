@@ -119,8 +119,8 @@ pub struct Application {
     default_command: String,
     single_command: bool,
     // $initialized is omitted. See ApplicationHandle::init().
-    pub(crate) composer: Option<PartialComposerHandle>,
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    composer: Option<PartialComposerHandle>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     has_plugin_commands: bool,
     /// Whether this application published the worker-side console application handoff. The
     /// handoff is process-wide, so a second application in the same process must replace it
@@ -443,9 +443,7 @@ impl Application {
     }
 
     /// Initializes all the composer commands.
-    pub(crate) fn get_default_commands(
-        &self,
-    ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
+    fn get_default_commands(&self) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
         let mut commands = self.base_get_default_commands();
         let composer_commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![
             std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new())),
@@ -525,7 +523,7 @@ impl Application {
         )
     }
 
-    pub(crate) fn get_default_input_definition(&self) -> anyhow::Result<InputDefinition> {
+    fn get_default_input_definition(&self) -> anyhow::Result<InputDefinition> {
         let mut definition = self.base_get_default_input_definition();
         definition.add_option(InputOption::new(
             "--profile",
@@ -3089,7 +3087,7 @@ thread_local! {
 }
 
 /// Registers the application the worker's reverse command stubs call back into.
-pub(crate) fn register_worker_reverse_application(
+fn register_worker_reverse_application(
     application: std::rc::Weak<std::cell::RefCell<Application>>,
 ) {
     WORKER_REVERSE_APPLICATION.with(|slot| *slot.borrow_mut() = Some(application));

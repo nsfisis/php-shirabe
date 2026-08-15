@@ -59,13 +59,13 @@ pub struct FileDownloader {
     /// @var Config
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var HttpDownloader
-    pub(crate) http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     /// @var Filesystem
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var ?Cache
-    pub(crate) cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
+    cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
     /// @var ?EventDispatcher
-    pub(crate) event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     /// @var ProcessExecutor
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var array<string, string> Map of package name to cache key

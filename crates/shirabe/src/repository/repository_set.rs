@@ -50,29 +50,29 @@ pub struct RepositorySet {
 
     /// @var array[]
     /// @phpstan-var array<string, array<string, array{alias: string, alias_normalized: string}>>
-    pub(crate) root_aliases: IndexMap<String, IndexMap<String, RootAliasEntry>>,
+    root_aliases: IndexMap<String, IndexMap<String, RootAliasEntry>>,
 
     /// @var string[]
     /// @phpstan-var array<string, string>
-    pub(crate) root_references: IndexMap<String, String>,
+    root_references: IndexMap<String, String>,
 
     /// @var RepositoryInterface[]
-    pub(crate) repositories: Vec<RepositoryInterfaceHandle>,
+    repositories: Vec<RepositoryInterfaceHandle>,
 
     /// @var int[] array of stability => BasePackage::STABILITY_* value
     /// @phpstan-var array<key-of<BasePackage::STABILITIES>, BasePackage::STABILITY_*>
-    pub(crate) acceptable_stabilities: IndexMap<String, i64>,
+    acceptable_stabilities: IndexMap<String, i64>,
 
     /// @var int[] array of package name => BasePackage::STABILITY_* value
     /// @phpstan-var array<string, BasePackage::STABILITY_*>
-    pub(crate) stability_flags: IndexMap<String, i64>,
+    stability_flags: IndexMap<String, i64>,
 
     /// @var ConstraintInterface[]
     /// @phpstan-var array<string, ConstraintInterface>
-    pub(crate) root_requires: IndexMap<String, AnyConstraint>,
+    root_requires: IndexMap<String, AnyConstraint>,
 
     /// @var array<string, ConstraintInterface>
-    pub(crate) temporary_constraints: IndexMap<String, AnyConstraint>,
+    temporary_constraints: IndexMap<String, AnyConstraint>,
 
     /// @var bool
     locked: bool,

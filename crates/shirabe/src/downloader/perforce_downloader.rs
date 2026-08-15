@@ -20,7 +20,7 @@ use shirabe_php_shim::{PhpMixed, impl_php_class};
 #[derive(Debug)]
 pub struct PerforceDownloader {
     inner: VcsDownloaderBase,
-    pub(crate) perforce: std::cell::RefCell<Option<Box<dyn PerforceInterface>>>,
+    perforce: std::cell::RefCell<Option<Box<dyn PerforceInterface>>>,
 }
 
 impl_php_class!(

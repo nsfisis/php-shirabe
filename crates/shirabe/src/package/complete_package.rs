@@ -11,18 +11,18 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug, Clone)]
 pub struct CompletePackage {
     pub(crate) inner: Package,
-    pub(crate) repositories: IndexMap<String, PhpMixed>,
-    pub(crate) license: Vec<String>,
-    pub(crate) keywords: Vec<String>,
-    pub(crate) authors: Vec<IndexMap<String, String>>,
-    pub(crate) description: Option<String>,
-    pub(crate) homepage: Option<String>,
-    pub(crate) scripts: IndexMap<String, Vec<String>>,
-    pub(crate) support: IndexMap<String, String>,
-    pub(crate) funding: Vec<IndexMap<String, PhpMixed>>,
-    pub(crate) abandoned: PhpMixed,
-    pub(crate) archive_name: Option<String>,
-    pub(crate) archive_excludes: Vec<String>,
+    repositories: IndexMap<String, PhpMixed>,
+    license: Vec<String>,
+    keywords: Vec<String>,
+    authors: Vec<IndexMap<String, String>>,
+    description: Option<String>,
+    homepage: Option<String>,
+    scripts: IndexMap<String, Vec<String>>,
+    support: IndexMap<String, String>,
+    funding: Vec<IndexMap<String, PhpMixed>>,
+    abandoned: PhpMixed,
+    archive_name: Option<String>,
+    archive_excludes: Vec<String>,
 }
 
 impl CompletePackage {

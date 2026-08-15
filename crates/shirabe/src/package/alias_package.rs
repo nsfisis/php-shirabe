@@ -23,18 +23,18 @@ pub struct AliasPackage {
     repository: Option<RepositoryInterfaceWeakHandle>,
 
     /// @var string
-    pub(crate) version: String,
+    version: String,
     /// @var string
-    pub(crate) pretty_version: String,
+    pretty_version: String,
     /// @var bool
-    pub(crate) dev: bool,
+    dev: bool,
     /// @var bool
-    pub(crate) root_package_alias: bool,
+    root_package_alias: bool,
     /// @var string
     /// @phpstan-var 'stable'|'RC'|'beta'|'alpha'|'dev'
-    pub(crate) stability: String,
+    stability: String,
     /// @var bool
-    pub(crate) has_self_version_requires: bool,
+    has_self_version_requires: bool,
 
     /// @var BasePackage
     pub(crate) alias_of: PackageHandle,

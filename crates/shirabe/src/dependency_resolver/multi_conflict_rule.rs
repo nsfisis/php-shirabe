@@ -6,7 +6,7 @@ use shirabe_php_shim::{RuntimeException, hash_raw};
 #[derive(Debug)]
 pub struct MultiConflictRule {
     inner: RuleBase,
-    pub(crate) literals: Vec<i64>,
+    literals: Vec<i64>,
 }
 
 impl MultiConflictRule {

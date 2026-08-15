@@ -40,12 +40,12 @@ pub struct PlatformOverride {
 
 #[derive(Debug)]
 pub struct PlatformRepository {
-    pub(crate) inner: ArrayRepository,
-    pub(crate) version_parser: Option<VersionParser>,
-    pub(crate) overrides: IndexMap<String, PlatformOverride>,
-    pub(crate) disabled_packages: IndexMap<String, CompletePackageInterfaceHandle>,
-    pub(crate) platform_info: Option<PlatformInfo>,
-    pub(crate) hhvm_detector: Box<dyn HhvmDetectorInterface>,
+    inner: ArrayRepository,
+    version_parser: Option<VersionParser>,
+    overrides: IndexMap<String, PlatformOverride>,
+    disabled_packages: IndexMap<String, CompletePackageInterfaceHandle>,
+    platform_info: Option<PlatformInfo>,
+    hhvm_detector: Box<dyn HhvmDetectorInterface>,
 }
 
 impl PlatformRepository {
@@ -123,7 +123,7 @@ impl PlatformRepository {
     }
 
     #[tracing::instrument(skip_all)]
-    pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
+    fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
 
         let platform_info = self

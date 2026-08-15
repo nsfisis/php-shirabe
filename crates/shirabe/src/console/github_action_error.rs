@@ -6,7 +6,7 @@ use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct GithubActionError {
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl GithubActionError {

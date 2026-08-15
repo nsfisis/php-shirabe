@@ -721,9 +721,9 @@ impl std::fmt::Display for Rule {
 
 #[derive(Debug)]
 pub struct RuleBase {
-    pub(crate) bitfield: i64,
-    pub(crate) request: Option<Request>,
-    pub(crate) reason_data: ReasonData,
+    bitfield: i64,
+    request: Option<Request>,
+    reason_data: ReasonData,
 }
 
 impl RuleBase {

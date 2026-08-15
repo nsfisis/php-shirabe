@@ -801,7 +801,7 @@ return array(
     }
 
     /// Throws InvalidArgumentException if the package has illegal settings.
-    pub(crate) fn validate_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+    fn validate_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         let autoload = package.get_autoload();
         if autoload
             .get("psr-4")
@@ -968,7 +968,7 @@ return array(
         loader
     }
 
-    pub(crate) fn get_include_paths_file(
+    fn get_include_paths_file(
         &self,
         package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         filesystem: &Filesystem,
@@ -1033,7 +1033,7 @@ return array(
         ))
     }
 
-    pub(crate) fn get_include_files_file(
+    fn get_include_files_file(
         &self,
         files: &IndexMap<String, String>,
         filesystem: &Filesystem,
@@ -1103,7 +1103,7 @@ return array(
         ))
     }
 
-    pub(crate) fn get_path_code(
+    fn get_path_code(
         &self,
         filesystem: &Filesystem,
         base_path: &str,
@@ -1137,7 +1137,7 @@ return array(
         format!("{}{}", base_dir, var_export(&PhpMixed::String(path), true))
     }
 
-    pub(crate) fn get_platform_check(
+    fn get_platform_check(
         &self,
         package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         check_platform: PhpMixed,
@@ -1382,11 +1382,7 @@ if ($issues) {{
         ))
     }
 
-    pub(crate) fn get_autoload_file(
-        &self,
-        vendor_path_to_target_dir_code: &str,
-        suffix: &str,
-    ) -> String {
+    fn get_autoload_file(&self, vendor_path_to_target_dir_code: &str, suffix: &str) -> String {
         let last_char = vendor_path_to_target_dir_code
             .chars()
             .nth(vendor_path_to_target_dir_code.len() - 1)
@@ -1431,7 +1427,7 @@ return ComposerAutoloaderInit{}::getLoader();
 
     /// Note: vendor_path_code and app_base_dir_code are unused in this method
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
-    pub(crate) fn get_autoload_real_file(
+    fn get_autoload_real_file(
         &self,
         _use_class_map: bool,
         use_include_path: bool,
@@ -1580,7 +1576,7 @@ class ComposerAutoloaderInit{}
         format!("{}}}\n", file)
     }
 
-    pub(crate) fn get_static_file(
+    fn get_static_file(
         &self,
         suffix: &str,
         target_dir: &str,
@@ -1819,7 +1815,7 @@ class ComposerStaticInit{}
         )
     }
 
-    pub(crate) fn parse_autoloads_type(
+    fn parse_autoloads_type(
         &self,
         package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         r#type: &str,
@@ -2029,17 +2025,13 @@ class ComposerStaticInit{}
         autoloads
     }
 
-    pub(crate) fn get_file_identifier(
-        &self,
-        package: PackageInterfaceHandle,
-        path: &str,
-    ) -> String {
+    fn get_file_identifier(&self, package: PackageInterfaceHandle, path: &str) -> String {
         // TODO composer v3 change this to sha1 or xxh3? Possibly not worth the potential breakage though
         hash("md5", &format!("{}:{}", package.get_name(), path))
     }
 
     /// Filters out dev-dependencies
-    pub(crate) fn filter_package_map(
+    fn filter_package_map(
         &self,
         package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
         root_package: RootPackageInterfaceHandle,
@@ -2096,7 +2088,7 @@ class ComposerStaticInit{}
     /// Sorts packages by dependency weight
     ///
     /// Packages of equal weight are sorted alphabetically
-    pub(crate) fn sort_package_map(
+    fn sort_package_map(
         &self,
         package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
     ) -> Vec<(PackageInterfaceHandle, Option<String>)> {

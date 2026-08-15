@@ -24,11 +24,11 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct GitBitbucketDriver {
-    pub(crate) inner: VcsDriverBase,
+    inner: VcsDriverBase,
     /// @var string
-    pub(crate) owner: String,
+    owner: String,
     /// @var string
-    pub(crate) repository: String,
+    repository: String,
     /// @var bool
     has_issues: bool,
     /// @var ?string
@@ -50,7 +50,7 @@ pub struct GitBitbucketDriver {
     /// @var array<string, mixed>
     repo_data: IndexMap<String, PhpMixed>,
     /// @var ?VcsDriver
-    pub(crate) fallback_driver: Option<Box<dyn VcsDriverInterface>>,
+    fallback_driver: Option<Box<dyn VcsDriverInterface>>,
     /// @var string|null if set either git or hg
     vcs_type: Option<String>,
 }

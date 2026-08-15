@@ -20,7 +20,7 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct DownloadManager {
     /// @var IOInterface
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var bool
     prefer_dist: bool,
     /// @var bool
@@ -425,10 +425,7 @@ impl DownloadManager {
     /// Determines the install preference of a package
     ///
     /// @param PackageInterface $package package instance
-    pub(crate) fn resolve_package_install_preference(
-        &self,
-        package: PackageInterfaceHandle,
-    ) -> String {
+    fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> String {
         for (pattern, preference) in &self.package_preferences {
             let pattern_regex = format!(
                 "{{^{}$}}i",

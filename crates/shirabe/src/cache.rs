@@ -485,7 +485,7 @@ impl Cache {
         None
     }
 
-    pub(crate) fn get_finder(&self) -> Finder {
+    fn get_finder(&self) -> Finder {
         let mut finder = Finder::create();
         finder.r#in(&self.root).files();
         finder

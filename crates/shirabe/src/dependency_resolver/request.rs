@@ -231,12 +231,12 @@ pub enum UpdateAllowTransitiveDeps {
 
 #[derive(Debug)]
 pub struct Request {
-    pub(crate) locked_repository: Option<LockArrayRepositoryHandle>,
-    pub(crate) requires: IndexMap<String, AnyConstraint>,
-    pub(crate) fixed_packages: IndexMap<String, BasePackageHandle>,
-    pub(crate) locked_packages: IndexMap<String, BasePackageHandle>,
-    pub(crate) fixed_locked_packages: IndexMap<String, BasePackageHandle>,
-    pub(crate) update_allow_list: Vec<String>,
-    pub(crate) update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
+    locked_repository: Option<LockArrayRepositoryHandle>,
+    requires: IndexMap<String, AnyConstraint>,
+    fixed_packages: IndexMap<String, BasePackageHandle>,
+    locked_packages: IndexMap<String, BasePackageHandle>,
+    fixed_locked_packages: IndexMap<String, BasePackageHandle>,
+    update_allow_list: Vec<String>,
+    update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     restrict_packages: Option<Vec<String>>,
 }

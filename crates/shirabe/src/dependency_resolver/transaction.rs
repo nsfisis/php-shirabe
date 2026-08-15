@@ -21,18 +21,18 @@ use shirabe_php_shim::{
 #[derive(Debug, Clone)]
 pub struct Transaction {
     /// @var OperationInterface[]
-    pub(crate) operations: Vec<AnyOperation>,
+    operations: Vec<AnyOperation>,
 
     /// Packages present at the beginning of the transaction
     /// @var PackageInterface[]
-    pub(crate) present_packages: Vec<PackageInterfaceHandle>,
+    present_packages: Vec<PackageInterfaceHandle>,
 
     /// Package set resulting from this transaction
     /// @var array<string, PackageInterface>
-    pub(crate) result_package_map: IndexMap<String, PackageInterfaceHandle>,
+    result_package_map: IndexMap<String, PackageInterfaceHandle>,
 
     /// @var array<string, PackageInterface[]>
-    pub(crate) result_packages_by_name: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    result_packages_by_name: IndexMap<String, Vec<PackageInterfaceHandle>>,
 }
 
 impl Default for Transaction {
@@ -104,7 +104,7 @@ impl Transaction {
         }
     }
 
-    pub(crate) fn calculate_operations(&mut self) -> Vec<AnyOperation> {
+    fn calculate_operations(&mut self) -> Vec<AnyOperation> {
         let mut operations: Vec<AnyOperation> = vec![];
 
         let mut present_package_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
@@ -218,7 +218,7 @@ impl Transaction {
     ///
     /// These serve as a starting point to enumerate packages in a topological order despite potential cycles.
     /// If there are packages with a cycle on the top level the package with the lowest name gets picked
-    pub(crate) fn get_root_packages(&self) -> IndexMap<String, PackageInterfaceHandle> {
+    fn get_root_packages(&self) -> IndexMap<String, PackageInterfaceHandle> {
         let mut roots: IndexMap<String, PackageInterfaceHandle> = self
             .result_package_map
             .iter()
@@ -245,7 +245,7 @@ impl Transaction {
         roots
     }
 
-    pub(crate) fn get_providers_in_result(&self, link: &Link) -> Vec<PackageInterfaceHandle> {
+    fn get_providers_in_result(&self, link: &Link) -> Vec<PackageInterfaceHandle> {
         let Some(packages) = self.result_packages_by_name.get(link.get_target()) else {
             return vec![];
         };

@@ -5,11 +5,11 @@ use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Clone, Debug)]
 pub struct Link {
-    pub(crate) source: String,
-    pub(crate) target: String,
-    pub(crate) constraint: AnyConstraint,
-    pub(crate) description: String,
-    pub(crate) pretty_constraint: String,
+    source: String,
+    target: String,
+    constraint: AnyConstraint,
+    description: String,
+    pretty_constraint: String,
 }
 
 impl Link {

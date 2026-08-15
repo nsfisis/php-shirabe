@@ -14,7 +14,7 @@ pub enum TableCellOption {
 
 #[derive(Debug, Clone)]
 pub struct TableCell {
-    pub(crate) value: String,
+    value: String,
     options: IndexMap<String, TableCellOption>,
 }
 

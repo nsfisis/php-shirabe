@@ -8,8 +8,8 @@ use shirabe_php_shim::LogicException;
 use std::fmt;
 
 pub struct Decisions {
-    pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
-    pub(crate) decision_map: IndexMap<i64, i64>,
+    pool: std::rc::Rc<std::cell::RefCell<Pool>>,
+    decision_map: IndexMap<i64, i64>,
     pub(crate) decision_queue: Vec<(i64, std::rc::Rc<std::cell::RefCell<Rule>>)>,
 }
 
@@ -153,7 +153,7 @@ impl Decisions {
         self.decision_queue.is_empty()
     }
 
-    pub(crate) fn add_decision(&mut self, literal: i64, level: i64) {
+    fn add_decision(&mut self, literal: i64, level: i64) {
         let package_id = literal.abs();
 
         let previous_decision = self.decision_map.get(&package_id).copied().unwrap_or(0);

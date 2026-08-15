@@ -40,8 +40,8 @@ pub struct ConsoleIO {
     /// directly instead of a `HelperSet`.
     question_helper: std::cell::RefCell<QuestionHelper>,
 
-    pub(crate) last_message: std::cell::RefCell<String>,
-    pub(crate) last_message_err: std::cell::RefCell<String>,
+    last_message: std::cell::RefCell<String>,
+    last_message_err: std::cell::RefCell<String>,
 
     start_time: Option<f64>,
     verbosity_map: IndexMap<i64, i64>,

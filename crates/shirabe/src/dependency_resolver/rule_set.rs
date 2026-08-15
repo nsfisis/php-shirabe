@@ -11,9 +11,9 @@ use shirabe_php_shim::OutOfBoundsException;
 #[derive(Debug)]
 pub struct RuleSet {
     pub rule_by_id: IndexMap<i64, std::rc::Rc<std::cell::RefCell<Rule>>>,
-    pub(crate) rules: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
-    pub(crate) next_rule_id: i64,
-    pub(crate) rules_by_hash: IndexMap<String, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
+    rules: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
+    next_rule_id: i64,
+    rules_by_hash: IndexMap<String, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
 }
 
 impl Default for RuleSet {

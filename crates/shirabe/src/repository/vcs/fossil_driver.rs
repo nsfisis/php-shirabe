@@ -19,12 +19,12 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct FossilDriver {
-    pub(crate) inner: VcsDriverBase,
-    pub(crate) tags: Option<IndexMap<String, String>>,
-    pub(crate) branches: Option<IndexMap<String, String>>,
-    pub(crate) root_identifier: Option<String>,
-    pub(crate) repo_file: Option<String>,
-    pub(crate) checkout_dir: String,
+    inner: VcsDriverBase,
+    tags: Option<IndexMap<String, String>>,
+    branches: Option<IndexMap<String, String>>,
+    root_identifier: Option<String>,
+    repo_file: Option<String>,
+    checkout_dir: String,
 }
 
 impl FossilDriver {
@@ -95,7 +95,7 @@ impl FossilDriver {
         Ok(())
     }
 
-    pub(crate) fn check_fossil(&self) -> anyhow::Result<()> {
+    fn check_fossil(&self) -> anyhow::Result<()> {
         let mut ignored_output = String::new();
         if self.inner.process.borrow_mut().execute_args(
             ["fossil", "version"].map(|s| s.to_string()).as_ref(),
@@ -112,7 +112,7 @@ impl FossilDriver {
         Ok(())
     }
 
-    pub(crate) fn update_local_repo(&mut self) -> anyhow::Result<()> {
+    fn update_local_repo(&mut self) -> anyhow::Result<()> {
         assert!(self.repo_file.is_some());
 
         let mut fs = Filesystem::new(None);

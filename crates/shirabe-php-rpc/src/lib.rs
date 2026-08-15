@@ -593,7 +593,7 @@ pub fn get_all_ini_files() -> Vec<String> {
 
 /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
 /// the process Xdebug is loaded into.
-pub(crate) fn xdebug_active() -> bool {
+fn xdebug_active() -> bool {
     match call("xdebug_active", "") {
         PhpMixed::Bool(b) => b,
         other => panic!("PHP RPC: `xdebug_active` did not return a bool: {other:?}"),

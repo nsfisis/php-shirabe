@@ -94,51 +94,49 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct Installer {
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
-    pub(crate) package: RootPackageInterfaceHandle,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    package: RootPackageInterfaceHandle,
     // TODO can we get rid of the below and just use the package itself?
-    pub(crate) fixed_root_package: RootPackageInterfaceHandle,
-    pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
-    pub(crate) repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-    pub(crate) locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
-    pub(crate) installation_manager:
-        std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-    pub(crate) event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
-    pub(crate) autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
-    pub(crate) prefer_source: bool,
-    pub(crate) prefer_dist: bool,
-    pub(crate) optimize_autoloader: bool,
-    pub(crate) class_map_authoritative: bool,
-    pub(crate) apcu_autoloader: bool,
-    pub(crate) apcu_autoloader_prefix: Option<String>,
-    pub(crate) dev_mode: bool,
-    pub(crate) dry_run: bool,
-    pub(crate) download_only: bool,
-    pub(crate) verbose: bool,
-    pub(crate) update: bool,
-    pub(crate) install: bool,
-    pub(crate) dump_autoloader: bool,
-    pub(crate) run_scripts: bool,
-    pub(crate) prefer_stable: bool,
-    pub(crate) prefer_lowest: bool,
-    pub(crate) minimal_update: bool,
-    pub(crate) write_lock: bool,
-    pub(crate) execute_operations: bool,
-    pub(crate) audit: bool,
-    pub(crate) error_on_audit: bool,
-    pub(crate) audit_format: String,
+    fixed_root_package: RootPackageInterfaceHandle,
+    download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+    repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
+    locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+    installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+    autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    prefer_source: bool,
+    prefer_dist: bool,
+    optimize_autoloader: bool,
+    class_map_authoritative: bool,
+    apcu_autoloader: bool,
+    apcu_autoloader_prefix: Option<String>,
+    dev_mode: bool,
+    dry_run: bool,
+    download_only: bool,
+    verbose: bool,
+    update: bool,
+    install: bool,
+    dump_autoloader: bool,
+    run_scripts: bool,
+    prefer_stable: bool,
+    prefer_lowest: bool,
+    minimal_update: bool,
+    write_lock: bool,
+    execute_operations: bool,
+    audit: bool,
+    error_on_audit: bool,
+    audit_format: String,
     audit_config: Option<AuditConfig>,
     ignored_types: Vec<String>,
     allowed_types: Option<Vec<String>>,
-    pub(crate) update_mirrors: bool,
-    pub(crate) update_allow_list: Option<Vec<String>>,
-    pub(crate) update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
-    pub(crate) suggested_packages_reporter:
-        std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
-    pub(crate) platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
-    pub(crate) additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
-    pub(crate) temporary_constraints: IndexMap<String, AnyConstraint>,
+    update_mirrors: bool,
+    update_allow_list: Option<Vec<String>>,
+    update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
+    suggested_packages_reporter: std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
+    platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
+    additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
+    temporary_constraints: IndexMap<String, AnyConstraint>,
 }
 
 impl Installer {
@@ -552,7 +550,7 @@ impl Installer {
     }
 
     #[tracing::instrument(skip_all)]
-    pub(crate) fn do_update(
+    fn do_update(
         &mut self,
         local_repo: crate::repository::RepositoryInterfaceHandle,
         do_install: bool,
@@ -915,7 +913,7 @@ impl Installer {
 
     /// Run the solver a second time on top of the existing update result with only the current result set in the pool
     /// and see what packages would get removed if we only had the non-dev packages in the solver request
-    pub(crate) fn extract_dev_packages(
+    fn extract_dev_packages(
         &mut self,
         lock_transaction: &mut LockTransaction,
         platform_repo: &PlatformRepositoryHandle,
@@ -999,7 +997,7 @@ impl Installer {
     }
 
     /// Whether the function is called as part of an update command or independently
-    pub(crate) fn do_install(
+    fn do_install(
         &mut self,
         local_repo: crate::repository::RepositoryInterfaceHandle,
         already_solved: bool,
@@ -1285,7 +1283,7 @@ impl Installer {
         Ok(0)
     }
 
-    pub(crate) fn create_platform_repo(
+    fn create_platform_repo(
         &mut self,
         for_update: bool,
     ) -> anyhow::Result<PlatformRepositoryHandle> {

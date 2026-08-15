@@ -12,11 +12,11 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct NoProxyPattern {
     /// @var string[]
-    pub(crate) host_names: Vec<String>,
+    host_names: Vec<String>,
     /// @var (null|object)[]
-    pub(crate) rules: IndexMap<i64, Option<UrlData>>,
+    rules: IndexMap<i64, Option<UrlData>>,
     /// @var bool
-    pub(crate) noproxy: bool,
+    noproxy: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +69,7 @@ impl NoProxyPattern {
     }
 
     /// Returns false is the url cannot be parsed, otherwise a data object
-    pub(crate) fn get_url_data(&self, url: &str) -> anyhow::Result<Option<UrlData>> {
+    fn get_url_data(&self, url: &str) -> anyhow::Result<Option<UrlData>> {
         let host = parse_url(url, PHP_URL_HOST);
         if empty(&host) {
             return Ok(None);
@@ -107,12 +107,7 @@ impl NoProxyPattern {
     }
 
     /// Returns true if the url is matched by a rule
-    pub(crate) fn r#match(
-        &mut self,
-        index: i64,
-        host_name: &str,
-        url: &UrlData,
-    ) -> anyhow::Result<bool> {
+    fn r#match(&mut self, index: i64, host_name: &str, url: &UrlData) -> anyhow::Result<bool> {
         let rule = match self.get_rule(index, host_name)? {
             Some(r) => r,
             None => {
@@ -148,7 +143,7 @@ impl NoProxyPattern {
     }
 
     /// Returns true if the target ip is in the network range
-    pub(crate) fn match_range(&self, network: &IpData, target: &IpData) -> anyhow::Result<bool> {
+    fn match_range(&self, network: &IpData, target: &IpData) -> anyhow::Result<bool> {
         let net = network.ip.as_slice();
         let mask = network.netmask.as_deref().unwrap_or_default();
         let ip = target.ip.as_slice();

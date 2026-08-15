@@ -17,10 +17,10 @@ use shirabe_php_shim::{
 };
 
 pub struct ArchiveManager {
-    pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
-    pub(crate) r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
-    pub(crate) archivers: Vec<Box<dyn ArchiverInterface>>,
-    pub(crate) overwrite_files: bool,
+    download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+    r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
+    archivers: Vec<Box<dyn ArchiverInterface>>,
+    overwrite_files: bool,
 }
 
 impl std::fmt::Debug for ArchiveManager {

@@ -5,10 +5,10 @@ use shirabe_php_shim::{PhpMixed, RuntimeException};
 #[derive(Debug, Clone)]
 pub struct TransportException {
     inner: RuntimeException,
-    pub(crate) headers: Option<Vec<String>>,
-    pub(crate) response: Option<String>,
-    pub(crate) status_code: Option<i64>,
-    pub(crate) response_info: Vec<PhpMixed>,
+    headers: Option<Vec<String>>,
+    response: Option<String>,
+    status_code: Option<i64>,
+    response_info: Vec<PhpMixed>,
 }
 
 impl TransportException {

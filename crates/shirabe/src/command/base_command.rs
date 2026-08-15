@@ -38,16 +38,16 @@ pub const INVALID: i64 = 2;
 #[derive(Debug)]
 pub struct BaseCommandData {
     inner: CommandData,
-    pub(crate) composer: std::cell::RefCell<Option<PartialComposerHandle>>,
-    pub(crate) io: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>>,
+    composer: std::cell::RefCell<Option<PartialComposerHandle>>,
+    io: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>>,
     /// The definition entries that were registered through the Composer-typed
     /// InputArgument/InputOption (which carry the suggested-values backport). PHP checks
     /// `$definition->getArgument($name) instanceof Composer\Console\Input\InputArgument`; in
     /// this port `set_definition` converts the entries to the Symfony types for storage, so
     /// the Composer-typedness is tracked by name in these side maps instead.
-    pub(crate) composer_arguments:
+    composer_arguments:
         std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputArgument>>>,
-    pub(crate) composer_options:
+    composer_options:
         std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputOption>>>,
 }
 
@@ -65,7 +65,7 @@ impl BaseCommandData {
     /// Access to the embedded Symfony command state, used by the Composer-typed definition
     /// builders to forward to `CommandData`'s Symfony-typed entry points. `CommandData` is
     /// interior-mutable, so a shared reference is enough.
-    pub(crate) fn command_data(&self) -> &CommandData {
+    fn command_data(&self) -> &CommandData {
         &self.inner
     }
 }

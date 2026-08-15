@@ -6,8 +6,8 @@ use shirabe_php_shim::{CmpOp, var_export_str, version_compare};
 /// Corresponds to PHP's `Constraint`.
 #[derive(Debug, Clone)]
 pub struct SimpleConstraint {
-    pub(crate) operator: CmpOp,
-    pub(crate) version: String,
+    operator: CmpOp,
+    version: String,
     pub(crate) pretty_string: Option<String>,
 }
 

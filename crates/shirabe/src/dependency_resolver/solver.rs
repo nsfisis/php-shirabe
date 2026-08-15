@@ -26,25 +26,25 @@ use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct Solver {
-    pub(crate) policy: std::rc::Rc<dyn PolicyInterface>,
-    pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
+    policy: std::rc::Rc<dyn PolicyInterface>,
+    pool: std::rc::Rc<std::cell::RefCell<Pool>>,
 
-    pub(crate) rules: RuleSet,
+    rules: RuleSet,
 
-    pub(crate) watch_graph: RuleWatchGraph,
-    pub(crate) decisions: Decisions,
-    pub(crate) fixed_map: IndexMap<i64, BasePackageHandle>,
+    watch_graph: RuleWatchGraph,
+    decisions: Decisions,
+    fixed_map: IndexMap<i64, BasePackageHandle>,
 
-    pub(crate) propagate_index: i64,
+    propagate_index: i64,
     /// Pairs of `(literals, level)` — PHP indexes into these with the BRANCH_* constants.
-    pub(crate) branches: Vec<(Vec<i64>, i64)>,
-    pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
-    pub(crate) learned_why: IndexMap<String, i64>,
+    branches: Vec<(Vec<i64>, i64)>,
+    problems: Vec<Problem>,
+    learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
+    learned_why: IndexMap<String, i64>,
 
     pub test_flag_learned_positive_literal: bool,
 
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl Solver {

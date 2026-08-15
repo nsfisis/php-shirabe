@@ -25,12 +25,12 @@ use shirabe_symfony_console::formatter::OutputFormatter;
 #[derive(Debug)]
 pub struct Problem {
     /// A map containing the id of each rule part of this problem as a key
-    pub(crate) reason_seen: IndexMap<String, bool>,
+    reason_seen: IndexMap<String, bool>,
 
     /// A set of reasons for the problem, each is a rule or a root require and a rule
-    pub(crate) reasons: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
+    reasons: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
 
-    pub(crate) section: i64,
+    section: i64,
 }
 
 impl Default for Problem {
@@ -360,7 +360,7 @@ impl Problem {
     }
 
     /// Store a reason descriptor but ignore duplicates
-    pub(crate) fn add_reason(&mut self, id: String, reason: std::rc::Rc<std::cell::RefCell<Rule>>) {
+    fn add_reason(&mut self, id: String, reason: std::rc::Rc<std::cell::RefCell<Rule>>) {
         // TODO: if a rule is part of a problem description in two sections, isn't this going to remove a message
         // that is important to understand the issue?
 
@@ -1377,7 +1377,7 @@ impl Problem {
     }
 
     /// Turns a constraint into text usable in a sentence describing a request
-    pub(crate) fn constraint_to_text(constraint: Option<&AnyConstraint>) -> String {
+    fn constraint_to_text(constraint: Option<&AnyConstraint>) -> String {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
