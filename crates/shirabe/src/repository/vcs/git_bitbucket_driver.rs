@@ -19,8 +19,7 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
-    array_search_mixed, extension_loaded, http_build_query_mixed, implode, is_array, php_regex,
-    strpos,
+    array_search_mixed, extension_loaded, http_build_query, implode, is_array, php_regex, strpos,
 };
 
 #[derive(Debug)]
@@ -152,18 +151,7 @@ impl GitBitbucketDriver {
             "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
             self.owner.clone(),
             self.repository.clone(),
-            http_build_query_mixed(
-                &{
-                    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                    m.insert(
-                        "fields".to_string(),
-                        PhpMixed::String("-project,-owner".to_string()),
-                    );
-                    m
-                },
-                "",
-                "&",
-            ),
+            http_build_query(&[("fields", "-project,-owner")]),
         );
 
         let repo_data = self
@@ -524,23 +512,11 @@ impl GitBitbucketDriver {
             let mut resource = format!(
                 "{}?{}",
                 self.tags_url.clone(),
-                http_build_query_mixed(
-                    &{
-                        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                        m.insert("pagelen".to_string(), PhpMixed::Int(100));
-                        m.insert(
-                            "fields".to_string(),
-                            PhpMixed::String("values.name,values.target.hash,next".to_string()),
-                        );
-                        m.insert(
-                            "sort".to_string(),
-                            PhpMixed::String("-target.date".to_string()),
-                        );
-                        m
-                    },
-                    "",
-                    "&",
-                ),
+                http_build_query(&[
+                    ("pagelen", "100"),
+                    ("fields", "values.name,values.target.hash,next"),
+                    ("sort", "-target.date"),
+                ]),
             );
             let mut has_next = true;
             while has_next {
@@ -603,25 +579,11 @@ impl GitBitbucketDriver {
             let mut resource = format!(
                 "{}?{}",
                 self.branches_url.clone(),
-                http_build_query_mixed(
-                    &{
-                        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                        m.insert("pagelen".to_string(), PhpMixed::Int(100));
-                        m.insert(
-                            "fields".to_string(),
-                            PhpMixed::String(
-                                "values.name,values.target.hash,values.heads,next".to_string(),
-                            ),
-                        );
-                        m.insert(
-                            "sort".to_string(),
-                            PhpMixed::String("-target.date".to_string()),
-                        );
-                        m
-                    },
-                    "",
-                    "&",
-                ),
+                http_build_query(&[
+                    ("pagelen", "100"),
+                    ("fields", "values.name,values.target.hash,values.heads,next"),
+                    ("sort", "-target.date"),
+                ]),
             );
             let mut has_next = true;
             while has_next {

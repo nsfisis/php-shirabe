@@ -867,7 +867,7 @@ impl InstallationManager {
                             .collect();
                         http.insert(
                             "content".to_string(),
-                            PhpMixed::String(http_build_query(&params_vec, "", "&")),
+                            PhpMixed::String(http_build_query(&params_vec)),
                         );
                         http.insert("timeout".to_string(), PhpMixed::Int(3));
                         opts.insert(

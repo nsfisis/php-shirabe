@@ -95,14 +95,8 @@ pub fn http_build_query_mixed(
     encode_pairs(&pairs, arg_separator)
 }
 
-pub fn http_build_query(
-    data: &[(&str, &str)],
-    numeric_prefix: &str,
-    arg_separator: &str,
-) -> String {
-    // numeric_prefix only applies to integer keys, which a string-keyed slice never has.
-    let _ = numeric_prefix;
-    encode_pairs(data, arg_separator)
+pub fn http_build_query(data: &[(&str, &str)]) -> String {
+    encode_pairs(data, "&")
 }
 
 fn encode_pairs<T: serde::Serialize>(pairs: T, arg_separator: &str) -> String {

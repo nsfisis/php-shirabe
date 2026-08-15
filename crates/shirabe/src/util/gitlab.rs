@@ -425,15 +425,11 @@ impl GitLab {
         let headers = vec!["Content-Type: application/x-www-form-urlencoded".to_string()];
 
         let api_url = origin_url;
-        let data = http_build_query(
-            &[
-                ("username", username.as_str()),
-                ("password", password.as_str()),
-                ("grant_type", "password"),
-            ],
-            "",
-            "&",
-        );
+        let data = http_build_query(&[
+            ("username", username.as_str()),
+            ("password", password.as_str()),
+            ("grant_type", "password"),
+        ]);
         let mut http_inner: IndexMap<String, PhpMixed> = IndexMap::new();
         http_inner.insert("method".to_string(), PhpMixed::String("POST".to_string()));
         http_inner.insert(
@@ -498,14 +494,10 @@ impl GitLab {
 
         let headers = vec!["Content-Type: application/x-www-form-urlencoded".to_string()];
 
-        let data = http_build_query(
-            &[
-                ("refresh_token", refresh_token.as_str()),
-                ("grant_type", "refresh_token"),
-            ],
-            "",
-            "&",
-        );
+        let data = http_build_query(&[
+            ("refresh_token", refresh_token.as_str()),
+            ("grant_type", "refresh_token"),
+        ]);
         let mut http_inner = IndexMap::new();
         http_inner.insert("method".to_string(), PhpMixed::String("POST".to_string()));
         http_inner.insert(
