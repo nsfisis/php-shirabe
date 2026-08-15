@@ -25,6 +25,11 @@ Building Shirabe requires:
 * Git
 * PHP
 * Composer
+* Nix (optional)
+* Direnv (optional)
+
+Nix flake supported; use `nix develop` to enter the development shell.
+TODO: support `nix build`
 
 
 ## Build
