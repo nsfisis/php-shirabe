@@ -41,7 +41,7 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
-    RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query,
+    RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query_mixed,
     json_decode, parse_url_all, php_regex, realpath, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
@@ -1052,18 +1052,17 @@ impl ComposerRepository {
                 ));
                 http_map.insert("header".to_string(), PhpMixed::List(headers));
                 http_map.insert("timeout".to_string(), PhpMixed::Int(10));
-                let packages_list: Vec<(String, String)> = package_constraint_map
-                    .keys()
-                    .map(|k| ("packages".to_string(), k.clone()))
-                    .collect();
-                let body = http_build_query(
-                    &packages_list
-                        .iter()
-                        .map(|(k, v)| (k.as_str(), v.as_str()))
-                        .collect::<Vec<_>>(),
-                    "&",
-                    "=",
+                let mut query: IndexMap<String, PhpMixed> = IndexMap::new();
+                query.insert(
+                    "packages".to_string(),
+                    PhpMixed::List(
+                        package_constraint_map
+                            .keys()
+                            .map(|k| PhpMixed::String(k.clone()))
+                            .collect(),
+                    ),
                 );
+                let body = http_build_query_mixed(&query, "", "&");
                 http_map.insert("content".to_string(), PhpMixed::String(body));
             }
 
