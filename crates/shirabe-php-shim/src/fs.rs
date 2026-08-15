@@ -1056,23 +1056,6 @@ pub fn sys_get_temp_dir() -> String {
     std::env::temp_dir().to_string_lossy().into_owned()
 }
 
-// A directory-handle resource. This is a distinct resource kind from the byte streams modeled by
-// PhpResource; readdir/closedir have no callers yet, so it only records the opened path.
-// TODO(php-semantics): give it real readdir/closedir behavior (cursor over the entries) when needed.
-#[derive(Debug)]
-pub struct PhpDirHandle {
-    pub path: std::path::PathBuf,
-}
-
-pub fn opendir(path: impl AsRef<std::path::Path>) -> Option<PhpDirHandle> {
-    let path = path.as_ref();
-    // opendir succeeds iff the path is a readable directory.
-    std::fs::read_dir(path).ok()?;
-    Some(PhpDirHandle {
-        path: path.to_path_buf(),
-    })
-}
-
 pub fn pathinfo(path: &str, option: i64) -> String {
     match option {
         PATHINFO_DIRNAME => dirname(path),

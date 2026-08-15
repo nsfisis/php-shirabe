@@ -841,8 +841,7 @@ impl Filesystem {
         }
 
         if is_dir(path) {
-            return Silencer::call(|| Ok(shirabe_php_shim::opendir(path).is_some()))
-                .unwrap_or(false);
+            return Silencer::call(|| Ok(std::fs::read_dir(path).is_ok())).unwrap_or(false);
         }
 
         // assume false otherwise
