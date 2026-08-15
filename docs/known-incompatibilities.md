@@ -75,3 +75,21 @@ Reflection on objects a plugin creates itself works as usual.
 
 `ob_*()` functions work as usual in PHP, but cannot capture any output from
 Rust side.
+
+
+## Misc.
+
+### Default Timezone
+
+PHP resolves the default timezone from the `date.timezone` INI setting, and
+falls back to UTC when it is unset. Shirabe does not read php.ini: it uses the
+system's local timezone instead and falls back to UTC when no tz database is
+available.
+
+Only the date time for humans are affected, such as the reset time of the
+GitHub API rate limit. The machine-readable time, e.g., timestamps written to
+`composer.lock` or `vendor/composer/installed.json` are recorded in UTC in both
+Composer and Shirabe.
+
+Plugins and scripts run in the PHP worker, where `date.timezone` is applied as
+usual.

@@ -8,7 +8,7 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date, explode, fclose, feof, fgets,
+    Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date_local, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode, php_regex, str_replace_array,
     strcmp, strlen, strpos, strrpos, substr, time, trim,
 };
@@ -414,7 +414,7 @@ impl Perforce {
             spec,
             format!(
                 "Update: {}{}{}",
-                date("Y/m/d H:i:s", None),
+                date_local("Y/m/d H:i:s", None),
                 PHP_EOL,
                 PHP_EOL
             ),
@@ -422,7 +422,7 @@ impl Perforce {
         );
         fwrite(
             spec,
-            format!("Access: {}{}", date("Y/m/d H:i:s", None), PHP_EOL),
+            format!("Access: {}{}", date_local("Y/m/d H:i:s", None), PHP_EOL),
             None,
         );
         fwrite(

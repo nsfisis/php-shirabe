@@ -39,8 +39,8 @@ use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, date, date_format_to_strftime, extension_loaded, impl_php_class, in_array_loose,
-    in_array_strict, php_regex, realpath, strtolower, version_compare,
+    array_search, date_format_to_strftime, date_local, extension_loaded, impl_php_class,
+    in_array_loose, in_array_strict, php_regex, realpath, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -1484,7 +1484,7 @@ impl ShowCommand {
         if release_date
             .format(date_format_to_strftime("Ymd"))
             .to_string()
-            == date("Ymd", None)
+            == date_local("Ymd", None)
         {
             return "today".to_string();
         }

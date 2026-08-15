@@ -276,7 +276,7 @@ impl Command for CompleteCommand {
                 String::new(),
                 format!(
                     "<comment>{}</>",
-                    shirabe_php_shim::date("Y-m-d H:i:s", None)
+                    shirabe_php_shim::date_utc("Y-m-d H:i:s", None)
                 ),
                 "<info>Input:</> <comment>(\"|\" indicates the cursor position)</>".to_string(),
                 format!("  {}", completion_input.to_string()),

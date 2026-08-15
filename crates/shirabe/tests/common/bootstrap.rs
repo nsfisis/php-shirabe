@@ -18,9 +18,6 @@ pub fn bootstrap() {
     ONCE.call_once(|| {
         // PHP: error_reporting(E_ALL) has no counterpart here.
 
-        // PHP: date_default_timezone_set(@date_default_timezone_get());
-        shirabe_php_shim::date_default_timezone_set(&shirabe_php_shim::date_default_timezone_get());
-
         // PHP: require src/bootstrap.php and refresh vendor/composer/InstalledVersions.php.
         // TODO(php-runtime): port remaining bootstrap processes (the src/bootstrap.php include and
         // the InstalledVersions refresh are PHP autoload mechanics with no Rust counterpart yet).

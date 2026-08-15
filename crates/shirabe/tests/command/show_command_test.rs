@@ -8,7 +8,7 @@ use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::PlatformRepository;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, date_local};
 
 /// Build a `Vec<(PhpMixed, PhpMixed)>` command input from `(key, value)` pairs.
 fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
@@ -1028,7 +1028,7 @@ fn test_self_and_package_combination() {
             match and prints \"this week\" whenever the local date differs from the UTC date \
             (e.g. daily 00:00-09:00 JST); see TODO(php-semantics) in shirabe-php-shim datetime.rs"]
 fn test_self() {
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let today = date_local("Y-m-d", None);
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
             "name": "vendor/package",

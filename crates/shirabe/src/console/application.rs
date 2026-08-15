@@ -57,13 +57,12 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir,
-    date_default_timezone_get, date_default_timezone_set, defined, dirname, disk_free_space,
-    extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists, getcwd,
-    getmypid, glob, ini_set, is_array, is_dir, is_file, is_string, json_decode,
-    memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname, posix_getuid,
-    random_bytes, realpath, restore_error_handler, round, str_replace, strpos, strtoupper,
-    sys_get_temp_dir, time, unlink,
+    LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir, defined,
+    dirname, disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
+    json_decode, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
+    posix_getuid, random_bytes, realpath, restore_error_handler, round, str_replace, strpos,
+    strtoupper, sys_get_temp_dir, time, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
@@ -155,13 +154,6 @@ impl Application {
         if function_exists("ini_set") && extension_loaded("xdebug") {
             ini_set("xdebug.show_exception_trace", "0");
             ini_set("xdebug.scream", "0");
-        }
-
-        if function_exists("date_default_timezone_set")
-            && function_exists("date_default_timezone_get")
-        {
-            let tz = Silencer::call(|| Ok(date_default_timezone_get())).unwrap_or_default();
-            date_default_timezone_set(&tz);
         }
 
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =

@@ -1,11 +1,8 @@
-static DEFAULT_TIMEZONE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
 /// Parse the subset of the strtotime()/date_create() grammar that Composer actually emits.
 ///
 /// Supported: ISO8601/RFC3339 (`2023-01-15T12:34:56Z`, `...+00:00`), `Y-m-d H:i:s`, `Y-m-d`,
-/// and `@<unixtime>`. Inputs without an explicit offset are interpreted as UTC, matching the
-/// default timezone this shim assumes elsewhere. Anything else returns `None` rather than
-/// guessing, mirroring PHP returning `false` on unrecognized input.
+/// and `@<unixtime>`. Inputs without an explicit offset are interpreted as UTC. Anything else
+/// returns `None` rather than guessing, mirroring PHP returning `false` on unrecognized input.
 fn parse_to_fixed(s: &str) -> Option<chrono::DateTime<chrono::FixedOffset>> {
     let s = s.trim();
     if s.is_empty() {
@@ -126,34 +123,35 @@ pub fn microtime() -> f64 {
     duration.as_secs_f64()
 }
 
-// PHP defaults to "UTC" when no default timezone has been configured.
-pub fn date_default_timezone_get() -> String {
-    DEFAULT_TIMEZONE
-        .lock()
-        .unwrap()
-        .clone()
-        .unwrap_or_else(|| "UTC".to_string())
-}
-
-pub fn date_default_timezone_set(tz: &str) -> bool {
-    *DEFAULT_TIMEZONE.lock().unwrap() = Some(tz.to_string());
-    true
-}
-
-pub fn date(format: &str, timestamp: Option<i64>) -> String {
+/// PHP: `date()`, rendering in UTC.
+pub fn date_utc(format: &str, timestamp: Option<i64>) -> String {
     let timestamp = timestamp.unwrap_or_else(time);
-    // TODO(php-semantics): model the system default timezone. PHP `date()` renders in the default
-    // timezone (usually the system's local zone); without a timezone database only "UTC" can be
-    // resolved here, so on a non-UTC machine this diverges whenever the local date differs from
-    // the UTC date (e.g. daily 00:00-09:00 JST). Fixing this needs a timezone database (a new
-    // crate). Any named zone is rejected loudly rather than silently rendered in the wrong zone.
-    let tz = date_default_timezone_get();
-    if tz != "UTC" {
-        panic!(
-            "date() with non-UTC default timezone {tz:?} is not supported (no timezone database)"
-        );
-    }
     let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
         .expect("date() timestamp out of range");
     dt.format(date_format_to_strftime(format)).to_string()
+}
+
+/// PHP: `date()`, rendering in the system's local timezone.
+pub fn date_local(format: &str, timestamp: Option<i64>) -> String {
+    let timestamp = timestamp.unwrap_or_else(time);
+    let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
+        .expect("date() timestamp out of range");
+    let tz = local_timezone();
+    dt.with_timezone(&&tz)
+        .format(date_format_to_strftime(format))
+        .to_string()
+}
+
+/// The zone `$TZ` names, or the one `/etc/localtime` describes. Falls back to UTC when no tz
+/// database is readable, as PHP does when `date.timezone` is unset.
+fn local_timezone() -> tzfile::Tz {
+    #[cfg(unix)]
+    {
+        tzfile::Tz::local().unwrap_or_else(|_| tzfile::Tz::from(chrono::Utc))
+    }
+    #[cfg(not(unix))]
+    {
+        // TODO(windows): `tzfile::Tz::local()` is Unix-only.
+        todo!()
+    }
 }

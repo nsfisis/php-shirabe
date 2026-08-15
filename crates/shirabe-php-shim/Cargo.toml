@@ -27,6 +27,7 @@ sha1.workspace = true
 sha2.workspace = true
 tar.workspace = true
 twox-hash.workspace = true
+tzfile.workspace = true
 zip.workspace = true
 
 [dev-dependencies]

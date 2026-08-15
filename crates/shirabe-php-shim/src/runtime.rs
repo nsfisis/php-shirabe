@@ -67,8 +67,6 @@ pub fn function_exists(name: &str) -> bool {
             | "curl_multi_setopt"
             | "curl_share_init"
             | "curl_strerror"
-            | "date_default_timezone_get"
-            | "date_default_timezone_set"
             | "disk_free_space"
             | "exec"
             | "filter_var"

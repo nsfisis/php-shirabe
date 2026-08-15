@@ -10,7 +10,7 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PhpMixed, date, in_array_loose, php_regex, stripos, strtolower};
+use shirabe_php_shim::{PhpMixed, date_local, in_array_loose, php_regex, stripos, strtolower};
 
 #[derive(Debug)]
 pub struct GitHub {
@@ -106,7 +106,7 @@ impl GitHub {
                 note += &format!(" on {}", output.trim());
             }
         }
-        note += &format!(" {}", date("Y-m-d Hi", None));
+        note += &format!(" {}", date_local("Y-m-d Hi", None));
 
         let (local_name, auth_name): (Option<String>, String) = {
             let cfg = self.config.borrow();
@@ -309,7 +309,7 @@ impl GitHub {
                     let ts: i64 = value.trim().parse().unwrap_or(0);
                     rate_limit.insert(
                         "reset".to_string(),
-                        PhpMixed::String(date("Y-m-d H:i:s", Some(ts))),
+                        PhpMixed::String(date_local("Y-m-d H:i:s", Some(ts))),
                     );
                 }
                 _ => {}
