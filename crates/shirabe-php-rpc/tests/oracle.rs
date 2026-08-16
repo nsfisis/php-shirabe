@@ -73,6 +73,21 @@ fn encode_direction_matches_php_for_scalars_and_floats() {
         5e-324,
         1.0 / 3.0,
         0.30000000000000004,
+        // The two edges of the plain-notation window, approached from both sides: PHP keeps a
+        // decimal exponent of -4..=16 in plain notation whatever the digit count, and the widest
+        // mantissa an f64 has does not push the large edge outwards.
+        1e-3,
+        -1e-5,
+        1.23456789e-5,
+        0.00012345,
+        1.2345678901234568e16,
+        1.2345678901234567e19,
+        -1e17,
+        1.5e17,
+        f64::MIN,
+        f64::MIN_POSITIVE,
+        f64::EPSILON,
+        2.5e-323,
         f64::NAN,
         f64::INFINITY,
         f64::NEG_INFINITY,
@@ -226,6 +241,10 @@ fn decode_direction_matches_php_serialize_output() {
         "return serialize([\"\\xff\\x00key\" => \"\\x80\\x81\", 0 => \"plain\"]);",
         // Floats straight from the PHP formatter.
         r#"return serialize([0.1, 2.0, 1e17, 1e-5, -0.0, NAN, INF, -INF, 1/3]);"#,
+        // Both edges of PHP's plain-notation window, plus the extremes of the f64 range.
+        r#"return serialize([1e-4, 1e-5, 1e16, 1e17, 1.2345678901234568e16, -1e17,
+                            PHP_FLOAT_MAX, -PHP_FLOAT_MAX, PHP_FLOAT_MIN, PHP_FLOAT_EPSILON,
+                            5e-324, 2.5e-323]);"#,
         // A sparse int-keyed array (not a list).
         r#"return serialize([3 => "c", 1 => "a"]);"#,
         // Deep nesting built in a loop.

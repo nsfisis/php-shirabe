@@ -59,21 +59,13 @@ fn serialize_into(out: &mut String, value: &PhpMixed) {
     }
 }
 
-// TODO(php-semantics): PHP's serialize uses serialize_precision (-1 => shortest round-trip), which Rust's
-// default float formatting also produces, but the two differ on scientific-notation spelling (PHP
-// "1.0E+20" vs Rust "1e20") for very large/small magnitudes.
+// TODO(php-runtime): the shim has no ini registry, so this hard-codes serialize_precision=-1
+// (the default: the shortest round-trip representation). Any other serialize_precision selects
+// php_gcvt's fixed-precision mode, which is not reachable from here.
 fn serialize_float(f: f64) -> String {
-    if f.is_nan() {
-        "NAN".to_string()
-    } else if f.is_infinite() {
-        if f < 0.0 {
-            "-INF".to_string()
-        } else {
-            "INF".to_string()
-        }
-    } else {
-        format!("{}", f)
-    }
+    let mut out = String::new();
+    shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, -1, false);
+    out
 }
 
 /// Returns the integer a PHP array key string normalizes to, or None if the key stays a string.
@@ -236,7 +228,7 @@ pub fn php_to_string(value: &PhpMixed) -> String {
         PhpMixed::Bool(true) => "1".to_string(),
         PhpMixed::Bool(false) => String::new(),
         PhpMixed::Int(i) => i.to_string(),
-        PhpMixed::Float(f) => f.to_string(),
+        PhpMixed::Float(f) => float_to_string(*f),
         PhpMixed::String(s) => s.clone(),
         // PHP renders any array as the literal string "Array".
         PhpMixed::List(_) | PhpMixed::Array(_) => "Array".to_string(),
@@ -244,6 +236,14 @@ pub fn php_to_string(value: &PhpMixed) -> String {
         // carries no class/method information to dispatch to.
         PhpMixed::Object(_) => todo!(),
     }
+}
+
+// TODO(php-runtime): the shim has no ini registry, so this hard-codes precision=14, the default
+// significant-digit count a float-to-string cast rounds to.
+fn float_to_string(f: f64) -> String {
+    let mut out = String::new();
+    shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, 14, false);
+    out
 }
 
 pub fn strval(value: &PhpMixed) -> String {
@@ -471,30 +471,158 @@ fn var_export_string(s: &str) -> String {
     out
 }
 
+// TODO(php-runtime): the shim has no ini registry, so this hard-codes serialize_precision=-1
+// (the default: the shortest round-trip representation). Any other serialize_precision selects
+// php_gcvt's fixed-precision mode, which is not reachable from here.
 fn var_export_float(f: f64) -> String {
-    if f.is_nan() {
-        return "NAN".to_string();
-    }
-    if f.is_infinite() {
-        return if f < 0.0 {
-            "-INF".to_string()
-        } else {
-            "INF".to_string()
-        };
-    }
-    // PHP always renders a float with a fractional/exponent marker, so a whole-valued float gets a
-    // trailing ".0".
-    let s = format!("{}", f);
-    if s.contains('.') || s.contains('e') || s.contains('E') {
-        s
-    } else {
-        format!("{}.0", s)
-    }
+    let mut out = String::new();
+    // var_export() renders a whole-valued float with a trailing ".0" so that it stays a float when
+    // the exported code is evaluated.
+    shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, -1, true);
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PHP 8.5.9 oracle: `(string) $v` with the default precision=14. The digits are rounded to 14
+    /// significant places and the layout switches to exponent form once the decimal exponent
+    /// leaves `-4..=13`, both of which differ from `serialize()`.
+    #[test]
+    #[allow(clippy::excessive_precision)]
+    fn test_php_to_string_float() {
+        for (expected, value) in [
+            ("0", 0.0),
+            ("-0", -0.0),
+            ("1", 1.0),
+            ("-1", -1.0),
+            ("100", 100.0),
+            ("0.5", 0.5),
+            ("-1.5", -1.5),
+            ("0.1", 0.1),
+            ("0.33333333333333", 1.0 / 3.0),
+            ("0.14285714285714", 1.0 / 7.0),
+            ("0.3", 0.30000000000000004),
+            ("0.001", 1e-3),
+            ("0.0001", 1e-4),
+            ("1.0E-5", 1e-5),
+            ("-1.0E-5", -1e-5),
+            ("0.00012345", 0.00012345),
+            ("1.23456789E-5", 1.23456789e-5),
+            ("10000000000000", 1e13),
+            ("1.0E+14", 1e14),
+            ("1.0E+15", 1e15),
+            ("1.0E+16", 1e16),
+            ("1.0E+17", 1e17),
+            ("12345678901234", 12345678901234.5),
+            ("1.2345678901235E+14", 123456789012345.6),
+            ("1.2345678901235E+16", 1.2345678901234568e16),
+            ("1.0E+20", 1e20),
+            ("1.0E+100", 1e100),
+            ("1.0E-100", 1e-100),
+            ("1.7976931348623E+308", f64::MAX),
+            ("-1.7976931348623E+308", f64::MIN),
+            ("2.2250738585072E-308", f64::MIN_POSITIVE),
+            ("2.2204460492503E-16", f64::EPSILON),
+            ("4.9406564584125E-324", 5e-324),
+            ("2.4703282292062E-323", 2.5e-323),
+            ("NAN", f64::NAN),
+            ("INF", f64::INFINITY),
+            ("-INF", f64::NEG_INFINITY),
+        ] {
+            assert_eq!(expected, php_to_string(&PhpMixed::Float(value)));
+        }
+    }
+
+    /// PHP 8.5.9 oracle: `serialize($v)` with the default serialize_precision=-1. The shortest
+    /// round-trip digits are laid out plainly while the decimal exponent stays in `-4..=16`, and
+    /// switch to `<d>.<rest>E<sign><exp>` outside it, where a single-digit mantissa gains a `.0`
+    /// and the exponent is unpadded and always signed.
+    #[test]
+    fn test_serialize_float() {
+        for (expected, value) in [
+            ("d:0;", 0.0),
+            ("d:-0;", -0.0),
+            ("d:1;", 1.0),
+            ("d:-1;", -1.0),
+            ("d:100;", 100.0),
+            ("d:0.5;", 0.5),
+            ("d:-1.5;", -1.5),
+            ("d:0.1;", 0.1),
+            ("d:0.3333333333333333;", 1.0 / 3.0),
+            ("d:0.001;", 1e-3),
+            ("d:0.0001;", 1e-4),
+            ("d:1.0E-5;", 1e-5),
+            ("d:-1.0E-5;", -1e-5),
+            ("d:0.00012345;", 0.00012345),
+            ("d:1.23456789E-5;", 1.23456789e-5),
+            ("d:1000000000000000;", 1e15),
+            ("d:10000000000000000;", 1e16),
+            ("d:12345678901234568;", 1.2345678901234568e16),
+            ("d:1.0E+17;", 1e17),
+            ("d:-1.0E+17;", -1e17),
+            ("d:1.5E+17;", 1.5e17),
+            ("d:1.0E+20;", 1e20),
+            ("d:1.0E+100;", 1e100),
+            ("d:1.0E-100;", 1e-100),
+            ("d:1.7976931348623157E+308;", f64::MAX),
+            ("d:-1.7976931348623157E+308;", f64::MIN),
+            ("d:2.2250738585072014E-308;", f64::MIN_POSITIVE),
+            ("d:2.220446049250313E-16;", f64::EPSILON),
+            ("d:5.0E-324;", 5e-324),
+            ("d:2.5E-323;", 2.5e-323),
+            ("d:NAN;", f64::NAN),
+            ("d:INF;", f64::INFINITY),
+            ("d:-INF;", f64::NEG_INFINITY),
+        ] {
+            assert_eq!(expected, serialize(&PhpMixed::Float(value)));
+        }
+    }
+
+    /// PHP 8.5.9 oracle: `var_export($v, true)` with the default serialize_precision=-1. The
+    /// digits follow `serialize()`, except that a value laid out plainly and lacking a fractional
+    /// part gains a ".0"; one in exponent form already carries a period and gains nothing.
+    #[test]
+    fn test_var_export_float() {
+        for (expected, value) in [
+            ("0.0", 0.0),
+            ("-0.0", -0.0),
+            ("1.0", 1.0),
+            ("-1.0", -1.0),
+            ("100.0", 100.0),
+            ("0.5", 0.5),
+            ("-1.5", -1.5),
+            ("0.1", 0.1),
+            ("0.3333333333333333", 1.0 / 3.0),
+            ("0.001", 1e-3),
+            ("0.0001", 1e-4),
+            ("1.0E-5", 1e-5),
+            ("-1.0E-5", -1e-5),
+            ("0.00012345", 0.00012345),
+            ("1.23456789E-5", 1.23456789e-5),
+            ("1000000000000000.0", 1e15),
+            ("10000000000000000.0", 1e16),
+            ("12345678901234568.0", 1.2345678901234568e16),
+            ("1.0E+17", 1e17),
+            ("-1.0E+17", -1e17),
+            ("1.5E+17", 1.5e17),
+            ("1.0E+20", 1e20),
+            ("1.0E+100", 1e100),
+            ("1.0E-100", 1e-100),
+            ("1.7976931348623157E+308", f64::MAX),
+            ("-1.7976931348623157E+308", f64::MIN),
+            ("2.2250738585072014E-308", f64::MIN_POSITIVE),
+            ("2.220446049250313E-16", f64::EPSILON),
+            ("5.0E-324", 5e-324),
+            ("2.5E-323", 2.5e-323),
+            ("NAN", f64::NAN),
+            ("INF", f64::INFINITY),
+            ("-INF", f64::NEG_INFINITY),
+        ] {
+            assert_eq!(expected, var_export(&PhpMixed::Float(value), true));
+        }
+    }
 
     /// PHP 8.5.8 oracle: `var_export($v, true)` over stdClass-shaped objects, standalone and
     /// nested in arrays (object properties indent one space deeper than array elements, and
