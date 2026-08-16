@@ -76,9 +76,15 @@ impl SplFileInfo {
         shirabe_php_shim::realpath(&self.pathname)
     }
 
-    pub fn get_size(&self) -> i64 {
-        // \SplFileInfo::getSize() returns the file size in bytes (throws on failure).
-        // TODO(php-semantics): PHP throws a \RuntimeException on stat failure; this returns 0 instead.
-        shirabe_php_shim::filesize(&self.pathname).unwrap_or(0)
+    pub fn get_size(&self) -> anyhow::Result<i64> {
+        // Inherited from \SplFileInfo, whose failure message names the base class even for subclasses.
+        match shirabe_php_shim::filesize(&self.pathname) {
+            Some(size) => Ok(size),
+            None => Err(shirabe_php_shim::RuntimeException::new(format!(
+                "SplFileInfo::getSize(): stat failed for {}",
+                self.pathname
+            ))
+            .into()),
+        }
     }
 }

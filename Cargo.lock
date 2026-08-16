@@ -2257,6 +2257,7 @@ dependencies = [
 name = "shirabe-symfony-finder"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "chrono",
  "indexmap",
  "regex",
