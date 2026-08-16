@@ -37,7 +37,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException, array_pop,
@@ -527,7 +527,7 @@ impl CreateProjectCommand {
                 stability = Some("stable".to_string());
             } else {
                 let ok = {
-                    let mut matched: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut matched = PregMatchedGroups::new();
                     let ok = Preg::is_match3(
                         format!(
                             "{{^[^,\\s]*?@({})$}}i",

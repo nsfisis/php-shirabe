@@ -37,7 +37,7 @@ use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
 use shirabe_metadata_minifier::MetadataMinifier;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
@@ -245,7 +245,7 @@ impl ComposerRepository {
             .to_string();
 
         // force url for packagist.org to repo.packagist.org
-        let mut match_packagist: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut match_packagist = PregMatchedGroups::new();
         if Preg::is_match3(
             php_regex!(r"{^(?P<proto>https?)://packagist\.org/?$}i"),
             &url,
@@ -781,7 +781,7 @@ impl ComposerRepository {
 
         if self.has_providers()? || self.lazy_providers_url.is_some() {
             // optimize search for "^foo/bar" where at least "^foo/" is present by loading this directly from the listUrl if present
-            let mut match_groups: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut match_groups = PregMatchedGroups::new();
             if Preg::is_match3(
                 php_regex!(r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i"),
                 &query,
@@ -2430,7 +2430,7 @@ impl ComposerRepository {
         }
 
         if url.starts_with('/') {
-            let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut matches = PregMatchedGroups::new();
             if Preg::is_match3(
                 php_regex!(r"{^[^:]++://[^/]*+}"),
                 &self.url,

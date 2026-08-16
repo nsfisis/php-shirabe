@@ -13,7 +13,7 @@ use crate::util::Svn as SvnUtil;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, php_regex, stripos, strrpos, strtr, substr, trim,
@@ -318,7 +318,7 @@ impl SvnDriver {
         )?;
         for line in self.inner.process.borrow().split_lines(&output) {
             if !line.is_empty() {
-                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut m = PregMatchedGroups::new();
                 if Preg::is_match3(
                     php_regex!(r"{^Last Changed Date: ([^(]+)}"),
                     &line,
@@ -350,7 +350,7 @@ impl SvnDriver {
                     for line in self.inner.process.borrow().split_lines(&output) {
                         let line = trim(&line, None);
                         if !line.is_empty() {
-                            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                            let mut m = PregMatchedGroups::new();
                             if Preg::is_match3(
                                 php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
                                 &line,
@@ -401,7 +401,7 @@ impl SvnDriver {
                 for line in self.inner.process.borrow().split_lines(&output) {
                     let line = trim(&line, None);
                     if !line.is_empty() {
-                        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                        let mut m = PregMatchedGroups::new();
                         if Preg::is_match3(
                             php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
                             &line,
@@ -443,7 +443,7 @@ impl SvnDriver {
                     {
                         let line = trim(&line, None);
                         if !line.is_empty() {
-                            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                            let mut m = PregMatchedGroups::new();
                             if Preg::is_match3(
                                 php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
                                 &line,

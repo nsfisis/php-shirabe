@@ -8,7 +8,7 @@
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_pcre::preg::Preg;
+use shirabe_pcre::preg::{Preg, PregMatchedGroups};
 use shirabe_php_shim::{CaptureKey, PhpMixed, intval, php_regex, preg_split_delim_capture};
 use std::path::{Path, PathBuf};
 
@@ -141,14 +141,14 @@ fn expect_matches(expected: &str, output: &str) {
             line += 1;
         }
         if eb[i] == b'%' {
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             if !Preg::is_match3(php_regex!("{%(.+?)%}"), &expected[i..], Some(&mut m)) {
                 panic!("Failed to match %...% in {}", &expected[i..]);
             }
             let regex = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap();
 
             let pattern = format!("{{{}}}", regex);
-            let mut m = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             if Preg::is_match3(&pattern, &output[j..], Some(&mut m)) {
                 let full = m.get(&CaptureKey::ByIndex(0)).cloned().unwrap();
                 i += regex.len() + 2;

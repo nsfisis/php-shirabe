@@ -14,7 +14,7 @@ use crate::util::Url;
 use chrono::TimeZone;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
@@ -199,7 +199,7 @@ impl GitDriver {
             if !branches.contains(&"* master".to_string()) {
                 for branch in &branches {
                     if !branch.is_empty() {
-                        let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
+                        let mut caps = PregMatchedGroups::new();
                         if Preg::match3(php_regex!(r"{^\* +(\S+)}"), branch, Some(&mut caps))
                             && let Some(name) = caps.get(&CaptureKey::ByIndex(1))
                         {
@@ -311,7 +311,7 @@ impl GitDriver {
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
-                    let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut caps = PregMatchedGroups::new();
                     if Preg::match3(
                         php_regex!(r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}"),
                         &tag,
@@ -350,7 +350,7 @@ impl GitDriver {
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() && !Preg::is_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch) {
-                    let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut caps = PregMatchedGroups::new();
                     if Preg::match3(
                         php_regex!(r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}"),
                         &branch,

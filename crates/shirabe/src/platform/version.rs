@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Platform/Version.php
 
-use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{CmpOp, php_regex, version_compare};
 
 pub struct Version;
@@ -10,7 +9,7 @@ impl Version {
     pub fn parse_openssl(openssl_version: &str, is_fips: &mut bool) -> Option<String> {
         *is_fips = false;
 
-        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut matches = PregMatchedGroups::new();
         if !Preg::match3(
             php_regex!(
                 r"/^(?P<version>[0-9.]+)(?P<patch>[a-z]{0,2})(?P<suffix>(?:-?(?:dev|pre|alpha|beta|rc|fips)[\d]*)*)(?:-\w+)?(?: \(.+?\))?$/"
@@ -56,7 +55,7 @@ impl Version {
     }
 
     pub fn parse_libjpeg(libjpeg_version: &str) -> Option<String> {
-        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut matches = PregMatchedGroups::new();
         if !Preg::match3(
             php_regex!(r"/^(?P<major>\d+)(?P<minor>[a-z]*)$/"),
             libjpeg_version,
@@ -81,7 +80,7 @@ impl Version {
     }
 
     pub fn parse_zoneinfo_version(zoneinfo_version: &str) -> Option<String> {
-        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut matches = PregMatchedGroups::new();
         if !Preg::match3(
             php_regex!(r"/^(?P<year>\d{4})(?P<revision>[a-z]*)$/"),
             zoneinfo_version,

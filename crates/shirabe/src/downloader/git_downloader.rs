@@ -17,7 +17,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups, PregMatchesAll};
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
     in_array_strict, is_dir, php_regex, preg_quote, preg_split, realpath, rtrim, strlen, strpos,
@@ -95,7 +95,7 @@ impl GitDownloader {
         }
 
         let mut refs = trim(&output, None);
-        let mut head_match: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut head_match = PregMatchedGroups::new();
         if !Preg::is_match3(
             php_regex!(r"{^([a-f0-9]+) HEAD$}mi"),
             &refs,
@@ -109,7 +109,7 @@ impl GitDownloader {
             .cloned()
             .unwrap_or_default();
 
-        let mut branches_match: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
+        let mut branches_match = PregMatchesAll::new();
         if !Preg::is_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
@@ -137,7 +137,7 @@ impl GitDownloader {
 
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
-                let mut m: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
+                let mut m = PregMatchesAll::new();
                 if Preg::is_match_all(
                     format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
@@ -510,7 +510,7 @@ impl GitDownloader {
 
     fn set_push_url(&self, path: &str, url: &str) {
         // set push url for github projects
-        let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut match_ = PregMatchedGroups::new();
         if Preg::is_match3(
             format!(
                 "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
@@ -1115,8 +1115,8 @@ impl VcsDownloader for GitDownloader {
             Some(&path),
         ) == 0
         {
-            let mut origin_match: IndexMap<CaptureKey, String> = IndexMap::new();
-            let mut composer_match: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut origin_match = PregMatchedGroups::new();
+            let mut composer_match = PregMatchedGroups::new();
             if Preg::is_match3(
                 php_regex!(r"{^origin\s+(?P<url>\S+)}m"),
                 &output,

@@ -15,7 +15,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_split,
     version_compare,
@@ -383,7 +383,7 @@ impl VcsDownloader for SvnDownloader {
             }
 
             let url_pattern = "#<url>(.*)</url>#";
-            let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut matches = PregMatchedGroups::new();
             let base_url = if Preg::match3(url_pattern, &output, Some(&mut matches)) {
                 matches
                     .get(&CaptureKey::ByIndex(1))

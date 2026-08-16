@@ -8,8 +8,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, php_regex, realpath,
@@ -202,7 +201,7 @@ impl BinaryInstaller {
             }
             Err(_) => String::new(),
         };
-        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut m = PregMatchedGroups::new();
         if Preg::is_match3(
             php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
             &line,

@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -97,7 +97,7 @@ impl PhpFileCleaner {
                 }
 
                 if char == '<' && self.peek('<') {
-                    let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut r#match = PregMatchedGroups::new();
                     // Regex pattern compatibility:
                     // PHP matches `<<<`, an optional quote, the identifier, then requires the
                     // closing quote to be the exact same character via `\1`. The `regex` crate has
@@ -144,7 +144,7 @@ impl PhpFileCleaner {
                         let end = self.index + entry.length;
                         if end <= self.len && self.contents[self.index..end] == entry.name {
                             let offset = if self.index > 0 { self.index - 1 } else { 0 };
-                            let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
+                            let mut r#match = PregMatchedGroups::new();
                             if Preg::is_match4(
                                 &entry.pattern,
                                 &self.contents,
@@ -164,7 +164,7 @@ impl PhpFileCleaner {
                 self.index += 1;
                 let rest_pattern = REST_PATTERN.lock().unwrap().clone();
                 if let Some(rest_pattern) = rest_pattern {
-                    let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut r#match = PregMatchedGroups::new();
                     if self.r#match(&rest_pattern, Some(&mut r#match)) {
                         let m0 = r#match
                             .get(&CaptureKey::ByIndex(0))
@@ -292,7 +292,7 @@ impl PhpFileCleaner {
         self.index + 1 < self.len && self.contents.as_bytes()[self.index + 1] as char == char
     }
 
-    fn r#match(&self, regex: &str, r#match: Option<&mut IndexMap<CaptureKey, String>>) -> bool {
+    fn r#match(&self, regex: &str, r#match: Option<&mut PregMatchedGroups>) -> bool {
         Preg::is_match4(regex, &self.contents, r#match, self.index)
     }
 }

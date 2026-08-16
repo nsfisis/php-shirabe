@@ -76,7 +76,7 @@ impl BufferIO {
         loop {
             let next = Preg::replace_callback(
                 php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
-                |matches: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
+                |matches: &shirabe_pcre::PregMatchedGroups| -> String {
                     let empty = String::new();
                     let g1 = matches
                         .get(&shirabe_pcre::CaptureKey::ByIndex(1))

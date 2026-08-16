@@ -26,7 +26,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{LogicException, get_debug_type, impl_php_class, php_regex};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -229,7 +229,7 @@ impl ArchiveCommand {
         }
 
         if let Some(version_str) = &version {
-            let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut matches = PregMatchedGroups::new();
             if Preg::match3(
                 php_regex!(r"{@(stable|RC|beta|alpha|dev)$}i"),
                 version_str,

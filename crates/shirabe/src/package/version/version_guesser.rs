@@ -12,7 +12,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, function_exists,
     implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen, strnatcasecmp,
@@ -229,7 +229,7 @@ impl VersionGuesser {
             // find current branch and collect all branch names
             for branch in self.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
-                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut m = PregMatchedGroups::new();
                     if Preg::is_match3(
                         php_regex!(
                             r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}"
@@ -258,10 +258,10 @@ impl VersionGuesser {
                 }
 
                 if !branch.is_empty() && {
-                    let mut tmp: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut tmp = PregMatchedGroups::new();
                     !Preg::is_match3(php_regex!(r"{^ *.+/HEAD }"), &branch, Some(&mut tmp))
                 } {
-                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut m = PregMatchedGroups::new();
                     if Preg::is_match3(
                         php_regex!(
                             r"{^(?:\* )? *((?:remotes/(?:origin|upstream)/)?[^\s/]+) *([a-f0-9]+) .*$}"
@@ -756,7 +756,7 @@ impl VersionGuesser {
                 .into());
             }
         };
-        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut m = PregMatchedGroups::new();
         if Preg::is_match3(
             php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"),
             &version,

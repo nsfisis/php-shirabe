@@ -13,7 +13,7 @@ use crate::util::Url;
 use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS,
@@ -148,7 +148,7 @@ impl RemoteFilesystem {
     pub fn find_status_code(headers: &[String]) -> Option<i64> {
         let mut value: Option<i64> = None;
         for header in headers {
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             if Preg::is_match3(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header, Some(&mut m)) {
                 value = m
                     .get(&CaptureKey::ByIndex(1))

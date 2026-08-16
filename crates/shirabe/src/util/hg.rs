@@ -5,7 +5,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use shirabe_pcre::Preg;
+use shirabe_pcre::{Preg, PregNamedGroups};
 use shirabe_php_shim::{php_regex, rawurlencode};
 use std::sync::OnceLock;
 
@@ -56,7 +56,7 @@ impl Hg {
         }
 
         // Try with the authentication information available
-        let mut matches: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
+        let mut matches = PregNamedGroups::new();
         let matched = Preg::is_match_named(
             php_regex!(
                 r"{^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?}mi"

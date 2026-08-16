@@ -15,7 +15,7 @@ use crate::util::Bitbucket;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
@@ -84,7 +84,7 @@ impl GitBitbucketDriver {
 
     /// @inheritDoc
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let mut m: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
+        let mut m = PregMatchedGroups::new();
         if !Preg::is_match3(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
             &self.inner.url,

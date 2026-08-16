@@ -2,7 +2,7 @@
 
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use shirabe_pcre::Preg;
+use shirabe_pcre::{Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
     file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_readable, mb_strlen,
@@ -99,7 +99,7 @@ impl Platform {
         // not participate is reported as an empty string, which `\w+` can never capture.
         Preg::replace_callback(
             php_regex!(r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#"),
-            |matches: &indexmap::IndexMap<CaptureKey, String>| -> String {
+            |matches: &PregMatchedGroups| -> String {
                 let var = matches
                     .get(&CaptureKey::ByName("dvar".to_string()))
                     .filter(|dvar| !dvar.is_empty())

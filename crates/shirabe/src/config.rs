@@ -8,7 +8,7 @@ pub use json_config_source::*;
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, array_key_exists, array_merge,
     array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,
@@ -647,7 +647,7 @@ impl Config {
             // numbers with kb/mb/gb support, without env var support
             "cache-files-maxsize" => {
                 let raw = self.config.get(key).map(php_to_string).unwrap_or_default();
-                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut matches = PregMatchedGroups::new();
                 if !Preg::is_match3(
                     php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
                     &raw,
@@ -961,7 +961,7 @@ impl Config {
         let mut error = None;
         let result = Preg::replace_callback(
             php_regex!(r"#\{\$(.+)\}#"),
-            |m: &IndexMap<CaptureKey, String>| -> String {
+            |m: &PregMatchedGroups| -> String {
                 let key_match = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 match self.get_with_flags(&key_match, flags) {
                     Ok(v) => php_to_string(&v),

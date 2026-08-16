@@ -433,7 +433,7 @@ impl Package {
             // dist URL never carries more than one SHA reference.
             self.set_dist_url(Some(Preg::replace_callback(
                 php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                |m: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
+                |m: &shirabe_pcre::PregMatchedGroups| -> String {
                     let get = |i: usize| -> String {
                         m.get(&shirabe_pcre::CaptureKey::ByIndex(i))
                             .cloned()

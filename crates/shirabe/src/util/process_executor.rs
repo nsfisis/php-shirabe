@@ -7,7 +7,7 @@ use crate::signal::SignalSubscription;
 use crate::util::GitHub;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
@@ -217,7 +217,7 @@ impl ProcessExecutor {
         if is_string(&command) {
             let mut command_str = command.as_string().unwrap_or("").to_string();
             if Platform::is_windows() {
-                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut m = PregMatchedGroups::new();
                 if Preg::is_match3(php_regex!(r"{^([^:/\\]++) }"), &command_str, Some(&mut m)) {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     command_str = substr_replace(
@@ -832,7 +832,7 @@ impl ProcessExecutor {
         };
         let safe_command = Preg::replace_callback(
             php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
-            |m: &IndexMap<CaptureKey, String>| -> String {
+            |m: &PregMatchedGroups| -> String {
                 let user_key = CaptureKey::ByName("user".to_string());
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
                 if Preg::is_match(

@@ -8,7 +8,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
@@ -114,7 +114,7 @@ impl ZipDownloader {
                 .unwrap_or(1)
                 == 0
             {
-                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut m = PregMatchedGroups::new();
                 if Preg::is_match3(
                     php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"),
                     &output,

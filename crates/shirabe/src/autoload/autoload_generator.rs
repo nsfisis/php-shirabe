@@ -23,7 +23,7 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
     array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
@@ -559,7 +559,7 @@ return array(
             {
                 let content =
                     file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default();
-                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut matches = PregMatchedGroups::new();
                 if Preg::match3(
                     php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"),
                     &content,
@@ -1155,7 +1155,7 @@ return array(
             let package = &item.0;
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
-                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut matches = PregMatchedGroups::new();
                 if Preg::match3(
                     php_regex!("{^ext-(.+)$}iD"),
                     link.get_target(),
@@ -1201,7 +1201,7 @@ return array(
                     required_php_64bit = true;
                 }
 
-                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut matches = PregMatchedGroups::new();
                 if check_platform.as_bool() == Some(true)
                     && Preg::match3(
                         php_regex!("{^ext-(.+)$}iD"),
@@ -1950,7 +1950,7 @@ class ComposerStaticInit{}
                             std::cell::RefCell::new(None);
                         let p = Preg::replace_callback(
                             php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
-                            |matches: &IndexMap<CaptureKey, String>| -> String {
+                            |matches: &PregMatchedGroups| -> String {
                                 // undo preg_quote for the matched string
                                 *updir_cell.borrow_mut() = Some(str_replace(
                                     "\\.",

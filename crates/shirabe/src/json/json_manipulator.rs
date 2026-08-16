@@ -4,7 +4,7 @@ use crate::json::JsonFile;
 use crate::json::json_grammar::{self, ValueKind};
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups, PregNamedGroups};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
@@ -112,7 +112,7 @@ impl JsonManipulator {
                 &links[value_end..]
             );
         } else {
-            let mut groups: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut groups = PregMatchedGroups::new();
             if Preg::is_match3(
                 php_regex!("#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s"),
                 &links,
@@ -740,7 +740,7 @@ impl JsonManipulator {
                 &children[cm.value_end..]
             );
         } else {
-            let mut leading_match: IndexMap<String, String> = IndexMap::new();
+            let mut leading_match = PregNamedGroups::new();
             if Preg::is_match_named(
                 php_regex!(
                     "#^\\{(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s"
@@ -942,7 +942,7 @@ impl JsonManipulator {
         let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()))?;
 
         // no child data left, $name was the only key in
-        let mut empty_match: IndexMap<String, String> = IndexMap::new();
+        let mut empty_match = PregNamedGroups::new();
         if Preg::is_match_named(
             php_regex!("#^\\{\\s*?(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s"),
             &children_clean,
@@ -1039,7 +1039,7 @@ impl JsonManipulator {
             return Ok(false);
         }
 
-        let mut leading_match: IndexMap<String, String> = IndexMap::new();
+        let mut leading_match = PregNamedGroups::new();
         if Preg::is_match_named(
             php_regex!(
                 "#^\\[(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\]$#s"
@@ -1330,7 +1330,7 @@ impl JsonManipulator {
         }
 
         // append at the end of the file and keep whitespace
-        let mut tail_match: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut tail_match = PregMatchedGroups::new();
         if Preg::is_match3(
             php_regex!("#[^{\\s](\\s*)\\}$#"),
             &self.contents,

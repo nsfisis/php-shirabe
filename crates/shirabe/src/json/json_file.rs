@@ -8,8 +8,7 @@ use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Silencer;
-use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
@@ -451,7 +450,7 @@ impl JsonFile {
             let indent_owned = options.indent;
             return Ok(Preg::replace_callback(
                 php_regex!(r"#^ {4,}#m"),
-                move |m: &indexmap::IndexMap<shirabe_pcre::CaptureKey, String>| -> String {
+                move |m: &shirabe_pcre::PregMatchedGroups| -> String {
                     let whole = m
                         .get(&shirabe_pcre::CaptureKey::ByIndex(0))
                         .map(|s| s.as_str())
@@ -555,7 +554,7 @@ impl JsonFile {
     }
 
     pub fn detect_indenting(json: Option<&str>) -> String {
-        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut m = PregMatchedGroups::new();
         if Preg::is_match3(
             php_regex!(r##"#^([ \t]+)"#m"##),
             json.unwrap_or(""),

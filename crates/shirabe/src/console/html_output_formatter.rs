@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
 
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::formatter::OutputFormatterStyleInterface;
@@ -72,7 +72,7 @@ impl HtmlOutputFormatter {
         )))
     }
 
-    fn format_html(&self, matches: &IndexMap<CaptureKey, String>) -> String {
+    fn format_html(&self, matches: &PregMatchedGroups) -> String {
         let codes_str = matches
             .get(&CaptureKey::ByIndex(1))
             .map(|s| s.as_str())

@@ -14,7 +14,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Url;
 use crate::util::{AuthHelper, StoreAuth};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
     clearstatcache, explode, implode, in_array_loose, in_array_strict, is_dir, php_regex,
@@ -226,7 +226,7 @@ impl Git {
                 &mut output,
                 cwd,
             )?;
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             if Preg::is_match3(
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
                 &output,
@@ -248,7 +248,7 @@ impl Git {
         let protocols = self.config.borrow_mut().get("github-protocols");
         // public github, autoswitch protocols
         // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        let mut m = PregMatchedGroups::new();
         if Preg::is_match3(
             format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
@@ -344,7 +344,7 @@ impl Git {
             let mut error_msg = self.process.borrow().get_error_output().to_string();
             // private github repository without ssh key access, try https with auth
             // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             let github_matched = Preg::is_match3(
                 format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
@@ -1089,8 +1089,8 @@ impl Git {
         Ok(false)
     }
 
-    fn get_authentication_failure(&self, url: &str) -> Option<IndexMap<CaptureKey, String>> {
-        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+    fn get_authentication_failure(&self, url: &str) -> Option<PregMatchedGroups> {
+        let mut m = PregMatchedGroups::new();
         if !Preg::is_match3(
             php_regex!(r"{^(https?://)([^/]+)(.*)$}i"),
             url,
@@ -1179,7 +1179,7 @@ impl Git {
                 .borrow()
                 .split_lines(output_mixed.as_string().unwrap_or(""));
             for line in lines {
-                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut matches = PregMatchedGroups::new();
                 if Preg::is_match3(
                     php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"),
                     &line,
@@ -1308,7 +1308,7 @@ impl Git {
                 Option::<&str>::None,
             );
             if exit_code == 0 {
-                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut matches = PregMatchedGroups::new();
                 if Preg::is_match3(
                     php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"),
                     &output,

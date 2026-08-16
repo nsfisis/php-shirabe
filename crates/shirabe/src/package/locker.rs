@@ -24,7 +24,7 @@ use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
@@ -844,7 +844,7 @@ impl Locker {
                         &mut output,
                         path.as_deref(),
                     )? {
-                        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                        let mut m = PregMatchedGroups::new();
                         if Preg::is_match3(
                             php_regex!(r"{^\s*(\d+)\s*}"),
                             output.as_string().unwrap_or(""),

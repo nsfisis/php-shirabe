@@ -7,8 +7,8 @@ use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInte
 use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
 use shirabe_php_shim::{
-    CaptureKey, php_regex, preg_match, preg_match_all, preg_match_all_offset_capture,
-    preg_match_all_set_order, preg_replace,
+    CaptureKey, PregMatchesAllWithOffsets, php_regex, preg_match, preg_match_all,
+    preg_match_all_offset_capture, preg_match_all_set_order, preg_replace,
 };
 use shirabe_symfony_string::b;
 
@@ -290,8 +290,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
-        let mut matches: indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>> =
-            indexmap::IndexMap::new();
+        let mut matches = PregMatchesAllWithOffsets::new();
         preg_match_all_offset_capture(
             format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,

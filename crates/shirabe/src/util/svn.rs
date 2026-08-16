@@ -6,8 +6,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, stripos, strpos,
     trim,
@@ -407,7 +406,7 @@ impl Svn {
                 &mut output,
                 None,
             ) {
-                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                let mut matches = PregMatchedGroups::new();
                 if Preg::is_match3(
                     php_regex!(r"{(\d+(?:\.\d+)+)}"),
                     &output,

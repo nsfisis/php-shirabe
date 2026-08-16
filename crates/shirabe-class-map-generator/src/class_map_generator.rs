@@ -3,8 +3,7 @@
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
-use indexmap::indexmap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
     getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath, str_replace,
@@ -348,7 +347,7 @@ impl ClassMapGenerator {
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        let mut r#match: indexmap::IndexMap<_, _> = indexmap![];
+        let mut r#match = PregMatchedGroups::new();
         if Preg::is_match3(
             php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,

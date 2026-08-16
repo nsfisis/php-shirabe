@@ -10,7 +10,7 @@ use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
     spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower, substr, substr_count,
@@ -220,7 +220,7 @@ impl Problem {
                 installed_map,
                 learned_pool,
             )?;
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             let matched = if matches!(
                 rule_ref.get_reason(),
                 rule::RULE_PACKAGE_REQUIRES | rule::RULE_PACKAGE_CONFLICT

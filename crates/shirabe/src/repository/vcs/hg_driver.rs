@@ -11,7 +11,7 @@ use crate::util::Hg as HgUtils;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex};
 
@@ -233,7 +233,7 @@ impl HgDriver {
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
-                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut m = PregMatchedGroups::new();
                     if Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag, Some(&mut m)) {
                         tags.insert(
                             m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
@@ -263,7 +263,7 @@ impl HgDriver {
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
-                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut m = PregMatchedGroups::new();
                     if Preg::match3(
                         php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"),
                         &branch,
@@ -288,7 +288,7 @@ impl HgDriver {
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
-                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut m = PregMatchedGroups::new();
                     if Preg::match3(
                         php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"),
                         &branch,

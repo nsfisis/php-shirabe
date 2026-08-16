@@ -2,8 +2,7 @@
 
 use crate::config::Config;
 use crate::util::GitHub;
-use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{PhpMixed, in_array_strict, parse_url, php_regex};
 
 pub struct Url;
@@ -15,7 +14,7 @@ impl Url {
             .unwrap_or_default();
 
         if host == "api.github.com" || host == "github.com" || host == "www.github.com" {
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             if Preg::match3(
                 php_regex!(
                     r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i"
@@ -60,7 +59,7 @@ impl Url {
                 );
             }
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             if Preg::match3(
                 php_regex!(
                     r"{^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$}i"
@@ -77,7 +76,7 @@ impl Url {
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
-            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut m = PregMatchedGroups::new();
             if Preg::match3(
                 php_regex!(
                     r"{^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$}i"

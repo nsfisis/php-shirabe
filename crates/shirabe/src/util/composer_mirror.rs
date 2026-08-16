@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{hash, php_regex};
 
 pub struct ComposerMirror;
@@ -53,8 +53,8 @@ impl ComposerMirror {
         url: &str,
         r#type: Option<&str>,
     ) -> String {
-        let mut gh_matches: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
-        let mut bb_matches: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
+        let mut gh_matches = PregMatchedGroups::new();
+        let mut bb_matches = PregMatchedGroups::new();
         let normalized_url = if Preg::match3(
             php_regex!(
                 r"#^(?:(?:https?|git)://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?$#"

@@ -12,8 +12,8 @@ use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CaptureKey, Descriptor, PhpMixed, PhpResource, php_regex, preg_match, preg_replace,
-    preg_replace_callback,
+    CaptureKey, Descriptor, PhpMixed, PhpResource, PregMatches, php_regex, preg_match,
+    preg_replace, preg_replace_callback,
 };
 use std::sync::OnceLock;
 
@@ -938,7 +938,7 @@ impl Process {
                 )++
             ) | [^"]*+ )"/x"#
             ),
-            |m: &IndexMap<CaptureKey, Option<String>>| -> anyhow::Result<String> {
+            |m: &PregMatches| -> anyhow::Result<String> {
                 let m0 = m[&CaptureKey::ByIndex(0)].clone().unwrap_or_default();
                 let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().flatten();
                 if m1.is_none() {
@@ -1072,7 +1072,7 @@ impl Process {
     ) -> anyhow::Result<String> {
         preg_replace_callback(
             php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
-            |matches: &IndexMap<CaptureKey, Option<String>>| -> anyhow::Result<String> {
+            |matches: &PregMatches| -> anyhow::Result<String> {
                 let key = matches
                     .get(&CaptureKey::ByIndex(1))
                     .cloned()

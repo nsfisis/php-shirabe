@@ -1790,8 +1790,7 @@ impl Application {
         let mut line = String::new();
 
         let mut offset = 0i64;
-        let mut m: indexmap::IndexMap<shirabe_php_shim::CaptureKey, Option<String>> =
-            indexmap::IndexMap::new();
+        let mut m = shirabe_php_shim::PregMatches::new();
         while preg_match2(
             php_regex!(r"/.{1,10000}/u"),
             &utf8_string,

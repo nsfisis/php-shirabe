@@ -7,6 +7,99 @@ pub enum CaptureKey {
     ByName(String),
 }
 
+/// Defines a newtype over `IndexMap` for one of the `$matches` shapes the `preg_*` functions fill
+/// in. Also used by `shirabe_pcre` for the shapes `Composer\Pcre\Preg` adds on top.
+#[macro_export]
+macro_rules! preg_match_map {
+    ($(#[$attr:meta])* $vis:vis struct $name:ident($key:ty => $value:ty);) => {
+        $(#[$attr])*
+        #[derive(Debug, Default, Clone, PartialEq, Eq)]
+        $vis struct $name(::indexmap::IndexMap<$key, $value>);
+
+        impl $name {
+            pub fn new() -> Self {
+                Self(::indexmap::IndexMap::new())
+            }
+
+            pub fn clear(&mut self) {
+                self.0.clear();
+            }
+
+            pub fn get<Q>(&self, key: &Q) -> Option<&$value>
+            where
+                Q: ?Sized + ::std::hash::Hash + ::indexmap::Equivalent<$key>,
+            {
+                self.0.get(key)
+            }
+
+            pub fn insert(&mut self, key: $key, value: $value) -> Option<$value> {
+                self.0.insert(key, value)
+            }
+
+            pub fn keys(&self) -> ::indexmap::map::Keys<'_, $key, $value> {
+                self.0.keys()
+            }
+
+            pub fn iter(&self) -> ::indexmap::map::Iter<'_, $key, $value> {
+                self.0.iter()
+            }
+        }
+
+        impl<Q> ::std::ops::Index<&Q> for $name
+        where
+            Q: ?Sized + ::std::hash::Hash + ::indexmap::Equivalent<$key>,
+        {
+            type Output = $value;
+
+            fn index(&self, key: &Q) -> &$value {
+                &self.0[key]
+            }
+        }
+
+        /// Looks a group up by its position in the map rather than by key, as `IndexMap` does.
+        impl ::std::ops::Index<usize> for $name {
+            type Output = $value;
+
+            fn index(&self, position: usize) -> &$value {
+                &self.0[position]
+            }
+        }
+
+        impl IntoIterator for $name {
+            type Item = ($key, $value);
+            type IntoIter = ::indexmap::map::IntoIter<$key, $value>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                self.0.into_iter()
+            }
+        }
+
+        impl FromIterator<($key, $value)> for $name {
+            fn from_iter<I: IntoIterator<Item = ($key, $value)>>(iter: I) -> Self {
+                Self(iter.into_iter().collect())
+            }
+        }
+    };
+}
+
+preg_match_map! {
+    /// A single match's `$matches`, keyed by both the named and the numbered form of each capture
+    /// group. A `None` value is a group the caller's flags reported as unmatched.
+    pub struct PregMatches(CaptureKey => Option<String>);
+}
+
+preg_match_map! {
+    /// `PREG_PATTERN_ORDER` `$matches`: one entry per capture group, holding that group's value
+    /// across every match occurrence.
+    pub struct PregMatchesAll(CaptureKey => Vec<Option<String>>);
+}
+
+preg_match_map! {
+    /// `PREG_OFFSET_CAPTURE` counterpart of `PregMatchesAll`, pairing each value with the byte
+    /// offset it was captured at (`-1` for a group that did not participate).
+    pub struct PregMatchesAllWithOffsets(CaptureKey => Vec<(Option<String>, i64)>);
+}
+
 pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     // Regex pattern compatibility:
     // PHP's preg_quote escapes `<` and `>` (PCRE treats `\<`/`\>` as literals), but the `regex`
@@ -53,7 +146,7 @@ pub fn preg_match(
 pub fn preg_match2(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut indexmap::IndexMap<CaptureKey, Option<String>>,
+    matches: &mut PregMatches,
     offset: usize,
 ) -> bool {
     preg_match2_impl(pattern, subject, matches, offset, false)
@@ -63,7 +156,7 @@ pub fn preg_match2(
 pub fn preg_match2_unmatched_as_null(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut indexmap::IndexMap<CaptureKey, Option<String>>,
+    matches: &mut PregMatches,
     offset: usize,
 ) -> bool {
     preg_match2_impl(pattern, subject, matches, offset, true)
@@ -72,7 +165,7 @@ pub fn preg_match2_unmatched_as_null(
 fn preg_match2_impl(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut indexmap::IndexMap<CaptureKey, Option<String>>,
+    matches: &mut PregMatches,
     offset: usize,
     unmatched_as_null: bool,
 ) -> bool {
@@ -123,7 +216,7 @@ pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<Strin
 pub fn preg_match_all2(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut indexmap::IndexMap<CaptureKey, Vec<Option<String>>>,
+    matches: &mut PregMatchesAll,
 ) -> usize {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
@@ -174,7 +267,7 @@ pub fn preg_match_all_set_order(
 pub fn preg_match_all_offset_capture(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
+    matches: &mut PregMatchesAllWithOffsets,
 ) -> usize {
     preg_match_all_offset_capture_impl(pattern, subject, matches, false)
 }
@@ -184,7 +277,7 @@ pub fn preg_match_all_offset_capture(
 pub fn preg_match_all_offset_capture_unmatched_as_null(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
+    matches: &mut PregMatchesAllWithOffsets,
 ) -> usize {
     preg_match_all_offset_capture_impl(pattern, subject, matches, true)
 }
@@ -192,7 +285,7 @@ pub fn preg_match_all_offset_capture_unmatched_as_null(
 fn preg_match_all_offset_capture_impl(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
+    matches: &mut PregMatchesAllWithOffsets,
     unmatched_as_null: bool,
 ) -> usize {
     let __resolved = pattern.resolve();
@@ -315,7 +408,7 @@ pub fn preg_replace_callback<F>(
     subject: &str,
 ) -> anyhow::Result<String>
 where
-    F: FnMut(&indexmap::IndexMap<CaptureKey, Option<String>>) -> anyhow::Result<String>,
+    F: FnMut(&PregMatches) -> anyhow::Result<String>,
 {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
@@ -615,11 +708,8 @@ fn php_match_row(caps: &regex::Captures) -> Vec<String> {
 // Builds a single match's `$matches` map with both named and numbered keys
 // (the named key precedes its number). Trailing unmatched groups are dropped
 // and interior ones become "".
-fn single_match_map(
-    caps: &regex::Captures,
-    names: &[Option<&str>],
-) -> indexmap::IndexMap<CaptureKey, Option<String>> {
-    let mut out = indexmap::IndexMap::new();
+fn single_match_map(caps: &regex::Captures, names: &[Option<&str>]) -> PregMatches {
+    let mut out = PregMatches::new();
     let group_count = caps.len();
     let last_participating = (0..group_count).rev().find(|&i| caps.get(i).is_some());
 
@@ -645,8 +735,8 @@ fn single_match_map(
 fn single_match_map_unmatched_as_null(
     caps: &regex::Captures,
     names: &[Option<&str>],
-) -> indexmap::IndexMap<CaptureKey, Option<String>> {
-    let mut out = indexmap::IndexMap::new();
+) -> PregMatches {
+    let mut out = PregMatches::new();
 
     for i in 0..caps.len() {
         let value = caps.get(i).map(|m| m.as_str().to_string());

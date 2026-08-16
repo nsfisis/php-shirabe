@@ -8,8 +8,8 @@
 
 use crate::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
-use indexmap::{IndexMap, IndexSet};
-use shirabe_pcre::{CaptureKey, Preg};
+use indexmap::IndexSet;
+use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
 use shirabe_php_shim::{file_exists, glob, is_dir, php_regex, preg_quote, rtrim};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -642,7 +642,7 @@ fn is_regex(str: &str) -> bool {
     // PHP 8.2+ available modifiers.
     let available_modifiers = "imsxuADUn";
 
-    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+    let mut matches = PregMatchedGroups::new();
     let pattern = format!("/^(.{{3,}}?)[{available_modifiers}]*$/");
     if Preg::is_match3(&pattern, str, Some(&mut matches)) {
         let group = matches
@@ -688,7 +688,7 @@ fn comparator_test(operator: &str, test: i64, target: i64) -> bool {
 /// `DateComparator::__construct`, returning `(operator, target unix timestamp)`.
 fn parse_date_comparator(test: &str) -> (String, i64) {
     let pattern = "#^\\s*(==|!=|[<>]=?|after|since|before|until)?\\s*(.+?)\\s*$#i";
-    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+    let mut matches = PregMatchedGroups::new();
     if !Preg::is_match3(pattern, test, Some(&mut matches)) {
         panic!("Don't understand \"{test}\" as a date test.");
     }

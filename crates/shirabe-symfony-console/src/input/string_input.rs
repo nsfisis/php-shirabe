@@ -6,7 +6,7 @@ use crate::input::InputDefinition;
 use crate::input::InputInterface;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex, preg_match2};
+use shirabe_php_shim::{CaptureKey, PhpMixed, PregMatches, php_regex, preg_match2};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -57,7 +57,7 @@ impl StringInput {
                 continue;
             }
 
-            let mut m: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
+            let mut m = PregMatches::new();
             if preg_match2(php_regex!(r"/\s+/A"), input, &mut m, cursor as usize) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
