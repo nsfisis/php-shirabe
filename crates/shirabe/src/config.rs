@@ -590,7 +590,7 @@ impl Config {
                     val
                 };
                 let processed = self.process(raw_val, flags)?;
-                let mut val_str = rtrim(processed.as_string().unwrap_or(""), Some("/\\"));
+                let mut val_str = rtrim(&php_to_string(&processed), Some("/\\"));
                 val_str = Platform::expand_path(&val_str);
 
                 if substr(key, -4, None) != "-dir" {
@@ -646,12 +646,7 @@ impl Config {
 
             // numbers with kb/mb/gb support, without env var support
             "cache-files-maxsize" => {
-                let raw = self
-                    .config
-                    .get(key)
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("")
-                    .to_string();
+                let raw = self.config.get(key).map(php_to_string).unwrap_or_default();
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if !Preg::is_match3(
                     php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
