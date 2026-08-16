@@ -122,27 +122,20 @@ pub fn preg_match_all2(
     pattern: impl PregPattern,
     subject: &str,
     matches: &mut indexmap::IndexMap<CaptureKey, Vec<Option<String>>>,
-    flags: i64,
-    offset: usize,
 ) -> usize {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
     // PREG_PATTERN_ORDER: one column per group, one row per match occurrence.
     let mut groups: Vec<Vec<Option<String>>> = vec![Vec::new(); group_count];
     let mut count = 0;
-    for caps in re.captures_iter(&subject[offset..]) {
+    for caps in re.captures_iter(subject) {
         count += 1;
         for (g, column) in groups.iter_mut().enumerate() {
             let value = caps.get(g).map(|m| m.as_str().to_string());
-            column.push(if unmatched_as_null {
-                value
-            } else {
-                Some(value.unwrap_or_default())
-            });
+            column.push(value);
         }
     }
 

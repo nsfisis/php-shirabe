@@ -57,7 +57,7 @@ impl Preg {
     }
 
     pub fn match_all(pattern: impl PregPattern, subject: &str) -> usize {
-        Self::match_all5(pattern, subject, None, 0, 0)
+        Self::match_all5(pattern, subject, None)
     }
 
     pub fn match_all3(
@@ -65,27 +65,16 @@ impl Preg {
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> usize {
-        Self::match_all5(pattern, subject, matches, 0, 0)
+        Self::match_all5(pattern, subject, matches)
     }
 
-    pub fn match_all5(
+    fn match_all5(
         pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
-        offset: usize,
     ) -> usize {
-        Self::check_offset_capture(flags, "matchAllWithOffsets");
-        Self::check_set_order(flags);
-
         let mut internal: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
-        let result = preg_match_all2(
-            pattern,
-            subject,
-            &mut internal,
-            flags | PREG_UNMATCHED_AS_NULL,
-            offset,
-        );
+        let result = preg_match_all2(pattern, subject, &mut internal);
 
         if let Some(out) = matches {
             *out = null_to_empty_match_all(internal);
@@ -266,7 +255,7 @@ impl Preg {
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> bool {
-        Self::match_all5(pattern, subject, matches, 0, 0) > 0
+        Self::match_all5(pattern, subject, matches) > 0
     }
 
     pub fn is_match_all_with_offsets3(
